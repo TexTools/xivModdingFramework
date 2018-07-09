@@ -47,7 +47,7 @@ namespace xivModdingFramework.General
         /// Gets the available races that contain texture data for the given gear
         /// </summary>
         /// <remarks>
-        /// This checks to see if the mtrl folder exists for each race
+        /// This checks to see if the mtrl file for each race exists in the mtrl folder
         /// It creates a list of the races which do have an available mtrl folder
         /// </remarks>
         /// <param name="xivGear">A gear item</param>
@@ -125,7 +125,7 @@ namespace xivModdingFramework.General
         /// <param name="itemModel">An item that contains model data</param>
         /// <param name="xivRace">The race for the requested data</param>
         /// <returns>A list of part characters</returns>
-        public List<char> GetPartList(IItemModel itemModel, XivRace xivRace)
+        public List<char> GetTexturePartList(IItemModel itemModel, XivRace xivRace)
         {
             // Get the mtrl version for the given item from the imc file
             var imc = new Imc(_gameDirectory, _dataFile);
@@ -196,6 +196,83 @@ namespace xivModdingFramework.General
             // append the part char to the mtrl file and see if its hashed value is within the files list
             // returns the list of parts that exist within the mtrl folder
             return (from part in parts let mtrlCheck = mtrlFile + part + ".mtrl" where files.Contains(HashGenerator.GetHash(mtrlCheck)) select part).ToList();
+        }
+
+        /// <summary>
+        /// Gets the available races that contain model data for the given gear
+        /// </summary>
+        /// <remarks>
+        /// This checks to see if the mdl file for each race exists in the mdl folder
+        /// It creates a list of the races which do have an available mdl file
+        /// </remarks>
+        /// <param name="xivGear">A gear item</param>
+        /// <returns>A list of XivRace data</returns>
+        public List<XivRace> GetRacesForModels(XivGear xivGear)
+        {
+            var itemType = ItemType.GetItemType(xivGear);
+
+            var modelID = xivGear.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+
+            var raceList = new List<XivRace>();
+
+
+            var index = new Index(_gameDirectory);
+
+            string mdlFolder;
+            var id = xivGear.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+
+            switch (itemType)
+            {
+                case XivItemType.equipment:
+                    mdlFolder = $"chara/{itemType}/e{id}/model";
+                    break;
+                case XivItemType.accessory:
+                    mdlFolder = $"chara/{itemType}/a{id}/model";
+                    break;
+                default:
+                    mdlFolder = "";
+                    break;
+            }
+
+
+            var testFilesDictionary = new Dictionary<int, string>();
+
+            // loop through each race ID to create a dictionary containing [Hashed file name, race ID]
+            foreach (var ID in IDRaceDictionary.Keys)
+            {
+                string mdlFile;
+
+                switch (itemType)
+                {
+                    case XivItemType.equipment:
+                        mdlFile = $"c{ID}e{modelID}_{SlotAbbreviationDictionary[xivGear.ItemCategory]}.mdl";
+                        break;
+                    case XivItemType.accessory:
+                        mdlFile = $"c{ID}a{modelID}_{SlotAbbreviationDictionary[xivGear.ItemCategory]}.mdl";
+                        break;
+                    default:
+                        mdlFile = "";
+                        break;
+                }
+
+                testFilesDictionary.Add(HashGenerator.GetHash(mdlFile), ID);
+            }
+
+            // get the list of hashed file names from the mtrl folder
+            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), _dataFile);
+
+            // Loop through each entry in the dictionary
+            foreach (var testFile in testFilesDictionary)
+            {
+                // if the file in the dictionary entry is contained in the list of files from the folder
+                // add that race to the race list
+                if (files.Contains(testFile.Key))
+                {
+                    raceList.Add(IDRaceDictionary[testFile.Value]);
+                }
+            }
+
+            return raceList;
         }
 
         /// <summary>
