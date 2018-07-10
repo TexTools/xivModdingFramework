@@ -66,6 +66,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="hashedFolder">The hashed value of the folder path</param>
         /// <param name="hashedFile">The hashed value of the file name</param>
+        /// <param name="dataFile">The data file to look in</param>
         /// <returns>The offset to the data</returns>
         internal int GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
         {
@@ -113,6 +114,53 @@ namespace xivModdingFramework.SqPack.FileTypes
             return offset;
         }
 
+        /// <summary>
+        /// Checks whether the index file contains any of the folders passed in
+        /// </summary>
+        /// <remarks>
+        /// Runs through the index file once checking if the hashed folder value exists in the dictionary
+        /// then adds it to the list if it does.
+        /// </remarks>
+        /// <param name="hashNumDictionary">A Dictionary containing the folder hash and item number</param>
+        /// <param name="dataFile">The data file to look in</param>
+        /// <returns></returns>
+        public List<int> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile)
+        {
+            // HashSet because we don't want any duplicates
+            var folderExistsList = new HashSet<int>();
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath)))
+            {
+                br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                var totalFiles = br.ReadInt32();
+
+                br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                {
+                    br.ReadBytes(4);
+
+                    var folderPathHash = br.ReadInt32();
+
+                    if (hashNumDictionary.ContainsKey(folderPathHash))
+                    {
+                        folderExistsList.Add(hashNumDictionary[folderPathHash]);
+                        br.ReadBytes(4);
+                    }
+                    else
+                    {
+                        br.ReadBytes(4);
+                    }
+                }
+            }
+
+            return folderExistsList.ToList();
+        }
 
         /// <summary>
         /// Gets all the file offsets in a given folder path
