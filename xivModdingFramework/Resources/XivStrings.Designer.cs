@@ -277,7 +277,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to mt_c{0}b{1}_a.mtrl.
+        ///   Looks up a localized string similar to mt_c{0}b{1}_{2}.mtrl.
         /// </summary>
         internal static string BodyMtrlFile {
             get {
@@ -1645,7 +1645,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to mt_c{0}t{1}_a.mtrl.
+        ///   Looks up a localized string similar to mt_c{0}t{1}_{2}.mtrl.
         /// </summary>
         internal static string TailMtrlFile {
             get {
