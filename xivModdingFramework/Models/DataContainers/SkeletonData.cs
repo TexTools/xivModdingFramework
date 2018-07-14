@@ -14,35 +14,43 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using System.Collections.Generic;
-
 namespace xivModdingFramework.Models.DataContainers
 {
-    public class MeshData
+    /// <summary>
+    /// This class contains properties for the model skeleton
+    /// </summary>
+    /// <remarks>
+    /// The model skeleton is kept separate from the mdl file and is usually in
+    /// the chara/human/[raceID]/skeleton/base/[bodyID] folder, it is a Havok file.
+    /// </remarks>
+    public class SkeletonData
     {
         /// <summary>
-        /// The information for the mesh data
+        /// The Name of the bone
         /// </summary>
-        public MeshDataInfo MeshInfo { get; set; }
+        public string BoneName { get; set; }
 
         /// <summary>
-        /// The list of parts for the mesh
+        /// The bone number
         /// </summary>
-        public List<MeshPart> MeshPartList { get; set; }
+        public int BoneNumber { get; set; }
 
         /// <summary>
-        /// The list of vertex data structures for the mesh
+        /// The bone parent
         /// </summary>
-        public List<VertexDataStruct> VertexDataStructList { get; set; }
+        /// <remarks>
+        /// The base bone that has no parent will have a value of -1
+        /// </remarks>
+        public int BoneParent { get; set; }
 
         /// <summary>
-        /// The vertex data for the mesh
+        /// The Pose Matrix for the bone
         /// </summary>
-        public VertexData VertexData { get; set; }
+        public float[] PoseMatrix { get; set; }
 
         /// <summary>
-        /// Determines whether this mesh contains a body material
+        /// The Inverse Pose Matrix for the bone
         /// </summary>
-        public bool IsBody { get; set; }
+        public float[] InversePoseMatrix { get; set; }
     }
 }

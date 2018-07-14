@@ -60,6 +60,11 @@ namespace xivModdingFramework.Models.DataContainers
         public List<Vector3> BiNormals { get; set; }
 
         /// <summary>
+        /// The vertex Tangent data in Vector3 format (X, Y, Z)
+        /// </summary>
+        public List<Vector3> Tangents { get; set; }
+
+        /// <summary>
         /// The vertex color data in Byte4 format (A, R, G, B)
         /// </summary>
         public List<Byte4> Colors { get; set; }

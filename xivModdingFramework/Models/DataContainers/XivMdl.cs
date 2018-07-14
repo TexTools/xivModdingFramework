@@ -23,6 +23,13 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class XivMdl
     {
+
+        /// <summary>
+        /// The path to this mdl file
+        /// </summary>
+        public (string Folder, string File) MdlPath { get; set; }
+
+
         /// <summary>
         /// The path data contained in the mdl file
         /// </summary>

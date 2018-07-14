@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
     <PackageReference Include="SharpDX" Version="4.2.0-ci259" />
     <PackageReference Include="SharpDX.Mathematics" Version="4.2.0-ci259" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0004" />

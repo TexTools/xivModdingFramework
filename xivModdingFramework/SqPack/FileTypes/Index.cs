@@ -162,6 +162,53 @@ namespace xivModdingFramework.SqPack.FileTypes
             return folderExistsList.ToList();
         }
 
+
+        /// <summary>
+        /// Determines whether the given file path exists
+        /// </summary>
+        /// <param name="fileHash">The hashed file</param>
+        /// <param name="folderHash">The hashed folder</param>
+        /// <param name="dataFile">The data file</param>
+        /// <returns>True if it exists, False otherwise</returns>
+        public bool FileExists(int fileHash, int folderHash, XivDataFile dataFile)
+        {
+            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath)))
+            {
+                br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                var numOfFiles = br.ReadInt32();
+
+                br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
+                {
+                    var fileNameHash = br.ReadInt32();
+
+                    if (fileNameHash == fileHash)
+                    {
+                        var folderPathHash = br.ReadInt32();
+
+                        if (folderPathHash == folderHash)
+                        {
+                            return true;
+                        }
+
+                        br.ReadBytes(4);
+                    }
+                    else
+                    {
+                        br.ReadBytes(8);
+                    }
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Gets all the file offsets in a given folder path
         /// </summary>

@@ -60,7 +60,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var mdlData = dat.GetType3Data(offset, _dataFile);
 
-            var xivMdl = new XivMdl();
+            var xivMdl = new XivMdl {MdlPath = mdlPath};
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
             {
@@ -278,6 +278,14 @@ namespace xivModdingFramework.Models.FileTypes
                         };
 
                         lod.MeshDataList[i].MeshInfo = meshDataInfo;
+
+                        var materialString = xivMdl.PathData.MaterialList[meshDataInfo.MaterialIndex];
+                        var typeChar = materialString[4].ToString() + materialString[9].ToString();
+
+                        if (typeChar.Equals("cb"))
+                        {
+                            lod.MeshDataList[i].IsBody = true;
+                        }
                     }
                 }
 
