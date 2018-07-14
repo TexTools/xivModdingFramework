@@ -14,14 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
-using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -36,7 +34,6 @@ namespace xivModdingFramework.Items.Categories
         {
             _gameDirectory = gameDirectory;
         }
-
 
         /// <summary>
         /// Gets the List to be displayed under the Character category
@@ -58,7 +55,7 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
-        /// Gets the Races and Numbers available for the given Character Item
+        /// Gets the Races and Numbers available for textures in the given Character Item
         /// </summary>
         /// <remarks>
         /// This gives you the race and the numbers available for it
@@ -117,6 +114,66 @@ namespace xivModdingFramework.Items.Categories
             return availableRacesAndNumbers;
         }
 
+
+        /// <summary>
+        /// Gets the Races and Numbers available for models in the given Character Item
+        /// </summary>
+        /// <remarks>
+        /// This gives you the race and the numbers available for it
+        /// <example>
+        ///  Body, [Hyur Midlander Male, int[] {1, 2, 3, 5, 6}
+        /// </example>
+        /// This means there is 5 body models for Hyur Midlander Male with those numbers
+        /// </remarks>
+        /// <param name="charaItem">The Character Item</param>
+        /// <returns>A Dictionary containing the race and the numbers available for it</returns>
+        public Dictionary<XivRace, int[]> GetRacesAndNumbersForModels(XivCharacter charaItem)
+        {
+            var availableRacesAndNumbers = new Dictionary<XivRace, int[]>();
+
+            var index = new Index(_gameDirectory);
+
+            var folder = "";
+
+            if (charaItem.ItemCategory == XivStrings.Hair)
+            {
+                folder = XivStrings.HairMDLFolder;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Face)
+            {
+                folder = XivStrings.FaceMDLFolder;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Body)
+            {
+                folder = XivStrings.BodyMDLFolder;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Tail)
+            {
+                folder = XivStrings.TailMDLFolder;
+            }
+
+
+            foreach (var race in IDRaceDictionary)
+            {
+                var testDictionary = new Dictionary<int, int>();
+
+                for (var i = 1; i <= 300; i++)
+                {
+                    var mtrl = string.Format(folder, race.Key, i.ToString().PadLeft(4, '0'));
+
+                    testDictionary.Add(HashGenerator.GetHash(mtrl), i);
+                }
+
+                var numList = index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+
+                if (numList.Count > 0)
+                {
+                    availableRacesAndNumbers.Add(race.Value, numList.ToArray());
+                }
+            }
+
+            return availableRacesAndNumbers;
+        }
 
         /// <summary>
         /// Gets the Type and Part for a given Character Item
@@ -213,6 +270,62 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
+        /// Gets the Type of models for a given Character Item
+        /// </summary>
+        /// <param name="charaItem">The character item</param>
+        /// <param name="race">The race</param>
+        /// <param name="num">The character item number</param>
+        /// <returns>A dictionary containging [</returns>
+        public List<string> GetTypeForModels(XivCharacter charaItem, XivRace race, int num)
+        {
+            var index = new Index(_gameDirectory);
+
+            var folder = "";
+            var file = "";
+            var typeDict = HairSlotAbbreviationDictionary;
+
+            if (charaItem.ItemCategory == XivStrings.Body)
+            {
+                folder = string.Format(XivStrings.BodyMDLFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                typeDict = BodySlotAbbreviationDictionary;
+                file = XivStrings.BodyMDLFile;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Hair)
+            {
+                folder = string.Format(XivStrings.HairMDLFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                typeDict = HairSlotAbbreviationDictionary;
+                file = XivStrings.HairMDLFile;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Face)
+            {
+                folder = string.Format(XivStrings.FaceMDLFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                typeDict = FaceSlotAbbreviationDictionary;
+                file = XivStrings.FaceMDLFile;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Tail)
+            {
+                folder = string.Format(XivStrings.TailMDLFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                typeDict = TailSlotAbbreviationDictionary;
+                file = XivStrings.TailMDLFile;
+            }
+
+            var fileList = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
+
+            var typeList = new List<string>();
+            foreach (var type in typeDict)
+            {
+                var mdlFile = string.Format(file, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), type.Value);
+
+                if (fileList.Contains(HashGenerator.GetHash(mdlFile)))
+                {
+                    typeList.Add(type.Key);
+                }
+            }
+
+            return typeList;
+        }
+
+        /// <summary>
         /// A dictionary containing race data in the format [Race ID, XivRace]
         /// </summary>
         private static readonly Dictionary<string, XivRace> IDRaceDictionary = new Dictionary<string, XivRace>
@@ -267,6 +380,27 @@ namespace xivModdingFramework.Items.Categories
         {
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"}
+        };
+
+        /// <summary>
+        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
+        /// </summary>
+        private static readonly Dictionary<string, string> BodySlotAbbreviationDictionary = new Dictionary<string, string>
+        {
+            {XivStrings.Head, "met"},
+            {XivStrings.Hands, "glv"},
+            {XivStrings.Legs, "dwn"},
+            {XivStrings.Feet, "sho"},
+            {XivStrings.Body, "top"}
+        };
+
+        /// <summary>
+        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
+        /// </summary>
+        private static readonly Dictionary<string, string> TailSlotAbbreviationDictionary = new Dictionary<string, string>
+        {
+            {XivStrings.Tail, "til"},
+            {XivStrings.Etc, "etc"}
         };
     }
 }
