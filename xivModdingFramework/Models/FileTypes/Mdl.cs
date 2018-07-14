@@ -843,7 +843,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         #region Indices
 
-                        var indexOffset = lod.IndexDataOffset + meshData.MeshInfo.IndexDataOffset;
+                        var indexOffset = lod.IndexDataOffset + meshData.MeshInfo.IndexDataOffset * 2;
 
                         br.BaseStream.Seek(indexOffset, SeekOrigin.Begin);
 

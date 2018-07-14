@@ -894,61 +894,62 @@ namespace xivModdingFramework.Models.FileTypes
                      * --------------------
                      */
 
-                    //<source>
-                    xmlWriter.WriteStartElement("source");
-                    xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map0-textangents");
-                    //<float_array>
-                    xmlWriter.WriteStartElement("float_array");
-                    xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map0-textangents-array");
-                    xmlWriter.WriteAttributeString("count", (totalCount * 3).ToString());
-
-                    var tangents = meshList[i].VertexData.Tangents.GetRange(totalVertices, totalCount);
-
-                    foreach (var tan in tangents)
+                    if (meshList[i].VertexData.Tangents != null)
                     {
-                        xmlWriter.WriteString(tan.X.ToString() + " " + tan.Y.ToString() + " " + tan.Z.ToString() + " ");
+                        //<source>
+                        xmlWriter.WriteStartElement("source");
+                        xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map0-textangents");
+                        //<float_array>
+                        xmlWriter.WriteStartElement("float_array");
+                        xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map0-textangents-array");
+                        xmlWriter.WriteAttributeString("count", (totalCount * 3).ToString());
+
+                        var tangents = meshList[i].VertexData.Tangents.GetRange(totalVertices, totalCount);
+
+                        foreach (var tan in tangents)
+                        {
+                            xmlWriter.WriteString(tan.X.ToString() + " " + tan.Y.ToString() + " " + tan.Z.ToString() + " ");
+                        }
+
+                        xmlWriter.WriteEndElement();
+                        //</float_array>
+
+                        //<technique_common>
+                        xmlWriter.WriteStartElement("technique_common");
+                        //<accessor>
+                        xmlWriter.WriteStartElement("accessor");
+                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0-textangents-array");
+                        xmlWriter.WriteAttributeString("count", totalCount.ToString());
+                        xmlWriter.WriteAttributeString("stride", "3");
+
+                        //<param>
+                        xmlWriter.WriteStartElement("param");
+                        xmlWriter.WriteAttributeString("name", "X");
+                        xmlWriter.WriteAttributeString("type", "float");
+                        xmlWriter.WriteEndElement();
+                        //</param>
+
+                        //<param>
+                        xmlWriter.WriteStartElement("param");
+                        xmlWriter.WriteAttributeString("name", "Y");
+                        xmlWriter.WriteAttributeString("type", "float");
+                        xmlWriter.WriteEndElement();
+                        //</param>
+
+                        //<param>
+                        xmlWriter.WriteStartElement("param");
+                        xmlWriter.WriteAttributeString("name", "Z");
+                        xmlWriter.WriteAttributeString("type", "float");
+                        xmlWriter.WriteEndElement();
+                        //</param>
+
+                        xmlWriter.WriteEndElement();
+                        //</accessor>
+                        xmlWriter.WriteEndElement();
+                        //</technique_common>
+                        xmlWriter.WriteEndElement();
+                        //</source>
                     }
-
-                    xmlWriter.WriteEndElement();
-                    //</float_array>
-
-                    //<technique_common>
-                    xmlWriter.WriteStartElement("technique_common");
-                    //<accessor>
-                    xmlWriter.WriteStartElement("accessor");
-                    xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0-textangents-array");
-                    xmlWriter.WriteAttributeString("count", totalCount.ToString());
-                    xmlWriter.WriteAttributeString("stride", "3");
-
-                    //<param>
-                    xmlWriter.WriteStartElement("param");
-                    xmlWriter.WriteAttributeString("name", "X");
-                    xmlWriter.WriteAttributeString("type", "float");
-                    xmlWriter.WriteEndElement();
-                    //</param>
-
-                    //<param>
-                    xmlWriter.WriteStartElement("param");
-                    xmlWriter.WriteAttributeString("name", "Y");
-                    xmlWriter.WriteAttributeString("type", "float");
-                    xmlWriter.WriteEndElement();
-                    //</param>
-
-                    //<param>
-                    xmlWriter.WriteStartElement("param");
-                    xmlWriter.WriteAttributeString("name", "Z");
-                    xmlWriter.WriteAttributeString("type", "float");
-                    xmlWriter.WriteEndElement();
-                    //</param>
-
-                    xmlWriter.WriteEndElement();
-                    //</accessor>
-                    xmlWriter.WriteEndElement();
-                    //</technique_common>
-                    xmlWriter.WriteEndElement();
-                    //</source>
-
-
 
                     /*
                      * --------------------
@@ -1591,9 +1592,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // only write controller data if bone weights exist for this mesh
                 if (meshDataList[i].VertexData.BoneWeights.Count <= 0) continue;
 
-                var prevWeightCount = 0;
                 var prevIndexCount = 0;
-                var totalVertices = 0;
 
                 for (var j = 0; j < meshDataList[i].MeshPartList.Count; j++)
                 {
@@ -1604,25 +1603,35 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var indexList = meshDataList[i].VertexData.Indices.GetRange(prevIndexCount, indexCount);
 
+                    var indexHashSet = new HashSet<int>();
+
+                    foreach (var index in indexList)
+                    {
+                        indexHashSet.Add(index);
+                    }
+
+                    var indexHashCount = indexHashSet.Count;
+
                     var vCounts = new List<int>();
                     var bwList = new List<float>();
                     var biList = new List<int>();
 
-                    foreach (var index in indexList)
+                    foreach (var index in indexHashSet)
                     {
                         var bw = meshDataList[i].VertexData.BoneWeights[index];
                         var bi = meshDataList[i].VertexData.BoneIndices[index];
 
-
+                        var count = 0;
                         for (var a = 0; a < 4; a++)
                         {
                             if (!(bw[a] > 0)) continue;
 
                             bwList.Add(bw[a]);
                             biList.Add(bi[a]);
+                            count++;
                         }
 
-                        vCounts.Add(bwList.Count);
+                        vCounts.Add(count);
                     }
 
                     var partString = "." + j;
@@ -1735,7 +1744,7 @@ namespace xivModdingFramework.Models.FileTypes
                     //<Name_array>
                     xmlWriter.WriteStartElement("float_array");
                     xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-skin1-weights-array");
-                    xmlWriter.WriteAttributeString("count", indexCount.ToString());
+                    xmlWriter.WriteAttributeString("count", bwList.Count.ToString());
 
                     foreach (var bw in bwList)
                     {
@@ -1751,7 +1760,7 @@ namespace xivModdingFramework.Models.FileTypes
                     //<accessor>
                     xmlWriter.WriteStartElement("accessor");
                     xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-skin1-weights-array");
-                    xmlWriter.WriteAttributeString("count", indexCount.ToString());
+                    xmlWriter.WriteAttributeString("count", bwList.Count.ToString());
                     xmlWriter.WriteAttributeString("stride", "1");
                     //<param>
                     xmlWriter.WriteStartElement("param");
@@ -1786,7 +1795,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     //<vertex_weights>
                     xmlWriter.WriteStartElement("vertex_weights");
-                    xmlWriter.WriteAttributeString("count", indexCount.ToString());
+                    xmlWriter.WriteAttributeString("count", bwList.Count.ToString());
                     //<input>
                     xmlWriter.WriteStartElement("input");
                     xmlWriter.WriteAttributeString("semantic", "JOINT");
