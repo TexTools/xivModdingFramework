@@ -336,11 +336,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>A tuple containing the decompressed data and XivTex data.</returns>
-        public (byte[] rawData, XivTex texData) GetType4Data(int offset, XivDataFile dataFile)
+        /// <param name="xivTex">The XivTex container to fill</param>
+        public void GetType4Data(int offset, XivDataFile dataFile, XivTex xivTex)
         {
-            var xivTex = new XivTex();
-
             var decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
@@ -462,15 +460,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     j = j + 20;
                 }
 
-                if (decompressedData.Count >= uncompressedFileSize) return (decompressedData.ToArray(), xivTex);
+                if (decompressedData.Count >= uncompressedFileSize) return;
 
-                int difference = uncompressedFileSize - decompressedData.Count;
-                byte[] padding = new byte[difference];
+                var difference = uncompressedFileSize - decompressedData.Count;
+                var padding = new byte[difference];
                 Array.Clear(padding, 0, difference);
                 decompressedData.AddRange(padding);
             }
-
-            return (decompressedData.ToArray(), xivTex);
         }
 
         /// <summary>

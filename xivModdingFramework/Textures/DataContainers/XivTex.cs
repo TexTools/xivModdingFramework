@@ -43,5 +43,15 @@ namespace xivModdingFramework.Textures.DataContainers
         /// </summary>
         public int MipMapCount { get; set; }
 
+        /// <summary>
+        /// The texture byte data
+        /// </summary>
+        public byte[] TexData { get; set; }
+
+        /// <summary>
+        /// The type and path of the texture
+        /// </summary>
+        public TexTypePath TextureTypeAndPath { get; set; }
+
     }
 }
