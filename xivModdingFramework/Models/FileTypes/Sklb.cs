@@ -47,6 +47,14 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
+        /// <summary>
+        /// Creates a Skel file from a Sklb
+        /// </summary>
+        /// <remarks>
+        /// The skel file is the Sklb havok data parsed into json objects
+        /// </remarks>
+        /// <param name="item">The item we are getting the skeleton for</param>
+        /// <param name="model">The model we are getting the skeleton for</param>
         public void CreateSkelFromSklb(IItem item, XivMdl model)
         {
             var hasAssetcc = File.Exists(Directory.GetCurrentDirectory() + "/AssetCc2.exe");
@@ -92,6 +100,11 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
+        /// <summary>
+        /// Gets the skeleton sklb file
+        /// </summary>
+        /// <param name="modelName">The name of the model</param>
+        /// <param name="category">The items category</param>
         private void GetSkeleton(string modelName, string category)
         {
             var index = new Index(_gameDirectory);
@@ -175,6 +188,10 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
+        /// <summary>
+        /// Parses the sklb file
+        /// </summary>
+        /// <param name="skelLoc">The location of the skeleton file</param>
         private static void ParseSkeleton(string skelLoc)
         {
             var skelData = new SkeletonData();
@@ -331,7 +348,9 @@ namespace xivModdingFramework.Models.FileTypes
             File.Delete(Path.ChangeExtension(skelLoc, ".xml"));
         }
 
-
+        /// <summary>
+        /// A dictionary containing the slot abbreviations
+        /// </summary>
         private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
         {
             {XivStrings.Head, "met"},

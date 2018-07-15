@@ -42,7 +42,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// </remarks>
         private const int ModelMultiplier = 10;
 
-
+        /// <summary>
+        /// Creates a Collada DAE file for a given model
+        /// </summary>
+        /// <param name="xivModel">The model to create a dae file for</param>
+        /// <param name="saveLocation">The location to save the dae file</param>
         public void MakeDaeFileFromModel(XivMdl xivModel, DirectoryInfo saveLocation)
         {
             var modelName = Path.GetFileNameWithoutExtension(xivModel.MdlPath.File);

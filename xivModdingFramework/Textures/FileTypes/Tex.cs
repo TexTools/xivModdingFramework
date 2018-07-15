@@ -59,6 +59,8 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <summary>
         /// Gets the raw pixel data for the texture
         /// </summary>
+        /// <param name="xivTex">The texture data</param>
+        /// <returns>A byte array with the image data</returns>
         public byte[] GetImageData(XivTex xivTex)
         {
             byte[] imageData = null;
