@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -25,14 +26,14 @@ namespace xivModdingFramework.Textures.FileTypes
     /// <summary>
     /// This class deals with dds file types
     /// </summary>
-    public class DDS
+    public static class DDS
     {
         /// <summary>
         /// Creates a DDS file for the given Texture
         /// </summary>
         /// <param name="saveDirectory">The directory to save the dds file to</param>
         /// <param name="xivTex">The Texture information</param>
-        public void MakeDDS(DirectoryInfo saveDirectory, XivTex xivTex)
+        public static void MakeDDS(DirectoryInfo saveDirectory, XivTex xivTex)
         {
             var savePath = Path.Combine(saveDirectory.FullName,
                 Path.GetFileNameWithoutExtension(xivTex.TextureTypeAndPath.Path) + ".dds");
@@ -67,7 +68,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <see cref="https://msdn.microsoft.com/en-us/library/windows/desktop/bb943982(v=vs.85).aspx"/>
         /// </summary>
         /// <returns>Byte array containing DDS header</returns>
-        private byte[] CreateDDSHeader(XivTex xivTex)
+        private static byte[] CreateDDSHeader(XivTex xivTex)
         {
             uint dwPitchOrLinearSize, pfFlags, dwFourCC;
             var header = new List<byte>();
@@ -335,7 +336,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <see cref="https://msdn.microsoft.com/en-us/library/windows/desktop/bb943982(v=vs.85).aspx"/>
         /// </summary>
         /// <returns>Byte array containing DDS header</returns>
-        private byte[] CreateColorDDSHeader()
+        private static byte[] CreateColorDDSHeader()
         {
             var header = new List<byte>();
 
@@ -395,6 +396,176 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(blank1);
 
             return header.ToArray();
+        }
+
+        /// <summary>
+        /// Reads and parses data from the DDS file to be imported.
+        /// </summary>
+        /// <param name="br">The currently active BinaryReader.</param>
+        /// <param name="xivTex">The Texture data.</param>
+        /// <param name="newWidth">The width of the DDS texture to be imported.</param>
+        /// <param name="newHeight">The height of the DDS texture to be imported.</param>
+        /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
+        /// <returns>A tuple containing the compressed DDS data, a list of offsets to the mipmap parts, a list with the number of parts per mipmap.</returns>
+        public static (List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts) ReadDDS(BinaryReader br, XivTex xivTex, int newWidth, int newHeight, int newMipCount)
+        {
+            var compressedDDS = new List<byte>();
+            var mipPartOffsets = new List<short>();
+            var mipPartCount = new List<short>();
+
+            int mipLength;
+
+            switch (xivTex.TextureFormat)
+            {
+                case XivTexFormat.DXT1:
+                    mipLength = (newWidth * newHeight) / 2;
+                    break;
+                case XivTexFormat.DXT5:
+                case XivTexFormat.A8:
+                    mipLength = newWidth * newHeight;
+                    break;
+                case XivTexFormat.A1R5G5B5:
+                case XivTexFormat.A4R4G4B4:
+                    mipLength = (newWidth * newHeight) * 2;
+                    break;
+                case XivTexFormat.L8:
+                case XivTexFormat.A8R8G8B8:
+                case XivTexFormat.X8R8G8B8:
+                case XivTexFormat.R32F:
+                case XivTexFormat.G16R16F:
+                case XivTexFormat.G32R32F:
+                case XivTexFormat.A16B16G16R16F:
+                case XivTexFormat.A32B32G32R32F:
+                case XivTexFormat.DXT3:
+                case XivTexFormat.D16:
+                default:
+                    mipLength = (newWidth * newHeight) * 4;
+                    break;
+            }
+
+            br.BaseStream.Seek(128, SeekOrigin.Begin);
+
+            for (var i = 0; i < newMipCount; i++)
+            {
+                var mipParts = (int)Math.Ceiling(mipLength / 16000f);
+                mipPartCount.Add((short)mipParts);
+
+                if (mipParts > 1)
+                {
+                    for (var j = 0; j < mipParts; j++)
+                    {
+                        int uncompLength;
+                        var comp = true;
+
+                        if (j == mipParts - 1)
+                        {
+                            uncompLength = mipLength % 16000;
+                        }
+                        else
+                        {
+                            uncompLength = 16000;
+                        }
+
+                        var uncompBytes = br.ReadBytes(uncompLength);
+                        var compressed = Compressor(uncompBytes);
+
+                        if (compressed.Length > uncompLength)
+                        {
+                            compressed = uncompBytes;
+                            comp = false;
+                        }
+
+                        compressedDDS.AddRange(BitConverter.GetBytes(16));
+                        compressedDDS.AddRange(BitConverter.GetBytes(0));
+
+                        compressedDDS.AddRange(!comp
+                            ? BitConverter.GetBytes(32000)
+                            : BitConverter.GetBytes(compressed.Length));
+
+                        compressedDDS.AddRange(BitConverter.GetBytes(uncompLength));
+                        compressedDDS.AddRange(compressed);
+
+                        var padding = 128 - (compressed.Length % 128);
+
+                        compressedDDS.AddRange(new byte[padding]);
+
+                        mipPartOffsets.Add((short)(compressed.Length + padding + 16));
+                    }
+                }
+                else
+                {
+                    int uncompLength;
+                    var comp = true;
+
+                    if (mipLength != 16000)
+                    {
+                        uncompLength = mipLength % 16000;
+                    }
+                    else
+                    {
+                        uncompLength = 16000;
+                    }
+
+                    var uncompBytes = br.ReadBytes(uncompLength);
+                    var compressed = Compressor(uncompBytes);
+
+                    if (compressed.Length > uncompLength)
+                    {
+                        compressed = uncompBytes;
+                        comp = false;
+                    }
+
+                    compressedDDS.AddRange(BitConverter.GetBytes(16));
+                    compressedDDS.AddRange(BitConverter.GetBytes(0));
+
+                    compressedDDS.AddRange(!comp
+                        ? BitConverter.GetBytes(32000)
+                        : BitConverter.GetBytes(compressed.Length));
+
+                    compressedDDS.AddRange(BitConverter.GetBytes(uncompLength));
+                    compressedDDS.AddRange(compressed);
+
+                    var padding = 128 - (compressed.Length % 128);
+
+                    compressedDDS.AddRange(new byte[padding]);
+
+                    mipPartOffsets.Add((short)(compressed.Length + padding + 16));
+                }
+
+                if (mipLength > 32)
+                {
+                    mipLength = mipLength / 4;
+                }
+                else
+                {
+                    mipLength = 8;
+                }
+            }
+
+            return (compressedDDS, mipPartOffsets, mipPartCount);
+        }
+
+        /// <summary>
+        /// Compresses raw byte data.
+        /// </summary>
+        /// <param name="uncomp">The data to be compressed.</param>
+        /// <returns>The compressed byte data.</returns>
+        private static byte[] Compressor(byte[] uncomp)
+        {
+            using (var uncompStream = new MemoryStream(uncomp))
+            {
+                byte[] compbytes = null;
+                using (var compStream = new MemoryStream())
+                {
+                    using (var ds = new DeflateStream(compStream, CompressionMode.Compress))
+                    {
+                        uncompStream.CopyTo(ds);
+                        ds.Close();
+                        compbytes = compStream.ToArray();
+                    }
+                }
+                return compbytes;
+            }
         }
     }
 }

@@ -20,7 +20,9 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
+using Newtonsoft.Json;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -467,6 +469,360 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Array.Clear(padding, 0, difference);
                 decompressedData.AddRange(padding);
             }
+        }
+
+        /// <summary>
+        /// Creates the header for the compressed texture data to be imported.
+        /// </summary>
+        /// <param name="xivTex">Data for the currently displayed texture.</param>
+        /// <param name="mipPartOffsets">List of part offsets.</param>
+        /// <param name="mipPartCount">List containing the amount of parts per mipmap.</param>
+        /// <param name="uncompressedLength">Length of the uncompressed texture file.</param>
+        /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
+        /// <param name="newWidth">The width of the DDS texture to be imported.</param>
+        /// <param name="newHeight">The height of the DDS texture to be imported.</param>
+        /// <returns>The created header data.</returns>
+        public byte[] MakeType4DatHeader(XivTex xivTex, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
+        {
+            var headerData = new List<byte>();
+
+            var headerSize = 24 + (newMipCount * 20) + (mipPartOffsets.Count * 2);
+            var headerPadding = 128 - (headerSize % 128);
+
+            headerData.AddRange(BitConverter.GetBytes(headerSize + headerPadding));
+            headerData.AddRange(BitConverter.GetBytes(4));
+            headerData.AddRange(BitConverter.GetBytes(uncompressedLength));
+            headerData.AddRange(BitConverter.GetBytes(0));
+            headerData.AddRange(BitConverter.GetBytes(0));
+            headerData.AddRange(BitConverter.GetBytes(newMipCount));
+
+
+            var partIndex = 0;
+            var mipOffsetIndex = 80;
+            var uncompMipSize = newHeight * newWidth;
+
+            switch (xivTex.TextureFormat)
+            {
+                case XivTexFormat.DXT1:
+                    uncompMipSize = (newWidth * newHeight) / 2;
+                    break;
+                case XivTexFormat.DXT5:
+                case XivTexFormat.A8:
+                    uncompMipSize = newWidth * newHeight;
+                    break;
+                case XivTexFormat.A1R5G5B5:
+                case XivTexFormat.A4R4G4B4:
+                    uncompMipSize = (newWidth * newHeight) * 2;
+                    break;
+                case XivTexFormat.L8:
+                case XivTexFormat.A8R8G8B8:
+                case XivTexFormat.X8R8G8B8:
+                case XivTexFormat.R32F:
+                case XivTexFormat.G16R16F:
+                case XivTexFormat.G32R32F:
+                case XivTexFormat.A16B16G16R16F:
+                case XivTexFormat.A32B32G32R32F:
+                case XivTexFormat.DXT3:
+                case XivTexFormat.D16:
+                default:
+                    uncompMipSize = (newWidth * newHeight) * 4;
+                    break;
+            }
+
+            for (var i = 0; i < newMipCount; i++)
+            {
+                headerData.AddRange(BitConverter.GetBytes(mipOffsetIndex));
+
+                var paddedSize = 0;
+
+                for (var j = 0; j < mipPartCount[i]; j++)
+                {
+                    paddedSize = paddedSize + mipPartOffsets[j + partIndex];
+                }
+
+                headerData.AddRange(BitConverter.GetBytes(paddedSize));
+
+                headerData.AddRange(uncompMipSize > 16
+                    ? BitConverter.GetBytes(uncompMipSize)
+                    : BitConverter.GetBytes(16));
+
+                uncompMipSize = uncompMipSize / 4;
+
+                headerData.AddRange(BitConverter.GetBytes(partIndex));
+                headerData.AddRange(BitConverter.GetBytes((int)mipPartCount[i]));
+
+                partIndex = partIndex + mipPartCount[i];
+                mipOffsetIndex = mipOffsetIndex + paddedSize;
+            }
+
+            foreach (var part in mipPartOffsets)
+            {
+                headerData.AddRange(BitConverter.GetBytes(part));
+            }
+
+            headerData.AddRange(new byte[headerPadding]);
+
+            return headerData.ToArray();
+        }
+
+        /// <summary>
+        /// Writes the newly imported data to the .dat for modifications.
+        /// </summary>
+        /// <param name="data">The data to be written.</param>
+        /// <param name="modEntry">The modlist entry (if any) for the given file.</param>
+        /// <param name="inModList">Is the item already contained within the mod list.</param>
+        /// <param name="internalFilePath">The internal file path of the item being modified.</param>
+        /// <param name="category">The category of the item.</param>
+        /// <param name="itemName">The name of the item being modified.</param>
+        /// <param name="lineNum">The line number of the existing mod list entry for the item if it exists.</param>
+        /// <param name="dataFile">The data file to which we write the data</param>
+        /// <returns>The new offset in which the modified data was placed.</returns>
+        public int WriteToDat(List<byte> data, ModInfo modEntry, bool inModList, string internalFilePath,
+            string category, string itemName, int lineNum, XivDataFile dataFile, DirectoryInfo modListDirectory)
+        {
+            var offset = 0;
+            var dataOverwritten = false;
+
+            var index = new Index(_gameDirectory);
+
+            var datNum = GetLargestDatNumber(dataFile);
+
+            var modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
+
+            if (inModList)
+            {
+                datNum = ((modEntry.modOffset / 8) & 0x0F) / 2;
+                modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
+            }
+            else
+            {
+                var fileLength = new FileInfo(modDatPath).Length;
+
+                // Creates a new Dat if the current dat is at the 2GB limit
+                if (fileLength >= 2000000000)
+                {
+                    var newDatNum = CreateNewDat(dataFile);
+
+                    modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + newDatNum;
+                }
+            }
+
+            // Checks to make sure the offsets in the mod list are not 0
+            // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
+            if (inModList)
+            {
+                if (modEntry.modOffset == 0)
+                {
+                    throw new Exception("The mod offset located in the mod list cannot be 0");
+                }
+
+                if (modEntry.originalOffset == 0)
+                {
+                    throw new Exception("The original offset located in the mod list cannot be 0");
+                }
+            }
+
+            /* 
+             * If the item has been previously modified and the compressed data being imported is smaller or equal to the exisiting data
+             *  replace the existing data with new data.
+             */
+            if (inModList && data.Count <= modEntry.modSize)
+            {
+                if (modEntry.modOffset != 0)
+                {
+                    var sizeDiff = modEntry.modSize - data.Count;
+
+                    datNum = ((modEntry.modOffset / 8) & 0x0F) / 2;
+                    modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
+                    var datOffsetAmount = 16 * datNum;
+
+                    using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
+                    {
+                        bw.BaseStream.Seek(modEntry.modOffset - datOffsetAmount, SeekOrigin.Begin);
+
+                        bw.Write(data.ToArray());
+
+                        bw.Write(new byte[sizeDiff]);
+                    }
+
+                    index.UpdateIndex(modEntry.modOffset, internalFilePath, dataFile);
+                    index.UpdateIndex2(modEntry.modOffset, internalFilePath, dataFile);
+
+                    offset = modEntry.modOffset;
+
+                    dataOverwritten = true;
+                }
+            }
+            else
+            {
+                var emptyLine = 0;
+
+                /* 
+                 * If there is an empty entry in the modlist and the compressed data being imported is smaller or equal to the available space
+                *  write the compressed data in the existing space.
+                */
+
+                foreach (var line in File.ReadAllLines(modListDirectory.FullName))
+                {
+                    var emptyEntry = JsonConvert.DeserializeObject<ModInfo>(line);
+
+                    if (emptyEntry.fullPath.Equals("") && emptyEntry.datFile.Equals(dataFile.GetDataFileName()))
+                    {
+                        if (emptyEntry.modOffset != 0)
+                        {
+                            var emptyLength = emptyEntry.modSize;
+
+                            if (emptyLength > data.Count)
+                            {
+                                var sizeDiff = emptyLength - data.Count;
+
+                                datNum = ((emptyEntry.modOffset / 8) & 0x0F) / 2;
+                                modDatPath = _gameDirectory + "\\" + emptyEntry.datFile + DatExtension + datNum;
+                                var datOffsetAmount = 16 * datNum;
+
+                                using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
+                                {
+                                    bw.BaseStream.Seek(emptyEntry.modOffset - datOffsetAmount, SeekOrigin.Begin);
+
+                                    bw.Write(data.ToArray());
+
+                                    bw.Write(new byte[sizeDiff]);
+                                }
+
+                                var originalOffset = index.UpdateIndex(emptyEntry.modOffset, internalFilePath, dataFile) * 8;
+                                index.UpdateIndex2(emptyEntry.modOffset, internalFilePath, dataFile);
+
+                                if (inModList)
+                                {
+                                    originalOffset = modEntry.originalOffset;
+
+                                    var replaceOriginalEntry = new ModInfo
+                                    {
+                                        category = string.Empty,
+                                        name = "Empty Replacement",
+                                        fullPath = string.Empty,
+                                        originalOffset = 0,
+                                        modOffset = modEntry.modOffset,
+                                        modSize = modEntry.modSize,
+                                        datFile = dataFile.GetDataFileName()
+                                    };
+
+                                    var oLines = File.ReadAllLines(modListDirectory.FullName);
+                                    oLines[lineNum] = JsonConvert.SerializeObject(replaceOriginalEntry);
+                                    File.WriteAllLines(modListDirectory.FullName, oLines);
+                                }
+
+
+                                var replaceEntry = new ModInfo
+                                {
+                                    category = category,
+                                    name = itemName,
+                                    fullPath = internalFilePath,
+                                    originalOffset = originalOffset,
+                                    modOffset = emptyEntry.modOffset,
+                                    modSize = emptyEntry.modSize,
+                                    datFile = dataFile.GetDataFileName()
+                                };
+
+                                var lines = File.ReadAllLines(modListDirectory.FullName);
+                                lines[emptyLine] = JsonConvert.SerializeObject(replaceEntry);
+                                File.WriteAllLines(modListDirectory.FullName, lines);
+
+                                offset = emptyEntry.modOffset;
+
+                                dataOverwritten = true;
+                                break;
+                            }
+                        }
+                    }
+                    emptyLine++;
+                }
+
+                if (!dataOverwritten)
+                {
+                    using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
+                    {
+                        bw.BaseStream.Seek(0, SeekOrigin.End);
+
+                        while ((bw.BaseStream.Position & 0xFF) != 0)
+                        {
+                            bw.Write((byte)0);
+                        }
+
+                        var eof = (int)bw.BaseStream.Position + data.Count;
+
+                        while ((eof & 0xFF) != 0)
+                        {
+                            data.AddRange(new byte[16]);
+                            eof = eof + 16;
+                        }
+
+                        var datOffsetAmount = 16 * datNum;
+                        offset = (int)bw.BaseStream.Position + datOffsetAmount;
+
+                        if (offset != 0)
+                        {
+                            bw.Write(data.ToArray());
+                        }
+                        else
+                        {
+                            throw new Exception("There was an issue obtaining the offset to write to.");
+                        }
+                    }
+                }
+            }
+
+            if (!dataOverwritten)
+            {
+                if (offset != 0)
+                {
+                    var oldOffset = index.UpdateIndex(offset, internalFilePath, dataFile) * 8;
+                    index.UpdateIndex2(offset, internalFilePath, dataFile);
+
+                    /*
+                     * If the item has been previously modifed, but the new compressed data to be imported is larger than the existing data
+                     * remove the data from the modlist, leaving the offset and size intact for future use
+                    */
+                    if (inModList && data.Count > modEntry.modSize)
+                    {
+                        oldOffset = modEntry.originalOffset;
+
+                        var replaceEntry = new ModInfo
+                        {
+                            category = string.Empty,
+                            name = string.Empty,
+                            fullPath = string.Empty,
+                            originalOffset = 0,
+                            modOffset = modEntry.modOffset,
+                            modSize = modEntry.modSize,
+                            datFile = dataFile.GetDataFileName()
+                        };
+
+                        var lines = File.ReadAllLines(modListDirectory.FullName);
+                        lines[lineNum] = JsonConvert.SerializeObject(replaceEntry);
+                        File.WriteAllLines(modListDirectory.FullName, lines);
+                    }
+
+                    var entry = new ModInfo
+                    {
+                        category = category,
+                        name = itemName,
+                        fullPath = internalFilePath,
+                        originalOffset = oldOffset,
+                        modOffset = offset,
+                        modSize = data.Count,
+                        datFile = dataFile.GetDataFileName()
+                    };
+
+                    using (var modFile = new StreamWriter(modListDirectory.FullName, true))
+                    {
+                        modFile.BaseStream.Seek(0, SeekOrigin.End);
+                        modFile.WriteLine(JsonConvert.SerializeObject(entry));
+                    }
+                }
+            }
+
+            return offset;
         }
 
         /// <summary>

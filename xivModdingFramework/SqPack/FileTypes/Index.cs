@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -289,6 +290,110 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             return fileHashesList;
+        }
+
+        /// <summary>
+        /// Updates the .index files offset for a given item.
+        /// </summary>
+        /// <param name="offset">The new offset to be used.</param>
+        /// <param name="fullPath">The internal path of the file whos offset is to be updated.</param>
+        /// <param name="dataFile">The data file to update the index for</param>
+        /// <returns>The offset which was replaced.</returns>
+        public int UpdateIndex(long offset, string fullPath, XivDataFile dataFile)
+        {
+            var folderHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
+            var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
+            var oldOffset = 0;
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+            using (var index = File.Open(indexPath, FileMode.Open))
+            {
+                using (var br = new BinaryReader(index))
+                {
+                    using (var bw = new BinaryWriter(index))
+                    {
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var numOfFiles = br.ReadInt32();
+
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
+                        {
+                            var fileNameHash = br.ReadInt32();
+
+                            if (fileNameHash == fileHash)
+                            {
+                                var folderPathHash = br.ReadInt32();
+
+                                if (folderPathHash == folderHash)
+                                {
+                                    oldOffset = br.ReadInt32();
+                                    bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
+                                    bw.Write(offset / 8);
+                                    break;
+                                }
+
+                                br.ReadBytes(4);
+                            }
+                            else
+                            {
+                                br.ReadBytes(8);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return oldOffset;
+        }
+
+        /// <summary>
+        /// Updates the .index2 files offset for a given item.
+        /// </summary>
+        /// <param name="offset">The new offset to be used.</param>
+        /// <param name="fullPath">The internal path of the file whos offset is to be updated.</param>
+        /// <param name="dataFile">The data file to update the index for</param>
+        /// <returns>The offset which was replaced.</returns>
+        public void UpdateIndex2(long offset, string fullPath, XivDataFile dataFile)
+        {
+            var pathHash = HashGenerator.GetHash(fullPath);
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            var index2Path = _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension;
+
+            using (var index = File.Open(index2Path, FileMode.Open))
+            {
+                using (var br = new BinaryReader(index))
+                {
+                    using (var bw = new BinaryWriter(index))
+                    {
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var numOfFiles = br.ReadInt32();
+
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < numOfFiles; i += 8)
+                        {
+                            var fullPathHash = br.ReadInt32();
+
+                            if (fullPathHash == pathHash)
+                            {
+                                bw.BaseStream.Seek(br.BaseStream.Position, SeekOrigin.Begin);
+                                bw.Write((int)(offset / 8));
+                                break;
+                            }
+
+                            br.ReadBytes(4);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
