@@ -253,6 +253,42 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets all the folder hashes in a given folder path
+        /// </summary>
+        /// <param name="dataFile">The data file to look in</param>
+        /// <returns>A list of all of the folder hashes</returns>
+        public List<int> GetAllFolderHashes(XivDataFile dataFile)
+        {
+            var folderHashList = new HashSet<int>();
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath)))
+            {
+                br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                var totalFiles = br.ReadInt32();
+
+                br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                {
+                    br.ReadBytes(4);
+
+                    var folderPathHash = br.ReadInt32();
+
+                    folderHashList.Add(folderPathHash);
+
+                    br.ReadBytes(4);
+                }
+            }
+
+            return folderHashList.ToList();
+        }
+
+        /// <summary>
         /// Get all the hashed values of the files in a given folder 
         /// </summary>
         /// <param name="hashedFolder">The hashed value of the folder path</param>
@@ -290,6 +326,48 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             return fileHashesList;
+        }
+
+        /// <summary>
+        /// Get all the file hash and file offset in a given folder 
+        /// </summary>
+        /// <param name="hashedFolder">The hashed value of the folder path</param>
+        /// <param name="dataFile">The data file to look in</param>
+        /// <returns>A list containing the hashed values of the files in the given folder</returns>
+        public Dictionary<int, int> GetAllHashedFilesAndOffsetsInFolder(int hashedFolder, XivDataFile dataFile)
+        {
+            var fileHashesDict = new Dictionary<int, int>();
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath)))
+            {
+                br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                var totalFiles = br.ReadInt32();
+
+                br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                {
+                    var hashedFile = br.ReadInt32();
+
+                    var folderPathHash = br.ReadInt32();
+
+                    if (folderPathHash == hashedFolder)
+                    {
+                        fileHashesDict.Add(br.ReadInt32() * 8, hashedFile);
+                    }
+                    else
+                    {
+                        br.ReadBytes(4);
+                    }
+                }
+            }
+
+            return fileHashesDict;
         }
 
         /// <summary>

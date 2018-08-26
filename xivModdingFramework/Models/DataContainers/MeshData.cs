@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using SharpDX;
 
 namespace xivModdingFramework.Models.DataContainers
 {
@@ -44,5 +45,20 @@ namespace xivModdingFramework.Models.DataContainers
         /// Determines whether this mesh contains a body material
         /// </summary>
         public bool IsBody { get; set; }
+
+        /// <summary>
+        /// A dictionary containing the reference index and position data for mesh hiding
+        /// </summary>
+        public Dictionary<int, Vector3> ReferencePositionsDictionary { get; set; }
+
+        /// <summary>
+        /// A dictionary containing the hide offset and position data for mesh hiding
+        /// </summary>
+        public Dictionary<int, Vector3> HidePositionsDictionary { get; set; }
+
+        /// <summary>
+        /// A dictionary containing the reference index and hide offset for mesh hiding
+        /// </summary>
+        public Dictionary<short, short> HideIndexOffsetDictionary { get; set; }
     }
 }

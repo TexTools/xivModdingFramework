@@ -109,5 +109,10 @@ namespace xivModdingFramework.Models.DataContainers
         /// The list containing the transform data for each bone
         /// </summary>
         public List<BoneTransformData> BoneTransformDataList { get; set; }
+
+        /// <summary>
+        /// Flag set when the model has hider data
+        /// </summary>
+        public bool HasHiderData { get; set; }
     }
 }

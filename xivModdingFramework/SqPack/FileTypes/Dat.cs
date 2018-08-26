@@ -22,6 +22,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using Newtonsoft.Json;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -195,15 +196,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         var compressedData = br.ReadBytes(compressedSize);
 
-                        var decompressedData = new byte[uncompressedSize];
-
-                        using (var ms = new MemoryStream(compressedData))
-                        {
-                            using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
-                            {
-                                ds.Read(decompressedData, 0, uncompressedSize);
-                            }
-                        }
+                        var decompressedData = IOUtil.Decompressor(compressedData, uncompressedSize);
 
                         type2Bytes.AddRange(decompressedData);
                     }
@@ -311,14 +304,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                     else
                     {
-                        var partDecompBytes = new byte[partDecompSize];
-                        using (var ms = new MemoryStream(br.ReadBytes(partCompSize)))
-                        {
-                            using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
-                            {
-                                ds.Read(partDecompBytes, 0, partDecompSize);
-                            }
-                        }
+                        var partDecompBytes = IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
+
                         byteList.AddRange(partDecompBytes);
                     }
 
@@ -390,15 +377,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     if (mipMapParts > 1)
                     {
                         var compressedData = br.ReadBytes(compressedSize);
-                        var decompressedPartData = new byte[uncompressedSize];
 
-                        using (var ms = new MemoryStream(compressedData))
-                        {
-                            using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
-                            {
-                                ds.Read(decompressedPartData, 0x00, uncompressedSize);
-                            }
-                        }
+                        var decompressedPartData = IOUtil.Decompressor(compressedData, uncompressedSize);
 
                         decompressedData.AddRange(decompressedPartData);
 
@@ -418,14 +398,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                             if (compressedSize != 32000)
                             {
                                 compressedData = br.ReadBytes(compressedSize);
-                                decompressedPartData = new byte[uncompressedSize];
-                                using (var ms = new MemoryStream(compressedData))
-                                {
-                                    using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
-                                    {
-                                        ds.Read(decompressedPartData, 0x00, uncompressedSize);
-                                    }
-                                }
+                                decompressedPartData = IOUtil.Decompressor(compressedData, uncompressedSize);
+
                                 decompressedData.AddRange(decompressedPartData);
                             }
                             else
@@ -441,15 +415,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                         if (compressedSize != 32000)
                         {
                             var compressedData = br.ReadBytes(compressedSize);
-                            var uncompressedData = new byte[uncompressedSize];
 
-                            using (var ms = new MemoryStream(compressedData))
-                            {
-                                using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
-                                {
-                                    ds.Read(uncompressedData, 0x00, uncompressedSize);
-                                }
-                            }
+                            var uncompressedData = IOUtil.Decompressor(compressedData, uncompressedSize);
 
                             decompressedData.AddRange(uncompressedData);
                         }

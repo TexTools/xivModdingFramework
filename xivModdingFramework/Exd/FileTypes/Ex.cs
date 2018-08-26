@@ -140,7 +140,7 @@ namespace xivModdingFramework.Exd.FileTypes
         /// It then places the data in a dictionary with format [index, raw data]
         /// </remarks>
         /// <param name="exFile"></param>
-        /// <returns></returns>
+        /// <returns>A dictionary containing the Index and Raw Data of the ex file</returns>
         public Dictionary<int, byte[]> ReadExData(XivEx exFile)
         {
             var exdOffsetList = new List<int>();

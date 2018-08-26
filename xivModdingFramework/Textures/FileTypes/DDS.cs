@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -467,7 +468,7 @@ namespace xivModdingFramework.Textures.FileTypes
                         }
 
                         var uncompBytes = br.ReadBytes(uncompLength);
-                        var compressed = Compressor(uncompBytes);
+                        var compressed = IOUtil.Compressor(uncompBytes);
 
                         if (compressed.Length > uncompLength)
                         {
@@ -507,7 +508,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     }
 
                     var uncompBytes = br.ReadBytes(uncompLength);
-                    var compressed = Compressor(uncompBytes);
+                    var compressed = IOUtil.Compressor(uncompBytes);
 
                     if (compressed.Length > uncompLength)
                     {
@@ -543,29 +544,6 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             return (compressedDDS, mipPartOffsets, mipPartCount);
-        }
-
-        /// <summary>
-        /// Compresses raw byte data.
-        /// </summary>
-        /// <param name="uncomp">The data to be compressed.</param>
-        /// <returns>The compressed byte data.</returns>
-        private static byte[] Compressor(byte[] uncomp)
-        {
-            using (var uncompStream = new MemoryStream(uncomp))
-            {
-                byte[] compbytes = null;
-                using (var compStream = new MemoryStream())
-                {
-                    using (var ds = new DeflateStream(compStream, CompressionMode.Compress))
-                    {
-                        uncompStream.CopyTo(ds);
-                        ds.Close();
-                        compbytes = compStream.ToArray();
-                    }
-                }
-                return compbytes;
-            }
         }
     }
 }

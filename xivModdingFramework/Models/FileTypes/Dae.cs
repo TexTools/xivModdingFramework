@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Xml;
 using xivModdingFramework.Models.DataContainers;
 
@@ -156,6 +157,380 @@ namespace xivModdingFramework.Models.FileTypes
                 FullSkel.Clear();
                 FullSkelNum.Clear();
             }
+        }
+
+        public Dictionary<int, Dictionary<int, ColladaData>> ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation)
+        {
+            var boneJointDict = new Dictionary<string, string>();
+
+            // A dictionary contining <Mesh Number, <Mesh Part Number, Collada Data>
+            var meshPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
+
+            for (var i = 0; i < xivMdl.LoDList[0].MeshCount; i++)
+            {
+                meshPartDataDictionary.Add(i, new Dictionary<int, ColladaData>());
+            }
+
+            // Reading Bone Data
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                while (reader.Read())
+                {
+                    if (reader.IsStartElement())
+                    {
+                        if (reader.Name.Equals("visual_scene"))
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader.IsStartElement())
+                                {
+                                    if (reader.Name.Contains("node"))
+                                    {
+                                        var sid = reader["sid"];
+                                        if (sid != null)
+                                        {
+                                            var name = reader["name"];
+
+                                            // Throw an exception if there is a duplicate bone
+                                            if (boneJointDict.ContainsKey(sid))
+                                            {
+                                                throw new Exception(
+                                                    $"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                            }
+
+                                            boneJointDict.Add(sid, name);
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Throw an exception if no bones were found in the dae file
+            if (boneJointDict.Count < 1)
+            {
+                throw new Exception("No bones were found in the dae file.");
+            }
+
+            var boneDict = new Dictionary<string, int>();
+            var meshNameDict = new Dictionary<string, string>();
+            var extraBones = new List<string>();
+
+            // Create a dictionary of the original bone data with <Bone Name, Bone Index>
+            for (var i = 0; i < xivMdl.PathData.BoneList.Count; i++)
+            {
+                boneDict.Add(xivMdl.PathData.BoneList[i], i);
+            }
+
+            // Default values for element names
+            var texc = "-map0-array";
+            var texc2 = "-map1-array";
+            var pos = "-positions-array";
+            var norm = "-normals-array";
+            var biNorm = "-texbinormals";
+            var tang = "-textangents";
+            var blender = false;
+
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                while (reader.Read())
+                {
+                    var cData = new ColladaData()
+                    {
+                        IndexStride = 4,
+                        TextureCoordinateStride = 2
+                    };
+
+                    if (reader.IsStartElement())
+                    {
+                        // Set element name values based on authoring tool
+                        if (reader.Name.Contains("authoring_tool"))
+                        {
+                            var tool = reader.ReadElementContentAsString();
+
+                            if (tool.Contains("OpenCOLLADA"))
+                            {
+                                texc = "-map1-array";
+                                texc2 = "-map2-array";
+                                biNorm = "-map1-texbinormals";
+                                tang = "-map1-textangents";
+                                cData.TextureCoordinateStride = 3;
+                                cData.IndexStride = 6;
+                            }
+                            else if (tool.Contains("FBX"))
+                            {
+                                pos = "-position-array";
+                                norm = "-normal0-array";
+                                texc = "-uv0-array";
+                                texc2 = "-uv1-array";
+                            }
+                            else if (tool.Contains("Exporter for Blender"))
+                            {
+                                biNorm = "-bitangents-array";
+                                tang = "-tangents-array";
+                                texc = "-texcoord-0-array";
+                                texc2 = "-texcoord-1-array";
+                                cData.IndexStride = 1;
+                                blender = true;
+                            }
+                            else if (!tool.Contains("TexTools"))
+                            {
+                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}");
+                            }
+                        }
+
+                        // Read Geometry
+                        if (reader.Name.Equals("geometry"))
+                        {
+                            var atr = reader["name"];
+                            var id = reader["id"];
+
+                            if (meshNameDict.ContainsKey(id))
+                            {
+                                throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}");
+                            }
+
+                            meshNameDict.Add(id, atr);
+
+                            var meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+
+                            // Determines whether the mesh has parts and gets the mesh number
+                            if (atr.Contains("."))
+                            {
+                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
+                                    atr.LastIndexOf(".", StringComparison.Ordinal) -
+                                    (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                            }
+
+                            while (reader.Read())
+                            {
+                                if (reader.IsStartElement())
+                                {
+                                    if (reader.Name.Contains("float_array"))
+                                    {
+                                        // Positions 
+                                        if (reader["id"].ToLower().Contains(pos))
+                                        {
+                                            cData.Positions.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                        // Normals
+                                        else if (reader["id"].ToLower().Contains(norm) && cData.Positions.Count > 0)
+                                        {
+                                            cData.Normals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                        //Texture Coordinates
+                                        else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
+                                        {
+                                            cData.TextureCoordinates0.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                        //Texture Coordinates2
+                                        else if (reader["id"].ToLower().Contains(texc2) && cData.Positions.Count > 0)
+                                        {
+                                            cData.TextureCoordinates1.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                        //Tangents
+                                        else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
+                                        {
+                                            cData.Tangents.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                        //BiNormals
+                                        else if (reader["id"].ToLower().Contains(biNorm) && cData.Positions.Count > 0)
+                                        {
+                                            cData.BiNormals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                    }
+
+                                    // Indices
+                                    if (reader.Name.Equals("p"))
+                                    {
+                                        cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
+
+                                        // The index stride changes if the secondary texture coordinates are not present
+                                        if (cData.TextureCoordinates1.Count < 1 && cData.IndexStride == 6)
+                                        {
+                                            cData.IndexStride = 4;
+                                        }
+
+                                        // Reads the indices for each data point and places them in a list
+                                        for (var i = 0; i < cData.Indices.Count; i += cData.IndexStride)
+                                        {
+                                            cData.PositionIndices.Add(cData.Indices[i]);
+                                            cData.NormalIndices.Add(cData.Indices[i + 1]);
+                                            cData.TextureCoordinate0Indices.Add(cData.Indices[i + 2]);
+
+                                            if (cData.TextureCoordinates1.Count > 0 && cData.IndexStride == 6)
+                                            {
+                                                cData.TextureCoordinate1Indices.Add(cData.Indices[i + 4]);
+                                            }
+                                            else if (cData.TextureCoordinates1.Count > 0 && cData.IndexStride == 4)
+                                            {
+                                                cData.TextureCoordinate1Indices.Add(cData.Indices[i + 2]);
+                                            }
+
+                                            if (cData.BiNormals.Count > 0)
+                                            {
+                                                cData.BiNormalIndices.Add(cData.Indices[i + 3]);
+                                            }
+
+                                        }
+
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // If the current attribute is a mesh part
+                            if (atr.Contains("."))
+                            {
+                                // Get part number
+                                var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+
+                                if (meshPartDataDictionary.ContainsKey(meshPartNum))
+                                {
+                                    throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
+                                }
+
+                                meshPartDataDictionary[meshNum].Add(meshPartNum, cData);
+                            }
+                            else
+                            {
+                                if (meshPartDataDictionary.ContainsKey(0))
+                                {
+                                    throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
+                                }
+
+                                meshPartDataDictionary[meshNum].Add(0, cData);
+                            }
+                        }
+
+                        // Read Controller
+                        else if (reader.Name.Equals("controller"))
+                        {
+                            var atr = reader["id"];
+                            ColladaData colladaData;
+
+                            // If the collada file was saved in blender
+                            if (blender)
+                            {
+                                while (reader.Read())
+                                {
+                                    if (reader.IsStartElement())
+                                    {
+                                        if (reader.Name.Equals("skin"))
+                                        {
+                                            var skinSource = reader["source"];
+                                            atr = meshNameDict[skinSource.Substring(1, skinSource.Length - 1)];
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            var meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_") + 1, 1));
+
+                            // If it is a mesh part get mesh number
+                            if (atr.Contains("."))
+                            {
+                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_") + 1, atr.LastIndexOf(".") - (atr.LastIndexOf("_") + 1)));
+                            }
+
+                            var partDataDictionary = meshPartDataDictionary[meshNum];
+
+                            // If it is a mesh part get part number, and get the Collada Data associated with it
+                            if (atr.Contains("."))
+                            {
+                                var meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.LastIndexOf("-") - (atr.LastIndexOf(".") + 1)));
+                                colladaData = partDataDictionary[meshPartNum];
+                            }
+                            else
+                            {
+                                colladaData = partDataDictionary[0];
+                            }
+
+                            while (reader.Read())
+                            {
+                                if (reader.IsStartElement())
+                                {
+                                    // Bone Strings 
+                                    if (reader.Name.Contains("Name_array"))
+                                    {
+                                        colladaData.Bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
+                                    }
+
+                                    if (reader.Name.Contains("float_array"))
+                                    {
+                                        // Bone Weights
+                                        if (reader["id"].ToLower().Contains("weights-array"))
+                                        {
+                                            colladaData.BoneWeights.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                    }
+
+                                    // Bone(v) Counts per vertex
+                                    else if (reader.Name.Equals("vcount"))
+                                    {
+                                        colladaData.Vcounts.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
+                                    }
+
+                                    // Bone Indices
+                                    else if (reader.Name.Equals("v"))
+                                    {
+                                        var tempbIndex = (int[])reader.ReadElementContentAs(typeof(int[]), null);
+                                        
+                                        // Some saved dae files have swapped bone names, so we correct them
+                                        for (var a = 0; a < tempbIndex.Length; a += 2)
+                                        {
+                                            var boneIndex = tempbIndex[a];
+                                            var blendName = colladaData.Bones[boneIndex];
+
+                                            if (!boneJointDict.ContainsKey(blendName))
+                                            {
+                                                throw new Exception(
+                                                    $"Bone Name not found in original bone data. Bone: {blendName}");
+                                            }
+
+                                            var blendBoneName = boneJointDict[blendName];
+
+                                            var bString = blendBoneName;
+
+                                            // Fix for hair bones
+                                            if (!blendBoneName.Contains("h0"))
+                                            {
+                                                bString = Regex.Replace(blendBoneName, @"[\d]", string.Empty);
+                                            }
+
+                                            if (!boneDict.ContainsKey(bString))
+                                            {
+                                                if (!extraBones.Contains(bString))
+                                                {
+                                                    extraBones.Add(bString);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                colladaData.BoneIndices.Add(boneDict[bString]);
+
+                                                colladaData.BoneIndices.Add(tempbIndex[a + 1]);
+                                            }
+                                        }
+
+                                        if (extraBones.Count > 0)
+                                        {
+                                            throw new Exception($"The model contains extra bones. {extraBones}");
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return meshPartDataDictionary;
         }
 
         /// <summary>
