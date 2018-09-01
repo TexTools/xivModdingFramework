@@ -561,6 +561,29 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Type 3 files are used for models
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
+        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
+        public (int MeshCount, int MaterialCount, byte[] Data) GetType3OriginalData(string internalPath)
+        {
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
+
+            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            foreach (var cat in cats)
+            {
+                if (cat.GetFolderKey() == folderKey)
+                    return GetType3OriginalData(internalPath, cat);
+            }
+
+            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+        }
+
+        /// <summary>
+        /// Gets the original data for Type 3 (Model) files
+        /// </summary>
+        /// <remarks>
+        /// Type 3 files are used for models
+        /// </remarks>
+        /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
         public (int MeshCount, int MaterialCount, byte[] Data) GetType3OriginalData(string internalPath, XivDataFile dataFile)
@@ -807,6 +830,30 @@ namespace xivModdingFramework.SqPack.FileTypes
                 decompressedData.AddRange(padding);
             }
         }
+
+        /// <summary>
+        /// Gets the original data for Type 4 (Texture) files.
+        /// </summary>
+        /// <remarks>
+        /// Type 4 files are used for Textures
+        /// </remarks>
+        /// <param name="internalPath">The internal file path of the item</param>
+        /// <param name="xivTex">The XivTex container to fill</param>
+        public void GetType4OriginalData(string internalPath, XivTex xivTex)
+        {
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
+
+            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            foreach (var cat in cats)
+            {
+                if (cat.GetFolderKey() == folderKey)
+                    GetType4OriginalData(internalPath, cat, xivTex);
+            }
+
+            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+        }
+
 
         /// <summary>
         /// Gets the original data for Type 4 (Texture) files.
