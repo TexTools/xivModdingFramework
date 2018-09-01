@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.ComponentModel;
 
 namespace xivModdingFramework.General.Enums
@@ -29,51 +30,55 @@ namespace xivModdingFramework.General.Enums
         /// <summary>
         /// Contains common data such as fonts, mouse pointers, dictionaries, etc.
         /// </summary>
-        [Description("000000")] _00_Common,
+        [XivDataFileDescription("000000", "common")] _00_Common,
         /// <summary>
         /// Contains common world data such terrain, housing, etc.
         /// </summary>
-        [Description("010000")] _01_Bgcommon,
+        [XivDataFileDescription("010000", "bgcommon")] _01_Bgcommon,
         /// <summary>
         /// Contains world data such as dungeons, trials, pvp, etc.
         /// </summary>
-        [Description("020000")] _02_Bg,
+        [XivDataFileDescription("020000", "bg")] _02_Bg,
         /// <summary>
         /// Contains cutscene data
         /// </summary>
-        [Description("030000")] _03_Cut,
+        [XivDataFileDescription("030000", "cut")] _03_Cut,
         /// <summary>
         /// Contains Character data such as equipment, accessories, weapons, monsters, etc.
         /// </summary>
-        [Description("040000")] _04_Chara,
+        [XivDataFileDescription("040000", "chara")] _04_Chara,
         /// <summary>
         /// Contains Shader data
         /// </summary>
-        [Description("050000")] _05_Shader,
+        [XivDataFileDescription("050000", "shader")] _05_Shader,
         /// <summary>
         /// Contains UI data such as Icons, Maps, HUD, etc.
         /// </summary>
-        [Description("060000")] _06_Ui,
+        [XivDataFileDescription("060000", "ui")] _06_Ui,
         /// <summary>
         /// Contains Sound data such as battle, voices, and effects
         /// </summary>
-        [Description("070000")] _07_Sound,
+        [XivDataFileDescription("070000", "sound")] _07_Sound,
         /// <summary>
         /// Contains Visual Effects data
         /// </summary>
-        [Description("080000")] _08_Vfx,
+        [XivDataFileDescription("080000", "vfx")] _08_Vfx,
+        /// <summary>
+        /// Contains UI Script data(CURRENTLY NOT PRESENT)
+        /// </summary>
+        [XivDataFileDescription("090000", "ui_script")] _09_UiScript,
         /// <summary>
         /// Contains EXD data such as information files, cut scene text, quest text, etc.
         /// </summary>
-        [Description("0a0000")] _0A_Exd,
+        [XivDataFileDescription("0a0000", "exd")] _0A_Exd,
         /// <summary>
         /// Contains Game Scripts in LUA format
         /// </summary>
-        [Description("0b0000")] _0B_GameScript,
+        [XivDataFileDescription("0b0000", "game_script")] _0B_GameScript,
         /// <summary>
         /// Contains Music data
         /// </summary>
-        [Description("0c0000")] _0C_Music
+        [XivDataFileDescription("0c0000", "music")] _0C_Music
     }
 
     /// <summary>
@@ -89,8 +94,33 @@ namespace xivModdingFramework.General.Enums
         public static string GetDataFileName(this XivDataFile value)
         {
             var field = value.GetType().GetField(value.ToString());
-            var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
-            return attribute.Length > 0 ? attribute[0].Description : value.ToString();
+            var attribute = (XivDataFileDescriptionAttribute[])field.GetCustomAttributes(typeof(XivDataFileDescriptionAttribute), false);
+            return attribute.Length > 0 ? attribute[0].CatNumber : value.ToString();
         }
+
+        /// <summary>
+        /// Gets the description from the enum value, in this case the folder of game data it contains
+        /// </summary>
+        /// <param name="value">The enum value</param>
+        /// <returns>The folder key</returns>
+        public static string GetFolderKey(this XivDataFile value)
+        {
+            var field = value.GetType().GetField(value.ToString());
+            var attribute = (XivDataFileDescriptionAttribute[])field.GetCustomAttributes(typeof(XivDataFileDescriptionAttribute), false);
+            return attribute.Length > 0 ? attribute[0].FolderKey : value.ToString();
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.All)]
+    public class XivDataFileDescriptionAttribute : DescriptionAttribute
+    {
+        public XivDataFileDescriptionAttribute(string catNum, string folderKey)
+        {
+            this.CatNumber = catNum;
+            this.FolderKey = folderKey;
+        }
+
+        public string CatNumber { get; set; }
+        public string FolderKey { get; set; }
     }
 }
