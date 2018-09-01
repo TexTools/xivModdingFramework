@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using xivModdingFramework.Items.Interfaces;
 
 namespace xivModdingFramework.Items.DataContainers
@@ -56,5 +57,11 @@ namespace xivModdingFramework.Items.DataContainers
         /// The Primary Model Information of the Minion Item 
         /// </summary>
         public XivModelInfo PrimaryModelInfo { get; set; }
+
+
+        public int CompareTo(object obj)
+        {
+            return string.Compare(Name, ((XivMinion)obj).Name, StringComparison.Ordinal);
+        }
     }
 }

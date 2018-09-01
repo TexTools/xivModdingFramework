@@ -98,6 +98,8 @@ namespace xivModdingFramework.Items.Categories
                 minionList.Add(xivMinion);
             }
 
+            minionList.Sort();
+
             return minionList;
         }
 
@@ -155,6 +157,8 @@ namespace xivModdingFramework.Items.Categories
 
                 mountList.Add(xivMount);
             }
+
+            mountList.Sort();
 
             return mountList;
         }
@@ -239,6 +243,8 @@ namespace xivModdingFramework.Items.Categories
 
                 petList.Add(xivPet);
             }
+
+            petList.Sort();
 
             return petList;
         }

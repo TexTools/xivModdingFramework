@@ -133,6 +133,8 @@ namespace xivModdingFramework.Items.Categories
                 mapList.Add(xivUi);
             }
 
+            mapList.Sort();
+
             return mapList;
         }
 
@@ -476,6 +478,8 @@ namespace xivModdingFramework.Items.Categories
                 actionList.Add(xivUi);
             }
 
+            actionList.Sort();
+
             return actionList;
         }
 
@@ -540,6 +544,8 @@ namespace xivModdingFramework.Items.Categories
                 statusList.Add(xivUi);
             }
 
+            statusList.Sort();
+
             return statusList;
         }
 
@@ -585,6 +591,8 @@ namespace xivModdingFramework.Items.Categories
 
                 mapSymbolList.Add(xivUi);
             }
+
+            mapSymbolList.Sort();
 
             return mapSymbolList;
         }
@@ -637,6 +645,8 @@ namespace xivModdingFramework.Items.Categories
                 onlineStatusList.Add(xivUi);
             }
 
+            onlineStatusList.Sort();
+
             return onlineStatusList;
         }
 
@@ -686,6 +696,8 @@ namespace xivModdingFramework.Items.Categories
                 weatherList.Add(xivUi);
             }
 
+            weatherList.Sort();
+
             return weatherList;
         }
 
@@ -731,6 +743,8 @@ namespace xivModdingFramework.Items.Categories
 
                 loadingImageList.Add(xivUi);
             }
+
+            loadingImageList.Sort();
 
             return loadingImageList;
         }

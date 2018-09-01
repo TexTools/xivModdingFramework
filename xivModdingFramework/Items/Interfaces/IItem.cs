@@ -14,12 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+
 namespace xivModdingFramework.Items.Interfaces
 {
     /// <summary>
     /// Interface for Item details
     /// </summary>
-    public interface IItem
+    public interface IItem : IComparable
     {
         /// <summary>
         /// The item Name

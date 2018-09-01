@@ -172,6 +172,7 @@ namespace xivModdingFramework.Items.Categories
                     xivGearList.Add(xivGear);
                 }
             }
+            xivGearList.Sort();
 
             return xivGearList;
         }

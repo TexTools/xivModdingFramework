@@ -50,7 +50,7 @@ namespace xivModdingFramework.Items.Categories
                 new XivCharacter {Name = XivStrings.Face_Paint, Category = XivStrings.Character},
                 new XivCharacter {Name = XivStrings.Equipment_Decals, Category = XivStrings.Character}
             };
-
+            
             return characterList;
         }
 
