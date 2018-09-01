@@ -25,6 +25,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -37,10 +38,13 @@ namespace xivModdingFramework.SqPack.FileTypes
     {
         private const string DatExtension = ".win32.dat";
         private readonly DirectoryInfo _gameDirectory;
+        private readonly DirectoryInfo _modListDirectory;
 
         public Dat(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
+
+            _modListDirectory = new DirectoryInfo(gameDirectory.Parent.Parent + "//" + XivStrings.ModlistFilePath); 
         }
 
 
@@ -214,18 +218,17 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Type 2 files vary in content.
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="modListDirectory">The directory where the mod list is located.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public byte[] GetType2OriginalData( string internalPath, DirectoryInfo modListDirectory )
+        public byte[] GetType2OriginalData(string internalPath)
         {
-            string folderKey = internalPath.Substring(0, internalPath.IndexOf( "/" ));
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf( "/" ));
 
             var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
 
             foreach (var cat in cats)
             {
                 if(cat.GetFolderKey() == folderKey)
-                    return GetType2OriginalData(internalPath, cat, modListDirectory);
+                    return GetType2OriginalData(internalPath, cat);
             }
 
             throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
@@ -239,15 +242,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="dataFile">The data file that contains the data.</param>
-        /// <param name="modListDirectory">The directory where the mod list is located.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public byte[] GetType2OriginalData(string internalPath, XivDataFile dataFile, DirectoryInfo modListDirectory)
+        public byte[] GetType2OriginalData(string internalPath, XivDataFile dataFile)
         {
-            var lineNum = 0;
             var inModList = false;
             ModInfo modInfo = null;
 
-            using (var sr = new StreamReader(modListDirectory.FullName))
+            using (var sr = new StreamReader(_modListDirectory.FullName))
             {
                 string line;
                 while ((line = sr.ReadLine()) != null)
@@ -258,7 +259,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                         inModList = true;
                         break;
                     }
-                    lineNum++;
                 }
             }
 
@@ -325,10 +325,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName">The name of the item being imported.</param>
         /// <param name="internalFilePath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
-        /// <param name="modListDirectory">The file path where the mod list is located.</param>
         /// <param name="dataFile">The data file to import the data into.</param>
-        public int ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalFilePath, string category,
-            DirectoryInfo modListDirectory, XivDataFile dataFile)
+        public int ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalFilePath,
+            string category, XivDataFile dataFile)
         {
             ModInfo modInfo = null;
             var lineNum = 0;
@@ -339,7 +338,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var dataBlocks = new List<byte>();
 
             // Checks if the item being imported already exists in the modlist
-            using (var streamReader = new StreamReader(modListDirectory.FullName))
+            using (var streamReader = new StreamReader(_modListDirectory.FullName))
             {
                 string line;
                 while ((line = streamReader.ReadLine()) != null)
@@ -435,7 +434,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             newData.AddRange(headerData);
             newData.AddRange(dataBlocks);
 
-            var newOffset = WriteToDat(newData, modInfo, inModList, internalFilePath, category, itemName, lineNum, dataFile, modListDirectory);
+            var newOffset = WriteToDat(newData, modInfo, inModList, internalFilePath, category, itemName, lineNum, dataFile);
 
             if (newOffset == 0)
             {
@@ -563,15 +562,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="dataFile">The data file that contains the data.</param>
-        /// <param name="modListDirectory">The directory where the mod list is located.</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public (int MeshCount, int MaterialCount, byte[] Data) GetType3OriginalData(string internalPath, XivDataFile dataFile, DirectoryInfo modListDirectory)
+        public (int MeshCount, int MaterialCount, byte[] Data) GetType3OriginalData(string internalPath, XivDataFile dataFile)
         {
-            var lineNum = 0;
             var inModList = false;
             ModInfo modInfo = null;
 
-            using (var sr = new StreamReader(modListDirectory.FullName))
+            using (var sr = new StreamReader(_modListDirectory.FullName))
             {
                 string line;
                 while ((line = sr.ReadLine()) != null)
@@ -582,7 +579,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                         inModList = true;
                         break;
                     }
-                    lineNum++;
                 }
             }
 
@@ -820,15 +816,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="dataFile">The data file that contains the data.</param>
-        /// <param name="modListDirectory">The directory where the mod list is located.</param>
         /// <param name="xivTex">The XivTex container to fill</param>
-        public void GetType4OriginalData(string internalPath, XivDataFile dataFile, DirectoryInfo modListDirectory, XivTex xivTex)
+        public void GetType4OriginalData(string internalPath, XivDataFile dataFile, XivTex xivTex)
         {
-            var lineNum = 0;
             var inModList = false;
             ModInfo modInfo = null;
 
-            using (var sr = new StreamReader(modListDirectory.FullName))
+            using (var sr = new StreamReader(_modListDirectory.FullName))
             {
                 string line;
                 while ((line = sr.ReadLine()) != null)
@@ -839,7 +833,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                         inModList = true;
                         break;
                     }
-                    lineNum++;
                 }
             }
 
@@ -1065,7 +1058,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="dataFile">The data file to which we write the data</param>
         /// <returns>The new offset in which the modified data was placed.</returns>
         public int WriteToDat(List<byte> data, ModInfo modEntry, bool inModList, string internalFilePath,
-            string category, string itemName, int lineNum, XivDataFile dataFile, DirectoryInfo modListDirectory)
+            string category, string itemName, int lineNum, XivDataFile dataFile)
         {
             var offset = 0;
             var dataOverwritten = false;
@@ -1149,7 +1142,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 *  write the compressed data in the existing space.
                 */
 
-                foreach (var line in File.ReadAllLines(modListDirectory.FullName))
+                foreach (var line in File.ReadAllLines(_modListDirectory.FullName))
                 {
                     var emptyEntry = JsonConvert.DeserializeObject<ModInfo>(line);
 
@@ -1194,9 +1187,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                                         datFile = dataFile.GetDataFileName()
                                     };
 
-                                    var oLines = File.ReadAllLines(modListDirectory.FullName);
+                                    var oLines = File.ReadAllLines(_modListDirectory.FullName);
                                     oLines[lineNum] = JsonConvert.SerializeObject(replaceOriginalEntry);
-                                    File.WriteAllLines(modListDirectory.FullName, oLines);
+                                    File.WriteAllLines(_modListDirectory.FullName, oLines);
                                 }
 
 
@@ -1211,9 +1204,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     datFile = dataFile.GetDataFileName()
                                 };
 
-                                var lines = File.ReadAllLines(modListDirectory.FullName);
+                                var lines = File.ReadAllLines(_modListDirectory.FullName);
                                 lines[emptyLine] = JsonConvert.SerializeObject(replaceEntry);
-                                File.WriteAllLines(modListDirectory.FullName, lines);
+                                File.WriteAllLines(_modListDirectory.FullName, lines);
 
                                 offset = emptyEntry.modOffset;
 
@@ -1285,9 +1278,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                             datFile = dataFile.GetDataFileName()
                         };
 
-                        var lines = File.ReadAllLines(modListDirectory.FullName);
+                        var lines = File.ReadAllLines(_modListDirectory.FullName);
                         lines[lineNum] = JsonConvert.SerializeObject(replaceEntry);
-                        File.WriteAllLines(modListDirectory.FullName, lines);
+                        File.WriteAllLines(_modListDirectory.FullName, lines);
                     }
 
                     var entry = new ModInfo
@@ -1301,7 +1294,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         datFile = dataFile.GetDataFileName()
                     };
 
-                    using (var modFile = new StreamWriter(modListDirectory.FullName, true))
+                    using (var modFile = new StreamWriter(_modListDirectory.FullName, true))
                     {
                         modFile.BaseStream.Seek(0, SeekOrigin.End);
                         modFile.WriteLine(JsonConvert.SerializeObject(entry));

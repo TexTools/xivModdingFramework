@@ -21,6 +21,7 @@ using Newtonsoft.Json;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -34,10 +35,12 @@ namespace xivModdingFramework.Textures.FileTypes
     {
         private const string TexExtension = ".tex";
         private readonly DirectoryInfo _gameDirectory;
+        private readonly DirectoryInfo _modListDirectory;
 
         public Tex(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
+            _modListDirectory = new DirectoryInfo(gameDirectory.Parent.Parent + "//" + XivStrings.ModlistFilePath);
         }
 
         public XivTex getTexData(TexTypePath ttp)
@@ -102,9 +105,8 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="xivTex">The texture data</param>
         /// <param name="item">The item who's texture we are importing</param>
         /// <param name="ddsFileDirectory">The directory of the dds file being imported</param>
-        /// <param name="modlistDirectory">The directory of the modlist to write to</param>
         /// <returns>The offset to the new imported data</returns>
-        public long TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory, DirectoryInfo modlistDirectory)
+        public long TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory)
         {
             int lineNum = 0, offset = 0;
             var inModList = false;
@@ -115,7 +117,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if (File.Exists(ddsFileDirectory.FullName))
             {
                 // Check if the texture being imported has been imported before
-                using (var sr = new StreamReader(modlistDirectory.FullName))
+                using (var sr = new StreamReader(_modListDirectory.FullName))
                 {
                     string line;
                     while ((line = sr.ReadLine()) != null)
@@ -201,7 +203,7 @@ namespace xivModdingFramework.Textures.FileTypes
                         newTex.AddRange(DDSInfo.compressedDDS);
 
                         offset = dat.WriteToDat(newTex, modInfo, inModList, xivTex.TextureTypeAndPath.Path,
-                            item.ItemCategory, item.Name, lineNum, xivTex.TextureTypeAndPath.DataFile, modlistDirectory);
+                            item.ItemCategory, item.Name, lineNum, xivTex.TextureTypeAndPath.DataFile);
                     }
                     else
                     {

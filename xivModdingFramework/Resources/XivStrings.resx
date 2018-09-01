@@ -708,4 +708,7 @@
   <data name="Hyur_Midlander_Male" xml:space="preserve">
     <value>Hyur Midlander Male</value>
   </data>
+  <data name="ModlistFilePath" xml:space="preserve">
+    <value>XivMods.json</value>
+  </data>
 </root>

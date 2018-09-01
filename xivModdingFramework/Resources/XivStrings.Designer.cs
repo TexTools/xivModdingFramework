@@ -1312,6 +1312,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to XivMods.json.
+        /// </summary>
+        internal static string ModlistFilePath {
+            get {
+                return ResourceManager.GetString("ModlistFilePath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Monster.
         /// </summary>
         internal static string Monster {

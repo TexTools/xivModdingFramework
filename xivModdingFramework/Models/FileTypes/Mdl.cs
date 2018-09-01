@@ -46,6 +46,7 @@ namespace xivModdingFramework.Models.FileTypes
     {
         private const string MdlExtension = ".mdl";
         private readonly DirectoryInfo _gameDirectory;
+        private readonly DirectoryInfo _modListDirectory;
         private readonly XivDataFile _dataFile;
 
         /// <summary>
@@ -59,6 +60,8 @@ namespace xivModdingFramework.Models.FileTypes
         public Mdl(DirectoryInfo gameDirectory, XivDataFile dataFile)
         {
             _gameDirectory = gameDirectory;
+            _modListDirectory = new DirectoryInfo(gameDirectory.Parent.Parent + "//" + XivStrings.ModlistFilePath);
+
             _dataFile = dataFile;
         }
 
@@ -1008,10 +1011,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="item">The current item being imported</param>
         /// <param name="xivMdl">The model data for the given item</param>
         /// <param name="daeLocation">The location of the dae file to import</param>
-        /// <param name="modListDirectory">The directory in which the mod list is located</param>
         /// <param name="advImportSettings">The advanced import settings if any</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public Dictionary<string, string> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation, DirectoryInfo modListDirectory,
+        public Dictionary<string, string> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
             Dictionary<string, ModelImportSettings> advImportSettings)
         {
             if (!File.Exists(daeLocation.FullName))
@@ -1861,7 +1863,7 @@ namespace xivModdingFramework.Models.FileTypes
                 meshNum++;
             }
 
-            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, modListDirectory, advImportSettings);
+            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings);
 
             return warningsDictionary;
         }
@@ -1872,10 +1874,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="item">The item the model belongs to</param>
         /// <param name="xivMdl">The original model data</param>
-        /// <param name="modlistDirectory">The directory in which the mod list is located</param>
         /// <param name="importSettings">The import settings if any</param>
-        private void MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl,
-            DirectoryInfo modlistDirectory, Dictionary<string, ModelImportSettings> importSettings)
+        private void MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl, 
+            Dictionary<string, ModelImportSettings> importSettings)
         {
             var lineNum = 0;
             var inModList = false;
@@ -1885,7 +1886,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
-            using (var sr = new StreamReader(modlistDirectory.FullName))
+            using (var sr = new StreamReader(_modListDirectory.FullName))
             {
                 string line;
                 while ((line = sr.ReadLine()) != null)
@@ -3181,7 +3182,7 @@ namespace xivModdingFramework.Models.FileTypes
             var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
             dat.WriteToDat(compressedMDLData, modInfo, inModList, filePath, item.Category, item.Name, lineNum,
-                _dataFile, modlistDirectory);
+                _dataFile);
 
             #endregion
         }

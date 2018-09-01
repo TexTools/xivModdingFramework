@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.IO;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Mods.FileTypes
 {
@@ -23,8 +24,7 @@ namespace xivModdingFramework.Mods.FileTypes
     /// </summary>
     public class ModList
     {
-        private readonly string _modListName;
-        private readonly DirectoryInfo _modlistDirectory;
+        private readonly DirectoryInfo _gameDirectory;
 
 
         /// <summary>
@@ -32,30 +32,19 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modlistDirectory">The directory in which to place the Modlist</param>
         /// <param name="modListName">The name to give the modlist file</param>
-        public ModList(DirectoryInfo modlistDirectory, string modListName)
+        public ModList(DirectoryInfo gameDirectory)
         {
-            _modlistDirectory = modlistDirectory;
-            _modListName = modListName + ".modlist";
+            _gameDirectory = gameDirectory;
         }
-
-        /// <summary>
-        /// Sets the modlist with the default name
-        /// </summary>
-        /// <param name="modlistDirectory"></param>
-        public ModList(DirectoryInfo modlistDirectory)
-        {
-            _modlistDirectory = modlistDirectory;
-            _modListName = "TexTools.modlist";
-        }
-
 
         /// <summary>
         /// Creates the Mod List that is used to keep track of mods.
         /// </summary>
         public void CreateModlist()
         {
-            var modListPath = _modlistDirectory.FullName + "\\" + _modListName;
-            Directory.CreateDirectory(_modlistDirectory.FullName);
+            var gameDir = _gameDirectory.Parent.Parent;
+
+            var modListPath = gameDir.FullName + "\\" + XivStrings.ModlistFilePath;
 
             if (!File.Exists(modListPath))
             {
