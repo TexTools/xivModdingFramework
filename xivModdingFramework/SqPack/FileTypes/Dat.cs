@@ -295,6 +295,133 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Imports any Type 2 data
+        /// </summary>
+        /// <param name="importFilePath">The file path where the file to be imported is located.</param>
+        /// <param name="itemName">The name of the item being imported.</param>
+        /// <param name="internalFilePath">The internal file path of the item.</param>
+        /// <param name="category">The items category.</param>
+        /// <param name="modListDirectory">The file path where the mod list is located.</param>
+        /// <param name="dataFile">The data file to import the data into.</param>
+        public int ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalFilePath, string category,
+            DirectoryInfo modListDirectory, XivDataFile dataFile)
+        {
+            ModInfo modInfo = null;
+            var lineNum = 0;
+            var inModList = false;
+
+            var newData = new List<byte>();
+            var headerData = new List<byte>();
+            var dataBlocks = new List<byte>();
+
+            // Checks if the item being imported already exists in the modlist
+            using (var streamReader = new StreamReader(modListDirectory.FullName))
+            {
+                string line;
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+                    if (modInfo.fullPath.Equals(internalFilePath))
+                    {
+                        inModList = true;
+                        break;
+                    }
+                    lineNum++;
+                }
+            }
+
+            var rawBytes = File.ReadAllBytes(importFilePath.FullName);
+
+            // Header size is defaulted to 128, but may need to change if the data being imported is very large.
+            headerData.AddRange(BitConverter.GetBytes(128));
+            headerData.AddRange(BitConverter.GetBytes(2));
+            headerData.AddRange(BitConverter.GetBytes(rawBytes.Length));
+
+            var dataOffset = 0;
+            var totalCompSize = 0;
+            var uncompressedLength = rawBytes.Length;
+
+            var partCount = (int)Math.Ceiling(uncompressedLength / 16000f);
+
+            headerData.AddRange(BitConverter.GetBytes(partCount));
+
+            var remainder = uncompressedLength;
+
+            using (var binaryReader = new BinaryReader(new MemoryStream(rawBytes)))
+            {
+                binaryReader.BaseStream.Seek(0, SeekOrigin.Begin);
+
+                for (var i = 1; i <= partCount; i++)
+                {
+                    if (i == partCount)
+                    {
+                        var compressedData = IOUtil.Compressor(binaryReader.ReadBytes(remainder));
+                        var padding = 128 - ((compressedData.Length + 16) % 128);
+
+                        dataBlocks.AddRange(BitConverter.GetBytes(16));
+                        dataBlocks.AddRange(BitConverter.GetBytes(0));
+                        dataBlocks.AddRange(BitConverter.GetBytes(compressedData.Length));
+                        dataBlocks.AddRange(BitConverter.GetBytes(remainder));
+                        dataBlocks.AddRange(compressedData);
+                        dataBlocks.AddRange(new byte[padding]);
+
+                        headerData.AddRange(BitConverter.GetBytes(dataOffset));
+                        headerData.AddRange(BitConverter.GetBytes((short)((compressedData.Length + 16) + padding)));
+                        headerData.AddRange(BitConverter.GetBytes((short)remainder));
+
+                        totalCompSize = dataOffset + ((compressedData.Length + 16) + padding);
+                    }
+                    else
+                    {
+                        var compressedData = IOUtil.Compressor(binaryReader.ReadBytes(16000));
+                        var padding = 128 - ((compressedData.Length + 16) % 128);
+
+                        dataBlocks.AddRange(BitConverter.GetBytes(16));
+                        dataBlocks.AddRange(BitConverter.GetBytes(0));
+                        dataBlocks.AddRange(BitConverter.GetBytes(compressedData.Length));
+                        dataBlocks.AddRange(BitConverter.GetBytes(16000));
+                        dataBlocks.AddRange(compressedData);
+                        dataBlocks.AddRange(new byte[padding]);
+
+                        headerData.AddRange(BitConverter.GetBytes(dataOffset));
+                        headerData.AddRange(BitConverter.GetBytes((short)((compressedData.Length + 16) + padding)));
+                        headerData.AddRange(BitConverter.GetBytes((short)16000));
+
+                        dataOffset += ((compressedData.Length + 16) + padding);
+                        remainder -= 16000;
+                    }
+                }
+            }
+
+            headerData.InsertRange(12, BitConverter.GetBytes(totalCompSize / 128));
+            headerData.InsertRange(16, BitConverter.GetBytes(totalCompSize / 128));
+
+            var headerSize = 128;
+
+            if (headerData.Count > 128)
+            {
+                headerData.RemoveRange(0, 4);
+                headerData.InsertRange(0, BitConverter.GetBytes(256));
+                headerSize = 256;
+            }
+            var headerPadding = headerSize - headerData.Count;
+
+            headerData.AddRange(new byte[headerPadding]);
+
+            newData.AddRange(headerData);
+            newData.AddRange(dataBlocks);
+
+            var newOffset = WriteToDat(newData, modInfo, inModList, internalFilePath, category, itemName, lineNum, dataFile, modListDirectory);
+
+            if (newOffset == 0)
+            {
+                throw new Exception("There was an error writing to the dat file. Offset returned was 0.");
+            }
+
+            return newOffset;
+        }
+
+        /// <summary>
         /// Gets the data for Type 3 (Model) files
         /// </summary>
         /// <remarks>
