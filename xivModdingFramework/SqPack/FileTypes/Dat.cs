@@ -208,7 +208,31 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Gets the original data for type 2 files.
+        /// Gets the original data for type 2 files based on the path specified.
+        /// </summary>
+        /// <remarks>
+        /// Type 2 files vary in content.
+        /// </remarks>
+        /// <param name="internalPath">The internal file path of the item</param>
+        /// <param name="modListDirectory">The directory where the mod list is located.</param>
+        /// <returns>Byte array containing the decompressed type 2 data.</returns>
+        public byte[] GetType2OriginalData( string internalPath, DirectoryInfo modListDirectory )
+        {
+            string folderKey = internalPath.Substring(0, internalPath.IndexOf( "/" ));
+
+            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            foreach (var cat in cats)
+            {
+                if(cat.GetFolderKey() == folderKey)
+                    return GetType2OriginalData(internalPath, cat, modListDirectory);
+            }
+
+            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+        }
+
+        /// <summary>
+        /// Gets the original data for type 2 files based on the dat specified.
         /// </summary>
         /// <remarks>
         /// Type 2 files vary in content.
