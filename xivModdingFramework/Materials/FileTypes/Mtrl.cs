@@ -110,7 +110,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 xivMtrl.TexturePathOffsetList = new List<int>(xivMtrl.TextureCount);
                 for (var i = 0; i < xivMtrl.TextureCount; i++)
                 {
-                    xivMtrl.TexturePathOffsetList.Add(br.ReadInt32());
+                    xivMtrl.TexturePathOffsetList.Add(br.ReadInt16());
+                    br.ReadBytes(2);
 
                     // add the size of the paths
                     if (i > 0)
@@ -123,7 +124,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 xivMtrl.MapPathOffsetList = new List<int>(xivMtrl.MapCount);
                 for (var i = 0; i < xivMtrl.MapCount; i++)
                 {
-                    xivMtrl.MapPathOffsetList.Add(br.ReadInt32());
+                    xivMtrl.MapPathOffsetList.Add(br.ReadInt16());
+                    br.ReadBytes(2);
 
                     // add the size of the paths
                     if (i > 0)
@@ -140,7 +142,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 xivMtrl.ColorSetPathOffsetList = new List<int>(xivMtrl.ColorSetCount);
                 for (var i = 0; i < xivMtrl.ColorSetCount; i++)
                 {
-                    xivMtrl.ColorSetPathOffsetList.Add(br.ReadInt32());
+                    xivMtrl.ColorSetPathOffsetList.Add(br.ReadInt16());
+                    br.ReadBytes(2);
 
                     // add the size of the paths
                     if (i > 0)

@@ -717,7 +717,91 @@
   <data name="All_Races" xml:space="preserve">
     <value>ALL</value>
   </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>AuRa Female</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>AuRa Female NPC</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>AuRa Male</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>AuRa Male NPC</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>Elezen Female</value>
+  </data>
+  <data name="Elezen_Female_NPC" xml:space="preserve">
+    <value>Elezen Female NPC</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>Elezen Male</value>
+  </data>
+  <data name="Elezen_Male_NPC" xml:space="preserve">
+    <value>Elezen Male NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>Hyur Highlander Female</value>
+  </data>
+  <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
+    <value>Hyur Highlander Female NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>Hyur Highlander Male</value>
+  </data>
+  <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
+    <value>Hyur Highlander Male NPC</value>
+  </data>
   <data name="Hyur_Midlander_Female" xml:space="preserve">
     <value>Hyur Midlander Female</value>
+  </data>
+  <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
+    <value>Hyur Midlander Female NPC</value>
+  </data>
+  <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
+    <value>Hyur Midlander Male NPC</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>Lalafell Female</value>
+  </data>
+  <data name="Lalafell_Female_NPC" xml:space="preserve">
+    <value>Lalafell Female NPC</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>Lalafell Male</value>
+  </data>
+  <data name="Lalafell_Male_NPC" xml:space="preserve">
+    <value>Lalafell Male NPC</value>
+  </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>Miqote Female</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>Miqote Female NPC</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>Miqote Male</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>Miqote Male NPC</value>
+  </data>
+  <data name="NPC_Female" xml:space="preserve">
+    <value>NPC Female</value>
+  </data>
+  <data name="NPC_Male" xml:space="preserve">
+    <value>NPC Male</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>Roegadyn Female</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>Roegadyn Female NPC</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>Roegadyn Male</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>Roegadyn Male NPC</value>
   </data>
 </root>

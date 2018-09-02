@@ -178,6 +178,42 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to AuRa Female.
+        /// </summary>
+        internal static string AuRa_Female {
+            get {
+                return ResourceManager.GetString("AuRa_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AuRa Female NPC.
+        /// </summary>
+        internal static string AuRa_Female_NPC {
+            get {
+                return ResourceManager.GetString("AuRa_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AuRa Male.
+        /// </summary>
+        internal static string AuRa_Male {
+            get {
+                return ResourceManager.GetString("AuRa_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to AuRa Male NPC.
+        /// </summary>
+        internal static string AuRa_Male_NPC {
+            get {
+                return ResourceManager.GetString("AuRa_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Au Ra Raen.
         /// </summary>
         internal static string AuRa_Raen {
@@ -525,6 +561,42 @@ namespace xivModdingFramework.Resources {
         internal static string Elezen {
             get {
                 return ResourceManager.GetString("Elezen", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Elezen Female.
+        /// </summary>
+        internal static string Elezen_Female {
+            get {
+                return ResourceManager.GetString("Elezen_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Elezen Female NPC.
+        /// </summary>
+        internal static string Elezen_Female_NPC {
+            get {
+                return ResourceManager.GetString("Elezen_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Elezen Male.
+        /// </summary>
+        internal static string Elezen_Male {
+            get {
+                return ResourceManager.GetString("Elezen_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Elezen Male NPC.
+        /// </summary>
+        internal static string Elezen_Male_NPC {
+            get {
+                return ResourceManager.GetString("Elezen_Male_NPC", resourceCulture);
             }
         }
         
@@ -979,6 +1051,42 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Hyur Highlander Female.
+        /// </summary>
+        internal static string Hyur_Highlander_Female {
+            get {
+                return ResourceManager.GetString("Hyur_Highlander_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur Highlander Female NPC.
+        /// </summary>
+        internal static string Hyur_Highlander_Female_NPC {
+            get {
+                return ResourceManager.GetString("Hyur_Highlander_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur Highlander Male.
+        /// </summary>
+        internal static string Hyur_Highlander_Male {
+            get {
+                return ResourceManager.GetString("Hyur_Highlander_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur Highlander Male NPC.
+        /// </summary>
+        internal static string Hyur_Highlander_Male_NPC {
+            get {
+                return ResourceManager.GetString("Hyur_Highlander_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Hyur Midlander.
         /// </summary>
         internal static string Hyur_M {
@@ -997,11 +1105,29 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Hyur Midlander Female NPC.
+        /// </summary>
+        internal static string Hyur_Midlander_Female_NPC {
+            get {
+                return ResourceManager.GetString("Hyur_Midlander_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Hyur Midlander Male.
         /// </summary>
         internal static string Hyur_Midlander_Male {
             get {
                 return ResourceManager.GetString("Hyur_Midlander_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur Midlander Male NPC.
+        /// </summary>
+        internal static string Hyur_Midlander_Male_NPC {
+            get {
+                return ResourceManager.GetString("Hyur_Midlander_Male_NPC", resourceCulture);
             }
         }
         
@@ -1101,6 +1227,42 @@ namespace xivModdingFramework.Resources {
         internal static string Lalafell {
             get {
                 return ResourceManager.GetString("Lalafell", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Lalafell Female.
+        /// </summary>
+        internal static string Lalafell_Female {
+            get {
+                return ResourceManager.GetString("Lalafell_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Lalafell Female NPC.
+        /// </summary>
+        internal static string Lalafell_Female_NPC {
+            get {
+                return ResourceManager.GetString("Lalafell_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Lalafell Male.
+        /// </summary>
+        internal static string Lalafell_Male {
+            get {
+                return ResourceManager.GetString("Lalafell_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Lalafell Male NPC.
+        /// </summary>
+        internal static string Lalafell_Male_NPC {
+            get {
+                return ResourceManager.GetString("Lalafell_Male_NPC", resourceCulture);
             }
         }
         
@@ -1321,6 +1483,42 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Miqote Female.
+        /// </summary>
+        internal static string Miqote_Female {
+            get {
+                return ResourceManager.GetString("Miqote_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Miqote Female NPC.
+        /// </summary>
+        internal static string Miqote_Female_NPC {
+            get {
+                return ResourceManager.GetString("Miqote_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Miqote Male.
+        /// </summary>
+        internal static string Miqote_Male {
+            get {
+                return ResourceManager.GetString("Miqote_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Miqote Male NPC.
+        /// </summary>
+        internal static string Miqote_Male_NPC {
+            get {
+                return ResourceManager.GetString("Miqote_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to modelchara_0.exd.
         /// </summary>
         internal static string ModelCharaFile {
@@ -1474,6 +1672,24 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to NPC Female.
+        /// </summary>
+        internal static string NPC_Female {
+            get {
+                return ResourceManager.GetString("NPC_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to NPC Male.
+        /// </summary>
+        internal static string NPC_Male {
+            get {
+                return ResourceManager.GetString("NPC_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Off Hand.
         /// </summary>
         internal static string Off_Hand {
@@ -1569,6 +1785,42 @@ namespace xivModdingFramework.Resources {
         internal static string Roegadyn {
             get {
                 return ResourceManager.GetString("Roegadyn", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roegadyn Female.
+        /// </summary>
+        internal static string Roegadyn_Female {
+            get {
+                return ResourceManager.GetString("Roegadyn_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roegadyn Female NPC.
+        /// </summary>
+        internal static string Roegadyn_Female_NPC {
+            get {
+                return ResourceManager.GetString("Roegadyn_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roegadyn Male.
+        /// </summary>
+        internal static string Roegadyn_Male {
+            get {
+                return ResourceManager.GetString("Roegadyn_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roegadyn Male NPC.
+        /// </summary>
+        internal static string Roegadyn_Male_NPC {
+            get {
+                return ResourceManager.GetString("Roegadyn_Male_NPC", resourceCulture);
             }
         }
         
