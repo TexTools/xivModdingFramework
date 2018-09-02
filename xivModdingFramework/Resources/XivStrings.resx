@@ -714,4 +714,10 @@
   <data name="None" xml:space="preserve">
     <value>None</value>
   </data>
+  <data name="All_Races" xml:space="preserve">
+    <value>ALL</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>Hyur Midlander Female</value>
+  </data>
 </root>

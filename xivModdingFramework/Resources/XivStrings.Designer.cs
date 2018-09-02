@@ -160,6 +160,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to ALL.
+        /// </summary>
+        internal static string All_Races {
+            get {
+                return ResourceManager.GetString("All_Races", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Au Ra.
         /// </summary>
         internal static string Au_Ra {
@@ -975,6 +984,15 @@ namespace xivModdingFramework.Resources {
         internal static string Hyur_M {
             get {
                 return ResourceManager.GetString("Hyur_M", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur Midlander Female.
+        /// </summary>
+        internal static string Hyur_Midlander_Female {
+            get {
+                return ResourceManager.GetString("Hyur_Midlander_Female", resourceCulture);
             }
         }
         

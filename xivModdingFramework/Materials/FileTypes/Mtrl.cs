@@ -301,16 +301,16 @@ namespace xivModdingFramework.Materials.FileTypes
                     break;
                 case XivItemType.weapon:
                     mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_w{id}_b{bodyVer}_{part}{MtrlExtension}";
+                    mtrlFile = $"mt_w{id}b{bodyVer}_{part}{MtrlExtension}";
                     break;
 
                 case XivItemType.monster:
                     mtrlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_m{id}_b{bodyVer}_{part}{MtrlExtension}";
+                    mtrlFile = $"mt_m{id}b{bodyVer}_{part}{MtrlExtension}";
                     break;
                 case XivItemType.demihuman:
                     mtrlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_d{id}_e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
+                    mtrlFile = $"mt_d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
                     break;
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
