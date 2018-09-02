@@ -14,16 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
-using Newtonsoft.Json;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
-using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
@@ -150,6 +148,73 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets the original or modded data for type 2 files based on the path specified.
+        /// </summary>
+        /// <remarks>
+        /// Type 2 files vary in content.
+        /// </remarks>
+        /// <param name="internalPath">The internal file path of the item</param>
+        /// <param name="forceOriginal">Flag used to get original game data</param>
+        /// <returns>Byte array containing the decompressed type 2 data.</returns>
+        public byte[] GetType2Data(string internalPath, bool forceOriginal)
+        {
+            var index = new Index(_gameDirectory);
+
+            XivDataFile? dataFile = null;
+            ModInfo modInfo = null;
+            var inModList = false;
+
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
+
+            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            foreach (var cat in cats)
+            {
+                if (cat.GetFolderKey() == folderKey)
+                    dataFile = cat;
+            }
+
+            if (dataFile == null)
+            {
+                throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+            }
+
+            if (forceOriginal)
+            {
+                // Checks if the item being imported already exists in the modlist
+                using (var streamReader = new StreamReader(_modListDirectory.FullName))
+                {
+                    string line;
+                    while ((line = streamReader.ReadLine()) != null)
+                    {
+                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+                        if (modInfo.fullPath.Equals(internalPath))
+                        {
+                            inModList = true;
+                            break;
+                        }
+                    }
+                }
+
+                // If the file exists in the modlist, get the data from the original data
+                if (inModList)
+                {
+                    return GetType2Data(modInfo.originalOffset, (XivDataFile)dataFile);
+                }
+            }
+
+            // If it doesn't exist in the modlist(the item is not modded) or force original is false,
+            // grab the data directly from them index file. 
+            var folder = Path.GetDirectoryName(internalPath);
+            var file = Path.GetFileName(internalPath);
+
+            var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
+                (XivDataFile)dataFile);
+
+            return GetType2Data(offset, (XivDataFile) dataFile);
+        }
+
+        /// <summary>
         /// Gets the data for type 2 files.
         /// </summary>
         /// <remarks>
@@ -186,113 +251,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var dataBlockOffset = br.ReadInt32();
 
                     br.BaseStream.Seek(offset + headerLength + dataBlockOffset, SeekOrigin.Begin);
-
-                    br.ReadBytes(8);
-
-                    var compressedSize = br.ReadInt32();
-                    var uncompressedSize = br.ReadInt32();
-
-                    // When the compressed size of a data block shows 32000, it is uncompressed.
-                    if (compressedSize == 32000)
-                    {
-                        type2Bytes.AddRange(br.ReadBytes(uncompressedSize));
-                    }
-                    else
-                    {
-                        var compressedData = br.ReadBytes(compressedSize);
-
-                        var decompressedData = IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                        type2Bytes.AddRange(decompressedData);
-                    }
-                }
-            }
-
-            return type2Bytes.ToArray();
-        }
-
-        /// <summary>
-        /// Gets the original data for type 2 files based on the path specified.
-        /// </summary>
-        /// <remarks>
-        /// Type 2 files vary in content.
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public byte[] GetType2OriginalData(string internalPath)
-        {
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf( "/" ));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var cat in cats)
-            {
-                if(cat.GetFolderKey() == folderKey)
-                    return GetType2OriginalData(internalPath, cat);
-            }
-
-            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-        }
-
-        /// <summary>
-        /// Gets the original data for type 2 files based on the dat specified.
-        /// </summary>
-        /// <remarks>
-        /// Type 2 files vary in content.
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public byte[] GetType2OriginalData(string internalPath, XivDataFile dataFile)
-        {
-            var inModList = false;
-            ModInfo modInfo = null;
-
-            using (var sr = new StreamReader(_modListDirectory.FullName))
-            {
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.fullPath.Equals(internalPath))
-                    {
-                        inModList = true;
-                        break;
-                    }
-                }
-            }
-
-            // Throw exception if the item does not exist in the modlist
-            if (!inModList) throw new Exception("Item not found in Modlist.");
-
-            var modOffset = modInfo.modOffset;
-
-            var type2Bytes = new List<byte>();
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((modOffset / 8) & 0x0F) / 2;
-
-            var datPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
-
-            modOffset = OffsetCorrection(datNum, modOffset);
-
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
-            {
-                br.BaseStream.Seek(modOffset, SeekOrigin.Begin);
-
-                var headerLength = br.ReadInt32();
-
-                br.ReadBytes(16);
-
-                var dataBlockCount = br.ReadInt32();
-
-                for (var i = 0; i < dataBlockCount; i++)
-                {
-                    br.BaseStream.Seek(modOffset + (24 + (8 * i)), SeekOrigin.Begin);
-
-                    var dataBlockOffset = br.ReadInt32();
-
-                    br.BaseStream.Seek(modOffset + headerLength + dataBlockOffset, SeekOrigin.Begin);
 
                     br.ReadBytes(8);
 
@@ -445,6 +403,73 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets the original or modded data for type 3 files based on the path specified.
+        /// </summary>
+        /// <remarks>
+        /// Type 3 files are used for models
+        /// </remarks>
+        /// <param name="internalPath">The internal file path of the item</param>
+        /// <param name="forceOriginal">Flag used to get original game data</param>
+        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
+        public (int MeshCount, int MaterialCount, byte[] Data) GetType3Data(string internalPath, bool forceOriginal)
+        {
+            var index = new Index(_gameDirectory);
+
+            XivDataFile? dataFile = null;
+            ModInfo modInfo = null;
+            var inModList = false;
+
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
+
+            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            foreach (var cat in cats)
+            {
+                if (cat.GetFolderKey() == folderKey)
+                    dataFile = cat;
+            }
+
+            if (dataFile == null)
+            {
+                throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+            }
+
+            if (forceOriginal)
+            {
+                // Checks if the item being imported already exists in the modlist
+                using (var streamReader = new StreamReader(_modListDirectory.FullName))
+                {
+                    string line;
+                    while ((line = streamReader.ReadLine()) != null)
+                    {
+                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+                        if (modInfo.fullPath.Equals(internalPath))
+                        {
+                            inModList = true;
+                            break;
+                        }
+                    }
+                }
+
+                // If the file exists in the modlist, get the data from the original data
+                if (inModList)
+                {
+                    return GetType3Data(modInfo.originalOffset, (XivDataFile)dataFile);
+                }
+            }
+
+            // If it doesn't exist in the modlist(the item is not modded) or force original is false,
+            // grab the data directly from them index file. 
+            var folder = Path.GetDirectoryName(internalPath);
+            var file = Path.GetFileName(internalPath);
+
+            var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
+                (XivDataFile)dataFile);
+
+            return GetType3Data(offset, (XivDataFile)dataFile);
+        }
+
+        /// <summary>
         /// Gets the data for Type 3 (Model) files
         /// </summary>
         /// <remarks>
@@ -555,15 +580,22 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Gets the original data for Type 3 (Model) files
+        /// Gets the original or modded data for type 4 files based on the path specified.
         /// </summary>
         /// <remarks>
-        /// Type 3 files are used for models
+        /// Type 4 files are used for Textures
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
-        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public (int MeshCount, int MaterialCount, byte[] Data) GetType3OriginalData(string internalPath)
+        /// <param name="forceOriginal">Flag used to get original game data</param>
+         /// <param name="xivTex">The XivTex container to fill</param>
+        public void GetType4Data(string internalPath, bool forceOriginal, XivTex xivTex)
         {
+            var index = new Index(_gameDirectory);
+
+            XivDataFile? dataFile = null;
+            ModInfo modInfo = null;
+            var inModList = false;
+
             var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
 
             var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
@@ -571,142 +603,49 @@ namespace xivModdingFramework.SqPack.FileTypes
             foreach (var cat in cats)
             {
                 if (cat.GetFolderKey() == folderKey)
-                    return GetType3OriginalData(internalPath, cat);
+                    dataFile = cat;
             }
 
-            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-        }
-
-        /// <summary>
-        /// Gets the original data for Type 3 (Model) files
-        /// </summary>
-        /// <remarks>
-        /// Type 3 files are used for models
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public (int MeshCount, int MaterialCount, byte[] Data) GetType3OriginalData(string internalPath, XivDataFile dataFile)
-        {
-            var inModList = false;
-            ModInfo modInfo = null;
-
-            using (var sr = new StreamReader(_modListDirectory.FullName))
+            if (dataFile == null)
             {
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.fullPath.Equals(internalPath))
-                    {
-                        inModList = true;
-                        break;
-                    }
-                }
+                throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
             }
 
-            // Throw exception if the item does not exist in the modlist
-            if (!inModList) throw new Exception("Item not found in Modlist.");
-
-            var modOffset = modInfo.modOffset;
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((modOffset / 8) & 0x0F) / 2;
-
-            modOffset = OffsetCorrection(datNum, modOffset);
-
-            var datPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
-
-            var byteList = new List<byte>();
-            var meshCount = 0;
-            var materialCount = 0;
-
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
+            if (forceOriginal)
             {
-                br.BaseStream.Seek(modOffset, SeekOrigin.Begin);
-
-                var headerLength = br.ReadInt32();
-                var fileType = br.ReadInt32();
-                var decompressedSize = br.ReadInt32();
-                var buffer1 = br.ReadInt32();
-                var buffer2 = br.ReadInt32();
-                var parts = br.ReadInt16();
-
-                var endOfHeader = modOffset + headerLength;
-
-                byteList.AddRange(new byte[68]);
-
-                br.BaseStream.Seek(modOffset + 24, SeekOrigin.Begin);
-
-                var chunkUncompSizes = new int[11];
-                var chunkLengths = new int[11];
-                var chunkOffsets = new int[11];
-                var chunkBlockStart = new int[11];
-                var chunkNumBlocks = new int[11];
-
-                for (var i = 0; i < 11; i++)
+                // Checks if the item being imported already exists in the modlist
+                using (var streamReader = new StreamReader(_modListDirectory.FullName))
                 {
-                    chunkUncompSizes[i] = br.ReadInt32();
-                }
-                for (var i = 0; i < 11; i++)
-                {
-                    chunkLengths[i] = br.ReadInt32();
-                }
-                for (var i = 0; i < 11; i++)
-                {
-                    chunkOffsets[i] = br.ReadInt32();
-                }
-                for (var i = 0; i < 11; i++)
-                {
-                    chunkBlockStart[i] = br.ReadInt16();
-                }
-                var totalBlocks = 0;
-                for (var i = 0; i < 11; i++)
-                {
-                    chunkNumBlocks[i] = br.ReadInt16();
-
-                    totalBlocks += chunkNumBlocks[i];
-                }
-
-                meshCount = br.ReadInt16();
-                materialCount = br.ReadInt16();
-
-                br.ReadBytes(4);
-
-                var blockSizes = new int[totalBlocks];
-
-                for (var i = 0; i < totalBlocks; i++)
-                {
-                    blockSizes[i] = br.ReadInt16();
-                }
-
-                br.BaseStream.Seek(modOffset + headerLength + chunkOffsets[0], SeekOrigin.Begin);
-
-                for (var i = 0; i < totalBlocks; i++)
-                {
-                    var lastPos = (int)br.BaseStream.Position;
-
-                    br.ReadBytes(8);
-
-                    var partCompSize = br.ReadInt32();
-                    var partDecompSize = br.ReadInt32();
-
-                    if (partCompSize == 32000)
+                    string line;
+                    while ((line = streamReader.ReadLine()) != null)
                     {
-                        byteList.AddRange(br.ReadBytes(partDecompSize));
+                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+                        if (modInfo.fullPath.Equals(internalPath))
+                        {
+                            inModList = true;
+                            break;
+                        }
                     }
-                    else
-                    {
-                        var partDecompBytes = IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
+                }
 
-                        byteList.AddRange(partDecompBytes);
-                    }
-
-                    br.BaseStream.Seek(lastPos + blockSizes[i], SeekOrigin.Begin);
+                // If the file exists in the modlist, get the data from the original data
+                if (inModList)
+                {
+                    GetType4Data(modInfo.originalOffset, (XivDataFile)dataFile, xivTex);
+                    return;
                 }
             }
 
-            return (meshCount, materialCount, byteList.ToArray());
+            // If it doesn't exist in the modlist(the item is not modded) or force original is false,
+            // grab the data directly from them index file. 
+
+            var folder = Path.GetDirectoryName(internalPath);
+            var file = Path.GetFileName(internalPath);
+
+            var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
+                (XivDataFile)dataFile);
+
+            GetType4Data(offset, (XivDataFile)dataFile, xivTex);
         }
 
 
@@ -758,173 +697,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var mipMapSize          = br.ReadInt32();
                     var mipMapStart         = br.ReadInt32();
                     var mipMapParts         = br.ReadInt32();
-
-                    var mipMapPartOffset = endOfHeader + offsetFromHeaderEnd;
-
-                    br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
-
-                    br.ReadBytes(8);
-                    var compressedSize = br.ReadInt32();
-                    var uncompressedSize = br.ReadInt32();
-
-                    if (mipMapParts > 1)
-                    {
-                        var compressedData = br.ReadBytes(compressedSize);
-
-                        var decompressedPartData = IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                        decompressedData.AddRange(decompressedPartData);
-
-                        for (var k = 1; k < mipMapParts; k++)
-                        {
-                            var check = br.ReadByte();
-                            while (check != 0x10)
-                            {
-                                check = br.ReadByte();
-                            }
-
-                            br.ReadBytes(7);
-                            compressedSize = br.ReadInt32();
-                            uncompressedSize = br.ReadInt32();
-
-                            // When the compressed size of a data block shows 32000, it is uncompressed.
-                            if (compressedSize != 32000)
-                            {
-                                compressedData = br.ReadBytes(compressedSize);
-                                decompressedPartData = IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                                decompressedData.AddRange(decompressedPartData);
-                            }
-                            else
-                            {
-                                decompressedPartData = br.ReadBytes(uncompressedSize);
-                                decompressedData.AddRange(decompressedPartData);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // When the compressed size of a data block shows 32000, it is uncompressed.
-                        if (compressedSize != 32000)
-                        {
-                            var compressedData = br.ReadBytes(compressedSize);
-
-                            var uncompressedData = IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                            decompressedData.AddRange(uncompressedData);
-                        }
-                        else
-                        {
-                            var decompressedPartData = br.ReadBytes(uncompressedSize);
-                            decompressedData.AddRange(decompressedPartData);
-                        }
-                    }
-                    j = j + 20;
-                }
-
-                if (decompressedData.Count >= uncompressedFileSize) return;
-
-                var difference = uncompressedFileSize - decompressedData.Count;
-                var padding = new byte[difference];
-                Array.Clear(padding, 0, difference);
-                decompressedData.AddRange(padding);
-            }
-        }
-
-        /// <summary>
-        /// Gets the original data for Type 4 (Texture) files.
-        /// </summary>
-        /// <remarks>
-        /// Type 4 files are used for Textures
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="xivTex">The XivTex container to fill</param>
-        public void GetType4OriginalData(string internalPath, XivTex xivTex)
-        {
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var cat in cats)
-            {
-                if (cat.GetFolderKey() == folderKey)
-                    GetType4OriginalData(internalPath, cat, xivTex);
-            }
-
-            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-        }
-
-
-        /// <summary>
-        /// Gets the original data for Type 4 (Texture) files.
-        /// </summary>
-        /// <remarks>
-        /// Type 4 files are used for Textures
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <param name="xivTex">The XivTex container to fill</param>
-        public void GetType4OriginalData(string internalPath, XivDataFile dataFile, XivTex xivTex)
-        {
-            var inModList = false;
-            ModInfo modInfo = null;
-
-            using (var sr = new StreamReader(_modListDirectory.FullName))
-            {
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.fullPath.Equals(internalPath))
-                    {
-                        inModList = true;
-                        break;
-                    }
-                }
-            }
-
-            // Throw exception if the item does not exist in the modlist
-            if (!inModList) throw new Exception("Item not found in Modlist.");
-
-            var modOffset = modInfo.modOffset;
-
-            var decompressedData = new List<byte>();
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((modOffset / 8) & 0x0F) / 2;
-
-            modOffset = OffsetCorrection(datNum, modOffset);
-
-            var datPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
-
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
-            {
-                br.BaseStream.Seek(modOffset, SeekOrigin.Begin);
-
-                var headerLength = br.ReadInt32();
-                var fileType = br.ReadInt32();
-                var uncompressedFileSize = br.ReadInt32();
-                br.ReadBytes(8);
-                xivTex.MipMapCount = br.ReadInt32();
-
-                var endOfHeader = modOffset + headerLength;
-                var mipMapInfoOffset = modOffset + 24;
-
-                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-
-                xivTex.TextureFormat = TextureTypeDictionary[br.ReadInt32()];
-                xivTex.Width = br.ReadInt16();
-                xivTex.Heigth = br.ReadInt16();
-
-                for (int i = 0, j = 0; i < xivTex.MipMapCount; i++)
-                {
-                    br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
-
-                    var offsetFromHeaderEnd = br.ReadInt32();
-                    var mipMapLength = br.ReadInt32();
-                    var mipMapSize = br.ReadInt32();
-                    var mipMapStart = br.ReadInt32();
-                    var mipMapParts = br.ReadInt32();
 
                     var mipMapPartOffset = endOfHeader + offsetFromHeaderEnd;
 
