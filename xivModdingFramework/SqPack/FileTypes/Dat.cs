@@ -148,6 +148,26 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets a XivDataFile category for the specified path.
+        /// </summary>
+        /// <param name="internalPath">The internal file path</param>
+        /// <returns>A XivDataFile entry for the needed dat category</returns>
+        private XivDataFile GetDataFileFromPath(string internalPath)
+        {
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
+
+            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            foreach (var cat in cats)
+            {
+                if (cat.GetFolderKey() == folderKey)
+                    return cat;
+            }
+
+            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+        }
+
+        /// <summary>
         /// Gets the original or modded data for type 2 files based on the path specified.
         /// </summary>
         /// <remarks>
@@ -160,24 +180,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var index = new Index(_gameDirectory);
 
-            XivDataFile? dataFile = null;
             ModInfo modInfo = null;
             var inModList = false;
 
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var cat in cats)
-            {
-                if (cat.GetFolderKey() == folderKey)
-                    dataFile = cat;
-            }
-
-            if (dataFile == null)
-            {
-                throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-            }
+            XivDataFile dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
@@ -281,12 +287,26 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="importFilePath">The file path where the file to be imported is located.</param>
         /// <param name="itemName">The name of the item being imported.</param>
-        /// <param name="internalFilePath">The internal file path of the item.</param>
+        /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
-        /// <param name="dataFile">The data file to import the data into.</param>
-        public int ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalFilePath,
-            string category, XivDataFile dataFile)
+        public int ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
+            string category)
         {
+            return ImportType2Data(File.ReadAllBytes(importFilePath.FullName), itemName, internalPath, category);
+        }
+
+        /// <summary>
+        /// Imports any Type 2 data
+        /// </summary>
+        /// <param name="dataToImport">Bytes to import.</param>
+        /// <param name="itemName">The name of the item being imported.</param>
+        /// <param name="internalPath">The internal file path of the item.</param>
+        /// <param name="category">The items category.</param>
+        public int ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
+            string category)
+        {
+            XivDataFile dataFile = GetDataFileFromPath(internalPath);
+
             ModInfo modInfo = null;
             var lineNum = 0;
             var inModList = false;
@@ -302,7 +322,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 while ((line = streamReader.ReadLine()) != null)
                 {
                     modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.fullPath.Equals(internalFilePath))
+                    if (modInfo.fullPath.Equals(internalPath))
                     {
                         inModList = true;
                         break;
@@ -311,16 +331,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
 
-            var rawBytes = File.ReadAllBytes(importFilePath.FullName);
-
             // Header size is defaulted to 128, but may need to change if the data being imported is very large.
             headerData.AddRange(BitConverter.GetBytes(128));
             headerData.AddRange(BitConverter.GetBytes(2));
-            headerData.AddRange(BitConverter.GetBytes(rawBytes.Length));
+            headerData.AddRange(BitConverter.GetBytes(dataToImport.Length));
 
             var dataOffset = 0;
             var totalCompSize = 0;
-            var uncompressedLength = rawBytes.Length;
+            var uncompressedLength = dataToImport.Length;
 
             var partCount = (int)Math.Ceiling(uncompressedLength / 16000f);
 
@@ -328,7 +346,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var remainder = uncompressedLength;
 
-            using (var binaryReader = new BinaryReader(new MemoryStream(rawBytes)))
+            using (var binaryReader = new BinaryReader(new MemoryStream(dataToImport)))
             {
                 binaryReader.BaseStream.Seek(0, SeekOrigin.Begin);
 
@@ -392,7 +410,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             newData.AddRange(headerData);
             newData.AddRange(dataBlocks);
 
-            var newOffset = WriteToDat(newData, modInfo, inModList, internalFilePath, category, itemName, lineNum, dataFile);
+            var newOffset = WriteToDat(newData, modInfo, inModList, internalPath, category, itemName, lineNum, dataFile);
 
             if (newOffset == 0)
             {
@@ -415,24 +433,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var index = new Index(_gameDirectory);
 
-            XivDataFile? dataFile = null;
             ModInfo modInfo = null;
             var inModList = false;
 
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var cat in cats)
-            {
-                if (cat.GetFolderKey() == folderKey)
-                    dataFile = cat;
-            }
-
-            if (dataFile == null)
-            {
-                throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-            }
+            XivDataFile dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
@@ -592,7 +596,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var index = new Index(_gameDirectory);
 
-            XivDataFile? dataFile = null;
             ModInfo modInfo = null;
             var inModList = false;
 
@@ -600,16 +603,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
 
-            foreach (var cat in cats)
-            {
-                if (cat.GetFolderKey() == folderKey)
-                    dataFile = cat;
-            }
-
-            if (dataFile == null)
-            {
-                throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-            }
+            XivDataFile dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
