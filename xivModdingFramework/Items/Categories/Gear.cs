@@ -201,6 +201,11 @@ namespace xivModdingFramework.Items.Categories
             var itemType = ItemType.GetItemType(xivGear);
             string mtrlFolder;
 
+            if (itemType == XivItemType.weapon)
+            {
+                return new List<XivRace>{XivRace.All_Races};
+            }
+
             switch (itemType)
             {
                 case XivItemType.equipment:

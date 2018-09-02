@@ -29,7 +29,7 @@ namespace xivModdingFramework.Items
         /// Gets the type of the item
         /// </summary>
         /// <remarks>
-        /// The item type is determined by its category
+        /// The item type is determined by its ItemCategory
         /// </remarks>
         /// <see cref="XivItemType"/>
         /// <param name="item">The item to get the type for</param>
@@ -38,30 +38,30 @@ namespace xivModdingFramework.Items
         {
             XivItemType itemType;
 
-            if (item.Category.Equals(XivStrings.Main_Hand) || item.Category.Equals(XivStrings.Off_Hand) || 
-                item.Category.Equals(XivStrings.Main_Off) || item.Category.Equals(XivStrings.Two_Handed))
+            if (item.ItemCategory.Equals(XivStrings.Main_Hand) || item.ItemCategory.Equals(XivStrings.Off_Hand) || 
+                item.ItemCategory.Equals(XivStrings.Main_Off) || item.ItemCategory.Equals(XivStrings.Two_Handed))
             {
                 itemType = XivItemType.weapon;
             }
-            else if (item.Category.Equals(XivStrings.Ears) || item.Category.Equals(XivStrings.Neck) || 
-                     item.Category.Equals(XivStrings.Wrists) || item.Category.Equals(XivStrings.Rings))
+            else if (item.ItemCategory.Equals(XivStrings.Ears) || item.ItemCategory.Equals(XivStrings.Neck) || 
+                     item.ItemCategory.Equals(XivStrings.Wrists) || item.ItemCategory.Equals(XivStrings.Rings))
             {
                 itemType = XivItemType.accessory;
             }
-            else if (item.Category.Equals(XivStrings.Mounts) || item.Category.Equals(XivStrings.Minions) || item.Category.Equals(XivStrings.Pets)
-                     || item.Category.Equals(XivStrings.Monster) || item.Category.Equals(XivStrings.Food))
+            else if (item.ItemCategory.Equals(XivStrings.Mounts) || item.ItemCategory.Equals(XivStrings.Minions) || item.ItemCategory.Equals(XivStrings.Pets)
+                     || item.ItemCategory.Equals(XivStrings.Monster) || item.ItemCategory.Equals(XivStrings.Food))
             {
                 itemType = XivItemType.monster;
             }
-            else if (item.Category.Equals(XivStrings.DemiHuman))
+            else if (item.ItemCategory.Equals(XivStrings.DemiHuman))
             {
                 itemType = XivItemType.demihuman;
             }
-            else if (item.Category.Equals(XivStrings.Character))
+            else if (item.ItemCategory.Equals(XivStrings.Character))
             {
                 itemType = XivItemType.human;
             }
-            else if (item.Category.Equals("UI"))
+            else if (item.ItemCategory.Equals("UI"))
             {
                 itemType = XivItemType.ui;
             }

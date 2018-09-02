@@ -59,6 +59,7 @@ namespace xivModdingFramework.General.Enums
         [Description("1404")] AuRa_Female_NPC,
         [Description("9104")] NPC_Male,
         [Description("9204")] NPC_Female,
+        [Description("0000")] All_Races,
 
     }
 
