@@ -93,6 +93,8 @@ namespace xivModdingFramework.Items.Categories
             var placeNameData = ex.ReadExData(XivEx.placename);
             var mapData = ex.ReadExData(XivEx.map);
 
+            var mapNameList = new List<string>();
+
             // Loops through all available maps in the map exd files
             // At present only one file exists (map_0)
             foreach (var map in mapData.Values)
@@ -114,11 +116,15 @@ namespace xivModdingFramework.Items.Categories
                     regionIndex = br.ReadInt16();
                     mapIndex = br.ReadInt16();
 
+                    if(mapIndex == 0) continue;
+
                     br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
 
                     // The size of the map path string 
                     // Size of the entire data chunk - size of the data portion
                     var mapPathLength = map.Length - dataLength;
+
+                    if(mapPathLength < 4) continue;
 
                     xivUi.UiPath = Encoding.UTF8.GetString(br.ReadBytes(mapPathLength)).Replace("\0", "");
                 }
@@ -127,8 +133,17 @@ namespace xivModdingFramework.Items.Categories
                 var regionName = GetPlaceName(placeNameData[regionIndex]);
                 var mapName = GetPlaceName(placeNameData[mapIndex]);
 
+                if (mapName.Equals(string.Empty)) continue;
+
                 xivUi.Name = mapName;
                 xivUi.ItemSubCategory = regionName;
+
+                if (mapNameList.Contains(mapName))
+                {
+                    xivUi.Name = mapName + " " + xivUi.UiPath.Substring(xivUi.UiPath.Length - 2);
+                }
+
+                mapNameList.Add(mapName);
 
                 mapList.Add(xivUi);
             }
@@ -155,6 +170,8 @@ namespace xivModdingFramework.Items.Categories
             var actionCategoryExData = ex.ReadExData(XivEx.actioncategory);
 
             var actionList = new List<XivUi>();
+
+            var actionNames = new List<string>();
 
             foreach (var action in actionExData.Values)
             {
@@ -185,6 +202,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
+
                 var actionCategoryData = actionCategoryExData[actionCategory];
 
                 // Big Endian Byte Order 
@@ -194,7 +214,15 @@ namespace xivModdingFramework.Items.Categories
 
                     var nameLength = actionCategoryData.Length - 4;
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-                    xivUi.ItemSubCategory = name;
+
+                    if (name.Equals(string.Empty))
+                    {
+                        xivUi.ItemSubCategory = XivStrings.None;
+                    }
+                    else
+                    {
+                        xivUi.ItemSubCategory = name;
+                    }
                 }
 
                 actionList.Add(xivUi);
@@ -233,12 +261,15 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
+
                 actionList.Add(xivUi);
             }
 
             // Data from buddyaction_0
             var buddyActionExData = ex.ReadExData(XivEx.buddyaction);
-
+             
             foreach (var action in buddyActionExData.Values)
             {
                 var xivUi = new XivUi()
@@ -268,6 +299,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = name;
                     xivUi.IconNumber = iconNumber;
                 }
+
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
 
                 actionList.Add(xivUi);
             }
@@ -305,6 +339,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
+
                 actionList.Add(xivUi);
             }
 
@@ -341,6 +378,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
+
                 actionList.Add(xivUi);
             }
 
@@ -374,6 +414,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = name;
                     xivUi.IconNumber = iconNumber;
                 }
+
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
 
                 actionList.Add(xivUi);
             }
@@ -409,6 +452,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
+
                 actionList.Add(xivUi);
             }
 
@@ -440,6 +486,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = name;
                     xivUi.IconNumber = iconNumber;
                 }
+
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
 
                 actionList.Add(xivUi);
             }
@@ -475,6 +524,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (actionNames.Contains(xivUi.Name)) continue;
+                actionNames.Add(xivUi.Name);
+
                 actionList.Add(xivUi);
             }
 
@@ -494,7 +546,7 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int nameLengthDataOffset = 6;
-            const int typeDataOffset = 12;
+            const int typeDataOffset = 13;
             const int dataLength = 24;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -521,7 +573,7 @@ namespace xivModdingFramework.Items.Categories
 
                     br.BaseStream.Seek(typeDataOffset, SeekOrigin.Begin);
 
-                    var type = br.ReadInt16();
+                    var type = br.ReadByte();
 
                     br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
 
@@ -529,6 +581,8 @@ namespace xivModdingFramework.Items.Categories
 
                     xivUi.IconNumber = iconNumber;
                     xivUi.Name = name;
+
+                    if(name.Equals(string.Empty)) continue;
 
                     //Status effects have a byte that determines whether the effect is detrimental or beneficial
                     if (type == 1)
@@ -538,6 +592,11 @@ namespace xivModdingFramework.Items.Categories
                     else if (type == 2)
                     {
                         xivUi.ItemSubCategory = XivStrings.Detrimental;
+                    }
+                    else
+                    {
+                        xivUi.ItemSubCategory = XivStrings.None;
+                        xivUi.Name = xivUi.Name + " " + type;
                     }
                 }
 
@@ -661,10 +720,12 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int nameLengthOffset = 6;
-            const int iconNumberOffest = 10;
+            const int iconNumberOffest = 26;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
             var weatherExData = ex.ReadExData(XivEx.weather);
+
+            var weatherNames = new List<string>();
 
             foreach (var weather in weatherExData.Values)
             {
@@ -692,6 +753,9 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                     xivUi.Name = name;
                 }
+
+                if (weatherNames.Contains(xivUi.Name)) continue;
+                weatherNames.Add(xivUi.Name);
 
                 weatherList.Add(xivUi);
             }

@@ -711,4 +711,7 @@
   <data name="ModlistFilePath" xml:space="preserve">
     <value>XivMods.json</value>
   </data>
+  <data name="None" xml:space="preserve">
+    <value>None</value>
+  </data>
 </root>
