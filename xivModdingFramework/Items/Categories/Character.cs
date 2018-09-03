@@ -20,6 +20,7 @@ using System.Linq;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -114,7 +115,6 @@ namespace xivModdingFramework.Items.Categories
 
             return availableRacesAndNumbers;
         }
-
 
         /// <summary>
         /// Gets the Races and Numbers available for models in the given Character Item
@@ -324,6 +324,46 @@ namespace xivModdingFramework.Items.Categories
             }
 
             return typeList;
+        }
+
+        public int[] GetDecalNums(IItem item)
+        {
+            var index = new Index(_gameDirectory);
+            var decalList = new List<int>();
+            List<int> fileList;
+
+            if (item.ItemCategory.Equals(XivStrings.Face_Paint))
+            {
+                fileList = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
+                    XivDataFile._04_Chara);
+
+                for (var i = 0; i < 200; i++)
+                {
+                    var file = string.Format(XivStrings.FacePaintFile, i);
+
+                    if (fileList.Contains(HashGenerator.GetHash(file)))
+                    {
+                        decalList.Add(i);
+                    }
+                }
+            }
+            else
+            {
+                fileList = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
+                    XivDataFile._04_Chara);
+
+                for (var i = 0; i < 300; i++)
+                {
+                    var file = string.Format(XivStrings.EquipDecalFile, i);
+
+                    if (fileList.Contains(HashGenerator.GetHash(file)))
+                    {
+                        decalList.Add(i);
+                    }
+                }
+            }
+
+            return decalList.ToArray();
         }
 
         /// <summary>
