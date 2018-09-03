@@ -19,6 +19,7 @@ using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Enums;
 
 namespace xivModdingFramework.General
 {
@@ -39,7 +40,7 @@ namespace xivModdingFramework.General
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int modelDataOffset = 5;
+            const int modelDataOffset = 4;
 
             var ex = new Ex(gameDirectory);
             var modelCharaEx = ex.ReadExData(XivEx.modelchara);
@@ -50,8 +51,22 @@ namespace xivModdingFramework.General
                 xivModelInfo.ModelID = br.ReadInt16();
 
                 br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
+                var modelType = br.ReadByte();
                 xivModelInfo.Body = br.ReadByte();
                 xivModelInfo.Variant = br.ReadByte();
+
+                if (modelType == 2)
+                {
+                    xivModelInfo.ModelType = XivItemType.demihuman;
+                }
+                else if (modelType == 3)
+                {
+                    xivModelInfo.ModelType = XivItemType.monster;
+                }
+                else
+                {
+                    xivModelInfo.ModelType = XivItemType.unknown;
+                }
             }
 
             return xivModelInfo;

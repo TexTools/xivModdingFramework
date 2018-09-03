@@ -21,12 +21,13 @@ namespace xivModdingFramework.Items.Enums
     /// </summary>
     public enum XivItemType
     {
+        unknown,
         weapon,
         equipment,
         accessory,
         monster,
         demihuman,
         human,
-        ui,
+        ui
     }
 }

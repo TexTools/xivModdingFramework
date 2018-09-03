@@ -25,7 +25,10 @@ using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Items.Categories
 {
@@ -248,5 +251,55 @@ namespace xivModdingFramework.Items.Categories
 
             return petList;
         }
+
+        public Dictionary<string, char[]> GetDemiHumanMountEquipPartList(IItemModel itemModel)
+        {
+            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+
+            var equipPartDictionary = new Dictionary<string, char[]>();
+
+            var index = new Index(_gameDirectory);
+            var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
+            var version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+
+            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+
+            var mtrlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
+
+            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
+
+            foreach (var slotAbr in SlotAbbreviationDictionary)
+            {
+                var charList =
+                    (from part in parts
+                        let mtrlFile = $"mt_d{id}e{bodyVer}_{slotAbr.Value}_{part}.mtrl"
+                        where files.Contains(HashGenerator.GetHash(mtrlFile))
+                        select part).ToList();
+
+                if (charList.Count > 0)
+                {
+                    equipPartDictionary.Add(slotAbr.Key, charList.ToArray());
+                }
+            }
+
+            return equipPartDictionary;
+        }
+
+        /// <summary>
+        /// A dictionary containing the slot abbreviations in the format [equipment slot, slot abbreviation]
+        /// </summary>
+        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
+        {
+            {XivStrings.Head, "met"},
+            {XivStrings.Hands, "glv"},
+            {XivStrings.Legs, "dwn"},
+            {XivStrings.Feet, "sho"},
+            {XivStrings.Body, "top"},
+            {XivStrings.Ears, "ear"},
+            {XivStrings.Neck, "nek"},
+            {XivStrings.Rings, "rir"},
+            {XivStrings.Wrists, "wrs"},
+        };
     }
 }

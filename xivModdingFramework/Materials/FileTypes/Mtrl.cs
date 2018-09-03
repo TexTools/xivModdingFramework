@@ -326,7 +326,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     break;
                 case XivItemType.demihuman:
                     mtrlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
+                    mtrlFile = $"mt_d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{part}{MtrlExtension}";
                     break;
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
