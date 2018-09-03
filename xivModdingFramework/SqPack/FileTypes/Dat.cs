@@ -154,7 +154,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>A XivDataFile entry for the needed dat category</returns>
         private XivDataFile GetDataFileFromPath(string internalPath)
         {
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
+            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/", StringComparison.Ordinal));
 
             var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
 
@@ -183,7 +183,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             ModInfo modInfo = null;
             var inModList = false;
 
-            XivDataFile dataFile = GetDataFileFromPath(internalPath);
+            var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
@@ -205,19 +205,20 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (inModList)
                 {
-                    return GetType2Data(modInfo.originalOffset, (XivDataFile)dataFile);
+                    return GetType2Data(modInfo.originalOffset, dataFile);
                 }
             }
 
             // If it doesn't exist in the modlist(the item is not modded) or force original is false,
             // grab the data directly from them index file. 
             var folder = Path.GetDirectoryName(internalPath);
+            folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
-                (XivDataFile)dataFile);
+                dataFile);
 
-            return GetType2Data(offset, (XivDataFile) dataFile);
+            return GetType2Data(offset, dataFile);
         }
 
         /// <summary>
@@ -436,7 +437,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             ModInfo modInfo = null;
             var inModList = false;
 
-            XivDataFile dataFile = GetDataFileFromPath(internalPath);
+            var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
@@ -458,19 +459,20 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (inModList)
                 {
-                    return GetType3Data(modInfo.originalOffset, (XivDataFile)dataFile);
+                    return GetType3Data(modInfo.originalOffset, dataFile);
                 }
             }
 
             // If it doesn't exist in the modlist(the item is not modded) or force original is false,
             // grab the data directly from them index file. 
             var folder = Path.GetDirectoryName(internalPath);
+            folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
-                (XivDataFile)dataFile);
+                dataFile);
 
-            return GetType3Data(offset, (XivDataFile)dataFile);
+            return GetType3Data(offset, dataFile);
         }
 
         /// <summary>
@@ -599,11 +601,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             ModInfo modInfo = null;
             var inModList = false;
 
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/"));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            XivDataFile dataFile = GetDataFileFromPath(internalPath);
+            var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
@@ -625,7 +623,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (inModList)
                 {
-                    GetType4Data(modInfo.originalOffset, (XivDataFile)dataFile, xivTex);
+                    GetType4Data(modInfo.originalOffset, dataFile, xivTex);
                     return;
                 }
             }
@@ -634,12 +632,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             // grab the data directly from them index file. 
 
             var folder = Path.GetDirectoryName(internalPath);
+            folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
-                (XivDataFile)dataFile);
+                dataFile);
 
-            GetType4Data(offset, (XivDataFile)dataFile, xivTex);
+            GetType4Data(offset, dataFile, xivTex);
         }
 
 

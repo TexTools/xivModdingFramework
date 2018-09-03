@@ -43,7 +43,7 @@ namespace xivModdingFramework.Textures.FileTypes
             _modListDirectory = new DirectoryInfo(gameDirectory.Parent.Parent + "//" + XivStrings.ModlistFilePath);
         }
 
-        public XivTex getTexData(TexTypePath ttp)
+        public XivTex GetTexData(TexTypePath ttp)
         {
             var xivTex = new XivTex {TextureTypeAndPath = ttp};
 
