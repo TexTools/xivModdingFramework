@@ -22,7 +22,7 @@ namespace xivModdingFramework.Items.DataContainers
     /// <summary>
     /// This class contains information for Items in the Pet Category
     /// </summary>
-    public class XivPet : IItem
+    public class XivPet : IItemModel
     {
         /// <summary>
         /// The name of the Pet
@@ -56,7 +56,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <summary>
         /// The Primary Model Information of the Pet Item 
         /// </summary>
-        public XivModelInfo ModelInfo { get; set; }
+        public XivModelInfo PrimaryModelInfo { get; set; }
 
 
         public int CompareTo(object obj)

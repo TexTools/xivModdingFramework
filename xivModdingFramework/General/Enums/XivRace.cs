@@ -60,6 +60,7 @@ namespace xivModdingFramework.General.Enums
         [Description("9104")] NPC_Male,
         [Description("9204")] NPC_Female,
         [Description("0000")] All_Races,
+        [Description("0000")] Monster
 
     }
 

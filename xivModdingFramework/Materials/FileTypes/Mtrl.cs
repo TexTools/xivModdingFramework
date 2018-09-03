@@ -93,18 +93,6 @@ namespace xivModdingFramework.Materials.FileTypes
                     TextureTypePathList = new List<TexTypePath>()
                 };
 
-                // If the mtrl file contains a color set, add it to the TextureTypePathList
-                if (xivMtrl.ColorSetCount > 0)
-                {
-                    var ttp = new TexTypePath
-                    {
-                        Path = mtrlPath.Folder + "/" + mtrlPath.File,
-                        Type = XivTexType.ColorSet,
-                        DataFile = _dataFile
-                    };
-                    xivMtrl.TextureTypePathList.Add(ttp);
-                }
-
                 var pathSizeList = new List<int>();
 
                 // get the texture path offsets
@@ -188,6 +176,18 @@ namespace xivModdingFramework.Materials.FileTypes
                     count++;
                 }
 
+                // If the mtrl file contains a color set, add it to the TextureTypePathList
+                if (xivMtrl.ColorSetDataSize > 0)
+                {
+                    var ttp = new TexTypePath
+                    {
+                        Path = mtrlPath.Folder + "/" + mtrlPath.File,
+                        Type = XivTexType.ColorSet,
+                        DataFile = _dataFile
+                    };
+                    xivMtrl.TextureTypePathList.Add(ttp);
+                }
+
                 var shaderPathSize = xivMtrl.MaterialDataSize - xivMtrl.TexturePathsDataSize;
 
                 xivMtrl.Shader = Encoding.UTF8.GetString(br.ReadBytes(shaderPathSize)).Replace("\0", "");
@@ -252,6 +252,8 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 var ttp = new TexTypePath {Path = path, DataFile = dataFile};
 
+                if(path.Contains("dummy") || path.Equals(string.Empty)) continue;
+
                 if (path.Contains("_s.tex"))
                 {
                     ttp.Type = XivTexType.Specular;
@@ -281,15 +283,21 @@ namespace xivModdingFramework.Materials.FileTypes
         /// Gets the mtrl path for a given item
         /// </summary>
         /// <param name="itemModel">Item that contains model data</param>
-        /// <param name="race">The race for the requested data</param>
+        /// <param name="xivRace">The race for the requested data</param>
         /// <param name="part">The mtrl part <see cref="GearInfo.GetPartList(IItemModel, XivRace)"/></param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>A tuple containing the mtrl folder and file</returns>
         private (string Folder, string File) GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType)
         {
-            // get the items version from the imc file
-            var imc = new Imc(_gameDirectory, _dataFile);
-            var version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+            // The default version number
+            var version = "0001";
+
+            if (itemType != XivItemType.human)
+            {
+                // get the items version from the imc file
+                var imc = new Imc(_gameDirectory, _dataFile);
+                version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+            }
 
             var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
@@ -323,23 +331,24 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/material";
-                        mtrlFile = $"mt_c{id}b{bodyVer}_{part}{MtrlExtension}";
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
+                        mtrlFile = $"mt_c{race}b{bodyVer}_{part}{MtrlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
+                        // Hair has a version number, but no IMC, so we leave it at the default 0001
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/material/v{version}";
+                        mtrlFile = $"mt_c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{part}{MtrlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Face))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/material";
-                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/material";
+                        mtrlFile = $"mt_c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{part}{MtrlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/material";
-                        mtrlFile = $"mt_c{id}t{bodyVer}_{part}{MtrlExtension}";
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
+                        mtrlFile = $"mt_c{race}t{bodyVer}_{part}{MtrlExtension}";
                     }
 
                     break;

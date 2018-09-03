@@ -43,12 +43,12 @@ namespace xivModdingFramework.Items.Categories
         {
             var characterList = new List<XivCharacter>
             {
-                new XivCharacter {Name = XivStrings.Body, Category = XivStrings.Character},
-                new XivCharacter {Name = XivStrings.Face, Category = XivStrings.Character},
-                new XivCharacter {Name = XivStrings.Hair, Category = XivStrings.Character},
-                new XivCharacter {Name = XivStrings.Tail, Category = XivStrings.Character},
-                new XivCharacter {Name = XivStrings.Face_Paint, Category = XivStrings.Character},
-                new XivCharacter {Name = XivStrings.Equipment_Decals, Category = XivStrings.Character}
+                new XivCharacter {Name = XivStrings.Body, Category = XivStrings.Character, ItemCategory = XivStrings.Body},
+                new XivCharacter {Name = XivStrings.Face, Category = XivStrings.Character, ItemCategory = XivStrings.Face},
+                new XivCharacter {Name = XivStrings.Hair, Category = XivStrings.Character, ItemCategory = XivStrings.Hair},
+                new XivCharacter {Name = XivStrings.Tail, Category = XivStrings.Character, ItemCategory = XivStrings.Tail},
+                new XivCharacter {Name = XivStrings.Face_Paint, Category = XivStrings.Character, ItemCategory = XivStrings.Face_Paint},
+                new XivCharacter {Name = XivStrings.Equipment_Decals, Category = XivStrings.Character, ItemCategory = XivStrings.Equipment_Decals}
             };
             
             return characterList;
@@ -104,6 +104,7 @@ namespace xivModdingFramework.Items.Categories
                 }
 
                 var numList = index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                numList.Sort();
 
                 if (numList.Count > 0)
                 {
@@ -377,9 +378,11 @@ namespace xivModdingFramework.Items.Categories
         /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
         /// </summary>
         private static readonly Dictionary<string, string> HairSlotAbbreviationDictionary = new Dictionary<string, string>
+
         {
-            {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
+            {XivStrings.Hair, "hir"},
+            {XivStrings.Accessory, "acc"}
+
         };
 
         /// <summary>

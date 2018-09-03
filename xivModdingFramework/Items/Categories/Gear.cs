@@ -160,6 +160,10 @@ namespace xivModdingFramework.Items.Categories
                     // Gear Slot/Category
                     br.BaseStream.Seek(slotDataOffset, SeekOrigin.Begin);
                     int slotNum = br.ReadByte();
+
+                    // Waist items do not have texture or model data
+                    if (slotNum == 6) continue;
+
                     xivGear.ItemCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
 
                     // Gear Name
@@ -257,87 +261,6 @@ namespace xivModdingFramework.Items.Categories
             }
 
             return raceList;
-        }
-
-
-
-        /// <summary>
-        /// Gets the list of available mtrl parts for a given item
-        /// </summary>
-        /// <param name="itemModel">An item that contains model data</param>
-        /// <param name="xivRace">The race for the requested data</param>
-        /// <returns>A list of part characters</returns>
-        public List<char> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile)
-        {
-            // Get the mtrl version for the given item from the imc file
-            var imc = new Imc(_gameDirectory, dataFile);
-            var version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
-
-            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
-            var race = xivRace.GetRaceCode();
-
-            var index = new Index(_gameDirectory);
-
-            var itemType = ItemType.GetItemType(itemModel);
-            string mtrlFolder = "", mtrlFile = "";
-
-            switch (itemType)
-            {
-                case XivItemType.equipment:
-                    mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
-                    break;
-                case XivItemType.accessory:
-                    mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
-                    break;
-                case XivItemType.weapon:
-                    mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_w{id}b{bodyVer}_";
-                    break;
-                case XivItemType.monster:
-                    mtrlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_m{id}b{bodyVer}_";
-                    break;
-                case XivItemType.demihuman:
-                    mtrlFolder = $"chara/{itemType}/d{id}/obj/body/e{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_d{id}e{bodyVer}_";
-                    break;
-                case XivItemType.human:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}b{bodyVer}_";
-                    }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
-                    }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
-                    }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}t{bodyVer}_";
-                    }
-                    break;
-                default:
-                    mtrlFolder = "";
-                    break;
-            }
-
-            // Get a list of hashed mtrl files that are in the given folder
-            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
-
-            // append the part char to the mtrl file and see if its hashed value is within the files list
-            // returns the list of parts that exist within the mtrl folder
-            return (from part in parts let mtrlCheck = mtrlFile + part + ".mtrl" where files.Contains(HashGenerator.GetHash(mtrlCheck)) select part).ToList();
         }
 
 

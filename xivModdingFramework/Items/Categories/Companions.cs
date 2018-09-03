@@ -239,7 +239,7 @@ namespace xivModdingFramework.Items.Categories
                     }
                 }
 
-                xivPet.ModelInfo = modelInfo;
+                xivPet.PrimaryModelInfo = modelInfo;
 
                 petList.Add(xivPet);
             }

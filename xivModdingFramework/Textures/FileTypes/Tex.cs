@@ -17,14 +17,19 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -58,6 +63,85 @@ namespace xivModdingFramework.Textures.FileTypes
             dat.GetType4Data(offset, ttp.DataFile, xivTex);
 
             return xivTex;
+        }
+
+        /// <summary>
+        /// Gets the list of available mtrl parts for a given item
+        /// </summary>
+        /// <param name="itemModel">An item that contains model data</param>
+        /// <param name="xivRace">The race for the requested data</param>
+        /// <returns>A list of part characters</returns>
+        public List<string> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile)
+        {
+            // Get the mtrl version for the given item from the imc file
+            var imc = new Imc(_gameDirectory, dataFile);
+            var version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+
+            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var race = xivRace.GetRaceCode();
+
+            var index = new Index(_gameDirectory);
+
+            var itemType = ItemType.GetItemType(itemModel);
+            string mtrlFolder = "", mtrlFile = "";
+
+            switch (itemType)
+            {
+                case XivItemType.equipment:
+                    mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
+                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    break;
+                case XivItemType.accessory:
+                    mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
+                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    break;
+                case XivItemType.weapon:
+                    mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
+                    mtrlFile = $"mt_w{id}b{bodyVer}_";
+                    break;
+                case XivItemType.monster:
+                    mtrlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/material/v{version}";
+                    mtrlFile = $"mt_m{id}b{bodyVer}_";
+                    break;
+                case XivItemType.demihuman:
+                    mtrlFolder = $"chara/{itemType}/d{id}/obj/body/e{bodyVer}/material/v{version}";
+                    mtrlFile = $"mt_d{id}e{bodyVer}_";
+                    break;
+                case XivItemType.human:
+                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/material/v{version}";
+                        mtrlFile = $"mt_c{id}b{bodyVer}_";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/material/v{version}";
+                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/material/v{version}";
+                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/material/v{version}";
+                        mtrlFile = $"mt_c{id}t{bodyVer}_";
+                    }
+                    break;
+                default:
+                    mtrlFolder = "";
+                    break;
+            }
+
+            // Get a list of hashed mtrl files that are in the given folder
+            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
+
+            // append the part char to the mtrl file and see if its hashed value is within the files list
+            // returns the list of parts that exist within the mtrl folder
+            return (from part in parts let mtrlCheck = mtrlFile + part + ".mtrl" where files.Contains(HashGenerator.GetHash(mtrlCheck)) select part.ToString()).ToList();
         }
 
         /// <summary>
@@ -320,6 +404,35 @@ namespace xivModdingFramework.Textures.FileTypes
 
             //Uncompressed RGBA
             {0, XivTexFormat.A8R8G8B8 }
+
+        };
+
+        /// <summary>
+        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
+        /// </summary>
+        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
+        {
+            {XivStrings.Head, "met"},
+            {XivStrings.Hands, "glv"},
+            {XivStrings.Legs, "dwn"},
+            {XivStrings.Feet, "sho"},
+            {XivStrings.Body, "top"},
+            {XivStrings.Ears, "ear"},
+            {XivStrings.Neck, "nek"},
+            {XivStrings.Rings, "rir"},
+            {XivStrings.Wrists, "wrs"},
+            {XivStrings.Head_Body, "top"},
+            {XivStrings.Body_Hands, "top"},
+            {XivStrings.Body_Hands_Legs, "top"},
+            {XivStrings.Body_Legs_Feet, "top"},
+            {XivStrings.Body_Hands_Legs_Feet, "top"},
+            {XivStrings.Legs_Feet, "top"},
+            {XivStrings.All, "top"},
+            {XivStrings.Face, "fac"},
+            {XivStrings.Iris, "iri"},
+            {XivStrings.Etc, "etc"},
+            {XivStrings.Accessory, "acc"},
+            {XivStrings.Hair, "hir"}
 
         };
     }

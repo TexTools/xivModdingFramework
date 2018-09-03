@@ -39,7 +39,7 @@ namespace xivModdingFramework.Items
             XivItemType itemType;
 
             if (item.ItemCategory.Equals(XivStrings.Main_Hand) || item.ItemCategory.Equals(XivStrings.Off_Hand) || 
-                item.ItemCategory.Equals(XivStrings.Main_Off) || item.ItemCategory.Equals(XivStrings.Two_Handed))
+                item.ItemCategory.Equals(XivStrings.Main_Off) || item.ItemCategory.Equals(XivStrings.Two_Handed) || item.ItemCategory.Equals(XivStrings.Food))
             {
                 itemType = XivItemType.weapon;
             }
@@ -49,7 +49,7 @@ namespace xivModdingFramework.Items
                 itemType = XivItemType.accessory;
             }
             else if (item.ItemCategory.Equals(XivStrings.Mounts) || item.ItemCategory.Equals(XivStrings.Minions) || item.ItemCategory.Equals(XivStrings.Pets)
-                     || item.ItemCategory.Equals(XivStrings.Monster) || item.ItemCategory.Equals(XivStrings.Food))
+                     || item.ItemCategory.Equals(XivStrings.Monster))
             {
                 itemType = XivItemType.monster;
             }
@@ -57,7 +57,7 @@ namespace xivModdingFramework.Items
             {
                 itemType = XivItemType.demihuman;
             }
-            else if (item.ItemCategory.Equals(XivStrings.Character))
+            else if (item.Category.Equals(XivStrings.Character))
             {
                 itemType = XivItemType.human;
             }

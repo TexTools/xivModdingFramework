@@ -186,7 +186,7 @@ namespace xivModdingFramework.Variants.FileTypes
                     break;
                 case XivItemType.monster:
                     imcFolder = $"chara/{itemType}/m{modelID}/obj/body/b{body}";
-                    imcFile = $"b{modelID}{ImcExtension}";
+                    imcFile = $"b{body}{ImcExtension}";
                     break;
                 case XivItemType.demihuman:
                     imcFolder = $"chara/{itemType}/d{modelID}/obj/equipment/e{body}";
