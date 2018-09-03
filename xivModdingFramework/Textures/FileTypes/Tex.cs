@@ -48,6 +48,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var xivTex = new XivTex {TextureTypeAndPath = ttp};
 
             var folder = Path.GetDirectoryName(ttp.Path);
+            folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(ttp.Path);
 
             var index = new Index(_gameDirectory);

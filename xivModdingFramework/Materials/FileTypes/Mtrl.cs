@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using SharpDX;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -193,7 +194,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 xivMtrl.Unknown2 = br.ReadInt32();
 
-                xivMtrl.ColorSetData = br.ReadBytes(xivMtrl.ColorSetDataSize);
+                xivMtrl.ColorSetData = new List<Half>();
+                for (var i = 0; i < xivMtrl.ColorSetDataSize / 2; i++)
+                {
+                    xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
+                }
 
                 xivMtrl.AdditionalDataSize = br.ReadInt16();
 

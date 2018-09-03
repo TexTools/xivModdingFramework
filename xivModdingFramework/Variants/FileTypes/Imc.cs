@@ -87,7 +87,8 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 br.BaseStream.Seek(variantOffset, SeekOrigin.Begin);
 
-                xivImc.Version = br.ReadUInt16();
+                xivImc.Version = br.ReadByte();
+                var unknown = br.ReadByte();
                 xivImc.Mask    = br.ReadUInt16();
                 xivImc.Vfx     = br.ReadUInt16();
             }

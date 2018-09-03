@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using SharpDX;
 using xivModdingFramework.Textures.DataContainers;
 
 namespace xivModdingFramework.Materials.DataContainers
@@ -138,7 +139,8 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The byte array containing the raw ColorSet data
         /// </summary>
-        public byte[] ColorSetData { get; set; }
+        //public byte[] ColorSetData { get; set; }
+        public List<Half> ColorSetData { get; set; }
 
         /// <summary>
         /// The size of the additional MTRL Data

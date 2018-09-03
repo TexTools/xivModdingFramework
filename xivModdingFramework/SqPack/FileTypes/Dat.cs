@@ -768,6 +768,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Array.Clear(padding, 0, difference);
                 decompressedData.AddRange(padding);
             }
+
+            xivTex.TexData = decompressedData.ToArray();
         }
 
         /// <summary>
