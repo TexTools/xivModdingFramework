@@ -244,6 +244,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // First we save our current position
                 var savePosition = br.BaseStream.Position;
 
+                var loDStructPos = 68;
                 // for each mesh in each lod
                 for (var i = 0; i < xivMdl.LoDList.Count; i++)
                 {
@@ -253,7 +254,8 @@ namespace xivModdingFramework.Models.FileTypes
                         xivMdl.LoDList[i].MeshDataList[j].VertexDataStructList = new List<VertexDataStruct>();
 
                         // LoD Index * Vertex Data Structure size + Header
-                        br.BaseStream.Seek(i * 136 + 68, SeekOrigin.Begin);
+                        
+                        br.BaseStream.Seek(j * 136 + loDStructPos, SeekOrigin.Begin);
 
                         // If the first byte is 255, we reached the end of the Vertex Data Structs
                         var dataBlockNum = br.ReadByte();
@@ -275,6 +277,8 @@ namespace xivModdingFramework.Models.FileTypes
                             dataBlockNum = br.ReadByte();
                         }
                     }
+
+                    loDStructPos += 136 * xivMdl.LoDList[i].MeshCount;
                 }
 
                 // Now that we finished reading the Vertex Data Structures, we can go back to our saved position

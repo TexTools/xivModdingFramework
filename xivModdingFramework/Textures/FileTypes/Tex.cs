@@ -144,6 +144,28 @@ namespace xivModdingFramework.Textures.FileTypes
             return (from part in parts let mtrlCheck = mtrlFile + part + ".mtrl" where files.Contains(HashGenerator.GetHash(mtrlCheck)) select part.ToString()).ToList();
         }
 
+        public Dictionary<string, string> GetMapAvailableTex(string path)
+        {
+            var mapNamePathDictonary = new Dictionary<string, string>();
+            var index = new Index(_gameDirectory);
+
+            var folderPath = $"ui/map/{path}";
+
+            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folderPath), XivDataFile._06_Ui);
+
+            foreach (var mapType in MapTypeDictionary)
+            {
+                var file = $"{path.Replace("/", "")}{mapType.Key}.tex";
+
+                if (files.Contains(HashGenerator.GetHash(file)))
+                {
+                    mapNamePathDictonary.Add(mapType.Value, folderPath + "/" + file);
+                }
+            }
+
+            return mapNamePathDictonary;
+        }
+
         /// <summary>
         /// Gets the raw pixel data for the texture
         /// </summary>
@@ -164,11 +186,17 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexFormat.DXT5:
                     imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Heigth);
                     break;
+                case XivTexFormat.A4R4G4B4:
+                    imageData = Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    break;
+                case XivTexFormat.A1R5G5B5:
+                    imageData = Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    break;
+                case XivTexFormat.A8R8G8B8:
+                    imageData = SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    break;
                 case XivTexFormat.L8:
                 case XivTexFormat.A8:
-                case XivTexFormat.A4R4G4B4:
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A8R8G8B8:
                 case XivTexFormat.X8R8G8B8:
                 case XivTexFormat.R32F:
                 case XivTexFormat.G16R16F:
@@ -182,6 +210,114 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             return imageData;
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed A1R5G5B5 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        private static byte[] Read5551Image(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+            using (var ms = new MemoryStream(textureData))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    for (var y = 0; y < height; y++)
+                    {
+                        for (var x = 0; x < width; x++)
+                        {
+                            var pixel = br.ReadUInt16() & 0xFFFF;
+
+                            var red = ((pixel & 0x7E00) >> 10) * 8;
+                            var green = ((pixel & 0x3E0) >> 5) * 8;
+                            var blue = ((pixel & 0x1F)) * 8;
+                            var alpha = ((pixel & 0x8000) >> 15) * 255;
+
+                            convertedBytes.Add((byte)red);
+                            convertedBytes.Add((byte)green);
+                            convertedBytes.Add((byte)blue);
+                            convertedBytes.Add((byte)alpha);
+                        }
+                    }
+                }
+            }
+            return convertedBytes.ToArray();
+        }
+
+
+        /// <summary>
+        /// Creates bitmap from decompressed A4R4G4B4 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        private static byte[] Read4444Image(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+            using (var ms = new MemoryStream(textureData))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    for (var y = 0; y < height; y++)
+                    {
+                        for (var x = 0; x < width; x++)
+                        {
+                            var pixel = br.ReadUInt16() & 0xFFFF;
+                            var red = ((pixel & 0xF)) * 16;
+                            var green = ((pixel & 0xF0) >> 4) * 16;
+                            var blue = ((pixel & 0xF00) >> 8) * 16;
+                            var alpha = ((pixel & 0xF000) >> 12) * 16;
+
+                            convertedBytes.Add((byte)blue);
+                            convertedBytes.Add((byte)green);
+                            convertedBytes.Add((byte)red);
+                            convertedBytes.Add((byte)alpha);
+                        }
+                    }
+                }
+            }
+
+            return convertedBytes.ToArray();
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed Linear texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        private static byte[] SwapRBColors(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+            using (var ms = new MemoryStream(textureData))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    for (var y = 0; y < height; y++)
+                    {
+                        for (var x = 0; x < width; x++)
+                        {
+                            var red = br.ReadByte();
+                            var green = br.ReadByte();
+                            var blue = br.ReadByte();
+                            var alpha = br.ReadByte();
+
+                            convertedBytes.Add(blue);
+                            convertedBytes.Add(green);
+                            convertedBytes.Add(red);
+                            convertedBytes.Add(alpha);
+                        }
+                    }
+                }
+            }
+
+            return convertedBytes.ToArray();
         }
 
         /// <summary>
@@ -433,6 +569,19 @@ namespace xivModdingFramework.Textures.FileTypes
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"}
+
+        };
+
+        /// <summary>
+        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
+        /// </summary>
+        private static readonly Dictionary<string, string> MapTypeDictionary = new Dictionary<string, string>
+        {
+            {"_m", "HighRes Diffuse"},
+            {"_s", "LowRes Diffuse"},
+            {"d", "PoI"},
+            {"m_m", "HighRes Mask"},
+            {"m_s", "LowRes Mask"}
 
         };
     }

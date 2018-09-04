@@ -38,5 +38,10 @@ namespace xivModdingFramework.Textures.DataContainers
         /// The data file in which the texture is contained
         /// </summary>
         public XivDataFile DataFile { get; set; }
+
+        /// <summary>
+        /// The name of the texture if differnt from XivTexType
+        /// </summary>
+        public string Name { get; set; }
     }
 }

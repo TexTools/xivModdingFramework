@@ -59,11 +59,12 @@ namespace xivModdingFramework.Items.Categories
             // Loops through the list of uld paths
             foreach (var uldPath in uldPaths)
             {
-                var xivUi = new XivUi()
+                var xivUi = new XivUi
                 {
                     Name = Path.GetFileNameWithoutExtension(uldPath),
                     Category = "UI",
-                    ItemCategory = "ULD"
+                    ItemCategory = "HUD",
+                    UiPath = "ui/uld"
                 };
 
                 uldList.Add(xivUi);
@@ -786,7 +787,7 @@ namespace xivModdingFramework.Items.Categories
                 {
                     Category = "UI",
                     ItemCategory = XivStrings.LoadingScreen,
-                    UiPath = "ui/loadingimage/"
+                    UiPath = "ui/loadingimage"
                 };
 
                 // Big Endian Byte Order 
