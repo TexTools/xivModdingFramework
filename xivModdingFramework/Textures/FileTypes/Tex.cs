@@ -172,6 +172,36 @@ namespace xivModdingFramework.Textures.FileTypes
             return mapNamePathDictonary;
         }
 
+        public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory)
+        {
+            string path;
+            if (item.Category.Equals("UI"))
+            {
+                if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
+                {
+                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.ItemSubCategory + "/" + item.Name;
+                }
+                else
+                {
+                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.Name;
+                }
+            }
+            else if (item.Category.Equals(XivStrings.Character))
+            {
+                path = saveDirectory.FullName + "/" + item.Category + "/" + item.Name;
+            }
+            else
+            {
+                path = saveDirectory.FullName + "/" + item.ItemCategory + "/" + item.Name;
+            }
+
+            Directory.CreateDirectory(path);
+
+            var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivTex.TextureTypeAndPath.Path) + ".dds");
+
+            DDS.MakeDDS(xivTex, savePath);
+        }
+
         /// <summary>
         /// Gets the raw pixel data for the texture
         /// </summary>
