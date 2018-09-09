@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -70,6 +71,11 @@ namespace xivModdingFramework.Materials.FileTypes
             // Get mtrl offset
             var mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder), HashGenerator.GetHash(mtrlPath.File),
                 _dataFile);
+
+            if (mtrlOffset == 0)
+            {
+                throw new Exception($"Could not find offest for {mtrlPath.Folder}/{mtrlPath.File}");
+            }
 
             // Get uncompressed mtrl data
             var mtrlData = dat.GetType2Data(mtrlOffset, _dataFile);

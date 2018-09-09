@@ -141,6 +141,11 @@ namespace xivModdingFramework.Models.FileTypes
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(skelFolder), HashGenerator.GetHash(skelFile), _dataFile);
 
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offest for {skelFolder}/{skelFile}");
+            }
+
             var sklbData = dat.GetType2Data(offset, _dataFile);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))

@@ -60,6 +60,12 @@ namespace xivModdingFramework.Textures.FileTypes
             var dat = new Dat(_gameDirectory);
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file), ttp.DataFile);
+
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offest for {ttp.Path}");
+            }
+
             dat.GetType4Data(offset, ttp.DataFile, xivTex);
 
             return xivTex;
@@ -197,6 +203,8 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
                 case XivTexFormat.L8:
                 case XivTexFormat.A8:
+                    imageData = Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    break;
                 case XivTexFormat.X8R8G8B8:
                 case XivTexFormat.R32F:
                 case XivTexFormat.G16R16F:
@@ -282,6 +290,37 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
+            return convertedBytes.ToArray();
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed A8/L8 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The created bitmap.</returns>
+        private static byte[] Read8bitImage(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+            using (var ms = new MemoryStream(textureData))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    for (var y = 0; y < height; y++)
+                    {
+                        for (var x = 0; x < width; x++)
+                        {
+                            var pixel = br.ReadByte() & 0xFF;
+
+                            convertedBytes.Add((byte)pixel);
+                            convertedBytes.Add((byte)pixel);
+                            convertedBytes.Add((byte)pixel);
+                            convertedBytes.Add(255);
+                        }
+                    }
+                }
+            }
             return convertedBytes.ToArray();
         }
 

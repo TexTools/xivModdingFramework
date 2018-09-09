@@ -84,6 +84,11 @@ namespace xivModdingFramework.Models.FileTypes
             var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
 
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offest for {mdlPath.Folder}/{mdlPath.File}");
+            }
+
             var mdlData = dat.GetType3Data(offset, _dataFile);
 
             var xivMdl = new XivMdl {MdlPath = mdlPath};

@@ -326,7 +326,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var nameLength = br.ReadInt16();
 
-                    br.BaseStream.Seek(10, SeekOrigin.Begin);
+                    br.BaseStream.Seek(14, SeekOrigin.Begin);
 
                     var iconNumber = br.ReadUInt16();
 

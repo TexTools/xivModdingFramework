@@ -218,6 +218,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
                 dataFile);
 
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offest for {internalPath}");
+            }
+
             return GetType2Data(offset, dataFile);
         }
 
@@ -472,6 +477,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
                 dataFile);
 
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offest for {internalPath}");
+            }
+
             return GetType3Data(offset, dataFile);
         }
 
@@ -637,6 +647,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
                 dataFile);
+
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offest for {internalPath}");
+            }
 
             GetType4Data(offset, dataFile, xivTex);
         }

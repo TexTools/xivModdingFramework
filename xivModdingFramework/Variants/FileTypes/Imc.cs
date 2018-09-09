@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using xivModdingFramework.General.Enums;
@@ -66,6 +67,12 @@ namespace xivModdingFramework.Variants.FileTypes
             var imcPath = GetImcPath(modelInfo, itemType);
 
             var imcOffset = index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
+
+            if (imcOffset == 0)
+            {
+                throw new Exception($"Could not find offest for {imcPath.Folder}/{imcPath.File}");
+            }
+
             var imcData = dat.GetType2Data(imcOffset, _dataFile);
 
             using (var br = new BinaryReader(new MemoryStream(imcData)))
@@ -111,6 +118,12 @@ namespace xivModdingFramework.Variants.FileTypes
             var imcPath = GetImcPath(modelInfo, itemType);
 
             var imcOffset = index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
+
+            if (imcOffset == 0)
+            {
+                throw new Exception($"Could not find offest for {imcPath.Folder}/{imcPath.File}");
+            }
+
             var imcByteData = dat.GetType2Data(imcOffset, _dataFile);
 
             using (var br = new BinaryReader(new MemoryStream(imcByteData)))
