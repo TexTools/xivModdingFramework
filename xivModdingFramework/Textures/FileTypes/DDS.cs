@@ -17,8 +17,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -34,10 +35,32 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="saveDirectory">The directory to save the dds file to</param>
         /// <param name="xivTex">The Texture information</param>
-        public static void MakeDDS(DirectoryInfo saveDirectory, XivTex xivTex)
+        public static void MakeDDS(DirectoryInfo saveDirectory, XivTex xivTex, IItem item)
         {
-            var savePath = Path.Combine(saveDirectory.FullName,
-                Path.GetFileNameWithoutExtension(xivTex.TextureTypeAndPath.Path) + ".dds");
+            string path;
+            if (item.Category.Equals("UI"))
+            {
+                if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
+                {
+                    path = saveDirectory.FullName + "/" + item.Category + "/"+ item.ItemCategory + "/" + item.ItemSubCategory + "/" + item.Name;
+                }
+                else
+                {
+                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.Name;
+                }
+            }
+            else if (item.Category.Equals(XivStrings.Character))
+            {
+                path = saveDirectory.FullName + "/" + item.Category + "/" + item.Name;
+            }
+            else
+            {
+                path = saveDirectory.FullName + "/" + item.ItemCategory + "/" + item.Name;
+            }
+
+            Directory.CreateDirectory(path);
+
+            var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivTex.TextureTypeAndPath.Path) + ".dds");
 
             var DDS = new List<byte>();
             switch (xivTex.TextureTypeAndPath.Type)
