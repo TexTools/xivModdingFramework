@@ -174,26 +174,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory)
         {
-            string path;
-            if (item.Category.Equals("UI"))
-            {
-                if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
-                {
-                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.ItemSubCategory + "/" + item.Name;
-                }
-                else
-                {
-                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.Name;
-                }
-            }
-            else if (item.Category.Equals(XivStrings.Character))
-            {
-                path = saveDirectory.FullName + "/" + item.Category + "/" + item.Name;
-            }
-            else
-            {
-                path = saveDirectory.FullName + "/" + item.ItemCategory + "/" + item.Name;
-            }
+            var path = IOUtil.MakeItemSavePath(item, saveDirectory);
 
             Directory.CreateDirectory(path);
 

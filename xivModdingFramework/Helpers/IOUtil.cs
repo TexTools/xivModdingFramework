@@ -16,6 +16,8 @@
 
 using System.IO;
 using System.IO.Compression;
+using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Helpers
 {
@@ -63,6 +65,32 @@ namespace xivModdingFramework.Helpers
             }
 
             return decompressedBytes;
+        }
+
+        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory)
+        {
+            string path;
+            if (item.Category.Equals("UI"))
+            {
+                if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
+                {
+                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.ItemSubCategory + "/" + item.Name;
+                }
+                else
+                {
+                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.Name;
+                }
+            }
+            else if (item.Category.Equals(XivStrings.Character))
+            {
+                path = saveDirectory.FullName + "/" + item.Category + "/" + item.Name;
+            }
+            else
+            {
+                path = saveDirectory.FullName + "/" + item.ItemCategory + "/" + item.Name;
+            }
+
+            return path;
         }
     }
 }

@@ -70,6 +70,8 @@ namespace xivModdingFramework.Items.Categories
                 uldList.Add(xivUi);
             }
 
+            uldList.Sort();
+
             return uldList;
         }
 
