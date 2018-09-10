@@ -199,6 +199,11 @@ namespace xivModdingFramework.Materials.DataContainers
         /// A list of TexTypePath for the mtrl <see cref="TexTypePath"/>
         /// </summary>
         public List<TexTypePath> TextureTypePathList { get; set; }
+
+        /// <summary>
+        /// The internal MTRL path
+        /// </summary>
+        public string MTRLPath { get; set; }
     }
 
     /// <summary>
