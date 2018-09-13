@@ -93,6 +93,26 @@ namespace xivModdingFramework.SqPack.FileTypes
             return max;
         }
 
+        private bool IsOriginalDat(XivDataFile dataFile)
+        {
+            // Checks if any entry in the modlist is within the datafile
+            // If there is, then a modded dat has already been created
+            using (var streamReader = new StreamReader(_modListDirectory.FullName))
+            {
+                string line;
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    var modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+                    if (modInfo.datFile.Contains(dataFile.GetDataFileName()))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// Makes the header for the SqPack portion of the dat file. 
         /// </summary>
@@ -913,6 +933,17 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var newDatNum = CreateNewDat(dataFile);
 
                     modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + newDatNum;
+                }
+                else
+                {
+                    // If it is an original dat and not a new empty mod dat file, then create a new mod dat file
+                    // Note: If the file length is 2048, then it is a new empty mod dat file
+                    if (IsOriginalDat(dataFile) && fileLength != 2048)
+                    {
+                        var newDatNum = CreateNewDat(dataFile);
+
+                        modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + newDatNum;
+                    }
                 }
             }
 
