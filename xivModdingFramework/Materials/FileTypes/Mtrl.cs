@@ -48,6 +48,7 @@ namespace xivModdingFramework.Materials.FileTypes
             _dataFile = dataFile;
         }
 
+
         /// <summary>
         /// Gets the MTRL data for the given item 
         /// </summary>
@@ -58,15 +59,15 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="itemModel">Item that contains model data</param>
         /// <param name="race">The race for the requested data</param>
         /// <param name="part">The Mtrl part </param>
-        /// <returns></returns>
+        /// <returns>XivMtrl containing all the mtrl data/returns>
         public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, char part)
         {
             var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
             var itemType = ItemType.GetItemType(itemModel);
 
             // Get mtrl path
             var mtrlPath = GetMtrlPath(itemModel, race, part, itemType);
+            var mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
 
             // Get mtrl offset
             var mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder), HashGenerator.GetHash(mtrlPath.File),
@@ -74,8 +75,23 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (mtrlOffset == 0)
             {
-                throw new Exception($"Could not find offest for {mtrlPath.Folder}/{mtrlPath.File}");
+                throw new Exception($"Could not find offest for {mtrlStringPath}");
             }
+
+            return GetMtrlData(mtrlOffset, mtrlStringPath);
+        }
+
+
+        /// <summary>
+        /// Gets the MTRL data for the given offset and path
+        /// </summary>
+        /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
+        /// <param name="mtrlPath">The full internal game path for the mtrl</param>
+        /// <returns>XivMtrl containing all the mtrl data</returns>
+        public XivMtrl GetMtrlData(int mtrlOffset, string mtrlPath)
+        {
+            var dat = new Dat(_gameDirectory);
+
 
             // Get uncompressed mtrl data
             var mtrlData = dat.GetType2Data(mtrlOffset, _dataFile);
@@ -97,7 +113,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     ColorSetCount = br.ReadByte(),
                     Unknown1 = br.ReadByte(),
                     TextureTypePathList = new List<TexTypePath>(),
-                    MTRLPath = $"{mtrlPath.Folder}/{mtrlPath.File}"
+                    MTRLPath = mtrlPath
                 };
 
                 var pathSizeList = new List<int>();
@@ -188,7 +204,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     var ttp = new TexTypePath
                     {
-                        Path = mtrlPath.Folder + "/" + mtrlPath.File,
+                        Path = mtrlPath,
                         Type = XivTexType.ColorSet,
                         DataFile = _dataFile
                     };
@@ -261,7 +277,8 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item whos mtrl is being imported</param>
-        public void ImportMtrl(XivMtrl xivMtrl, IItem item)
+        /// <returns>The new offset</returns>
+        public int ImportMtrl(XivMtrl xivMtrl, IItem item)
         {
             var mtrlBytes = new List<byte>();
 
@@ -349,7 +366,7 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
             var dat = new Dat(_gameDirectory);
-            dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category);
+            return dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category);
         }
 
         /// <summary>

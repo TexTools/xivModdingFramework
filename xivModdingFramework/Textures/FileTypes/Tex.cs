@@ -19,11 +19,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
+using SharpDX;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -378,7 +381,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item who's texture we are importing</param>
         /// <param name="ddsFileDirectory">The directory of the dds file being imported</param>
         /// <returns>The offset to the new imported data</returns>
-        public long TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory)
+        public int TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory)
         {
             int lineNum = 0, offset = 0;
             var inModList = false;
@@ -489,6 +492,49 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             return offset;
+        }
+
+        public int TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item)
+        {
+            var colorSetData = new List<Half>();
+
+            using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
+            {
+                // skip DDS header
+                br.BaseStream.Seek(128, SeekOrigin.Begin);
+
+                // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
+                // this reads 256 ushort values which is 256 x 2 = 512
+                for (var i = 0; i < 256; i++)
+                {
+                    colorSetData.Add(new Half(br.ReadUInt16()));
+                }
+            }
+
+            // If the colorset size is 544, it contains extra data that must be imported
+            if (xivMtrl.ColorSetDataSize == 544)
+            {
+                var flagsPath = Path.Combine(Path.GetDirectoryName(ddsFileDirectory.FullName), (Path.GetFileNameWithoutExtension(ddsFileDirectory.FullName) + ".dat"));
+
+                if (File.Exists(flagsPath))
+                {
+                    using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
+                    {
+                        // The extra data after the colorset is always 32 bytes 
+                        // This reads 16 ushort values which is 16 x 2 = 32
+                        for (var i = 0; i < 16; i++)
+                        {
+                            colorSetData.Add(new Half(br.ReadUInt16()));
+                        }
+                    }
+                }
+            }
+
+            // Replace the color set data with the imported data
+            xivMtrl.ColorSetData = colorSetData;
+
+            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile);
+            return mtrl.ImportMtrl(xivMtrl, item);
         }
 
         /// <summary>
