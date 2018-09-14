@@ -93,6 +93,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             return max;
         }
 
+        /// <summary>
+        /// Checks the modlist to determine whether a mod dat already exists
+        /// </summary>
+        /// <param name="dataFile">The dat file to check.</param>
+        /// <returns>True if it is original, false otherwise</returns>
         private bool IsOriginalDat(XivDataFile dataFile)
         {
             // Checks if any entry in the modlist is within the datafile
