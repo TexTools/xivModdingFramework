@@ -951,7 +951,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         var newDatNum = CreateNewDat(dataFile);
 
-                        modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + newDatNum;
+                        modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + newDatNum;
                     }
                 }
             }
