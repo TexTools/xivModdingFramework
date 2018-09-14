@@ -60,7 +60,7 @@ namespace xivModdingFramework.Models.FileTypes
         public Mdl(DirectoryInfo gameDirectory, XivDataFile dataFile)
         {
             _gameDirectory = gameDirectory;
-            _modListDirectory = new DirectoryInfo(gameDirectory.Parent.Parent + "//" + XivStrings.ModlistFilePath);
+            _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
             _dataFile = dataFile;
         }
