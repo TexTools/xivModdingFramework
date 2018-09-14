@@ -939,9 +939,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Creates a new Dat if the current dat is at the 2GB limit
                 if (fileLength >= 2000000000)
                 {
-                    var newDatNum = CreateNewDat(dataFile);
+                    datNum = CreateNewDat(dataFile);
 
-                    modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + newDatNum;
+                    modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
                 }
                 else
                 {
@@ -949,9 +949,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Note: If the file length is 2048, then it is a new empty mod dat file
                     if (IsOriginalDat(dataFile) && fileLength != 2048)
                     {
-                        var newDatNum = CreateNewDat(dataFile);
+                        datNum = CreateNewDat(dataFile);
 
-                        modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + newDatNum;
+                        modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
                     }
                 }
             }

@@ -14,8 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Newtonsoft.Json;
+using System;
 using System.IO;
+using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes
 {
@@ -52,6 +59,59 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
+
+        public XivModStatus IsModEnabled(string internalPath, XivDataFile dataFile)
+        {
+            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+
+            if (!File.Exists(modListDirectory.FullName))
+            {
+                return XivModStatus.Original;
+            }
+
+            var index = new Index(_gameDirectory);
+
+            ModInfo modInfo = null;
+
+            using (var streamReader = new StreamReader(modListDirectory.FullName))
+            {
+                string line;
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    var tempModInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+
+                    if (!tempModInfo.fullPath.Equals(internalPath)) continue;
+
+                    modInfo = tempModInfo;
+                    break;
+                }
+            }
+
+            if (modInfo == null)
+            {
+                return XivModStatus.Original;
+            }
+
+            var originalOffset = modInfo.originalOffset;
+            var moddedOffset = modInfo.modOffset;
+
+            var offset = index.GetDataOffset(HashGenerator.GetHash(Path.GetDirectoryName(internalPath).Replace("\\", "/")),
+                HashGenerator.GetHash(Path.GetFileName(internalPath)), dataFile);
+
+            if (offset.Equals(originalOffset))
+            {
+                return XivModStatus.Disabled;
+            }
+
+            if (offset.Equals(moddedOffset))
+            {
+                return XivModStatus.Enabled;
+            }
+
+            throw new Exception("Offset in Index does not match either original or modded offset in modlist.");
+
+
+        }
 
     }
 }
