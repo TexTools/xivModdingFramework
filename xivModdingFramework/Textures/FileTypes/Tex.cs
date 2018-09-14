@@ -518,7 +518,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (File.Exists(flagsPath))
                 {
-                    using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
+                    using (var br = new BinaryReader(File.OpenRead(flagsPath)))
                     {
                         // The extra data after the colorset is always 32 bytes 
                         // This reads 16 ushort values which is 16 x 2 = 32
