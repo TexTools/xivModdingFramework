@@ -42,7 +42,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             _gameDirectory = gameDirectory;
 
-            _modListDirectory = new DirectoryInfo(gameDirectory.Parent.Parent + "//" + XivStrings.ModlistFilePath); 
+            _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath)); 
+
+            // Create a empty modlist if it doesn't exist yet
+            if(!File.Exists(_modListDirectory.FullName))
+                File.Create(_modListDirectory.FullName);
         }
 
 
