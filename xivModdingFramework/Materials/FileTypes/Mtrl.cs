@@ -29,6 +29,7 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
+using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Materials.FileTypes
@@ -78,7 +79,15 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw new Exception($"Could not find offest for {mtrlStringPath}");
             }
 
-            return GetMtrlData(mtrlOffset, mtrlStringPath);
+            var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath);
+
+            if (mtrlPath.HasVfx)
+            {
+                var atex = new ATex(_gameDirectory, _dataFile);
+                mtrlData.TextureTypePathList.AddRange(atex.GetAtexPaths(itemModel));
+            }
+
+            return mtrlData;
         }
 
 
@@ -91,7 +100,6 @@ namespace xivModdingFramework.Materials.FileTypes
         public XivMtrl GetMtrlData(int mtrlOffset, string mtrlPath)
         {
             var dat = new Dat(_gameDirectory);
-
 
             // Get uncompressed mtrl data
             var mtrlData = dat.GetType2Data(mtrlOffset, _dataFile);
@@ -419,17 +427,25 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivRace">The race for the requested data</param>
         /// <param name="part">The mtrl part <see cref="GearInfo.GetPartList(IItemModel, XivRace)"/></param>
         /// <param name="itemType">The type of the item</param>
-        /// <returns>A tuple containing the mtrl folder and file</returns>
-        private (string Folder, string File) GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType)
+        /// <returns>A tuple containing the mtrl folder and file, and whether it has a vfx</returns>
+        private (string Folder, string File, bool HasVfx) GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType)
         {
             // The default version number
             var version = "0001";
+
+            var hasVfx = false;
 
             if (itemType != XivItemType.human)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, _dataFile);
-                version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+                var imcInfo = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo);
+                version = imcInfo.Version.ToString().PadLeft(4, '0');
+
+                if (imcInfo.Vfx > 0)
+                {
+                    hasVfx = true;
+                }
             }
 
             var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
@@ -491,7 +507,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     break;
             }
 
-            return (mtrlFolder, mtrlFile);
+            return (mtrlFolder, mtrlFile, hasVfx);
         }
 
         /// <summary>

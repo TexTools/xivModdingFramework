@@ -36,7 +36,7 @@ namespace xivModdingFramework.Textures.DataContainers
         /// <summary>
         /// The height of the texture
         /// </summary>
-        public int Heigth { get; set; }
+        public int Height { get; set; }
 
         /// <summary>
         /// The amount of mipmaps the texture contains

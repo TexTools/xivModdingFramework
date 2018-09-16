@@ -87,7 +87,7 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(dwFlags));
 
             // Surface height (in pixels).
-            var dwHeight = (uint)xivTex.Heigth;
+            var dwHeight = (uint)xivTex.Height;
             header.AddRange(BitConverter.GetBytes(dwHeight));
 
             // Surface width (in pixels).

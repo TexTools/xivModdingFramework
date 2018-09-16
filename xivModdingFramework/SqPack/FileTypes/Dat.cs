@@ -632,8 +632,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
-         /// <param name="xivTex">The XivTex container to fill</param>
-        public void GetType4Data(string internalPath, bool forceOriginal, XivTex xivTex)
+        /// <returns>An XivTex containing all the type 4 texture data</returns>
+        public XivTex GetType4Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
 
@@ -662,8 +662,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (inModList)
                 {
-                    GetType4Data(modInfo.originalOffset, dataFile, xivTex);
-                    return;
+                    return GetType4Data(modInfo.originalOffset, dataFile);
                 }
             }
 
@@ -682,7 +681,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception($"Could not find offest for {internalPath}");
             }
 
-            GetType4Data(offset, dataFile, xivTex);
+            return GetType4Data(offset, dataFile);
         }
 
 
@@ -694,9 +693,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
-        /// <param name="xivTex">The XivTex container to fill</param>
-        public void GetType4Data(int offset, XivDataFile dataFile, XivTex xivTex)
+        /// <returns>An XivTex containing all the type 4 texture data</returns>
+        public XivTex GetType4Data(int offset, XivDataFile dataFile)
         {
+            var xivTex = new XivTex();
+
             var decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
@@ -723,7 +724,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 xivTex.TextureFormat = TextureTypeDictionary[br.ReadInt32()];
                 xivTex.Width = br.ReadInt16();
-                xivTex.Heigth = br.ReadInt16();
+                xivTex.Height = br.ReadInt16();
 
                 for (int i = 0, j = 0; i < xivTex.MipMapCount; i++)
                 {
@@ -798,7 +799,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     j = j + 20;
                 }
 
-                if (decompressedData.Count >= uncompressedFileSize) return;
+                if (decompressedData.Count >= uncompressedFileSize) return xivTex;
 
                 var difference = uncompressedFileSize - decompressedData.Count;
                 var padding = new byte[difference];
@@ -807,6 +808,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             xivTex.TexData = decompressedData.ToArray();
+
+            return xivTex;
         }
 
         /// <summary>
@@ -1177,7 +1180,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Dictionary that holds [Texture Code, Texture Format] data
         /// </summary>
-        public Dictionary<int, XivTexFormat> TextureTypeDictionary = new Dictionary<int, XivTexFormat>
+        public static Dictionary<int, XivTexFormat> TextureTypeDictionary = new Dictionary<int, XivTexFormat>
         {
             {4400, XivTexFormat.L8 },
             {4401, XivTexFormat.A8 },

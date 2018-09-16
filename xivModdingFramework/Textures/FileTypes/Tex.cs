@@ -54,8 +54,6 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public XivTex GetTexData(TexTypePath ttp)
         {
-            var xivTex = new XivTex {TextureTypeAndPath = ttp};
-
             var folder = Path.GetDirectoryName(ttp.Path);
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(ttp.Path);
@@ -70,7 +68,19 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new Exception($"Could not find offest for {ttp.Path}");
             }
 
-            dat.GetType4Data(offset, ttp.DataFile, xivTex);
+            XivTex xivTex;
+
+            if (ttp.Path.Contains(".atex"))
+            {
+                var atex = new ATex(_gameDirectory, ttp.DataFile);
+                xivTex = atex.GetATexData(offset);
+            }
+            else
+            {
+                xivTex = dat.GetType4Data(offset, ttp.DataFile);
+            }
+
+            xivTex.TextureTypeAndPath = ttp;
 
             return xivTex;
         }
@@ -199,26 +209,26 @@ namespace xivModdingFramework.Textures.FileTypes
             switch (xivTex.TextureFormat)
             {
                 case XivTexFormat.DXT1:
-                    imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.DXT3:
-                    imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.DXT5:
-                    imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.A4R4G4B4:
-                    imageData = Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.A1R5G5B5:
-                    imageData = Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.A8R8G8B8:
-                    imageData = SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.L8:
                 case XivTexFormat.A8:
-                    imageData = Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Heigth);
+                    imageData = Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Height);
                     break;
                 case XivTexFormat.X8R8G8B8:
                 case XivTexFormat.R32F:
@@ -467,18 +477,30 @@ namespace xivModdingFramework.Textures.FileTypes
 
                     if (textureType == xivTex.TextureFormat)
                     {
-                        var newTex = new List<byte>();
 
                         var uncompressedLength = (int)new FileInfo(ddsFileDirectory.FullName).Length - 128;
+                        var newTex = new List<byte>();
 
-                        var DDSInfo = DDS.ReadDDS(br, xivTex, newWidth, newHeight, newMipCount);
+                        if (!xivTex.TextureTypeAndPath.Path.Contains(".atex"))
+                        {
+                            var DDSInfo = DDS.ReadDDS(br, xivTex, newWidth, newHeight, newMipCount);
 
-                        newTex.AddRange(dat.MakeType4DatHeader(xivTex, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, uncompressedLength, newMipCount, newWidth, newHeight));
-                        newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
-                        newTex.AddRange(DDSInfo.compressedDDS);
+                            newTex.AddRange(dat.MakeType4DatHeader(xivTex, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, uncompressedLength, newMipCount, newWidth, newHeight));
+                            newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
+                            newTex.AddRange(DDSInfo.compressedDDS);
 
-                        offset = dat.WriteToDat(newTex, modInfo, inModList, xivTex.TextureTypeAndPath.Path,
-                            item.ItemCategory, item.Name, lineNum, xivTex.TextureTypeAndPath.DataFile);
+                            offset = dat.WriteToDat(newTex, modInfo, inModList, xivTex.TextureTypeAndPath.Path,
+                                item.ItemCategory, item.Name, lineNum, xivTex.TextureTypeAndPath.DataFile);
+                        }
+                        else
+                        {
+                            br.BaseStream.Seek(128, SeekOrigin.Begin);
+                            newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
+                            newTex.AddRange(br.ReadBytes(uncompressedLength));
+
+                            offset = dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
+                                item.ItemCategory);
+                        }
                     }
                     else
                     {

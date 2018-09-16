@@ -97,7 +97,8 @@ namespace xivModdingFramework.Variants.FileTypes
                 xivImc.Version = br.ReadByte();
                 var unknown = br.ReadByte();
                 xivImc.Mask    = br.ReadUInt16();
-                xivImc.Vfx     = br.ReadUInt16();
+                xivImc.Vfx     = br.ReadByte();
+                var unknown1 = br.ReadByte();
             }
 
             return xivImc;
@@ -140,6 +141,13 @@ namespace xivModdingFramework.Variants.FileTypes
                 {
                     imcData.OtherVariantList = new List<XivImc>();
 
+                    imcData.DefaultVariant = new XivImc
+                    {
+                        Version = br.ReadUInt16(),
+                        Mask = br.ReadUInt16(),
+                        Vfx = br.ReadUInt16()
+                    };
+
                     for (var i = 0; i < imcData.VariantCount; i++)
                     {
                         imcData.OtherVariantList.Add(new XivImc{ Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() });
@@ -149,7 +157,16 @@ namespace xivModdingFramework.Variants.FileTypes
                 {
                     imcData.GearVariantList = new List<VariantSet>();
 
-                    for (var i = 0; i < imcData.VariantCount + 1; i++)
+                    imcData.DefaultVariantSet = new VariantSet
+                    {
+                        Slot1 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
+                        Slot2 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
+                        Slot3 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
+                        Slot4 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
+                        Slot5 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
+                    };
+
+                    for (var i = 0; i < imcData.VariantCount; i++)
                     {
                         // gets the data for each slot in the current variant set
                         var imcGear = new VariantSet
@@ -271,6 +288,16 @@ namespace xivModdingFramework.Variants.FileTypes
             /// Variant List for other items that do not contain varian sets
             /// </summary>
             public List<XivImc> OtherVariantList { get; set; }
+
+            /// <summary>
+            /// The default variant for the item, always the variant immediatly following the header
+            /// </summary>
+            public XivImc DefaultVariant { get; set; }
+
+            /// <summary>
+            /// The default variant set for the item, always the variant immediatly following the header
+            /// </summary>
+            public VariantSet DefaultVariantSet { get; set; }
         }
 
         /// <summary>
