@@ -3474,14 +3474,13 @@ namespace xivModdingFramework.Models.FileTypes
                     mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
                     mdlFile   = $"w{id}b{bodyVer}{MdlExtension}";
                     break;
-
                 case XivItemType.monster:
                     mdlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/model";
                     mdlFile   = $"m{id}b{bodyVer}{MdlExtension}";
                     break;
                 case XivItemType.demihuman:
                     mdlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/model";
-                    mdlFile   = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                    mdlFile   = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{MdlExtension}";
                     break;
                     //TODO: Check these
                 case XivItemType.human:

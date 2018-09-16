@@ -252,7 +252,7 @@ namespace xivModdingFramework.Items.Categories
             return petList;
         }
 
-        public Dictionary<string, char[]> GetDemiHumanMountEquipPartList(IItemModel itemModel)
+        public Dictionary<string, char[]> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel)
         {
             var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
 
@@ -284,6 +284,32 @@ namespace xivModdingFramework.Items.Categories
             }
 
             return equipPartDictionary;
+        }
+
+        public List<string> GetDemiHumanMountModelEquipPartList(IItemModel itemModel)
+        {
+            var equipPartList = new List<string>();
+
+            var index = new Index(_gameDirectory);
+
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+
+            var mdlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/model";
+
+            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara);
+
+            foreach (var slotAbr in SlotAbbreviationDictionary)
+            {
+                var mdlFile = $"d{id}e{bodyVer}_{slotAbr.Value}.mdl";
+
+                if (files.Contains(HashGenerator.GetHash(mdlFile)))
+                {
+                    equipPartList.Add(slotAbr.Key);
+                }
+            }
+
+            return equipPartList;
         }
 
         /// <summary>
