@@ -92,7 +92,6 @@ namespace xivModdingFramework.Items.Categories
                 folder = XivStrings.TailMtrlFolder;
             }
 
-
             foreach (var race in IDRaceDictionary)
             {
                 var testDictionary = new Dictionary<int, int>();
@@ -152,7 +151,6 @@ namespace xivModdingFramework.Items.Categories
             {
                 folder = XivStrings.TailMDLFolder;
             }
-
 
             foreach (var race in IDRaceDictionary)
             {

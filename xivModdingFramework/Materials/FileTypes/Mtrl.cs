@@ -385,12 +385,19 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </remarks>
         /// <param name="texPathList">The list of texture paths</param>
         /// <returns>A list of TexTypePath</returns>
-        private static List<TexTypePath> GetTexNames(IEnumerable<string> texPathList, XivDataFile dataFile)
+        private List<TexTypePath> GetTexNames(IEnumerable<string> texPathList, XivDataFile dataFile)
         {
+            var index = new Index(_gameDirectory);
             var texTypePathList = new List<TexTypePath>();
 
             foreach (var path in texPathList)
             {
+                if (!index.FileExists(HashGenerator.GetHash(Path.GetFileName(path)),
+                    HashGenerator.GetHash(Path.GetDirectoryName(path).Replace("\\", "/")), dataFile))
+                {
+                    continue;
+                }
+
                 var ttp = new TexTypePath {Path = path, DataFile = dataFile};
 
                 if(path.Contains("dummy") || path.Equals(string.Empty)) continue;

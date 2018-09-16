@@ -24,7 +24,6 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
-using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
@@ -62,6 +61,8 @@ namespace xivModdingFramework.Items.Categories
             const int slotDataOffset = 146;
 
             var xivGearList = new List<XivGear>();
+
+            xivGearList.AddRange(GetMissingGear());
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
             var itemDictionary = ex.ReadExData(XivEx.item);
@@ -177,6 +178,47 @@ namespace xivModdingFramework.Items.Categories
                 }
             }
             xivGearList.Sort();
+
+            return xivGearList;
+        }
+
+        /// <summary>
+        /// Gets any missing gear that must be added manualy as it does not exist in the items exd
+        /// </summary>
+        /// <returns>The list of missing gear</returns>
+        private List<XivGear> GetMissingGear()
+        {
+            var xivGearList = new List<XivGear>();
+
+            var xivGear = new XivGear
+            {
+                Name = "SmallClothes Body",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[4],
+                PrimaryModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0}
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Legs",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[7],
+                PrimaryModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Feet",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[8],
+                PrimaryModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
 
             return xivGearList;
         }
