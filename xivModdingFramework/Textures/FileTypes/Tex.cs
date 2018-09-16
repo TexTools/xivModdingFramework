@@ -95,10 +95,10 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             // Get the mtrl version for the given item from the imc file
             var imc = new Imc(_gameDirectory, dataFile);
-            var version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+            var version = imc.GetImcInfo(itemModel, itemModel.ModelInfo).Version.ToString().PadLeft(4, '0');
 
-            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
             var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
             var race = xivRace.GetRaceCode();
 

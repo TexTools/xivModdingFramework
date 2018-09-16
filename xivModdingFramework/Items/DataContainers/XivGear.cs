@@ -56,7 +56,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <summary>
         /// The Primary Model Information for the gear item
         /// </summary>
-        public XivModelInfo PrimaryModelInfo { get; set; }
+        public XivModelInfo ModelInfo { get; set; }
 
         /// <summary>
         /// The Secondary Model Information for the gear item

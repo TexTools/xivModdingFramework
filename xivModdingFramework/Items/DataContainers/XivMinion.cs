@@ -56,7 +56,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <summary>
         /// The Primary Model Information of the Minion Item 
         /// </summary>
-        public XivModelInfo PrimaryModelInfo { get; set; }
+        public XivModelInfo ModelInfo { get; set; }
 
 
         public int CompareTo(object obj)

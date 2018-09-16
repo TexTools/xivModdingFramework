@@ -122,11 +122,11 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             // get the vfx version from the imc file
             var imc = new Imc(_gameDirectory, _dataFile);
-            var imcInfo = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo);
+            var imcInfo = imc.GetImcInfo(itemModel, itemModel.ModelInfo);
             int vfx = imcInfo.Vfx;
 
-            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
 
             string vfxFolder, vfxFile;
 

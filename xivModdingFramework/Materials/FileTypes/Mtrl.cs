@@ -446,7 +446,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, _dataFile);
-                var imcInfo = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo);
+                var imcInfo = imc.GetImcInfo(itemModel, itemModel.ModelInfo);
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
 
                 if (imcInfo.Vfx > 0)
@@ -455,8 +455,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";

@@ -96,7 +96,7 @@ namespace xivModdingFramework.Items.Categories
                 if (modelCharaIndex == 0) continue;
 
                 // This will get the model data using the index obtained for the current minion
-                xivMinion.PrimaryModelInfo = XivModelChara.GetModelInfo(_gameDirectory, modelCharaIndex);
+                xivMinion.ModelInfo = XivModelChara.GetModelInfo(_gameDirectory, modelCharaIndex);
 
                 minionList.Add(xivMinion);
             }
@@ -156,7 +156,7 @@ namespace xivModdingFramework.Items.Categories
                 if(modelCharaIndex == 0 || xivMount.Name.Equals("")) continue;
 
                 // This will get the model data using the index obtained for the current mount
-                xivMount.PrimaryModelInfo = XivModelChara.GetModelInfo(_gameDirectory, modelCharaIndex);
+                xivMount.ModelInfo = XivModelChara.GetModelInfo(_gameDirectory, modelCharaIndex);
 
                 mountList.Add(xivMount);
             }
@@ -242,7 +242,7 @@ namespace xivModdingFramework.Items.Categories
                     }
                 }
 
-                xivPet.PrimaryModelInfo = modelInfo;
+                xivPet.ModelInfo = modelInfo;
 
                 petList.Add(xivPet);
             }
@@ -260,10 +260,10 @@ namespace xivModdingFramework.Items.Categories
 
             var index = new Index(_gameDirectory);
             var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
-            var version = imc.GetImcInfo(itemModel, itemModel.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+            var version = imc.GetImcInfo(itemModel, itemModel.ModelInfo).Version.ToString().PadLeft(4, '0');
 
-            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
 
             var mtrlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
 

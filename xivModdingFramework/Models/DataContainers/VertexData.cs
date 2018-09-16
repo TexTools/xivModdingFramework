@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using SixLabors.ImageSharp.PixelFormats;
 using System.Collections.Generic;
 using SharpDX;
 
@@ -67,7 +66,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The vertex color data in Byte4 format (A, R, G, B)
         /// </summary>
-        public List<Byte4> Colors { get; set; }
+        public List<Color> Colors { get; set; }
 
         /// <summary>
         /// The primary texture coordinates for the mesh in Vector2 format (X, Y)

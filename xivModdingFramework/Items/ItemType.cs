@@ -51,7 +51,7 @@ namespace xivModdingFramework.Items
             else if (item.ItemCategory.Equals(XivStrings.Mounts) || item.ItemCategory.Equals(XivStrings.Minions) || item.ItemCategory.Equals(XivStrings.Pets)
                      || item.ItemCategory.Equals(XivStrings.Monster))
             {
-                itemType = item.PrimaryModelInfo.ModelType;
+                itemType = item.ModelInfo.ModelType;
             }
             else if (item.ItemCategory.Equals(XivStrings.DemiHuman))
             {

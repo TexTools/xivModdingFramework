@@ -82,7 +82,7 @@ namespace xivModdingFramework.Items.Categories
                 var xivGear = new XivGear
                 {
                     Category = XivStrings.Gear,
-                    PrimaryModelInfo = primaryMi,
+                    ModelInfo = primaryMi,
                     SecondaryModelInfo = secondaryMi
                 };
 
@@ -195,7 +195,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Body",
                 Category = XivStrings.Gear,
                 ItemCategory = _slotNameDictionary[4],
-                PrimaryModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0}
+                ModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0}
             };
 
             xivGearList.Add(xivGear);
@@ -205,7 +205,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Legs",
                 Category = XivStrings.Gear,
                 ItemCategory = _slotNameDictionary[7],
-                PrimaryModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
+                ModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -215,7 +215,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Feet",
                 Category = XivStrings.Gear,
                 ItemCategory = _slotNameDictionary[8],
-                PrimaryModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
+                ModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -237,9 +237,9 @@ namespace xivModdingFramework.Items.Categories
         {
             // Get the material version for the item from the imc file
             var imc = new Imc(_gameDirectory, dataFile);
-            var gearVersion = imc.GetImcInfo(xivGear, xivGear.PrimaryModelInfo).Version.ToString().PadLeft(4, '0');
+            var gearVersion = imc.GetImcInfo(xivGear, xivGear.ModelInfo).Version.ToString().PadLeft(4, '0');
 
-            var modelID = xivGear.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var modelID = xivGear.ModelInfo.ModelID.ToString().PadLeft(4, '0');
 
             var raceList = new List<XivRace>();
 
@@ -319,15 +319,19 @@ namespace xivModdingFramework.Items.Categories
         {
             var itemType = ItemType.GetItemType(xivGear);
 
-            var modelID = xivGear.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var modelID = xivGear.ModelInfo.ModelID.ToString().PadLeft(4, '0');
 
             var raceList = new List<XivRace>();
 
+            if (itemType == XivItemType.weapon)
+            {
+                return new List<XivRace> { XivRace.All_Races };
+            }
 
             var index = new Index(_gameDirectory);
 
             string mdlFolder;
-            var id = xivGear.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var id = xivGear.ModelInfo.ModelID.ToString().PadLeft(4, '0');
 
             switch (itemType)
             {

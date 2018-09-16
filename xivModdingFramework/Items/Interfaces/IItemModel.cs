@@ -26,6 +26,6 @@ namespace xivModdingFramework.Items.Interfaces
         /// <summary>
         /// The Primary Model Information of the Item
         /// </summary>
-        XivModelInfo PrimaryModelInfo { get; set; }
+        XivModelInfo ModelInfo { get; set; }
     }
 }

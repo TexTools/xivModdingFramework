@@ -14,20 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using System;
-using SixLabors.ImageSharp.PixelFormats;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Xml;
 using HelixToolkit.Wpf.SharpDX;
 using HelixToolkit.Wpf.SharpDX.Core;
 using Newtonsoft.Json;
 using SharpDX;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -536,7 +532,7 @@ namespace xivModdingFramework.Models.FileTypes
                             BoneIndices = new List<byte[]>(),
                             Normals = new List<Vector3>(),
                             BiNormals = new List<Vector3>(),
-                            Colors = new List<Byte4>(),
+                            Colors = new List<Color>(),
                             TextureCoordinates0 = new List<Vector2>(),
                             TextureCoordinates1 = new List<Vector2>(),
                             Indices = new List<int>()
@@ -827,7 +823,7 @@ namespace xivModdingFramework.Models.FileTypes
                             var g = br.ReadByte();
                             var b = br.ReadByte();
 
-                            vertexData.Colors.Add(new Byte4(a, r, g, b));
+                            vertexData.Colors.Add(new Color(r, g, b, a));
                         }
                         #endregion
 
@@ -970,7 +966,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                                     foreach (var data in hiderDataForMesh)
                                     {
-                                        hideIndexOffsetDictionary.Add(data.ReferenceIndexOffset, data.HideIndex);
+                                        //TODO: Face seems to have duplicated refrence index offsets, may need to look further into this.
+                                        if (!hideIndexOffsetDictionary.ContainsKey(data.ReferenceIndexOffset))
+                                        {
+                                            hideIndexOffsetDictionary.Add(data.ReferenceIndexOffset, data.HideIndex);
+                                        }
+                                        else
+                                        {
+                                            Debug.WriteLine($"Unable to add {data.ReferenceIndexOffset}  {data.HideIndex}");
+                                        }
+
                                         if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
                                         {
                                             throw new Exception(
@@ -3450,8 +3455,9 @@ namespace xivModdingFramework.Models.FileTypes
         private (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType)
         {
             string mdlFolder = "", mdlFile = "";
-            var id = itemModel.PrimaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.PrimaryModelInfo.Body.ToString().PadLeft(4, '0');
+
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
             var race = xivRace.GetRaceCode();
 
             switch (itemType)
@@ -3481,23 +3487,23 @@ namespace xivModdingFramework.Models.FileTypes
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
                     {
-                        mdlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/model";
-                        mdlFile   = $"c{id}b{bodyVer}_{SlotAbbreviationDictionary[XivStrings.Body]}{MdlExtension}";
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/model";
+                        mdlFile   = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{MdlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
                     {
-                        mdlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/model";
-                        mdlFile   = $"c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{MdlExtension}";
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/model";
+                        mdlFile   = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Face))
                     {
-                        mdlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/model";
-                        mdlFile   = $"c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{MdlExtension}";
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/model";
+                        mdlFile   = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
                     {
-                        mdlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/model";
-                        mdlFile   = $"c{id}t{bodyVer}_{MdlExtension}";
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
+                        mdlFile   = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
                     }
 
                     break;
@@ -3532,7 +3538,9 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Iris, "iri"},
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
+            {XivStrings.Hair, "hir"},
+            {XivStrings.Tail, "til"}
+
         };
 
         private static readonly Dictionary<byte, VertexDataType> VertexTypeDictionary =
