@@ -83,6 +83,12 @@ namespace xivModdingFramework.Variants.FileTypes
                 {
                     // weapons and monsters do not have variant sets
                     variantOffset = (modelInfo.Variant * variantLength) + headerLength;
+
+                    // use default if offset is out of range
+                    if (variantOffset >= imcData.Length)
+                    {
+                        variantOffset = headerLength;
+                    }
                 }
                 else
                 {
@@ -90,9 +96,17 @@ namespace xivModdingFramework.Variants.FileTypes
                     // These can be Head, Body, Hands, Legs, Feet  or  Ears, Neck, Wrists, LRing, RRing
                     // This skips to the correct variant set, then to the correct slot within that set for the item
                     variantOffset = (modelInfo.Variant * variantSetLength) + (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+
+                    // use defalut if offset is out of range
+                    if (variantOffset >= imcData.Length)
+                    {
+                        variantOffset = (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+                    }
                 }
 
                 br.BaseStream.Seek(variantOffset, SeekOrigin.Begin);
+
+               // if(variantOffset)
 
                 xivImc.Version = br.ReadByte();
                 var unknown = br.ReadByte();

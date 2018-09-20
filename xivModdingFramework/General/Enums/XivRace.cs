@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Resources;
 using xivModdingFramework.Resources;
 
@@ -94,6 +96,19 @@ namespace xivModdingFramework.General.Enums
             var displayName = rm.GetString(value.ToString());
 
             return displayName;
+        }
+
+
+        /// <summary>
+        /// Gets the enum value from the description
+        /// </summary>
+        /// <param name="value">The race string</param>
+        /// <returns>The XivRace enum</returns>
+        public static XivRace GetXivRace(string value)
+        {
+            var races = Enum.GetValues(typeof(XivRace)).Cast<XivRace>();
+
+            return races.FirstOrDefault(race => race.GetRaceCode() == value);
         }
     }
 }

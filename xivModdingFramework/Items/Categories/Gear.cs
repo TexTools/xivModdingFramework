@@ -54,11 +54,11 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int modelDataCheckOffset = 31;
-            const int dataLength = 152;
+            const int dataLength = 160;
             const int nameDataOffset = 14;
             const int modelDataOffset = 24;
-            const int iconDataOffset = 128;
-            const int slotDataOffset = 146;
+            const int iconDataOffset = 136;
+            const int slotDataOffset = 154;
 
             var xivGearList = new List<XivGear>();
 

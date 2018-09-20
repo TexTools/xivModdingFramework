@@ -60,7 +60,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="itemModel">Item that contains model data</param>
         /// <param name="race">The race for the requested data</param>
         /// <param name="part">The Mtrl part </param>
-        /// <returns>XivMtrl containing all the mtrl data/returns>
+        /// <returns>XivMtrl containing all the mtrl data</returns>
         public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, char part)
         {
             var index = new Index(_gameDirectory);
@@ -90,6 +90,39 @@ namespace xivModdingFramework.Materials.FileTypes
             return mtrlData;
         }
 
+        /// <summary>
+        /// Gets the MTRL data for the given item 
+        /// </summary>
+        /// <remarks>
+        /// It requires a race (The default is usually <see cref="XivRace.Hyur_Midlander_Male"/>)
+        /// It also requires an mtrl part <see cref="GearInfo.GetPartList(IItemModel, XivRace)"/> (default is 'a')
+        /// </remarks>
+        /// <param name="itemModel">Item that contains model data</param>
+        /// <param name="race">The race for the requested data</param>
+        /// <param name="mtrlFile">The Mtrl file</param>
+        /// <returns>XivMtrl containing all the mtrl data</returns>
+        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, string mtrlFile)
+        {
+            var index = new Index(_gameDirectory);
+            var itemType = ItemType.GetItemType(itemModel);
+
+            // Get mtrl path
+            var mtrlFolder = GetMtrlFolder(itemModel, race, itemType);
+            var mtrlStringPath = $"{mtrlFolder}/{mtrlFile}";
+
+            // Get mtrl offset
+            var mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlFolder), HashGenerator.GetHash(mtrlFile),
+                _dataFile);
+
+            if (mtrlOffset == 0)
+            {
+                throw new Exception($"Could not find offest for {mtrlStringPath}");
+            }
+
+            var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath);
+
+            return mtrlData;
+        }
 
         /// <summary>
         /// Gets the MTRL data for the given offset and path
@@ -225,10 +258,22 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 xivMtrl.Unknown2 = br.ReadInt32();
 
-                xivMtrl.ColorSetData = new List<Half>();
-                for (var i = 0; i < xivMtrl.ColorSetDataSize / 2; i++)
+                if (xivMtrl.ColorSetDataSize > 0)
                 {
-                    xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
+                    // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
+                    var colorDataSize = 512;
+
+                    xivMtrl.ColorSetData = new List<Half>();
+                    for (var i = 0; i < colorDataSize / 2; i++)
+                    {
+                        xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
+                    }
+
+                    // If the color set is 544 in length, it has an extra 32 bytes at the end
+                    if (xivMtrl.ColorSetDataSize == 544)
+                    {
+                        xivMtrl.ColorSetExtraData = br.ReadBytes(32);
+                    }
                 }
 
                 xivMtrl.AdditionalDataSize = br.ReadInt16();
@@ -518,6 +563,78 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         /// <summary>
+        /// Gets the mtrl folder for a given item
+        /// </summary>
+        /// <param name="itemModel">Item that contains model data</param>
+        /// <param name="xivRace">The race for the requested data</param>
+        /// <param name="itemType">The type of the item</param>
+        /// <returns>The mtrl Folder</returns>
+        private string GetMtrlFolder(IItemModel itemModel, XivRace xivRace, XivItemType itemType)
+        {
+            // The default version number
+            var version = "0001";
+
+            if (itemType != XivItemType.human)
+            {
+                // get the items version from the imc file
+                var imc = new Imc(_gameDirectory, _dataFile);
+                var imcInfo = imc.GetImcInfo(itemModel, itemModel.ModelInfo);
+                version = imcInfo.Version.ToString().PadLeft(4, '0');
+            }
+
+            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var race = xivRace.GetRaceCode();
+
+            var mtrlFolder = "";
+
+            switch (itemType)
+            {
+                case XivItemType.equipment:
+                    mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
+                    break;
+                case XivItemType.accessory:
+                    mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
+                    break;
+                case XivItemType.weapon:
+                    mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
+                    break;
+
+                case XivItemType.monster:
+                    mtrlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/material/v{version}";
+                    break;
+                case XivItemType.demihuman:
+                    mtrlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
+                    break;
+                case XivItemType.human:
+                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    {
+                        // Hair has a version number, but no IMC, so we leave it at the default 0001
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/material/v{version}";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/material";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
+                    }
+
+                    break;
+                default:
+                    mtrlFolder = "";
+                    break;
+            }
+
+            return mtrlFolder;
+        }
+
+        /// <summary>
         /// A dictionary containing the slot abbreviations in the format [equipment slot, slot abbreviation]
         /// </summary>
         private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
@@ -543,6 +660,43 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"}
+        };
+
+        /// <summary>
+        /// A dictionary containing race data in the format [Race ID, XivRace]
+        /// </summary>
+        private static readonly Dictionary<string, XivRace> IDRaceDictionary = new Dictionary<string, XivRace>
+        {
+            {"0101", XivRace.Hyur_Midlander_Male},
+            {"0104", XivRace.Hyur_Midlander_Male_NPC},
+            {"0201", XivRace.Hyur_Midlander_Female},
+            {"0204", XivRace.Hyur_Midlander_Female_NPC},
+            {"0301", XivRace.Hyur_Highlander_Male},
+            {"0304", XivRace.Hyur_Highlander_Male_NPC},
+            {"0401", XivRace.Hyur_Highlander_Female},
+            {"0404", XivRace.Hyur_Highlander_Female_NPC},
+            {"0501", XivRace.Elezen_Male},
+            {"0504", XivRace.Elezen_Male_NPC},
+            {"0601", XivRace.Elezen_Female},
+            {"0604", XivRace.Elezen_Female_NPC},
+            {"0701", XivRace.Miqote_Male},
+            {"0704", XivRace.Miqote_Male_NPC},
+            {"0801", XivRace.Miqote_Female},
+            {"0804", XivRace.Miqote_Female_NPC},
+            {"0901", XivRace.Roegadyn_Male},
+            {"0904", XivRace.Roegadyn_Male_NPC},
+            {"1001", XivRace.Roegadyn_Female},
+            {"1004", XivRace.Roegadyn_Female_NPC},
+            {"1101", XivRace.Lalafell_Male},
+            {"1104", XivRace.Lalafell_Male_NPC},
+            {"1201", XivRace.Lalafell_Female},
+            {"1204", XivRace.Lalafell_Female_NPC},
+            {"1301", XivRace.AuRa_Male},
+            {"1304", XivRace.AuRa_Male_NPC},
+            {"1401", XivRace.AuRa_Female},
+            {"1404", XivRace.AuRa_Female_NPC},
+            {"9104", XivRace.NPC_Male},
+            {"9204", XivRace.NPC_Female}
         };
     }
 }

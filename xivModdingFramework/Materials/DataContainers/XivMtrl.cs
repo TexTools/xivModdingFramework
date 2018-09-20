@@ -137,10 +137,14 @@ namespace xivModdingFramework.Materials.DataContainers
         public int Unknown2 { get; set; }
 
         /// <summary>
-        /// The byte array containing the raw ColorSet data
+        /// The list of half floats containing the ColorSet data
         /// </summary>
-        //public byte[] ColorSetData { get; set; }
         public List<Half> ColorSetData { get; set; }
+
+        /// <summary>
+        /// The byte array containing the extra ColorSet data
+        /// </summary>
+        public byte[] ColorSetExtraData { get; set; }
 
         /// <summary>
         /// The size of the additional MTRL Data

@@ -527,15 +527,15 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var vertexData = new VertexData
                         {
-                            Positions = new List<Vector3>(),
+                            Positions = new Vector3Collection(),
                             BoneWeights = new List<float[]>(),
                             BoneIndices = new List<byte[]>(),
-                            Normals = new List<Vector3>(),
-                            BiNormals = new List<Vector3>(),
+                            Normals = new Vector3Collection(),
+                            BiNormals = new Vector3Collection(),
                             Colors = new List<Color>(),
-                            TextureCoordinates0 = new List<Vector2>(),
-                            TextureCoordinates1 = new List<Vector2>(),
-                            Indices = new List<int>()
+                            TextureCoordinates0 = new Vector2Collection(),
+                            TextureCoordinates1 = new Vector2Collection(),
+                            Indices = new IntCollection()
                         };
 
                         #region Positions

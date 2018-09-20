@@ -68,12 +68,19 @@ namespace xivModdingFramework.HUD.FileTypes
 
                     for (var i = 0; i < pathCount; i++)
                     {
-                        br.ReadBytes(4);
+                        var pathNum = br.ReadInt32();
+                        while (pathNum != i + 1)
+                        {
+                            pathNum = br.ReadInt32();
+                        }
+
                         var path = Encoding.UTF8.GetString(br.ReadBytes(48)).Replace("\0", "");
+                        path = new string(path.Where(c => !char.IsControl(c)).ToArray());
 
                         if (path.Length <= 2 || !path.Contains("uld")) continue;
 
                         var uldPath = path.Substring(0, path.LastIndexOf(".", StringComparison.Ordinal) + 4);
+
                         uldStringList.Add(uldPath);
                     }
                 }

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using HelixToolkit.Wpf.SharpDX.Core;
 using SharpDX;
 
 namespace xivModdingFramework.Models.DataContainers
@@ -27,7 +28,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The vertex position data in Vector3 format (X, Y, Z)
         /// </summary>
-        public List<Vector3> Positions { get; set; }
+        public Vector3Collection Positions { get; set; }
 
         /// <summary>
         /// The bone weight array per vertex
@@ -51,17 +52,17 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// The W coordinate is present but has never been noticed to be anything other than 0
         /// </remarks>
-        public List<Vector3> Normals { get; set; }
+        public Vector3Collection Normals { get; set; }
 
         /// <summary>
         /// The vertex BiNormal data in Vector3 format (X, Y, Z)
         /// </summary>
-        public List<Vector3> BiNormals { get; set; }
+        public Vector3Collection BiNormals { get; set; }
 
         /// <summary>
         /// The vertex Tangent data in Vector3 format (X, Y, Z)
         /// </summary>
-        public List<Vector3> Tangents { get; set; }
+        public Vector3Collection Tangents { get; set; }
 
         /// <summary>
         /// The vertex color data in Byte4 format (A, R, G, B)
@@ -71,16 +72,16 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The primary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
-        public List<Vector2> TextureCoordinates0 { get; set; }
+        public Vector2Collection TextureCoordinates0 { get; set; }
 
         /// <summary>
         /// The secondary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
-        public List<Vector2> TextureCoordinates1 { get; set; }
+        public Vector2Collection TextureCoordinates1 { get; set; }
 
         /// <summary>
         /// The index data for the mesh
         /// </summary>
-        public List<int> Indices { get; set; }
+        public IntCollection Indices { get; set; }
     }
 }
