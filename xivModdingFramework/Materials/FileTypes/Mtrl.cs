@@ -61,7 +61,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="part">The Mtrl part </param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, char part)
+        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion)
         {
             var index = new Index(_gameDirectory);
             var itemType = ItemType.GetItemType(itemModel);
@@ -79,7 +79,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw new Exception($"Could not find offest for {mtrlStringPath}");
             }
 
-            var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath);
+            var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
 
             if (mtrlPath.HasVfx)
             {
@@ -101,7 +101,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="mtrlFile">The Mtrl file</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, string mtrlFile)
+        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, string mtrlFile, int dxVersion)
         {
             var index = new Index(_gameDirectory);
             var itemType = ItemType.GetItemType(itemModel);
@@ -119,7 +119,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw new Exception($"Could not find offest for {mtrlStringPath}");
             }
 
-            var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath);
+            var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
 
             return mtrlData;
         }
@@ -130,9 +130,10 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
         /// <param name="mtrlPath">The full internal game path for the mtrl</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public XivMtrl GetMtrlData(int mtrlOffset, string mtrlPath)
+        public XivMtrl GetMtrlData(int mtrlOffset, string mtrlPath, int dxVersion)
         {
             var dat = new Dat(_gameDirectory);
+            var index = new Index(_gameDirectory);
 
             // Get uncompressed mtrl data
             var mtrlData = dat.GetType2Data(mtrlOffset, _dataFile);
@@ -217,7 +218,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 xivMtrl.TexturePathList = new List<string>(xivMtrl.TextureCount);
                 for (var i = 0; i < xivMtrl.TextureCount; i++)
                 {
-                    xivMtrl.TexturePathList.Add(Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count])).Replace("\0", ""));
+                    var texturePath = Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count])).Replace("\0", "");
+                    var dx11FileName = Path.GetFileName(texturePath).Insert(0, "--");
+
+                    if (index.FileExists(HashGenerator.GetHash(dx11FileName),
+                        HashGenerator.GetHash(Path.GetDirectoryName(texturePath).Replace("\\", "/")), _dataFile))
+                    {
+                        texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
+                    }
+
+                    xivMtrl.TexturePathList.Add(texturePath);
                     count++;
                 }
 

@@ -41,11 +41,13 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public ModelTextureData GetModelMaps()
+        public ModelTextureData GetModelMaps(Color? customColor = null)
         {
             var texMapData = GetTexMapData();
 
             var dimensions = EqualizeTextureSizes(texMapData);
+
+            var materialType = GetMaterialType(_mtrlData.MTRLPath);
 
             var diffuseMap = new List<byte>();
             var specularMap = new List<byte>();
@@ -88,14 +90,36 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 for (var i = 0; i < 1024; i += 16)
                 {
-                    diffuseColorList.Add(new Color(255, 255, 255));
-                    specularColorList.Add(new Color(0, 0, 0));
+                    if (!materialType.Equals("other"))
+                    {
+                        if (customColor != null)
+                        {
+                            diffuseColorList.Add(customColor.GetValueOrDefault());
+                        }
+                        else
+                        {
+                            if (!materialType.Equals("body"))
+                            {
+                                diffuseColorList.Add(new Color(96, 57, 19));
+                            }
+                            else
+                            {
+                                diffuseColorList.Add(new Color(255, 255, 255));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        diffuseColorList.Add(new Color(255, 255, 255));
+                    }
+
+                    specularColorList.Add(new Color(25, 25, 25));
                     emissiveColorList.Add(new Color(0, 0, 0));
                 }
             }
 
             var normalPixels = texMapData.Normal.Data;
-            byte[] diffusePixels = null, specularPixels = null, multiPixels = null;
+            byte[] diffusePixels = null, specularPixels = null, multiPixels = null, skinPixels = null;
             if (texMapData.Diffuse != null)
             {
                 diffusePixels = texMapData.Diffuse.Data;
@@ -111,10 +135,19 @@ namespace xivModdingFramework.Models.ModelTextures
                 multiPixels = texMapData.Multi.Data;
             }
 
+            if (texMapData.Skin != null)
+            {
+                skinPixels = texMapData.Skin.Data;
+            }
+
             for (var i = 3; i < texMapData.Normal.Data.Length; i += 4)
             {
-
                 var alpha = normalPixels[i - 1];
+
+                if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                {
+                    alpha = normalPixels[i];
+                }
 
                 byte diffR = 255, diffG = 255, diffB = 255;
                 byte specR = 255, specG = 255, specB = 255;
@@ -140,10 +173,22 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     if (specularPixels != null)
                     {
-                        specR = specularPixels[i - 2];
-                        specG = specularPixels[i - 2];
-                        specB = specularPixels[i - 2];
+                        if (specularPixels.Length > i)
+                        {
+                            specR = specularPixels[i - 3];
+                            specG = specularPixels[i - 2];
+                            specB = specularPixels[i - 1];
+                        }
+                    }
 
+                    if (skinPixels != null)
+                    {
+                        if (skinPixels.Length > i)
+                        {
+                            specR = skinPixels[i - 3];
+                            specG = skinPixels[i - 2];
+                            specB = skinPixels[i - 1];
+                        }
                     }
                 }
 
@@ -151,6 +196,12 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 var pixel = (normalPixels[i] / 255f) * 15f;
                 var blendPercent = (float)(pixel - Math.Truncate(pixel));
+
+                if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                {
+                    pixel = 0;
+                    blendPercent = 0;
+                }
 
                 if (blendPercent != 0)
                 {
@@ -193,12 +244,24 @@ namespace xivModdingFramework.Models.ModelTextures
                     var specColor = specularColorList[colorLoc];
                     var emisColor = emissiveColorList[colorLoc];
 
-                    diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), (int)alpha);
-                    specularColor = new Color((int)((specColor.R / 255f) * specR), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specB), 255);
+                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                    {
+                        diffuseColor = new Color((int)((diffColor.R / 255f) * specR), (int)((diffColor.G / 255f) * specR), (int)((diffColor.B / 255f) * specR), (int)alpha);
+                        specularColor = new Color((int)((specColor.R / 255f) * specG), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specG), 255);
+                    }
+                    else
+                    {
+                        diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), (int)alpha);
+
+                        specularColor = materialType.Equals("body") ? 
+                            new Color((int)((specColor.R / 255f) * specG), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specG), 255) 
+                            : new Color((int)((specColor.R / 255f) * specR), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specB), 255);
+                    }
+
                     emissiveColor = new Color((int)emisColor.R, (int)emisColor.G, (int)emisColor.B, (int)255);
                 }
 
-                alphaColor = new Color((int)alpha, (int)alpha, (int)alpha, (int)255);
+                alphaColor = new Color((int)alpha, (int)alpha, (int)alpha, (int)alpha);
 
                 diffuseMap.AddRange(BitConverter.GetBytes(diffuseColor.ToRgba()));
                 specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
@@ -331,6 +394,18 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
+            if (texMapData.Skin != null)
+            {
+                var size = texMapData.Skin.Width * texMapData.Skin.Height;
+
+                if (size > largestSize)
+                {
+                    largestSize = size;
+                    width = texMapData.Skin.Width;
+                    height = texMapData.Skin.Height;
+                }
+            }
+
             if (largestSize > texMapData.Normal.Width * texMapData.Normal.Height)
             {
                 var pixelSettings =
@@ -395,6 +470,22 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
+            if (texMapData.Skin != null && largestSize > texMapData.Skin.Width * texMapData.Skin.Height)
+            {
+                var pixelSettings =
+                    new PixelStorageSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char, PixelMapping.RGBA);
+
+                using (var image = new MagickImage(texMapData.Skin.Data, pixelSettings))
+                {
+                    image.Resize(width, height);
+
+                    texMapData.Skin.Width = width;
+                    texMapData.Skin.Height = height;
+
+                    texMapData.Skin.Data = image.ToByteArray(MagickFormat.Rgba);
+                }
+            }
+
             return (width, height);
         }
 
@@ -404,12 +495,53 @@ namespace xivModdingFramework.Models.ModelTextures
         /// <param name="amount">How much of <paramref name="color"/> to keep,
         /// “on top of” <paramref name="backColor"/>.</param>
         /// <returns>The blended colors.</returns>
-        public static Color Blend(Color color, Color backColor, double amount)
+        private static Color Blend(Color color, Color backColor, double amount)
         {
             var r = (byte)((color.R * amount) + backColor.R * (1 - amount));
             var g = (byte)((color.G * amount) + backColor.G * (1 - amount));
             var b = (byte)((color.B * amount) + backColor.B * (1 - amount));
             return new Color(r, g, b);
+        }
+
+        private string GetMaterialType(string mtrlPath)
+        {
+            if (mtrlPath.Contains("/hair/h"))
+            {
+                return "hair";
+            }
+
+            if (mtrlPath.Contains("/body/b"))
+            {
+                return "body";
+            }
+
+            if (mtrlPath.Contains("/face/f"))
+            {
+                if (mtrlPath.Contains("_etc_"))
+                {
+                    return "etc";
+                }
+
+                if (mtrlPath.Contains("_iri"))
+                {
+                    return "iris";
+                }
+
+                return "other";
+            }
+
+            if (mtrlPath.Contains("/tail/t"))
+            {
+                if (mtrlPath.Contains("1301") || mtrlPath.Contains("1304") || mtrlPath.Contains("1401") ||
+                    mtrlPath.Contains("1404"))
+                {
+                    return "other";
+                }
+
+                return "tail";
+            }
+
+            return "other";
         }
 
         public class TexMapData

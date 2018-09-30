@@ -72,6 +72,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var skelLoc = Directory.GetCurrentDirectory() + "\\Skeletons\\";
 
+                Directory.CreateDirectory(skelLoc);
+
                 if (!File.Exists(skelLoc + sklbName + ".xml"))
                 {
                     GetSkeleton(mdlFile, item.ItemCategory);
@@ -131,8 +133,15 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var abr = SlotAbbreviationDictionary[category];
 
-                skelFolder = string.Format(XivStrings.EquipSkelFolder, modelName.Substring(1, 4), abr, abr[0], modelName.Substring(6, 4));
-                skelFile = string.Format(XivStrings.EquipSkelFile, modelName.Substring(1, 4), abr[0], modelName.Substring(6, 4));
+                var id = modelName.Substring(6, 4);
+
+                if (abr.Equals("base"))
+                {
+                    id = "0001";
+                }
+
+                skelFolder = string.Format(XivStrings.EquipSkelFolder, modelName.Substring(1, 4), abr, abr[0], id);
+                skelFile = string.Format(XivStrings.EquipSkelFile, modelName.Substring(1, 4), abr[0], id);
             }
 
             // Continue only if the skeleton file exists
@@ -359,26 +368,26 @@ namespace xivModdingFramework.Models.FileTypes
         private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
         {
             {XivStrings.Head, "met"},
-            {XivStrings.Hands, "glv"},
-            {XivStrings.Legs, "dwn"},
-            {XivStrings.Feet, "sho"},
-            {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
-            {XivStrings.Neck, "nek"},
-            {XivStrings.Rings, "rir"},
-            {XivStrings.Wrists, "wrs"},
-            {XivStrings.Head_Body, "top"},
-            {XivStrings.Body_Hands, "top"},
-            {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "top"},
-            {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "top"},
-            {XivStrings.All, "top"},
-            {XivStrings.Face, "fac"},
-            {XivStrings.Iris, "iri"},
-            {XivStrings.Etc, "etc"},
-            {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
+            {XivStrings.Hands, "base"},
+            {XivStrings.Legs, "base"},
+            {XivStrings.Feet, "base"},
+            {XivStrings.Body, "base"},
+            {XivStrings.Ears, "base"},
+            {XivStrings.Neck, "base"},
+            {XivStrings.Rings, "base"},
+            {XivStrings.Wrists, "base"},
+            {XivStrings.Head_Body, "base"},
+            {XivStrings.Body_Hands, "base"},
+            {XivStrings.Body_Hands_Legs, "base"},
+            {XivStrings.Body_Legs_Feet, "base"},
+            {XivStrings.Body_Hands_Legs_Feet, "base"},
+            {XivStrings.Legs_Feet, "base"},
+            {XivStrings.All, "base"},
+            {XivStrings.Face, "face"},
+            {XivStrings.Iris, "face"},
+            {XivStrings.Etc, "face"},
+            {XivStrings.Accessory, "base"},
+            {XivStrings.Hair, "hair"}
         };
     }
 }

@@ -22,7 +22,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Xml;
+using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -34,6 +38,16 @@ namespace xivModdingFramework.Models.FileTypes
         private static readonly Dictionary<string, SkeletonData> FullSkel = new Dictionary<string, SkeletonData>();
 
         private static readonly Dictionary<int, SkeletonData> FullSkelNum = new Dictionary<int, SkeletonData>();
+
+        private readonly DirectoryInfo _gameDirectory;
+        private readonly XivDataFile _dataFile;
+
+        public Dae(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        {
+            _gameDirectory = gameDirectory;
+            _dataFile = dataFile;
+
+        }
 
         /// <summary>
         /// This value represents the amount to multiply the model data
@@ -48,9 +62,15 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="xivModel">The model to create a dae file for</param>
         /// <param name="saveLocation">The location to save the dae file</param>
-        public void MakeDaeFileFromModel(XivMdl xivModel, DirectoryInfo saveLocation)
+        public void MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation)
         {
             var modelName = Path.GetFileNameWithoutExtension(xivModel.MdlPath.File);
+
+            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation)}\\3D";
+
+            Directory.CreateDirectory(path);
+
+            var savePath = Path.Combine(path, modelName) + ".dae";
 
             // We will only use the LoD with the highest quality, that being LoD 0
             var lod0 = xivModel.LoDList[0];
@@ -60,10 +80,27 @@ namespace xivModdingFramework.Models.FileTypes
             // This would be the same name given to the skeleton file
             var skelName = modelName.Substring(0, 5);
 
+            if (item.ItemCategory.Equals(XivStrings.Head))
+            {
+                skelName = modelName.Substring(5, 5);
+            }
+
             // Checks to see if the skeleton file exists, and throws an exception if it does not
             if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
             {
-                throw new IOException("Skeleton File Not Found!");
+                try
+                {
+                    var sklb = new Sklb(_gameDirectory, _dataFile);
+                    sklb.CreateSkelFromSklb(item, xivModel);
+                }
+                catch (Exception e)
+                {
+                    skelName = modelName.Substring(0, 5);
+                    if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
+                    {
+                        throw new IOException("Skeleton File Not Found!");
+                    }
+                }
             }
 
             var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
@@ -116,7 +153,7 @@ namespace xivModdingFramework.Models.FileTypes
                 Indent = true,
             };
 
-            using (var xmlWriter = XmlWriter.Create(saveLocation.FullName, xmlWriterSettings))
+            using (var xmlWriter = XmlWriter.Create(savePath, xmlWriterSettings))
             {
                 xmlWriter.WriteStartDocument();
 

@@ -1045,7 +1045,7 @@ namespace xivModdingFramework.Models.FileTypes
             // A dictonary containing any warnings raised by the import in the format <Warning Title, Warning Message>
             var warningsDictionary = new Dictionary<string, string>();
 
-            var dae = new Dae();
+            var dae = new Dae(_gameDirectory, _dataFile);
 
             // We only use the highest quality LoD for importing which is LoD 0
             var lod0 = xivMdl.LoDList[0];
