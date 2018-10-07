@@ -56,5 +56,13 @@ namespace xivModdingFramework.Models.DataContainers
         /// These are references to the MTRL files used by the model
         /// </remarks>
         public List<string> MaterialList { get; set; }
+
+        /// <summary>
+        /// The list of extra path strings
+        /// </summary>
+        /// <remarks>
+        /// These are extra paths contained in the mdl path data
+        /// </remarks>
+        public List<string> ExtraPathList { get; set; }
     }
 }

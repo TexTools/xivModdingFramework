@@ -60,6 +60,11 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector3Collection BiNormals { get; set; }
 
         /// <summary>
+        /// The vertex BiNormal Handedness data in bytes
+        /// </summary>
+        public List<byte> BiNormalHandedness { get; set; }
+
+        /// <summary>
         /// The vertex Tangent data in Vector3 format (X, Y, Z)
         /// </summary>
         public Vector3Collection Tangents { get; set; }
