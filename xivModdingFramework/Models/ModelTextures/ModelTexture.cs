@@ -18,6 +18,7 @@ using ImageMagick;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using SharpDX.Direct2D1;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -140,6 +141,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 skinPixels = texMapData.Skin.Data;
             }
 
+            byte diffR = 255, diffG = 255, diffB = 255;
+            byte specR = 255, specG = 255, specB = 255;
+
             for (var i = 3; i < texMapData.Normal.Data.Length; i += 4)
             {
                 var alpha = normalPixels[i - 1];
@@ -148,9 +152,6 @@ namespace xivModdingFramework.Models.ModelTextures
                 {
                     alpha = normalPixels[i];
                 }
-
-                byte diffR = 255, diffG = 255, diffB = 255;
-                byte specR = 255, specG = 255, specB = 255;
 
                 if (multiPixels != null)
                 {
@@ -358,6 +359,9 @@ namespace xivModdingFramework.Models.ModelTextures
             var height = texMapData.Normal.Height;
             var largestSize = width * height;
 
+            var scaleDown = false;
+            var scale = 1;
+
             if (texMapData.Diffuse != null)
             {
                 var size = texMapData.Diffuse.Width * texMapData.Diffuse.Height;
@@ -406,7 +410,22 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (largestSize > texMapData.Normal.Width * texMapData.Normal.Height)
+            if (width > 4000 || height > 4000)
+            {
+                scale = 4;
+                scaleDown = true;
+            }
+            //else if (width > 2000 || height > 2000)
+            //{
+            //    scale = 2;
+            //    scaleDown = true;
+            //}
+
+            width = width / scale;
+            height = height / scale;
+            largestSize = width * height;
+
+            if (largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
             {
                 var pixelSettings =
                     new PixelStorageSettings(texMapData.Normal.Width, texMapData.Normal.Height, StorageType.Char, PixelMapping.RGBA);
@@ -422,13 +441,14 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (texMapData.Diffuse != null && largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height)
+            if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
             {
                 var pixelSettings =
                     new PixelStorageSettings(texMapData.Diffuse.Width, texMapData.Diffuse.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Diffuse.Data, pixelSettings))
                 {
+                    image.Alpha(AlphaOption.Opaque);
                     image.Resize(width, height);
 
                     texMapData.Diffuse.Width = width;
@@ -438,13 +458,14 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (texMapData.Specular != null && largestSize > texMapData.Specular.Width * texMapData.Specular.Height)
+            if (texMapData.Specular != null && (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
             {
                 var pixelSettings =
                     new PixelStorageSettings(texMapData.Specular.Width, texMapData.Specular.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Specular.Data, pixelSettings))
                 {
+                    image.Alpha(AlphaOption.Opaque);
                     image.Resize(width, height);
 
                     texMapData.Specular.Width = width;
@@ -454,13 +475,14 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (texMapData.Multi != null && largestSize > texMapData.Multi.Width * texMapData.Multi.Height)
+            if (texMapData.Multi != null && (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
             {
                 var pixelSettings =
                     new PixelStorageSettings(texMapData.Multi.Width, texMapData.Multi.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Multi.Data, pixelSettings))
                 {
+                    image.Alpha(AlphaOption.Opaque);
                     image.Resize(width, height);
 
                     texMapData.Multi.Width = width;
@@ -470,13 +492,14 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (texMapData.Skin != null && largestSize > texMapData.Skin.Width * texMapData.Skin.Height)
+            if (texMapData.Skin != null && (largestSize > texMapData.Skin.Width * texMapData.Skin.Height || scaleDown))
             {
                 var pixelSettings =
                     new PixelStorageSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Skin.Data, pixelSettings))
                 {
+                    image.Alpha(AlphaOption.Opaque);
                     image.Resize(width, height);
 
                     texMapData.Skin.Width = width;
