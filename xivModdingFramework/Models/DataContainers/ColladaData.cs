@@ -28,57 +28,57 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The positions in the collada file
         /// </summary>
-        public List<float> Positions { get; set; }
+        public List<float> Positions { get; set; } = new List<float>();
 
         /// <summary>
         /// The normals in the collada file
         /// </summary>
-        public List<float> Normals { get; set; }
+        public List<float> Normals { get; set; } = new List<float>();
 
         /// <summary>
         /// The primary texture coordinates in the collada file
         /// </summary>
-        public List<float> TextureCoordinates0 { get; set; }
+        public List<float> TextureCoordinates0 { get; set; } = new List<float>();
 
         /// <summary>
         /// The secondary texture coordinates in the collada file
         /// </summary>
-        public List<float> TextureCoordinates1 { get; set; }
+        public List<float> TextureCoordinates1 { get; set; } = new List<float>();
 
         /// <summary>
         /// The bone weights in the collada file
         /// </summary>
-        public List<float> BoneWeights { get; set; }
+        public List<float> BoneWeights { get; set; } = new List<float>();
 
         /// <summary>
         /// The BiNormals in the collada file
         /// </summary>
-        public List<float> BiNormals { get; set; }
+        public List<float> BiNormals { get; set; } = new List<float>();
 
         /// <summary>
         /// The tangents in the collada file
         /// </summary>
-        public List<float> Tangents { get; set; }
+        public List<float> Tangents { get; set; } = new List<float>();
 
         /// <summary>
         /// The indices in teh collada file
         /// </summary>
-        public List<int> Indices { get; set; }
+        public List<int> Indices { get; set; } = new List<int>();
 
 
-        public List<int> BoneIndices { get; set; }
+        public List<int> BoneIndices { get; set; } = new List<int>();
 
-        public List<int> Vcounts { get; set; }
+        public List<int> Vcounts { get; set; } = new List<int>();
 
-        public List<int> PositionIndices { get; set; }
+        public List<int> PositionIndices { get; set; } = new List<int>();
 
-        public List<int> NormalIndices { get; set; }
+        public List<int> NormalIndices { get; set; } = new List<int>();
 
-        public List<int> BiNormalIndices { get; set; }
+        public List<int> BiNormalIndices { get; set; } = new List<int>();
 
-        public List<int> TextureCoordinate0Indices { get; set; }
+        public List<int> TextureCoordinate0Indices { get; set; } = new List<int>();
 
-        public List<int> TextureCoordinate1Indices { get; set; }
+        public List<int> TextureCoordinate1Indices { get; set; } = new List<int>();
 
         public Dictionary<int, int> PartsDictionary = new Dictionary<int, int>();
 
