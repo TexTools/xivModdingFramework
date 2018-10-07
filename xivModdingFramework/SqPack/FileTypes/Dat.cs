@@ -799,12 +799,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     j = j + 20;
                 }
 
-                if (decompressedData.Count >= uncompressedFileSize) return xivTex;
-
-                var difference = uncompressedFileSize - decompressedData.Count;
-                var padding = new byte[difference];
-                Array.Clear(padding, 0, difference);
-                decompressedData.AddRange(padding);
+                if (decompressedData.Count < uncompressedFileSize)
+                {
+                    var difference = uncompressedFileSize - decompressedData.Count;
+                    var padding = new byte[difference];
+                    Array.Clear(padding, 0, difference);
+                    decompressedData.AddRange(padding);
+                }
             }
 
             xivTex.TexData = decompressedData.ToArray();
@@ -923,6 +924,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var offset = 0;
             var dataOverwritten = false;
+
+            internalFilePath = internalFilePath.Replace("\\", "/");
 
             var index = new Index(_gameDirectory);
 

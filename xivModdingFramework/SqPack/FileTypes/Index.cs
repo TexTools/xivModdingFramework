@@ -32,6 +32,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         private const string Index2Extension = ".win32.index2";
         private readonly DirectoryInfo _gameDirectory;
 
+
         public Index(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
@@ -379,6 +380,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>The offset which was replaced.</returns>
         public int UpdateIndex(long offset, string fullPath, XivDataFile dataFile)
         {
+            fullPath = fullPath.Replace("\\", "/");
             var folderHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
             var oldOffset = 0;
