@@ -271,15 +271,14 @@ namespace xivModdingFramework.Models.FileTypes
             var tang = "-textangents";
             var blender = false;
 
+            var indexStride = 4;
+            var textureCoordinateStride = 2;
+
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
                 while (reader.Read())
                 {
-                    var cData = new ColladaData()
-                    {
-                        IndexStride = 4,
-                        TextureCoordinateStride = 2
-                    };
+                    var cData = new ColladaData();
 
                     if (reader.IsStartElement())
                     {
@@ -294,8 +293,8 @@ namespace xivModdingFramework.Models.FileTypes
                                 texc2 = "-map2-array";
                                 biNorm = "-map1-texbinormals";
                                 tang = "-map1-textangents";
-                                cData.TextureCoordinateStride = 3;
-                                cData.IndexStride = 6;
+                                textureCoordinateStride = 3;
+                                indexStride = 6;
                             }
                             else if (tool.Contains("FBX"))
                             {
@@ -310,7 +309,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 tang = "-tangents-array";
                                 texc = "-texcoord-0-array";
                                 texc2 = "-texcoord-1-array";
-                                cData.IndexStride = 1;
+                                indexStride = 1;
                                 blender = true;
                             }
                             else if (!tool.Contains("TexTools"))
@@ -386,23 +385,23 @@ namespace xivModdingFramework.Models.FileTypes
                                         cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
 
                                         // The index stride changes if the secondary texture coordinates are not present
-                                        if (cData.TextureCoordinates1.Count < 1 && cData.IndexStride == 6)
+                                        if (cData.TextureCoordinates1.Count < 1 && indexStride == 6)
                                         {
-                                            cData.IndexStride = 4;
+                                            indexStride = 4;
                                         }
 
                                         // Reads the indices for each data point and places them in a list
-                                        for (var i = 0; i < cData.Indices.Count; i += cData.IndexStride)
+                                        for (var i = 0; i < cData.Indices.Count; i += indexStride)
                                         {
                                             cData.PositionIndices.Add(cData.Indices[i]);
                                             cData.NormalIndices.Add(cData.Indices[i + 1]);
                                             cData.TextureCoordinate0Indices.Add(cData.Indices[i + 2]);
 
-                                            if (cData.TextureCoordinates1.Count > 0 && cData.IndexStride == 6)
+                                            if (cData.TextureCoordinates1.Count > 0 && indexStride == 6)
                                             {
                                                 cData.TextureCoordinate1Indices.Add(cData.Indices[i + 4]);
                                             }
-                                            else if (cData.TextureCoordinates1.Count > 0 && cData.IndexStride == 4)
+                                            else if (cData.TextureCoordinates1.Count > 0 && indexStride == 4)
                                             {
                                                 cData.TextureCoordinate1Indices.Add(cData.Indices[i + 2]);
                                             }
@@ -419,13 +418,16 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                             }
 
+                            cData.IndexStride = indexStride;
+                            cData.TextureCoordinateStride = textureCoordinateStride;
+
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
                                 // Get part number
                                 var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
 
-                                if (meshPartDataDictionary.ContainsKey(meshPartNum))
+                                if (meshPartDataDictionary[meshNum].ContainsKey(meshPartNum))
                                 {
                                     throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
                                 }
@@ -434,11 +436,6 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
-                                if (meshPartDataDictionary.ContainsKey(0))
-                                {
-                                    throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
-                                }
-
                                 meshPartDataDictionary[meshNum].Add(0, cData);
                             }
                         }
