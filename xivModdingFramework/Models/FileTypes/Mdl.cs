@@ -16,7 +16,6 @@
 
 using HelixToolkit.Wpf.SharpDX;
 using HelixToolkit.Wpf.SharpDX.Core;
-using Newtonsoft.Json;
 using SharpDX;
 using System;
 using System.Collections.Generic;
@@ -33,6 +32,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
@@ -1933,6 +1933,8 @@ namespace xivModdingFramework.Models.FileTypes
         private void MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl, 
             Dictionary<string, ModelImportSettings> importSettings)
         {
+            var modlist = new ModList(_gameDirectory);
+
             var lineNum = 0;
             var inModList = false;
             ModInfo modInfo = null;
@@ -1942,19 +1944,13 @@ namespace xivModdingFramework.Models.FileTypes
 
             var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
-            using (var sr = new StreamReader(_modListDirectory.FullName))
+            var modInfoData = modlist.TryGetModEntry(mdlPath);
+
+            if (modInfoData != null)
             {
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.fullPath.Equals(mdlPath))
-                    {
-                        inModList = true;
-                        break;
-                    }
-                    lineNum++;
-                }
+                modInfo = modInfoData.Value.ModInfo;
+                lineNum = modInfoData.Value.LineNum;
+                inModList = true;
             }
 
             // Get the imported data

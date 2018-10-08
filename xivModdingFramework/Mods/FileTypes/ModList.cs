@@ -59,8 +59,41 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
+        /// <summary>
+        /// Tries to get the mod entry for the given internal file path, return null otherwise
+        /// </summary>
+        /// <param name="internalFilePath">The internal file path to find</param>
+        /// <returns>ModInfo and line number if it exists, Null otherwise</returns>
+        public (ModInfo ModInfo, int LineNum)? TryGetModEntry(string internalFilePath)
+        {
+            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
-        public XivModStatus IsModEnabled(string internalPath, XivDataFile dataFile)
+            var lineNum = 0;
+            using (var streamReader = new StreamReader(modListDirectory.FullName))
+            {
+                string line;
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    var modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+                    if (modInfo.fullPath.Equals(internalFilePath))
+                    {
+                        return (modInfo, lineNum);
+                    }
+                    lineNum++;
+                }
+
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Checks to see whether the mod is currently enabled
+        /// </summary>
+        /// <param name="internalPath">The internal path of the file</param>
+        /// <param name="dataFile">The data file to check in</param>
+        /// <returns></returns>
+        public XivModStatus IsModEnabled(string internalPath)
         {
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
@@ -71,21 +104,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var index = new Index(_gameDirectory);
 
-            ModInfo modInfo = null;
-
-            using (var streamReader = new StreamReader(modListDirectory.FullName))
-            {
-                string line;
-                while ((line = streamReader.ReadLine()) != null)
-                {
-                    var tempModInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-
-                    if (!tempModInfo.fullPath.Equals(internalPath)) continue;
-
-                    modInfo = tempModInfo;
-                    break;
-                }
-            }
+            var modInfo = TryGetModEntry(internalPath)?.ModInfo;
 
             if (modInfo == null)
             {
@@ -96,7 +115,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var moddedOffset = modInfo.modOffset;
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(Path.GetDirectoryName(internalPath).Replace("\\", "/")),
-                HashGenerator.GetHash(Path.GetFileName(internalPath)), dataFile);
+                HashGenerator.GetHash(Path.GetFileName(internalPath)), XivDataFiles.GetXivDataFile(modInfo.datFile));
 
             if (offset.Equals(originalOffset))
             {
@@ -113,5 +132,29 @@ namespace xivModdingFramework.Mods.FileTypes
 
         }
 
+
+        public void ToggleModStatus(string internalFilePath, bool enable)
+        {
+            var index = new Index(_gameDirectory);
+
+            var modInfo = TryGetModEntry(internalFilePath)?.ModInfo;
+
+            if (modInfo == null)
+            {
+                throw new Exception("Unable to find mod entry in modlist.");
+            }
+
+            if (enable)
+            {
+                index.UpdateIndex(modInfo.modOffset, internalFilePath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+                index.UpdateIndex2(modInfo.modOffset, internalFilePath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+            }
+            else
+            {
+                index.UpdateIndex(modInfo.originalOffset, internalFilePath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+                index.UpdateIndex2(modInfo.originalOffset, internalFilePath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+            }
+
+        }
     }
 }

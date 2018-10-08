@@ -23,6 +23,7 @@ using System.Security.Cryptography;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -208,6 +209,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public byte[] GetType2Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
+            var modlist = new ModList(_gameDirectory);
 
             ModInfo modInfo = null;
             var inModList = false;
@@ -217,18 +219,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                using (var streamReader = new StreamReader(_modListDirectory.FullName))
+                var modInfoData = modlist.TryGetModEntry(internalPath);
+
+                if (modInfoData != null)
                 {
-                    string line;
-                    while ((line = streamReader.ReadLine()) != null)
-                    {
-                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                        if (modInfo.fullPath.Equals(internalPath))
-                        {
-                            inModList = true;
-                            break;
-                        }
-                    }
+                    modInfo = modInfoData.Value.ModInfo;
+                    inModList = true;
                 }
 
                 // If the file exists in the modlist, get the data from the original data
@@ -341,6 +337,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             string category)
         {
             XivDataFile dataFile = GetDataFileFromPath(internalPath);
+            var modlist = new ModList(_gameDirectory);
 
             ModInfo modInfo = null;
             var lineNum = 0;
@@ -351,19 +348,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             var dataBlocks = new List<byte>();
 
             // Checks if the item being imported already exists in the modlist
-            using (var streamReader = new StreamReader(_modListDirectory.FullName))
+            var modInfoData = modlist.TryGetModEntry(internalPath);
+
+            if (modInfoData != null)
             {
-                string line;
-                while ((line = streamReader.ReadLine()) != null)
-                {
-                    modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.fullPath.Equals(internalPath))
-                    {
-                        inModList = true;
-                        break;
-                    }
-                    lineNum++;
-                }
+                modInfo = modInfoData.Value.ModInfo;
+                lineNum = modInfoData.Value.LineNum;
+                inModList = true;
             }
 
             // Header size is defaulted to 128, but may need to change if the data being imported is very large.
@@ -467,27 +458,22 @@ namespace xivModdingFramework.SqPack.FileTypes
         public (int MeshCount, int MaterialCount, byte[] Data) GetType3Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
+            var modlist = new ModList(_gameDirectory);
 
-            ModInfo modInfo = null;
             var inModList = false;
+            ModInfo modInfo = null;
 
             var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                using (var streamReader = new StreamReader(_modListDirectory.FullName))
+                var modInfoData = modlist.TryGetModEntry(internalPath);
+
+                if (modInfoData != null)
                 {
-                    string line;
-                    while ((line = streamReader.ReadLine()) != null)
-                    {
-                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                        if (modInfo.fullPath.Equals(internalPath))
-                        {
-                            inModList = true;
-                            break;
-                        }
-                    }
+                    modInfo = modInfoData.Value.ModInfo;
+                    inModList = true;
                 }
 
                 // If the file exists in the modlist, get the data from the original data
@@ -636,6 +622,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public XivTex GetType4Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
+            var modlist = new ModList(_gameDirectory);
 
             ModInfo modInfo = null;
             var inModList = false;
@@ -645,18 +632,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                using (var streamReader = new StreamReader(_modListDirectory.FullName))
+                var modInfoData = modlist.TryGetModEntry(internalPath);
+
+                if (modInfoData != null)
                 {
-                    string line;
-                    while ((line = streamReader.ReadLine()) != null)
-                    {
-                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                        if (modInfo.fullPath.Equals(internalPath))
-                        {
-                            inModList = true;
-                            break;
-                        }
-                    }
+                    modInfo = modInfoData.Value.ModInfo;
+                    inModList = true;
                 }
 
                 // If the file exists in the modlist, get the data from the original data

@@ -28,6 +28,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -398,23 +399,18 @@ namespace xivModdingFramework.Textures.FileTypes
             ModInfo modInfo = null;
 
             var dat = new Dat(_gameDirectory);
+            var modlist = new ModList(_gameDirectory);
 
             if (File.Exists(ddsFileDirectory.FullName))
             {
                 // Check if the texture being imported has been imported before
-                using (var sr = new StreamReader(_modListDirectory.FullName))
+                var modInfoData = modlist.TryGetModEntry(xivTex.TextureTypeAndPath.Path);
+
+                if (modInfoData != null)
                 {
-                    string line;
-                    while ((line = sr.ReadLine()) != null)
-                    {
-                        modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                        if (modInfo.fullPath.Equals(xivTex.TextureTypeAndPath.Path))
-                        {
-                            inModList = true;
-                            break;
-                        }
-                        lineNum++;
-                    }
+                    modInfo = modInfoData.Value.ModInfo;
+                    lineNum = modInfoData.Value.LineNum;
+                    inModList = true;
                 }
 
                 using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
