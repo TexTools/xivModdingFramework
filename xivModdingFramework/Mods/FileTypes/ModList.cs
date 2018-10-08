@@ -132,7 +132,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
         }
 
-
+        /// <summary>
+        /// Toggles the mod on or off
+        /// </summary>
+        /// <param name="internalFilePath">The internal file path of the mod</param>
+        /// <param name="enable">The status of the mod</param>
         public void ToggleModStatus(string internalFilePath, bool enable)
         {
             var index = new Index(_gameDirectory);
@@ -154,7 +158,37 @@ namespace xivModdingFramework.Mods.FileTypes
                 index.UpdateIndex(modInfo.originalOffset, internalFilePath, XivDataFiles.GetXivDataFile(modInfo.datFile));
                 index.UpdateIndex2(modInfo.originalOffset, internalFilePath, XivDataFiles.GetXivDataFile(modInfo.datFile));
             }
+        }
 
+        /// <summary>
+        /// Toggles all mods on or off
+        /// </summary>
+        /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
+        public void ToggleAllMods(bool enable)
+        {
+            var index = new Index(_gameDirectory);
+
+            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+
+            using (var streamReader = new StreamReader(modListDirectory.FullName))
+            {
+                string line;
+                while ((line = streamReader.ReadLine()) != null)
+                {
+                    var modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
+
+                    if (enable)
+                    {
+                        index.UpdateIndex(modInfo.modOffset, modInfo.fullPath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+                        index.UpdateIndex2(modInfo.modOffset, modInfo.fullPath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+                    }
+                    else
+                    {
+                        index.UpdateIndex(modInfo.originalOffset, modInfo.fullPath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+                        index.UpdateIndex2(modInfo.originalOffset, modInfo.fullPath, XivDataFiles.GetXivDataFile(modInfo.datFile));
+                    }
+                }
+            }
         }
     }
 }
