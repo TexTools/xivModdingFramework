@@ -16,6 +16,7 @@
 
 using System;
 using System.ComponentModel;
+using System.Linq;
 
 namespace xivModdingFramework.General.Enums
 {
@@ -108,6 +109,19 @@ namespace xivModdingFramework.General.Enums
             var field = value.GetType().GetField(value.ToString());
             var attribute = (XivDataFileDescriptionAttribute[])field.GetCustomAttributes(typeof(XivDataFileDescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].FolderKey : value.ToString();
+        }
+
+
+        /// <summary>
+        /// Gets the enum value from the description
+        /// </summary>
+        /// <param name="value">The data file string</param>
+        /// <returns>The XivDataFile enum</returns>
+        public static XivDataFile GetXivDataFile(string value)
+        {
+            var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            return dataFiles.FirstOrDefault(dataFile => dataFile.GetDataFileName() == value);
         }
     }
 
