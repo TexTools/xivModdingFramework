@@ -394,7 +394,7 @@ namespace xivModdingFramework.Materials.FileTypes
             pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
             pathStringList.Add(0);
 
-            var paddingSize = xivMtrl.TexturePathsDataSize - pathStringList.Count;
+            var paddingSize = xivMtrl.MaterialDataSize - pathStringList.Count;
 
             pathStringList.AddRange(new byte[paddingSize]);
 
