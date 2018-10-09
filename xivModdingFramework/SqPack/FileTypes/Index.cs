@@ -359,7 +359,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     if (folderPathHash == hashedFolder)
                     {
-                        fileHashesDict.Add(br.ReadInt32() * 8, hashedFile);
+                        fileHashesDict.Add(hashedFile, br.ReadInt32() * 8);
                     }
                     else
                     {
