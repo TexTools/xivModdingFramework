@@ -371,31 +371,45 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(BitConverter.GetBytes(colorPath));
             }
 
+            var pathStringList = new List<byte>();
+
             foreach (var texPathString in xivMtrl.TexturePathList)
             {
-                mtrlBytes.AddRange(Encoding.UTF8.GetBytes(texPathString));
-                mtrlBytes.Add(0);
+                pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString));
+                pathStringList.Add(0);
             }
 
             foreach (var mapPathString in xivMtrl.MapPathList)
             {
-                mtrlBytes.AddRange(Encoding.UTF8.GetBytes(mapPathString));
-                mtrlBytes.Add(0);
+                pathStringList.AddRange(Encoding.UTF8.GetBytes(mapPathString));
+                pathStringList.Add(0);
             }
 
             foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
             {
-                mtrlBytes.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
-                mtrlBytes.Add(0);
+                pathStringList.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
+                pathStringList.Add(0);
             }
 
-            mtrlBytes.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
-            mtrlBytes.Add(0);
+            pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
+            pathStringList.Add(0);
+
+            var paddingSize = xivMtrl.TexturePathsDataSize - pathStringList.Count;
+
+            pathStringList.AddRange(new byte[paddingSize]);
+
+            mtrlBytes.AddRange(pathStringList);
+
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown2));
 
             foreach (var colorSetHalf in xivMtrl.ColorSetData)
             {
                 mtrlBytes.AddRange(BitConverter.GetBytes(colorSetHalf.RawValue));
+            }
+
+            if (xivMtrl.ColorSetDataSize == 544)
+            {
+                mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
             }
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.AdditionalDataSize));
