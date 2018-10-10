@@ -162,10 +162,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 // get the texture path offsets
                 xivMtrl.TexturePathOffsetList = new List<int>(xivMtrl.TextureCount);
+                xivMtrl.TexturePathUnknownList = new List<short>(xivMtrl.TextureCount);
                 for (var i = 0; i < xivMtrl.TextureCount; i++)
                 {
                     xivMtrl.TexturePathOffsetList.Add(br.ReadInt16());
-                    br.ReadBytes(2);
+                    xivMtrl.TexturePathUnknownList.Add(br.ReadInt16());
 
                     // add the size of the paths
                     if (i > 0)
@@ -176,10 +177,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 // get the map path offsets
                 xivMtrl.MapPathOffsetList = new List<int>(xivMtrl.MapCount);
+                xivMtrl.MapPathUnknownList = new List<short>(xivMtrl.MapCount);
                 for (var i = 0; i < xivMtrl.MapCount; i++)
                 {
                     xivMtrl.MapPathOffsetList.Add(br.ReadInt16());
-                    br.ReadBytes(2);
+                    xivMtrl.MapPathUnknownList.Add(br.ReadInt16());
 
                     // add the size of the paths
                     if (i > 0)
@@ -194,10 +196,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 // get the color set offsets
                 xivMtrl.ColorSetPathOffsetList = new List<int>(xivMtrl.ColorSetCount);
+                xivMtrl.ColorSetPathUnknownList = new List<short>(xivMtrl.ColorSetCount);
                 for (var i = 0; i < xivMtrl.ColorSetCount; i++)
                 {
                     xivMtrl.ColorSetPathOffsetList.Add(br.ReadInt16());
-                    br.ReadBytes(2);
+                    xivMtrl.ColorSetPathUnknownList.Add(br.ReadInt16());
 
                     // add the size of the paths
                     if (i > 0)
@@ -356,19 +359,22 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.Add(xivMtrl.ColorSetCount);
             mtrlBytes.Add(xivMtrl.Unknown1);
 
-            foreach (var texPath in xivMtrl.TexturePathOffsetList)
+            for (int i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(texPath));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathUnknownList[i]));
             }
 
-            foreach (var mapPath in xivMtrl.MapPathOffsetList)
+            for (int i = 0; i < xivMtrl.MapPathOffsetList.Count; i++)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(mapPath));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathOffsetList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathUnknownList[i]));
             }
 
-            foreach (var colorPath in xivMtrl.ColorSetPathOffsetList)
+            for (int i = 0; i < xivMtrl.ColorSetPathOffsetList.Count; i++)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(colorPath));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathOffsetList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathUnknownList[i]));
             }
 
             var pathStringList = new List<byte>();
@@ -394,7 +400,7 @@ namespace xivModdingFramework.Materials.FileTypes
             pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
             pathStringList.Add(0);
 
-            var paddingSize = xivMtrl.TexturePathsDataSize - pathStringList.Count;
+            var paddingSize = xivMtrl.MaterialDataSize - pathStringList.Count;
 
             pathStringList.AddRange(new byte[paddingSize]);
 

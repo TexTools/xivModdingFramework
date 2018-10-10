@@ -102,14 +102,29 @@ namespace xivModdingFramework.Materials.DataContainers
         public List<int> TexturePathOffsetList { get; set; }
 
         /// <summary>
+        /// A list containing the Texture Path Unknowns
+        /// </summary>
+        public List<short> TexturePathUnknownList { get; set; }
+
+        /// <summary>
         /// A list containing the Map Path offsets
         /// </summary>
         public List<int> MapPathOffsetList { get; set; }
 
         /// <summary>
+        /// A list containing the Map Path Unknowns
+        /// </summary>
+        public List<short> MapPathUnknownList { get; set; }
+
+        /// <summary>
         /// A list containing the ColorSet Path offsets
         /// </summary>
         public List<int> ColorSetPathOffsetList { get; set; }
+
+        /// <summary>
+        /// A list containing the ColorSet Path Unknowns
+        /// </summary>
+        public List<short> ColorSetPathUnknownList { get; set; }
 
         /// <summary>
         /// A list containing the Texture Path strings
