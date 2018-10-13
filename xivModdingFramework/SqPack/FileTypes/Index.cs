@@ -20,6 +20,7 @@ using System.IO;
 using System.Linq;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -369,6 +370,508 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             return fileHashesDict;
+        }
+
+        /// <summary>
+        /// Deletes a file descriptor/stub from the Index files.
+        /// </summary>
+        /// <param name="fullPath">Full internal file path to the file that should be deleted.</param>
+        /// <param name="dataFile">Which data file to use</param>
+        /// <returns></returns>
+        public bool DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
+        {
+            fullPath = fullPath.Replace("\\", "/");
+            var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
+            var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
+            var uPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(pathHash), 0);
+            var uFileHash = BitConverter.ToUInt32(BitConverter.GetBytes(fileHash), 0);
+            var fullPathHash = HashGenerator.GetHash(fullPath);
+            var uFullPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(fullPathHash), 0);
+
+            var SegmentHeaders = new int[4];
+            var SegmentOffsets = new int[4];
+            var SegmentSizes = new int[4];
+
+            // Segment header offsets
+            SegmentHeaders[0] = 1028;                   // Files
+            SegmentHeaders[1] = 1028 + (72 * 1) + 4;    // Unknown
+            SegmentHeaders[2] = 1028 + (72 * 2) + 4;    // Unknown
+            SegmentHeaders[3] = 1028 + (72 * 3) + 4;    // Folders
+
+
+            // Index 1 Closure
+            {
+                var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+                // Dump the index into memory, since we're going to have to inject data.
+                byte[] originalIndex = File.ReadAllBytes(indexPath);
+                byte[] modifiedIndex = new byte[originalIndex.Length - 16];
+
+                // Get all the segment header data
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                    SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                }
+
+                int fileCount = SegmentSizes[0] / 16;
+
+                // Search for appropriate location to inject data.
+                var deleteLocation = 0;
+
+                for (int i = 0; i < fileCount; i++)
+                {
+                    int position = SegmentOffsets[0] + (i * 16);
+                    uint iHash = BitConverter.ToUInt32(originalIndex, position);
+                    uint iPathHash = BitConverter.ToUInt32(originalIndex, position + 4);
+                    uint iOffset = BitConverter.ToUInt32(originalIndex, position + 8);
+                    
+                    if (iHash == uFileHash && iPathHash == uPathHash)
+                    {
+                        deleteLocation = position;
+                        break;
+                    }
+                }
+
+                // Cancel if we failed to find the file.
+                if (deleteLocation == 0)
+                {
+                    return false;
+                }
+
+                byte[] DataToDelete = new byte[16];
+                Array.Copy(originalIndex, deleteLocation, DataToDelete, 0, 16);
+
+                // Split the file at the injection point.
+                int remainder = originalIndex.Length - deleteLocation - 16;
+                Array.Copy(originalIndex, 0, modifiedIndex, 0, deleteLocation);
+                Array.Copy(originalIndex, deleteLocation + 16, modifiedIndex, deleteLocation, remainder);
+
+
+                // Update the segment headers.
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    // Update Segment 0 Size.
+                    if (i == 0)
+                    {
+                        SegmentSizes[i] -= 16;
+                        Array.Copy(BitConverter.GetBytes(SegmentSizes[i]), 0, modifiedIndex, SegmentHeaders[i] + 8, 4);
+
+                    }
+                    // Update other segments' offsets.
+                    else
+                    {
+                        SegmentOffsets[i] -= 16;
+                        Array.Copy(BitConverter.GetBytes(SegmentOffsets[i]), 0, modifiedIndex, SegmentHeaders[i] + 4, 4);
+                    }
+                }
+                // Update the folder structure
+                var folderCount = SegmentSizes[3] / 16;
+                bool foundFolder = false;
+
+                for (int i = 0; i < folderCount; i++)
+                {
+                    int position = SegmentOffsets[3] + (i * 16);
+                    uint iHash = BitConverter.ToUInt32(modifiedIndex, position);
+                    uint iOffset = BitConverter.ToUInt32(modifiedIndex, position + 4);
+                    uint iFolderSize = BitConverter.ToUInt32(modifiedIndex, position + 8);
+
+                    // Update folder offset
+                    if (iOffset > deleteLocation)
+                    {
+                        Array.Copy(BitConverter.GetBytes(iOffset - 16), 0, modifiedIndex, position + 4, 4);
+                    }
+
+                    // Update folder size
+                    if (iHash == uPathHash)
+                    {
+                        foundFolder = true;
+                        Array.Copy(BitConverter.GetBytes(iFolderSize - 16), 0, modifiedIndex, position + 8, 4);
+                    }
+                }
+
+                if (!foundFolder)
+                {
+                    return false;
+                }
+
+                
+                // Update SHA-1 Hashes.
+                SHA1 sha = new SHA1CryptoServiceProvider();
+                byte[] shaHash;
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    //Segment
+                    shaHash = sha.ComputeHash(modifiedIndex, SegmentOffsets[i], SegmentSizes[i]);
+                    Array.Copy(shaHash, 0, modifiedIndex, SegmentHeaders[i] + 12, 20);
+                }
+
+                // Compute Hash of the header segment
+                shaHash = sha.ComputeHash(modifiedIndex, 0, 960);
+                Array.Copy(shaHash, 0, modifiedIndex, 960, 20);
+                
+
+
+                // Write file
+                File.WriteAllBytes(indexPath, modifiedIndex);
+            }
+
+            // Index 2 Closure
+            {
+                var index2Path = _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension;
+
+                // Dump the index into memory, since we're going to have to inject data.
+                byte[] originalIndex = File.ReadAllBytes(index2Path);
+                byte[] modifiedIndex = new byte[originalIndex.Length - 8];
+
+                bool foundFile = false;
+
+                // Get all the segment header data
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                    SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                }
+
+                int fileCount = SegmentSizes[0] / 8;
+
+                // Search for appropriate location to inject data.
+                var deleteLocation = 0;
+
+                for (int i = 0; i < fileCount; i++)
+                {
+                    int position = SegmentOffsets[0] + (i * 8);
+                    uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
+                    uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
+
+                    // Index 2 is just in hash order, so find the spot where we fit in.
+                    if (iFullPathHash == uFullPathHash)
+                    {
+                        deleteLocation = position;
+                    }
+                }
+
+                // It's possible a valid file doesn't have an Index 2 entry, just skip it in that case.
+                if (deleteLocation > 0)
+                {
+
+                    byte[] DataToDelete = new byte[8];
+                    Array.Copy(originalIndex, deleteLocation, DataToDelete, 0, 8);
+
+
+                    // Split the file at the injection point.
+                    int remainder = originalIndex.Length - deleteLocation - 8;
+                    Array.Copy(originalIndex, 0, modifiedIndex, 0, deleteLocation);
+                    Array.Copy(originalIndex, deleteLocation + 8, modifiedIndex, deleteLocation, remainder);
+
+
+
+                    // Update the segment headers.
+                    for (int i = 0; i < SegmentHeaders.Length; i++)
+                    {
+                        // Update Segment 0 Size.
+                        if (i == 0)
+                        {
+                            SegmentSizes[i] -= 8;
+                            Array.Copy(BitConverter.GetBytes(SegmentSizes[i]), 0, modifiedIndex, SegmentHeaders[i] + 8, 4);
+
+                        }
+                        // Update other segments' offsets.
+                        else
+                        {
+                            // Index 2 doesn't have all 4 segments.
+                            if (SegmentOffsets[i] != 0)
+                            {
+                                SegmentOffsets[i] -= 8;
+                                Array.Copy(BitConverter.GetBytes(SegmentOffsets[i]), 0, modifiedIndex, SegmentHeaders[i] + 4, 4);
+                            }
+                        }
+                    }
+                    
+                    // Update SHA-1 Hashes.
+                    SHA1 sha = new SHA1CryptoServiceProvider();
+                    byte[] shaHash;
+                    for (int i = 0; i < SegmentHeaders.Length; i++)
+                    {
+                        if (SegmentSizes[i] > 0)
+                        {
+                            //Segment
+                            byte[] oldHash = new byte[20];
+                            Array.Copy(originalIndex, SegmentHeaders[i] + 12, oldHash, 0, 20);
+
+                            shaHash = sha.ComputeHash(modifiedIndex, SegmentOffsets[i], SegmentSizes[i]);
+                            Array.Copy(shaHash, 0, modifiedIndex, SegmentHeaders[i] + 12, 20);
+                        }
+                    }
+
+                    // Compute Hash of the header segment
+                    shaHash = sha.ComputeHash(modifiedIndex, 0, 960);
+                    Array.Copy(shaHash, 0, modifiedIndex, 960, 20);
+                    
+                    // Write file
+                    File.WriteAllBytes(index2Path, modifiedIndex);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Adds a new file descriptor/stub into the Index files.
+        /// </summary>
+        /// <param name="fullPath">Full path to the new file.</param>
+        /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
+        /// <param name="dataFile">Which data file set to use.</param>
+        /// <returns></returns>
+        public bool AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
+        {
+            fullPath = fullPath.Replace("\\", "/");
+            var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
+            var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
+            var uPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(pathHash), 0);
+            var uFileHash = BitConverter.ToUInt32(BitConverter.GetBytes(fileHash), 0);
+            var fullPathHash = HashGenerator.GetHash(fullPath);
+            var uFullPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(fullPathHash), 0);
+
+            var SegmentHeaders = new int[4];
+            var SegmentOffsets = new int[4];
+            var SegmentSizes = new int[4];
+
+            // Segment header offsets
+            SegmentHeaders[0] = 1028;                   // Files
+            SegmentHeaders[1] = 1028 + (72 * 1) + 4;    // Unknown
+            SegmentHeaders[2] = 1028 + (72 * 2) + 4;    // Unknown
+            SegmentHeaders[3] = 1028 + (72 * 3) + 4;    // Folders
+
+
+            // Index 1 Closure
+            {
+                var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+                // Dump the index into memory, since we're going to have to inject data.
+                byte[] originalIndex = File.ReadAllBytes(indexPath);
+                byte[] modifiedIndex = new byte[originalIndex.Length + 16];
+
+                // Get all the segment header data
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                    SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                }
+
+                int fileCount = SegmentSizes[0] / 16;
+
+                // Search for appropriate location to inject data.
+                bool foundFolder = false;
+                var injectLocation = SegmentOffsets[0] + SegmentSizes[0];
+
+                for (int i = 0; i < fileCount; i++)
+                {
+                    int position = SegmentOffsets[0] + (i * 16);
+                    uint iHash = BitConverter.ToUInt32(originalIndex, position);
+                    uint iPathHash = BitConverter.ToUInt32(originalIndex, position + 4);
+                    uint iOffset = BitConverter.ToUInt32(originalIndex, position + 8);
+
+                    if (iPathHash == uPathHash)
+                    {
+                        foundFolder = true;
+
+                        if(iHash == uFileHash)
+                        {
+                            // File already exists
+                            return false;
+                        }
+                        else if (iHash > uFileHash)
+                        {
+                            injectLocation = position;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // End of folder - inject file here if we haven't yet.
+                        if (foundFolder == true)
+                        {
+                            injectLocation = position;
+                            break;
+                        }
+                    }
+                }
+
+                // Cancel if we failed to find the path.
+                if (foundFolder == false)
+                {
+                    return false;
+                }
+
+                // Split the file at the injection point.
+                int remainder = originalIndex.Length - injectLocation;
+                Array.Copy(originalIndex, 0, modifiedIndex, 0, injectLocation);
+                Array.Copy(originalIndex, injectLocation, modifiedIndex, injectLocation + 16, remainder);
+
+
+                // Update the segment headers.
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    // Update Segment 0 Size.
+                    if (i == 0)
+                    {
+                        SegmentSizes[i] += 16;
+                        Array.Copy(BitConverter.GetBytes(SegmentSizes[i]), 0, modifiedIndex, SegmentHeaders[i] + 8, 4);
+
+                    }
+                    // Update other segments' offsets.
+                    else
+                    {
+                        SegmentOffsets[i] += 16;
+                        Array.Copy(BitConverter.GetBytes(SegmentOffsets[i]), 0, modifiedIndex, SegmentHeaders[i] + 4, 4);
+                    }
+                }
+
+                // Set the actual Injected Data
+                Array.Copy(BitConverter.GetBytes(fileHash), 0, modifiedIndex, injectLocation, 4);
+                Array.Copy(BitConverter.GetBytes(pathHash), 0, modifiedIndex, injectLocation + 4, 4);
+                Array.Copy(BitConverter.GetBytes(dataOffset), 0, modifiedIndex, injectLocation + 8, 4);
+
+                // Update the folder structure
+                var folderCount = SegmentSizes[3] / 16;
+                foundFolder = false;
+
+                for (int i = 0; i < folderCount; i++)
+                {
+                    int position = SegmentOffsets[3] + (i * 16);
+                    uint iHash = BitConverter.ToUInt32(modifiedIndex, position);
+                    uint iOffset = BitConverter.ToUInt32(modifiedIndex, position + 4);
+                    uint iFolderSize = BitConverter.ToUInt32(modifiedIndex, position + 8);
+
+                    // Update folder offset
+                    if (iOffset > injectLocation)
+                    {
+                        Array.Copy(BitConverter.GetBytes(iOffset + 16), 0, modifiedIndex, position + 4, 4);
+                    }
+
+                    // Update folder size
+                    if (iHash == uPathHash)
+                    {
+                        foundFolder = true;
+                        Array.Copy(BitConverter.GetBytes(iFolderSize + 16), 0, modifiedIndex, position + 8, 4);
+                    }
+                }
+
+                if(!foundFolder)
+                {
+                    return false;
+                }
+                
+                // Update SHA-1 Hashes.
+                SHA1 sha = new SHA1CryptoServiceProvider();
+                byte[] shaHash;
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    //Segment
+                    shaHash = sha.ComputeHash(modifiedIndex, SegmentOffsets[i], SegmentSizes[i]);
+                    Array.Copy(shaHash, 0, modifiedIndex, SegmentHeaders[i]+12, 20);
+                }
+
+                // Compute Hash of the header segment
+                shaHash = sha.ComputeHash(modifiedIndex, 0, 960);
+                Array.Copy(shaHash, 0, modifiedIndex, 960, 20);
+                
+
+
+                // Write file
+                File.WriteAllBytes(indexPath, modifiedIndex);
+            }
+
+            // Index 2 Closure
+            {
+                var index2Path = _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension;
+
+                // Dump the index into memory, since we're going to have to inject data.
+                byte[] originalIndex = File.ReadAllBytes(index2Path);
+                byte[] modifiedIndex = new byte[originalIndex.Length + 16];
+
+                // Get all the segment header data
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                    SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                }
+
+                int fileCount = SegmentSizes[0] / 8;
+
+                // Search for appropriate location to inject data.
+                var injectLocation = SegmentOffsets[0] + SegmentSizes[0];
+                
+                for (int i = 0; i < fileCount; i++)
+                {
+                    int position = SegmentOffsets[0] + (i * 8);
+                    uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
+                    uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
+
+                    // Index 2 is just in hash order, so find the spot where we fit in.
+                    if(iFullPathHash > uFullPathHash)
+                    {
+                        injectLocation = position;
+                        break;
+                    }
+                }
+
+                // Split the file at the injection point.
+                int remainder = originalIndex.Length - injectLocation;
+                Array.Copy(originalIndex, 0, modifiedIndex, 0, injectLocation);
+                Array.Copy(originalIndex, injectLocation, modifiedIndex, injectLocation + 8, remainder);
+
+
+                // Update the segment headers.
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    // Update Segment 0 Size.
+                    if (i == 0)
+                    {
+                        SegmentSizes[i] += 8;
+                        Array.Copy(BitConverter.GetBytes(SegmentSizes[i]), 0, modifiedIndex, SegmentHeaders[i] + 8, 4);
+
+                    }
+                    // Update other segments' offsets.
+                    else
+                    {
+                        // Index 2 doesn't have all 4 segments.
+                        if (SegmentOffsets[i] != 0)
+                        {
+                            SegmentOffsets[i] += 8;
+                            Array.Copy(BitConverter.GetBytes(SegmentOffsets[i]), 0, modifiedIndex, SegmentHeaders[i] + 4, 4);
+                        }
+                    }
+                }
+
+                // Set the actual Injected Data
+                Array.Copy(BitConverter.GetBytes(uFullPathHash), 0, modifiedIndex, injectLocation, 4);
+                Array.Copy(BitConverter.GetBytes(dataOffset), 0, modifiedIndex, injectLocation + 4, 4);
+                
+                // Update SHA-1 Hashes.
+                SHA1 sha = new SHA1CryptoServiceProvider();
+                byte[] shaHash;
+                for (int i = 0; i < SegmentHeaders.Length; i++)
+                {
+                    if (SegmentSizes[i] > 0)
+                    {
+                        //Segment
+                        shaHash = sha.ComputeHash(modifiedIndex, SegmentOffsets[i], SegmentSizes[i]);
+                        Array.Copy(shaHash, 0, modifiedIndex, SegmentHeaders[i] + 12, 20);
+                    }
+                }
+                // Compute Hash of the header segment
+                shaHash = sha.ComputeHash(modifiedIndex, 0, 960);
+                Array.Copy(shaHash, 0, modifiedIndex, 960, 20);
+                
+
+                // Write file
+                File.WriteAllBytes(index2Path, modifiedIndex);
+
+            }
+
+            return true;
         }
 
         /// <summary>
