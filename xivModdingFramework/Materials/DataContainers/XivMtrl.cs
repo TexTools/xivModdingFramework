@@ -44,7 +44,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <remarks>
         /// Can be 0 if there is no ColorSet Data
         /// </remarks>
-        public short ColorSetDataSize { get; set; }
+        public ushort ColorSetDataSize { get; set; }
 
         /// <summary>
         /// The size of the Material Data section
@@ -52,7 +52,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <remarks>
         /// This is the size of the data chunk containing all of the path and filename strings
         /// </remarks>
-        public short MaterialDataSize { get; set; }
+        public ushort MaterialDataSize { get; set; }
 
         /// <summary>
         /// The size of the Texture Path Data section
@@ -60,15 +60,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <remarks>
         /// This is the size of the data chucnk containing only the texture paths
         /// </remarks>
-        public byte TexturePathsDataSize { get; set; }
-
-        /// <summary>
-        /// Unknown Value
-        /// </summary>
-        /// <remarks>
-        /// Assumed to be the size of something
-        /// </remarks>
-        public byte Unknown { get; set; }
+        public ushort TexturePathsDataSize { get; set; }
 
         /// <summary>
         /// The number of textures paths in the mtrl
@@ -89,12 +81,9 @@ namespace xivModdingFramework.Materials.DataContainers
         public byte ColorSetCount { get; set; }
 
         /// <summary>
-        /// Unknown value
+        /// The number of bytes to skip after path section
         /// </summary>
-        /// <remarks>
-        /// Assumed to be the count of something
-        /// </remarks>
-        public byte Unknown1 { get; set; }
+        public byte UnknownDataSize { get; set; }
 
         /// <summary>
         /// A list containing the Texture Path offsets
@@ -134,7 +123,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// Unknown value
         /// </summary>
-        public int Unknown2 { get; set; }
+        public byte[] Unknown2 { get; set; }
 
         /// <summary>
         /// The list of half floats containing the ColorSet data
@@ -149,22 +138,22 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The size of the additional MTRL Data
         /// </summary>
-        public short AdditionalDataSize { get; set; }
+        public ushort AdditionalDataSize { get; set; }
 
         /// <summary>
         /// The number of type 1 data sturctures 
         /// </summary>
-        public short DataStruct1Count { get; set; }
+        public ushort DataStruct1Count { get; set; }
 
         /// <summary>
         /// The number of type 2 data structures
         /// </summary>
-        public short DataStruct2Count { get; set; }
+        public ushort DataStruct2Count { get; set; }
 
         /// <summary>
         /// The number of parameter stuctures
         /// </summary>
-        public short ParameterStructCount { get; set; }
+        public ushort ParameterStructCount { get; set; }
 
         /// <summary>
         /// The shader number used by the item
@@ -172,12 +161,12 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <remarks>
         /// This is a guess and has not been tested to be true
         /// </remarks>
-        public short ShaderNumber { get; set; }
+        public ushort ShaderNumber { get; set; }
 
         /// <summary>
         /// Unknown Value
         /// </summary>
-        public short Unknown3 { get; set; }
+        public ushort Unknown3 { get; set; }
 
         /// <summary>
         /// The list of Type 1 data structures
