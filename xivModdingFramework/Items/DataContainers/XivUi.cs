@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
 
 namespace xivModdingFramework.Items.DataContainers
@@ -52,6 +53,14 @@ namespace xivModdingFramework.Items.DataContainers
         /// This would be a category such as a maps region names and action types
         /// </remarks>
         public string ItemSubCategory { get; set; }
+
+        /// <summary>
+        /// The data file the item belongs to
+        /// </summary>
+        /// <remarks>
+        /// Minion items are always in 060000
+        /// </remarks>
+        public XivDataFile DataFile { get; set; } = XivDataFile._06_Ui;
 
         /// <summary>
         /// The internal UI path

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using xivModdingFramework.General.Enums;
 
 namespace xivModdingFramework.Items.Interfaces
 {
@@ -52,5 +53,13 @@ namespace xivModdingFramework.Items.Interfaces
         /// This is mostly used in the UI main category
         /// </remarks>
         string ItemSubCategory { get; }
+
+        /// <summary>
+        /// The data file the item belongs to
+        /// </summary>
+        /// <remarks>
+        /// This would change depending on the data file the data is to be pulled from
+        /// </remarks>
+        XivDataFile DataFile { get; }
     }
 }

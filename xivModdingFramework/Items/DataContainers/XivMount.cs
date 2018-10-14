@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
 
 namespace xivModdingFramework.Items.DataContainers
@@ -52,6 +53,14 @@ namespace xivModdingFramework.Items.DataContainers
         /// This is currently not used for the Mount Category, but may be used in the future
         /// </remarks>
         public string ItemSubCategory { get; set; }
+
+        /// <summary>
+        /// The data file the item belongs to
+        /// </summary>
+        /// <remarks>
+        /// Mount items are always in 040000
+        /// </remarks>
+        public XivDataFile DataFile { get; set; } = XivDataFile._04_Chara;
 
         /// <summary>
         /// The Primary Model Information of the Mount Item
