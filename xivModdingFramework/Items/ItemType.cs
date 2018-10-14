@@ -65,6 +65,10 @@ namespace xivModdingFramework.Items
             {
                 itemType = XivItemType.ui;
             }
+            else if (item.ItemCategory.Equals(XivStrings.Furniture))
+            {
+                itemType = XivItemType.furniture;
+            }
             else
             {
                 itemType = XivItemType.equipment;

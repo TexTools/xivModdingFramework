@@ -934,6 +934,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Furniture.
+        /// </summary>
+        internal static string Furniture {
+            get {
+                return ResourceManager.GetString("Furniture", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Garuda-Egi.
         /// </summary>
         internal static string Garuda_Egi {
@@ -1038,6 +1047,15 @@ namespace xivModdingFramework.Resources {
         internal static string Head_Body {
             get {
                 return ResourceManager.GetString("Head_Body", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Housing.
+        /// </summary>
+        internal static string Housing {
+            get {
+                return ResourceManager.GetString("Housing", resourceCulture);
             }
         }
         

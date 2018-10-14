@@ -28,6 +28,7 @@ namespace xivModdingFramework.Items.Enums
         monster,
         demihuman,
         human,
-        ui
+        ui,
+        furniture
     }
 }

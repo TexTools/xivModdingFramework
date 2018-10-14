@@ -192,6 +192,9 @@
   <data name="Food" xml:space="preserve">
     <value>Food</value>
   </data>
+  <data name="Furniture" xml:space="preserve">
+    <value>Furniture</value>
+  </data>
   <data name="Garuda_Egi" xml:space="preserve">
     <value>Garuda-Egi</value>
   </data>
@@ -206,6 +209,9 @@
   </data>
   <data name="Head_Body" xml:space="preserve">
     <value>Head + Body</value>
+  </data>
+  <data name="Housing" xml:space="preserve">
+    <value>Housing</value>
   </data>
   <data name="Hyur_H" xml:space="preserve">
     <value>Hyur Highlander</value>

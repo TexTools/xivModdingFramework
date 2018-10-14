@@ -94,9 +94,16 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>A list of part characters</returns>
         public List<string> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile)
         {
-            // Get the mtrl version for the given item from the imc file
-            var imc = new Imc(_gameDirectory, dataFile);
-            var version = imc.GetImcInfo(itemModel, itemModel.ModelInfo).Version.ToString().PadLeft(4, '0');
+            var itemType = ItemType.GetItemType(itemModel);
+
+            var version = "0001";
+
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
+            {
+                // Get the mtrl version for the given item from the imc file
+                var imc = new Imc(_gameDirectory, dataFile);
+                version = imc.GetImcInfo(itemModel, itemModel.ModelInfo).Version.ToString().PadLeft(4, '0');
+            }
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
@@ -105,7 +112,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var index = new Index(_gameDirectory);
 
-            var itemType = ItemType.GetItemType(itemModel);
+
             string mtrlFolder = "", mtrlFile = "";
 
             switch (itemType)
@@ -152,6 +159,10 @@ namespace xivModdingFramework.Textures.FileTypes
                         mtrlFile = $"mt_c{id}t{bodyVer}_";
                     }
                     break;
+                case XivItemType.furniture:
+                    mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
+                    mtrlFile = $"fun_b0_m{id}_0";
+                    break;
                 default:
                     mtrlFolder = "";
                     break;
@@ -161,8 +172,29 @@ namespace xivModdingFramework.Textures.FileTypes
             var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
 
             // append the part char to the mtrl file and see if its hashed value is within the files list
+            var partList =
+                (from part in parts
+                    let mtrlCheck = mtrlFile + part + ".mtrl"
+                    where files.Contains(HashGenerator.GetHash(mtrlCheck))
+                    select part.ToString()).ToList();
+
+            if (partList.Count < 1 && itemType == XivItemType.furniture)
+            {
+                mtrlFile = $"fun_b0_m{id}_1";
+
+                // Get a list of hashed mtrl files that are in the given folder
+                files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
+
+                // append the part char to the mtrl file and see if its hashed value is within the files list
+                partList =
+                    (from part in parts
+                        let mtrlCheck = mtrlFile + part + ".mtrl"
+                        where files.Contains(HashGenerator.GetHash(mtrlCheck))
+                        select part.ToString()).ToList();
+            }
+
             // returns the list of parts that exist within the mtrl folder
-            return (from part in parts let mtrlCheck = mtrlFile + part + ".mtrl" where files.Contains(HashGenerator.GetHash(mtrlCheck)) select part.ToString()).ToList();
+            return partList;
         }
 
         public Dictionary<string, string> GetMapAvailableTex(string path)

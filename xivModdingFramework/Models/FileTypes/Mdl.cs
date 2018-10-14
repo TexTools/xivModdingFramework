@@ -69,7 +69,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivRace">The race for which to get the data</param>
         /// <param name="secondaryModel">The secondary model info if needed</param>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public XivMdl GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null)
+        public XivMdl GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null)
         {
 
             var index = new Index(_gameDirectory);
@@ -77,7 +77,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var itemType = ItemType.GetItemType(itemModel);
 
-            var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel);
+            var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel, mdlStringPath);
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
@@ -265,6 +265,12 @@ namespace xivModdingFramework.Models.FileTypes
                     };
                     // Finished reading LoD
 
+                    // if LoD0 shows no mesh, add one (This is rare, but happens on company chest for example)
+                    if (i == 0 && lod.MeshCount == 0)
+                    {
+                        lod.MeshCount = 1;
+                    }
+
                     //Adding to xivMdl
                     xivMdl.LoDList.Add(lod);
                 }
@@ -307,6 +313,37 @@ namespace xivModdingFramework.Models.FileTypes
                         }
                     }
 
+                    // This will add another entry if there is a discrepancy in mesh counts for the LoD
+                    if (xivMdl.LoDList[i].MeshCount == 0 && loDStructPos < (136 * xivMdl.ModelData.MeshCount))
+                    {
+                        xivMdl.LoDList[i].MeshDataList.Add(new MeshData());
+                        xivMdl.LoDList[i].MeshDataList[0].VertexDataStructList = new List<VertexDataStruct>();
+
+                        // LoD Index * Vertex Data Structure size + Header
+
+                        br.BaseStream.Seek(loDStructPos, SeekOrigin.Begin);
+
+                        // If the first byte is 255, we reached the end of the Vertex Data Structs
+                        var dataBlockNum = br.ReadByte();
+                        while (dataBlockNum != 255)
+                        {
+                            var vertexDataStruct = new VertexDataStruct
+                            {
+                                DataBlock = dataBlockNum,
+                                DataOffset = br.ReadByte(),
+                                DataType = VertexTypeDictionary[br.ReadByte()],
+                                DataUsage = VertexUsageDictionary[br.ReadByte()]
+                            };
+
+                            xivMdl.LoDList[i].MeshDataList[0].VertexDataStructList.Add(vertexDataStruct);
+
+                            // padding between Vertex Data Structs
+                            br.ReadBytes(4);
+
+                            dataBlockNum = br.ReadByte();
+                        }
+                    }
+
                     loDStructPos += 136 * xivMdl.LoDList[i].MeshCount;
                 }
 
@@ -314,6 +351,7 @@ namespace xivModdingFramework.Models.FileTypes
                 br.BaseStream.Seek(savePosition, SeekOrigin.Begin);
 
                 // Mesh Data Information
+                var meshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
                     for (var i = 0; i < lod.MeshCount; i++)
@@ -345,6 +383,32 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             lod.MeshDataList[i].IsBody = true;
                         }
+
+                        meshNum++;
+                    }
+
+                    // This will add another entry if there is a discrepancy in mesh counts for the LoD
+                    if (lod.MeshCount == 0 && meshNum < xivMdl.ModelData.MeshCount)
+                    {
+                        var meshDataInfo = new MeshDataInfo
+                        {
+                            VertexCount = br.ReadInt32(),
+                            IndexCount = br.ReadInt32(),
+                            MaterialIndex = br.ReadInt16(),
+                            MeshPartIndex = br.ReadInt16(),
+                            MeshPartCount = br.ReadInt16(),
+                            BoneListIndex = br.ReadInt16(),
+                            IndexDataOffset = br.ReadInt32(),
+                            VertexDataOffset0 = br.ReadInt32(),
+                            VertexDataOffset1 = br.ReadInt32(),
+                            VertexDataOffset2 = br.ReadInt32(),
+                            VertexDataEntrySize0 = br.ReadByte(),
+                            VertexDataEntrySize1 = br.ReadByte(),
+                            VertexDataEntrySize2 = br.ReadByte(),
+                            VertexDataBlockCount = br.ReadByte()
+                        };
+
+                        lod.MeshDataList[0].MeshInfo = meshDataInfo;
                     }
                 }
 
@@ -357,9 +421,11 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.AttrDataBlock = attributeDataBlock;
 
                 // Unknown data block
+                // This is commented out to allow housing items to display, the data does not exist for housing items
+                // more investigation needed as to what this data is
                 var unkData1 = new UnknownData1
                 {
-                    Unknown = br.ReadBytes(xivMdl.ModelData.Unknown3 * 20)
+                    //Unknown = br.ReadBytes(xivMdl.ModelData.Unknown3 * 20)
                 };
                 xivMdl.UnkData1 = unkData1;
 
@@ -551,7 +617,16 @@ namespace xivModdingFramework.Models.FileTypes
                 var totalMeshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
-                    foreach (var meshData in lod.MeshDataList)
+                    if(lod.MeshCount == 0) continue;
+
+                    var meshDataList = lod.MeshDataList;
+
+                    if (lod.MeshOffset != totalMeshNum)
+                    {
+                        meshDataList = xivMdl.LoDList[lodNum + 1].MeshDataList;
+                    }
+
+                    foreach (var meshData in meshDataList)
                     {
                         var vertexData = new VertexData
                         {
@@ -569,354 +644,396 @@ namespace xivModdingFramework.Models.FileTypes
 
                         #region Positions
                         // Get the Vertex Data Structure for positions
-                        var posDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var posDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                                              where vertexDataStruct.DataUsage == VertexUsageType.Position
                                              select vertexDataStruct).FirstOrDefault();
 
                         int vertexDataOffset;
                         int vertexDataSize;
 
-                        // Determine which data block the position data is in
-                        // This always seems to be in the first data block
-                        switch (posDataSturct.DataBlock)
+                        if (posDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+                            // Determine which data block the position data is in
+                            // This always seems to be in the first data block
+                            switch (posDataStruct.DataBlock)
+                            {
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
 
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
+                            }
+
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                // Get the offset for the position data for each vertex
+                                var positionOffset = lod.VertexDataOffset + vertexDataOffset + posDataStruct.DataOffset + vertexDataSize * i;
+
+                                // Go to the Data Block
+                                br.BaseStream.Seek(positionOffset, SeekOrigin.Begin);
+
+                                Vector3 positionVector;
+                                // Position data is either stored in half-floats or singles
+                                if (posDataStruct.DataType == VertexDataType.Half4)
+                                {
+                                    var x = new SharpDX.Half(br.ReadUInt16());
+                                    var y = new SharpDX.Half(br.ReadUInt16());
+                                    var z = new SharpDX.Half(br.ReadUInt16());
+                                    var w = new SharpDX.Half(br.ReadUInt16());
+
+                                    positionVector = new Vector3(x, y, z);
+                                }
+                                else
+                                {
+                                    var x = br.ReadSingle();
+                                    var y = br.ReadSingle();
+                                    var z = br.ReadSingle();
+
+                                    positionVector = new Vector3(x, y, z);
+                                }
+                                vertexData.Positions.Add(positionVector);
+                            }
                         }
 
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            // Get the offset for the position data for each vertex
-                            var positionOffset = lod.VertexDataOffset + vertexDataOffset + posDataSturct.DataOffset + vertexDataSize * i;
-
-                            // Go to the Data Block
-                            br.BaseStream.Seek(positionOffset, SeekOrigin.Begin);
-
-                            Vector3 positionVector;
-                            // Position data is either stored in half-floats or singles
-                            if (posDataSturct.DataType == VertexDataType.Half4)
-                            {
-                                var x = new SharpDX.Half(br.ReadUInt16());
-                                var y = new SharpDX.Half(br.ReadUInt16());
-                                var z = new SharpDX.Half(br.ReadUInt16());
-                                var w = new SharpDX.Half(br.ReadUInt16());
-
-                                positionVector = new Vector3(x, y, z);
-                            }
-                            else
-                            {
-                                var x = br.ReadSingle();
-                                var y = br.ReadSingle();
-                                var z = br.ReadSingle();
-
-                                positionVector = new Vector3(x, y, z);
-                            }
-                            vertexData.Positions.Add(positionVector);
-                        }
                         #endregion
 
 
                         #region BoneWeights
 
                         // Get the Vertex Data Structure for bone weights
-                        var bwDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var bwDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                             where vertexDataStruct.DataUsage == VertexUsageType.BoneWeight
                             select vertexDataStruct).FirstOrDefault();
 
-                        // Determine which data block the bone weight data is in
-                        // This always seems to be in the first data block
-                        switch (bwDataSturct.DataBlock)
+                        if (bwDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+                            // Determine which data block the bone weight data is in
+                            // This always seems to be in the first data block
+                            switch (bwDataStruct.DataBlock)
+                            {
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
 
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
+                            }
+
+                            // There is always one set of bone weights per vertex
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var bwOffset = lod.VertexDataOffset + vertexDataOffset + bwDataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(bwOffset, SeekOrigin.Begin);
+
+                                var bw0 = br.ReadByte() / 255f;
+                                var bw1 = br.ReadByte() / 255f;
+                                var bw2 = br.ReadByte() / 255f;
+                                var bw3 = br.ReadByte() / 255f;
+
+                                vertexData.BoneWeights.Add(new[] { bw0, bw1, bw2, bw3 });
+                            }
                         }
 
-                        // There is always one set of bone weights per vertex
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            var bwOffset = lod.VertexDataOffset + vertexDataOffset + bwDataSturct.DataOffset + vertexDataSize * i;
 
-                            br.BaseStream.Seek(bwOffset, SeekOrigin.Begin);
-
-                            var bw0 = br.ReadByte() / 255f;
-                            var bw1 = br.ReadByte() / 255f;
-                            var bw2 = br.ReadByte() / 255f;
-                            var bw3 = br.ReadByte() / 255f;
-
-                            vertexData.BoneWeights.Add(new []{bw0, bw1, bw2, bw3});
-                        }
                         #endregion
 
 
                         #region BoneIndices
 
                         // Get the Vertex Data Structure for bone indices
-                        var biDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var biDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                             where vertexDataStruct.DataUsage == VertexUsageType.BoneIndex
                             select vertexDataStruct).FirstOrDefault();
 
-                        // Determine which data block the bone index data is in
-                        // This always seems to be in the first data block
-                        switch (biDataSturct.DataBlock)
+                        if (biDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+                            // Determine which data block the bone index data is in
+                            // This always seems to be in the first data block
+                            switch (biDataStruct.DataBlock)
+                            {
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
 
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
+                            }
+
+                            // There is always one set of bone indices per vertex
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var biOffset = lod.VertexDataOffset + vertexDataOffset + biDataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(biOffset, SeekOrigin.Begin);
+
+                                var bi0 = br.ReadByte();
+                                var bi1 = br.ReadByte();
+                                var bi2 = br.ReadByte();
+                                var bi3 = br.ReadByte();
+
+                                vertexData.BoneIndices.Add(new[] { bi0, bi1, bi2, bi3 });
+                            }
                         }
 
-                        // There is always one set of bone indices per vertex
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            var biOffset = lod.VertexDataOffset + vertexDataOffset + biDataSturct.DataOffset + vertexDataSize * i;
-
-                            br.BaseStream.Seek(biOffset, SeekOrigin.Begin);
-
-                            var bi0 = br.ReadByte();
-                            var bi1 = br.ReadByte();
-                            var bi2 = br.ReadByte();
-                            var bi3 = br.ReadByte();
-
-                            vertexData.BoneIndices.Add(new []{bi0, bi1, bi2, bi3});
-                        }
                         #endregion
 
 
                         #region Normals
 
                         // Get the Vertex Data Structure for Normals
-                        var normDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var normDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                             where vertexDataStruct.DataUsage == VertexUsageType.Normal
                             select vertexDataStruct).FirstOrDefault();
 
-                        // Determine which data block the normal data is in
-                        // This always seems to be in the second data block
-                        switch (normDataSturct.DataBlock)
+                        if (normDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
-
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
-                        }
-
-                        // There is always one set of normals per vertex
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            var normOffset = lod.VertexDataOffset + vertexDataOffset + normDataSturct.DataOffset + vertexDataSize * i;
-
-                            br.BaseStream.Seek(normOffset, SeekOrigin.Begin);
-
-                            Vector3 normalVector;
-                            // Normal data is either stored in half-floats or singles
-                            if (normDataSturct.DataType == VertexDataType.Half4)
+                            // Determine which data block the normal data is in
+                            // This always seems to be in the second data block
+                            switch (normDataStruct.DataBlock)
                             {
-                                var x = new SharpDX.Half(br.ReadUInt16());
-                                var y = new SharpDX.Half(br.ReadUInt16());
-                                var z = new SharpDX.Half(br.ReadUInt16());
-                                var w = new SharpDX.Half(br.ReadUInt16());
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
 
-                                normalVector = new Vector3(x, y, z);
-                            }
-                            else
-                            {
-                                var x = br.ReadSingle();
-                                var y = br.ReadSingle();
-                                var z = br.ReadSingle();
-
-                                normalVector = new Vector3(x, y, z);
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
                             }
 
-                            vertexData.Normals.Add(normalVector);
+                            // There is always one set of normals per vertex
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var normOffset = lod.VertexDataOffset + vertexDataOffset + normDataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(normOffset, SeekOrigin.Begin);
+
+                                Vector3 normalVector;
+                                // Normal data is either stored in half-floats or singles
+                                if (normDataStruct.DataType == VertexDataType.Half4)
+                                {
+                                    var x = new SharpDX.Half(br.ReadUInt16());
+                                    var y = new SharpDX.Half(br.ReadUInt16());
+                                    var z = new SharpDX.Half(br.ReadUInt16());
+                                    var w = new SharpDX.Half(br.ReadUInt16());
+
+                                    normalVector = new Vector3(x, y, z);
+                                }
+                                else
+                                {
+                                    var x = br.ReadSingle();
+                                    var y = br.ReadSingle();
+                                    var z = br.ReadSingle();
+
+                                    normalVector = new Vector3(x, y, z);
+                                }
+
+                                vertexData.Normals.Add(normalVector);
+                            }
                         }
+
                         #endregion
 
 
                         #region BiNormals
 
                         // Get the Vertex Data Structure for BiNormals
-                        var biNormDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var biNormDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                             where vertexDataStruct.DataUsage == VertexUsageType.Binormal
                             select vertexDataStruct).FirstOrDefault();
 
-                        // Determine which data block the binormal data is in
-                        // This always seems to be in the second data block
-                        switch (biNormDataSturct.DataBlock)
+                        if (biNormDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+                            // Determine which data block the binormal data is in
+                            // This always seems to be in the second data block
+                            switch (biNormDataStruct.DataBlock)
+                            {
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
 
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
+                            }
+
+                            // There is always one set of biNormals per vertex
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var biNormOffset = lod.VertexDataOffset + vertexDataOffset + biNormDataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(biNormOffset, SeekOrigin.Begin);
+
+                                var x = br.ReadByte() * 2 / 255f - 1f;
+                                var y = br.ReadByte() * 2 / 255f - 1f;
+                                var z = br.ReadByte() * 2 / 255f - 1f;
+                                var w = br.ReadByte();
+
+                                vertexData.BiNormals.Add(new Vector3(x, y, z));
+                                vertexData.BiNormalHandedness.Add(w);
+                            }
                         }
 
-                        // There is always one set of biNormals per vertex
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            var biNormOffset = lod.VertexDataOffset + vertexDataOffset + biNormDataSturct.DataOffset + vertexDataSize * i;
-
-                            br.BaseStream.Seek(biNormOffset, SeekOrigin.Begin);
-
-                            var x = br.ReadByte() * 2 / 255f - 1f;
-                            var y = br.ReadByte() * 2 / 255f - 1f;
-                            var z = br.ReadByte() * 2 / 255f - 1f;
-                            var w = br.ReadByte();
-
-                            vertexData.BiNormals.Add(new Vector3(x, y, z));
-                            vertexData.BiNormalHandedness.Add(w);
-                        }
                         #endregion
 
 
                         #region VertexColor
 
                         // Get the Vertex Data Structure for colors
-                        var colorDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var colorDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                             where vertexDataStruct.DataUsage == VertexUsageType.Color
                             select vertexDataStruct).FirstOrDefault();
 
-                        // Determine which data block the color data is in
-                        // This always seems to be in the second data block
-                        switch (colorDataSturct.DataBlock)
+                        if (colorDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+                            // Determine which data block the color data is in
+                            // This always seems to be in the second data block
+                            switch (colorDataStruct.DataBlock)
+                            {
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
 
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
+                            }
+
+                            // There is always one set of colors per vertex
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var colorOffset = lod.VertexDataOffset + vertexDataOffset + colorDataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(colorOffset, SeekOrigin.Begin);
+
+                                var a = br.ReadByte();
+                                var r = br.ReadByte();
+                                var g = br.ReadByte();
+                                var b = br.ReadByte();
+
+                                vertexData.Colors.Add(new Color(r, g, b, a));
+                            }
                         }
 
-                        // There is always one set of colors per vertex
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            var colorOffset = lod.VertexDataOffset + vertexDataOffset + colorDataSturct.DataOffset + vertexDataSize * i;
-
-                            br.BaseStream.Seek(colorOffset, SeekOrigin.Begin);
-
-                            var a = br.ReadByte();
-                            var r = br.ReadByte();
-                            var g = br.ReadByte();
-                            var b = br.ReadByte();
-
-                            vertexData.Colors.Add(new Color(r, g, b, a));
-                        }
                         #endregion
 
 
                         #region TextureCoordinates
 
                         // Get the Vertex Data Structure for texture coordinates
-                        var tcDataSturct = (from vertexDataStruct in meshData.VertexDataStructList
+                        var tcDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
                             where vertexDataStruct.DataUsage == VertexUsageType.TextureCoordinate
                             select vertexDataStruct).FirstOrDefault();
 
-                        // Determine which data block the texture coordinate data is in
-                        // This always seems to be in the second data block
-                        switch (tcDataSturct.DataBlock)
+                        if (tcDataStruct != null)
                         {
-                            case 0:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
-                                break;
-                            case 1:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
-
-                                break;
-                            default:
-                                vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
-                                vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
-                                break;
-                        }
-
-                        // There is always one set of normals per vertex
-                        for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
-                        {
-                            var tcOffset = lod.VertexDataOffset + vertexDataOffset + tcDataSturct.DataOffset + vertexDataSize * i;
-
-                            br.BaseStream.Seek(tcOffset, SeekOrigin.Begin);
-
-                            Vector2 tcVector1;
-                            Vector2 tcVector2;
-                            // Normal data is either stored in half-floats or singles
-                            if (tcDataSturct.DataType == VertexDataType.Half4)
+                            // Determine which data block the texture coordinate data is in
+                            // This always seems to be in the second data block
+                            switch (tcDataStruct.DataBlock)
                             {
-                                var x  = new SharpDX.Half(br.ReadUInt16());
-                                var y  = new SharpDX.Half(br.ReadUInt16());
-                                var x1 = new SharpDX.Half(br.ReadUInt16());
-                                var y1 = new SharpDX.Half(br.ReadUInt16());
-
-                                tcVector1 = new Vector2(x, y);
-                                tcVector2 = new Vector2(x1, y1);
-                            }
-                            else
-                            {
-                                var x  = br.ReadSingle();
-                                var y  = br.ReadSingle();
-                                var x1 = br.ReadSingle();
-                                var y1 = br.ReadSingle();
-
-                                tcVector1 = new Vector2(x, y);
-                                tcVector2 = new Vector2(x1, y1);
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
                             }
 
-                            vertexData.TextureCoordinates0.Add(tcVector1);
-                            vertexData.TextureCoordinates1.Add(tcVector2);
+                            // There is always one set of texture coordinates per vertex
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var tcOffset = lod.VertexDataOffset + vertexDataOffset + tcDataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(tcOffset, SeekOrigin.Begin);
+
+                                Vector2 tcVector1;
+                                Vector2 tcVector2;
+                                // Normal data is either stored in half-floats or singles
+                                if (tcDataStruct.DataType == VertexDataType.Half4)
+                                {
+                                    var x = new SharpDX.Half(br.ReadUInt16());
+                                    var y = new SharpDX.Half(br.ReadUInt16());
+                                    var x1 = new SharpDX.Half(br.ReadUInt16());
+                                    var y1 = new SharpDX.Half(br.ReadUInt16());
+
+                                    tcVector1 = new Vector2(x, y);
+                                    tcVector2 = new Vector2(x1, y1);
+
+
+                                    vertexData.TextureCoordinates0.Add(tcVector1);
+                                    vertexData.TextureCoordinates1.Add(tcVector2);
+                                }
+                                else if (tcDataStruct.DataType == VertexDataType.Half2)
+                                {
+                                    var x = new SharpDX.Half(br.ReadUInt16());
+                                    var y = new SharpDX.Half(br.ReadUInt16());
+
+                                    tcVector1 = new Vector2(x, y);
+
+                                    vertexData.TextureCoordinates0.Add(tcVector1);
+                                }
+                                else
+                                {
+                                    var x = br.ReadSingle();
+                                    var y = br.ReadSingle();
+                                    var x1 = br.ReadSingle();
+                                    var y1 = br.ReadSingle();
+
+                                    tcVector1 = new Vector2(x, y);
+                                    tcVector2 = new Vector2(x1, y1);
+
+
+                                    vertexData.TextureCoordinates0.Add(tcVector1);
+                                    vertexData.TextureCoordinates1.Add(tcVector2);
+                                }
+
+                            }
                         }
 
                         #endregion
@@ -935,6 +1052,7 @@ namespace xivModdingFramework.Models.FileTypes
                         #endregion
 
                         meshData.VertexData = vertexData;
+                        totalMeshNum++;
                     }
 
                     #region MeshHider
@@ -1036,7 +1154,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     mesh.HidePositionsDictionary = meshHidePositionsDictionary;
                                 }
                             }
-                            totalMeshNum++;
                         }
                     }
 
@@ -3486,8 +3603,16 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="itemType">The items type</param>
         /// <param name="secondaryModel">The secondary model if any</param>
         /// <returns>A Tuple containing the Folder and File string paths</returns>
-        private (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel)
+        private (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel, string mdlStringPath = null)
         {
+            if (mdlStringPath != null)
+            {
+                var folder = Path.GetDirectoryName(mdlStringPath).Replace("\\", "/");
+                var file = Path.GetFileName(mdlStringPath);
+
+                return (folder, file);
+            }
+
             string mdlFolder = "", mdlFile = "";
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
@@ -3541,7 +3666,15 @@ namespace xivModdingFramework.Models.FileTypes
                         mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
                         mdlFile   = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
                     }
-
+                    break;
+                case XivItemType.furniture:
+                    var part = "";
+                    if (itemModel.ItemSubCategory != "base")
+                    {
+                        part = itemModel.ItemSubCategory;
+                    }
+                    mdlFolder = $"bgcommon/hou/indoor/general/{id}/bgparts";
+                    mdlFile = $"fun_b0_m{id}{part}{MdlExtension}";
                     break;
                 default:
                     mdlFolder = "";

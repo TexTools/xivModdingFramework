@@ -804,4 +804,10 @@
   <data name="Roegadyn_Male_NPC" xml:space="preserve">
     <value>Roegadyn Male NPC</value>
   </data>
+  <data name="Furniture" xml:space="preserve">
+    <value>Furniture</value>
+  </data>
+  <data name="Housing" xml:space="preserve">
+    <value>Housing</value>
+  </data>
 </root>

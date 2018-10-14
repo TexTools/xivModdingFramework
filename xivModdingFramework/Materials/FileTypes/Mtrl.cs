@@ -74,6 +74,16 @@ namespace xivModdingFramework.Materials.FileTypes
             var mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder), HashGenerator.GetHash(mtrlPath.File),
                 _dataFile);
 
+            if (mtrlOffset == 0 && itemType == XivItemType.furniture)
+            {
+                mtrlPath.File = mtrlPath.File.Replace("_0", "_1");
+                mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
+
+                // Get mtrl offset
+                mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder), HashGenerator.GetHash(mtrlPath.File),
+                    _dataFile);
+            }
+
             if (mtrlOffset == 0)
             {
                 throw new Exception($"Could not find offest for {mtrlStringPath}");
@@ -109,6 +119,13 @@ namespace xivModdingFramework.Materials.FileTypes
             // Get mtrl path
             var mtrlFolder = GetMtrlFolder(itemModel, race, itemType);
             var mtrlStringPath = $"{mtrlFolder}/{mtrlFile}";
+
+            if (itemType == XivItemType.furniture)
+            {
+                mtrlStringPath = $"b{mtrlFile}";
+                mtrlFolder = Path.GetDirectoryName(mtrlStringPath).Replace("\\", "/");
+                mtrlFile = Path.GetFileName(mtrlStringPath);
+            }
 
             // Get mtrl offset
             var mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlFolder), HashGenerator.GetHash(mtrlFile),
@@ -146,14 +163,13 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     Signature = br.ReadInt32(),
                     FileSize = br.ReadInt16(),
-                    ColorSetDataSize = br.ReadInt16(),
-                    MaterialDataSize = br.ReadInt16(),
-                    TexturePathsDataSize = br.ReadByte(),
-                    Unknown = br.ReadByte(),
+                    ColorSetDataSize = br.ReadUInt16(),
+                    MaterialDataSize = br.ReadUInt16(),
+                    TexturePathsDataSize = br.ReadUInt16(),
                     TextureCount = br.ReadByte(),
                     MapCount = br.ReadByte(),
                     ColorSetCount = br.ReadByte(),
-                    Unknown1 = br.ReadByte(),
+                    UnknownDataSize = br.ReadByte(),
                     TextureTypePathList = new List<TexTypePath>(),
                     MTRLPath = mtrlPath
                 };
@@ -266,7 +282,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 xivMtrl.Shader = Encoding.UTF8.GetString(br.ReadBytes(shaderPathSize)).Replace("\0", "");
 
-                xivMtrl.Unknown2 = br.ReadInt32();
+                xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
                 if (xivMtrl.ColorSetDataSize > 0)
                 {
@@ -286,17 +302,17 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                 }
 
-                xivMtrl.AdditionalDataSize = br.ReadInt16();
+                xivMtrl.AdditionalDataSize = br.ReadUInt16();
 
-                xivMtrl.DataStruct1Count = br.ReadInt16();
+                xivMtrl.DataStruct1Count = br.ReadUInt16();
 
-                xivMtrl.DataStruct2Count = br.ReadInt16();
+                xivMtrl.DataStruct2Count = br.ReadUInt16();
 
-                xivMtrl.ParameterStructCount = br.ReadInt16();
+                xivMtrl.ParameterStructCount = br.ReadUInt16();
 
-                xivMtrl.ShaderNumber = br.ReadInt16();
+                xivMtrl.ShaderNumber = br.ReadUInt16();
 
-                xivMtrl.Unknown3 = br.ReadInt16();
+                xivMtrl.Unknown3 = br.ReadUInt16();
 
                 xivMtrl.DataStruct1List = new List<DataStruct1>(xivMtrl.DataStruct1Count);
                 for (var i = 0; i < xivMtrl.DataStruct1Count; i++)
@@ -330,7 +346,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="translucencyEnabled">Flag determining if translucency is to be enabled or disabled</param>
         public void ToggleTranslucency(XivMtrl xivMtrl, IItem item, bool translucencyEnabled)
         {
-            xivMtrl.ShaderNumber = !translucencyEnabled ? (short) 0x0D : (short) 0x1D;
+            xivMtrl.ShaderNumber = !translucencyEnabled ? (ushort) 0x0D : (ushort) 0x1D;
 
             ImportMtrl(xivMtrl, item);
         }
@@ -349,12 +365,11 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.FileSize));
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ColorSetDataSize));
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialDataSize));
-            mtrlBytes.Add(xivMtrl.TexturePathsDataSize);
-            mtrlBytes.Add(xivMtrl.Unknown);
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TexturePathsDataSize));
             mtrlBytes.Add(xivMtrl.TextureCount);
             mtrlBytes.Add(xivMtrl.MapCount);
             mtrlBytes.Add(xivMtrl.ColorSetCount);
-            mtrlBytes.Add(xivMtrl.Unknown1);
+            mtrlBytes.Add(xivMtrl.UnknownDataSize);
 
             foreach (var texPath in xivMtrl.TexturePathOffsetList)
             {
@@ -400,7 +415,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             mtrlBytes.AddRange(pathStringList);
 
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown2));
+            mtrlBytes.AddRange(xivMtrl.Unknown2);
 
             foreach (var colorSetHalf in xivMtrl.ColorSetData)
             {
@@ -511,7 +526,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var hasVfx = false;
 
-            if (itemType != XivItemType.human)
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, _dataFile);
@@ -575,7 +590,10 @@ namespace xivModdingFramework.Materials.FileTypes
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
                         mtrlFile = $"mt_c{race}t{bodyVer}_{part}{MtrlExtension}";
                     }
-
+                    break;
+                case XivItemType.furniture:
+                    mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
+                    mtrlFile = $"fun_b0_m{id}_0{part}{MtrlExtension}";
                     break;
                 default:
                     mtrlFolder = "";
@@ -598,7 +616,7 @@ namespace xivModdingFramework.Materials.FileTypes
             // The default version number
             var version = "0001";
 
-            if (itemType != XivItemType.human)
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, _dataFile);
@@ -648,7 +666,9 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
                     }
-
+                    break;
+                case XivItemType.furniture:
+                    mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
                     break;
                 default:
                     mtrlFolder = "";
