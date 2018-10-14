@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
 
 namespace xivModdingFramework.Items.DataContainers
@@ -43,6 +44,11 @@ namespace xivModdingFramework.Items.DataContainers
         /// The item SubCategory
         /// </summary>
         public string ItemSubCategory { get; set; }
+
+        /// <summary>
+        /// The data file the item belongs to
+        /// </summary>
+        public XivDataFile DataFile { get; set; }
 
         /// <summary>
         /// The Model Information for the gear item
