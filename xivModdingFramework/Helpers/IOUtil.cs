@@ -67,6 +67,12 @@ namespace xivModdingFramework.Helpers
             return decompressedBytes;
         }
 
+        /// <summary>
+        /// Makes the save path the item will be saved to
+        /// </summary>
+        /// <param name="item">The item to be saved</param>
+        /// <param name="saveDirectory">The base directory to save to</param>
+        /// <returns>A string containing the full save path for the given item</returns>
         public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory)
         {
             string path;
@@ -91,6 +97,22 @@ namespace xivModdingFramework.Helpers
             }
 
             return path;
+        }
+
+        /// <summary>
+        /// Determines whether a DDS file exists for the given item
+        /// </summary>
+        /// <param name="item">The item to check</param>
+        /// <param name="saveDirectory">The save directory where the DDS should be located</param>
+        /// <param name="fileName">The name of the file</param>
+        /// <returns>True if the DDS file exists, false otherwise</returns>
+        public static bool DDSFileExists(IItem item, DirectoryInfo saveDirectory, string fileName)
+        {
+            var path = MakeItemSavePath(item, saveDirectory);
+
+            var fullPath = new DirectoryInfo($"{path}\\{fileName}.dds");
+
+            return File.Exists(fullPath.FullName);
         }
     }
 }
