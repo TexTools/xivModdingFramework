@@ -18,8 +18,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
+using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
@@ -387,6 +389,141 @@ namespace xivModdingFramework.Items.Categories
             return raceList;
         }
 
+        /// <summary>
+        /// Searches for items given a model ID and item type
+        /// </summary>
+        /// <param name="modelID"> The model id used for searching</param>
+        /// <param name="type">The type of item</param>
+        /// <returns>A list of SearchResults objects</returns>
+        public List<SearchResults> SearchGearByModelID(int modelID, string type)
+        {
+            var searchResultsList = new List<SearchResults>();
+            var index = new Index(_gameDirectory);
+
+            var t1 = Task.Run(() =>
+            {
+                var equipmentSlots = new string[] { "met", "glv", "dwn", "sho", "top", };
+                var accessorySlots = new string[] { "ear", "nek", "rir", "ril", "wrs" };
+                var parts = new string[] { "a", "b", "c", "d", "e", "f" };
+
+                var id = modelID.ToString().PadLeft(4, '0');
+                var folder = "";
+                var file = "";
+
+                if (type.Equals("Equipment"))
+                {
+                    folder = $"chara/equipment/e{id}/material/v";
+                }
+                else if (type.Equals("Accessory"))
+                {
+                    folder = $"chara/accessory/a{id}/material/v";
+                }
+                else if (type.Equals("Weapon"))
+                {
+                    folder = $"chara/weapon/w{id}/obj/body/b";
+                }
+
+
+                var bodyVariantDictionary = new Dictionary<int, List<int>>();
+                List<int> variantList = null;
+
+                if (type.Equals("Weapon"))
+                {
+                    for (var i = 1; i < 200; i++)
+                    {
+                        var folderHashDictionary = new Dictionary<int, int>();
+
+                        var wFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
+
+                        for (var j = 1; j < 200; j++)
+                        {
+                            folderHashDictionary.Add(HashGenerator.GetHash($"{wFolder}{j.ToString().PadLeft(4, '0')}"), j);
+                        }
+
+                        variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
+
+                        if (variantList.Count > 0)
+                        {
+                            variantList.Sort();
+                            bodyVariantDictionary.Add(i, variantList);
+                        }
+                    }
+                }
+                else
+                {
+                    var folderHashDictionary = new Dictionary<int, int>();
+
+                    for (var i = 1; i < 200; i++)
+                    {
+                        folderHashDictionary.Add(HashGenerator.GetHash($"{folder}{i.ToString().PadLeft(4, '0')}"), i);
+                    }
+
+                    variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
+                }
+
+
+                if (!type.Equals("Weapon"))
+                {
+                    foreach (var variant in variantList)
+                    {
+                        var mtrlFolder = $"{folder}{variant.ToString().PadLeft(4, '0')}";
+                        var mtrlFile = "";
+
+                        var mtrlFolderHashes =
+                            index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
+
+                        foreach (var race in IDRaceDictionary.Keys)
+                        {
+                            string[] slots = null;
+
+                            if (type.Equals("Equipment"))
+                            {
+                                slots = equipmentSlots;
+                            }
+                            else if (type.Equals("Accessory"))
+                            {
+                                slots = accessorySlots;
+                            }
+
+                            foreach (var slot in slots)
+                            {
+                                foreach (var part in parts)
+                                {
+                                    if (type.Equals("Equipment"))
+                                    {
+                                        mtrlFile = $"mt_c{race}e{id}_{slot}_{part}.mtrl";
+                                    }
+                                    else if (type.Equals("Accessory"))
+                                    {
+                                        mtrlFile = $"mt_c{race}a{id}_{slot}_{part}.mtrl";
+                                    }
+
+                                    if (mtrlFolderHashes.Contains(HashGenerator.GetHash(mtrlFile)))
+                                    {
+                                        searchResultsList.Add(new SearchResults { Body = "-", Slot = AbbreviationSlotDictionary[slot], Variant = variant.ToString() });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var bodyVariant in bodyVariantDictionary)
+                    {
+                        foreach (var variant in bodyVariant.Value)
+                        {
+                            searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Main_Hand, Variant = variant.ToString() });
+                        }
+                    }
+                }
+
+            });
+
+            t1.Wait();
+            return searchResultsList;
+        }
+
         // A dictionary containg <Slot ID, Gear Category>
         private readonly Dictionary<int, string> _slotNameDictionary = new Dictionary<int, string>
         {
@@ -477,7 +614,22 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"}
+        };
 
+        /// <summary>
+        /// A dictionary containing slot data in the format [Slot abbreviation, Slot Name]
+        /// </summary>
+        private static readonly Dictionary<string, string> AbbreviationSlotDictionary = new Dictionary<string, string>
+        {
+            {"met", XivStrings.Head},
+            {"glv", XivStrings.Hands},
+            {"dwn", XivStrings.Legs},
+            {"sho", XivStrings.Feet},
+            {"top", XivStrings.Body},
+            {"ear", XivStrings.Ears},
+            {"nek", XivStrings.Neck},
+            {"rir", XivStrings.Rings},
+            {"wrs", XivStrings.Wrists},
         };
     }
 }

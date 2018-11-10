@@ -20,9 +20,11 @@ using System.Linq;
 using System.Text;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
+using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -358,6 +360,40 @@ namespace xivModdingFramework.Items.Categories
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Searches for housing items given a model ID
+        /// </summary>
+        /// <param name="modelID">The Model ID of the housing item</param>
+        /// <param name="type">The type of housing item to search for</param>
+        /// <returns>A list of Search Results</returns>
+        public List<SearchResults> SearchHousingByModelID(int modelID, XivItemType type)
+        {
+            var searchResultsList = new List<SearchResults>();
+            var index = new Index(_gameDirectory);
+            var id = modelID.ToString().PadLeft(4, '0');
+
+            var folder = "";
+
+            if (type == XivItemType.furniture)
+            {
+                folder = $"bgcommon/hou/indoor/general/{id}/material";
+            }
+
+            if (index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
+            {
+                var searchResults = new SearchResults
+                {
+                    Body = "-",
+                    Slot = "Furniture",
+                    Variant = $"{id}"
+                };
+
+                searchResultsList.Add(searchResults);
+            }
+
+            return searchResultsList;
         }
     }
 

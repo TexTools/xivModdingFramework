@@ -22,9 +22,11 @@ using System.Text;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
+using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -310,6 +312,81 @@ namespace xivModdingFramework.Items.Categories
             }
 
             return equipPartList;
+        }
+
+        /// <summary>
+        /// Searches for monsters with the given model ID
+        /// </summary>
+        /// <param name="modelID">The ID of the monster model</param>
+        /// <param name="type">The type of monster to look for</param>
+        /// <returns>A list of Search Results</returns>
+        public List<SearchResults> SearchMonstersByModelID(int modelID, XivItemType type)
+        {
+            var searchResultsList = new List<SearchResults>();
+            var index = new Index(_gameDirectory);
+            var id = modelID.ToString().PadLeft(4, '0');
+
+            var bodyVariantDictionary = new Dictionary<int, List<int>>();
+
+            if (type == XivItemType.monster)
+            {
+                var folder = $"chara/monster/m{id}/obj/body/b";
+
+
+                for (var i = 0; i < 100; i++)
+                {
+                    var folderHashDictionary = new Dictionary<int, int>();
+
+                    var mtrlFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
+
+                    for (var j = 1; j < 100; j++)
+                    {
+                        folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"), j);
+                    }
+
+                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
+
+                    if (variantList.Count > 0)
+                    {
+                        variantList.Sort();
+                        bodyVariantDictionary.Add(i, variantList);
+                    }
+                }
+            }
+            else if (type == XivItemType.demihuman)
+            {
+                var folder = $"chara/demihuman/d{id}/obj/equipment/e";
+
+                for (var i = 0; i < 100; i++)
+                {
+                    var folderHashDictionary = new Dictionary<int, int>();
+
+                    var mtrlFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
+
+                    for (var j = 1; j < 100; j++)
+                    {
+                        folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"), j);
+                    }
+
+                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
+
+                    if (variantList.Count > 0)
+                    {
+                        variantList.Sort();
+                        bodyVariantDictionary.Add(i, variantList);
+                    }
+                }
+            }
+
+            foreach (var bodyVariant in bodyVariantDictionary)
+            {
+                foreach (var variant in bodyVariant.Value)
+                {
+                    searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Monster, Variant = variant.ToString() });
+                }
+            }
+
+            return searchResultsList;
         }
 
         /// <summary>
