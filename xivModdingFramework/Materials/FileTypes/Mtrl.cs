@@ -347,11 +347,12 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item to toggle translucency for</param>
         /// <param name="translucencyEnabled">Flag determining if translucency is to be enabled or disabled</param>
-        public void ToggleTranslucency(XivMtrl xivMtrl, IItem item, bool translucencyEnabled)
+        /// <param name="source">The source/application that is writing to the dat.</param>
+        public void ToggleTranslucency(XivMtrl xivMtrl, IItem item, bool translucencyEnabled, string source)
         {
             xivMtrl.ShaderNumber = !translucencyEnabled ? (ushort) 0x0D : (ushort) 0x1D;
 
-            ImportMtrl(xivMtrl, item);
+            ImportMtrl(xivMtrl, item, source);
         }
 
         /// <summary>
@@ -359,8 +360,9 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item whos mtrl is being imported</param>
+        /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public int ImportMtrl(XivMtrl xivMtrl, IItem item)
+        public int ImportMtrl(XivMtrl xivMtrl, IItem item, string source)
         {
             var mtrlBytes = new List<byte>();
 
@@ -464,7 +466,7 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
             var dat = new Dat(_gameDirectory);
-            return dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category);
+            return dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category, source);
         }
 
         /// <summary>

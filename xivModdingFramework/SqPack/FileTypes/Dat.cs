@@ -23,7 +23,7 @@ using System.Security.Cryptography;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
-using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -43,11 +43,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             _gameDirectory = gameDirectory;
 
-            _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath)); 
-
-            // Create a empty modlist if it doesn't exist yet
-            if(!File.Exists(_modListDirectory.FullName))
-                File.Create(_modListDirectory.FullName);
+            var modding = new Modding(_gameDirectory);
+            modding.CreateModlist();
+            _modListDirectory = modding.ModListDirectory;
         }
 
 
@@ -105,18 +103,17 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if it is original, false otherwise</returns>
         private bool IsOriginalDat(XivDataFile dataFile)
         {
+            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+
+            if (modList == null) return true;
+
             // Checks if any entry in the modlist is within the datafile
             // If there is, then a modded dat has already been created
-            using (var streamReader = new StreamReader(_modListDirectory.FullName))
+            foreach (var modEntry in modList.Mods)
             {
-                string line;
-                while ((line = streamReader.ReadLine()) != null)
+                if (modEntry.datFile.Contains(dataFile.GetDataFileName()))
                 {
-                    var modInfo = JsonConvert.DeserializeObject<ModInfo>(line);
-                    if (modInfo.datFile.Contains(dataFile.GetDataFileName()))
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
 
@@ -209,28 +206,19 @@ namespace xivModdingFramework.SqPack.FileTypes
         public byte[] GetType2Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
-            var modlist = new ModList(_gameDirectory);
-
-            ModInfo modInfo = null;
-            var inModList = false;
+            var modding = new Modding(_gameDirectory);
 
             var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                var modInfoData = modlist.TryGetModEntry(internalPath);
-
-                if (modInfoData != null)
-                {
-                    modInfo = modInfoData.Value.ModInfo;
-                    inModList = true;
-                }
+                var modEntry = modding.TryGetModEntry(internalPath);
 
                 // If the file exists in the modlist, get the data from the original data
-                if (inModList)
+                if (modEntry != null)
                 {
-                    return GetType2Data(modInfo.originalOffset, dataFile);
+                    return GetType2Data(modEntry.data.originalOffset, dataFile);
                 }
             }
 
@@ -320,10 +308,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName">The name of the item being imported.</param>
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
+        /// <param name="source">The source/application that is writing to the dat.</param>
         public int ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
-            string category)
+            string category, string source)
         {
-            return ImportType2Data(File.ReadAllBytes(importFilePath.FullName), itemName, internalPath, category);
+            return ImportType2Data(File.ReadAllBytes(importFilePath.FullName), itemName, internalPath, category, source);
         }
 
         /// <summary>
@@ -333,14 +322,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName">The name of the item being imported.</param>
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
+        /// <param name="source">The source/application that is writing to the dat.</param>
         public int ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
-            string category)
+            string category, string source)
         {
-            XivDataFile dataFile = GetDataFileFromPath(internalPath);
-            var modlist = new ModList(_gameDirectory);
+            var dataFile = GetDataFileFromPath(internalPath);
+            var modding = new Modding(_gameDirectory);
 
-            ModInfo modInfo = null;
-            var lineNum = 0;
             var inModList = false;
 
             var newData = new List<byte>();
@@ -348,14 +336,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var dataBlocks = new List<byte>();
 
             // Checks if the item being imported already exists in the modlist
-            var modInfoData = modlist.TryGetModEntry(internalPath);
-
-            if (modInfoData != null)
-            {
-                modInfo = modInfoData.Value.ModInfo;
-                lineNum = modInfoData.Value.LineNum;
-                inModList = true;
-            }
+            var modEntry = modding.TryGetModEntry(internalPath);
 
             // Header size is defaulted to 128, but may need to change if the data being imported is very large.
             headerData.AddRange(BitConverter.GetBytes(128));
@@ -436,7 +417,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             newData.AddRange(headerData);
             newData.AddRange(dataBlocks);
 
-            var newOffset = WriteToDat(newData, modInfo, inModList, internalPath, category, itemName, lineNum, dataFile);
+            var newOffset = WriteToDat(newData, modEntry, internalPath, category, itemName, dataFile, source, 2);
 
             if (newOffset == 0)
             {
@@ -458,28 +439,20 @@ namespace xivModdingFramework.SqPack.FileTypes
         public (int MeshCount, int MaterialCount, byte[] Data) GetType3Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
-            var modlist = new ModList(_gameDirectory);
-
-            var inModList = false;
-            ModInfo modInfo = null;
+            var modding = new Modding(_gameDirectory);
 
             var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                var modInfoData = modlist.TryGetModEntry(internalPath);
 
-                if (modInfoData != null)
-                {
-                    modInfo = modInfoData.Value.ModInfo;
-                    inModList = true;
-                }
+                var modEntry = modding.TryGetModEntry(internalPath);
 
                 // If the file exists in the modlist, get the data from the original data
-                if (inModList)
+                if (modEntry != null)
                 {
-                    return GetType3Data(modInfo.originalOffset, dataFile);
+                    return GetType3Data(modEntry.data.originalOffset, dataFile);
                 }
             }
 
@@ -622,28 +595,19 @@ namespace xivModdingFramework.SqPack.FileTypes
         public XivTex GetType4Data(string internalPath, bool forceOriginal)
         {
             var index = new Index(_gameDirectory);
-            var modlist = new ModList(_gameDirectory);
-
-            ModInfo modInfo = null;
-            var inModList = false;
+            var modding = new Modding(_gameDirectory);
 
             var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                var modInfoData = modlist.TryGetModEntry(internalPath);
-
-                if (modInfoData != null)
-                {
-                    modInfo = modInfoData.Value.ModInfo;
-                    inModList = true;
-                }
+                var modEntry = modding.TryGetModEntry(internalPath);
 
                 // If the file exists in the modlist, get the data from the original data
-                if (inModList)
+                if (modEntry != null)
                 {
-                    return GetType4Data(modInfo.originalOffset, dataFile);
+                    return GetType4Data(modEntry.data.originalOffset, dataFile);
                 }
             }
 
@@ -891,17 +855,17 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Writes the newly imported data to the .dat for modifications.
         /// </summary>
-        /// <param name="data">The data to be written.</param>
+        /// <param name="importData">The data to be written.</param>
         /// <param name="modEntry">The modlist entry (if any) for the given file.</param>
-        /// <param name="inModList">Is the item already contained within the mod list.</param>
         /// <param name="internalFilePath">The internal file path of the item being modified.</param>
         /// <param name="category">The category of the item.</param>
         /// <param name="itemName">The name of the item being modified.</param>
         /// <param name="lineNum">The line number of the existing mod list entry for the item if it exists.</param>
         /// <param name="dataFile">The data file to which we write the data</param>
+        /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset in which the modified data was placed.</returns>
-        public int WriteToDat(List<byte> data, ModInfo modEntry, bool inModList, string internalFilePath,
-            string category, string itemName, int lineNum, XivDataFile dataFile)
+        public int WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
+            string category, string itemName, XivDataFile dataFile, string source, int dataType)
         {
             var offset = 0;
             var dataOverwritten = false;
@@ -914,9 +878,14 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
 
-            if (inModList)
+            if (category.Equals(itemName))
             {
-                datNum = ((modEntry.modOffset / 8) & 0x0F) / 2;
+                category = XivStrings.Character;
+            }
+
+            if (modEntry != null)
+            {
+                datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
                 modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
             }
             else
@@ -945,135 +914,147 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Checks to make sure the offsets in the mod list are not 0
             // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
-            if (inModList)
+            if (modEntry != null)
             {
-                if (modEntry.modOffset == 0)
+                if (modEntry.data.modOffset == 0)
                 {
                     throw new Exception("The mod offset located in the mod list cannot be 0");
                 }
 
-                if (modEntry.originalOffset == 0)
+                if (modEntry.data.originalOffset == 0)
                 {
                     throw new Exception("The original offset located in the mod list cannot be 0");
                 }
             }
 
             /* 
-             * If the item has been previously modified and the compressed data being imported is smaller or equal to the exisiting data
+             * If the item has been previously modified and the compressed data being imported is smaller or equal to the existing data
              *  replace the existing data with new data.
              */
-            if (inModList && data.Count <= modEntry.modSize)
+            if (modEntry != null && importData.Count <= modEntry.data.modSize)
             {
-                if (modEntry.modOffset != 0)
+                if (modEntry.data.modOffset != 0)
                 {
-                    var sizeDiff = modEntry.modSize - data.Count;
+                    var sizeDiff = modEntry.data.modSize - importData.Count;
 
-                    datNum = ((modEntry.modOffset / 8) & 0x0F) / 2;
+                    datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
                     modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
                     var datOffsetAmount = 16 * datNum;
 
                     using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                     {
-                        bw.BaseStream.Seek(modEntry.modOffset - datOffsetAmount, SeekOrigin.Begin);
+                        bw.BaseStream.Seek(modEntry.data.modOffset - datOffsetAmount, SeekOrigin.Begin);
 
-                        bw.Write(data.ToArray());
+                        bw.Write(importData.ToArray());
 
                         bw.Write(new byte[sizeDiff]);
                     }
 
-                    index.UpdateIndex(modEntry.modOffset, internalFilePath, dataFile);
-                    index.UpdateIndex2(modEntry.modOffset, internalFilePath, dataFile);
+                    index.UpdateIndex(modEntry.data.modOffset, internalFilePath, dataFile);
+                    index.UpdateIndex2(modEntry.data.modOffset, internalFilePath, dataFile);
 
-                    offset = modEntry.modOffset;
+                    offset = modEntry.data.modOffset;
 
                     dataOverwritten = true;
+
+                    var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+
+                    var entryEnableUpdate = (from entry in modList.Mods
+                        where entry.fullPath.Equals(modEntry.fullPath)
+                        select entry).FirstOrDefault();
+
+                    entryEnableUpdate.enabled = true;
+
+                    File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
             }
             else
             {
-                var emptyLine = 0;
-
                 /* 
                  * If there is an empty entry in the modlist and the compressed data being imported is smaller or equal to the available space
                 *  write the compressed data in the existing space.
                 */
 
-                foreach (var line in File.ReadAllLines(_modListDirectory.FullName))
+                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+
+                if (modList != null && modList.emptyCount > 0)
                 {
-                    var emptyEntry = JsonConvert.DeserializeObject<ModInfo>(line);
-
-                    if (emptyEntry.fullPath.Equals("") && emptyEntry.datFile.Equals(dataFile.GetDataFileName()))
+                    foreach (var mod in modList.Mods)
                     {
-                        if (emptyEntry.modOffset != 0)
+                        if (!mod.fullPath.Equals(string.Empty) || !mod.datFile.Equals(dataFile.GetDataFileName()))
+                            continue;
+
+                        if (mod.data.modOffset == 0) continue;
+
+                        var emptyEntryLength = mod.data.modSize;
+
+                        if (emptyEntryLength > importData.Count)
                         {
-                            var emptyLength = emptyEntry.modSize;
+                            var sizeDiff = emptyEntryLength - importData.Count;
 
-                            if (emptyLength > data.Count)
+                            datNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
+                            modDatPath = _gameDirectory + "\\" + mod.datFile + DatExtension + datNum;
+                            var datOffsetAmount = 16 * datNum;
+
+                            using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                             {
-                                var sizeDiff = emptyLength - data.Count;
+                                bw.BaseStream.Seek(mod.data.modOffset - datOffsetAmount, SeekOrigin.Begin);
 
-                                datNum = ((emptyEntry.modOffset / 8) & 0x0F) / 2;
-                                modDatPath = _gameDirectory + "\\" + emptyEntry.datFile + DatExtension + datNum;
-                                var datOffsetAmount = 16 * datNum;
+                                bw.Write(importData.ToArray());
 
-                                using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
-                                {
-                                    bw.BaseStream.Seek(emptyEntry.modOffset - datOffsetAmount, SeekOrigin.Begin);
-
-                                    bw.Write(data.ToArray());
-
-                                    bw.Write(new byte[sizeDiff]);
-                                }
-
-                                var originalOffset = index.UpdateIndex(emptyEntry.modOffset, internalFilePath, dataFile) * 8;
-                                index.UpdateIndex2(emptyEntry.modOffset, internalFilePath, dataFile);
-
-                                if (inModList)
-                                {
-                                    originalOffset = modEntry.originalOffset;
-
-                                    var replaceOriginalEntry = new ModInfo
-                                    {
-                                        category = string.Empty,
-                                        name = "Empty Replacement",
-                                        fullPath = string.Empty,
-                                        originalOffset = 0,
-                                        modOffset = modEntry.modOffset,
-                                        modSize = modEntry.modSize,
-                                        datFile = dataFile.GetDataFileName()
-                                    };
-
-                                    var oLines = File.ReadAllLines(_modListDirectory.FullName);
-                                    oLines[lineNum] = JsonConvert.SerializeObject(replaceOriginalEntry);
-                                    File.WriteAllLines(_modListDirectory.FullName, oLines);
-                                }
-
-
-                                var replaceEntry = new ModInfo
-                                {
-                                    category = category,
-                                    name = itemName,
-                                    fullPath = internalFilePath,
-                                    originalOffset = originalOffset,
-                                    modOffset = emptyEntry.modOffset,
-                                    modSize = emptyEntry.modSize,
-                                    datFile = dataFile.GetDataFileName()
-                                };
-
-                                var lines = File.ReadAllLines(_modListDirectory.FullName);
-                                lines[emptyLine] = JsonConvert.SerializeObject(replaceEntry);
-                                File.WriteAllLines(_modListDirectory.FullName, lines);
-
-                                offset = emptyEntry.modOffset;
-
-                                dataOverwritten = true;
-                                break;
+                                bw.Write(new byte[sizeDiff]);
                             }
+
+                            var originalOffset = index.UpdateIndex(mod.data.modOffset, internalFilePath, dataFile) * 8;
+                            index.UpdateIndex2(mod.data.modOffset, internalFilePath, dataFile);
+
+                            // The imported data was larger than the original existing mod,
+                            // and an empty slot large enough for the data was available,
+                            // so we need to empty out the original entry so it may be used later
+                            if (modEntry != null)
+                            {
+                                var entryToEmpty = (from entry in modList.Mods
+                                    where entry.fullPath.Equals(modEntry.fullPath)
+                                    select entry).FirstOrDefault();
+
+                                originalOffset = entryToEmpty.data.originalOffset;
+
+                                entryToEmpty.name = string.Empty;
+                                entryToEmpty.category = string.Empty;
+                                entryToEmpty.fullPath = string.Empty;
+                                entryToEmpty.source = string.Empty;
+                                entryToEmpty.modPack = null;
+                                entryToEmpty.enabled = false;
+                                entryToEmpty.data.originalOffset = 0;
+                                entryToEmpty.data.dataType = 0;
+
+                                modList.emptyCount += 1;
+                            }
+
+                            // Replace the empty entry with the new data
+                            mod.source = source;
+                            mod.name = itemName;
+                            mod.category = category;
+                            mod.fullPath = internalFilePath;
+                            mod.datFile = dataFile.GetDataFileName();
+                            mod.data.originalOffset = originalOffset;
+                            mod.data.dataType = dataType;
+                            mod.enabled = true;
+
+                            modList.emptyCount -= 1;
+                            modList.modCount += 1;
+
+                            File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+
+                            offset = mod.data.modOffset;
+
+                            dataOverwritten = true;
+                            break;
                         }
                     }
-                    emptyLine++;
                 }
 
+                // If there was no mod entry overwritten, write the new import data at the end of the dat file
                 if (!dataOverwritten)
                 {
                     using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
@@ -1085,11 +1066,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                             bw.Write((byte)0);
                         }
 
-                        var eof = (int)bw.BaseStream.Position + data.Count;
+                        var eof = (int)bw.BaseStream.Position + importData.Count;
 
                         while ((eof & 0xFF) != 0)
                         {
-                            data.AddRange(new byte[16]);
+                            importData.AddRange(new byte[16]);
                             eof = eof + 16;
                         }
 
@@ -1098,7 +1079,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         if (offset != 0)
                         {
-                            bw.Write(data.ToArray());
+                            bw.Write(importData.ToArray());
                         }
                         else
                         {
@@ -1108,53 +1089,64 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
 
+            // If there was no mod entry overwritten, write a new mod entry
             if (!dataOverwritten)
             {
                 if (offset != 0)
                 {
+                    var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+
                     var oldOffset = index.UpdateIndex(offset, internalFilePath, dataFile) * 8;
                     index.UpdateIndex2(offset, internalFilePath, dataFile);
 
                     /*
-                     * If the item has been previously modifed, but the new compressed data to be imported is larger than the existing data
-                     * remove the data from the modlist, leaving the offset and size intact for future use
+                     * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
+                     * and no empty slot was found for it, then empty out the entry from the modlist, 
+                     * leaving the offset and size intact for future use
                     */
-                    if (inModList && data.Count > modEntry.modSize)
+                    if (modEntry != null)
                     {
-                        oldOffset = modEntry.originalOffset;
 
-                        var replaceEntry = new ModInfo
-                        {
-                            category = string.Empty,
-                            name = string.Empty,
-                            fullPath = string.Empty,
-                            originalOffset = 0,
-                            modOffset = modEntry.modOffset,
-                            modSize = modEntry.modSize,
-                            datFile = dataFile.GetDataFileName()
-                        };
+                        var entryToEmpty = (from entry in modList.Mods
+                            where entry.fullPath.Equals(modEntry.fullPath)
+                            select entry).FirstOrDefault();
 
-                        var lines = File.ReadAllLines(_modListDirectory.FullName);
-                        lines[lineNum] = JsonConvert.SerializeObject(replaceEntry);
-                        File.WriteAllLines(_modListDirectory.FullName, lines);
+                        oldOffset = entryToEmpty.data.originalOffset;
+
+                        entryToEmpty.name = string.Empty;
+                        entryToEmpty.category = string.Empty;
+                        entryToEmpty.fullPath = string.Empty;
+                        entryToEmpty.source = string.Empty;
+                        entryToEmpty.modPack = null;
+                        entryToEmpty.enabled = false;
+                        entryToEmpty.data.originalOffset = 0;
+                        entryToEmpty.data.dataType = 0;
+
+                        modList.emptyCount += 1;
                     }
 
-                    var entry = new ModInfo
+                    var newEntry = new Mod
                     {
-                        category = category,
+                        source = source,
                         name = itemName,
+                        category = category,
                         fullPath = internalFilePath,
-                        originalOffset = oldOffset,
-                        modOffset = offset,
-                        modSize = data.Count,
-                        datFile = dataFile.GetDataFileName()
+                        datFile = dataFile.GetDataFileName(),
+                        enabled = true,
+                        data = new Data
+                        {
+                            dataType = dataType,
+                            originalOffset = oldOffset,
+                            modOffset = offset,
+                            modSize = importData.Count
+                        }
                     };
 
-                    using (var modFile = new StreamWriter(_modListDirectory.FullName, true))
-                    {
-                        modFile.BaseStream.Seek(0, SeekOrigin.End);
-                        modFile.WriteLine(JsonConvert.SerializeObject(entry));
-                    }
+                    modList.Mods.Add(newEntry);
+
+                    modList.modCount += 1;
+
+                    File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
             }
 
@@ -1164,7 +1156,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Dictionary that holds [Texture Code, Texture Format] data
         /// </summary>
-        public static Dictionary<int, XivTexFormat> TextureTypeDictionary = new Dictionary<int, XivTexFormat>
+        public static readonly Dictionary<int, XivTexFormat> TextureTypeDictionary = new Dictionary<int, XivTexFormat>
         {
             {4400, XivTexFormat.L8 },
             {4401, XivTexFormat.A8 },

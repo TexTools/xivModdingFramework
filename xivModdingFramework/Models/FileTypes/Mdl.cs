@@ -32,7 +32,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Mods.DataContainers;
-using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
@@ -1173,9 +1173,10 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivMdl">The model data for the given item</param>
         /// <param name="daeLocation">The location of the dae file to import</param>
         /// <param name="advImportSettings">The advanced import settings if any</param>
+        /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
         public Dictionary<string, string> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
-            Dictionary<string, ModelImportSettings> advImportSettings)
+            Dictionary<string, ModelImportSettings> advImportSettings, string source)
         {
             if (!File.Exists(daeLocation.FullName))
             {
@@ -2035,7 +2036,7 @@ namespace xivModdingFramework.Models.FileTypes
                 meshNum++;
             }
 
-            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings);
+            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source);
 
             return warningsDictionary;
         }
@@ -2047,28 +2048,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="item">The item the model belongs to</param>
         /// <param name="xivMdl">The original model data</param>
         /// <param name="importSettings">The import settings if any</param>
+        /// <param name="source">The source/application that is writing to the dat.</param>
         private void MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl, 
-            Dictionary<string, ModelImportSettings> importSettings)
+            Dictionary<string, ModelImportSettings> importSettings, string source)
         {
-            var modlist = new ModList(_gameDirectory);
+            var modding = new Modding(_gameDirectory);
 
-            var lineNum = 0;
-            var inModList = false;
-            ModInfo modInfo = null;
             var isAlreadyModified = false;
 
             var itemType = ItemType.GetItemType(item);
 
             var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
-            var modInfoData = modlist.TryGetModEntry(mdlPath);
-
-            if (modInfoData != null)
-            {
-                modInfo = modInfoData.Value.ModInfo;
-                lineNum = modInfoData.Value.LineNum;
-                inModList = true;
-            }
+            var modEntry = modding.TryGetModEntry(mdlPath);
 
             // Get the imported data
             var importDataDictionary = GetImportData(colladaMeshDataList, itemType);
@@ -3345,8 +3337,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
-            dat.WriteToDat(compressedMDLData, modInfo, inModList, filePath, item.Category, item.Name, lineNum,
-                _dataFile);
+            dat.WriteToDat(compressedMDLData, modEntry, filePath, item.Category, item.Name, _dataFile, source, 3);
 
             #endregion
         }

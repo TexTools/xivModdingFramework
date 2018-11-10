@@ -28,7 +28,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
-using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -424,26 +424,17 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item who's texture we are importing</param>
         /// <param name="ddsFileDirectory">The directory of the dds file being imported</param>
         /// <returns>The offset to the new imported data</returns>
-        public int TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory)
+        public int TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory, string source)
         {
-            int lineNum = 0, offset = 0;
-            var inModList = false;
-            ModInfo modInfo = null;
+            var offset = 0;;
 
             var dat = new Dat(_gameDirectory);
-            var modlist = new ModList(_gameDirectory);
+            var modding = new Modding(_gameDirectory);
 
             if (File.Exists(ddsFileDirectory.FullName))
             {
                 // Check if the texture being imported has been imported before
-                var modInfoData = modlist.TryGetModEntry(xivTex.TextureTypeAndPath.Path);
-
-                if (modInfoData != null)
-                {
-                    modInfo = modInfoData.Value.ModInfo;
-                    lineNum = modInfoData.Value.LineNum;
-                    inModList = true;
-                }
+                var modEntry = modding.TryGetModEntry(xivTex.TextureTypeAndPath.Path);
 
                 using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
                 {
@@ -517,8 +508,8 @@ namespace xivModdingFramework.Textures.FileTypes
                             newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
                             newTex.AddRange(DDSInfo.compressedDDS);
 
-                            offset = dat.WriteToDat(newTex, modInfo, inModList, xivTex.TextureTypeAndPath.Path,
-                                item.ItemCategory, item.Name, lineNum, xivTex.TextureTypeAndPath.DataFile);
+                            offset = dat.WriteToDat(newTex, modEntry, xivTex.TextureTypeAndPath.Path,
+                                item.ItemCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
                         }
                         else
                         {
@@ -527,7 +518,7 @@ namespace xivModdingFramework.Textures.FileTypes
                             newTex.AddRange(br.ReadBytes(uncompressedLength));
 
                             offset = dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
-                                item.ItemCategory);
+                                item.ItemCategory, source);
                         }
                     }
                     else
@@ -544,7 +535,7 @@ namespace xivModdingFramework.Textures.FileTypes
             return offset;
         }
 
-        public int TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item)
+        public int TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source)
         {
             var colorSetData = new List<Half>();
 
@@ -584,7 +575,7 @@ namespace xivModdingFramework.Textures.FileTypes
             xivMtrl.ColorSetData = colorSetData;
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile);
-            return mtrl.ImportMtrl(xivMtrl, item);
+            return mtrl.ImportMtrl(xivMtrl, item, source);
         }
 
         /// <summary>
