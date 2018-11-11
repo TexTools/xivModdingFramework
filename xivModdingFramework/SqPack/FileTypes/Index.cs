@@ -44,7 +44,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to update the index for.</param>
         /// <param name="datNum">The dat number to update to.</param>
-        internal void UpdateIndexDatCount(XivDataFile dataFile, int datNum)
+        public void UpdateIndexDatCount(XivDataFile dataFile, int datNum)
         {
             var datCount = (byte)(datNum + 1);
 
@@ -71,7 +71,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFile">The hashed value of the file name</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>The offset to the data</returns>
-        internal int GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
+        public int GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
         {
             var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
             var offset = 0;
@@ -206,6 +206,44 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         br.ReadBytes(8);
                     }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Determines whether the given folder path exists
+        /// </summary>
+        /// <param name="folderHash">The hashed folder</param>
+        /// <param name="dataFile">The data file</param>
+        /// <returns>True if it exists, False otherwise</returns>
+        public bool FolderExists(int folderHash, XivDataFile dataFile)
+        {
+            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath)))
+            {
+                br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                var numOfFiles = br.ReadInt32();
+
+                br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
+                {
+                    var fileNameHash = br.ReadInt32();
+
+                    var folderPathHash = br.ReadInt32();
+
+                    if (folderPathHash == folderHash)
+                    {
+                        return true;
+                    }
+
+                    br.ReadBytes(4);
                 }
             }
 
