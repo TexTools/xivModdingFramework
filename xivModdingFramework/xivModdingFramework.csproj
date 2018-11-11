@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <Folder Include="Models\Interfaces\" />
+    <Folder Include="Mods\FileTypes\" />
   </ItemGroup>
 
 </Project>
