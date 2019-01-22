@@ -30,6 +30,7 @@ namespace xivModdingFramework.Textures.Enums
         ColorSet,
         Map,
         Icon,
-        Vfx
+        Vfx,
+        Other
     }
 }
