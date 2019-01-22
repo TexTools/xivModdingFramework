@@ -85,7 +85,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check.</param>
         /// <returns>The largest dat number for the given data file.</returns>
-        private int GetLargestDatNumber(XivDataFile dataFile)
+        public int GetLargestDatNumber(XivDataFile dataFile)
         {
             var allFiles = Directory.GetFiles(_gameDirectory.FullName);
 
@@ -756,6 +756,47 @@ namespace xivModdingFramework.SqPack.FileTypes
             xivTex.TexData = decompressedData.ToArray();
 
             return xivTex;
+        }
+
+        /// <summary>
+        /// Gets the file type of an item
+        /// </summary>
+        /// <param name="offset">Offset to the texture data.</param>
+        /// <param name="dataFile">The data file that contains the data.</param>
+        /// <returns>The file type</returns>
+        public int GetFileType(int offset, XivDataFile dataFile)
+        {
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = ((offset / 8) & 0x0F) / 2;
+
+            offset = OffsetCorrection(datNum, offset);
+
+            var datPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+
+            using (var br = new BinaryReader(File.OpenRead(datPath)))
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+
+                br.ReadInt32(); // Header Length
+                return br.ReadInt32(); // File Type
+            }
+        }
+
+        public byte[] GetRawData(int offset, XivDataFile dataFile, int dataSize)
+        {
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = ((offset / 8) & 0x0F) / 2;
+
+            offset = OffsetCorrection(datNum, offset);
+
+            var datPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+
+            using (var br = new BinaryReader(File.OpenRead(datPath)))
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+
+                return br.ReadBytes(dataSize);
+            }
         }
 
         /// <summary>
