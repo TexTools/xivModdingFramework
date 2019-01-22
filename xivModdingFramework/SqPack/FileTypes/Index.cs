@@ -65,6 +65,40 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets the dat count within the index files.
+        /// </summary>
+        /// <param name="dataFile">The data file to update the index for.</param>
+        public (int Index1, int Index2) GetIndexDatCount(XivDataFile dataFile)
+        {
+            int index1 = 0, index2 = 0;
+
+            var indexPaths = new[]
+            {
+                _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension,
+                _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension
+            };
+
+            for (var i = 0; i < indexPaths.Length; i++)
+            {
+                using (var br = new BinaryReader(File.OpenRead(indexPaths[i])))
+                {
+                    br.BaseStream.Seek(1104, SeekOrigin.Begin);
+                    if (i == 0)
+                    {
+                        index1 = br.ReadByte();
+                    }
+                    else
+                    {
+                        index2 = br.ReadByte();
+                    }
+
+                }
+            }
+
+            return (index1, index2);
+        }
+
+        /// <summary>
         /// Gets the offset for the data in the .dat file
         /// </summary>
         /// <param name="hashedFolder">The hashed value of the folder path</param>
@@ -1052,6 +1086,33 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 CreateIndexBackups(backupsDirectory, dataFile);
             }
+        }
+
+        public bool IsIndexLocked(XivDataFile dataFile)
+        {
+            var fileName = dataFile.GetDataFileName();
+
+            var indexPath = _gameDirectory + "\\" + fileName + IndexExtension;
+            var index2Path = _gameDirectory + "\\" + fileName + Index2Extension;
+
+            FileStream stream = null;
+            FileStream stream1 = null;
+
+            try
+            {
+                stream = File.Open(indexPath, FileMode.Open);
+                stream1= File.Open(index2Path, FileMode.Open);
+            }
+            catch (Exception e)
+            {
+                return true;
+            }
+            finally
+            {
+                stream?.Close();
+            }
+
+            return false;
         }
     }
 }
