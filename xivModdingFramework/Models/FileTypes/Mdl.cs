@@ -62,6 +62,8 @@ namespace xivModdingFramework.Models.FileTypes
             _dataFile = dataFile;
         }
 
+        public byte[] MDLRawData { get; set; }
+
         /// <summary>
         /// Gets the MDL Data given a model and race
         /// </summary>
@@ -1176,14 +1178,14 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
         public Dictionary<string, string> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
-            Dictionary<string, ModelImportSettings> advImportSettings, string source)
+            Dictionary<string, ModelImportSettings> advImportSettings, string source, bool rawDataOnly = false)
         {
             if (!File.Exists(daeLocation.FullName))
             {
                 throw new IOException("The file provided for import does not exist");
             }
 
-            if (!Path.GetExtension(daeLocation.FullName).Equals(".dae"))
+            if (!Path.GetExtension(daeLocation.FullName).ToLower().Equals(".dae"))
             {
                 throw new FormatException("The file provided is not a collada .dae file");
             }
@@ -2036,7 +2038,7 @@ namespace xivModdingFramework.Models.FileTypes
                 meshNum++;
             }
 
-            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source);
+            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source, rawDataOnly);
 
             return warningsDictionary;
         }
@@ -2050,7 +2052,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="importSettings">The import settings if any</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         private void MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl, 
-            Dictionary<string, ModelImportSettings> importSettings, string source)
+            Dictionary<string, ModelImportSettings> importSettings, string source, bool rawDataOnly)
         {
             var modding = new Modding(_gameDirectory);
 
@@ -2505,8 +2507,10 @@ namespace xivModdingFramework.Models.FileTypes
 
             var unknownDataBlock1 = xivMdl.UnkData1.Unknown;
 
-            fullModelDataBlock.AddRange(unknownDataBlock1);
-
+            if (unknownDataBlock1 != null)
+            {
+                fullModelDataBlock.AddRange(unknownDataBlock1);
+            }
             #endregion
 
             // Mesh Part
@@ -3337,7 +3341,14 @@ namespace xivModdingFramework.Models.FileTypes
 
             var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
-            dat.WriteToDat(compressedMDLData, modEntry, filePath, item.Category, item.Name, _dataFile, source, 3);
+            if (rawDataOnly)
+            {
+                MDLRawData = compressedMDLData.ToArray();
+            }
+            else
+            {
+                dat.WriteToDat(compressedMDLData, modEntry, filePath, item.ItemCategory, item.Name, _dataFile, source, 3);
+            }
 
             #endregion
         }
