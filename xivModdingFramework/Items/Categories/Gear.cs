@@ -398,6 +398,7 @@ namespace xivModdingFramework.Items.Categories
         public List<SearchResults> SearchGearByModelID(int modelID, string type)
         {
             var searchResultsList = new List<SearchResults>();
+            var resultCheckList = new List<string>();
             var index = new Index(_gameDirectory);
 
             var t1 = Task.Run(() =>
@@ -500,7 +501,13 @@ namespace xivModdingFramework.Items.Categories
 
                                     if (mtrlFolderHashes.Contains(HashGenerator.GetHash(mtrlFile)))
                                     {
-                                        searchResultsList.Add(new SearchResults { Body = "-", Slot = AbbreviationSlotDictionary[slot], Variant = variant.ToString() });
+                                        var abbrSlot = AbbreviationSlotDictionary[slot];
+                                        if (!resultCheckList.Contains($"{abbrSlot}{variant.ToString()}"))
+                                        {
+                                            searchResultsList.Add(new SearchResults { Body = "-", Slot = abbrSlot, Variant = variant});
+                                            resultCheckList.Add($"{abbrSlot}{variant.ToString()}");
+                                        }
+
                                     }
                                 }
                             }
@@ -513,14 +520,18 @@ namespace xivModdingFramework.Items.Categories
                     {
                         foreach (var variant in bodyVariant.Value)
                         {
-                            searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Main_Hand, Variant = variant.ToString() });
+                            searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Main_Hand, Variant = variant });
                         }
                     }
                 }
 
+                searchResultsList.Sort();
+
             });
 
             t1.Wait();
+
+
             return searchResultsList;
         }
 
