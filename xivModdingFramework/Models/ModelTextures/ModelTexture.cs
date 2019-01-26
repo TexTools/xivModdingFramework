@@ -18,7 +18,6 @@ using ImageMagick;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using SharpDX.Direct2D1;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -252,8 +251,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     var diffColor1 = diffuseColorList[secondColorLocation];
                     var diffColor2 = diffuseColorList[firstColorLocation];
 
-                    var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, alpha);
-                    var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, alpha);
+                    var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, (byte)255);
+                    var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, (byte)255);
 
                     var diffuseBlend = Blend(firstColor, secondColor, blendPercent);
 
@@ -273,7 +272,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var emisBlend = Blend(firstColor, secondColor, blendPercent);
 
-                    diffuseColor = new Color((int)((diffuseBlend.R / 255f) * diffR), (int)((diffuseBlend.G / 255f) * diffG), (int)((diffuseBlend.B / 255f) * diffB), (int)alpha);
+                    diffuseColor = new Color((int)((diffuseBlend.R / 255f) * diffR), (int)((diffuseBlend.G / 255f) * diffG), (int)((diffuseBlend.B / 255f) * diffB), (byte)255);
                     specularColor = new Color((int)((specBlend.R / 255f) * specR), (int)((specBlend.G / 255f) * specG), (int)((specBlend.B / 255f) * specB), 255);
                     emissiveColor = new Color((int)emisBlend.R, (int)emisBlend.G, (int)emisBlend.B, (int)255);
                 }
@@ -287,12 +286,12 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
                     {
-                        diffuseColor = new Color((int)((diffColor.R / 255f) * specR), (int)((diffColor.G / 255f) * specR), (int)((diffColor.B / 255f) * specR), (int)alpha);
+                        diffuseColor = new Color((int)((diffColor.R / 255f) * specR), (int)((diffColor.G / 255f) * specR), (int)((diffColor.B / 255f) * specR), (byte)255);
                         specularColor = new Color((int)((specColor.R / 255f) * specG), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specG), 255);
                     }
                     else
                     {
-                        diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), (int)alpha);
+                        diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), (byte)255);
 
                         if (materialType.Equals("body"))
                         {
@@ -533,6 +532,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 using (var image = new MagickImage(texMapData.Diffuse.Data, pixelSettings))
                 {
+                    image.Alpha(AlphaOption.Off);
                     var size = new MagickGeometry(width, height);
                     size.IgnoreAspectRatio = true;
                     image.Resize(size);
@@ -644,7 +644,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     return "iris";
                 }
 
-                return "other";
+                return "fac";
             }
 
             if (mtrlPath.Contains("/tail/t"))
