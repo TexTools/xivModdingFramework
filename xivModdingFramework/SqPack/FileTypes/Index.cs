@@ -1088,12 +1088,17 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
+        /// <summary>
+        /// Checks to see whether the index file is locked
+        /// </summary>
+        /// <param name="dataFile">The data file to check</param>
+        /// <returns>True if locked</returns>
         public bool IsIndexLocked(XivDataFile dataFile)
         {
             var fileName = dataFile.GetDataFileName();
 
-            var indexPath = _gameDirectory + "\\" + fileName + IndexExtension;
-            var index2Path = _gameDirectory + "\\" + fileName + Index2Extension;
+            var indexPath = $"{_gameDirectory}\\{fileName}{IndexExtension}";
+            var index2Path = $"{_gameDirectory}\\{fileName}{Index2Extension}";
 
             FileStream stream = null;
             FileStream stream1 = null;
@@ -1110,6 +1115,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             finally
             {
                 stream?.Close();
+                stream1?.Close();
             }
 
             return false;
