@@ -382,9 +382,11 @@ namespace xivModdingFramework.Items.Categories
             {
                 foreach (var variant in bodyVariant.Value)
                 {
-                    searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Monster, Variant = variant.ToString() });
+                    searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Monster, Variant = variant });
                 }
             }
+
+            searchResultsList.Sort();
 
             return searchResultsList;
         }

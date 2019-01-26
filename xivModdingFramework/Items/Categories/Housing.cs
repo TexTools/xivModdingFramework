@@ -387,11 +387,13 @@ namespace xivModdingFramework.Items.Categories
                 {
                     Body = "-",
                     Slot = "Furniture",
-                    Variant = $"{id}"
+                    Variant = int.Parse(id)
                 };
 
                 searchResultsList.Add(searchResults);
             }
+
+            searchResultsList.Sort();
 
             return searchResultsList;
         }
