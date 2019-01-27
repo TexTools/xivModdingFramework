@@ -212,48 +212,69 @@ namespace xivModdingFramework.Items.Categories
 
             foreach (var mdl in assets.MdlList)
             {
-                var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 6);
-                if (!mdl.Contains("_b0_"))
+                if (mdl.Contains("base"))
                 {
-                    if (mdl.Contains("_t4_"))
-                    {
-                        var partChar = part[5];
-                        var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
+                    var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 1);
 
-                        if (partChar.Equals('.'))
-                        {
-                            furniturePartDict.Add($"base ({descriptor})", mdl);
-                        }
-                        else
-                        {
-                            furniturePartDict.Add($"{partChar.ToString()} ({descriptor})", mdl);
-                        }
-                    }
-                    else
-                    {
-                        if (!furniturePartDict.ContainsKey(part.Remove(5)))
-                        {
-                            furniturePartDict.Add(part.Remove(5), mdl);
-                        }
-                        else
-                        {
-                            var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
-                            furniturePartDict.Add($"{part} ({descriptor})", mdl);
-                        }
-                    }
+                    furniturePartDict.Add($"base ({part})", mdl);
                 }
                 else
                 {
-                    var partChar = part[5];
-                    if (partChar.Equals('.'))
+                    try
                     {
-                        furniturePartDict.Add("base", mdl);
+                        var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 6);
+                        if (!mdl.Contains("_b0_"))
+                        {
+                            if (mdl.Contains("_t4_"))
+                            {
+                                var partChar = part[5];
+                                var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
+
+                                if (partChar.Equals('.'))
+                                {
+                                    furniturePartDict.Add($"base ({descriptor})", mdl);
+                                }
+                                else
+                                {
+                                    furniturePartDict.Add($"{partChar.ToString()} ({descriptor})", mdl);
+                                }
+                            }
+                            else
+                            {
+                                if (!furniturePartDict.ContainsKey(part.Remove(5)))
+                                {
+                                    furniturePartDict.Add(part.Remove(5), mdl);
+                                }
+                                else
+                                {
+                                    var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
+                                    furniturePartDict.Add($"{part} ({descriptor})", mdl);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var partChar = part[5];
+                            if (partChar.Equals('.'))
+                            {
+                                furniturePartDict.Add("base", mdl);
+                            }
+                            else
+                            {
+                                furniturePartDict.Add(partChar.ToString(), mdl);
+                            }
+                        }
                     }
-                    else
+                    catch
                     {
-                        furniturePartDict.Add(partChar.ToString(), mdl);
+                        var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 1);
+                        var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
+
+                        furniturePartDict.Add($"{part} ({descriptor})", mdl);
                     }
+
                 }
+
             }
 
             return furniturePartDict;
