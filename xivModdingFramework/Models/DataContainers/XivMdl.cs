@@ -114,5 +114,13 @@ namespace xivModdingFramework.Models.DataContainers
         /// Flag set when the model has hider data
         /// </summary>
         public bool HasHiderData { get; set; }
+
+        /// <summary>
+        /// The list of extra MeshData for the Model
+        /// </summary>
+        /// <remarks>
+        /// This happens when the sum of all LoD mesh counts is less than the model data mesh count
+        /// </remarks>
+        public List<MeshData> ExtraMeshData { get; set; }
     }
 }

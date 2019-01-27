@@ -413,6 +413,37 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
+                // Adds any extra mesh data 
+                if (meshNum < mdlModelData.MeshCount)
+                {
+                    var missingMeshCount = mdlModelData.MeshCount - meshNum;
+
+                    xivMdl.ExtraMeshData = new List<MeshData>();
+
+                    for (var i = 0; i < missingMeshCount; i++)
+                    {
+                        var meshDataInfo = new MeshDataInfo
+                        {
+                            VertexCount = br.ReadInt32(),
+                            IndexCount = br.ReadInt32(),
+                            MaterialIndex = br.ReadInt16(),
+                            MeshPartIndex = br.ReadInt16(),
+                            MeshPartCount = br.ReadInt16(),
+                            BoneListIndex = br.ReadInt16(),
+                            IndexDataOffset = br.ReadInt32(),
+                            VertexDataOffset0 = br.ReadInt32(),
+                            VertexDataOffset1 = br.ReadInt32(),
+                            VertexDataOffset2 = br.ReadInt32(),
+                            VertexDataEntrySize0 = br.ReadByte(),
+                            VertexDataEntrySize1 = br.ReadByte(),
+                            VertexDataEntrySize2 = br.ReadByte(),
+                            VertexDataBlockCount = br.ReadByte()
+                        };
+
+                        xivMdl.ExtraMeshData.Add(new MeshData{ MeshInfo = meshDataInfo });
+                    }
+                }
+
                 // Data block for attributes
                 // Currently unknown usage
                 var attributeDataBlock = new AttributeDataBlock
