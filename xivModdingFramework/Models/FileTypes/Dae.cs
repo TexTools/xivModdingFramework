@@ -974,9 +974,26 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var prevIndexCount = 0;
                 var totalVertices = 0;
-                for (var j = 0; j < meshList[i].MeshPartList.Count; j++)
+                var meshPartCount = meshList[i].MeshPartList.Count;
+                var noMeshParts = false;
+
+                if (meshPartCount == 0)
                 {
-                    var indexCount = meshList[i].MeshPartList[j].IndexCount;
+                    meshPartCount = 1;
+                    noMeshParts = true;
+                }
+
+                for (var j = 0; j < meshPartCount; j++)
+                {
+                    var indexCount = 0;
+                    if (noMeshParts)
+                    {
+                        indexCount = meshList[i].MeshInfo.IndexCount;
+                    }
+                    else
+                    {
+                        indexCount = meshList[i].MeshPartList[j].IndexCount;
+                    }
 
                     // Only write geometry data if there are indices for the positions
                     if (indexCount <= 0) continue;
@@ -2469,11 +2486,21 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < meshDataList.Count; i++)
             {
+                if(meshDataList[i].VertexData.Positions.Count <= 0) continue;
+
                 //<node>
                 xmlWriter.WriteStartElement("node");
                 xmlWriter.WriteAttributeString("id", "node-Group_" + i);
                 xmlWriter.WriteAttributeString("name", "Group_" + i);
-                for (var j = 0; j < meshDataList[i].MeshPartList.Count; j++)
+
+                var meshPartCount = meshDataList[i].MeshPartList.Count;
+
+                if (meshPartCount == 0)
+                {
+                    meshPartCount = 1;
+                }
+
+                for (var j = 0; j < meshPartCount; j++)
                 {
                     var partString = "." + j;
 
