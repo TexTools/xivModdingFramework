@@ -42,6 +42,20 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
+        /// Gets the list of all Housing Items
+        /// </summary>
+        /// <returns>A list of XivFurniture objects containing housing items</returns>
+        public List<XivFurniture> GetFurnitureList()
+        {
+            var furnitureList = new List<XivFurniture>();
+
+            furnitureList.AddRange(GetIndoorFurniture());
+            furnitureList.AddRange(GetOutdoorFurniture());
+
+            return furnitureList;
+        }
+
+        /// <summary>
         /// Gets the list of indoor furniture
         /// </summary>
         /// <remarks>
@@ -51,7 +65,7 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option one
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        public List<XivFurniture> GetFurnitureList()
+        private List<XivFurniture> GetIndoorFurniture()
         {
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -74,7 +88,7 @@ namespace xivModdingFramework.Items.Categories
                 var item = new XivFurniture
                 {
                     Category = XivStrings.Housing,
-                    ItemCategory = XivStrings.Furniture,
+                    ItemCategory = XivStrings.Furniture_Indoor,
                     ModelInfo = new XivModelInfo()
                 };
 
@@ -117,6 +131,75 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
+        /// Gets the list of outdoor furniture
+        /// </summary>
+        /// <returns>A list of XivFurniture objects containing outdoor furniture item info</returns>
+        private List<XivFurniture> GetOutdoorFurniture()
+        {
+            // These are the offsets to relevant data
+            // These will need to be changed if data gets added or removed with a patch
+            const int itemIndexOffset = 10;
+            const int modelNumberOffset = 12;
+            const int itemCategoryOffset = 13;
+
+            const int itemNameDataOffset = 14;
+            const int itemDataLength = 160;
+            const int itemIconDataOffset = 136;
+
+            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var housingDictionary = ex.ReadExData(XivEx.housingyardobject);
+            var itemDictionary = ex.ReadExData(XivEx.item);
+
+            var furnitureList = new List<XivFurniture>();
+
+            foreach (var housingItem in housingDictionary.Values)
+            {
+                var item = new XivFurniture
+                {
+                    Category = XivStrings.Housing,
+                    ItemCategory = XivStrings.Furniture_Outdoor,
+                    ModelInfo = new XivModelInfo()
+                };
+
+                using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
+                {
+                    br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
+                    var itemIndex = br.ReadInt16();
+
+                    br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
+                    item.ModelInfo.ModelID = br.ReadByte();
+
+                    br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
+                    var housingCategory = br.ReadByte();
+
+                    using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
+                    {
+                        br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
+                        var nameOffset = br1.ReadInt16();
+
+                        br1.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
+                        item.IconNumber = br1.ReadUInt16();
+
+                        var gearNameOffset = itemDataLength + nameOffset;
+                        var gearNameLength = itemDictionary[itemIndex].Length - gearNameOffset;
+                        br1.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
+                        var nameString = Encoding.UTF8.GetString(br1.ReadBytes(gearNameLength)).Replace("\0", "");
+                        item.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                    }
+                }
+
+                if (!item.Name.Equals(string.Empty))
+                {
+                    furnitureList.Add(item);
+                }
+            }
+
+            furnitureList.Sort();
+
+            return furnitureList;
+        }
+
+        /// <summary>
         /// Gets the parts list for furniture
         /// </summary>
         /// <param name="itemModel">The item to get the parts for</param>
@@ -125,7 +208,7 @@ namespace xivModdingFramework.Items.Categories
         {
             var furniturePartDict = new Dictionary<string, string>();
 
-            var assets = GetFurnitureAssets(itemModel.ModelInfo.ModelID);
+            var assets = GetFurnitureAssets(itemModel.ModelInfo.ModelID, itemModel.ItemCategory);
 
             foreach (var mdl in assets.MdlList)
             {
@@ -158,8 +241,6 @@ namespace xivModdingFramework.Items.Categories
                             furniturePartDict.Add($"{part} ({descriptor})", mdl);
                         }
                     }
-
-
                 }
                 else
                 {
@@ -183,14 +264,26 @@ namespace xivModdingFramework.Items.Categories
         /// </summary>
         /// <param name="modelID">The model id to get the assets for</param>
         /// <returns>A HousingAssets object containing the asset info</returns>
-        private HousingAssets GetFurnitureAssets(int modelID)
+        private HousingAssets GetFurnitureAssets(int modelID, string category)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var id = modelID.ToString().PadLeft(4, '0');
-            var assetFolder = $"bgcommon/hou/indoor/general/{id}/asset";
-            var assetFile = $"fun_b0_m{id}.sgb";
+
+            var assetFolder = "";
+            var assetFile = "";
+
+            if (category.Equals(XivStrings.Furniture_Indoor))
+            {
+                assetFolder = $"bgcommon/hou/indoor/general/{id}/asset";
+                assetFile = $"fun_b0_m{id}.sgb";
+            }
+            else if (category.Equals(XivStrings.Furniture_Outdoor))
+            {
+                assetFolder = $"bgcommon/hou/outdoor/general/{id}/asset";
+                assetFile = $"gar_b0_m{id}.sgb";
+            }
 
             var assetOffset = index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile),
                 XivDataFile._01_Bgcommon);
@@ -386,7 +479,21 @@ namespace xivModdingFramework.Items.Categories
                 var searchResults = new SearchResults
                 {
                     Body = "-",
-                    Slot = "Furniture",
+                    Slot = "Indoor Furniture",
+                    Variant = int.Parse(id)
+                };
+
+                searchResultsList.Add(searchResults);
+            }
+
+            folder = $"bgcommon/hou/outdoor/general/{id}/material";
+
+            if (index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
+            {
+                var searchResults = new SearchResults
+                {
+                    Body = "-",
+                    Slot = "Outdoor Furniture",
                     Variant = int.Parse(id)
                 };
 
