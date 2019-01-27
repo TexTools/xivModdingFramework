@@ -387,7 +387,8 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Iris, "face"},
             {XivStrings.Etc, "face"},
             {XivStrings.Accessory, "base"},
-            {XivStrings.Hair, "hair"}
+            {XivStrings.Hair, "hair"},
+            {XivStrings.Tail, "base" }
         };
     }
 }
