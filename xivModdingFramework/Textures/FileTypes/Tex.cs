@@ -158,8 +158,17 @@ namespace xivModdingFramework.Textures.FileTypes
                     }
                     break;
                 case XivItemType.furniture:
-                    mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
-                    mtrlFile = $"fun_b0_m{id}_0";
+                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    {
+                        mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
+                        mtrlFile = $"fun_b0_m{id}_0";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    {
+                        mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
+                        mtrlFile = $"gar_b0_m{id}_0";
+                    }
+
                     break;
                 default:
                     mtrlFolder = "";
@@ -178,7 +187,14 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (partList.Count < 1 && itemType == XivItemType.furniture)
             {
-                mtrlFile = $"fun_b0_m{id}_1";
+                if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                {
+                    mtrlFile = $"fun_b0_m{id}_1";
+                }
+                else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                {
+                    mtrlFile = $"gar_b0_m{id}_1";
+                }
 
                 // Get a list of hashed mtrl files that are in the given folder
                 files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);

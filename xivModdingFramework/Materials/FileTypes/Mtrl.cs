@@ -712,8 +712,16 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     break;
                 case XivItemType.furniture:
-                    mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
-                    mtrlFile = $"fun_b0_m{id}_0{part}{MtrlExtension}";
+                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    {
+                        mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
+                        mtrlFile = $"fun_b0_m{id}_0{part}{MtrlExtension}";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    {
+                        mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
+                        mtrlFile = $"gar_b0_m{id}_0{part}{MtrlExtension}";
+                    }
                     break;
                 default:
                     mtrlFolder = "";
@@ -744,6 +752,11 @@ namespace xivModdingFramework.Materials.FileTypes
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
             }
 
+            if (version.Equals("0000"))
+            {
+                version = "0001";
+            }
+
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
             var race = xivRace.GetRaceCode();
@@ -761,7 +774,6 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.weapon:
                     mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
                     break;
-
                 case XivItemType.monster:
                     mtrlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/material/v{version}";
                     break;
@@ -788,7 +800,14 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     break;
                 case XivItemType.furniture:
-                    mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
+                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    {
+                        mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    {
+                        mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
+                    }
                     break;
                 default:
                     mtrlFolder = "";

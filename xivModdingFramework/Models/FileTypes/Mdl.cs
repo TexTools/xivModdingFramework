@@ -31,7 +31,6 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.Enums;
-using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -3675,8 +3674,18 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         part = itemModel.ItemSubCategory;
                     }
-                    mdlFolder = $"bgcommon/hou/indoor/general/{id}/bgparts";
-                    mdlFile = $"fun_b0_m{id}{part}{MdlExtension}";
+
+                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    {
+                        mdlFolder = $"bgcommon/hou/indoor/general/{id}/bgparts";
+                        mdlFile = $"fun_b0_m{id}{part}{MdlExtension}";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    {
+                        mdlFolder = $"bgcommon/hou/outdoor/general/{id}/bgparts";
+                        mdlFile = $"gar_b0_m{id}{part}{MdlExtension}";
+                    }
+
                     break;
                 default:
                     mdlFolder = "";
