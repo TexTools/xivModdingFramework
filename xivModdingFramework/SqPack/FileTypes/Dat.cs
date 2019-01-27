@@ -121,6 +121,36 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets the modded dat files
+        /// </summary>
+        /// <param name="dataFile">The data file to check</param>
+        /// <returns>A list of modded dat files</returns>
+        public List<string> GetModdedDatList(XivDataFile dataFile)
+        {
+            var datList = new List<string>();
+
+            for (var i = 1; i < 9; i++)
+            {
+                var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
+
+                if (File.Exists(datFilePath))
+                {
+                    using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
+                    {
+                        binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+
+                        if (binaryReader.ReadByte() == 0)
+                        {
+                            datList.Add(datFilePath);
+                        }
+                    }
+                }
+            }
+
+            return datList;
+        }
+
+        /// <summary>
         /// Makes the header for the SqPack portion of the dat file. 
         /// </summary>
         /// <returns>byte array containing the header.</returns>
