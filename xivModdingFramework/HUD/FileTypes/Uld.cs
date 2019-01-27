@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -52,7 +53,19 @@ namespace xivModdingFramework.HUD.FileTypes
 
             foreach (var offset in uldOffsetList)
             {
-                var uldData = dat.GetType2Data(offset, XivDataFile._06_Ui);
+                byte[] uldData;
+                try
+                {
+                    uldData = dat.GetType2Data(offset, XivDataFile._06_Ui);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error at offset: {offset}");
+                    Debug.WriteLine($"Message: {ex.Message}");
+                    continue;
+                }
+
+                if (uldData.Length < 10) continue;
 
                 using (var br = new BinaryReader(new MemoryStream(uldData)))
                 {
