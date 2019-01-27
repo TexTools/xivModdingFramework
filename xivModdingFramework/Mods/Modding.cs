@@ -256,7 +256,7 @@ namespace xivModdingFramework.Mods
 
             var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
 
-            if(modList == null) return;
+            if(modList == null || modList.modCount == 0) return;
 
             foreach (var modEntry in modList.Mods)
             {
