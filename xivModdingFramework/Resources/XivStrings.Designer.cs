@@ -934,11 +934,20 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Furniture.
+        ///   Looks up a localized string similar to Indoor Furniture.
         /// </summary>
-        internal static string Furniture {
+        internal static string Furniture_Indoor {
             get {
-                return ResourceManager.GetString("Furniture", resourceCulture);
+                return ResourceManager.GetString("Furniture_Indoor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Outdoor Furniture.
+        /// </summary>
+        internal static string Furniture_Outdoor {
+            get {
+                return ResourceManager.GetString("Furniture_Outdoor", resourceCulture);
             }
         }
         
