@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.IO.Compression;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 
@@ -73,27 +74,34 @@ namespace xivModdingFramework.Helpers
         /// <param name="item">The item to be saved</param>
         /// <param name="saveDirectory">The base directory to save to</param>
         /// <returns>A string containing the full save path for the given item</returns>
-        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory)
+        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
         {
             string path;
             if (item.Category.Equals("UI"))
             {
                 if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
                 {
-                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.ItemSubCategory + "/" + item.Name;
+                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.ItemSubCategory}/{item.Name}";
                 }
                 else
                 {
-                    path = saveDirectory.FullName + "/" + item.Category + "/" + item.ItemCategory + "/" + item.Name;
+                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.Name}";
                 }
             }
             else if (item.Category.Equals(XivStrings.Character))
             {
-                path = saveDirectory.FullName + "/" + item.Category + "/" + item.Name;
+                if (item.Name.Equals(XivStrings.Equipment_Decals) || item.Name.Equals(XivStrings.Face_Paint))
+                {
+                    path = $"{saveDirectory.FullName}/{item.Category}/{item.Name}";
+                }
+                else
+                {
+                    path = $"{saveDirectory.FullName}/{item.Category}/{item.Name}/{race}/{((IItemModel)item).ModelInfo.Body}";
+                }
             }
             else
             {
-                path = saveDirectory.FullName + "/" + item.ItemCategory + "/" + item.Name;
+                path = $"{saveDirectory.FullName}/{item.ItemCategory}/{item.Name}";
             }
 
             return path;
@@ -106,9 +114,9 @@ namespace xivModdingFramework.Helpers
         /// <param name="saveDirectory">The save directory where the DDS should be located</param>
         /// <param name="fileName">The name of the file</param>
         /// <returns>True if the DDS file exists, false otherwise</returns>
-        public static bool DDSFileExists(IItem item, DirectoryInfo saveDirectory, string fileName)
+        public static bool DDSFileExists(IItem item, DirectoryInfo saveDirectory, string fileName, XivRace race = XivRace.All_Races)
         {
-            var path = MakeItemSavePath(item, saveDirectory);
+            var path = MakeItemSavePath(item, saveDirectory, race);
 
             var fullPath = new DirectoryInfo($"{path}\\{fileName}.dds");
 

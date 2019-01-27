@@ -217,9 +217,9 @@ namespace xivModdingFramework.Textures.FileTypes
             return mapNamePathDictonary;
         }
 
-        public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory)
+        public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
         {
-            var path = IOUtil.MakeItemSavePath(item, saveDirectory);
+            var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
 
             Directory.CreateDirectory(path);
 

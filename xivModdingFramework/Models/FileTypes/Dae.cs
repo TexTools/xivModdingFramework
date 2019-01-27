@@ -62,13 +62,13 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="xivModel">The model to create a dae file for</param>
         /// <param name="saveLocation">The location to save the dae file</param>
-        public void MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation)
+        public void MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation, XivRace race)
         {
             var hasBones = true;
 
             var modelName = Path.GetFileNameWithoutExtension(xivModel.MdlPath.File);
 
-            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation)}\\3D";
+            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation, race)}\\3D";
 
             Directory.CreateDirectory(path);
 

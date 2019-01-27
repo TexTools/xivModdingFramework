@@ -16,6 +16,7 @@
 
 using System.Collections.Generic;
 using System.IO;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
@@ -40,11 +41,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="item">The item to be exported</param>
         /// <param name="xivMdl">The XivMdl model data</param>
         /// <param name="saveLocation">The location in which to save the obj file</param>
-        public void ExportObj(IItemModel item, XivMdl xivMdl, DirectoryInfo saveLocation)
+        public void ExportObj(IItemModel item, XivMdl xivMdl, DirectoryInfo saveLocation, XivRace race)
         {
             var meshes = xivMdl.LoDList[0].MeshDataList;
 
-            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation)}\\3D";
+            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation, race)}\\3D";
 
             Directory.CreateDirectory(path);
 
