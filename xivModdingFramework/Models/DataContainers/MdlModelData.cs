@@ -128,7 +128,12 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown10 { get; set; }
+        public byte Unknown10a { get; set; }
+
+        /// <summary>
+        /// Unknown Usage
+        /// </summary>
+        public byte Unknown10b { get; set; }
 
         /// <summary>
         /// Unknown Usage

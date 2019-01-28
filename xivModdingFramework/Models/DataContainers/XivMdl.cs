@@ -116,6 +116,15 @@ namespace xivModdingFramework.Models.DataContainers
         public bool HasHiderData { get; set; }
 
         /// <summary>
+        /// The list containing the info for each etra Level of Detail of the model
+        /// </summary>
+        /// <remarks>
+        /// This happens when the sum of all LoD mesh counts is less than the model data mesh count.
+        /// The number of extra LoDs seems to be the value of Unknown10
+        /// </remarks>
+        public List<LevelOfDetail> ExtraLoDList { get; set; }
+
+        /// <summary>
         /// The list of extra MeshData for the Model
         /// </summary>
         /// <remarks>

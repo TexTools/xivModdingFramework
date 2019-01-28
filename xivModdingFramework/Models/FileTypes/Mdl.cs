@@ -133,7 +133,8 @@ namespace xivModdingFramework.Models.FileTypes
                     Unknown7            = br.ReadInt16(),
                     Unknown8            = br.ReadInt16(),
                     Unknown9            = br.ReadInt16(),
-                    Unknown10           = br.ReadInt16(),
+                    Unknown10a           = br.ReadByte(),
+                    Unknown10b           = br.ReadByte(),
                     Unknown11           = br.ReadInt16(),
                     Unknown12           = br.ReadInt16(),
                     Unknown13           = br.ReadInt16(),
@@ -239,6 +240,8 @@ namespace xivModdingFramework.Models.FileTypes
                 // Adding to xivMdl
                 xivMdl.UnkData0 = unkData0;
 
+                var totalLoDMeshes = 0;
+
                 // We add each LoD to the list
                 // Note: There is always 3 LoD
                 xivMdl.LoDList = new List<LevelOfDetail>();
@@ -266,6 +269,8 @@ namespace xivModdingFramework.Models.FileTypes
                     };
                     // Finished reading LoD
 
+                    totalLoDMeshes += lod.MeshCount;
+
                     // if LoD0 shows no mesh, add one (This is rare, but happens on company chest for example)
                     if (i == 0 && lod.MeshCount == 0)
                     {
@@ -274,6 +279,37 @@ namespace xivModdingFramework.Models.FileTypes
 
                     //Adding to xivMdl
                     xivMdl.LoDList.Add(lod);
+                }
+
+                if (totalLoDMeshes < mdlModelData.MeshCount)
+                {
+                    xivMdl.ExtraLoDList = new List<LevelOfDetail>();
+
+                    for (var i = 0; i < mdlModelData.Unknown10a; i++)
+                    {
+                        var lod = new LevelOfDetail
+                        {
+                            MeshOffset = br.ReadInt16(),
+                            MeshCount = br.ReadInt16(),
+                            Unknown0 = br.ReadInt32(),
+                            Unknown1 = br.ReadInt32(),
+                            Unknown2 = br.ReadInt32(),
+                            Unknown3 = br.ReadInt32(),
+                            Unknown4 = br.ReadInt32(),
+                            Unknown5 = br.ReadInt32(),
+                            Unknown6 = br.ReadInt32(),
+                            IndexDataStart = br.ReadInt32(),
+                            Unknown7 = br.ReadInt32(),
+                            Unknown8 = br.ReadInt32(),
+                            VertexDataSize = br.ReadInt32(),
+                            IndexDataSize = br.ReadInt32(),
+                            VertexDataOffset = br.ReadInt32(),
+                            IndexDataOffset = br.ReadInt32(),
+                            MeshDataList = new List<MeshData>()
+                        };
+
+                        xivMdl.ExtraLoDList.Add(lod);
+                    }
                 }
 
                 // Now that we have the LoD data, we can go back and read the Vertex Data Structures
@@ -410,6 +446,8 @@ namespace xivModdingFramework.Models.FileTypes
                         };
 
                         lod.MeshDataList[0].MeshInfo = meshDataInfo;
+
+                        meshNum++;
                     }
                 }
 
@@ -2277,7 +2315,8 @@ namespace xivModdingFramework.Models.FileTypes
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown7));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown8));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown9));
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown10));
+            modelDataBlock.Add(modelData.Unknown10a);
+            modelDataBlock.Add(modelData.Unknown10b);
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown11));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown12));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown13));
@@ -2414,6 +2453,38 @@ namespace xivModdingFramework.Models.FileTypes
             fullModelDataBlock.AddRange(lodDataBlock);
 
             #endregion
+
+            // Extra LoD Data
+            #region Extra Level Of Detail Block
+
+            if (xivMdl.ExtraLoDList.Count > 0)
+            {
+                var extraLodDataBlock = new List<byte>();
+
+                foreach (var lod in xivMdl.ExtraLoDList)
+                {
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshOffset));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshCount));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown0));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown1));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown3));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown4));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown5));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataStart));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown7));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown8));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.VertexDataSize));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataSize));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.VertexDataOffset));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataOffset));
+                }
+
+                fullModelDataBlock.AddRange(extraLodDataBlock);
+            }
+            #endregion
+
 
             // Mesh Data
             #region Mesh Data Block
