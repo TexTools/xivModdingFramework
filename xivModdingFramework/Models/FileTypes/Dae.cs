@@ -212,6 +212,8 @@ namespace xivModdingFramework.Models.FileTypes
 
         public Dictionary<int, Dictionary<int, ColladaData>> ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation)
         {
+            var isHousingItem = xivMdl.MdlPath.Folder.Contains("bgcommon/hou/");
+
             var boneJointDict = new Dictionary<string, string>();
 
             // A dictionary contining <Mesh Number, <Mesh Part Number, Collada Data>
@@ -245,8 +247,7 @@ namespace xivModdingFramework.Models.FileTypes
                                             // Throw an exception if there is a duplicate bone
                                             if (boneJointDict.ContainsKey(sid))
                                             {
-                                                throw new Exception(
-                                                    $"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
                                             boneJointDict.Add(sid, name);
@@ -260,8 +261,8 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            // Throw an exception if no bones were found in the dae file
-            if (boneJointDict.Count < 1)
+            // Throw an exception if no bones were found in the dae file, and it is not a housing item
+            if (boneJointDict.Count < 1 && !isHousingItem)
             {
                 throw new Exception("No bones were found in the dae file.");
             }
@@ -840,7 +841,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteStartElement("technique");
                 xmlWriter.WriteAttributeString("sid", "common");
                 //<phong>
-                xmlWriter.WriteStartElement("blinn");
+                xmlWriter.WriteStartElement("phong");
                 //<diffuse>
                 xmlWriter.WriteStartElement("diffuse");
                 //<texture>
@@ -876,9 +877,23 @@ namespace xivModdingFramework.Models.FileTypes
                     xmlWriter.WriteEndElement();
                     //</transparent>
                 }
+                else
+                {
+                    //<transparent>
+                    xmlWriter.WriteStartElement("transparent");
+                    xmlWriter.WriteAttributeString("opaque", "A_ONE");
+                    //<color>
+                    xmlWriter.WriteStartElement("color");
+                    xmlWriter.WriteString("1 1 1 1");
+                    xmlWriter.WriteEndElement();
+                    //</color>
+                    xmlWriter.WriteEndElement();
+                    //</transparent>
+                }
 
                 xmlWriter.WriteEndElement();
                 //</phong>
+
                 //<extra>
                 xmlWriter.WriteStartElement("extra");
                 //<technique>
@@ -1434,32 +1449,49 @@ namespace xivModdingFramework.Models.FileTypes
                     xmlWriter.WriteEndElement();
                     //</input>
 
-                    //<input>
-                    xmlWriter.WriteStartElement("input");
-                    xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
-                    xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map1");
-                    xmlWriter.WriteAttributeString("offset", "2");
-                    xmlWriter.WriteAttributeString("set", "1");
-                    xmlWriter.WriteEndElement();
-                    //</input>
+                    if (meshList[i].VertexData.TextureCoordinates1 != null &&
+                        meshList[i].VertexData.TextureCoordinates1.Count > 0)
+                    {
 
-                    //<input>
-                    xmlWriter.WriteStartElement("input");
-                    xmlWriter.WriteAttributeString("semantic", "TEXTANGENT");
-                    xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0-textangents");
-                    xmlWriter.WriteAttributeString("offset", "3");
-                    xmlWriter.WriteAttributeString("set", "1");
-                    xmlWriter.WriteEndElement();
-                    //</input>
+                        //<input>
+                        xmlWriter.WriteStartElement("input");
+                        xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
+                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map1");
+                        xmlWriter.WriteAttributeString("offset", "2");
+                        xmlWriter.WriteAttributeString("set", "1");
+                        xmlWriter.WriteEndElement();
+                        //</input>
+                    }
 
-                    //<input>
-                    xmlWriter.WriteStartElement("input");
-                    xmlWriter.WriteAttributeString("semantic", "TEXBINORMAL");
-                    xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0-texbinormals");
-                    xmlWriter.WriteAttributeString("offset", "3");
-                    xmlWriter.WriteAttributeString("set", "1");
-                    xmlWriter.WriteEndElement();
-                    //</input>
+                    var pCount = 3;
+
+                    if (meshList[i].VertexData.Tangents != null && meshList[i].VertexData.Tangents.Count > 0)
+                    {
+                        //<input>
+                        xmlWriter.WriteStartElement("input");
+                        xmlWriter.WriteAttributeString("semantic", "TEXTANGENT");
+                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0-textangents");
+                        xmlWriter.WriteAttributeString("offset", "3");
+                        xmlWriter.WriteAttributeString("set", "1");
+                        xmlWriter.WriteEndElement();
+                        //</input>
+
+                        pCount++;
+                    }
+
+                    if (meshList[i].VertexData.BiNormals != null && meshList[i].VertexData.BiNormals.Count > 0)
+                    {
+                        //<input>
+                        xmlWriter.WriteStartElement("input");
+                        xmlWriter.WriteAttributeString("semantic", "TEXBINORMAL");
+                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0-texbinormals");
+                        xmlWriter.WriteAttributeString("offset", "3");
+                        xmlWriter.WriteAttributeString("set", "1");
+                        xmlWriter.WriteEndElement();
+                        //</input>
+
+                        pCount++;
+                    }
 
                     //<p>
                     xmlWriter.WriteStartElement("p");
@@ -1469,7 +1501,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (p >= 0)
                         {
-                            xmlWriter.WriteString(p + " " + p + " " + p + " " + p + " ");
+                            if (pCount == 3)
+                            {
+                                xmlWriter.WriteString(p + " " + p + " " + p + " ");
+                            }
+                            else
+                            {
+                                xmlWriter.WriteString(p + " " + p + " " + p + " " + p + " ");
+                            }
                         }
                     }
                     xmlWriter.WriteEndElement();
