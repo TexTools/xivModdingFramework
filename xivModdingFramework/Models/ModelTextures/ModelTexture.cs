@@ -50,6 +50,7 @@ namespace xivModdingFramework.Models.ModelTextures
             var materialType = GetMaterialType(_mtrlData.MTRLPath);
 
             var diffuseMap = new List<byte>();
+            var normalMap = new List<byte>();
             var specularMap = new List<byte>();
             var emissiveMap = new List<byte>();
             var alphaMap = new List<byte>();
@@ -147,6 +148,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
             byte diffR = 255, diffG = 255, diffB = 255;
             byte specR = 255, specG = 255, specB = 255;
+            byte normR = 255, normG = 255, normB = 255;
 
             var dataLength = 0;
 
@@ -165,10 +167,16 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 if (normalPixels != null)
                 {
-                    alpha = normalPixels[i - 1];
+                    normR = normalPixels[i - 3];
+                    normG = normalPixels[i - 2];
+                    alpha = normalPixels[i - 1]; // This is the normal maps blue channel, and usually acts as the alpha channel
+
 
                     if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
                     {
+                        normR = normalPixels[i - 3];
+                        normG = normalPixels[i - 2];
+                        normB = normalPixels[i - 1];
                         alpha = normalPixels[i];
                     }
                 }
@@ -251,8 +259,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     var diffColor1 = diffuseColorList[secondColorLocation];
                     var diffColor2 = diffuseColorList[firstColorLocation];
 
-                    var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, (byte)255);
-                    var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, (byte)255);
+                    var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, alpha);
+                    var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, alpha);
 
                     var diffuseBlend = Blend(firstColor, secondColor, blendPercent);
 
@@ -272,7 +280,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var emisBlend = Blend(firstColor, secondColor, blendPercent);
 
-                    diffuseColor = new Color((int)((diffuseBlend.R / 255f) * diffR), (int)((diffuseBlend.G / 255f) * diffG), (int)((diffuseBlend.B / 255f) * diffB), (byte)255);
+                    diffuseColor = new Color((int)((diffuseBlend.R / 255f) * diffR), (int)((diffuseBlend.G / 255f) * diffG), (int)((diffuseBlend.B / 255f) * diffB), alpha);
                     specularColor = new Color((int)((specBlend.R / 255f) * specR), (int)((specBlend.G / 255f) * specG), (int)((specBlend.B / 255f) * specB), 255);
                     emissiveColor = new Color((int)emisBlend.R, (int)emisBlend.G, (int)emisBlend.B, (int)255);
                 }
@@ -286,12 +294,12 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
                     {
-                        diffuseColor = new Color((int)((diffColor.R / 255f) * specR), (int)((diffColor.G / 255f) * specR), (int)((diffColor.B / 255f) * specR), (byte)255);
+                        diffuseColor = new Color((int)((diffColor.R / 255f) * specR), (int)((diffColor.G / 255f) * specR), (int)((diffColor.B / 255f) * specR), alpha);
                         specularColor = new Color((int)((specColor.R / 255f) * specG), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specG), 255);
                     }
                     else
                     {
-                        diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), (byte)255);
+                        diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), alpha);
 
                         if (materialType.Equals("body"))
                         {
@@ -317,13 +325,14 @@ namespace xivModdingFramework.Models.ModelTextures
                 specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
                 emissiveMap.AddRange(BitConverter.GetBytes(emissiveColor.ToRgba()));
                 alphaMap.AddRange(BitConverter.GetBytes(alphaColor.ToRgba()));
+                normalMap.AddRange(BitConverter.GetBytes(new Color(normR, normG, normB, (byte)255).ToRgba()));
             }
 
             var modelTextureData = new ModelTextureData
             {
                 Width = dimensions.Width,
                 Height = dimensions.Height,
-                Normal = normalPixels,
+                Normal = normalMap.ToArray(),
                 Diffuse = diffuseMap.ToArray(),
                 Specular = specularMap.ToArray(),
                 Emissive = emissiveMap.ToArray(),
