@@ -59,6 +59,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// A dictionary containing the reference index and hide offset for mesh hiding
         /// </summary>
-        public Dictionary<short, short> HideIndexOffsetDictionary { get; set; }
+        public Dictionary<int, Dictionary<short, short>> HideIndexOffsetDictionary { get; set; }
     }
 }

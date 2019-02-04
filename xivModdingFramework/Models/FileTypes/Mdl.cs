@@ -133,8 +133,8 @@ namespace xivModdingFramework.Models.FileTypes
                     Unknown7            = br.ReadInt16(),
                     Unknown8            = br.ReadInt16(), // Used for transform count with furniture
                     Unknown9            = br.ReadInt16(),
-                    Unknown10a           = br.ReadByte(),
-                    Unknown10b           = br.ReadByte(),
+                    Unknown10a          = br.ReadByte(),
+                    Unknown10b          = br.ReadByte(),
                     Unknown11           = br.ReadInt16(),
                     Unknown12           = br.ReadInt16(),
                     Unknown13           = br.ReadInt16(),
@@ -581,7 +581,6 @@ namespace xivModdingFramework.Models.FileTypes
                         Unknown = br.ReadInt32(),
                         HiderIndexParts = new List<MeshHiderData.HiderIndexPart>()
                     };
-
 
                     var dataInfoIndexList = new List<short>();
                     for (var j = 0; j < xivMdl.LoDList.Count; j++)
@@ -1199,6 +1198,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         var hiderData = xivMdl.MeshHideData.HiderDataList;
 
+                        // Get the index data offsets in each mesh
                         for (var i = 0; i < lod.MeshCount; i++)
                         {
                             var indexDataOffset = lod.MeshDataList[i].MeshInfo.IndexDataOffset;
@@ -1208,12 +1208,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                         for (var i = 0; i < lod.MeshCount; i++)
                         {
+                            Debug.WriteLine($"=== Mesh {i} ===");
                             var referencePositionsDictionary = new Dictionary<int, Vector3>();
                             var meshHidePositionsDictionary = new Dictionary<int, Vector3>();
-                            var hideIndexOffsetDictionary = new Dictionary<short, short>();
+                            //var hideIndexOffsetDictionary = new Dictionary<short, short>();
+                            var hideIndexOffsetDictionary = new Dictionary<int, Dictionary<short, short>>();
 
+                            // Hider info list
                             var hiderInfoList = xivMdl.MeshHideData.HiderInfoList;
 
+                            // Number of hider info in each mesh
                             var perMeshCount = xivMdl.ModelData.MeshHiderInfoCount;
 
                             for (var j = 0; j < perMeshCount; j++)
@@ -1222,48 +1226,57 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 var indexPart = hiderInfo.HiderIndexParts[lodNum];
 
-                                var infoCount = indexPart.PartCount;
+                                // The part count
+                                var infoPartCount = indexPart.PartCount;
 
-                                for (var k = 0; k < infoCount; k++)
+                                for (var k = 0; k < infoPartCount; k++)
                                 {
+                                    // Gets the data info for the part
                                     var hiderDataInfo = xivMdl.MeshHideData.HiderDataInfoList[indexPart.DataInfoIndex + k];
 
+                                    // The offset in the hider data 
                                     var indexDataOffset = hiderDataInfo.IndexDataOffset;
 
                                     var indexMeshLocation = 0;
 
+                                    // Determine which mesh the info belongs to
                                     if (indexMeshNum.ContainsKey(indexDataOffset))
                                     {
                                         indexMeshLocation = indexMeshNum[indexDataOffset];
 
+                                        // Move to the next part if it is not the current mesh
                                         if (indexMeshLocation != i)
                                         {
                                             continue;
                                         }
                                     }
 
+                                    // Get the mesh data
                                     var mesh = lod.MeshDataList[indexMeshLocation];
 
+                                    // Get the hider data for the current mesh
                                     var hiderDataForMesh = hiderData.GetRange(hiderDataInfo.DataIndexOffset, hiderDataInfo.IndexCount);
 
+                                    // Fill hider data dictionaries
                                     foreach (var data in hiderDataForMesh)
                                     {
-                                        //TODO: Face seems to have duplicated refrence index offsets, may need to look further into this.
-                                        if (!hideIndexOffsetDictionary.ContainsKey(data.ReferenceIndexOffset))
+                                        //TODO: Face seems to have duplicated reference index offsets, may need to look further into this.
+                                        if (!hideIndexOffsetDictionary.ContainsKey(hiderDataInfo.DataIndexOffset))
                                         {
-                                            hideIndexOffsetDictionary.Add(data.ReferenceIndexOffset, data.HideIndex);
+                                            hideIndexOffsetDictionary.Add(hiderDataInfo.DataIndexOffset, new Dictionary<short, short>{{ data.ReferenceIndexOffset, data.HideIndex }});
                                         }
                                         else
                                         {
-                                            Debug.WriteLine($"Unable to add {data.ReferenceIndexOffset}  {data.HideIndex}");
+                                            hideIndexOffsetDictionary[hiderDataInfo.DataIndexOffset].Add(data.ReferenceIndexOffset, data.HideIndex);
                                         }
+
 
                                         if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
                                         {
-                                            throw new Exception(
-                                                $"Reference Index is larger than the index count. Refrence Index: {data.ReferenceIndexOffset}  Index Count: {mesh.VertexData.Indices.Count}");
+                                            throw new Exception($"Reference Index is larger than the index count. Refrence Index: {data.ReferenceIndexOffset}  Index Count: {mesh.VertexData.Indices.Count}");
                                         }
 
+                                        // Gets the index to which the data is referencing
                                         var referenceIndex = mesh.VertexData.Indices[data.ReferenceIndexOffset];
 
                                         if (!referencePositionsDictionary.ContainsKey(data.ReferenceIndexOffset))
@@ -1273,8 +1286,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         if (data.HideIndex >= mesh.VertexData.Positions.Count)
                                         {
-                                            throw new Exception(
-                                                $"Hide Index is larger than the positions count. Hide Index: {data.ReferenceIndexOffset}  Positions Count: {mesh.VertexData.Positions.Count}");
+                                            throw new Exception($"Hide Index is larger than the positions count. Hide Index: {data.ReferenceIndexOffset}  Positions Count: {mesh.VertexData.Positions.Count}");
                                         }
 
                                         if (!meshHidePositionsDictionary.ContainsKey(data.HideIndex))
@@ -2489,7 +2501,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     entrySizeSum += 12;
                                 }
                             }
-                            
+
                             hideDataCount = meshData.HidePositionsDictionary.Count * entrySizeSum;
                         }
 
@@ -2640,6 +2652,8 @@ namespace xivModdingFramework.Models.FileTypes
                             // The hide positions count is added to the vertex count because it is not exported and therefore
                             // missing from the imported data.
                             vertexCount += meshData.HidePositionsDictionary.Count;
+
+                            importDataDictionary[meshNum].VertexCount = vertexCount;
                         }
 
                         // Calculate new index data offset
@@ -2907,52 +2921,90 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var meshHiderDataBlock = new List<byte>();
 
+                var lodNumber = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
-                    var meshNum = 0;
-                    foreach (var meshData in lod.MeshDataList)
+                    var indexMeshNum = new Dictionary<int, int>();
+
+                    // Get the index data offsets in each mesh
+                    for (var i = 0; i < lod.MeshCount; i++)
                     {
-                        if (importSettings != null && importSettings.ContainsKey(meshNum.ToString()))
+                        var indexDataOffset = lod.MeshDataList[i].MeshInfo.IndexDataOffset;
+
+                        indexMeshNum.Add(indexDataOffset, i);
+                    }
+
+                    // Number of hider info in each mesh
+                    var perMeshCount = xivMdl.ModelData.MeshHiderInfoCount;
+
+                    // Hider info list
+                    var hiderInfoList = xivMdl.MeshHideData.HiderInfoList;
+
+                    for (var j = 0; j < perMeshCount; j++)
+                    {
+                        var hiderInfo = hiderInfoList[j];
+
+                        var indexPart = hiderInfo.HiderIndexParts[lodNumber];
+
+                        // The part count
+                        var infoPartCount = indexPart.PartCount;
+
+                        for (var k = 0; k < infoPartCount; k++)
                         {
-                            var hideCount = meshData.HideIndexOffsetDictionary.Count;
+                            // Gets the data info for the part
+                            var hiderDataInfo = xivMdl.MeshHideData.HiderDataInfoList[indexPart.DataInfoIndex + k];
 
-                            if (importSettings[XivStrings.All].Disable || importSettings[meshNum.ToString()].Disable)
+                            // The offset in the hider data 
+                            var indexDataOffset = hiderDataInfo.IndexDataOffset;
+
+                            var indexMeshLocation = indexMeshNum[indexDataOffset];
+
+                            // Get the mesh data
+                            var mesh = lod.MeshDataList[indexMeshLocation];
+
+                            var hideData = mesh.HideIndexOffsetDictionary[hiderDataInfo.DataIndexOffset];
+
+                            if (importSettings != null && importSettings.ContainsKey(mesh.ToString()))
                             {
-                                for (var i = 0; i < hideCount; i++)
+                                var hideCount = mesh.HideIndexOffsetDictionary.Count;
+
+                                if (importSettings[XivStrings.All].Disable || importSettings[mesh.ToString()].Disable)
                                 {
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes((short)0));
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                    foreach (var indexOffset in hideData)
+                                    {
+                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                    }
                                 }
-                            }
-                            else if (importSettings[XivStrings.All].Fix || importSettings[meshNum.ToString()].Fix)
-                            {
-                                throw new NotImplementedException();
+                                else if (importSettings[XivStrings.All].Fix || importSettings[mesh.ToString()].Fix)
+                                {
+                                    throw new NotImplementedException();
 
-                                //TODO Implement Fix
-                                // Find the nearest to what the original was?
+                                    //TODO Implement Fix
+                                    // Find the nearest to what the original was?
+                                }
+                                else
+                                {
+                                    foreach (var indexOffset in hideData)
+                                    {
+                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
+                                    }
+                                }
                             }
                             else
                             {
-                                foreach (var hideIndexOffset in meshData.HideIndexOffsetDictionary)
+
+                                foreach (var indexOffset in hideData)
                                 {
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(hideIndexOffset.Key));
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(hideIndexOffset.Value));
+                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
                                 }
                             }
                         }
-                        else
-                        {
-                            if (meshData.HideIndexOffsetDictionary != null)
-                            {
-                                foreach (var hideIndexOffset in meshData.HideIndexOffsetDictionary)
-                                {
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(hideIndexOffset.Key));
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(hideIndexOffset.Value));
-                                }
-                            }
-                        }
-                        meshNum++;
                     }
+
+                    lodNumber++;
                 }
 
                 fullModelDataBlock.AddRange(meshHiderDataBlock);
