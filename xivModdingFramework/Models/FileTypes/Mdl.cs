@@ -72,7 +72,6 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns>An XivMdl structure containing all mdl data.</returns>
         public XivMdl GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null)
         {
-
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
@@ -650,7 +649,7 @@ namespace xivModdingFramework.Models.FileTypes
                     boneIndexPart.BoneIndexList.Add(br.ReadInt16());
                 }
 
-                xivMdl.BonIndexPart = boneIndexPart;
+                xivMdl.BoneIndexPart = boneIndexPart;
 
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
@@ -1210,7 +1209,7 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             Debug.WriteLine($"=== Mesh {i} ===");
                             var referencePositionsDictionary = new Dictionary<int, Vector3>();
-                            var meshHidePositionsDictionary = new Dictionary<int, Vector3>();
+                            var meshHidePositionsDictionary = new SortedDictionary<int, Vector3>();
                             //var hideIndexOffsetDictionary = new Dictionary<short, short>();
                             var hideIndexOffsetDictionary = new Dictionary<int, Dictionary<short, short>>();
 
@@ -1260,7 +1259,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     // Fill hider data dictionaries
                                     foreach (var data in hiderDataForMesh)
                                     {
-                                        //TODO: Face seems to have duplicated reference index offsets, may need to look further into this.
                                         if (!hideIndexOffsetDictionary.ContainsKey(hiderDataInfo.DataIndexOffset))
                                         {
                                             hideIndexOffsetDictionary.Add(hiderDataInfo.DataIndexOffset, new Dictionary<short, short>{{ data.ReferenceIndexOffset, data.HideIndex }});
@@ -1269,7 +1267,6 @@ namespace xivModdingFramework.Models.FileTypes
                                         {
                                             hideIndexOffsetDictionary[hiderDataInfo.DataIndexOffset].Add(data.ReferenceIndexOffset, data.HideIndex);
                                         }
-
 
                                         if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
                                         {
@@ -1286,7 +1283,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         if (data.HideIndex >= mesh.VertexData.Positions.Count)
                                         {
-                                            throw new Exception($"Hide Index is larger than the positions count. Hide Index: {data.ReferenceIndexOffset}  Positions Count: {mesh.VertexData.Positions.Count}");
+                                            throw new Exception($"Hide Index is larger than the positions count. Hide Index: {data.HideIndex}  Positions Count: {mesh.VertexData.Positions.Count}");
                                         }
 
                                         if (!meshHidePositionsDictionary.ContainsKey(data.HideIndex))
@@ -1297,7 +1294,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                                     mesh.HideIndexOffsetDictionary = hideIndexOffsetDictionary;
                                     mesh.ReferencePositionsDictionary = referencePositionsDictionary;
-                                    mesh.HidePositionsDictionary = meshHidePositionsDictionary;
+                                    mesh.HidePositionsDictionary = new Dictionary<int, Vector3>(meshHidePositionsDictionary);
                                 }
                             }
                         }
@@ -3019,7 +3016,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var boneIndexPartDataBlock = new List<byte>();
 
-            var boneIndexPart = xivMdl.BonIndexPart;
+            var boneIndexPart = xivMdl.BoneIndexPart;
 
             boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndexPart.BoneIndexCount));
 
