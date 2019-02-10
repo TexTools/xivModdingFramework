@@ -88,7 +88,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The data containing the information for the bone indices used by mesh parts
         /// </summary>
-        public BoneIndexPart BonIndexPart { get; set; }
+        public BoneIndexPart BoneIndexPart { get; set; }
 
         /// <summary>
         /// The size of the padded bytes immediately following 
