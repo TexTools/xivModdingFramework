@@ -87,6 +87,11 @@ namespace xivModdingFramework.Helpers
                 {
                     path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.Name}";
                 }
+
+                if (path.Contains("???"))
+                {
+                    path = path.Replace("???", "Unk");
+                }
             }
             else if (item.Category.Equals(XivStrings.Character))
             {
