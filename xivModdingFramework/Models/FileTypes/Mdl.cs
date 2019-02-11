@@ -3217,12 +3217,10 @@ namespace xivModdingFramework.Models.FileTypes
                                     importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
                                     importData.VertexData1.Add(0);
 
-                                    var colorVector = color.ToVector4();
-
-                                    importData.VertexData1.Add((byte)colorVector.X);
-                                    importData.VertexData1.Add((byte)colorVector.Y);
-                                    importData.VertexData1.Add((byte)colorVector.Z);
-                                    importData.VertexData1.Add((byte)colorVector.W);
+                                    importData.VertexData1.Add(color.A);
+                                    importData.VertexData1.Add(color.R);
+                                    importData.VertexData1.Add(color.G);
+                                    importData.VertexData1.Add(color.B);
 
 
                                     importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.X));
