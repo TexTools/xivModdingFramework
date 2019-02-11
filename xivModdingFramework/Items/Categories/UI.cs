@@ -67,6 +67,8 @@ namespace xivModdingFramework.Items.Categories
                     UiPath = "ui/uld"
                 };
 
+                if(xivUi.Name.Equals(string.Empty)) continue;
+
                 uldList.Add(xivUi);
             }
 
@@ -205,6 +207,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
+                if (xivUi.Name.Equals(string.Empty)) continue;
                 if (actionNames.Contains(xivUi.Name)) continue;
                 actionNames.Add(xivUi.Name);
 
@@ -439,17 +442,18 @@ namespace xivModdingFramework.Items.Categories
                 // Big Endian Byte Order 
                 using (var br = new BinaryReaderBE(new MemoryStream(action)))
                 {
-                    br.BaseStream.Seek(26, SeekOrigin.Begin);
+                    br.BaseStream.Seek(28, SeekOrigin.Begin);
 
                     var iconNumber = br.ReadUInt16();
 
                     if (iconNumber == 0) continue;
 
-                    br.BaseStream.Seek(36, SeekOrigin.Begin);
+                    br.BaseStream.Seek(40, SeekOrigin.Begin);
 
-                    var nameLength = action.Length - 36;
+                    var nameLength = action.Length - 40;
 
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
 
                     xivUi.Name = name;
                     xivUi.IconNumber = iconNumber;
@@ -650,6 +654,8 @@ namespace xivModdingFramework.Items.Categories
 
                 // Gets the name of the map symbol from the placename exd
                 xivUi.Name = GetPlaceName(placeNameData[placeNameIndex]);
+
+                if(xivUi.Name.Equals(string.Empty)) continue;
 
                 mapSymbolList.Add(xivUi);
             }
