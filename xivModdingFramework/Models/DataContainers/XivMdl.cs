@@ -81,9 +81,9 @@ namespace xivModdingFramework.Models.DataContainers
         public List<BoneIndexMesh> BoneIndexMeshList { get; set; }
 
         /// <summary>
-        /// The data containing the information for mesh hiding
+        /// The data containing the information for mesh shapes
         /// </summary>
-        public MeshHiderData MeshHideData { get; set; }
+        public ShapeData MeshShapeData { get; set; }
 
         /// <summary>
         /// The data containing the information for the bone indices used by mesh parts
@@ -111,9 +111,9 @@ namespace xivModdingFramework.Models.DataContainers
         public List<BoneTransformData> BoneTransformDataList { get; set; }
 
         /// <summary>
-        /// Flag set when the model has hider data
+        /// Flag set when the model has shape data
         /// </summary>
-        public bool HasHiderData { get; set; }
+        public bool HasShapeData { get; set; }
 
         /// <summary>
         /// The list containing the info for each etra Level of Detail of the model

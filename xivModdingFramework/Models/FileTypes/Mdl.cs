@@ -104,6 +104,7 @@ namespace xivModdingFramework.Models.FileTypes
                     AttributeList = new List<string>(),
                     BoneList      = new List<string>(),
                     MaterialList  = new List<string>(),
+                    ShapeList     = new List<string>(),
                     ExtraPathList = new List<string>()
                 };
 
@@ -120,9 +121,9 @@ namespace xivModdingFramework.Models.FileTypes
                     MaterialCount       = br.ReadInt16(),
                     BoneCount           = br.ReadInt16(),
                     BoneListCount       = br.ReadInt16(),
-                    MeshHiderInfoCount  = br.ReadInt16(),
-                    MeshHiderDataCount  = br.ReadInt16(),
-                    MeshHiderIndexCount = br.ReadInt16(),
+                    ShapeCount          = br.ReadInt16(),
+                    ShapeDataCount      = br.ReadInt16(),
+                    ShapeIndexCount     = br.ReadInt16(),
                     Unknown1            = br.ReadInt16(),
                     Unknown2            = br.ReadInt16(),
                     Unknown3            = br.ReadInt16(),
@@ -197,6 +198,21 @@ namespace xivModdingFramework.Models.FileTypes
                         var mat = Encoding.ASCII.GetString(materialName.ToArray()).Replace("\0", "");
 
                         mdlPathData.MaterialList.Add(mat);
+                    }
+
+                    // Shape Paths
+                    for (var i = 0; i < mdlModelData.ShapeCount; i++)
+                    {
+                        byte a;
+                        var shapeName = new List<byte>();
+                        while ((a = br1.ReadByte()) != 0)
+                        {
+                            shapeName.Add(a);
+                        }
+
+                        var shp = Encoding.ASCII.GetString(shapeName.ToArray()).Replace("\0", "");
+
+                        mdlPathData.ShapeList.Add(shp);
                     }
 
                     var remainingPathData = mdlPathData.PathBlockSize - br1.BaseStream.Position;
@@ -481,12 +497,17 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
-                // Data block for attributes
-                // Currently unknown usage
+                // Data block for attributes offset paths
                 var attributeDataBlock = new AttributeDataBlock
                 {
-                    Unknown = br.ReadBytes(xivMdl.ModelData.AttributeCount * 4)
+                    AttributePathOffsetList = new List<int>(xivMdl.ModelData.AttributeCount)
                 };
+
+                for (var i = 0; i < xivMdl.ModelData.AttributeCount; i++)
+                {
+                    attributeDataBlock.AttributePathOffsetList.Add(br.ReadInt32());
+                }
+
                 xivMdl.AttrDataBlock = attributeDataBlock;
 
                 // Unknown data block
@@ -532,16 +553,28 @@ namespace xivModdingFramework.Models.FileTypes
                 // Currently unknown usage
                 var matDataBlock = new MaterialDataBlock
                 {
-                    Unknown = br.ReadBytes(xivMdl.ModelData.MaterialCount * 4)
+                    MaterialPathOffsetList = new List<int>(xivMdl.ModelData.MaterialCount)
                 };
+
+                for (var i = 0; i < xivMdl.ModelData.MaterialCount; i++)
+                {
+                    matDataBlock.MaterialPathOffsetList.Add(br.ReadInt32());
+                }
+
                 xivMdl.MatDataBlock = matDataBlock;
 
                 // Data block for bones
                 // Currently unknown usage
                 var boneDataBlock = new BoneDataBlock
                 {
-                    Unknown = br.ReadBytes(xivMdl.ModelData.BoneCount * 4)
+                    BonePathOffsetList = new List<int>(xivMdl.ModelData.BoneCount)
                 };
+
+                for (var i = 0; i < xivMdl.ModelData.BoneCount; i++)
+                {
+                    boneDataBlock.BonePathOffsetList.Add(br.ReadInt32());
+                }
+
                 xivMdl.BonDataBlock = boneDataBlock;
 
                 // Bone Lists
@@ -563,22 +596,23 @@ namespace xivModdingFramework.Models.FileTypes
                     xivMdl.BoneIndexMeshList.Add(boneIndexMesh);
                 }
 
-                var hiderDataLists = new MeshHiderData
+                var shapeDataLists = new ShapeData
                 {
-                    HiderInfoList     = new List<MeshHiderData.HiderInfo>(),
-                    HiderDataInfoList = new List<MeshHiderData.HiderIndexInfo>(),
-                    HiderDataList     = new List<MeshHiderData.HiderData>()
+                    ShapeInfoList     = new List<ShapeData.ShapeInfo>(),
+                    ShapeDataInfoList = new List<ShapeData.ShapeIndexInfo>(),
+                    ShapeDataList     = new List<ShapeData.ShapeEntryData>()
                 };
 
                 var totalPartCount = 0;
-                // Hider Info
+                // Shape Info
 
-                for (var i = 0; i < xivMdl.ModelData.MeshHiderInfoCount; i++)
+                for (var i = 0; i < xivMdl.ModelData.ShapeCount; i++)
                 {
-                    var hiderInfo = new MeshHiderData.HiderInfo
+                    var shapeInfo = new ShapeData.ShapeInfo
                     {
-                        Unknown = br.ReadInt32(),
-                        HiderIndexParts = new List<MeshHiderData.HiderIndexPart>()
+                        ShapePathOffset = br.ReadInt32(),
+                        ShapePath = xivMdl.PathData.ShapeList[i],
+                        ShapeIndexParts = new List<ShapeData.ShapeIndexPart>()
                     };
 
                     var dataInfoIndexList = new List<short>();
@@ -595,47 +629,47 @@ namespace xivModdingFramework.Models.FileTypes
 
                     for (var j = 0; j < xivMdl.LoDList.Count; j++)
                     {
-                        var hiderIndexPart = new MeshHiderData.HiderIndexPart
+                        var shapeIndexPart = new ShapeData.ShapeIndexPart
                         {
                             DataInfoIndex = dataInfoIndexList[j],
                             PartCount = infoPartCountList[j]
                         };
-                        hiderInfo.HiderIndexParts.Add(hiderIndexPart);
-                        totalPartCount += hiderIndexPart.PartCount;
+                        shapeInfo.ShapeIndexParts.Add(shapeIndexPart);
+                        totalPartCount += shapeIndexPart.PartCount;
                     }
 
-                    hiderDataLists.HiderInfoList.Add(hiderInfo);
+                    shapeDataLists.ShapeInfoList.Add(shapeInfo);
                 }
 
-                // Hider Index Info
-                for (var i = 0; i < xivMdl.ModelData.MeshHiderDataCount; i++)
+                // Shape Index Info
+                for (var i = 0; i < xivMdl.ModelData.ShapeDataCount; i++)
                 {
-                    var hiderIndexInfo = new MeshHiderData.HiderIndexInfo
+                    var shapeIndexInfo = new ShapeData.ShapeIndexInfo
                     {
                         IndexDataOffset = br.ReadInt32(),
                         IndexCount      = br.ReadInt32(),
                         DataIndexOffset = br.ReadInt32()
                     };
 
-                    hiderDataLists.HiderDataInfoList.Add(hiderIndexInfo);
+                    shapeDataLists.ShapeDataInfoList.Add(shapeIndexInfo);
                 }
 
-                // Hider data
-                for (var i = 0; i < xivMdl.ModelData.MeshHiderIndexCount; i++)
+                // Shape data
+                for (var i = 0; i < xivMdl.ModelData.ShapeIndexCount; i++)
                 {
-                    var hiderData = new MeshHiderData.HiderData
+                    var shapeData = new ShapeData.ShapeEntryData
                     {
                         ReferenceIndexOffset = br.ReadInt16(),
-                        HideIndex            = br.ReadInt16()
+                        ShapeIndex            = br.ReadInt16()
                     };
 
-                    hiderDataLists.HiderDataList.Add(hiderData);
+                    shapeDataLists.ShapeDataList.Add(shapeData);
                 }
 
-                xivMdl.MeshHideData = hiderDataLists;
+                xivMdl.MeshShapeData = shapeDataLists;
 
-                // Sets the boolean flag if the model has hider data
-                xivMdl.HasHiderData = xivMdl.ModelData.MeshHiderInfoCount > 0;
+                // Sets the boolean flag if the model has shape data
+                xivMdl.HasShapeData = xivMdl.ModelData.ShapeCount > 0;
 
                 // Bone index for Parts
                 var boneIndexPart = new BoneIndexPart
@@ -1187,15 +1221,15 @@ namespace xivModdingFramework.Models.FileTypes
                         totalMeshNum++;
                     }
 
-                    #region MeshHider
+                    #region MeshShape
 
-                    // If the model contains Hider Data, parse the data for each mesh
-                    if (xivMdl.HasHiderData)
+                    // If the model contains Shape Data, parse the data for each mesh
+                    if (xivMdl.HasShapeData)
                     {
                         //Dictionary containing <index data offset, mesh number>
                         var indexMeshNum = new Dictionary<int, int>();
 
-                        var hiderData = xivMdl.MeshHideData.HiderDataList;
+                        var shapeData = xivMdl.MeshShapeData.ShapeDataList;
 
                         // Get the index data offsets in each mesh
                         for (var i = 0; i < lod.MeshCount; i++)
@@ -1209,21 +1243,20 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             Debug.WriteLine($"=== Mesh {i} ===");
                             var referencePositionsDictionary = new Dictionary<int, Vector3>();
-                            var meshHidePositionsDictionary = new SortedDictionary<int, Vector3>();
-                            //var hideIndexOffsetDictionary = new Dictionary<short, short>();
-                            var hideIndexOffsetDictionary = new Dictionary<int, Dictionary<short, short>>();
+                            var meshShapePositionsDictionary = new SortedDictionary<int, Vector3>();
+                            var shapeIndexOffsetDictionary = new Dictionary<int, Dictionary<short, short>>();
 
-                            // Hider info list
-                            var hiderInfoList = xivMdl.MeshHideData.HiderInfoList;
+                            // Shape info list
+                            var shapeInfoList = xivMdl.MeshShapeData.ShapeInfoList;
 
-                            // Number of hider info in each mesh
-                            var perMeshCount = xivMdl.ModelData.MeshHiderInfoCount;
+                            // Number of shape info in each mesh
+                            var perMeshCount = xivMdl.ModelData.ShapeCount;
 
                             for (var j = 0; j < perMeshCount; j++)
                             {
-                                var hiderInfo = hiderInfoList[j];
+                                var shapeInfo = shapeInfoList[j];
 
-                                var indexPart = hiderInfo.HiderIndexParts[lodNum];
+                                var indexPart = shapeInfo.ShapeIndexParts[lodNum];
 
                                 // The part count
                                 var infoPartCount = indexPart.PartCount;
@@ -1231,10 +1264,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 for (var k = 0; k < infoPartCount; k++)
                                 {
                                     // Gets the data info for the part
-                                    var hiderDataInfo = xivMdl.MeshHideData.HiderDataInfoList[indexPart.DataInfoIndex + k];
+                                    var shapeDataInfo = xivMdl.MeshShapeData.ShapeDataInfoList[indexPart.DataInfoIndex + k];
 
-                                    // The offset in the hider data 
-                                    var indexDataOffset = hiderDataInfo.IndexDataOffset;
+                                    // The offset in the shape data 
+                                    var indexDataOffset = shapeDataInfo.IndexDataOffset;
 
                                     var indexMeshLocation = 0;
 
@@ -1253,19 +1286,19 @@ namespace xivModdingFramework.Models.FileTypes
                                     // Get the mesh data
                                     var mesh = lod.MeshDataList[indexMeshLocation];
 
-                                    // Get the hider data for the current mesh
-                                    var hiderDataForMesh = hiderData.GetRange(hiderDataInfo.DataIndexOffset, hiderDataInfo.IndexCount);
+                                    // Get the shape data for the current mesh
+                                    var shapeDataForMesh = shapeData.GetRange(shapeDataInfo.DataIndexOffset, shapeDataInfo.IndexCount);
 
-                                    // Fill hider data dictionaries
-                                    foreach (var data in hiderDataForMesh)
+                                    // Fill shape data dictionaries
+                                    foreach (var data in shapeDataForMesh)
                                     {
-                                        if (!hideIndexOffsetDictionary.ContainsKey(hiderDataInfo.DataIndexOffset))
+                                        if (!shapeIndexOffsetDictionary.ContainsKey(shapeDataInfo.DataIndexOffset))
                                         {
-                                            hideIndexOffsetDictionary.Add(hiderDataInfo.DataIndexOffset, new Dictionary<short, short>{{ data.ReferenceIndexOffset, data.HideIndex }});
+                                            shapeIndexOffsetDictionary.Add(shapeDataInfo.DataIndexOffset, new Dictionary<short, short>{{ data.ReferenceIndexOffset, data.ShapeIndex }});
                                         }
                                         else
                                         {
-                                            hideIndexOffsetDictionary[hiderDataInfo.DataIndexOffset].Add(data.ReferenceIndexOffset, data.HideIndex);
+                                            shapeIndexOffsetDictionary[shapeDataInfo.DataIndexOffset].Add(data.ReferenceIndexOffset, data.ShapeIndex);
                                         }
 
                                         if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
@@ -1281,20 +1314,20 @@ namespace xivModdingFramework.Models.FileTypes
                                             referencePositionsDictionary.Add(data.ReferenceIndexOffset, mesh.VertexData.Positions[referenceIndex]);
                                         }
 
-                                        if (data.HideIndex >= mesh.VertexData.Positions.Count)
+                                        if (data.ShapeIndex >= mesh.VertexData.Positions.Count)
                                         {
-                                            throw new Exception($"Hide Index is larger than the positions count. Hide Index: {data.HideIndex}  Positions Count: {mesh.VertexData.Positions.Count}");
+                                            throw new Exception($"Shape Index is larger than the positions count. Shape Index: {data.ShapeIndex}  Positions Count: {mesh.VertexData.Positions.Count}");
                                         }
 
-                                        if (!meshHidePositionsDictionary.ContainsKey(data.HideIndex))
+                                        if (!meshShapePositionsDictionary.ContainsKey(data.ShapeIndex))
                                         {
-                                            meshHidePositionsDictionary.Add(data.HideIndex, mesh.VertexData.Positions[data.HideIndex]);
+                                            meshShapePositionsDictionary.Add(data.ShapeIndex, mesh.VertexData.Positions[data.ShapeIndex]);
                                         }
                                     }
 
-                                    mesh.HideIndexOffsetDictionary = hideIndexOffsetDictionary;
+                                    mesh.ShapeIndexOffsetDictionary = shapeIndexOffsetDictionary;
                                     mesh.ReferencePositionsDictionary = referencePositionsDictionary;
-                                    mesh.HidePositionsDictionary = new Dictionary<int, Vector3>(meshHidePositionsDictionary);
+                                    mesh.ShapePositionsDictionary = new Dictionary<int, Vector3>(meshShapePositionsDictionary);
                                 }
                             }
                         }
@@ -1333,7 +1366,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var isHousingItem = item.Category.Equals(XivStrings.Housing);
 
-            var meshHideDictionary = new Dictionary<int, int>();
+            var meshShapeDictionary = new Dictionary<int, int>();
 
             // A dictonary containing any warnings raised by the import in the format <Warning Title, Warning Message>
             var warningsDictionary = new Dictionary<string, string>();
@@ -1846,7 +1879,7 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
-                var meshHideData = xivMdl.MeshHideData;
+                var meshShapeData = xivMdl.MeshShapeData;
 
                 // Dictionary with <index, index number>
                 var indexDict = new Dictionary<int, int>();
@@ -2071,9 +2104,9 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     for (var i = 0; i < indexCollection.Count; i++)
                                     {
-                                        if (a == indexCollection[i] && !nPositionsList.Contains(i) && !meshHideDictionary.ContainsKey(referencePosition.Key))
+                                        if (a == indexCollection[i] && !nPositionsList.Contains(i) && !meshShapeDictionary.ContainsKey(referencePosition.Key))
                                         {
-                                            meshHideDictionary.Add(referencePosition.Key, i);
+                                            meshShapeDictionary.Add(referencePosition.Key, i);
                                             nPositionsList.Add(i);
                                             found = true;
                                             break;
@@ -2400,9 +2433,9 @@ namespace xivModdingFramework.Models.FileTypes
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.MaterialCount));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.BoneCount));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.BoneListCount));
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.MeshHiderInfoCount));
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.MeshHiderDataCount));
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.MeshHiderIndexCount));
+            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeCount));
+            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeDataCount));
+            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeIndexCount));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown1));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown2));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown3));
@@ -2481,8 +2514,8 @@ namespace xivModdingFramework.Models.FileTypes
                     foreach (var importData in importDataDictionary)
                     {
                         var meshData = lod.MeshDataList[importData.Key];
-                        var hideDataCount = 0;
-                        if (meshData.HidePositionsDictionary != null)
+                        var shapeDataCount = 0;
+                        if (meshData.ShapePositionsDictionary != null)
                         {
                             var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                             if (!isAlreadyModified)
@@ -2499,10 +2532,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                             }
 
-                            hideDataCount = meshData.HidePositionsDictionary.Count * entrySizeSum;
+                            shapeDataCount = meshData.ShapePositionsDictionary.Count * entrySizeSum;
                         }
 
-                        importVertexDataSize += importData.Value.VertexData0.Count + importData.Value.VertexData1.Count + hideDataCount;
+                        importVertexDataSize += importData.Value.VertexData0.Count + importData.Value.VertexData1.Count + shapeDataCount;
 
                         var indexPadding = 16 - importData.Value.IndexData.Count % 16;
                         if (indexPadding == 16)
@@ -2644,11 +2677,11 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                         }
 
-                        if (xivMdl.HasHiderData && meshData.HidePositionsDictionary != null)
+                        if (xivMdl.HasShapeData && meshData.ShapePositionsDictionary != null)
                         {
-                            // The hide positions count is added to the vertex count because it is not exported and therefore
+                            // The shape positions count is added to the vertex count because it is not exported and therefore
                             // missing from the imported data.
-                            vertexCount += meshData.HidePositionsDictionary.Count;
+                            vertexCount += meshData.ShapePositionsDictionary.Count;
 
                             importDataDictionary[meshNum].VertexCount = vertexCount;
                         }
@@ -2717,9 +2750,10 @@ namespace xivModdingFramework.Models.FileTypes
             // Unknown Attribute Data
             #region Attribute Data Block
 
-            var attributeDataBlock = xivMdl.AttrDataBlock.Unknown;
-
-            fullModelDataBlock.AddRange(attributeDataBlock);
+            foreach (var attributeOffset in xivMdl.AttrDataBlock.AttributePathOffsetList)
+            {
+                fullModelDataBlock.AddRange(BitConverter.GetBytes(attributeOffset));
+            }
 
             #endregion
 
@@ -2833,18 +2867,20 @@ namespace xivModdingFramework.Models.FileTypes
             // Unknown Material Data
             #region Material Data Block
 
-            var materialDataBlock = xivMdl.MatDataBlock.Unknown;
-
-            fullModelDataBlock.AddRange(materialDataBlock);
+            foreach (var materialOffset in xivMdl.MatDataBlock.MaterialPathOffsetList)
+            {
+                fullModelDataBlock.AddRange(BitConverter.GetBytes(materialOffset));
+            }
 
             #endregion
 
             // Unknown Bone Data
             #region Bone Data Block
 
-            var boneDataBlock = xivMdl.BonDataBlock.Unknown;
-
-            fullModelDataBlock.AddRange(boneDataBlock);
+            foreach (var boneOffset in xivMdl.BonDataBlock.BonePathOffsetList)
+            {
+                fullModelDataBlock.AddRange(BitConverter.GetBytes(boneOffset));
+            }
 
             #endregion
 
@@ -2867,56 +2903,56 @@ namespace xivModdingFramework.Models.FileTypes
 
             #endregion
 
-            #region Hider Data Block
+            #region Shape Data Block
 
-            if (xivMdl.HasHiderData)
+            if (xivMdl.HasShapeData)
             {
-                // Mesh Hider Info
-                #region Mesh Hider Info Data Block
+                // Mesh Shape Info
+                #region Mesh Shape Info Data Block
 
-                var meshHiderInfoDataBlock = new List<byte>();
+                var meshShapeInfoDataBlock = new List<byte>();
 
-                var hiderInfoCount = xivMdl.MeshHideData.HiderInfoList.Count;
+                var shapeInfoCount = xivMdl.MeshShapeData.ShapeInfoList.Count;
 
-                foreach (var info in xivMdl.MeshHideData.HiderInfoList)
+                foreach (var info in xivMdl.MeshShapeData.ShapeInfoList)
                 {
-                    meshHiderInfoDataBlock.AddRange(BitConverter.GetBytes(info.Unknown));
+                    meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(info.ShapePathOffset));
 
-                    foreach (var hiderInfoHiderIndexPart in info.HiderIndexParts)
+                    foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                     {
-                        meshHiderInfoDataBlock.AddRange(BitConverter.GetBytes(hiderInfoHiderIndexPart.DataInfoIndex));
+                        meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.DataInfoIndex));
                     }
 
-                    foreach (var hiderInfoHiderIndexPart in info.HiderIndexParts)
+                    foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                     {
-                        meshHiderInfoDataBlock.AddRange(BitConverter.GetBytes(hiderInfoHiderIndexPart.PartCount));
+                        meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.PartCount));
                     }
                 }
 
-                fullModelDataBlock.AddRange(meshHiderInfoDataBlock);
+                fullModelDataBlock.AddRange(meshShapeInfoDataBlock);
 
                 #endregion
 
-                // Mesh Hider Index Info
+                // Mesh Shape Index Info
                 #region Mesh Index Info Data Block
 
-                var meshHiderIndexInfoDataBlock = new List<byte>();
+                var meshShapeIndexInfoDataBlock = new List<byte>();
 
-                foreach (var hiderIndexInfo in xivMdl.MeshHideData.HiderDataInfoList)
+                foreach (var shapeIndexInfo in xivMdl.MeshShapeData.ShapeDataInfoList)
                 {
-                    meshHiderIndexInfoDataBlock.AddRange(BitConverter.GetBytes(hiderIndexInfo.IndexDataOffset));
-                    meshHiderIndexInfoDataBlock.AddRange(BitConverter.GetBytes(hiderIndexInfo.IndexCount));
-                    meshHiderIndexInfoDataBlock.AddRange(BitConverter.GetBytes(hiderIndexInfo.DataIndexOffset));
+                    meshShapeIndexInfoDataBlock.AddRange(BitConverter.GetBytes(shapeIndexInfo.IndexDataOffset));
+                    meshShapeIndexInfoDataBlock.AddRange(BitConverter.GetBytes(shapeIndexInfo.IndexCount));
+                    meshShapeIndexInfoDataBlock.AddRange(BitConverter.GetBytes(shapeIndexInfo.DataIndexOffset));
                 }
 
-                fullModelDataBlock.AddRange(meshHiderIndexInfoDataBlock);
+                fullModelDataBlock.AddRange(meshShapeIndexInfoDataBlock);
 
                 #endregion
 
-                // Mesh Hider Data
-                #region Mesh Hider Data Block
+                // Mesh Shape Data
+                #region Mesh Shape Data Block
 
-                var meshHiderDataBlock = new List<byte>();
+                var meshShapeDataBlock = new List<byte>();
 
                 var lodNumber = 0;
                 foreach (var lod in xivMdl.LoDList)
@@ -2931,17 +2967,17 @@ namespace xivModdingFramework.Models.FileTypes
                         indexMeshNum.Add(indexDataOffset, i);
                     }
 
-                    // Number of hider info in each mesh
-                    var perMeshCount = xivMdl.ModelData.MeshHiderInfoCount;
+                    // Number of shape info in each mesh
+                    var perMeshCount = xivMdl.ModelData.ShapeCount;
 
-                    // Hider info list
-                    var hiderInfoList = xivMdl.MeshHideData.HiderInfoList;
+                    // Shape info list
+                    var shapeInfoList = xivMdl.MeshShapeData.ShapeInfoList;
 
                     for (var j = 0; j < perMeshCount; j++)
                     {
-                        var hiderInfo = hiderInfoList[j];
+                        var shapeInfo = shapeInfoList[j];
 
-                        var indexPart = hiderInfo.HiderIndexParts[lodNumber];
+                        var indexPart = shapeInfo.ShapeIndexParts[lodNumber];
 
                         // The part count
                         var infoPartCount = indexPart.PartCount;
@@ -2949,28 +2985,28 @@ namespace xivModdingFramework.Models.FileTypes
                         for (var k = 0; k < infoPartCount; k++)
                         {
                             // Gets the data info for the part
-                            var hiderDataInfo = xivMdl.MeshHideData.HiderDataInfoList[indexPart.DataInfoIndex + k];
+                            var shapeDataInfo = xivMdl.MeshShapeData.ShapeDataInfoList[indexPart.DataInfoIndex + k];
 
-                            // The offset in the hider data 
-                            var indexDataOffset = hiderDataInfo.IndexDataOffset;
+                            // The offset in the shape data 
+                            var indexDataOffset = shapeDataInfo.IndexDataOffset;
 
                             var indexMeshLocation = indexMeshNum[indexDataOffset];
 
                             // Get the mesh data
                             var mesh = lod.MeshDataList[indexMeshLocation];
 
-                            var hideData = mesh.HideIndexOffsetDictionary[hiderDataInfo.DataIndexOffset];
+                            var shapeData = mesh.ShapeIndexOffsetDictionary[shapeDataInfo.DataIndexOffset];
 
                             if (importSettings != null && importSettings.ContainsKey(mesh.ToString()))
                             {
-                                var hideCount = mesh.HideIndexOffsetDictionary.Count;
+                                var shapeCount = mesh.ShapeIndexOffsetDictionary.Count;
 
                                 if (importSettings[XivStrings.All].Disable || importSettings[mesh.ToString()].Disable)
                                 {
-                                    foreach (var indexOffset in hideData)
+                                    foreach (var indexOffset in shapeData)
                                     {
-                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes((short)0));
-                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
                                     }
                                 }
                                 else if (importSettings[XivStrings.All].Fix || importSettings[mesh.ToString()].Fix)
@@ -2982,20 +3018,20 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                                 else
                                 {
-                                    foreach (var indexOffset in hideData)
+                                    foreach (var indexOffset in shapeData)
                                     {
-                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
-                                        meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
                                     }
                                 }
                             }
                             else
                             {
 
-                                foreach (var indexOffset in hideData)
+                                foreach (var indexOffset in shapeData)
                                 {
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
-                                    meshHiderDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
                                 }
                             }
                         }
@@ -3004,7 +3040,7 @@ namespace xivModdingFramework.Models.FileTypes
                     lodNumber++;
                 }
 
-                fullModelDataBlock.AddRange(meshHiderDataBlock);
+                fullModelDataBlock.AddRange(meshShapeDataBlock);
 
                 #endregion
             }
@@ -3161,13 +3197,13 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var importData = importDataDictionary[meshNum];
 
-                        // Because our imported data does not include mesh hider data, we must include it manually
-                        if (xivMdl.HasHiderData)
+                        // Because our imported data does not include mesh shape data, we must include it manually
+                        if (xivMdl.HasShapeData)
                         {
-                            if (meshData.HidePositionsDictionary != null)
+                            if (meshData.ShapePositionsDictionary != null)
                             {
                                 // We add the data from the mesh vertex data
-                                foreach (var vertIndex in meshData.HidePositionsDictionary.Keys)
+                                foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
                                 {
                                     var position = meshData.VertexData.Positions[vertIndex];
                                     var boneWeights = meshData.VertexData.BoneWeights[vertIndex];

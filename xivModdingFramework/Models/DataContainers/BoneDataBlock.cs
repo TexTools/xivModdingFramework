@@ -14,16 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
+
 namespace xivModdingFramework.Models.DataContainers
 {
     public class BoneDataBlock
     {
         /// <summary>
-        /// This data block is associated with the models bones but their function is unknown
+        /// This data block contains the offsets to each bone path within the data block
         /// </summary>
         /// <remarks>
-        /// The size of this bone data block is the [ MdlModelData.BoneCount * 4 ]
+        /// The data block consists of offsets with an int data type (4 bytes each)
         /// </remarks>
-        public byte[] Unknown { get; set; }
+        public List<int> BonePathOffsetList { get; set; }
     }
 }

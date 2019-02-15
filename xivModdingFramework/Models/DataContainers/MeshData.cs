@@ -52,13 +52,13 @@ namespace xivModdingFramework.Models.DataContainers
         public Dictionary<int, Vector3> ReferencePositionsDictionary { get; set; }
 
         /// <summary>
-        /// A dictionary containing the hide offset and position data for mesh hiding
+        /// A dictionary containing the shape offset and position data for mesh hiding
         /// </summary>
-        public Dictionary<int, Vector3> HidePositionsDictionary { get; set; }
+        public Dictionary<int, Vector3> ShapePositionsDictionary { get; set; }
 
         /// <summary>
-        /// A dictionary containing the reference index and hide offset for mesh hiding
+        /// A dictionary containing the reference index and shape offset for mesh hiding
         /// </summary>
-        public Dictionary<int, Dictionary<short, short>> HideIndexOffsetDictionary { get; set; }
+        public Dictionary<int, Dictionary<short, short>> ShapeIndexOffsetDictionary { get; set; }
     }
 }

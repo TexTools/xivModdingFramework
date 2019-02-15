@@ -14,16 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
+
 namespace xivModdingFramework.Models.DataContainers
 {
     public class AttributeDataBlock
     {
         /// <summary>
-        /// This data block is associated with the models attributues but their function is unknown
+        /// This data block contains the offsets to each attribute path within the data block
         /// </summary>
         /// <remarks>
-        /// The size of this attribute data block is the [ MdlModelData.AttributeCount * 4 ]
+        /// The data block consists of offsets with an int data type (4 bytes each)
         /// </remarks>
-        public byte[] Unknown { get; set; }
+        public List<int> AttributePathOffsetList { get; set; }
     }
 }

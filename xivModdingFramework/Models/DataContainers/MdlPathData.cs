@@ -58,6 +58,14 @@ namespace xivModdingFramework.Models.DataContainers
         public List<string> MaterialList { get; set; }
 
         /// <summary>
+        /// The list of shape strings
+        /// </summary>
+        /// <remarks>
+        /// These will usually begin with shp_
+        /// </remarks>
+        public List<string> ShapeList { get; set; }
+
+        /// <summary>
         /// The list of extra path strings
         /// </summary>
         /// <remarks>

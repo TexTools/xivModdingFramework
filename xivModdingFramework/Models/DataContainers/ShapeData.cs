@@ -18,28 +18,33 @@ using System.Collections.Generic;
 
 namespace xivModdingFramework.Models.DataContainers
 {
-    public class MeshHiderData
+    public class ShapeData
     {
-        public List<HiderInfo> HiderInfoList { get; set; }
+        public List<ShapeInfo> ShapeInfoList { get; set; }
 
-        public List<HiderIndexInfo> HiderDataInfoList { get; set; }
+        public List<ShapeIndexInfo> ShapeDataInfoList { get; set; }
 
-        public List<HiderData> HiderDataList { get; set; }
+        public List<ShapeEntryData> ShapeDataList { get; set; }
 
-        public class HiderInfo
+        public class ShapeInfo
         {
             /// <summary>
-            /// Unknown usage
+            /// The offset to the shape path in the path data block
             /// </summary>
-            public int Unknown { get; set; }
+            public int ShapePathOffset { get; set; }
 
             /// <summary>
-            /// The list of hider index parts
+            /// The path of the shape
             /// </summary>
-            public List<HiderIndexPart> HiderIndexParts { get; set; }
+            public string ShapePath { get; set; }
+
+            /// <summary>
+            /// The list of shape index parts
+            /// </summary>
+            public List<ShapeIndexPart> ShapeIndexParts { get; set; }
         }
 
-        public class HiderIndexInfo
+        public class ShapeIndexInfo
         {
             /// <summary>
             /// The offset to the index data
@@ -50,39 +55,39 @@ namespace xivModdingFramework.Models.DataContainers
             public int IndexDataOffset { get; set; }
 
             /// <summary>
-            /// The number of indices to read from the Hider Data
+            /// The number of indices to read from the Shape Data
             /// </summary>
             public int IndexCount { get; set; }
 
             /// <summary>
-            /// The offset to the index in the Hider Data
+            /// The offset to the index in the Shape Data
             /// </summary>
             public int DataIndexOffset { get; set; }
         }
 
 
-        public class HiderData
+        public class ShapeEntryData
         {
             /// <summary>
-            /// The offset to the existing index that will be hidden/moved
+            /// The offset to the existing index that will be moved
             /// </summary>
             public short ReferenceIndexOffset { get; set; }
 
             /// <summary>
-            /// This is the Index to which the Reference index will hide/move to
+            /// This is the Index to which the Reference index will move to
             /// </summary>
-            public short HideIndex { get; set; }
+            public short ShapeIndex { get; set; }
         }
 
-        public class HiderIndexPart
+        public class ShapeIndexPart
         {
             /// <summary>
-            /// Index to the Hider Data Information
+            /// Index to the Shape Data Information
             /// </summary>
             public short DataInfoIndex { get; set; }
 
             /// <summary>
-            /// The number of parts in the Hider Data Information
+            /// The number of parts in the Shape Data Information
             /// </summary>
             public short PartCount { get; set; }
         }
