@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
-using HelixToolkit.Wpf.SharpDX.Core;
+using HelixToolkit.Wpf.SharpDX;
 using SharpDX;
 
 namespace xivModdingFramework.Models.DataContainers

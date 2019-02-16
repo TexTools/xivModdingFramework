@@ -519,7 +519,7 @@ namespace xivModdingFramework.Models.ModelTextures
             if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
             {
                 var pixelSettings =
-                    new PixelStorageSettings(texMapData.Normal.Width, texMapData.Normal.Height, StorageType.Char, PixelMapping.RGBA);
+                    new PixelReadSettings(texMapData.Normal.Width, texMapData.Normal.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Normal.Data, pixelSettings))
                 {
@@ -537,7 +537,7 @@ namespace xivModdingFramework.Models.ModelTextures
             if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
             {
                 var pixelSettings =
-                    new PixelStorageSettings(texMapData.Diffuse.Width, texMapData.Diffuse.Height, StorageType.Char, PixelMapping.RGBA);
+                    new PixelReadSettings(texMapData.Diffuse.Width, texMapData.Diffuse.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Diffuse.Data, pixelSettings))
                 {
@@ -556,7 +556,7 @@ namespace xivModdingFramework.Models.ModelTextures
             if (texMapData.Specular != null && (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
             {
                 var pixelSettings =
-                    new PixelStorageSettings(texMapData.Specular.Width, texMapData.Specular.Height, StorageType.Char, PixelMapping.RGBA);
+                    new PixelReadSettings(texMapData.Specular.Width, texMapData.Specular.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Specular.Data, pixelSettings))
                 {
@@ -574,7 +574,7 @@ namespace xivModdingFramework.Models.ModelTextures
             if (texMapData.Multi != null && (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
             {
                 var pixelSettings =
-                    new PixelStorageSettings(texMapData.Multi.Width, texMapData.Multi.Height, StorageType.Char, PixelMapping.RGBA);
+                    new PixelReadSettings(texMapData.Multi.Width, texMapData.Multi.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Multi.Data, pixelSettings))
                 {
@@ -592,7 +592,7 @@ namespace xivModdingFramework.Models.ModelTextures
             if (texMapData.Skin != null && (largestSize > texMapData.Skin.Width * texMapData.Skin.Height || scaleDown))
             {
                 var pixelSettings =
-                    new PixelStorageSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char, PixelMapping.RGBA);
+                    new PixelReadSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char, PixelMapping.RGBA);
 
                 using (var image = new MagickImage(texMapData.Skin.Data, pixelSettings))
                 {

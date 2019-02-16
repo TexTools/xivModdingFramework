@@ -1016,7 +1016,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var indexList = new List<int>();
                     var indexHashSet = new HashSet<int>();
 
-                    indexList = meshList[i].VertexData.Indices.GetRange(prevIndexCount, indexCount);
+                    indexList = new List<int>(meshList[i].VertexData.Indices.GetRange(prevIndexCount, indexCount));
 
                     foreach (var index in indexList)
                     {
