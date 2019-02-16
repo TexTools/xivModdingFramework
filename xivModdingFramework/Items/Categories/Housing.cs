@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -216,63 +217,41 @@ namespace xivModdingFramework.Items.Categories
                 {
                     var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 1);
 
-                    furniturePartDict.Add($"base ({part})", mdl);
+                    furniturePartDict.Add($"base ( {part} )", mdl);
+                }
+                else if (mdl.Contains("al_"))
+                {
+                    var startIndex = mdl.IndexOf("_") + 1;
+                    var length = mdl.LastIndexOf(".") - startIndex;
+
+                    var part = mdl.Substring(startIndex, length);
+
+                    furniturePartDict.Add($"{part}", mdl);
                 }
                 else
                 {
-                    try
+                    var startIndex = mdl.IndexOf("_") + 1;
+                    var length = mdl.LastIndexOf("_") - startIndex;
+
+                    var part = mdl.Substring(startIndex, length);
+
+                    if (!furniturePartDict.ContainsKey($"{part}"))
                     {
-                        var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 6);
-                        if (!mdl.Contains("_b0_"))
-                        {
-                            if (mdl.Contains("_t4_"))
-                            {
-                                var partChar = part[5];
-                                var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
-
-                                if (partChar.Equals('.'))
-                                {
-                                    furniturePartDict.Add($"base ({descriptor})", mdl);
-                                }
-                                else
-                                {
-                                    furniturePartDict.Add($"{partChar.ToString()} ({descriptor})", mdl);
-                                }
-                            }
-                            else
-                            {
-                                if (!furniturePartDict.ContainsKey(part.Remove(5)))
-                                {
-                                    furniturePartDict.Add(part.Remove(5), mdl);
-                                }
-                                else
-                                {
-                                    var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
-                                    furniturePartDict.Add($"{part} ({descriptor})", mdl);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            var partChar = part[5];
-                            if (partChar.Equals('.'))
-                            {
-                                furniturePartDict.Add("base", mdl);
-                            }
-                            else
-                            {
-                                furniturePartDict.Add(partChar.ToString(), mdl);
-                            }
-                        }
+                        furniturePartDict.Add($"{part}", mdl);
                     }
-                    catch
+                    else
                     {
-                        var part = mdl.Substring(mdl.LastIndexOf("_") + 1, 1);
-                        var descriptor = mdl.Substring(mdl.LastIndexOf("/") + 1, 3);
+                        part = mdl.Substring(startIndex, length);
+                        var descriptor = mdl.Substring(mdl.LastIndexOf(".") - 1, 1);
 
-                        furniturePartDict.Add($"{part} ({descriptor})", mdl);
+                        if (furniturePartDict.ContainsKey($"{part} ( {descriptor} )"))
+                        {
+                            Debug.WriteLine($"Possible Duplicate: {mdl}");
+                            continue;
+                        }
+
+                        furniturePartDict.Add($"{part} ( {descriptor} )", mdl);
                     }
-
                 }
 
             }
