@@ -44,9 +44,24 @@ namespace xivModdingFramework.Models.DataContainers
         public int Unknown1 { get; set; }
 
         /// <summary>
+        /// Mesh End
+        /// </summary>
+        public short MeshEnd { get; set; }
+
+        /// <summary>
+        /// Extra Mesh Count
+        /// </summary>
+        public short ExtraMeshCount { get; set; }
+
+        /// <summary>
+        /// Mesh Sum
+        /// </summary>
+        public short MeshSum{ get; set; }
+
+        /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown2 { get; set; }
+        public short Unknown2 { get; set; }
 
         /// <summary>
         /// Unknown Usage
@@ -64,11 +79,6 @@ namespace xivModdingFramework.Models.DataContainers
         public int Unknown5 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public int Unknown6 { get; set; }
-
-        /// <summary>
         /// The offset at which the index data begins
         /// </summary>
         public int IndexDataStart { get; set; }
@@ -76,12 +86,12 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown7 { get; set; }
+        public int Unknown6 { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown8 { get; set; }
+        public int Unknown7 { get; set; }
 
         /// <summary>
         /// The size of the Vertex Data Block

@@ -268,14 +268,16 @@ namespace xivModdingFramework.Models.FileTypes
                         MeshCount        = br.ReadInt16(),
                         Unknown0         = br.ReadInt32(),
                         Unknown1         = br.ReadInt32(),
-                        Unknown2         = br.ReadInt32(),
+                        MeshEnd          = br.ReadInt16(),
+                        ExtraMeshCount   = br.ReadInt16(),
+                        MeshSum          = br.ReadInt16(),
+                        Unknown2         = br.ReadInt16(),
                         Unknown3         = br.ReadInt32(),
                         Unknown4         = br.ReadInt32(),
                         Unknown5         = br.ReadInt32(),
-                        Unknown6         = br.ReadInt32(),
                         IndexDataStart   = br.ReadInt32(),
+                        Unknown6         = br.ReadInt32(),
                         Unknown7         = br.ReadInt32(),
-                        Unknown8         = br.ReadInt32(),
                         VertexDataSize   = br.ReadInt32(),
                         IndexDataSize    = br.ReadInt32(),
                         VertexDataOffset = br.ReadInt32(),
@@ -296,7 +298,15 @@ namespace xivModdingFramework.Models.FileTypes
                     xivMdl.LoDList.Add(lod);
                 }
 
-                if (totalLoDMeshes < mdlModelData.MeshCount)
+                //HACK: This is a workaround for certain furniture items, mainly with picture frames and easel
+                var isEmpty = false;
+                try
+                {
+                    isEmpty = br.PeekChar() == 0;
+                }
+                catch{}
+
+                if (isEmpty && totalLoDMeshes < mdlModelData.MeshCount)
                 {
                     xivMdl.ExtraLoDList = new List<LevelOfDetail>();
 
@@ -304,23 +314,25 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var lod = new LevelOfDetail
                         {
-                            MeshOffset = br.ReadInt16(),
-                            MeshCount = br.ReadInt16(),
-                            Unknown0 = br.ReadInt32(),
-                            Unknown1 = br.ReadInt32(),
-                            Unknown2 = br.ReadInt32(),
-                            Unknown3 = br.ReadInt32(),
-                            Unknown4 = br.ReadInt32(),
-                            Unknown5 = br.ReadInt32(),
-                            Unknown6 = br.ReadInt32(),
-                            IndexDataStart = br.ReadInt32(),
-                            Unknown7 = br.ReadInt32(),
-                            Unknown8 = br.ReadInt32(),
-                            VertexDataSize = br.ReadInt32(),
-                            IndexDataSize = br.ReadInt32(),
+                            MeshOffset       = br.ReadInt16(),
+                            MeshCount        = br.ReadInt16(),
+                            Unknown0         = br.ReadInt32(),
+                            Unknown1         = br.ReadInt32(),
+                            MeshEnd          = br.ReadInt16(),
+                            ExtraMeshCount   = br.ReadInt16(),
+                            MeshSum          = br.ReadInt16(),
+                            Unknown2         = br.ReadInt16(),
+                            Unknown3         = br.ReadInt32(),
+                            Unknown4         = br.ReadInt32(),
+                            Unknown5         = br.ReadInt32(),
+                            IndexDataStart   = br.ReadInt32(),
+                            Unknown6         = br.ReadInt32(),
+                            Unknown7         = br.ReadInt32(),
+                            VertexDataSize   = br.ReadInt32(),
+                            IndexDataSize    = br.ReadInt32(),
                             VertexDataOffset = br.ReadInt32(),
-                            IndexDataOffset = br.ReadInt32(),
-                            MeshDataList = new List<MeshData>()
+                            IndexDataOffset  = br.ReadInt32(),
+                            MeshDataList     = new List<MeshData>()
                         };
 
                         xivMdl.ExtraLoDList.Add(lod);
@@ -335,7 +347,8 @@ namespace xivModdingFramework.Models.FileTypes
                 // for each mesh in each lod
                 for (var i = 0; i < xivMdl.LoDList.Count; i++)
                 {
-                    for (var j = 0; j < xivMdl.LoDList[i].MeshCount; j++)
+                    var totalMeshCount = xivMdl.LoDList[i].MeshCount + xivMdl.LoDList[i].ExtraMeshCount;
+                    for (var j = 0; j < totalMeshCount; j++)
                     {
                         xivMdl.LoDList[i].MeshDataList.Add(new MeshData());
                         xivMdl.LoDList[i].MeshDataList[j].VertexDataStructList = new List<VertexDataStruct>();
@@ -365,37 +378,6 @@ namespace xivModdingFramework.Models.FileTypes
                         }
                     }
 
-                    // This will add another entry if there is a discrepancy in mesh counts for the LoD
-                    if (xivMdl.LoDList[i].MeshCount == 0 && loDStructPos < (136 * xivMdl.ModelData.MeshCount))
-                    {
-                        xivMdl.LoDList[i].MeshDataList.Add(new MeshData());
-                        xivMdl.LoDList[i].MeshDataList[0].VertexDataStructList = new List<VertexDataStruct>();
-
-                        // LoD Index * Vertex Data Structure size + Header
-
-                        br.BaseStream.Seek(loDStructPos, SeekOrigin.Begin);
-
-                        // If the first byte is 255, we reached the end of the Vertex Data Structs
-                        var dataBlockNum = br.ReadByte();
-                        while (dataBlockNum != 255)
-                        {
-                            var vertexDataStruct = new VertexDataStruct
-                            {
-                                DataBlock = dataBlockNum,
-                                DataOffset = br.ReadByte(),
-                                DataType = VertexTypeDictionary[br.ReadByte()],
-                                DataUsage = VertexUsageDictionary[br.ReadByte()]
-                            };
-
-                            xivMdl.LoDList[i].MeshDataList[0].VertexDataStructList.Add(vertexDataStruct);
-
-                            // padding between Vertex Data Structs
-                            br.ReadBytes(4);
-
-                            dataBlockNum = br.ReadByte();
-                        }
-                    }
-
                     loDStructPos += 136 * xivMdl.LoDList[i].MeshCount;
                 }
 
@@ -406,7 +388,9 @@ namespace xivModdingFramework.Models.FileTypes
                 var meshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
-                    for (var i = 0; i < lod.MeshCount; i++)
+                    var totalMeshCount = lod.MeshCount + lod.ExtraMeshCount;
+
+                    for (var i = 0; i < totalMeshCount; i++)
                     {
                         var meshDataInfo = new MeshDataInfo
                         {
@@ -437,63 +421,6 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         meshNum++;
-                    }
-
-                    // This will add another entry if there is a discrepancy in mesh counts for the LoD
-                    if (lod.MeshCount == 0 && meshNum < xivMdl.ModelData.MeshCount)
-                    {
-                        var meshDataInfo = new MeshDataInfo
-                        {
-                            VertexCount = br.ReadInt32(),
-                            IndexCount = br.ReadInt32(),
-                            MaterialIndex = br.ReadInt16(),
-                            MeshPartIndex = br.ReadInt16(),
-                            MeshPartCount = br.ReadInt16(),
-                            BoneListIndex = br.ReadInt16(),
-                            IndexDataOffset = br.ReadInt32(),
-                            VertexDataOffset0 = br.ReadInt32(),
-                            VertexDataOffset1 = br.ReadInt32(),
-                            VertexDataOffset2 = br.ReadInt32(),
-                            VertexDataEntrySize0 = br.ReadByte(),
-                            VertexDataEntrySize1 = br.ReadByte(),
-                            VertexDataEntrySize2 = br.ReadByte(),
-                            VertexDataBlockCount = br.ReadByte()
-                        };
-
-                        lod.MeshDataList[0].MeshInfo = meshDataInfo;
-
-                        meshNum++;
-                    }
-                }
-
-                // Adds any extra mesh data 
-                if (meshNum < mdlModelData.MeshCount)
-                {
-                    var missingMeshCount = mdlModelData.MeshCount - meshNum;
-
-                    xivMdl.ExtraMeshData = new List<MeshData>();
-
-                    for (var i = 0; i < missingMeshCount; i++)
-                    {
-                        var meshDataInfo = new MeshDataInfo
-                        {
-                            VertexCount = br.ReadInt32(),
-                            IndexCount = br.ReadInt32(),
-                            MaterialIndex = br.ReadInt16(),
-                            MeshPartIndex = br.ReadInt16(),
-                            MeshPartCount = br.ReadInt16(),
-                            BoneListIndex = br.ReadInt16(),
-                            IndexDataOffset = br.ReadInt32(),
-                            VertexDataOffset0 = br.ReadInt32(),
-                            VertexDataOffset1 = br.ReadInt32(),
-                            VertexDataOffset2 = br.ReadInt32(),
-                            VertexDataEntrySize0 = br.ReadByte(),
-                            VertexDataEntrySize1 = br.ReadByte(),
-                            VertexDataEntrySize2 = br.ReadByte(),
-                            VertexDataBlockCount = br.ReadByte()
-                        };
-
-                        xivMdl.ExtraMeshData.Add(new MeshData{ MeshInfo = meshDataInfo });
                     }
                 }
 
@@ -2569,16 +2496,20 @@ namespace xivModdingFramework.Models.FileTypes
 
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown0));
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown1));
+
+                lodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshEnd));
+                lodDataBlock.AddRange(BitConverter.GetBytes(lod.ExtraMeshCount));
+                lodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshSum));
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
+
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown3));
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown4));
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown5));
-                lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
 
                 lodDataBlock.AddRange(BitConverter.GetBytes(indexDataStart));
 
+                lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
                 lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown7));
-                lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown8));
 
                 lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataSize));
                 lodDataBlock.AddRange(BitConverter.GetBytes(indexDataSize));
@@ -2609,14 +2540,16 @@ namespace xivModdingFramework.Models.FileTypes
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshCount));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown0));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown1));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshEnd));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.ExtraMeshCount));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshSum));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown3));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown4));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown5));
-                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataStart));
+                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown7));
-                    extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown8));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.VertexDataSize));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataSize));
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.VertexDataOffset));
