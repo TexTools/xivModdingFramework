@@ -249,7 +249,7 @@ namespace xivModdingFramework.Items.Categories
                 // Big Endian Byte Order 
                 using (var br = new BinaryReaderBE(new MemoryStream(action)))
                 {
-                    br.BaseStream.Seek(8, SeekOrigin.Begin);
+                    br.BaseStream.Seek(6, SeekOrigin.Begin);
 
                     var nameLength = br.ReadInt16();
 
@@ -267,7 +267,6 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
                 actionNames.Add(xivUi.Name);
 
                 actionList.Add(xivUi);
