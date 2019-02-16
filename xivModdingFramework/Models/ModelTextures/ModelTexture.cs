@@ -187,13 +187,24 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 if (materialType.Equals("housing"))
                 {
-                    if (colorChangeShader)
+                    if (colorChangeShader && normalPixels != null)
                     {
-                        alpha = normalPixels != null ? normalPixels[i] : 255;
+                        alpha = normalPixels[i];
                     }
                     else
                     {
-                        alpha = diffusePixels != null ? diffusePixels[i] : 255;
+                        if (diffusePixels != null)
+                        {
+                            alpha = diffusePixels[i];
+                        }
+                        else if (normalPixels != null)
+                        {
+                            alpha = normalPixels[i];
+                        }
+                        else
+                        {
+                            alpha = 255;
+                        }
                     }
                 }
 
