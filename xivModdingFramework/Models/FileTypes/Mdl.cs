@@ -1168,7 +1168,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                         for (var i = 0; i < lod.MeshCount; i++)
                         {
-                            Debug.WriteLine($"=== Mesh {i} ===");
                             var referencePositionsDictionary = new Dictionary<int, Vector3>();
                             var meshShapePositionsDictionary = new SortedDictionary<int, Vector3>();
                             var shapeIndexOffsetDictionary = new Dictionary<int, Dictionary<short, short>>();
@@ -1217,6 +1216,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     var shapeDataForMesh = shapeData.GetRange(shapeDataInfo.DataIndexOffset, shapeDataInfo.IndexCount);
 
                                     // Fill shape data dictionaries
+                                    short dataIndex = -1;
                                     foreach (var data in shapeDataForMesh)
                                     {
                                         if (!shapeIndexOffsetDictionary.ContainsKey(shapeDataInfo.DataIndexOffset))
@@ -1225,7 +1225,18 @@ namespace xivModdingFramework.Models.FileTypes
                                         }
                                         else
                                         {
-                                            shapeIndexOffsetDictionary[shapeDataInfo.DataIndexOffset].Add(data.ReferenceIndexOffset, data.ShapeIndex);
+                                            try
+                                            {
+                                                shapeIndexOffsetDictionary[shapeDataInfo.DataIndexOffset]
+                                                    .Add(data.ReferenceIndexOffset, data.ShapeIndex);
+                                            }
+                                            catch
+                                            {
+                                                //Debug.WriteLine($"duplicate {data.ReferenceIndexOffset}, {data.ShapeIndex}");
+                                                shapeIndexOffsetDictionary[shapeDataInfo.DataIndexOffset].Add(dataIndex, data.ShapeIndex);
+                                                dataIndex--;
+                                            }
+
                                         }
 
                                         if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
@@ -1255,6 +1266,15 @@ namespace xivModdingFramework.Models.FileTypes
                                     mesh.ShapeIndexOffsetDictionary = shapeIndexOffsetDictionary;
                                     mesh.ReferencePositionsDictionary = referencePositionsDictionary;
                                     mesh.ShapePositionsDictionary = new Dictionary<int, Vector3>(meshShapePositionsDictionary);
+
+                                    if (mesh.ShapePathList != null)
+                                    {
+                                        mesh.ShapePathList.Add(shapeInfo.ShapePath);
+                                    }
+                                    else
+                                    {
+                                        mesh.ShapePathList = new List<string>{shapeInfo.ShapePath};
+                                    }
                                 }
                             }
                         }
@@ -2951,19 +2971,38 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                                 else
                                 {
+                                    short previousEntry = 0;
                                     foreach (var indexOffset in shapeData)
                                     {
-                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                        if (indexOffset.Key < 0)
+                                        {
+                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                            previousEntry = indexOffset.Key;
+                                        }
+                                        else
+                                        {
+                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes(previousEntry));
+                                        }
+
                                         meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
                                     }
                                 }
                             }
                             else
                             {
-
+                                short previousEntry = 0;
                                 foreach (var indexOffset in shapeData)
                                 {
-                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                    if (indexOffset.Key < 0)
+                                    {
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
+                                        previousEntry = indexOffset.Key;
+                                    }
+                                    else
+                                    {
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes(previousEntry));
+                                    }
+
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Value));
                                 }
                             }
