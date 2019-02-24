@@ -342,6 +342,54 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         /// <summary>
+        /// Converts an xivMtrl to a XivTex for ColorSet exporting
+        /// </summary>
+        /// <param name="xivMtrl">The XivMtrl with the ColorSet data</param>
+        /// <returns>The XivTex of the ColorSet</returns>
+        public XivTex MtrlToXivTex(XivMtrl xivMtrl)
+        {
+            var colorSetData = new List<byte>();
+
+            foreach (var colorSetHalf in xivMtrl.ColorSetData)
+            {
+                colorSetData.AddRange(BitConverter.GetBytes(colorSetHalf.RawValue));
+            }
+
+            var xivTex = new XivTex
+            {
+                Width = 4,
+                Height = 16,
+                MipMapCount = 0,
+                TexData = colorSetData.ToArray(),
+                TextureFormat = XivTexFormat.A16B16G16R16F,
+                TextureTypeAndPath = xivMtrl.TextureTypePathList[xivMtrl.TextureTypePathList.Count - 1]
+            };
+
+            return xivTex;
+        }
+
+        /// <summary>
+        /// Saves the Extra data from the ColorSet
+        /// </summary>
+        /// <param name="item">The item containing the ColorSet</param>
+        /// <param name="xivMtrl">The XivMtrl for the ColorSet</param>
+        /// <param name="saveDirectory">The save directory</param>
+        /// <param name="race">The selected race for the item</param>
+        public void SaveColorSetExtraData(IItem item, XivMtrl xivMtrl, DirectoryInfo saveDirectory, XivRace race)
+        {
+            if (xivMtrl.ColorSetExtraData != null)
+            {
+                var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
+
+                Directory.CreateDirectory(path);
+
+                var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivMtrl.MTRLPath) + ".dat");
+
+                File.WriteAllBytes(savePath, xivMtrl.ColorSetExtraData);
+            }
+        }
+
+        /// <summary>
         /// Toggles Translucency for an item on or off
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
