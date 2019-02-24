@@ -140,16 +140,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp";
+                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
 
                 if (File.Exists(modPackPath))
                 {
                     var fileNum = 1;
-                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp";
+                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
                     while (File.Exists(modPackPath))
                     {
                         fileNum++;
-                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp";
+                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
                     }
                 }
 
@@ -227,16 +227,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp";
+                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
 
                 if (File.Exists(modPackPath))
                 {
                     var fileNum = 1;
-                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp";
+                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
                     while (File.Exists(modPackPath))
                     {
                         fileNum++;
-                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp";
+                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
                     }
                 }
 
@@ -378,7 +378,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 foreach (var modListMod in modList.Mods)
                 {
-                    modListFullPaths.Add(modListMod.fullPath);
+                    if (!string.IsNullOrEmpty(modListMod.fullPath))
+                    {
+                        modListFullPaths.Add(modListMod.fullPath);
+                    }
                 }
 
                 using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
