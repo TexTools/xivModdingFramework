@@ -21,71 +21,116 @@ namespace xivModdingFramework.Models.DataContainers
     public class ColladaData
     {
         /// <summary>
-        /// The bone strings in the collada file
+        /// The bone strings as they appear in the collada file
         /// </summary>
         public string[] Bones { get; set; }
 
         /// <summary>
-        /// The positions in the collada file
+        /// The bone string names for all meshes
+        /// </summary>
+        public string[] AllBonesNames { get; set; }
+
+        /// <summary>
+        /// The bone names for the mesh
+        /// </summary>
+        public  List<string> MeshBoneNames { get; set; } = new List<string>();
+
+        /// <summary>
+        /// The Vertex Positions
         /// </summary>
         public List<float> Positions { get; set; } = new List<float>();
 
         /// <summary>
-        /// The normals in the collada file
+        /// The Vertex Normals
         /// </summary>
         public List<float> Normals { get; set; } = new List<float>();
 
         /// <summary>
-        /// The primary texture coordinates in the collada file
+        /// The Vertex Primary Texture Coordinates
         /// </summary>
         public List<float> TextureCoordinates0 { get; set; } = new List<float>();
 
         /// <summary>
-        /// The secondary texture coordinates in the collada file
+        /// The Vertex Secondary Texture Coordinates
         /// </summary>
         public List<float> TextureCoordinates1 { get; set; } = new List<float>();
 
         /// <summary>
-        /// The bone weights in the collada file
+        /// The Vertex Bone Weights
         /// </summary>
         public List<float> BoneWeights { get; set; } = new List<float>();
 
         /// <summary>
-        /// The BiNormals in the collada file
+        /// The Vertex BiNormals
         /// </summary>
         public List<float> BiNormals { get; set; } = new List<float>();
 
         /// <summary>
-        /// The tangents in the collada file
+        /// The Vertex Tangents
         /// </summary>
         public List<float> Tangents { get; set; } = new List<float>();
 
         /// <summary>
-        /// The indices in teh collada file
+        /// The Indices
         /// </summary>
         public List<int> Indices { get; set; } = new List<int>();
 
-
+        /// <summary>
+        /// The Vertex Bone Indices
+        /// </summary>
         public List<int> BoneIndices { get; set; } = new List<int>();
 
+        /// <summary>
+        /// The V count
+        /// </summary>
+        /// <remarks>
+        /// This list contains the number of bone weights per vertex
+        /// </remarks>
         public List<int> Vcounts { get; set; } = new List<int>();
 
+        /// <summary>
+        /// THe Position Indices
+        /// </summary>
         public List<int> PositionIndices { get; set; } = new List<int>();
 
+        /// <summary>
+        /// The Normal Indices
+        /// </summary>
         public List<int> NormalIndices { get; set; } = new List<int>();
 
+        /// <summary>
+        /// The BiNormal Indices
+        /// </summary>
         public List<int> BiNormalIndices { get; set; } = new List<int>();
 
+        /// <summary>
+        /// The Primary Texture Coordinate Indices
+        /// </summary>
         public List<int> TextureCoordinate0Indices { get; set; } = new List<int>();
 
+        /// <summary>
+        /// The Secondary Texture Coordinate Indices
+        /// </summary>
         public List<int> TextureCoordinate1Indices { get; set; } = new List<int>();
 
+        /// <summary>
+        /// The Parts Dictionary
+        /// </summary>
         public Dictionary<int, int> PartsDictionary = new Dictionary<int, int>();
 
+        /// <summary>
+        /// The stride for Index values
+        /// </summary>
         public int IndexStride { get; set; }
 
+        /// <summary>
+        /// The stride for Texture Coordinate values
+        /// </summary>
         public int TextureCoordinateStride { get; set; }
 
+        /// <summary>
+        /// A flag to determine if the import is from Blender
+        /// </summary>
         public bool IsBlender { get; set; }
     }
 }
