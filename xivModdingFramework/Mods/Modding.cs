@@ -278,6 +278,38 @@ namespace xivModdingFramework.Mods
         }
 
         /// <summary>
+        /// Disables all mods from older modlist
+        /// </summary>
+        public void DisableOldModList(DirectoryInfo oldModListDirectory)
+        {
+            var index = new Index(_gameDirectory);
+
+            using (var sr = new StreamReader(oldModListDirectory.FullName))
+            {
+                string line;
+                while ((line = sr.ReadLine()) != null)
+                {
+                    var modEntry = JsonConvert.DeserializeObject<OriginalModList>(line);
+
+                    if (!string.IsNullOrEmpty(modEntry.fullPath))
+                    {
+                        try
+                        {
+                            index.UpdateIndex(modEntry.originalOffset, modEntry.fullPath,
+                                XivDataFiles.GetXivDataFile(modEntry.datFile));
+                            index.UpdateIndex2(modEntry.originalOffset, modEntry.fullPath,
+                                XivDataFiles.GetXivDataFile(modEntry.datFile));
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new Exception($"Unable to disable {modEntry.name} | {modEntry.fullPath}");
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Deletes a mod from the modlist
         /// </summary>
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
