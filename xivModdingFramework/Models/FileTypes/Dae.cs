@@ -210,16 +210,30 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
-        public Dictionary<int, Dictionary<int, ColladaData>> ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation)
+        /// <summary>
+        /// Reads the collada file
+        /// </summary>
+        /// <param name="xivMdl">The XivMdl data</param>
+        /// <param name="daeLocation">The location of the dae file</param>
+        /// <param name="advImportSettings">The advanced Import settings</param>
+        /// <returns>A dictionary containing (Mesh Number, (Mesh Part Number, Collada Data)</returns>
+        public Dictionary<int, Dictionary<int, ColladaData>> ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation, Dictionary<string, ModelImportSettings> advImportSettings = null)
         {
             var isHousingItem = xivMdl.MdlPath.Folder.Contains("bgcommon/hou/");
 
             var boneJointDict = new Dictionary<string, string>();
 
-            // A dictionary contining <Mesh Number, <Mesh Part Number, Collada Data>
+            // A dictionary containing <Mesh Number, <Mesh Part Number, Collada Data>
             var meshPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
 
-            for (var i = 0; i < xivMdl.LoDList[0].MeshCount; i++)
+            var meshCount = xivMdl.LoDList[0].MeshCount;
+
+            if (advImportSettings != null)
+            {
+                meshCount = (short)advImportSettings.Count;
+            }
+
+            for (var i = 0; i < meshCount; i++)
             {
                 meshPartDataDictionary.Add(i, new Dictionary<int, ColladaData>());
             }
@@ -507,6 +521,15 @@ namespace xivModdingFramework.Models.FileTypes
                                     if (reader.Name.Contains("Name_array"))
                                     {
                                         colladaData.Bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
+
+                                        var boneNames = new List<string>();
+
+                                        foreach (var colladaDataBone in colladaData.Bones)
+                                        {
+                                            boneNames.Add(boneJointDict[colladaDataBone]); 
+                                        }
+
+                                        colladaData.AllBonesNames = boneNames.ToArray();
                                     }
 
                                     if (reader.Name.Contains("float_array"))
@@ -551,6 +574,11 @@ namespace xivModdingFramework.Models.FileTypes
                                                 bString = Regex.Replace(blendBoneName, @"[\d]", string.Empty);
                                             }
 
+                                            if (!colladaData.MeshBoneNames.Contains(bString))
+                                            {
+                                                colladaData.MeshBoneNames.Add(bString);
+                                            }
+
                                             if (!boneDict.ContainsKey(bString))
                                             {
                                                 if (!extraBones.Contains(bString))
@@ -580,6 +608,80 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             return meshPartDataDictionary;
+        }
+
+        /// <summary>
+        /// A quick collada reader to obtain mesh and part numbers
+        /// </summary>
+        /// <param name="daeLocation">The location of the dae file</param>
+        /// <returns>A dictionary containing the mesh number and its parts</returns>
+        public Dictionary<int, List<int>> QuickColladaReader(DirectoryInfo daeLocation)
+        {
+            var meshNameDict = new Dictionary<string, string>();
+
+            // A dictionary containing <Mesh Number, List<Mesh Parts>>
+            var meshPartDictionary = new Dictionary<int, List<int>>();
+
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                while (reader.Read())
+                {
+                    if (reader.IsStartElement())
+                    {
+                        // Read Geometry
+                        if (reader.Name.Equals("geometry"))
+                        {
+                            var atr = reader["name"];
+                            var id = reader["id"];
+
+                            if (meshNameDict.ContainsKey(id))
+                            {
+                                throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}");
+                            }
+
+                            meshNameDict.Add(id, atr);
+
+                            var meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+
+                            // Determines whether the mesh has parts and gets the mesh number
+                            if (atr.Contains("."))
+                            {
+                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
+                                    atr.LastIndexOf(".", StringComparison.Ordinal) -
+                                    (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                            }
+
+                            // If the current attribute is a mesh part
+                            if (atr.Contains("."))
+                            {
+                                // Get part number
+                                var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+
+                                if (meshPartDictionary[meshNum].Contains(meshPartNum))
+                                {
+                                    throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
+                                }
+
+                                meshPartDictionary[meshNum].Add(meshPartNum);
+                            }
+                            else
+                            {
+                                if (meshPartDictionary.ContainsKey(meshNum))
+                                {
+                                    meshPartDictionary[meshNum].Add(0);
+                                }
+                                else
+                                {
+                                    meshPartDictionary.Add(meshNum, new List<int>{0});
+                                }
+
+                            }
+                        }
+                    }
+                }
+            }
+
+            return meshPartDictionary;
         }
 
         /// <summary>
