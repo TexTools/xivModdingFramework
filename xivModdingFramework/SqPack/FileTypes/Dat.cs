@@ -50,7 +50,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Creates a new dat file to store moddified data.
+        /// Creates a new dat file to store modified data.
         /// </summary>
         /// <remarks>
         /// This will first find what the largest dat number is for a given data file
@@ -63,7 +63,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var nextDatNumber = GetLargestDatNumber(dataFile) + 1;
 
-            var datPath = _gameDirectory.FullName + "\\" + dataFile.GetDataFileName() + DatExtension + nextDatNumber;
+            var datPath = $"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}{DatExtension}{nextDatNumber}";
 
             using (var fs = File.Create(datPath))
             {
@@ -97,27 +97,15 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Checks the modlist to determine whether a mod dat already exists
+        /// Determines whether a mod dat already exists
         /// </summary>
         /// <param name="dataFile">The dat file to check.</param>
         /// <returns>True if it is original, false otherwise</returns>
         private bool IsOriginalDat(XivDataFile dataFile)
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+            var moddedList = GetModdedDatList(dataFile);
 
-            if (modList == null) return true;
-
-            // Checks if any entry in the modlist is within the datafile
-            // If there is, then a modded dat has already been created
-            foreach (var modEntry in modList.Mods)
-            {
-                if (modEntry.datFile.Contains(dataFile.GetDataFileName()))
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return moddedList.Count <= 0;
         }
 
         /// <summary>
@@ -135,6 +123,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 if (File.Exists(datFilePath))
                 {
+                    // Due to an issue where 060000 dat1 gets deleted, we are skipping it here
+                    if(datFilePath.Contains("060000.win32.dat1")) continue;
+
                     using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                     {
                         binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
@@ -803,12 +794,19 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var datPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
 
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
+            if (File.Exists(datPath))
             {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                using (var br = new BinaryReader(File.OpenRead(datPath)))
+                {
+                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
-                br.ReadInt32(); // Header Length
-                return br.ReadInt32(); // File Type
+                    br.ReadInt32(); // Header Length
+                    return br.ReadInt32(); // File Type
+                }
+            }
+            else
+            {
+                throw new Exception($"Unable to find {datPath}");
             }
         }
 
@@ -947,17 +945,18 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var datNum = GetLargestDatNumber(dataFile);
 
-            var modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
+            var modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
 
             if (category.Equals(itemName))
             {
                 category = XivStrings.Character;
             }
 
+            // If there is an existing modlist entry, use that data to get the modDatPath
             if (modEntry != null)
             {
                 datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
+                modDatPath = $"{_gameDirectory}\\{modEntry.datFile}{DatExtension}{datNum}";
             }
             else
             {
@@ -968,17 +967,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     datNum = CreateNewDat(dataFile);
 
-                    modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
+                    modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
                 }
                 else
                 {
-                    // If it is an original dat and not a new empty mod dat file, then create a new mod dat file
-                    // Note: If the file length is 2048, then it is a new empty mod dat file
-                    if (IsOriginalDat(dataFile) && fileLength != 2048)
+                    // If it is an original dat file, then create a new mod dat file
+                    if (IsOriginalDat(dataFile))
                     {
                         datNum = CreateNewDat(dataFile);
 
-                        modDatPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
+                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
                     }
                 }
             }
