@@ -69,14 +69,21 @@ namespace xivModdingFramework.Textures.FileTypes
 
             XivTex xivTex;
 
-            if (ttp.Path.Contains(".atex"))
+            try
             {
-                var atex = new ATex(_gameDirectory, ttp.DataFile);
-                xivTex = atex.GetATexData(offset);
+                if (ttp.Path.Contains(".atex"))
+                {
+                    var atex = new ATex(_gameDirectory, ttp.DataFile);
+                    xivTex = atex.GetATexData(offset);
+                }
+                else
+                {
+                    xivTex = dat.GetType4Data(offset, ttp.DataFile);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                xivTex = dat.GetType4Data(offset, ttp.DataFile);
+                throw new Exception($"There was an error reading texture data at offset {offset}");
             }
 
             xivTex.TextureTypeAndPath = ttp;
@@ -670,6 +677,7 @@ namespace xivModdingFramework.Textures.FileTypes
         public int TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source)
         {
             var colorSetData = new List<Half>();
+            byte[] colorSetExtraData = null;
 
             using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
             {
@@ -691,20 +699,15 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (File.Exists(flagsPath))
                 {
-                    using (var br = new BinaryReader(File.OpenRead(flagsPath)))
-                    {
-                        // The extra data after the colorset is always 32 bytes 
-                        // This reads 16 ushort values which is 16 x 2 = 32
-                        for (var i = 0; i < 16; i++)
-                        {
-                            colorSetData.Add(new Half(br.ReadUInt16()));
-                        }
-                    }
+                    // The extra data after the colorset is always 32 bytes 
+                    // This reads 16 ushort values which is 16 x 2 = 32
+                    colorSetExtraData = File.ReadAllBytes(flagsPath);
                 }
             }
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
+            xivMtrl.ColorSetExtraData = colorSetExtraData;
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile);
             return mtrl.ImportMtrl(xivMtrl, item, source);
