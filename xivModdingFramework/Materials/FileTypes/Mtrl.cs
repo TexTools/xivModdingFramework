@@ -346,7 +346,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl with the ColorSet data</param>
         /// <returns>The XivTex of the ColorSet</returns>
-        public XivTex MtrlToXivTex(XivMtrl xivMtrl)
+        public XivTex MtrlToXivTex(XivMtrl xivMtrl, TexTypePath ttp)
         {
             var colorSetData = new List<byte>();
 
@@ -362,7 +362,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 MipMapCount = 0,
                 TexData = colorSetData.ToArray(),
                 TextureFormat = XivTexFormat.A16B16G16R16F,
-                TextureTypeAndPath = xivMtrl.TextureTypePathList[xivMtrl.TextureTypePathList.Count - 1]
+                TextureTypeAndPath = ttp
             };
 
             return xivTex;
