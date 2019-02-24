@@ -36,6 +36,16 @@ namespace xivModdingFramework.Models.DataContainers
         public bool Disable { get; set; }
 
         /// <summary>
+        /// The material index associated with this mesh
+        /// </summary>
+        public short MaterialIndex { get; set; }
+
+        /// <summary>
+        /// The mesh part list
+        /// </summary>
+        public List<int> PartList { get; set; }
+
+        /// <summary>
         /// The mesh part dictionary
         /// </summary>
         public Dictionary<int, int> PartDictionary { get; set; }
