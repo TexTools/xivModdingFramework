@@ -46,8 +46,13 @@ namespace xivModdingFramework.Models.DataContainers
         public List<int> PartList { get; set; }
 
         /// <summary>
-        /// The mesh part dictionary
+        /// The mesh part dictionary containing (mesh part, attribute index)
         /// </summary>
-        public Dictionary<int, int> PartDictionary { get; set; }
+        public Dictionary<int, int> PartAttributeDictionary { get; set; } = new Dictionary<int, int>();
+
+        /// <summary>
+        /// The bones for the model
+        /// </summary>
+        public List<string> ExtraBones { get; set; }
     }
 }
