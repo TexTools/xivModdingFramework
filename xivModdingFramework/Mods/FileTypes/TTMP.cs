@@ -409,7 +409,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                         dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
                                             modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                            GetDataType(modJson.FullPath));
+                                            GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                     }
                                     else
                                     {
@@ -419,7 +419,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                         dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                             modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                            GetDataType(modJson.FullPath));
+                                            GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                     }
 
                                     progress?.Report((double)modCount/ modsJson.Count);
@@ -432,6 +432,20 @@ namespace xivModdingFramework.Mods.FileTypes
                             break;
                         }
                     }
+                }
+
+                if (modsJson[0].ModPackEntry != null)
+                {
+                    modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+
+                    var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
+
+                    if (!modPackExists)
+                    {
+                        modList.ModPacks.Add(modsJson[0].ModPackEntry);
+                    }
+
+                    File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
 
                 return modCount - 1;
