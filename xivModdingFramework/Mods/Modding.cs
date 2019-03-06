@@ -80,6 +80,8 @@ namespace xivModdingFramework.Mods
         /// <returns>The mod entry if found, null otherwise</returns>
         public Mod TryGetModEntry(string internalFilePath)
         {
+            internalFilePath = internalFilePath.Replace("\\", "/");
+
             var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
 
             if (modList == null) return null;
@@ -260,6 +262,8 @@ namespace xivModdingFramework.Mods
 
             foreach (var modEntry in modList.Mods)
             {
+                if(string.IsNullOrEmpty(modEntry.name)) continue;
+                
                 if (enable && !modEntry.enabled)
                 {
                     index.UpdateIndex(modEntry.data.modOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
