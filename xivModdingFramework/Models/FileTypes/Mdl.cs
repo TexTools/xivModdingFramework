@@ -15,11 +15,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using HelixToolkit.Wpf.SharpDX;
-using HelixToolkit.Wpf.SharpDX.Core;
 using SharpDX;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -81,6 +79,11 @@ namespace xivModdingFramework.Models.FileTypes
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
+
+            if (originalOffset != 0)
+            {
+                offset = originalOffset;
+            }
 
             if (offset == 0)
             {
@@ -1239,10 +1242,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         }
 
-                                        if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
-                                        {
-                                            throw new Exception($"Reference Index is larger than the index count. Refrence Index: {data.ReferenceIndexOffset}  Index Count: {mesh.VertexData.Indices.Count}");
-                                        }
+                                        //if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
+                                        //{
+                                        //    throw new Exception($"Reference Index is larger than the index count. Refrence Index: {data.ReferenceIndexOffset}  Index Count: {mesh.VertexData.Indices.Count}");
+                                        //}
 
                                         // Gets the index to which the data is referencing
                                         var referenceIndex = mesh.VertexData.Indices[data.ReferenceIndexOffset];
@@ -1252,14 +1255,16 @@ namespace xivModdingFramework.Models.FileTypes
                                             referencePositionsDictionary.Add(data.ReferenceIndexOffset, mesh.VertexData.Positions[referenceIndex]);
                                         }
 
-                                        if (data.ShapeIndex >= mesh.VertexData.Positions.Count)
-                                        {
-                                            throw new Exception($"Shape Index is larger than the positions count. Shape Index: {data.ShapeIndex}  Positions Count: {mesh.VertexData.Positions.Count}");
-                                        }
-
                                         if (!meshShapePositionsDictionary.ContainsKey(data.ShapeIndex))
                                         {
-                                            meshShapePositionsDictionary.Add(data.ShapeIndex, mesh.VertexData.Positions[data.ShapeIndex]);
+                                            if (data.ShapeIndex >= mesh.VertexData.Positions.Count)
+                                            {
+                                                meshShapePositionsDictionary.Add(data.ShapeIndex, new Vector3(0));
+                                            }
+                                            else
+                                            {
+                                                meshShapePositionsDictionary.Add(data.ShapeIndex, mesh.VertexData.Positions[data.ShapeIndex]);
+                                            }
                                         }
                                     }
 
@@ -1299,7 +1304,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
         public Dictionary<string, string> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
-            Dictionary<string, ModelImportSettings> advImportSettings, string source, bool rawDataOnly = false)
+            Dictionary<string, ModelImportSettings> advImportSettings, string source, string pluginTarget, bool rawDataOnly = false)
         {
             if (!File.Exists(daeLocation.FullName))
             {
@@ -1318,7 +1323,7 @@ namespace xivModdingFramework.Models.FileTypes
             // A dictonary containing any warnings raised by the import in the format <Warning Title, Warning Message>
             var warningsDictionary = new Dictionary<string, string>();
 
-            var dae = new Dae(_gameDirectory, _dataFile);
+            var dae = new Dae(_gameDirectory, _dataFile, pluginTarget);
 
             // We only use the highest quality LoD for importing which is LoD 0
             var lod0 = xivMdl.LoDList[0];
@@ -1377,12 +1382,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var bInList = new List<int>();
 
-                var partNum = 0;
-                var positionMax = 0;
-                var normalMax = 0;
-                var texCoord0Max = 0;
-                var texCoord1Max = 0;
-                var biNormalMax = 0;
+                var partNum        = 0;
+                var positionMax    = 0;
+                var normalMax      = 0;
+                var vColorMax      = 0;
+                var texCoord0Max   = 0;
+                var texCoord1Max   = 0;
+                var biNormalMax    = 0;
+                var vColorAlphaMax = 0;
 
                 if (partDataDict.Count > 0)
                 {
@@ -1403,6 +1410,8 @@ namespace xivModdingFramework.Models.FileTypes
                         meshDataDictionary[i].TextureCoordinates1.AddRange(partDataDict[partNum].TextureCoordinates1);
                         meshDataDictionary[i].Tangents.AddRange(partDataDict[partNum].Tangents);
                         meshDataDictionary[i].BiNormals.AddRange(partDataDict[partNum].BiNormals);
+                        meshDataDictionary[i].VertexColors.AddRange(partDataDict[partNum].VertexColors);
+                        meshDataDictionary[i].VertexAlphas.AddRange(partDataDict[partNum].VertexAlphas);
 
                         // Consolidate all index data into one Collada Data per mesh
                         for (var k = 0; k < partDataDict[partNum].PositionIndices.Count; k++)
@@ -1420,11 +1429,28 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 meshDataDictionary[i].Indices.Add(partDataDict[partNum].BiNormalIndices[k] + biNormalMax);
                             }
+
+                            if (partDataDict[partNum].VertexColors.Count > 0)
+                            {
+                                meshDataDictionary[i].Indices.Add(partDataDict[partNum].VertexColorIndices[k] + vColorMax);
+                            }
+
+
+                            if (partDataDict[partNum].VertexAlphas.Count > 0)
+                            {
+                                meshDataDictionary[i].Indices.Add(partDataDict[partNum].VertexAlphaIndices[k] + vColorAlphaMax);
+                            }
                         }
 
                         // Get the largest index for each data point
                         positionMax += partDataDict[partNum].PositionIndices.Max() + 1;
                         normalMax += partDataDict[partNum].NormalIndices.Max() + 1;
+
+                        if (partDataDict[partNum].VertexColors.Count > 0)
+                        {
+                            vColorMax += partDataDict[partNum].VertexColorIndices.Max() + 1;
+                        }
+
                         texCoord0Max += partDataDict[partNum].TextureCoordinate0Indices.Max() + 1;
 
                         if (partDataDict[partNum].TextureCoordinates1.Count > 0)
@@ -1436,6 +1462,12 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             biNormalMax += partDataDict[partNum].BiNormalIndices.Max() + 1;
                         }
+
+                        if (partDataDict[partNum].VertexAlphas.Count > 0)
+                        {
+                            vColorAlphaMax += partDataDict[partNum].VertexAlphaIndices.Max() + 1;
+                        }
+
 
                         // Add the part number and index count for each part in the mesh
                         meshDataDictionary[i].PartsDictionary.Add(partNum, partDataDict[partNum].Indices.Count / partDataDict[partNum].IndexStride);
@@ -1484,26 +1516,30 @@ namespace xivModdingFramework.Models.FileTypes
             foreach (var colladaData in meshDataDictionary.Values)
             {
                 // Make the data into collections of vectors
-                var positionCollection = new Vector3Collection();
-                var texCoord0Collection = new Vector2Collection();
-                var texCoord1Collection = new Vector2Collection();
-                var normalsCollection = new Vector3Collection();
-                var tangentsCollection = new Vector3Collection();
-                var biNormalsCollection = new Vector3Collection();
-                var indexCollection = new IntCollection();
-                var boneIndexCollection = new List<byte[]>();
-                var boneWeightCollection = new List<byte[]>();
-                var boneStringList = new List<string>();
+                var positionCollection    = new Vector3Collection();
+                var texCoord0Collection   = new Vector2Collection();
+                var texCoord1Collection   = new Vector2Collection();
+                var normalsCollection     = new Vector3Collection();
+                var tangentsCollection    = new Vector3Collection();
+                var biNormalsCollection   = new Vector3Collection();
+                var vertexColorCollection = new Vector3Collection();
+                var vertexAlphaCollection = new Vector2Collection();
+                var indexCollection       = new IntCollection();
+                var boneIndexCollection   = new List<byte[]>();
+                var boneWeightCollection  = new List<byte[]>();
+                var boneStringList        = new List<string>();
 
 
-                var nPositionCollection = new Vector3Collection();
-                var nTexCoord0Collection = new Vector2Collection();
-                var nTexCoord1Collection = new Vector2Collection();
-                var nNormalsCollection = new Vector3Collection();
-                var nTangentsCollection = new Vector3Collection();
-                var nBiNormalsCollection = new Vector3Collection();
-                var nBoneIndexCollection = new List<byte[]>();
-                var nBoneWeightCollection = new List<byte[]>();
+                var nPositionCollection    = new Vector3Collection();
+                var nTexCoord0Collection   = new Vector2Collection();
+                var nTexCoord1Collection   = new Vector2Collection();
+                var nNormalsCollection     = new Vector3Collection();
+                var nTangentsCollection    = new Vector3Collection();
+                var nBiNormalsCollection   = new Vector3Collection();
+                var nVertexColorCollection = new Vector3Collection();
+                var nVertexAlphaCollection = new Vector2Collection();
+                var nBoneIndexCollection   = new List<byte[]>();
+                var nBoneWeightCollection  = new List<byte[]>();
 
                 for (var i = 0; i < colladaData.Positions.Count; i += 3)
                 {
@@ -1516,6 +1552,12 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     normalsCollection.Add(new Vector3(colladaData.Normals[i], colladaData.Normals[i + 1],
                         colladaData.Normals[i + 2]));
+                }
+
+                for (var i = 0; i < colladaData.VertexColors.Count; i += 3)
+                {
+                    vertexColorCollection.Add(new Vector3(colladaData.VertexColors[i], colladaData.VertexColors[i + 1],
+                        colladaData.VertexColors[i + 2]));
                 }
 
                 if (colladaData.BiNormals.Count > 0)
@@ -1548,264 +1590,117 @@ namespace xivModdingFramework.Models.FileTypes
                         colladaData.TextureCoordinates1[i + 1]));
                 }
 
+                for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
+                {
+                    vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]));
+                }
+
                 if (!isHousingItem) // housing items do not have bones
                 {
                     var errorDict = new Dictionary<int, int>();
 
-                    // Bone index dictionary containing <bone index, index>
-                    var boneIndexDict = new Dictionary<int, int>();
+                    var currentBoneIndex = 0;
 
-                    var boneListIndex = lod0.MeshDataList[meshNum].MeshInfo.BoneListIndex;
-                    var boneIndices = xivMdl.BoneIndexMeshList[boneListIndex];
-
-                    // Fill the dictionary with the bone index and its index
-                    for (var i = 0; i < boneIndices.BoneIndexCount; i++)
+                    for (var i = 0; i < positionCollection.Count; i++)
                     {
-                        boneIndexDict.Add(boneIndices.BoneIndices[i], i);
-                    }
+                        // The number of bones for this vertex
+                        var vertBoneCount = colladaData.Vcounts[i];
 
-                    var totalBoneCount = 0;
+                        var boneSum = 0;
 
-                    try
-                    {
-                        for (var i = 0; i < positionCollection.Count; i++)
+                        var boneIndexList = new List<byte>();
+                        var boneWeightList = new List<byte>();
+
+                        var newBoneCount = 0;
+
+                        for (var j = 0; j < vertBoneCount * 2; j += 2)
                         {
-                            // The number of bones for this vertex
-                            var vertBoneCount = colladaData.Vcounts[i];
+                            var colladaBoneIndex = currentBoneIndex * 2 + j;
 
-                            var boneSum = 0;
-
-                            var boneIndexList = new List<byte>();
-                            var boneWeightList = new List<byte>();
-
-                            var newBoneCount = 0;
-                            for (var j = 0; j < vertBoneCount * 2; j += 2)
+                            if (colladaBoneIndex > colladaData.BoneIndices.Count)
                             {
-                                // Get bone index from read data
-                                var dbi = totalBoneCount * 2 + j;
-
-                                if (!colladaData.BoneIndices.Contains(dbi))
-                                {
-                                    throw new Exception($"Could not find bone index '{dbi}' in Mesh: {meshNum}");
-                                }
-
-                                var dataBoneIndex = colladaData.BoneIndices[dbi];
-
-                                // Get correct bone index from original model data
-                                if (!boneIndexDict.ContainsKey(dataBoneIndex))
-                                {
-                                    throw new Exception($"Mesh: {meshNum} does not contain a bone at index {dataBoneIndex}");
-                                }
-
-                                var newBoneIndex = (byte)boneIndexDict[dataBoneIndex];
-
-                                // Get the bone weight for that index
-                                var bwi = colladaData.BoneIndices[totalBoneCount * 2 + j + 1];
-
-                                if (!colladaData.BoneWeights.Contains(bwi))
-                                {
-                                    throw new Exception($"There is no bone weight at index {bwi} in Mesh: {meshNum}");
-                                }
-
-                                var boneWeight = (byte)Math.Round(colladaData.BoneWeights[bwi] * 255f);
-
-                                // If the bone weight is not 0 add the index and weight to the list
-                                if (boneWeight == 0) continue;
-
-                                boneIndexList.Add(newBoneIndex);
-                                boneWeightList.Add(boneWeight);
-                                boneSum += boneWeight;
-                                newBoneCount++;
+                                throw new Exception($"Could not find bone index '{colladaBoneIndex}' in Mesh: {meshNum}");
                             }
 
-                            // Keep the original bone count, and set vertex bone count to the new bone count
-                            var originalBoneCount = vertBoneCount;
-                            vertBoneCount = newBoneCount;
+                            var dataBoneIndex = colladaData.BoneIndices[colladaBoneIndex];
 
-                            // Check if the bone count for the vertex is less than 4
-                            // Note: The maximum allowed by the mdl file is 4
-                            if (vertBoneCount < 4)
+                            var boneWeightIndex = colladaData.BoneIndices[colladaBoneIndex + 1];
+
+                            if (boneWeightIndex > colladaData.BoneWeights.Count)
                             {
-                                var remainder = 4 - vertBoneCount;
-
-                                // Add 0 for any remaining bones to fill up to 4
-                                for (var k = 0; k < remainder; k++)
-                                {
-                                    boneIndexList.Add(0);
-                                    boneWeightList.Add(0);
-                                }
-                            }
-                            else if (vertBoneCount > 4)
-                            {
-                                var extras = vertBoneCount - 4;
-
-                                // Removes any extra bones from the list
-                                // This will remove the ones with the smallest weights
-                                for (var k = 0; k < extras; k++)
-                                {
-                                    var min = boneWeightList.Min();
-                                    var minIndex = boneWeightList.IndexOf(min);
-                                    var count = (boneWeightList.Count(x => x == min));
-                                    boneWeightList.Remove(min);
-                                    boneIndexList.RemoveAt(minIndex);
-                                    boneSum -= min;
-                                }
+                                throw new Exception($"There is no bone weight at index {boneWeightIndex} in Mesh: {meshNum}");
                             }
 
-                            // If the sum of the bones is not 255,
-                            // add or remove weight from the largest bone weight
-                            if (boneSum != 255)
-                            {
-                                var diff = boneSum - 255;
-                                var max = boneWeightList.Max();
-                                var maxIndex = boneWeightList.IndexOf(max);
-                                errorDict.Add(i, diff);
-                                if (diff < 0)
-                                {
-                                    boneWeightList[maxIndex] += (byte)Math.Abs(diff);
-                                }
-                                else
-                                {
-                                    // Subtract difference when over-weight.
-                                    boneWeightList[maxIndex] -= (byte)Math.Abs(diff);
-                                }
-                            }
+                            var boneWeight = (byte)Math.Round(colladaData.BoneWeights[boneWeightIndex] * 255f);
 
-                            boneSum = 0;
-                            boneWeightList.ForEach(x => boneSum += x);
+                            // If the bone weight is not 0 add the index and weight to the list
+                            if (boneWeight == 0) continue;
 
-                            boneIndexCollection.Add(boneIndexList.ToArray());
-                            boneWeightCollection.Add(boneWeightList.ToArray());
-                            totalBoneCount += originalBoneCount;
-                        }
-                    }
-                    catch
-                    {
-                        warningsDictionary.Add($"Mismatched Bones {meshNum}",
-                            $"It was detected that Mesh: {meshNum}  references bones that were not originally part of that mesh.\n\nAn attempt to correct the data was made");
-
-                        totalBoneCount = 0;
-                        boneIndexDict.Clear();
-                        errorDict.Clear();
-                        boneIndexCollection.Clear();
-                        boneWeightCollection.Clear();
-
-                        // Use the bone index list for mesh 0 which usually contains all bones
-                        boneIndices = xivMdl.BoneIndexMeshList[0];
-
-                        for (var i = 0; i < boneIndices.BoneIndexCount; i++)
-                        {
-                            boneIndexDict.Add(boneIndices.BoneIndices[i], i);
+                            boneIndexList.Add((byte)dataBoneIndex);
+                            boneWeightList.Add(boneWeight);
+                            boneSum += boneWeight;
+                            newBoneCount++;
                         }
 
-                        for (var i = 0; i < positionCollection.Count; i++)
+                        // Keep the original bone count, and set vertex bone count to the new bone count
+                        var originalBoneCount = vertBoneCount;
+                        vertBoneCount = newBoneCount;
+
+                        // Check if the bone count for the vertex is less than 4
+                        // Note: The maximum allowed by the mdl file is 4
+                        if (vertBoneCount < 4)
                         {
-                            var vertBoneCount = colladaData.Vcounts[i];
+                            var remainder = 4 - vertBoneCount;
 
-                            var boneSum = 0;
-
-                            var boneIndexList = new List<byte>();
-                            var boneWeightList = new List<byte>();
-
-                            var newBoneCount = 0;
-                            for (var j = 0; j < vertBoneCount * 2; j += 2)
+                            // Add 0 for any remaining bones to fill up to 4
+                            for (var k = 0; k < remainder; k++)
                             {
-                                // Get bone index from read data
-                                var dbi = totalBoneCount * 2 + j;
-
-                                if (dbi > colladaData.BoneIndices.Count)
-                                {
-                                    throw new Exception($"Could not find bone index '{dbi}' in Mesh: {meshNum} on second attempt");
-                                }
-
-                                var dataBoneIndex = colladaData.BoneIndices[dbi];
-
-                                // Get correct bone index from original model data
-                                if (!boneIndexDict.ContainsKey(dataBoneIndex))
-                                {
-                                    throw new Exception($"Mesh: {meshNum} does not contain a bone at index {dataBoneIndex} on second attempt");
-                                }
-
-                                var newBoneIndex = (byte)boneIndexDict[dataBoneIndex];
-
-                                // Get the bone weight for that index
-                                var bwi = colladaData.BoneIndices[totalBoneCount * 2 + j + 1];
-
-                                if (bwi > colladaData.BoneWeights.Count)
-                                {
-                                    throw new Exception($"There is no bone weight at index {bwi} in Mesh: {meshNum}");
-                                }
-
-                                var boneWeight = (byte)Math.Round(colladaData.BoneWeights[bwi] * 255f);
-
-                                // If the bone weight is not 0 add the index and weight to the list
-                                if (boneWeight == 0) continue;
-
-                                boneIndexList.Add(newBoneIndex);
-                                boneWeightList.Add(boneWeight);
-                                boneSum += boneWeight;
-                                newBoneCount++;
+                                boneIndexList.Add(0);
+                                boneWeightList.Add(0);
                             }
-
-                            // Keep the original bone count, and set vertex bone count to the new bone count
-                            var originalBoneCount = vertBoneCount;
-                            vertBoneCount = newBoneCount;
-
-                            // Check if the bone count for the vertex is less than 4
-                            // Note: The maximum allowed by the mdl file is 4
-                            if (vertBoneCount < 4)
-                            {
-                                var remainder = 4 - vertBoneCount;
-
-                                for (var k = 0; k < remainder; k++)
-                                {
-                                    boneIndexList.Add(0);
-                                    boneWeightList.Add(0);
-                                }
-                            }
-                            else if (vertBoneCount > 4)
-                            {
-                                var extras = vertBoneCount - 4;
-
-                                // Removes any extra bones from the list
-                                // This will remove the ones with the smallest weights
-                                for (var k = 0; k < extras; k++)
-                                {
-                                    var min = boneWeightList.Min();
-                                    var minIndex = boneWeightList.IndexOf(min);
-                                    var count = (boneWeightList.Count(x => x == min));
-                                    boneWeightList.Remove(min);
-                                    boneIndexList.RemoveAt(minIndex);
-                                    boneSum -= min;
-                                }
-                            }
-
-                            // If the sum of the bones is not 255,
-                            // add or remove weight from the largest bone weight
-                            if (boneSum != 255)
-                            {
-                                var diff = boneSum - 255;
-                                var max = boneWeightList.Max();
-                                var maxIndex = boneWeightList.IndexOf(max);
-                                errorDict.Add(i, diff);
-                                if (diff < 0)
-                                {
-                                    boneWeightList[maxIndex] += (byte)Math.Abs(diff);
-                                }
-                                else
-                                {
-                                    // Subtract difference when over-weight.
-                                    boneWeightList[maxIndex] -= (byte)Math.Abs(diff);
-                                }
-                            }
-
-                            boneSum = 0;
-                            boneWeightList.ForEach(x => boneSum += x);
-
-                            boneIndexCollection.Add(boneIndexList.ToArray());
-                            boneWeightCollection.Add(boneWeightList.ToArray());
-                            totalBoneCount += originalBoneCount;
                         }
+                        else if (vertBoneCount > 4)
+                        {
+                            var extras = vertBoneCount - 4;
+
+                            // Removes any extra bones from the list
+                            // This will remove the ones with the smallest weights
+                            for (var k = 0; k < extras; k++)
+                            {
+                                var min = boneWeightList.Min();
+                                var minIndex = boneWeightList.IndexOf(min);
+                                var count = (boneWeightList.Count(x => x == min));
+                                boneWeightList.Remove(min);
+                                boneIndexList.RemoveAt(minIndex);
+                                boneSum -= min;
+                            }
+                        }
+
+                        // If the sum of the bones is not 255,
+                        // add or remove weight from the largest bone weight
+                        if (boneSum != 255)
+                        {
+                            var diff = boneSum - 255;
+                            var max = boneWeightList.Max();
+                            var maxIndex = boneWeightList.IndexOf(max);
+                            errorDict.Add(i, diff);
+                            if (diff < 0)
+                            {
+                                boneWeightList[maxIndex] += (byte)Math.Abs(diff);
+                            }
+                            else
+                            {
+                                // Subtract difference when over-weight.
+                                boneWeightList[maxIndex] -= (byte)Math.Abs(diff);
+                            }
+                        }
+
+                        boneSum = 0;
+                        boneWeightList.ForEach(x => boneSum += x);
+
+                        boneIndexCollection.Add(boneIndexList.ToArray());
+                        boneWeightCollection.Add(boneWeightList.ToArray());
+                        currentBoneIndex += originalBoneCount;
                     }
 
                     // If there were bones that needed to be corrected a string of the corrected data will be made
@@ -1831,9 +1726,19 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var stride = 5;
 
+                if (colladaData.VertexColors.Count > 0)
+                {
+                    stride = 7;
+                }
+
                 if (texCoord1Collection.Count < 1)
                 {
                     stride = 4;
+                }
+
+                if (biNormalsCollection.Count < 1)
+                {
+                    stride = 3;
                 }
 
                 for (var i = 0; i < colladaData.Indices.Count; i += stride)
@@ -1906,11 +1811,9 @@ namespace xivModdingFramework.Models.FileTypes
                             nTexCoord1Collection.Add(texCoord1Collection[pos3]);
                         }
 
-                        // If there are secondary texture coordinates, we adjust the index position as necessary
-                        var nPos = texCoord1Collection.Count > 0 ? indexList[i][4] : indexList[i][3];
-
                         if (tangentsCollection.Count > 0)
                         {
+                            var nPos = texCoord1Collection.Count > 0 ? indexList[i][4] : indexList[i][3];
                             // If the index at index n is larger than the tangents collection, throw an exception
                             if (nPos > tangentsCollection.Count)
                             {
@@ -1921,12 +1824,35 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (biNormalsCollection.Count > 0)
                         {
+                            var nPos = texCoord1Collection.Count > 0 ? indexList[i][4] : indexList[i][3];
                             // If the index at index n is larger than the binormals collection, throw an exception
                             if (nPos > biNormalsCollection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no binormal at index {nPos},  binormal count: {biNormalsCollection.Count}");
                             }
                             nBiNormalsCollection.Add(biNormalsCollection[nPos]);
+                        }
+
+                        if (vertexColorCollection.Count > 0)
+                        {
+                            var colorPos = indexList[i][5];
+
+                            if (colorPos > vertexColorCollection.Count)
+                            {
+                                throw new IndexOutOfRangeException($"There is no vertex color at index {colorPos},  vertex color count: {vertexColorCollection.Count}");
+                            }
+                            nVertexColorCollection.Add(vertexColorCollection[colorPos]);
+                        }
+
+                        if (vertexAlphaCollection.Count > 0)
+                        {
+                            var alphaPos = indexList[i][6];
+
+                            if (alphaPos > vertexAlphaCollection.Count)
+                            {
+                                throw new IndexOutOfRangeException($"There is no vertex alpha at index {alphaPos},  vertex color count: {vertexAlphaCollection.Count}");
+                            }
+                            nVertexAlphaCollection.Add(vertexAlphaCollection[alphaPos]);
                         }
                     }
                     // For blender there is only 1 index for all data points
@@ -2023,39 +1949,43 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 // TODO: Implement a better version of Fix for shape data
-                var referencePositionDictionary = lod0.MeshDataList[meshNum].ReferencePositionsDictionary;
 
                 // If there are advanced import settings available and the current mesh is in the settings
                 if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
                 {
-                    // If the fix option is selected for either all meshes or this mesh
-                    if (advImportSettings[meshNum.ToString()].Fix)
+                    if (lod0.MeshDataList.Count > meshNum)
                     {
-                        foreach (var referencePosition in referencePositionDictionary)
+                        var referencePositionDictionary = lod0.MeshDataList[meshNum].ReferencePositionsDictionary;
+
+                        // If the fix option is selected for either all meshes or this mesh
+                        if (advImportSettings[meshNum.ToString()].Fix)
                         {
-                            var a = 0;
-                            foreach (var v in nPositionCollection)
+                            foreach (var referencePosition in referencePositionDictionary)
                             {
-                                var found = false;
-                                if (Vector3.NearEqual(referencePosition.Value, v, new Vector3(0.02f)))
+                                var a = 0;
+                                foreach (var v in nPositionCollection)
                                 {
-                                    for (var i = 0; i < indexCollection.Count; i++)
+                                    var found = false;
+                                    if (Vector3.NearEqual(referencePosition.Value, v, new Vector3(0.02f)))
                                     {
-                                        if (a == indexCollection[i] && !nPositionsList.Contains(i) && !meshShapeDictionary.ContainsKey(referencePosition.Key))
+                                        for (var i = 0; i < indexCollection.Count; i++)
                                         {
-                                            meshShapeDictionary.Add(referencePosition.Key, i);
-                                            nPositionsList.Add(i);
-                                            found = true;
+                                            if (a == indexCollection[i] && !nPositionsList.Contains(i) && !meshShapeDictionary.ContainsKey(referencePosition.Key))
+                                            {
+                                                meshShapeDictionary.Add(referencePosition.Key, i);
+                                                nPositionsList.Add(i);
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if (found)
+                                        {
                                             break;
                                         }
                                     }
-
-                                    if (found)
-                                    {
-                                        break;
-                                    }
+                                    a++;
                                 }
-                                a++;
                             }
                         }
                     }
@@ -2149,6 +2079,20 @@ namespace xivModdingFramework.Models.FileTypes
                 colladaMeshData.BoneWeights = nBoneWeightCollection;
                 colladaMeshData.PartsDictionary = colladaData.PartsDictionary;
                 colladaMeshData.TextureCoordintes1 = nTexCoord1Collection;
+                colladaMeshData.VertexColors = nVertexColorCollection;
+
+                // Go ahead and distill this down into just the single value we care about.
+                foreach (var uv3Coordinate in nVertexAlphaCollection)
+                {
+                    colladaMeshData.VertexAlphas.Add(MathUtil.Clamp(uv3Coordinate.X, 0, 1));
+
+                }
+
+                colladaMeshData.BoneNumDictionary = meshPartDataDictionary[meshNum][0].BoneNumDictionary;
+                foreach (var data in meshPartDataDictionary[meshNum])
+                {
+                    colladaMeshData.PartBoneDictionary.Add(data.Key, data.Value.MeshBoneNames);
+                }
 
                 colladaMeshDataList.Add(colladaMeshData);
 
@@ -2403,13 +2347,25 @@ namespace xivModdingFramework.Models.FileTypes
 
             var pathInfoBlock = new List<byte>();
 
+            var pathCount = xivMdl.PathData.PathCount;
+            var pathBlockSize = xivMdl.PathData.PathBlockSize;
+
+            if (importSettings != null)
+            {
+                foreach (var extraBone in importSettings["0"].ExtraBones)
+                {
+                    pathCount++;
+                    pathBlockSize += extraBone.Length + 1;
+                }
+            }
+
             // Path Count
             // If doing an advanced import, and paths were added/removed, this value has already been changed directly in the XivMdl
-            pathInfoBlock.AddRange(BitConverter.GetBytes(xivMdl.PathData.PathCount));
+            pathInfoBlock.AddRange(BitConverter.GetBytes(pathCount));
 
             // Path Block Size
             // If doing an advanced import, and paths were added/removed, this value has already been changed directly in the XivMdl
-            pathInfoBlock.AddRange(BitConverter.GetBytes(xivMdl.PathData.PathBlockSize));
+            pathInfoBlock.AddRange(BitConverter.GetBytes(pathBlockSize));
 
             // Attribute paths
             var attributeOffsetList = new List<int>();
@@ -2428,13 +2384,34 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Bone paths
+            var boneOffsetList = new List<int>();
+
             foreach (var bone in xivMdl.PathData.BoneList)
             {
+                // Bone offset in path data block
+                boneOffsetList.Add(pathInfoBlock.Count - 8);
+
                 // Path converted to bytes
                 pathInfoBlock.AddRange(Encoding.UTF8.GetBytes(bone));
 
                 // Byte between paths
                 pathInfoBlock.Add(0);
+            }
+
+            // Extra Bone paths
+            if (importSettings != null)
+            {
+                foreach (var extraBone in importSettings["0"].ExtraBones)
+                {
+                    // Bone offset in path data block
+                    boneOffsetList.Add(pathInfoBlock.Count - 8);
+
+                    // Path converted to bytes
+                    pathInfoBlock.AddRange(Encoding.UTF8.GetBytes(extraBone));
+
+                    // Byte between paths
+                    pathInfoBlock.Add(0);
+                }
             }
 
             // Material paths
@@ -2453,6 +2430,21 @@ namespace xivModdingFramework.Models.FileTypes
                 pathInfoBlock.Add(0);
             }
 
+            // Shape paths
+            var shapeOffsetList = new List<int>();
+
+            foreach (var shape in xivMdl.PathData.ShapeList)
+            {
+                // Shape offset in path data block
+                shapeOffsetList.Add(pathInfoBlock.Count - 8);
+
+                // Path converted to bytes
+                pathInfoBlock.AddRange(Encoding.UTF8.GetBytes(shape));
+
+                // Byte between paths
+                pathInfoBlock.Add(0);
+            }
+
             // Extra paths
             foreach (var extra in xivMdl.PathData.ExtraPathList)
             {
@@ -2464,10 +2456,10 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Padding before next section
-            var pathPadding = xivMdl.PathData.PathBlockSize - (pathInfoBlock.Count - 8);
+            var pathPadding = pathBlockSize - (pathInfoBlock.Count - 8);
             pathInfoBlock.AddRange(new byte[pathPadding]);
 
-            fullModelDataBlock.AddRange(pathInfoBlock);
+
             #endregion
 
             // Model Data
@@ -2492,6 +2484,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
+            modelData.MeshCount = meshCount;
             modelDataBlock.AddRange(BitConverter.GetBytes(meshCount));
 
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.AttributeCount)); // This value has already been changed if doing an advanced import and attributes were added/removed
@@ -2522,9 +2515,18 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             modelDataBlock.AddRange(BitConverter.GetBytes(meshPartCount));
-
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.MaterialCount)); // This value has already been changed if doing an advanced import and materials were added/removed
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.BoneCount));
+
+            // Add extra bone count if doing an advanced import
+            var boneStringCount = modelData.BoneCount;
+
+            if (importSettings != null)
+            {
+                boneStringCount += (short)importSettings["0"].ExtraBones.Count;
+            }
+            modelDataBlock.AddRange(BitConverter.GetBytes(boneStringCount));
+
+
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.BoneListCount));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeCount));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeDataCount));
@@ -2548,7 +2550,7 @@ namespace xivModdingFramework.Models.FileTypes
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown16));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown17));
 
-            fullModelDataBlock.AddRange(modelDataBlock);
+
 
             #endregion
 
@@ -2557,7 +2559,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var unknownDataBlock0 = xivMdl.UnkData0.Unknown;
 
-            fullModelDataBlock.AddRange(unknownDataBlock0);
+
 
             #endregion
 
@@ -2611,9 +2613,9 @@ namespace xivModdingFramework.Models.FileTypes
                         var skipShapeData = false;
 
                         // If meshes were added, no entry exists for it in the original data, so we grab the last available mesh
-                        if (importSettings != null && importData.Key > lod.MeshDataList.Count)
+                        if (importSettings != null && importData.Key >= lod.MeshDataList.Count)
                         {
-                            var diff = importData.Key - lod.MeshDataList.Count;
+                            var diff = (importData.Key + 1) - lod.MeshDataList.Count;
                             meshData = lod.MeshDataList[importData.Key - diff];
                             skipShapeData = true;
                         }
@@ -2721,17 +2723,16 @@ namespace xivModdingFramework.Models.FileTypes
                 lodNum++;
             }
 
-            fullModelDataBlock.AddRange(lodDataBlock);
+
 
             #endregion
 
             // Extra LoD Data
             #region Extra Level Of Detail Block
+            var extraLodDataBlock = new List<byte>();
 
             if (xivMdl.ExtraLoDList != null && xivMdl.ExtraLoDList.Count > 0)
             {
-                var extraLodDataBlock = new List<byte>();
-
                 foreach (var lod in xivMdl.ExtraLoDList)
                 {
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshOffset));
@@ -2754,7 +2755,7 @@ namespace xivModdingFramework.Models.FileTypes
                     extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataOffset));
                 }
 
-                fullModelDataBlock.AddRange(extraLodDataBlock);
+
             }
             #endregion
 
@@ -2765,14 +2766,16 @@ namespace xivModdingFramework.Models.FileTypes
             var meshDataBlock = new List<byte>();
 
             lodNum = 0;
-            var addedMeshParts = 0;
+            var totalAddedMeshParts = 0;
             foreach (var lod in xivMdl.LoDList)
             {
                 var meshNum = 0;
                 var previousVertexDataOffset1 = 0;
                 var previousIndexDataOffset = 0;
                 var previousIndexCount = 0;
-                var previousMeshPartIndex = 0;
+                var newMeshPartIndex = 0;
+                var lod0VertexDataEntrySize0 = 0;
+                var lod0VertexDataEntrySize1 = 0;
 
                 foreach (var meshData in lod.MeshDataList)
                 {
@@ -2847,13 +2850,16 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             vertexDataOffset1 = vertexCount * vertexDataEntrySize0;
                         }
+
+                        lod0VertexDataEntrySize0 = vertexDataEntrySize0;
+                        lod0VertexDataEntrySize1 = vertexDataEntrySize1;
                     }
 
                     meshDataBlock.AddRange(BitConverter.GetBytes(vertexCount));
                     meshDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                     meshDataBlock.AddRange(BitConverter.GetBytes(meshInfo.MaterialIndex));
 
-                    meshDataBlock.AddRange(BitConverter.GetBytes((short)(meshInfo.MeshPartIndex + addedMeshParts)));
+                    meshDataBlock.AddRange(BitConverter.GetBytes((short)(meshInfo.MeshPartIndex + totalAddedMeshParts)));
                     meshDataBlock.AddRange(BitConverter.GetBytes(meshInfo.MeshPartCount));
 
                     meshDataBlock.AddRange(BitConverter.GetBytes(meshInfo.BoneListIndex));
@@ -2866,7 +2872,7 @@ namespace xivModdingFramework.Models.FileTypes
                     meshDataBlock.Add(vertexDataEntrySize2);
                     meshDataBlock.Add(meshInfo.VertexDataBlockCount);
 
-                    previousMeshPartIndex = meshInfo.MeshPartIndex;
+                    newMeshPartIndex = meshInfo.MeshPartIndex + meshInfo.MeshPartCount;
                     previousVertexDataOffset1 = vertexDataOffset1;
                     previousIndexDataOffset = indexDataOffset;
                     previousIndexCount = indexCount;
@@ -2885,31 +2891,14 @@ namespace xivModdingFramework.Models.FileTypes
                         var vertexDataOffset0 = 0;
                         var vertexDataOffset1 = 0;
                         var vertexDataOffset2 = 0;
-                        var vertexDataEntrySize0 = (byte)0;
-                        var vertexDataEntrySize1 = (byte)0;
+                        var vertexDataEntrySize0 = (byte)lod0VertexDataEntrySize0;
+                        var vertexDataEntrySize1 = (byte)lod0VertexDataEntrySize1;
                         var vertexDataEntrySize2 = (byte)0;
 
                         for (var i = 0; i < additionalMeshCount; i++)
                         {
                             vertexCount = importDataDictionary[meshNum].VertexCount;
                             indexCount = importDataDictionary[meshNum].IndexCount;
-
-                            // Since we changed Normals and Texture coordinates from half to floats, we need
-                            // to adjust the vertex data entry size for that data block from 24 to 36, or from 16 to 24 if its a housing item
-                            // we skip this adjustment if the model is already modified
-                            if (!isAlreadyModified)
-                            {
-                                var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
-
-                                if (texCoordDataType == VertexDataType.Float2)
-                                {
-                                    vertexDataEntrySize1 += 8;
-                                }
-                                else
-                                {
-                                    vertexDataEntrySize1 += 12;
-                                }
-                            }
 
                             // Calculate new index data offset
                             if (meshNum > 0)
@@ -2939,9 +2928,9 @@ namespace xivModdingFramework.Models.FileTypes
                             meshDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                             meshDataBlock.AddRange(BitConverter.GetBytes(importSettings[meshNum.ToString()].MaterialIndex));
 
-                            addedMeshParts = importSettings[meshNum.ToString()].PartList.Count;
-                            var newMeshPartIndex = (short) (previousMeshPartIndex + addedMeshParts);
-                            meshDataBlock.AddRange(BitConverter.GetBytes(newMeshPartIndex));
+                            var addedMeshParts = importSettings[meshNum.ToString()].PartList.Count;
+                            //var newMeshPartIndex = (short) (previousMeshPartIndex + addedMeshParts);
+                            meshDataBlock.AddRange(BitConverter.GetBytes((short)newMeshPartIndex));
                             meshDataBlock.AddRange(BitConverter.GetBytes((short)addedMeshParts));
 
                             // For new meshes added to LoD0, we use the first bone list at index 0 
@@ -2961,7 +2950,8 @@ namespace xivModdingFramework.Models.FileTypes
                             previousVertexDataOffset1 = vertexDataOffset1;
                             previousIndexDataOffset = indexDataOffset;
                             previousIndexCount = indexCount;
-                            previousMeshPartIndex = newMeshPartIndex;
+                            newMeshPartIndex += addedMeshParts;
+                            totalAddedMeshParts += addedMeshParts;
 
                             meshNum++;
                         }
@@ -2971,7 +2961,7 @@ namespace xivModdingFramework.Models.FileTypes
                 lodNum++;
             }
 
-            fullModelDataBlock.AddRange(meshDataBlock);
+
 
             #endregion
 
@@ -2986,9 +2976,10 @@ namespace xivModdingFramework.Models.FileTypes
                 attrPathOffsetList = attributeOffsetList;
             }
 
+            var attributePathDataBlock = new List<byte>();
             foreach (var attributeOffset in attrPathOffsetList)
             {
-                fullModelDataBlock.AddRange(BitConverter.GetBytes(attributeOffset));
+                attributePathDataBlock.AddRange(BitConverter.GetBytes(attributeOffset));
             }
 
             #endregion
@@ -2998,10 +2989,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var unknownDataBlock1 = xivMdl.UnkData1.Unknown;
 
-            if (unknownDataBlock1 != null)
-            {
-                fullModelDataBlock.AddRange(unknownDataBlock1);
-            }
+
             #endregion
 
             // Mesh Part
@@ -3010,12 +2998,15 @@ namespace xivModdingFramework.Models.FileTypes
             var meshPartDataBlock = new List<byte>();
 
             lodNum = 0;
-            var partPadding = 0;
+
+            short currentBoneOffset = 0;
             foreach (var lod in xivMdl.LoDList)
             {
                 var meshNum = 0;
                 var previousIndexOffset = 0;
                 var previousIndexCount = 0;
+                var partPadding = 0;
+
                 foreach (var meshData in lod.MeshDataList)
                 {
                     var partCount = meshData.MeshPartList.Count;
@@ -3040,7 +3031,15 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
-                                indexOffset = previousIndexOffset + previousIndexCount + partPadding;
+                                if (partNum == 0)
+                                {
+                                    indexOffset = previousIndexOffset + previousIndexCount + partPadding;
+                                }
+                                else
+                                {
+                                    indexOffset = previousIndexOffset + previousIndexCount;
+                                }
+
                             }
 
                             // Recalculate Index Count
@@ -3061,87 +3060,165 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                             }
 
-                            // Change attribute index if advanced import settings are present
+                            // Attribute index is changed directly to XivMdl from Advanced Import for existing meshes
+                            // This adds attributes if any for newly added meshes
                             if (importSettings != null && importSettings.ContainsKey(meshNum.ToString()))
                             {
-                                if (importSettings[meshNum.ToString()].PartDictionary != null)
+                                if (importSettings[meshNum.ToString()].PartAttributeDictionary.ContainsKey(partNum))
                                 {
-                                    attributeIndex = importSettings[meshNum.ToString()].PartDictionary[partNum];
+                                    attributeIndex = importSettings[meshNum.ToString()].PartAttributeDictionary[partNum];
                                 }
                             }
+                        }
+
+
+                        var boneCount = meshPart.BoneCount;
+                        if (lodNum == 0 && importSettings != null)
+                        {
+                            boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
                         }
 
                         meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
                         meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                         meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
-                        meshPartDataBlock.AddRange(BitConverter.GetBytes(meshPart.BoneStartOffset));
-                        meshPartDataBlock.AddRange(BitConverter.GetBytes(meshPart.BoneCount));
+                        meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
+                        meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
 
                         previousIndexCount = indexCount;
                         previousIndexOffset = indexOffset;
+                        currentBoneOffset += boneCount;
 
                         partNum++;
                     } 
 
                     if (lodNum == 0 && importSettings != null)
                     {
+                        var importSettingsMesh = importSettings[meshNum.ToString()];
+
                         // Add additional mesh parts if there are any from advanced importing
-                        if (importSettings[meshNum.ToString()].PartList.Count > partCount)
+                        if (importSettingsMesh.PartList.Count > partCount)
                         {
-                            int indexOffset;
+                            var extraPartCount = importSettingsMesh.PartList.Count - partCount;
 
-                            var importedPartsDictionary = colladaMeshDataList[meshNum].PartsDictionary;
-
-                            // Recalculate Index Offset
-                            if (meshNum == 0)
+                            for (var i = 0; i < extraPartCount; i++)
                             {
+                                int indexOffset;
+
+                                var importedPartsDictionary = colladaMeshDataList[meshNum].PartsDictionary;
+
+                                // Recalculate Index Offset
                                 indexOffset = previousIndexOffset + previousIndexCount;
-                            }
-                            else
-                            {
-                                indexOffset = previousIndexOffset + previousIndexCount + partPadding;
-                            }
 
-                            // Recalculate Index Count
-                            var indexCount = importedPartsDictionary.ContainsKey(partNum) ? importedPartsDictionary[partNum] : 0;
+                                // Recalculate Index Count
+                                var indexCount = importedPartsDictionary.ContainsKey(partNum) ? importedPartsDictionary[partNum] : 0;
 
-                            // Calculate padding between meshes
-                            if (partNum == partCount - 1)
-                            {
-                                var padd = (indexOffset + indexCount) % 8;
-
-                                if (padd != 0)
+                                // Calculate padding between meshes
+                                if (partNum == partCount - 1)
                                 {
-                                    partPadding = 8 - padd;
+                                    var padd = (indexOffset + indexCount) % 8;
+
+                                    if (padd != 0)
+                                    {
+                                        partPadding = 8 - padd;
+                                    }
+                                    else
+                                    {
+                                        partPadding = 0;
+                                    }
                                 }
-                                else
-                                {
-                                    partPadding = 0;
-                                }
+
+                                var attributeIndex = importSettingsMesh.PartAttributeDictionary.ContainsKey(partNum) ? importSettingsMesh.PartAttributeDictionary[partNum] : 0;
+                                var boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
+
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
+
+                                previousIndexCount = indexCount;
+                                previousIndexOffset = indexOffset;
+                                currentBoneOffset += boneCount;
+
+                                partNum++;
                             }
-
-                            var attributeIndex = importSettings[meshNum.ToString()].PartDictionary != null ? importSettings[meshNum.ToString()].PartDictionary[partNum] : 0;
-
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
-                            //meshPartDataBlock.AddRange(BitConverter.GetBytes(meshPart.BoneStartOffset));
-                            //meshPartDataBlock.AddRange(BitConverter.GetBytes(meshPart.BoneCount));
-
-                            previousIndexCount = indexCount;
-                            previousIndexOffset = indexOffset;
-
-                            partNum++;
                         }
                     }
 
                     meshNum++;
                 }
 
+                if (lodNum == 0 && importSettings != null)
+                {
+                    if (additionalMeshCount > 0)
+                    {
+                        partPadding = 0;
+                        for (var i = 0; i < additionalMeshCount; i++)
+                        {
+                            var partNum = 0;
+                            var importSettingsMesh = importSettings[meshNum.ToString()];
+                            var partCount = importSettingsMesh.PartList.Count;
+
+                            for (var j = 0; j < partCount; j++)
+                            {
+                                int indexOffset;
+
+                                var importedPartsDictionary = colladaMeshDataList[meshNum].PartsDictionary;
+
+                                // Recalculate Index Offset
+                                if (partNum == 0)
+                                {
+                                    indexOffset = previousIndexOffset + previousIndexCount + partPadding;
+                                }
+                                else
+                                {
+                                    indexOffset = previousIndexOffset + previousIndexCount;
+                                }
+
+
+                                // Recalculate Index Count
+                                var indexCount = importedPartsDictionary.ContainsKey(partNum) ? importedPartsDictionary[partNum] : 0;
+
+                                // Calculate padding between meshes
+                                if (partNum == partCount - 1)
+                                {
+                                    var padd = (indexOffset + indexCount) % 8;
+
+                                    if (padd != 0)
+                                    {
+                                        partPadding = 8 - padd;
+                                    }
+                                    else
+                                    {
+                                        partPadding = 0;
+                                    }
+                                }
+
+                                var attributeIndex = importSettingsMesh.PartAttributeDictionary.ContainsKey(partNum) ? importSettingsMesh.PartAttributeDictionary[partNum] : 0;
+                                var boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
+
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
+
+                                previousIndexCount = indexCount;
+                                previousIndexOffset = indexOffset;
+                                currentBoneOffset += boneCount;
+
+                                partNum++;
+                            }
+
+                            meshNum++;
+                        }
+                    }
+                }
+
                 lodNum++;
             }
 
-            fullModelDataBlock.AddRange(meshPartDataBlock);
+
 
             #endregion
 
@@ -3150,11 +3227,11 @@ namespace xivModdingFramework.Models.FileTypes
 
             var unknownDataBlock2 = xivMdl.UnkData2.Unknown;
 
-            fullModelDataBlock.AddRange(unknownDataBlock2);
+
 
             #endregion
 
-            // Unknown Material Data
+            // Material Offset Data
             #region Material Data Block
 
             var matPathOffsetList = xivMdl.MatDataBlock.MaterialPathOffsetList;
@@ -3165,19 +3242,29 @@ namespace xivModdingFramework.Models.FileTypes
                 matPathOffsetList = materialOffsetList;
             }
 
+            var matPathOffsetDataBlock = new List<byte>();
             foreach (var materialOffset in matPathOffsetList)
             {
-                fullModelDataBlock.AddRange(BitConverter.GetBytes(materialOffset));
+                matPathOffsetDataBlock.AddRange(BitConverter.GetBytes(materialOffset));
             }
 
             #endregion
 
-            // Unknown Bone Data
+            // Bone Offset Data
             #region Bone Data Block
 
-            foreach (var boneOffset in xivMdl.BonDataBlock.BonePathOffsetList)
+            var bonePathOffsetList = xivMdl.BonDataBlock.BonePathOffsetList;
+
+            // If doing an advanced import, use the calculated bone offsets in case bones were added
+            if (importSettings != null)
             {
-                fullModelDataBlock.AddRange(BitConverter.GetBytes(boneOffset));
+                bonePathOffsetList = boneOffsetList;
+            }
+
+            var bonePathOffsetDataBlock = new List<byte>();
+            foreach (var boneOffset in bonePathOffsetList)
+            {
+                bonePathOffsetDataBlock.AddRange(BitConverter.GetBytes(boneOffset));
             }
 
             #endregion
@@ -3187,22 +3274,47 @@ namespace xivModdingFramework.Models.FileTypes
 
             var boneIndexMeshBlock = new List<byte>();
 
+            lodNum = 0;
             foreach (var boneIndexMesh in xivMdl.BoneIndexMeshList)
             {
-                foreach (var boneIndex in boneIndexMesh.BoneIndices)
+                if (importSettings != null && lodNum == 0)
                 {
-                    boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndex));
+                    var boneMaxEntries = 64;
+
+                    var remaining = boneMaxEntries - boneStringCount;
+
+                    for (var i = 0; i < boneStringCount; i++)
+                    {
+                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)i));
+                    }
+
+                    for (var i = 0; i < remaining; i++)
+                    {
+                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)0));
+                    }
+
+                    boneIndexMeshBlock.AddRange(BitConverter.GetBytes((int)boneStringCount));
+                }
+                else
+                {
+                    foreach (var boneIndex in boneIndexMesh.BoneIndices)
+                    {
+                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndex));
+                    }
+
+                    boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndexMesh.BoneIndexCount));
                 }
 
-                boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndexMesh.BoneIndexCount));
+                lodNum++;
             }
 
-            fullModelDataBlock.AddRange(boneIndexMeshBlock);
+
 
             #endregion
 
             #region Shape Data Block
 
+            var FullShapeDataBlock = new List<byte>();
             if (xivMdl.HasShapeData)
             {
                 // Mesh Shape Info
@@ -3212,9 +3324,18 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var shapeInfoCount = xivMdl.MeshShapeData.ShapeInfoList.Count;
 
+                var infoNum = 0;
                 foreach (var info in xivMdl.MeshShapeData.ShapeInfoList)
                 {
-                    meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(info.ShapePathOffset));
+                    if (importSettings != null)
+                    {
+                        meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeOffsetList[infoNum]));
+                    }
+                    else
+                    {
+                        meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(info.ShapePathOffset));
+                    }
+
 
                     foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                     {
@@ -3225,9 +3346,11 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.PartCount));
                     }
+
+                    infoNum++;
                 }
 
-                fullModelDataBlock.AddRange(meshShapeInfoDataBlock);
+                FullShapeDataBlock.AddRange(meshShapeInfoDataBlock);
 
                 #endregion
 
@@ -3243,7 +3366,7 @@ namespace xivModdingFramework.Models.FileTypes
                     meshShapeIndexInfoDataBlock.AddRange(BitConverter.GetBytes(shapeIndexInfo.DataIndexOffset));
                 }
 
-                fullModelDataBlock.AddRange(meshShapeIndexInfoDataBlock);
+                FullShapeDataBlock.AddRange(meshShapeIndexInfoDataBlock);
 
                 #endregion
 
@@ -3357,7 +3480,7 @@ namespace xivModdingFramework.Models.FileTypes
                     lodNumber++;
                 }
 
-                fullModelDataBlock.AddRange(meshShapeDataBlock);
+                FullShapeDataBlock.AddRange(meshShapeDataBlock);
 
                 #endregion
             }
@@ -3369,16 +3492,67 @@ namespace xivModdingFramework.Models.FileTypes
 
             var boneIndexPartDataBlock = new List<byte>();
 
-            var boneIndexPart = xivMdl.BoneIndexPart;
-
-            boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndexPart.BoneIndexCount));
-
-            foreach (var boneIndex in boneIndexPart.BoneIndexList)
+            if (importSettings != null)
             {
-                boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndex));
+                var totalBonePartIndices = 0;
+                var originalBonePartSum = 0;
+                var boneNumDict = colladaMeshDataList[0].BoneNumDictionary;
+
+                // Lod 0
+                // Mesh
+                for (var j = 0; j < importSettings.Count; j++)
+                {
+                    var partBoneDict = colladaMeshDataList[j].PartBoneDictionary;
+                    // Mesh Part
+                    foreach (var partBone in partBoneDict)
+                    {
+                        // Part Bone
+                        foreach (var boneListString in partBone.Value)
+                        {
+                            boneIndexPartDataBlock.AddRange(BitConverter.GetBytes((short)boneNumDict[boneListString]));
+                        }
+
+                        totalBonePartIndices += partBone.Value.Count;
+                    }
+                }
+
+                // Get total bone index count for original model
+                foreach (var meshData in xivMdl.LoDList[0].MeshDataList)
+                {
+                    foreach (var meshPart in meshData.MeshPartList)
+                    {
+                        originalBonePartSum += meshPart.BoneCount;
+                    }
+                }
+
+
+                // Lod 1 - 2
+                var boneIndexPart = xivMdl.BoneIndexPart;
+
+                var remaining = boneIndexPart.BoneIndexList.Count - originalBonePartSum;
+
+                for (var j = originalBonePartSum; j < boneIndexPart.BoneIndexList.Count; j++)
+                {
+                    boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndexPart.BoneIndexList[j]));
+                }
+
+                totalBonePartIndices += remaining;
+
+                boneIndexPartDataBlock.InsertRange(0, BitConverter.GetBytes(totalBonePartIndices * 2));
+            }
+            else
+            {
+                var boneIndexPart = xivMdl.BoneIndexPart;
+
+                boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndexPart.BoneIndexCount));
+
+                foreach (var boneIndex in boneIndexPart.BoneIndexList)
+                {
+                    boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndex));
+                }
             }
 
-            fullModelDataBlock.AddRange(boneIndexPartDataBlock);
+
 
             #endregion
 
@@ -3390,7 +3564,7 @@ namespace xivModdingFramework.Models.FileTypes
             paddingDataBlock.Add(xivMdl.PaddingSize);
             paddingDataBlock.AddRange(xivMdl.PaddedBytes);
 
-            fullModelDataBlock.AddRange(paddingDataBlock);
+
 
             #endregion
 
@@ -3409,7 +3583,7 @@ namespace xivModdingFramework.Models.FileTypes
                 boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.W));
             }
 
-            fullModelDataBlock.AddRange(boundingBoxDataBlock);
+
 
             #endregion
 
@@ -3434,9 +3608,212 @@ namespace xivModdingFramework.Models.FileTypes
                 boneTransformDataBlock.AddRange(BitConverter.GetBytes(transform1.W));
             }
 
-            fullModelDataBlock.AddRange(boneTransformDataBlock);
+            if (importSettings != null && importSettings["0"].ExtraBones.Count > 0)
+            {
+                for (var i = 0; i < importSettings["0"].ExtraBones.Count; i++)
+                {
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                }
+            }
+
+
 
             #endregion
+
+            // Combined Data Block Sizes
+            // This is the offset to the beginning of the vertex data
+            var combinedDataBlockSize = 68 + vertexInfoBlock.Count + pathInfoBlock.Count + modelDataBlock.Count + unknownDataBlock0.Length + lodDataBlock.Count + extraLodDataBlock.Count + meshDataBlock.Count +
+                attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
+                boneIndexMeshBlock.Count + FullShapeDataBlock.Count + boneIndexPartDataBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneTransformDataBlock.Count;
+
+            // We have to recalculate the LoD Vertex Offsets
+            if (importSettings != null)
+            {
+               lodDataBlock.Clear();
+
+                lodNum = 0;
+                importVertexDataSize = 0;
+                importIndexDataSize = 0;
+                previousVertexDataSize = 0;
+                previousindexDataSize = 0;
+                previousVertexDataOffset = 0;
+                additionalMeshCount = 0;
+
+                foreach (var lod in xivMdl.LoDList)
+                {
+                    // Index Data Size is recalculated for LoD 0, because of the imported data, but remains the same
+                    // for every other LoD.
+                    var indexDataSize = lod.IndexDataSize;
+
+                    // Both of these index values are always the same.
+                    // Because index data starts after the vertex data, these values need to be recalculated because
+                    // the imported data can add/remove vertex data
+                    var indexDataStart = lod.IndexDataStart;
+                    var indexDataOffset = lod.IndexDataOffset;
+
+
+                    // This value is modified for LoD0 when import settings are present
+                    // This value is recalculated for every other LoD because of the imported data can add/remove vertex data.
+                    var vertexDataOffset = lod.VertexDataOffset;
+
+                    // Vertex Data Size is recalculated for LoD 0, because of the imported data, but remains the same
+                    // for every other LoD.
+                    var vertexDataSize = lod.VertexDataSize;
+
+                    // Calculate the new values based on imported data
+                    // Note: Only the highest quality LoD is used which is LoD 0
+                    if (lodNum == 0)
+                    {
+                        // Get the sum of the vertex data and indices for all meshes in the imported data
+                        foreach (var importData in importDataDictionary)
+                        {
+                            MeshData meshData;
+                            var skipShapeData = false;
+
+                            // If meshes were added, no entry exists for it in the original data, so we grab the last available mesh
+                            if (importSettings != null && importData.Key >= lod.MeshDataList.Count)
+                            {
+                                var diff = (importData.Key + 1) - lod.MeshDataList.Count;
+                                meshData = lod.MeshDataList[importData.Key - diff];
+                                skipShapeData = true;
+                            }
+                            else
+                            {
+                                meshData = lod.MeshDataList[importData.Key];
+                            }
+
+                            var shapeDataCount = 0;
+                            if (meshData.ShapePositionsDictionary != null && !skipShapeData)
+                            {
+                                var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
+                                if (!isAlreadyModified)
+                                {
+                                    var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
+
+                                    if (texCoordDataType == VertexDataType.Float2)
+                                    {
+                                        entrySizeSum += 8;
+                                    }
+                                    else
+                                    {
+                                        entrySizeSum += 12;
+                                    }
+                                }
+
+                                shapeDataCount = meshData.ShapePositionsDictionary.Count * entrySizeSum;
+                            }
+
+                            importVertexDataSize += importData.Value.VertexData0.Count + importData.Value.VertexData1.Count + shapeDataCount;
+
+                            var indexPadding = 16 - importData.Value.IndexData.Count % 16;
+                            if (indexPadding == 16)
+                            {
+                                indexPadding = 0;
+                            }
+
+                            importIndexDataSize += importData.Value.IndexData.Count + indexPadding;
+                        }
+
+                        vertexDataOffset = combinedDataBlockSize;
+
+                        vertexDataSize = importVertexDataSize;
+                        indexDataSize = importIndexDataSize;
+
+                        indexDataOffset = vertexDataOffset + vertexDataSize;
+                        indexDataStart = indexDataOffset;
+                    }
+                    else
+                    {
+                        // The (vertex offset + vertex data size + index data size) of the previous LoD give you the vertex offset of the current LoD
+                        vertexDataOffset = previousVertexDataOffset + previousVertexDataSize + previousindexDataSize;
+
+                        // The (vertex data offset + vertex data size) of the current LoD give you the index offset
+                        // In this case it uses the newly calculated vertex data offset to get the correct index offset
+                        indexDataOffset = vertexDataOffset + vertexDataSize;
+                        indexDataStart = indexDataOffset;
+                    }
+
+                    // We add any additional meshes to the offset if we added any through advanced importing, otherwise additionalMeshCount stays at 0
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(lod.MeshOffset + additionalMeshCount)));
+
+                    // Check for additional meshes from import settings
+                    if (lodNum == 0 && importSettings != null)
+                    {
+                        if (importSettings.Count > lod.MeshDataList.Count)
+                        {
+                            additionalMeshCount = importSettings.Count - lod.MeshDataList.Count;
+                        }
+
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)(lod.MeshCount + additionalMeshCount)));
+                    }
+                    else // Add normal count if no advanced settings were found
+                    {
+                        lodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshCount));
+                    }
+
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown0));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown1));
+
+                    // We add any additional meshes to the mesh end and mesh sum if we added any through advanced imoprting, otherwise additionalMeshCount stays at 0
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(lod.MeshEnd + additionalMeshCount)));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.ExtraMeshCount));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(lod.MeshSum + additionalMeshCount)));
+
+
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
+
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown3));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown4));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown5));
+
+                    lodDataBlock.AddRange(BitConverter.GetBytes(indexDataStart));
+
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown7));
+
+                    lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataSize));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(indexDataSize));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataOffset));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
+
+                    previousVertexDataSize = vertexDataSize;
+                    previousindexDataSize = indexDataSize;
+                    previousVertexDataOffset = vertexDataOffset;
+
+                    lodNum++;
+                }
+            }
+
+            // Combine All DataBlocks
+            fullModelDataBlock.AddRange(pathInfoBlock);
+            fullModelDataBlock.AddRange(modelDataBlock);
+            fullModelDataBlock.AddRange(unknownDataBlock0);
+            fullModelDataBlock.AddRange(lodDataBlock);
+            fullModelDataBlock.AddRange(extraLodDataBlock);
+            fullModelDataBlock.AddRange(meshDataBlock);
+            fullModelDataBlock.AddRange(attributePathDataBlock);
+            if (unknownDataBlock1 != null)
+            {
+                fullModelDataBlock.AddRange(unknownDataBlock1);
+            }
+            fullModelDataBlock.AddRange(meshPartDataBlock);
+            fullModelDataBlock.AddRange(unknownDataBlock2);
+            fullModelDataBlock.AddRange(matPathOffsetDataBlock);
+            fullModelDataBlock.AddRange(bonePathOffsetDataBlock);
+            fullModelDataBlock.AddRange(boneIndexMeshBlock);
+            fullModelDataBlock.AddRange(FullShapeDataBlock);
+            fullModelDataBlock.AddRange(boneIndexPartDataBlock);
+            fullModelDataBlock.AddRange(paddingDataBlock);
+            fullModelDataBlock.AddRange(boundingBoxDataBlock);
+            fullModelDataBlock.AddRange(boneTransformDataBlock);
 
             // Data Compression
             #region Data Compression
@@ -3507,114 +3884,235 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var vertexDataSection = new VertexDataSection();
                 var meshNum = 0;
-                foreach (var meshData in lod.MeshDataList)
+
+                if (importSettings != null)
                 {
-                    // We only make changes to LoD 0
                     if (lodNum == 0)
                     {
-                        var importData = importDataDictionary[meshNum];
-
-                        // Because our imported data does not include mesh shape data, we must include it manually
-                        if (xivMdl.HasShapeData)
+                        for (var i = 0; i < importSettings.Count; i++)
                         {
-                            if (meshData.ShapePositionsDictionary != null)
+
+                            var importData = importDataDictionary[meshNum];
+
+                            // Because our imported data does not include mesh shape data, we must include it manually
+                            if (xivMdl.HasShapeData && meshNum < lod.MeshDataList.Count)
                             {
-                                // We add the data from the mesh vertex data
-                                foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
+                                var meshData = lod.MeshDataList[meshNum];
+
+                                if (meshData.ShapePositionsDictionary != null)
                                 {
-                                    var position = meshData.VertexData.Positions[vertIndex];
-                                    var boneWeights = meshData.VertexData.BoneWeights[vertIndex];
-                                    var boneIndices = meshData.VertexData.BoneIndices[vertIndex];
-
-                                    var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
-                                    if (posDataType == VertexDataType.Half4)
+                                    // We add the data from the mesh vertex data
+                                    foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
                                     {
-                                        var x = new Half(position.X);
-                                        var y = new Half(position.Y);
-                                        var z = new Half(position.Z);
-                                        var w = new Half(1);
+                                        var position = meshData.VertexData.Positions[vertIndex];
+                                        var boneWeights = meshData.VertexData.BoneWeights[vertIndex];
+                                        var boneIndices = meshData.VertexData.BoneIndices[vertIndex];
 
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
+                                        var posDataType = vertexInfoDict[0][VertexUsageType.Position];
+
+                                        if (posDataType == VertexDataType.Half4)
+                                        {
+                                            var x = new Half(position.X);
+                                            var y = new Half(position.Y);
+                                            var z = new Half(position.Z);
+                                            var w = new Half(1);
+
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
+                                        }
+                                        else
+                                        {
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.X));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.Y));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.Z));
+                                        }
+
+                                        foreach (var boneWeight in boneWeights)
+                                        {
+                                            importData.VertexData0.Add((byte)Math.Round(boneWeight * 255f));
+                                        }
+
+                                        importData.VertexData0.AddRange(boneIndices);
+
+
+                                        var normal = meshData.VertexData.Normals[vertIndex];
+                                        var binormal = meshData.VertexData.BiNormals[vertIndex];
+                                        var color = meshData.VertexData.Colors[vertIndex];
+                                        var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
+                                        var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
+
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(normal.X));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Y));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Z));
+
+                                        importData.VertexData1.Add((byte)((Math.Abs(binormal.X) * 255 + 255) / 2));
+                                        importData.VertexData1.Add((byte)((Math.Abs(binormal.Y) * 255 + 255) / 2));
+                                        importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
+                                        importData.VertexData1.Add(0);
+
+                                        importData.VertexData1.Add(color.A);
+                                        importData.VertexData1.Add(color.R);
+                                        importData.VertexData1.Add(color.G);
+                                        importData.VertexData1.Add(color.B);
+
+
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.X));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.Y));
+
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.X));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.Y));
                                     }
-                                    else
-                                    {
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(position.X));
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(position.Y));
-                                        importData.VertexData0.AddRange(BitConverter.GetBytes(position.Z));
-                                    }
-
-                                    foreach (var boneWeight in boneWeights)
-                                    {
-                                        importData.VertexData0.Add((byte)Math.Round(boneWeight * 255f));
-                                    }
-
-                                    importData.VertexData0.AddRange(boneIndices);
-
-
-                                    var normal = meshData.VertexData.Normals[vertIndex];
-                                    var binormal = meshData.VertexData.BiNormals[vertIndex];
-                                    var color = meshData.VertexData.Colors[vertIndex];
-                                    var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
-                                    var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
-
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(normal.X));
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Y));
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Z));
-
-                                    importData.VertexData1.Add((byte)((Math.Abs(binormal.X) * 255 + 255) / 2));
-                                    importData.VertexData1.Add((byte)((Math.Abs(binormal.Y) * 255 + 255) / 2));
-                                    importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
-                                    importData.VertexData1.Add(0);
-
-                                    importData.VertexData1.Add(color.A);
-                                    importData.VertexData1.Add(color.R);
-                                    importData.VertexData1.Add(color.G);
-                                    importData.VertexData1.Add(color.B);
-
-
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.X));
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.Y));
-
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.X));
-                                    importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.Y));
                                 }
+
                             }
 
-                        }
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
 
-                        vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
-                        vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
-                        vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
+                            var indexPadding = (importData.IndexCount * 2) % 16;
+                            if (indexPadding != 0)
+                            {
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            }
 
-                        var indexPadding = (importData.IndexCount * 2) % 16;
-                        if (indexPadding != 0)
-                        {
-                            vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            meshNum++;
                         }
-                    }
-                    // All other LoDs
-                    else
+                    }            
+
+                    if (lodNum > 0)
                     {
-                        var vertexInfo = vertexInfoDict[lodNum];
-                        var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
-
-                        vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
-                        vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
-                        vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
-
-                        var indexPadding = (vertexData.IndexCount * 2) % 16;
-
-                        if (indexPadding != 0)
+                        foreach (var meshData in lod.MeshDataList)
                         {
-                            vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            var vertexInfo = vertexInfoDict[lodNum];
+                            var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
+
+                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
+
+                            var indexPadding = (vertexData.IndexCount * 2) % 16;
+
+                            if (indexPadding != 0)
+                            {
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            }
                         }
                     }
+                }
+                else
+                {
+                    foreach (var meshData in lod.MeshDataList)
+                    {
+                        // We only make changes to LoD 0
+                        if (lodNum == 0)
+                        {
+                            var importData = importDataDictionary[meshNum];
 
-                    meshNum++;
+                            // Because our imported data does not include mesh shape data, we must include it manually
+                            if (xivMdl.HasShapeData)
+                            {
+                                if (meshData.ShapePositionsDictionary != null)
+                                {
+                                    // We add the data from the mesh vertex data
+                                    foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
+                                    {
+                                        var position = meshData.VertexData.Positions[vertIndex];
+                                        var boneWeights = meshData.VertexData.BoneWeights[vertIndex];
+                                        var boneIndices = meshData.VertexData.BoneIndices[vertIndex];
+
+                                        var posDataType = vertexInfoDict[0][VertexUsageType.Position];
+
+                                        if (posDataType == VertexDataType.Half4)
+                                        {
+                                            var x = new Half(position.X);
+                                            var y = new Half(position.Y);
+                                            var z = new Half(position.Z);
+                                            var w = new Half(1);
+
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
+                                        }
+                                        else
+                                        {
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.X));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.Y));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.Z));
+                                        }
+
+                                        foreach (var boneWeight in boneWeights)
+                                        {
+                                            importData.VertexData0.Add((byte)Math.Round(boneWeight * 255f));
+                                        }
+
+                                        importData.VertexData0.AddRange(boneIndices);
+
+
+                                        var normal = meshData.VertexData.Normals[vertIndex];
+                                        var binormal = meshData.VertexData.BiNormals[vertIndex];
+                                        var color = meshData.VertexData.Colors[vertIndex];
+                                        var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
+                                        var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
+
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(normal.X));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Y));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Z));
+
+                                        importData.VertexData1.Add((byte)((Math.Abs(binormal.X) * 255 + 255) / 2));
+                                        importData.VertexData1.Add((byte)((Math.Abs(binormal.Y) * 255 + 255) / 2));
+                                        importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
+                                        importData.VertexData1.Add(0);
+
+                                        importData.VertexData1.Add(color.A);
+                                        importData.VertexData1.Add(color.R);
+                                        importData.VertexData1.Add(color.G);
+                                        importData.VertexData1.Add(color.B);
+
+
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.X));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.Y));
+
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.X));
+                                        importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.Y));
+                                    }
+                                }
+
+                            }
+
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
+
+                            var indexPadding = (importData.IndexCount * 2) % 16;
+                            if (indexPadding != 0)
+                            {
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            }
+                        }
+                        // All other LoDs
+                        else
+                        {
+                            var vertexInfo = vertexInfoDict[lodNum];
+                            var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
+
+                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
+
+                            var indexPadding = (vertexData.IndexCount * 2) % 16;
+
+                            if (indexPadding != 0)
+                            {
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            }
+                        }
+
+                        meshNum++;
+                    }
                 }
 
                 // Vertex Compression
@@ -4129,9 +4627,29 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // Vertex Color
                     // The Vertex Color is currently not taken into consideration and is defaulted to 0xFFFFFFFF
-                    if (vertexInfoDict[0].ContainsKey(VertexUsageType.Color))
+                    //if (vertexInfoDict[0].ContainsKey(VertexUsageType.Color))
+                    //{
+                    //    importData.VertexData1.AddRange(BitConverter.GetBytes(0xFFFFFFFF));
+                    //}
+
+                    if (colladaMeshData.VertexColors.Count > 0)
                     {
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(0xFFFFFFFF));
+                        var red   = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].X * 255), 0, 255));
+                        var green = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Y * 255), 0, 255));
+                        var blue  = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Z * 255), 0, 255));
+                        var alpha = Convert.ToByte(Math.Round(colladaMeshData.VertexAlphas[i] * 255));
+
+                        importData.VertexData1.Add(red);
+                        importData.VertexData1.Add(green);
+                        importData.VertexData1.Add(blue);
+                        importData.VertexData1.Add(alpha);
+                    }
+                    else
+                    {
+                        if (vertexInfoDict[0].ContainsKey(VertexUsageType.Color))
+                        {
+                            importData.VertexData1.AddRange(BitConverter.GetBytes(0xFFFFFFFF));
+                        }
                     }
 
                     // Texture Coordinates
@@ -4460,7 +4978,15 @@ namespace xivModdingFramework.Models.FileTypes
 
             public Vector2Collection TextureCoordintes1 { get; set; }
 
+            public Vector3Collection VertexColors { get; set; } = new Vector3Collection();
+
+            public List<float> VertexAlphas { get; set; } = new List<float>();
+
             public Dictionary<int, int> PartsDictionary { get; set; }
+
+            public Dictionary<int, List<string>> PartBoneDictionary { get; set; } = new Dictionary<int, List<string>>();
+
+            public Dictionary<string, int> BoneNumDictionary;
         }
 
         /// <summary>
