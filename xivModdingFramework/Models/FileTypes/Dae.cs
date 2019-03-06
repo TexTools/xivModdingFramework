@@ -41,12 +41,14 @@ namespace xivModdingFramework.Models.FileTypes
 
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivDataFile _dataFile;
+        private readonly string _pluginTarget, _appVersion;
 
-        public Dae(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        public Dae(DirectoryInfo gameDirectory, XivDataFile dataFile, string pluginTarget, string appVersion = "1.0.0")
         {
             _gameDirectory = gameDirectory;
             _dataFile = dataFile;
-
+            _pluginTarget = pluginTarget;
+            _appVersion = appVersion;
         }
 
         /// <summary>
@@ -241,6 +243,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Reading Bone Data
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
+                var boneNames = new List<string>();
                 while (reader.Read())
                 {
                     if (reader.IsStartElement())
@@ -249,6 +252,8 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             while (reader.Read())
                             {
+                                var sameBone = false;
+
                                 if (reader.IsStartElement())
                                 {
                                     if (reader.Name.Contains("node"))
@@ -264,7 +269,29 @@ namespace xivModdingFramework.Models.FileTypes
                                                 throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
-                                            boneJointDict.Add(sid, name);
+                                            if(name.Contains("n_root")) continue;
+                                            if(name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
+
+                                            var sameBoneName = "";
+                                            foreach (var boneName in boneNames)
+                                            {
+                                                if (name.Contains(boneName))
+                                                {
+                                                    sameBone = true;
+                                                    sameBoneName = boneName;
+                                                }
+                                            }
+
+                                            if (!sameBone)
+                                            {
+                                                boneJointDict.Add(sid, name);
+                                            }
+                                            else
+                                            {
+                                                boneJointDict.Add(sid, sameBoneName);
+                                            }
+
+                                            boneNames.Add(name);
                                         }
                                     }
                                 }
@@ -283,7 +310,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             var boneDict = new Dictionary<string, int>();
             var meshNameDict = new Dictionary<string, string>();
-            var extraBones = new List<string>();
 
             // Create a dictionary of the original bone data with <Bone Name, Bone Index>
             for (var i = 0; i < xivMdl.PathData.BoneList.Count; i++)
@@ -292,12 +318,14 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Default values for element names
-            var texc = "-map0-array";
-            var texc2 = "-map1-array";
-            var pos = "-positions-array";
-            var norm = "-normals-array";
+            var texc   = "-map0-array";
+            var texc2  = "-map1-array";
+            var valpha = "-map2-array";
+            var vcol   = "-col0-array";
+            var pos    = "-positions-array";
+            var norm   = "-normals-array";
             var biNorm = "-texbinormals";
-            var tang = "-textangents";
+            var tang   = "-textangents";
             var blender = false;
 
             var indexStride = 4;
@@ -318,26 +346,28 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (tool.Contains("OpenCOLLADA"))
                             {
-                                texc = "-map1-array";
-                                texc2 = "-map2-array";
+                                vcol   = "-map0-array";
+                                texc   = "-map1-array";
+                                texc2  = "-map2-array";
+                                valpha = "-map3-array";
                                 biNorm = "-map1-texbinormals";
-                                tang = "-map1-textangents";
+                                tang   = "-map1-textangents";
                                 textureCoordinateStride = 3;
                                 indexStride = 6;
                             }
                             else if (tool.Contains("FBX"))
                             {
-                                pos = "-position-array";
-                                norm = "-normal0-array";
-                                texc = "-uv0-array";
+                                pos   = "-position-array";
+                                norm  = "-normal0-array";
+                                texc  = "-uv0-array";
                                 texc2 = "-uv1-array";
                             }
                             else if (tool.Contains("Exporter for Blender"))
                             {
                                 biNorm = "-bitangents-array";
-                                tang = "-tangents-array";
-                                texc = "-texcoord-0-array";
-                                texc2 = "-texcoord-1-array";
+                                tang   = "-tangents-array";
+                                texc   = "-texcoord-0-array";
+                                texc2  = "-texcoord-1-array";
                                 indexStride = 1;
                                 blender = true;
                             }
@@ -386,6 +416,11 @@ namespace xivModdingFramework.Models.FileTypes
                                         {
                                             cData.Normals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
+                                        // Vertex Colors
+                                        else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
+                                        {
+                                            cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
                                         //Texture Coordinates
                                         else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
                                         {
@@ -395,6 +430,11 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if (reader["id"].ToLower().Contains(texc2) && cData.Positions.Count > 0)
                                         {
                                             cData.TextureCoordinates1.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+                                        }
+                                        // Vertex Alphas
+                                        else if (reader["id"].ToLower().Contains(valpha) && cData.Positions.Count > 0)
+                                        {
+                                            cData.VertexAlphas.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Tangents
                                         else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
@@ -419,25 +459,68 @@ namespace xivModdingFramework.Models.FileTypes
                                             indexStride = 4;
                                         }
 
+                                        if (cData.VertexColors.Count > 0 && indexStride == 6)
+                                        {
+                                            indexStride = 9;
+                                        }
+
+                                        if (cData.BiNormals.Count < 1 && indexStride == 4)
+                                        {
+                                            indexStride = 3;
+                                        }
+                                        else if (cData.BiNormals.Count > 0 && indexStride == 3)
+                                        {
+                                            indexStride = 4;
+                                        }
+
                                         // Reads the indices for each data point and places them in a list
                                         for (var i = 0; i < cData.Indices.Count; i += indexStride)
                                         {
-                                            cData.PositionIndices.Add(cData.Indices[i]);
-                                            cData.NormalIndices.Add(cData.Indices[i + 1]);
-                                            cData.TextureCoordinate0Indices.Add(cData.Indices[i + 2]);
+                                            if (indexStride == 9)
+                                            {
+                                                cData.PositionIndices.Add(cData.Indices[i]);
+                                                cData.NormalIndices.Add(cData.Indices[i + 1]);
+                                                cData.VertexColorIndices.Add(cData.Indices[i + 2]);
+                                                cData.TextureCoordinate0Indices.Add(cData.Indices[i + 3]);
 
-                                            if (cData.TextureCoordinates1.Count > 0 && indexStride == 6)
-                                            {
-                                                cData.TextureCoordinate1Indices.Add(cData.Indices[i + 4]);
-                                            }
-                                            else if (cData.TextureCoordinates1.Count > 0 && indexStride == 4)
-                                            {
-                                                cData.TextureCoordinate1Indices.Add(cData.Indices[i + 2]);
-                                            }
+                                                if (cData.BiNormals.Count > 0)
+                                                {
+                                                    cData.BiNormalIndices.Add(cData.Indices[i + 4]);
+                                                }
 
-                                            if (cData.BiNormals.Count > 0)
+                                                if (cData.TextureCoordinates1.Count > 0)
+                                                {
+                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 5]);
+                                                }
+
+                                                cData.VertexAlphaIndices.Add(cData.Indices[i + 7]);
+
+                                            }
+                                            else
                                             {
-                                                cData.BiNormalIndices.Add(cData.Indices[i + 3]);
+                                                cData.PositionIndices.Add(cData.Indices[i]);
+                                                cData.NormalIndices.Add(cData.Indices[i + 1]);
+                                                cData.TextureCoordinate0Indices.Add(cData.Indices[i + 2]);
+
+                                                if (cData.TextureCoordinates1.Count > 0 && indexStride == 6)
+                                                {
+                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 4]);
+                                                }
+                                                else if (cData.TextureCoordinates1.Count > 0 && indexStride == 4)
+                                                {
+                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 2]);
+                                                }
+
+                                                if (cData.BiNormals.Count > 0)
+                                                {
+                                                    cData.BiNormalIndices.Add(cData.Indices[i + 3]);
+                                                }
+
+                                                if (cData.VertexColors.Count > 0)
+                                                {
+                                                    cData.VertexColorIndices.Add(cData.Indices[i + 2]);
+                                                    cData.VertexAlphaIndices.Add(cData.Indices[i + 2]);
+                                                }
                                             }
 
                                         }
@@ -465,6 +548,16 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
+                                if (!meshPartDataDictionary.ContainsKey(meshNum))
+                                {
+                                    throw new Exception($"Extra meshes detected, please use Advanced Import.");
+                                }
+
+                                if (meshPartDataDictionary[meshNum].ContainsKey(0))
+                                {
+                                    throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
+                                }
+
                                 meshPartDataDictionary[meshNum].Add(0, cData);
                             }
                         }
@@ -522,14 +615,28 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         colladaData.Bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
 
-                                        var boneNames = new List<string>();
+                                        var boneAdditionNames = new List<string>();
 
-                                        foreach (var colladaDataBone in colladaData.Bones)
+                                        foreach (var colladaDataBone in boneJointDict.Keys)
                                         {
-                                            boneNames.Add(boneJointDict[colladaDataBone]); 
+                                            if (!boneDict.ContainsKey(boneJointDict[colladaDataBone]))
+                                            {
+                                                boneAdditionNames.Add(colladaDataBone);
+                                            }
                                         }
 
-                                        colladaData.AllBonesNames = boneNames.ToArray();
+                                        var boneNum = 0;
+                                        foreach (var bone in boneDict.Keys)
+                                        {
+                                            colladaData.BoneNumDictionary.Add(bone, boneNum);
+                                            boneNum++;
+                                        }
+
+                                        foreach (var extraBone in boneAdditionNames)
+                                        {
+                                            colladaData.BoneNumDictionary.Add(boneJointDict[extraBone], boneNum);
+                                            boneNum++;
+                                        }
                                     }
 
                                     if (reader.Name.Contains("float_array"))
@@ -558,12 +665,6 @@ namespace xivModdingFramework.Models.FileTypes
                                             var boneIndex = tempbIndex[a];
                                             var blendName = colladaData.Bones[boneIndex];
 
-                                            if (!boneJointDict.ContainsKey(blendName))
-                                            {
-                                                throw new Exception(
-                                                    $"Bone Name not found in original bone data. Bone: {blendName}");
-                                            }
-
                                             var blendBoneName = boneJointDict[blendName];
 
                                             var bString = blendBoneName;
@@ -579,24 +680,9 @@ namespace xivModdingFramework.Models.FileTypes
                                                 colladaData.MeshBoneNames.Add(bString);
                                             }
 
-                                            if (!boneDict.ContainsKey(bString))
-                                            {
-                                                if (!extraBones.Contains(bString))
-                                                {
-                                                    extraBones.Add(bString);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                colladaData.BoneIndices.Add(boneDict[bString]);
+                                            colladaData.BoneIndices.Add(colladaData.BoneNumDictionary[bString]);
 
-                                                colladaData.BoneIndices.Add(tempbIndex[a + 1]);
-                                            }
-                                        }
-
-                                        if (extraBones.Count > 0)
-                                        {
-                                            throw new Exception($"The model contains extra bones. {extraBones}");
+                                            colladaData.BoneIndices.Add(tempbIndex[a + 1]);
                                         }
                                         break;
                                     }
@@ -615,12 +701,68 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="daeLocation">The location of the dae file</param>
         /// <returns>A dictionary containing the mesh number and its parts</returns>
-        public Dictionary<int, List<int>> QuickColladaReader(DirectoryInfo daeLocation)
+        public (Dictionary<int, List<int>> MeshPartDictionary, List<string> BoneList) QuickColladaReader(DirectoryInfo daeLocation)
         {
             var meshNameDict = new Dictionary<string, string>();
+            var boneStringList = new List<string>();
 
             // A dictionary containing <Mesh Number, List<Mesh Parts>>
             var meshPartDictionary = new Dictionary<int, List<int>>();
+
+            // Reading Bone Data
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                var boneNames = new List<string>();
+                while (reader.Read())
+                {
+                    if (reader.IsStartElement())
+                    {
+                        if (reader.Name.Equals("visual_scene"))
+                        {
+                            while (reader.Read())
+                            {
+                                var sameBone = false;
+
+                                if (reader.IsStartElement())
+                                {
+                                    if (reader.Name.Contains("node"))
+                                    {
+                                        var sid = reader["sid"];
+                                        if (sid != null)
+                                        {
+                                            var name = reader["name"];
+
+                                            // Throw an exception if there is a duplicate bone
+                                            if (boneStringList.Contains(sid))
+                                            {
+                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                            }
+
+                                            if(name.Contains("n_root")) continue;
+
+                                            foreach (var boneName in boneNames)
+                                            {
+                                                if (name.Contains(boneName))
+                                                {
+                                                    sameBone = true;
+                                                }
+                                            }
+
+                                            if (!sameBone)
+                                            {
+                                                boneStringList.Add(name);
+                                            }
+
+                                            boneNames.Add(name);
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
 
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
@@ -636,7 +778,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (meshNameDict.ContainsKey(id))
                             {
-                                throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}");
+                                throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}\n\n" +
+                                                    $"Meshes must have unique numbers, make sure to rename them if any were added");
                             }
 
                             meshNameDict.Add(id, atr);
@@ -657,12 +800,20 @@ namespace xivModdingFramework.Models.FileTypes
                                 // Get part number
                                 var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
 
-                                if (meshPartDictionary[meshNum].Contains(meshPartNum))
+                                if (meshPartDictionary.ContainsKey(meshNum))
                                 {
-                                    throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
-                                }
+                                    if (meshPartDictionary[meshNum].Contains(meshPartNum))
+                                    {
+                                        throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}\n\n" +
+                                                            $"Meshes must have unique numbers, make sure to rename them if any were added");
+                                    }
 
-                                meshPartDictionary[meshNum].Add(meshPartNum);
+                                    meshPartDictionary[meshNum].Add(meshPartNum);
+                                }
+                                else
+                                {
+                                    meshPartDictionary.Add(meshNum, new List<int> { meshPartNum });
+                                }
                             }
                             else
                             {
@@ -681,14 +832,14 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            return meshPartDictionary;
+            return (meshPartDictionary, boneStringList);
         }
 
         /// <summary>
         /// Writes the XML assets to the xml writer
         /// </summary>
         /// <param name="xmlWriter">The xml writer being used</param>
-        private static void XMLassets(XmlWriter xmlWriter)
+        private void XMLassets(XmlWriter xmlWriter)
         {
             //<asset>
             xmlWriter.WriteStartElement("asset");
@@ -697,9 +848,19 @@ namespace xivModdingFramework.Models.FileTypes
             xmlWriter.WriteStartElement("contributor");
             //<authoring_tool>
             xmlWriter.WriteStartElement("authoring_tool");
-            xmlWriter.WriteString("FFXIV TexTools2");
+            xmlWriter.WriteString("FFXIV TexTools");
             xmlWriter.WriteEndElement();
             //</authoring_tool>
+            //<tool_settings>
+            xmlWriter.WriteStartElement("tool_settings");
+            xmlWriter.WriteString(_pluginTarget);
+            xmlWriter.WriteEndElement();
+            //</tool_settings>
+            //<tool_version>
+            xmlWriter.WriteStartElement("tool_version");
+            xmlWriter.WriteString(_appVersion);
+            xmlWriter.WriteEndElement();
+            //</tool_version>
             xmlWriter.WriteEndElement();
             //</contributor>
 
@@ -801,7 +962,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="modelName">The name of the model</param>
         /// <param name="meshCount">The number of meshes</param>
         /// <param name="meshData">The list of mesh data for the model</param>
-        private static void XMLeffects(XmlWriter xmlWriter, string modelName, int meshCount, IReadOnlyList<MeshData> meshData)
+        private void XMLeffects(XmlWriter xmlWriter, string modelName, int meshCount, IReadOnlyList<MeshData> meshData)
         {
             //<library_effects>
             xmlWriter.WriteStartElement("library_effects");
@@ -967,9 +1128,18 @@ namespace xivModdingFramework.Models.FileTypes
                     //</texture>
                     xmlWriter.WriteEndElement();
                     //</specular>
+
                     //<transparent>
                     xmlWriter.WriteStartElement("transparent");
-                    xmlWriter.WriteAttributeString("opaque", "RGB_ZERO");
+                    if (_pluginTarget.Equals(XivStrings.AutodeskCollada))
+                    {
+                        xmlWriter.WriteAttributeString("opaque", "RGB_ZERO");
+                    }
+                    else
+                    {
+                        xmlWriter.WriteAttributeString("opaque", "A_ONE");
+                    }
+
                     //<texture>
                     xmlWriter.WriteStartElement("texture");
                     xmlWriter.WriteAttributeString("texture", modelName + "_" + i + "_Alpha_bmp-sampler");
@@ -983,7 +1153,15 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     //<transparent>
                     xmlWriter.WriteStartElement("transparent");
-                    xmlWriter.WriteAttributeString("opaque", "A_ONE");
+                    if (_pluginTarget.Equals(XivStrings.AutodeskCollada))
+                    {
+                        xmlWriter.WriteAttributeString("opaque", "RGB_ZERO");
+                    }
+                    else
+                    {
+                        xmlWriter.WriteAttributeString("opaque", "A_ONE");
+                    }
+
                     //<color>
                     xmlWriter.WriteStartElement("color");
                     xmlWriter.WriteString("1 1 1 1");
@@ -1079,7 +1257,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xmlWriter">The xml writer being used</param>
         /// <param name="modelName">The model name</param>
         /// <param name="meshList">The list of meshes in the model</param>
-        private static void XMLgeometries(XmlWriter xmlWriter, string modelName, IReadOnlyList<MeshData> meshList)
+        private void XMLgeometries(XmlWriter xmlWriter, string modelName, IReadOnlyList<MeshData> meshList)
         {
             //<library_geometries>
             xmlWriter.WriteStartElement("library_geometries");
@@ -1268,6 +1446,85 @@ namespace xivModdingFramework.Models.FileTypes
 
                     /*
                      * --------------------
+                     * Vertex Colors
+                     * --------------------
+                     */
+
+                    if (meshList[i].VertexData.Colors != null && meshList[i].VertexData.Colors.Count > 0)
+                    {
+                        var vertexColors = meshList[i].VertexData.Colors.GetRange(totalVertices, totalCount);
+
+                        if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
+                        {
+                            //<source>
+                            xmlWriter.WriteStartElement("source");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-col0");
+                            //<float_array>
+                            xmlWriter.WriteStartElement("float_array");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-col0-array");
+                            xmlWriter.WriteAttributeString("count", (totalCount * 3).ToString());
+
+                            foreach (var vc in vertexColors)
+                            {
+                                var red = vc.R / 255.0f;
+                                var green = vc.G / 255.0f;
+                                var blue = vc.B / 255.0f;
+                                //float a = vc.A / 255.0f;
+
+                                xmlWriter.WriteString(red.ToString() + " " + green.ToString() + " " + blue.ToString() + " ");
+                            }
+
+                            xmlWriter.WriteEndElement();
+                            //</float_array>
+
+                            //<technique_common>
+                            xmlWriter.WriteStartElement("technique_common");
+                            //<accessor>
+                            xmlWriter.WriteStartElement("accessor");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-col0-array");
+                            xmlWriter.WriteAttributeString("count", totalCount.ToString());
+                            xmlWriter.WriteAttributeString("stride", "3");
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "R");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "G");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "B");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            /*xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "A");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();*/
+                            //</param>
+
+                            xmlWriter.WriteEndElement();
+                            //</accessor>
+                            xmlWriter.WriteEndElement();
+                            //</technique_common>
+                            xmlWriter.WriteEndElement();
+                            //</source>
+                        }
+                    }
+
+
+                    /*
+                     * --------------------
                      * Primary Texture Coordinates
                      * --------------------
                      */
@@ -1282,7 +1539,6 @@ namespace xivModdingFramework.Models.FileTypes
                         xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map0-array");
                         xmlWriter.WriteAttributeString("count", (totalCount * 2).ToString());
 
-                        //var texCoords = meshList[i].TextureCoordinates.GetRange(totalVertices, totalCount);
                         var texCoords = meshList[i].VertexData.TextureCoordinates0.GetRange(totalVertices, totalCount);
 
                         foreach (var tc in texCoords)
@@ -1325,7 +1581,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     /*
                      * --------------------
-                     * Seconadry Texture Coordinates
+                     * Secondary Texture Coordinates
                      * --------------------
                      */
 
@@ -1339,7 +1595,6 @@ namespace xivModdingFramework.Models.FileTypes
                         xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map1-array");
                         xmlWriter.WriteAttributeString("count", (totalCount * 2).ToString());
 
-                        //var texCoords = meshList[i].TextureCoordinates.GetRange(totalVertices, totalCount);
                         var texCoords2 = meshList[i].VertexData.TextureCoordinates1.GetRange(totalVertices, totalCount);
 
                         foreach (var tc in texCoords2)
@@ -1378,6 +1633,68 @@ namespace xivModdingFramework.Models.FileTypes
                         //</technique_common>
                         xmlWriter.WriteEndElement();
                         //</source>
+                    }
+
+                    /*
+                     * --------------------
+                     * Vertex Alpha - UV Work-Around
+                     * --------------------
+                     */
+
+                    if (meshList[i].VertexData.Colors != null && meshList[i].VertexData.Colors.Count > 0)
+                    {
+                        if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
+                        {
+                            //<source>
+                            xmlWriter.WriteStartElement("source");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map2");
+                            //<float_array>
+                            xmlWriter.WriteStartElement("float_array");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map2-array");
+                            xmlWriter.WriteAttributeString("count", (totalCount * 2).ToString());
+
+                            var vertexColors = meshList[i].VertexData.Colors.GetRange(totalVertices, totalCount);
+
+                            foreach (var vc in vertexColors)
+                            {
+                                var a = vc.A / 255.0f;
+
+                                // Use the UV S channel for the Alpha data, since OpenCollada doesn't play with it nicely.
+                                xmlWriter.WriteString(a.ToString() + " 0 ");
+                            }
+
+                            xmlWriter.WriteEndElement();
+                            //</float_array>
+
+                            //<technique_common>
+                            xmlWriter.WriteStartElement("technique_common");
+                            //<accessor>
+                            xmlWriter.WriteStartElement("accessor");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map2-array");
+                            xmlWriter.WriteAttributeString("count", totalCount.ToString());
+                            xmlWriter.WriteAttributeString("stride", "2");
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "S");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "T");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            xmlWriter.WriteEndElement();
+                            //</accessor>
+                            xmlWriter.WriteEndElement();
+                            //</technique_common>
+                            xmlWriter.WriteEndElement();
+                            //</source>
+                        }
                     }
 
 
@@ -1542,15 +1859,40 @@ namespace xivModdingFramework.Models.FileTypes
                     xmlWriter.WriteEndElement();
                     //</input>
 
+                    if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
+                    {
+                        if (meshList[i].VertexData.Colors.Count > 0)
+                        {
+                            //<input>
+                            xmlWriter.WriteStartElement("input");
+                            xmlWriter.WriteAttributeString("semantic", "COLOR");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-col0");
+                            xmlWriter.WriteAttributeString("offset", "2");
+                            xmlWriter.WriteAttributeString("set", "0");
+                            xmlWriter.WriteEndElement();
+                            //</input>
+                        }
+                    }
+
                     //<input>
                     xmlWriter.WriteStartElement("input");
                     xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
                     xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map0");
                     xmlWriter.WriteAttributeString("offset", "2");
-                    xmlWriter.WriteAttributeString("set", "0");
+
+                    if (_pluginTarget.Equals(XivStrings.AutodeskCollada))
+                    {
+                        xmlWriter.WriteAttributeString("set", "0");
+                    }
+                    else
+                    {
+                        xmlWriter.WriteAttributeString("set", "1");
+                    }
+
                     xmlWriter.WriteEndElement();
                     //</input>
 
+                    var hasTexCoord1 = false;
                     if (meshList[i].VertexData.TextureCoordinates1 != null &&
                         meshList[i].VertexData.TextureCoordinates1.Count > 0)
                     {
@@ -1560,9 +1902,41 @@ namespace xivModdingFramework.Models.FileTypes
                         xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
                         xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map1");
                         xmlWriter.WriteAttributeString("offset", "2");
-                        xmlWriter.WriteAttributeString("set", "1");
+
+                        if (_pluginTarget.Equals(XivStrings.AutodeskCollada))
+                        {
+                            xmlWriter.WriteAttributeString("set", "1");
+                        }
+                        else
+                        {
+                            xmlWriter.WriteAttributeString("set", "2");
+                        }
                         xmlWriter.WriteEndElement();
                         //</input>
+
+                        hasTexCoord1 = true;
+                    }
+
+                    if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
+                    {
+                        if (meshList[i].VertexData.Colors.Count > 0)
+                        {
+                            //<input>
+                            xmlWriter.WriteStartElement("input");
+                            xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map2");
+                            xmlWriter.WriteAttributeString("offset", "2");
+                            if (_pluginTarget == XivStrings.AutodeskCollada)
+                            {
+                                xmlWriter.WriteAttributeString("set", hasTexCoord1 ? "2" : "1");
+                            }
+                            else
+                            {
+                                xmlWriter.WriteAttributeString("set", hasTexCoord1 ? "3" : "2");
+                            }
+                            xmlWriter.WriteEndElement();
+                            //</input>
+                        }
                     }
 
                     var pCount = 3;
