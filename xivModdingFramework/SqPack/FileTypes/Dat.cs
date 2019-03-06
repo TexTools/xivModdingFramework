@@ -932,9 +932,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="lineNum">The line number of the existing mod list entry for the item if it exists.</param>
         /// <param name="dataFile">The data file to which we write the data</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
+        /// <param name="dataType">The data type (2, 3, 4)</param>
+        /// <param name="modPack">The modpack associated with the import data if any</param>
         /// <returns>The new offset in which the modified data was placed.</returns>
         public int WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
-            string category, string itemName, XivDataFile dataFile, string source, int dataType)
+            string category, string itemName, XivDataFile dataFile, string source, int dataType,
+            ModPack modPack = null)
         {
             var offset = 0;
             var dataOverwritten = false;
@@ -1034,6 +1037,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     entryEnableUpdate.enabled = true;
 
+                    if (modPack != null)
+                    {
+                        entryEnableUpdate.modPack = modPack;
+                    }
+
                     File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
             }
@@ -1109,6 +1117,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             mod.data.originalOffset = originalOffset;
                             mod.data.dataType = dataType;
                             mod.enabled = true;
+                            mod.modPack = modPack;
 
                             modList.emptyCount -= 1;
                             modList.modCount += 1;
@@ -1202,6 +1211,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         fullPath = internalFilePath,
                         datFile = dataFile.GetDataFileName(),
                         enabled = true,
+                        modPack = modPack,
                         data = new Data
                         {
                             dataType = dataType,
