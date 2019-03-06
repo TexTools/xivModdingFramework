@@ -159,5 +159,10 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The dat file associated with the item
         /// </summary>
         public string DatFile { get; set; }
+
+        /// <summary>
+        /// The Mod Pack Entry
+        /// </summary>
+        public ModPack ModPackEntry { get; set; }
     }
 }
