@@ -26,14 +26,14 @@ namespace xivModdingFramework.Models.DataContainers
         public string[] Bones { get; set; }
 
         /// <summary>
-        /// The bone string names for all meshes
+        /// The list of bones and their associated number
         /// </summary>
-        public string[] AllBonesNames { get; set; }
+        public Dictionary<string, int> BoneNumDictionary { get; set; } = new Dictionary<string, int>();
 
         /// <summary>
         /// The bone names for the mesh
         /// </summary>
-        public  List<string> MeshBoneNames { get; set; } = new List<string>();
+        public List<string> MeshBoneNames { get; set; } = new List<string>();
 
         /// <summary>
         /// The Vertex Positions
@@ -46,6 +46,11 @@ namespace xivModdingFramework.Models.DataContainers
         public List<float> Normals { get; set; } = new List<float>();
 
         /// <summary>
+        /// The Vertex Colors
+        /// </summary>
+        public List<float> VertexColors { get; set; } = new List<float>();
+
+        /// <summary>
         /// The Vertex Primary Texture Coordinates
         /// </summary>
         public List<float> TextureCoordinates0 { get; set; } = new List<float>();
@@ -54,6 +59,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// The Vertex Secondary Texture Coordinates
         /// </summary>
         public List<float> TextureCoordinates1 { get; set; } = new List<float>();
+
+        /// <summary>
+        /// The Vertex Alphas
+        /// </summary>
+        public List<float> VertexAlphas { get; set; } = new List<float>();
 
         /// <summary>
         /// The Vertex Bone Weights
@@ -112,6 +122,16 @@ namespace xivModdingFramework.Models.DataContainers
         /// The Secondary Texture Coordinate Indices
         /// </summary>
         public List<int> TextureCoordinate1Indices { get; set; } = new List<int>();
+
+        /// <summary>
+        /// The Secondary Texture Coordinate Indices
+        /// </summary>
+        public List<int> VertexColorIndices { get; set; } = new List<int>();
+
+        /// <summary>
+        /// The Secondary Texture Coordinate Indices
+        /// </summary>
+        public List<int> VertexAlphaIndices { get; set; } = new List<int>();
 
         /// <summary>
         /// The Parts Dictionary
