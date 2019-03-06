@@ -55,7 +55,7 @@ namespace xivModdingFramework.Items.Categories
         {
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int modelDataCheckOffset = 31;
+            const int modelDataCheckOffset = 30;
             const int dataLength = 160;
             const int nameDataOffset = 14;
             const int modelDataOffset = 24;
@@ -72,10 +72,10 @@ namespace xivModdingFramework.Items.Categories
             // Loops through all the items in the item exd files
             // Item files start at 0 and increment by 500 for each new file
             // Item_0, Item_500, Item_1000, etc.
-            foreach (var item in itemDictionary.Values)
+            foreach (var item in itemDictionary)
             {
                 // This checks whether there is any model data present in the current item
-                if (item[modelDataCheckOffset] <= 0) continue;
+                if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) continue;
 
                 // Gear can have 2 separate models (MNK weapons for example)
                 var primaryMi = new XivModelInfo();
@@ -89,7 +89,7 @@ namespace xivModdingFramework.Items.Categories
                 };
 
                 /* Used to determine if the given model is a weapon
-                 * This is important because the data is formated differently
+                 * This is important because the data is formatted differently
                  * The model data is a 16 byte section separated into two 8 byte parts (primary model, secondary model)
                  * Format is 8 bytes in length with 2 bytes per data point [short, short, short, short]
                  * Gear: primary model [blank, blank, variant, ID] nothing in secondary model
@@ -98,7 +98,7 @@ namespace xivModdingFramework.Items.Categories
                 var isWeapon = false;
 
                 // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(item)))
+                using (var br = new BinaryReaderBE(new MemoryStream(item.Value)))
                 {
                     br.BaseStream.Seek(nameDataOffset, SeekOrigin.Begin);
                     var nameOffset = br.ReadInt16();
@@ -171,7 +171,7 @@ namespace xivModdingFramework.Items.Categories
 
                     // Gear Name
                     var gearNameOffset = dataLength + nameOffset;
-                    var gearNameLength = item.Length - gearNameOffset;
+                    var gearNameLength = item.Value.Length - gearNameOffset;
                     br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
                     var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
                     xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
