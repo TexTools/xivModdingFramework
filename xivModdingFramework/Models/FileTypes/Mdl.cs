@@ -4828,12 +4828,9 @@ namespace xivModdingFramework.Models.FileTypes
 
             string mdlFolder = "", mdlFile = "";
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            if (secondaryModel != null)
-            {
-                id = secondaryModel.ModelID.ToString().PadLeft(4, '0');
-            }
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var mdlInfo = secondaryModel == null ? itemModel.ModelInfo : secondaryModel;
+            var id = mdlInfo.ModelID.ToString().PadLeft(4, '0');
+            var bodyVer = mdlInfo.Body.ToString().PadLeft(4, '0');
             var race = xivRace.GetRaceCode();
 
             switch (itemType)

@@ -137,6 +137,7 @@ namespace xivModdingFramework.Items.Categories
                     primaryMi.ModelID = br.ReadInt16();
 
                     // Secondary Model Key
+                    isWeapon = false;
                     secondaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
                     br.BaseStream.Seek(-8, SeekOrigin.Current);
 

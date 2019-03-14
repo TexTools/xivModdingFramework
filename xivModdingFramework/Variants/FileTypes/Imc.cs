@@ -70,7 +70,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
             if (imcOffset == 0)
             {
-                throw new Exception($"Could not find offest for {imcPath.Folder}/{imcPath.File}");
+                throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
             }
 
             var imcData = dat.GetType2Data(imcOffset, _dataFile);
