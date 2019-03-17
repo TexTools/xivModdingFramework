@@ -194,8 +194,10 @@ namespace xivModdingFramework.Exd.FileTypes
                         var entrySize = br.ReadInt32();
                         br.ReadBytes(2);
 
-
-                        exdDataDictionary.Add(entryNum, br.ReadBytes(entrySize));
+                        if (!exdDataDictionary.ContainsKey(entryNum))
+                        {
+                            exdDataDictionary.Add(entryNum, br.ReadBytes(entrySize));
+                        }
                     }
                 }
             }
