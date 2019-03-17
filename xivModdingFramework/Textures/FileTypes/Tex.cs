@@ -22,6 +22,7 @@ using System.Linq;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
@@ -97,7 +98,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="itemModel">An item that contains model data</param>
         /// <param name="xivRace">The race for the requested data</param>
         /// <returns>A list of part characters</returns>
-        public List<string> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile)
+        public List<string> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile, string type = "Primary")
         {
             var itemType = ItemType.GetItemType(itemModel);
 
@@ -112,6 +113,18 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+
+            if (type.Equals("Secondary"))
+            {
+                var xivGear = itemModel as XivGear;
+
+                id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+                bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
+
+                var imc = new Imc(_gameDirectory, xivGear.DataFile);
+                version = imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo).Version.ToString().PadLeft(4, '0'); ;
+            }
+
             var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
             var race = xivRace.GetRaceCode();
 
