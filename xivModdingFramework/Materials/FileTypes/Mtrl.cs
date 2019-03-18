@@ -238,7 +238,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     // add the size of the paths
                     if (i > 0)
                     {
-                        pathSizeList.Add(xivMtrl.MapPathOffsetList[i] - xivMtrl.MapPathOffsetList[i-1]);
+                        pathSizeList.Add(xivMtrl.MapPathOffsetList[i] - xivMtrl.MapPathOffsetList[i - 1]);
                     }
                     else
                     {

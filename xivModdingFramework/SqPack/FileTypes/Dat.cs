@@ -929,7 +929,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalFilePath">The internal file path of the item being modified.</param>
         /// <param name="category">The category of the item.</param>
         /// <param name="itemName">The name of the item being modified.</param>
-        /// <param name="lineNum">The line number of the existing mod list entry for the item if it exists.</param>
         /// <param name="dataFile">The data file to which we write the data</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="dataType">The data type (2, 3, 4)</param>
