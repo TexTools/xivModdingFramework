@@ -960,26 +960,24 @@ namespace xivModdingFramework.SqPack.FileTypes
                 datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
                 modDatPath = $"{_gameDirectory}\\{modEntry.datFile}{DatExtension}{datNum}";
             }
+
+            var fileLength = new FileInfo(modDatPath).Length;
+
+            // Creates a new Dat if the current dat is at the 2GB limit
+            if (fileLength >= 2000000000)
+            {
+                datNum = CreateNewDat(dataFile);
+
+                modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            }
             else
             {
-                var fileLength = new FileInfo(modDatPath).Length;
-
-                // Creates a new Dat if the current dat is at the 2GB limit
-                if (fileLength >= 2000000000)
+                // If it is an original dat file, then create a new mod dat file
+                if (IsOriginalDat(dataFile))
                 {
                     datNum = CreateNewDat(dataFile);
 
                     modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-                }
-                else
-                {
-                    // If it is an original dat file, then create a new mod dat file
-                    if (IsOriginalDat(dataFile))
-                    {
-                        datNum = CreateNewDat(dataFile);
-
-                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-                    }
                 }
             }
 
