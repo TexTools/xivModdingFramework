@@ -21,6 +21,7 @@ using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
+using xivModdingFramework.General;
 using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -106,6 +107,10 @@ namespace xivModdingFramework.Items.Categories
                     // Model Data
                     br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
 
+                    // Primary Model Key
+                    primaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
+                    br.BaseStream.Seek(-8, SeekOrigin.Current);
+
                     // Primary Blank
                     primaryMi.Unused = br.ReadInt16();
 
@@ -130,6 +135,11 @@ namespace xivModdingFramework.Items.Categories
 
                     // Primary Model ID
                     primaryMi.ModelID = br.ReadInt16();
+
+                    // Secondary Model Key
+                    isWeapon = false;
+                    secondaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
+                    br.BaseStream.Seek(-8, SeekOrigin.Current);
 
                     // Secondary Blank
                     secondaryMi.Unused = br.ReadInt16();
@@ -167,6 +177,7 @@ namespace xivModdingFramework.Items.Categories
                     // Waist items do not have texture or model data
                     if (slotNum == 6) continue;
 
+                    xivGear.EquipSlotCategory = slotNum;
                     xivGear.ItemCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
 
                     // Gear Name

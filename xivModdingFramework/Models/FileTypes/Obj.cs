@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
@@ -52,40 +54,47 @@ namespace xivModdingFramework.Models.FileTypes
             var meshNum = 0;
             foreach (var meshData in meshes)
             {
-                var objStringList = new List<string>();
-
                 var modelName = $"{Path.GetFileNameWithoutExtension(xivMdl.MdlPath.File)}_{meshNum}";
                 var savePath = Path.Combine(path, modelName) + ".obj";
 
-                var vertexData = meshData.VertexData;
-
-                foreach (var vertexDataPosition in vertexData.Positions)
-                {
-                    objStringList.Add($"v {vertexDataPosition.X:N5} {vertexDataPosition.Y:N5} {vertexDataPosition.Z:N5} ");
-                }
-
-                foreach (var texCoord in vertexData.TextureCoordinates0)
-                {
-                    objStringList.Add($"vt {texCoord.X:N5} {(-1 * texCoord.Y):N5} ");
-                }
-
-                foreach (var vertexDataNormal in vertexData.Normals)
-                {
-                    objStringList.Add($"vn {vertexDataNormal.X:N5} {vertexDataNormal.Y:N5} {vertexDataNormal.Z:N5} ");
-                }
-
-                for (var i = 0; i < vertexData.Indices.Count; i += 3)
-                {
-                    var index1 = vertexData.Indices[i] + 1;
-                    var index2 = vertexData.Indices[i + 1] + 1;
-                    var index3 = vertexData.Indices[i + 2] + 1;
-                    objStringList.Add($"f {index1}/{index1}/{index1} {index2}/{index2}/{index2} {index3}/{index3}/{index3} ");
-                }
-
                 meshNum++;
-            
-                File.WriteAllLines(savePath, objStringList);
+
+                File.WriteAllText(savePath, ExportObj(meshData));
             }
+        }
+
+        public string ExportObj(MeshData meshData)
+        {
+            var sb = new StringBuilder();
+
+            var vertexData = meshData.VertexData;
+
+            foreach (var vertexDataPosition in vertexData.Positions)
+            {
+                sb.AppendLine($"v {vertexDataPosition.X:N5} {vertexDataPosition.Y:N5} {vertexDataPosition.Z:N5}");
+            }
+
+            foreach (var texCoord in vertexData.TextureCoordinates0)
+            {
+                var ox = texCoord.X - Math.Truncate(texCoord.X);
+                var oy = texCoord.Y - Math.Truncate(texCoord.Y);
+                sb.AppendLine($"vt {ox:N5} {(1 - oy):N5}");
+            }
+
+            foreach (var vertexDataNormal in vertexData.Normals)
+            {
+                sb.AppendLine($"vn {vertexDataNormal.X:N5} {vertexDataNormal.Y:N5} {vertexDataNormal.Z:N5}");
+            }
+
+            for (var i = 0; i < vertexData.Indices.Count; i += 3)
+            {
+                var index1 = vertexData.Indices[i] + 1;
+                var index2 = vertexData.Indices[i + 1] + 1;
+                var index3 = vertexData.Indices[i + 2] + 1;
+                sb.AppendLine($"f {index1}/{index1}/{index1} {index2}/{index2}/{index2} {index3}/{index3}/{index3}");
+            }
+
+            return sb.ToString();
         }
     }
 }

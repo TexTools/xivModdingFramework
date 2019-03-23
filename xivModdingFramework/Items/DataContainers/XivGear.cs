@@ -77,10 +77,16 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public uint IconNumber { get; set; }
 
+        /// <summary>
+        /// The gear EquipSlotCategory key
+        /// </summary>
+        public int EquipSlotCategory { get; set; }
 
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivGear) obj).Name, StringComparison.Ordinal);
         }
+
+        public override string ToString() => Name;
     }
 }

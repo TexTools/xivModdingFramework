@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using xivModdingFramework.General;
 using xivModdingFramework.Items.Enums;
 
 namespace xivModdingFramework.Items.DataContainers
@@ -52,5 +53,10 @@ namespace xivModdingFramework.Items.DataContainers
         /// The model type, this is only used when an item has a reference to ModelChara
         /// </summary>
         public XivItemType ModelType { get; set; }
+
+        /// <summary>
+        /// The items full model key value.
+        /// </summary>
+        public Quad ModelKey { get; set; }
     }
 }
