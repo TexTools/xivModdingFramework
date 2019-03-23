@@ -4831,6 +4831,7 @@ namespace xivModdingFramework.Models.FileTypes
             var mdlInfo = secondaryModel == null ? itemModel.ModelInfo : secondaryModel;
             var id = mdlInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = mdlInfo.Body.ToString().PadLeft(4, '0');
+          
             var race = xivRace.GetRaceCode();
 
             switch (itemType)

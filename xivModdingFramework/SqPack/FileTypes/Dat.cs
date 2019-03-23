@@ -929,7 +929,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalFilePath">The internal file path of the item being modified.</param>
         /// <param name="category">The category of the item.</param>
         /// <param name="itemName">The name of the item being modified.</param>
-        /// <param name="lineNum">The line number of the existing mod list entry for the item if it exists.</param>
         /// <param name="dataFile">The data file to which we write the data</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="dataType">The data type (2, 3, 4)</param>
@@ -961,26 +960,24 @@ namespace xivModdingFramework.SqPack.FileTypes
                 datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
                 modDatPath = $"{_gameDirectory}\\{modEntry.datFile}{DatExtension}{datNum}";
             }
+
+            var fileLength = new FileInfo(modDatPath).Length;
+
+            // Creates a new Dat if the current dat is at the 2GB limit
+            if (fileLength >= 2000000000)
+            {
+                datNum = CreateNewDat(dataFile);
+
+                modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            }
             else
             {
-                var fileLength = new FileInfo(modDatPath).Length;
-
-                // Creates a new Dat if the current dat is at the 2GB limit
-                if (fileLength >= 2000000000)
+                // If it is an original dat file, then create a new mod dat file
+                if (IsOriginalDat(dataFile))
                 {
                     datNum = CreateNewDat(dataFile);
 
                     modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-                }
-                else
-                {
-                    // If it is an original dat file, then create a new mod dat file
-                    if (IsOriginalDat(dataFile))
-                    {
-                        datNum = CreateNewDat(dataFile);
-
-                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-                    }
                 }
             }
 

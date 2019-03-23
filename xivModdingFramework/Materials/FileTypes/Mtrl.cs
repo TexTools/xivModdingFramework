@@ -14,14 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using SharpDX;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
@@ -61,13 +62,13 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="part">The Mtrl part </param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion)
+        public XivMtrl GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion, string type = "Primary")
         {
             var index = new Index(_gameDirectory);
             var itemType = ItemType.GetItemType(itemModel);
 
             // Get mtrl path
-            var mtrlPath = GetMtrlPath(itemModel, race, part, itemType);
+            var mtrlPath = GetMtrlPath(itemModel, race, part, itemType, type);
             var mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
 
             // Get mtrl offset
@@ -86,7 +87,42 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (mtrlOffset == 0)
             {
-                throw new Exception($"Could not find offest for {mtrlStringPath}");
+                // If secondary info does not give an offset, try setting body to 1
+                if (type.Equals("Secondary"))
+                {
+                    var xivGear = itemModel as XivGear;
+                    // Get mtrl path
+                    var originalBody = xivGear.SecondaryModelInfo.Body;
+                    xivGear.SecondaryModelInfo.Body = 1;
+                    mtrlPath = GetMtrlPath(itemModel, race, part, itemType, type);
+                    mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
+
+                    // Get mtrl offset
+                    mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder), HashGenerator.GetHash(mtrlPath.File),
+                        _dataFile);
+
+                    // If secondary info with body at 1 does not give an offset, go back to primary
+                    if (mtrlOffset == 0)
+                    {
+                        // Get mtrl path
+                        mtrlPath = GetMtrlPath(itemModel, race, part, itemType, "Primary");
+                        mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
+
+                        // Get mtrl offset
+                        mtrlOffset = index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder), HashGenerator.GetHash(mtrlPath.File),
+                            _dataFile);
+
+                        if (mtrlOffset == 0)
+                        {
+                            throw new Exception($"Could not find offset for {mtrlStringPath}");
+                        }
+                    }
+                }
+                else
+                {
+                    throw new Exception($"Could not find offset for {mtrlStringPath}");
+                }
+
             }
 
             var mtrlData = GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
@@ -202,7 +238,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     // add the size of the paths
                     if (i > 0)
                     {
-                        pathSizeList.Add(xivMtrl.MapPathOffsetList[i] - xivMtrl.MapPathOffsetList[i-1]);
+                        pathSizeList.Add(xivMtrl.MapPathOffsetList[i] - xivMtrl.MapPathOffsetList[i - 1]);
                     }
                     else
                     {
@@ -686,8 +722,9 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivRace">The race for the requested data</param>
         /// <param name="part">The mtrl part <see cref="GearInfo.GetPartList(IItemModel, XivRace)"/></param>
         /// <param name="itemType">The type of the item</param>
+        /// <param name="type">The item type whether Primary or Secondary</param>
         /// <returns>A tuple containing the mtrl folder and file, and whether it has a vfx</returns>
-        private (string Folder, string File, bool HasVfx) GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType)
+        private (string Folder, string File, bool HasVfx) GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType, string type)
         {
             // The default version number
             var version = "0001";
@@ -709,6 +746,19 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+
+            if (type.Equals("Secondary"))
+            {
+                var xivGear = itemModel as XivGear;
+
+                id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
+                bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
+
+                var imc = new Imc(_gameDirectory, _dataFile);
+                var imcInfo = imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo);
+                version = imcInfo.Version.ToString().PadLeft(4, '0');
+            }
+
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";
@@ -807,6 +857,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+
             var race = xivRace.GetRaceCode();
 
             var mtrlFolder = "";
