@@ -1469,7 +1469,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 meshDataDictionary[i].Indices.Add(partDataDict[partNum].VertexColorIndices[k] + vColorMax);
                             }
 
-
                             if (partDataDict[partNum].VertexAlphas.Count > 0)
                             {
                                 meshDataDictionary[i].Indices.Add(partDataDict[partNum].VertexAlphaIndices[k] + vColorAlphaMax);
@@ -1590,8 +1589,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.VertexColors.Count; i += 3)
                 {
-                    vertexColorCollection.Add(new Vector3(colladaData.VertexColors[i], colladaData.VertexColors[i + 1],
-                        colladaData.VertexColors[i + 2]));
+                    // Check vertex colors for bad data, if any is found replace with default of 1
+                    if (colladaData.VertexColors.Any(x => x < 0f || x > 1f))
+                    {
+                        vertexColorCollection.Add(new Vector3(1, 1, 1));
+                    }
+                    else
+                    {
+                        vertexColorCollection.Add(new Vector3(colladaData.VertexColors[i], colladaData.VertexColors[i + 1],
+                            colladaData.VertexColors[i + 2]));
+                    }
                 }
 
                 if (colladaData.BiNormals.Count > 0)
@@ -1626,7 +1633,15 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
                 {
-                    vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]));
+                    // Check vertex alphas for bad data, if any is found replace with default of 1
+                    if (colladaData.VertexAlphas.Any(x => x < 0f || x > 1f))
+                    {
+                        vertexAlphaCollection.Add(new Vector2(1, 0));
+                    }
+                    else
+                    {
+                        vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]));
+                    }
                 }
 
                 if (!isHousingItem) // housing items do not have bones
