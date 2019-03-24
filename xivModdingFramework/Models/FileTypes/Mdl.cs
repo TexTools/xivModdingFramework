@@ -1320,7 +1320,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var meshShapeDictionary = new Dictionary<int, int>();
 
-            // A dictonary containing any warnings raised by the import in the format <Warning Title, Warning Message>
+            // A dictionary containing any warnings raised by the import in the format <Warning Title, Warning Message>
             var warningsDictionary = new Dictionary<string, string>();
 
             var dae = new Dae(_gameDirectory, _dataFile, pluginTarget);
@@ -1365,14 +1365,48 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (partData.Value.BoneWeights.Count < 1)
                     {
-                        throw new Exception($"Missing Bone Weights at Mesh: {i}  Part: {partData.Key}");
+                        //throw new Exception($"Missing Bone Weights at Mesh: {i}  Part: {partData.Key}");
+                        warningsDictionary.Add("Missing Bones", $"There were missing bones at Mesh: {i}  Part: {partData.Key}\n\nDummy data was added. This may cause unintentional effects");
+
+                        // Add dummy data for missing bones
+                        partData.Value.BoneWeights.AddRange(new float[partData.Value.Positions.Count]);
                     }
 
                     if (partData.Value.BoneIndices.Count < 1)
                     {
-                        throw new Exception($"Missing Bone Indices at Mesh: {i}  Part: {partData.Key}");
+                        //throw new Exception($"Missing Bone Indices at Mesh: {i}  Part: {partData.Key}");
+
+                        var boneDict = meshPartDataDictionary[0][0].BoneNumDictionary;
+
+                        // Find the closest bone to the root and get its index
+                        var boneIndex = 0;
+                        if (boneDict.ContainsKey("n_hara"))
+                        {
+                            boneIndex = boneDict["n_hara"];
+                        }
+                        else if (boneDict.ContainsKey("j_kosi"))
+                        {
+                            boneIndex = boneDict["j_kosi"];
+                        }
+                        else if (boneDict.ContainsKey("j_sebo_a"))
+                        {
+                            boneIndex = boneDict["j_sebo_a"];
+                        }
+
+                        // Add dummy data for missing bones
+                        for (var j = 0; j < partData.Value.Positions.Count; j++)
+                        {
+                            partData.Value.BoneIndices.Add(boneIndex);
+                        }
                     }
 
+                    if (partData.Value.Vcounts.Count < 1)
+                    {
+                        for (var j = 0; j < partData.Value.Positions.Count; j++)
+                        {
+                            partData.Value.Vcounts.Add(1);
+                        }
+                    }
                 }
             }
 
@@ -2029,38 +2063,38 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Computing the BiTangents with the below calculations have given better results
                 // than using the data directly from the dae file above
-                var tan1 = new Vector3[positionCollection.Count];
-                var tan2 = new Vector3[positionCollection.Count];
+                var tangents = new Vector3[positionCollection.Count];
+                var bitangents = new Vector3[positionCollection.Count];
                 for (var a = 0; a < indexCollection.Count; a += 3)
                 {
-                    var i1 = indexCollection[a];
-                    var i2 = indexCollection[a + 1];
-                    var i3 = indexCollection[a + 2];
-                    var v1 = nPositionCollection[i1];
-                    var v2 = nPositionCollection[i2];
-                    var v3 = nPositionCollection[i3];
-                    var w1 = nTexCoord0Collection[i1];
-                    var w2 = nTexCoord0Collection[i2];
-                    var w3 = nTexCoord0Collection[i3];
-                    var x1 = v2.X - v1.X;
-                    var x2 = v3.X - v1.X;
-                    var y1 = v2.Y - v1.Y;
-                    var y2 = v3.Y - v1.Y;
-                    var z1 = v2.Z - v1.Z;
-                    var z2 = v3.Z - v1.Z;
-                    var s1 = w2.X - w1.X;
-                    var s2 = w3.X - w1.X;
-                    var t1 = w2.Y - w1.Y;
-                    var t2 = w3.Y - w1.Y;
-                    var r = 1.0f / (s1 * t2 - s2 * t1);
-                    var sdir = new Vector3((t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r);
-                    var tdir = new Vector3((s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r, (s1 * z2 - s2 * z1) * r);
-                    tan1[i1] += sdir;
-                    tan1[i2] += sdir;
-                    tan1[i3] += sdir;
-                    tan2[i1] += tdir;
-                    tan2[i2] += tdir;
-                    tan2[i3] += tdir;
+                    var index1  = indexCollection[a];
+                    var index2  = indexCollection[a + 1];
+                    var index3  = indexCollection[a + 2];
+                    var vertex1 = nPositionCollection[index1];
+                    var vertex2 = nPositionCollection[index2];
+                    var vertex3 = nPositionCollection[index3];
+                    var uv1     = nTexCoord0Collection[index1];
+                    var uv2     = nTexCoord0Collection[index2];
+                    var uv3     = nTexCoord0Collection[index3];
+                    var deltaX1 = vertex2.X - vertex1.X;
+                    var deltaX2 = vertex3.X - vertex1.X;
+                    var deltaY1 = vertex2.Y - vertex1.Y;
+                    var deltaY2 = vertex3.Y - vertex1.Y;
+                    var deltaZ1 = vertex2.Z - vertex1.Z;
+                    var deltaZ2 = vertex3.Z - vertex1.Z;
+                    var deltaU1 = uv2.X - uv1.X;
+                    var deltaU2 = uv3.X - uv1.X;
+                    var deltaV1 = uv2.Y - uv1.Y;
+                    var deltaV2 = uv3.Y - uv1.Y;
+                    var r = 1.0f / (deltaU1 * deltaV2 - deltaU2 * deltaV1);
+                    var sdir = new Vector3((deltaV2 * deltaX1 - deltaV1 * deltaX2) * r, (deltaV2 * deltaY1 - deltaV1 * deltaY2) * r, (deltaV2 * deltaZ1 - deltaV1 * deltaZ2) * r);
+                    var tdir = new Vector3((deltaU1 * deltaX2 - deltaU2 * deltaX1) * r, (deltaU1 * deltaY2 - deltaU2 * deltaY1) * r, (deltaU1 * deltaZ2 - deltaU2 * deltaZ1) * r);
+                    tangents[index1] += sdir;
+                    tangents[index2] += sdir;
+                    tangents[index3] += sdir;
+                    bitangents[index1] += tdir;
+                    bitangents[index2] += tdir;
+                    bitangents[index3] += tdir;
                 }
 
                 var colladaMeshData = new ColladaMeshData();
@@ -2068,8 +2102,8 @@ namespace xivModdingFramework.Models.FileTypes
                 for (var a = 0; a < nPositionCollection.Count; ++a)
                 {
                     var n = Vector3.Normalize(nNormalsCollection[a]);
-                    var t = Vector3.Normalize(tan1[a]);
-                    var d = (Vector3.Dot(Vector3.Cross(n, t), tan2[a]) < 0.0f) ? -1.0f : 1.0f;
+                    var t = Vector3.Normalize(tangents[a]);
+                    var d = (Vector3.Dot(Vector3.Cross(n, t), bitangents[a]) < 0.0f) ? -1.0f : 1.0f;
                     var tmpt = new Vector3(t.X, t.Y, t.Z);
                     meshGeometry.BiTangents.Add(tmpt);
                     colladaMeshData.Handedness.Add((int)d);
@@ -2088,7 +2122,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 }
 
-                colladaMeshData.BoneNumDictionary = meshPartDataDictionary[meshNum][0].BoneNumDictionary;
+                if (meshPartDataDictionary[meshNum].ContainsKey(0))
+                {
+                    colladaMeshData.BoneNumDictionary = meshPartDataDictionary[meshNum][0].BoneNumDictionary;
+                }
+
                 foreach (var data in meshPartDataDictionary[meshNum])
                 {
                     colladaMeshData.PartBoneDictionary.Add(data.Key, data.Value.MeshBoneNames);
@@ -2536,9 +2574,9 @@ namespace xivModdingFramework.Models.FileTypes
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown3));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown4));
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown5));
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown6));
+            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown6)); // Unknown - Differential between gloves
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown7));
-            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown8));
+            modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown8)); // Unknown - Differential between gloves
             modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown9));
             modelDataBlock.Add(modelData.Unknown10a);
             modelDataBlock.Add(modelData.Unknown10b);
@@ -3075,7 +3113,10 @@ namespace xivModdingFramework.Models.FileTypes
                         var boneCount = meshPart.BoneCount;
                         if (lodNum == 0 && importSettings != null)
                         {
-                            boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
+                            if (colladaMeshDataList[meshNum].PartBoneDictionary.ContainsKey(partNum))
+                            {
+                                boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
+                            }
                         }
 
                         meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
@@ -3093,54 +3134,57 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (lodNum == 0 && importSettings != null)
                     {
-                        var importSettingsMesh = importSettings[meshNum.ToString()];
-
-                        // Add additional mesh parts if there are any from advanced importing
-                        if (importSettingsMesh.PartList.Count > partCount)
+                        if (importSettings.ContainsKey(meshNum.ToString()))
                         {
-                            var extraPartCount = importSettingsMesh.PartList.Count - partCount;
+                            var importSettingsMesh = importSettings[meshNum.ToString()];
 
-                            for (var i = 0; i < extraPartCount; i++)
+                            // Add additional mesh parts if there are any from advanced importing
+                            if (importSettingsMesh.PartList.Count > partCount)
                             {
-                                int indexOffset;
+                                var extraPartCount = importSettingsMesh.PartList.Count - partCount;
 
-                                var importedPartsDictionary = colladaMeshDataList[meshNum].PartsDictionary;
-
-                                // Recalculate Index Offset
-                                indexOffset = previousIndexOffset + previousIndexCount;
-
-                                // Recalculate Index Count
-                                var indexCount = importedPartsDictionary.ContainsKey(partNum) ? importedPartsDictionary[partNum] : 0;
-
-                                // Calculate padding between meshes
-                                if (partNum == partCount - 1)
+                                for (var i = 0; i < extraPartCount; i++)
                                 {
-                                    var padd = (indexOffset + indexCount) % 8;
+                                    int indexOffset;
 
-                                    if (padd != 0)
+                                    var importedPartsDictionary = colladaMeshDataList[meshNum].PartsDictionary;
+
+                                    // Recalculate Index Offset
+                                    indexOffset = previousIndexOffset + previousIndexCount;
+
+                                    // Recalculate Index Count
+                                    var indexCount = importedPartsDictionary.ContainsKey(partNum) ? importedPartsDictionary[partNum] : 0;
+
+                                    // Calculate padding between meshes
+                                    if (partNum == partCount - 1)
                                     {
-                                        partPadding = 8 - padd;
+                                        var padd = (indexOffset + indexCount) % 8;
+
+                                        if (padd != 0)
+                                        {
+                                            partPadding = 8 - padd;
+                                        }
+                                        else
+                                        {
+                                            partPadding = 0;
+                                        }
                                     }
-                                    else
-                                    {
-                                        partPadding = 0;
-                                    }
+
+                                    var attributeIndex = importSettingsMesh.PartAttributeDictionary.ContainsKey(partNum) ? importSettingsMesh.PartAttributeDictionary[partNum] : 0;
+                                    var boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
+
+                                    meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
+                                    meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
+                                    meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
+                                    meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
+                                    meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
+
+                                    previousIndexCount = indexCount;
+                                    previousIndexOffset = indexOffset;
+                                    currentBoneOffset += boneCount;
+
+                                    partNum++;
                                 }
-
-                                var attributeIndex = importSettingsMesh.PartAttributeDictionary.ContainsKey(partNum) ? importSettingsMesh.PartAttributeDictionary[partNum] : 0;
-                                var boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
-
-                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
-                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
-                                meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
-                                meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
-                                meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
-
-                                previousIndexCount = indexCount;
-                                previousIndexOffset = indexOffset;
-                                currentBoneOffset += boneCount;
-
-                                partNum++;
                             }
                         }
                     }
