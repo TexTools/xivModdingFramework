@@ -230,7 +230,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var meshCount = xivMdl.LoDList[0].MeshCount;
 
-            if (advImportSettings != null)
+            if (advImportSettings != null && advImportSettings.Count > meshCount)
             {
                 meshCount = (short)advImportSettings.Count;
             }
@@ -739,6 +739,28 @@ namespace xivModdingFramework.Models.FileTypes
                                             }
 
                                             if(name.Contains("n_root")) continue;
+
+                                            foreach (var boneName in boneNames)
+                                            {
+                                                if (name.Contains(boneName))
+                                                {
+                                                    sameBone = true;
+                                                }
+                                            }
+
+                                            if (!sameBone)
+                                            {
+                                                boneStringList.Add(name);
+                                            }
+
+                                            boneNames.Add(name);
+                                        }
+                                        else
+                                        {
+                                            var name = reader["name"];
+
+                                            if (!name.Contains("n_") && !name.Contains("j_")) continue;
+                                            if (name.Contains("n_root")) continue;
 
                                             foreach (var boneName in boneNames)
                                             {
