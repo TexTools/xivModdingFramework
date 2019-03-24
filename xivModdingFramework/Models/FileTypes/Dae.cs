@@ -269,6 +269,7 @@ namespace xivModdingFramework.Models.FileTypes
                                                 throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
+                                            if(!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
                                             if(name.Contains("n_root")) continue;
                                             if(name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
@@ -330,6 +331,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var indexStride = 4;
             var textureCoordinateStride = 2;
+            var vertexColorStride = 3;
 
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
@@ -357,10 +359,14 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else if (tool.Contains("FBX"))
                             {
-                                pos   = "-position-array";
-                                norm  = "-normal0-array";
-                                texc  = "-uv0-array";
-                                texc2 = "-uv1-array";
+                                pos    = "-position-array";
+                                norm   = "-normal0-array";
+                                vcol   = "_color0-array";
+                                texc   = "-uv0-array";
+                                texc2  = "-uv1-array";
+                                valpha = "-uv2-array";
+                                indexStride = 6;
+                                vertexColorStride = 4;
                             }
                             else if (tool.Contains("Exporter for Blender"))
                             {
@@ -386,6 +392,11 @@ namespace xivModdingFramework.Models.FileTypes
                             if (meshNameDict.ContainsKey(id))
                             {
                                 throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}");
+                            }
+
+                            if (atr.Contains("Mesh"))
+                            {
+                                atr = atr.Replace("Mesh", string.Empty);
                             }
 
                             meshNameDict.Add(id, atr);
@@ -448,30 +459,31 @@ namespace xivModdingFramework.Models.FileTypes
                                         }
                                     }
 
+                                    var inputOffset = 0;
+                                    if (reader.Name.Equals("triangles"))
+                                    {
+                                        while (reader.Read())
+                                        {
+                                            if (reader.IsStartElement())
+                                            {
+                                                if (reader.Name.Contains("input"))
+                                                {
+                                                    inputOffset = int.Parse(reader["offset"]);
+                                                }
+                                                else
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     // Indices
                                     if (reader.Name.Equals("p"))
                                     {
                                         cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
 
-                                        // The index stride changes if the secondary texture coordinates are not present
-                                        if (cData.TextureCoordinates1.Count < 1 && indexStride == 6)
-                                        {
-                                            indexStride = 4;
-                                        }
-
-                                        if (cData.VertexColors.Count > 0 && indexStride == 6)
-                                        {
-                                            indexStride = 9;
-                                        }
-
-                                        if (cData.BiNormals.Count < 1 && indexStride == 4)
-                                        {
-                                            indexStride = 3;
-                                        }
-                                        else if (cData.BiNormals.Count > 0 && indexStride == 3)
-                                        {
-                                            indexStride = 4;
-                                        }
+                                        indexStride = inputOffset + 1;
 
                                         // Reads the indices for each data point and places them in a list
                                         for (var i = 0; i < cData.Indices.Count; i += indexStride)
@@ -532,6 +544,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             cData.IndexStride = indexStride;
                             cData.TextureCoordinateStride = textureCoordinateStride;
+                            cData.VertexColorStride = vertexColorStride;
 
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
@@ -566,6 +579,12 @@ namespace xivModdingFramework.Models.FileTypes
                         else if (reader.Name.Equals("controller"))
                         {
                             var atr = reader["id"];
+
+                            if (atr.Contains("Controller"))
+                            {
+                                atr = atr.Replace("Controller", "-Controller");
+                            }
+
                             ColladaData colladaData;
 
                             // If the collada file was saved in blender

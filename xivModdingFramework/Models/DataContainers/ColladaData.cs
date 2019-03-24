@@ -149,6 +149,11 @@ namespace xivModdingFramework.Models.DataContainers
         public int TextureCoordinateStride { get; set; }
 
         /// <summary>
+        /// The stride for Vertex Color values
+        /// </summary>
+        public int VertexColorStride { get; set; }
+
+        /// <summary>
         /// A flag to determine if the import is from Blender
         /// </summary>
         public bool IsBlender { get; set; }

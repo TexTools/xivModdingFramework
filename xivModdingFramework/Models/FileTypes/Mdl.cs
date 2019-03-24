@@ -1345,7 +1345,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 meshDataDictionary.Add(i, new ColladaData
                 {
-                    TextureCoordinateStride = textureCoordinateStride
+                    TextureCoordinateStride = textureCoordinateStride,
+                    VertexColorStride = meshPartDict[0].VertexColorStride
                 });
             }
          
@@ -1475,6 +1476,31 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                         }
 
+                        // Set new index stride
+                        var indexStride = 3;
+
+                        if (partDataDict[partNum].TextureCoordinates1.Count > 0)
+                        {
+                            indexStride++;
+                        }
+
+                        if (partDataDict[partNum].BiNormals.Count > 0)
+                        {
+                            indexStride++;
+                        }
+
+                        if (partDataDict[partNum].VertexColors.Count > 0)
+                        {
+                            indexStride++;
+                        }
+
+                        if (partDataDict[partNum].VertexAlphas.Count > 0)
+                        {
+                            indexStride++;
+                        }
+
+                        meshDataDictionary[i].IndexStride = indexStride;
+
                         // Get the largest index for each data point
                         positionMax += partDataDict[partNum].PositionIndices.Max() + 1;
                         normalMax += partDataDict[partNum].NormalIndices.Max() + 1;
@@ -1587,7 +1613,7 @@ namespace xivModdingFramework.Models.FileTypes
                         colladaData.Normals[i + 2]));
                 }
 
-                for (var i = 0; i < colladaData.VertexColors.Count; i += 3)
+                for (var i = 0; i < colladaData.VertexColors.Count; i += colladaData.VertexColorStride)
                 {
                     // Check vertex colors for bad data, if any is found replace with default of 1
                     if (colladaData.VertexColors.Any(x => x < 0f || x > 1f))
@@ -1773,26 +1799,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Each item in this list contains the index for each data point
                 var indexList = new List<int[]>();
 
-                var stride = 5;
-
-                if (colladaData.VertexColors.Count > 0)
+                for (var i = 0; i < colladaData.Indices.Count; i += colladaData.IndexStride)
                 {
-                    stride = 7;
-                }
-
-                if (texCoord1Collection.Count < 1)
-                {
-                    stride = 4;
-                }
-
-                if (biNormalsCollection.Count < 1)
-                {
-                    stride = 3;
-                }
-
-                for (var i = 0; i < colladaData.Indices.Count; i += stride)
-                {
-                    indexList.Add(colladaData.Indices.GetRange(i, stride).ToArray());
+                    indexList.Add(colladaData.Indices.GetRange(i, colladaData.IndexStride).ToArray());
                 }
 
                 // Create the new data point lists in their appropriate order from their indices
@@ -1884,7 +1893,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (vertexColorCollection.Count > 0)
                         {
-                            var colorPos = indexList[i][5];
+                            var colorPos = biNormalsCollection.Count > 0 ? indexList[i][5] : indexList[i][4];
 
                             if (colorPos > vertexColorCollection.Count)
                             {
@@ -1895,7 +1904,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (vertexAlphaCollection.Count > 0)
                         {
-                            var alphaPos = indexList[i][6];
+                            var alphaPos = biNormalsCollection.Count > 0 ? indexList[i][6] : indexList[i][5];
 
                             if (alphaPos > vertexAlphaCollection.Count)
                             {
