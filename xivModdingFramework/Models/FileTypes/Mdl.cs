@@ -68,14 +68,14 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivRace">The race for which to get the data</param>
         /// <param name="secondaryModel">The secondary model info if needed</param>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public XivMdl GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null, int originalOffset = 0)
+        public XivMdl GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null, int originalOffset = 0, string ringSide = null)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var itemType = ItemType.GetItemType(itemModel);
 
-            var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel, mdlStringPath);
+            var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel, mdlStringPath, ringSide);
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
@@ -4884,7 +4884,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="itemType">The items type</param>
         /// <param name="secondaryModel">The secondary model if any</param>
         /// <returns>A Tuple containing the Folder and File string paths</returns>
-        private (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel, string mdlStringPath = null)
+        private (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel, string mdlStringPath, string ringSide)
         {
             if (mdlStringPath != null)
             {
@@ -4910,7 +4910,21 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case XivItemType.accessory:
                     mdlFolder = $"chara/{itemType}/a{id}/model";
-                    mdlFile   = $"c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                    if (ringSide != null)
+                    {
+                        if (ringSide.Equals("Right"))
+                        {
+                            mdlFile = $"c{race}a{id}_rir{MdlExtension}";
+                        }
+                        else
+                        {
+                            mdlFile = $"c{race}a{id}_ril{MdlExtension}";
+                        }
+                    }
+                    else
+                    {
+                        mdlFile = $"c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                    }
                     break;
                 case XivItemType.weapon:
                     mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
