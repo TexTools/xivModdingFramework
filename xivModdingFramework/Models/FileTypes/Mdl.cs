@@ -1166,7 +1166,10 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var indexDataOffset = lod.MeshDataList[i].MeshInfo.IndexDataOffset;
 
-                            indexMeshNum.Add(indexDataOffset, i);
+                            if (!indexMeshNum.ContainsKey(indexDataOffset))
+                            {
+                                indexMeshNum.Add(indexDataOffset, i);
+                            }
                         }
 
                         for (var i = 0; i < lod.MeshCount; i++)
@@ -1254,7 +1257,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         if (!referencePositionsDictionary.ContainsKey(data.ReferenceIndexOffset))
                                         {
-                                            referencePositionsDictionary.Add(data.ReferenceIndexOffset, mesh.VertexData.Positions[referenceIndex]);
+                                            if (mesh.VertexData.Positions.Count > referenceIndex)
+                                            {
+                                                referencePositionsDictionary.Add(data.ReferenceIndexOffset, mesh.VertexData.Positions[referenceIndex]);
+                                            }
                                         }
 
                                         if (!meshShapePositionsDictionary.ContainsKey(data.ShapeIndex))
