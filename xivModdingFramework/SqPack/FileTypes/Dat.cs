@@ -821,9 +821,17 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             using (var br = new BinaryReader(File.OpenRead(datPath)))
             {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                try
+                {
+                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
-                return br.ReadBytes(dataSize);
+                    return br.ReadBytes(dataSize);
+                }
+                catch
+                {
+                    return null;
+                }
+
             }
         }
 

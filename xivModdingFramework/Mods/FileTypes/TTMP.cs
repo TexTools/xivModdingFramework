@@ -215,6 +215,14 @@ namespace xivModdingFramework.Mods.FileTypes
                         var rawData = dat.GetRawData((int)simpleModData.ModOffset, XivDataFiles.GetXivDataFile(simpleModData.DatFile),
                             simpleModData.ModSize);
 
+                        if (rawData == null)
+                        {
+                            throw new Exception("Unable to obtain data for the following mod\n\n" +
+                                                $"Name: {simpleModData.Name}\nFull Path: {simpleModData.FullPath}\n" +
+                                                $"Mod Offset: {simpleModData.ModOffset}\nData File: {simpleModData.DatFile}\n\n" +
+                                                $"Unselect the above mod and try again.");
+                        }
+
                         binaryWriter.Write(rawData);
 
                         modPackJson.SimpleModsList.Add(modsJson);
