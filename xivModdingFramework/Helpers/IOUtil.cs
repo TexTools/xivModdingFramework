@@ -127,5 +127,21 @@ namespace xivModdingFramework.Helpers
 
             return File.Exists(fullPath.FullName);
         }
+
+        /// <summary>
+        /// Determines whether a BMP file exists for the given item
+        /// </summary>
+        /// <param name="item">The item to check</param>
+        /// <param name="saveDirectory">The save directory where the BMP should be located</param>
+        /// <param name="fileName">The name of the file</param>
+        /// <returns>True if the BMP file exists, false otherwise</returns>
+        public static bool BMPFileExists(IItem item, DirectoryInfo saveDirectory, string fileName, XivRace race = XivRace.All_Races)
+        {
+            var path = MakeItemSavePath(item, saveDirectory, race);
+
+            var fullPath = new DirectoryInfo($"{path}\\{fileName}.bmp");
+
+            return File.Exists(fullPath.FullName);
+        }
     }
 }
