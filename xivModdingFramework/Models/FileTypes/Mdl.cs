@@ -1242,13 +1242,15 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         }
 
-                                        //if (data.ReferenceIndexOffset >= mesh.VertexData.Indices.Count)
-                                        //{
-                                        //    throw new Exception($"Reference Index is larger than the index count. Refrence Index: {data.ReferenceIndexOffset}  Index Count: {mesh.VertexData.Indices.Count}");
-                                        //}
+                                        var referenceIndex = 0;
 
-                                        // Gets the index to which the data is referencing
-                                        var referenceIndex = mesh.VertexData.Indices[data.ReferenceIndexOffset];
+                                        if (data.ReferenceIndexOffset < mesh.VertexData.Indices.Count)
+                                        {
+                                            // Gets the index to which the data is referencing
+                                            referenceIndex = mesh.VertexData.Indices[data.ReferenceIndexOffset];
+
+                                            //throw new Exception($"Reference Index is larger than the index count. Reference Index: {data.ReferenceIndexOffset}  Index Count: {mesh.VertexData.Indices.Count}");
+                                        }
 
                                         if (!referencePositionsDictionary.ContainsKey(data.ReferenceIndexOffset))
                                         {
