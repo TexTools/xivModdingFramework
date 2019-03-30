@@ -267,7 +267,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var lod = new LevelOfDetail
                     {
-                        MeshOffset       = br.ReadInt16(),
+                        MeshOffset       = br.ReadUInt16(),
                         MeshCount        = br.ReadInt16(),
                         Unknown0         = br.ReadInt32(),
                         Unknown1         = br.ReadInt32(),
@@ -317,7 +317,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var lod = new LevelOfDetail
                         {
-                            MeshOffset       = br.ReadInt16(),
+                            MeshOffset       = br.ReadUInt16(),
                             MeshCount        = br.ReadInt16(),
                             Unknown0         = br.ReadInt32(),
                             Unknown1         = br.ReadInt32(),
@@ -545,10 +545,10 @@ namespace xivModdingFramework.Models.FileTypes
                         ShapeIndexParts = new List<ShapeData.ShapeIndexPart>()
                     };
 
-                    var dataInfoIndexList = new List<short>();
+                    var dataInfoIndexList = new List<ushort>();
                     for (var j = 0; j < xivMdl.LoDList.Count; j++)
                     {
-                        dataInfoIndexList.Add(br.ReadInt16());
+                        dataInfoIndexList.Add(br.ReadUInt16());
                     }
 
                     var infoPartCountList = new List<short>();
@@ -589,8 +589,8 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var shapeData = new ShapeData.ShapeEntryData
                     {
-                        ReferenceIndexOffset = br.ReadInt16(),
-                        ShapeIndex            = br.ReadInt16()
+                        ReferenceIndexOffset = br.ReadUInt16(),
+                        ShapeIndex            = br.ReadUInt16()
                     };
 
                     shapeDataLists.ShapeDataList.Add(shapeData);
@@ -1142,7 +1142,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         for (var i = 0; i < meshData.MeshInfo.IndexCount; i++)
                         {
-                            vertexData.Indices.Add(br.ReadInt16());
+                            vertexData.Indices.Add(br.ReadUInt16());
                         }
 
                         #endregion
@@ -1173,7 +1173,7 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var referencePositionsDictionary = new Dictionary<int, Vector3>();
                             var meshShapePositionsDictionary = new SortedDictionary<int, Vector3>();
-                            var shapeIndexOffsetDictionary = new Dictionary<int, Dictionary<short, short>>();
+                            var shapeIndexOffsetDictionary = new Dictionary<int, Dictionary<ushort, ushort>>();
 
                             // Shape info list
                             var shapeInfoList = xivMdl.MeshShapeData.ShapeInfoList;
@@ -1219,12 +1219,12 @@ namespace xivModdingFramework.Models.FileTypes
                                     var shapeDataForMesh = shapeData.GetRange(shapeDataInfo.DataIndexOffset, shapeDataInfo.IndexCount);
 
                                     // Fill shape data dictionaries
-                                    short dataIndex = -1;
+                                    ushort dataIndex = ushort.MaxValue;
                                     foreach (var data in shapeDataForMesh)
                                     {
                                         if (!shapeIndexOffsetDictionary.ContainsKey(shapeDataInfo.DataIndexOffset))
                                         {
-                                            shapeIndexOffsetDictionary.Add(shapeDataInfo.DataIndexOffset, new Dictionary<short, short>{{ data.ReferenceIndexOffset, data.ShapeIndex }});
+                                            shapeIndexOffsetDictionary.Add(shapeDataInfo.DataIndexOffset, new Dictionary<ushort, ushort>{{ data.ReferenceIndexOffset, data.ShapeIndex }});
                                         }
                                         else
                                         {
@@ -3507,10 +3507,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                                 else
                                 {
-                                    short previousEntry = 0;
+                                    ushort previousEntry = 0;
                                     foreach (var indexOffset in shapeData)
                                     {
-                                        if (indexOffset.Key >= 0)
+                                        if (indexOffset.Key != ushort.MaxValue)
                                         {
                                             meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
                                             previousEntry = indexOffset.Key;
@@ -3526,10 +3526,10 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
-                                short previousEntry = 0;
+                                ushort previousEntry = 0;
                                 foreach (var indexOffset in shapeData)
                                 {
-                                    if (indexOffset.Key >= 0)
+                                    if (indexOffset.Key != ushort.MaxValue)
                                     {
                                         meshShapeDataBlock.AddRange(BitConverter.GetBytes(indexOffset.Key));
                                         previousEntry = indexOffset.Key;

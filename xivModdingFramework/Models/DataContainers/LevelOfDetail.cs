@@ -26,7 +26,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The offset to the mesh data block
         /// </summary>
-        public short MeshOffset { get; set; }
+        public ushort MeshOffset { get; set; }
 
         /// <summary>
         /// The number of meshes to use

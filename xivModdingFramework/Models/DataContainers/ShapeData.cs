@@ -71,12 +71,12 @@ namespace xivModdingFramework.Models.DataContainers
             /// <summary>
             /// The offset to the existing index that will be moved
             /// </summary>
-            public short ReferenceIndexOffset { get; set; }
+            public ushort ReferenceIndexOffset { get; set; }
 
             /// <summary>
             /// This is the Index to which the Reference index will move to
             /// </summary>
-            public short ShapeIndex { get; set; }
+            public ushort ShapeIndex { get; set; }
         }
 
         public class ShapeIndexPart
@@ -84,7 +84,7 @@ namespace xivModdingFramework.Models.DataContainers
             /// <summary>
             /// Index to the Shape Data Information
             /// </summary>
-            public short DataInfoIndex { get; set; }
+            public ushort DataInfoIndex { get; set; }
 
             /// <summary>
             /// The number of parts in the Shape Data Information

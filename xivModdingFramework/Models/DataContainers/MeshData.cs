@@ -59,7 +59,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// A dictionary containing the reference index and shape offset for mesh hiding
         /// </summary>
-        public Dictionary<int, Dictionary<short, short>> ShapeIndexOffsetDictionary { get; set; }
+        public Dictionary<int, Dictionary<ushort, ushort>> ShapeIndexOffsetDictionary { get; set; }
 
         /// <summary>
         /// A list of the shape paths associated with this mesh
