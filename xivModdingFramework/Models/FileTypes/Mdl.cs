@@ -87,7 +87,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {mdlPath.Folder}/{mdlPath.File}");
+                throw new Exception($"Could not find offset for {mdlPath.Folder}/{mdlPath.File}");
             }
 
             var mdlData = dat.GetType3Data(offset, _dataFile);
@@ -2925,12 +2925,22 @@ namespace xivModdingFramework.Models.FileTypes
                         lod0VertexDataEntrySize1 = vertexDataEntrySize1;
                     }
 
+                    var addedMeshParts = 0;
+
+                    if (importSettings != null)
+                    {
+                        if (importSettings[meshNum.ToString()].PartList.Count > meshInfo.MeshPartCount)
+                        {
+                            addedMeshParts = importSettings[meshNum.ToString()].PartList.Count - meshInfo.MeshPartCount;
+                        }
+                    }
+
                     meshDataBlock.AddRange(BitConverter.GetBytes(vertexCount));
                     meshDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                     meshDataBlock.AddRange(BitConverter.GetBytes(meshInfo.MaterialIndex));
 
                     meshDataBlock.AddRange(BitConverter.GetBytes((short)(meshInfo.MeshPartIndex + totalAddedMeshParts)));
-                    meshDataBlock.AddRange(BitConverter.GetBytes(meshInfo.MeshPartCount));
+                    meshDataBlock.AddRange(BitConverter.GetBytes((short)(meshInfo.MeshPartCount + addedMeshParts)));
 
                     meshDataBlock.AddRange(BitConverter.GetBytes(meshInfo.BoneListIndex));
                     meshDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
@@ -2942,7 +2952,8 @@ namespace xivModdingFramework.Models.FileTypes
                     meshDataBlock.Add(vertexDataEntrySize2);
                     meshDataBlock.Add(meshInfo.VertexDataBlockCount);
 
-                    newMeshPartIndex = meshInfo.MeshPartIndex + meshInfo.MeshPartCount;
+                    newMeshPartIndex = (meshInfo.MeshPartIndex + totalAddedMeshParts) + (meshInfo.MeshPartCount + addedMeshParts);
+                    totalAddedMeshParts += addedMeshParts;
                     previousVertexDataOffset1 = vertexDataOffset1;
                     previousIndexDataOffset = indexDataOffset;
                     previousIndexCount = indexCount;
@@ -4513,7 +4524,7 @@ namespace xivModdingFramework.Models.FileTypes
             datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].CompressedIndexDataBlockSize));
 
             // Rest of Header
-            if (datHeader.Count != 256 && datHeader.Count != 384)
+            if ((headerLength == 256 && datHeader.Count < 256) || (headerLength == 384 && datHeader.Count != 384)) 
             {
                 var headerEnd = headerLength - datHeader.Count % headerLength;
                 datHeader.AddRange(new byte[headerEnd]);
