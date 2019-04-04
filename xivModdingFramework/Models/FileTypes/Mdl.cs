@@ -30,6 +30,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Mods;
+using xivModdingFramework.Mods.Enums;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
@@ -72,6 +73,8 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
+            var modding = new Modding(_gameDirectory);
+            var getShapeData = true;
 
             var itemType = ItemType.GetItemType(itemModel);
 
@@ -79,6 +82,11 @@ namespace xivModdingFramework.Models.FileTypes
 
             var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
+
+            if (modding.IsModEnabled($"{mdlPath.Folder}/{mdlPath.File}", false) == XivModStatus.Enabled)
+            {
+                getShapeData = false;
+            }
 
             if (originalOffset != 0)
             {
@@ -1154,7 +1162,7 @@ namespace xivModdingFramework.Models.FileTypes
                     #region MeshShape
 
                     // If the model contains Shape Data, parse the data for each mesh
-                    if (xivMdl.HasShapeData)
+                    if (xivMdl.HasShapeData && getShapeData)
                     {
                         //Dictionary containing <index data offset, mesh number>
                         var indexMeshNum = new Dictionary<int, int>();
