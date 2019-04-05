@@ -1015,6 +1015,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>The offset which was replaced.</returns>
         public void UpdateIndex2(long offset, string fullPath, XivDataFile dataFile)
         {
+            fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath);
 
             // These are the offsets to relevant data
