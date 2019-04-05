@@ -720,7 +720,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="daeLocation">The location of the dae file</param>
         /// <returns>A dictionary containing the mesh number and its parts</returns>
-        public (Dictionary<int, List<int>> MeshPartDictionary, List<string> BoneList) QuickColladaReader(DirectoryInfo daeLocation)
+        public (Dictionary<int, List<int>> MeshPartDictionary, List<string> BoneList) QuickColladaReader(DirectoryInfo daeLocation, XivMdl xivMdl)
         {
             var meshNameDict = new Dictionary<string, string>();
             var boneStringList = new List<string>();
@@ -757,7 +757,9 @@ namespace xivModdingFramework.Models.FileTypes
                                                 throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
-                                            if(name.Contains("n_root")) continue;
+                                            if (!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+                                            if (name.Contains("n_root")) continue;
+                                            if (name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
                                             foreach (var boneName in boneNames)
                                             {
@@ -777,9 +779,9 @@ namespace xivModdingFramework.Models.FileTypes
                                         else
                                         {
                                             var name = reader["name"];
-
-                                            if (!name.Contains("n_") && !name.Contains("j_")) continue;
+                                            if (!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
                                             if (name.Contains("n_root")) continue;
+                                            if (name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
                                             foreach (var boneName in boneNames)
                                             {
