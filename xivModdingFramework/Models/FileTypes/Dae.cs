@@ -552,9 +552,19 @@ namespace xivModdingFramework.Models.FileTypes
                                 // Get part number
                                 var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
 
+                                if (!meshPartDataDictionary.ContainsKey(meshNum))
+                                {
+                                    throw new Exception($"Extra meshes detected, please use Advanced Import.");
+                                }
+
                                 if (meshPartDataDictionary[meshNum].ContainsKey(meshPartNum))
                                 {
                                     throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
+                                }
+
+                                if (advImportSettings == null && (meshPartNum + 1 > xivMdl.LoDList[0].MeshDataList[meshNum].MeshPartList.Count))
+                                {
+                                    throw new Exception($"Extra mesh parts detected, please use Advanced Import.");
                                 }
 
                                 meshPartDataDictionary[meshNum].Add(meshPartNum, cData);
