@@ -83,7 +83,8 @@ namespace xivModdingFramework.Models.FileTypes
             var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
 
-            if (modding.IsModEnabled($"{mdlPath.Folder}/{mdlPath.File}", false) == XivModStatus.Enabled)
+            if (modding.IsModEnabled($"{mdlPath.Folder}/{mdlPath.File}", false) == XivModStatus.Enabled &&
+                originalOffset == 0)
             {
                 getShapeData = false;
             }
@@ -597,7 +598,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var shapeData = new ShapeData.ShapeEntryData
                     {
-                        ReferenceIndexOffset = br.ReadUInt16(),
+                        ReferenceIndexOffset  = br.ReadUInt16(),
                         ShapeIndex            = br.ReadUInt16()
                     };
 
@@ -2935,7 +2936,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var addedMeshParts = 0;
 
-                    if (importSettings != null)
+                    if (lodNum == 0 && importSettings != null)
                     {
                         if (importSettings[meshNum.ToString()].PartList.Count > meshInfo.MeshPartCount)
                         {
@@ -3207,7 +3208,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     var indexCount = importedPartsDictionary.ContainsKey(partNum) ? importedPartsDictionary[partNum] : 0;
 
                                     // Calculate padding between meshes
-                                    if (partNum == partCount - 1)
+                                    if (partNum == (partCount + extraPartCount) - 1)
                                     {
                                         var padd = (indexOffset + indexCount) % 8;
 
