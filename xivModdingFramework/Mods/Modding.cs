@@ -263,6 +263,7 @@ namespace xivModdingFramework.Mods
             foreach (var modEntry in modList.Mods)
             {
                 if(string.IsNullOrEmpty(modEntry.name)) continue;
+                if(string.IsNullOrEmpty(modEntry.fullPath)) continue;
                 
                 if (enable && !modEntry.enabled)
                 {
