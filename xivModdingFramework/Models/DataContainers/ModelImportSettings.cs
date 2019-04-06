@@ -54,5 +54,10 @@ namespace xivModdingFramework.Models.DataContainers
         /// The bones for the model
         /// </summary>
         public List<string> ExtraBones { get; set; }
+
+        /// <summary>
+        /// Determines whether the vertex alpha value is flipped for vertex colors
+        /// </summary>
+        public bool FlipAlpha { get; set; }
     }
 }

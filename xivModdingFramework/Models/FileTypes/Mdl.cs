@@ -2642,8 +2642,13 @@ namespace xivModdingFramework.Models.FileTypes
 
             #endregion
 
+            var flipAlpha = false;
+            if (importSettings != null)
+            {
+                flipAlpha = importSettings.FirstOrDefault().Value.FlipAlpha;
+            }
             // Get the imported data
-            var importDataDictionary = GetImportData(colladaMeshDataList, itemType, vertexInfoDict);
+            var importDataDictionary = GetImportData(colladaMeshDataList, itemType, vertexInfoDict, flipAlpha);
 
             // Level of Detail
             #region Level of Detail Block
@@ -4564,7 +4569,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A dictionary containing the vertex byte data per mesh</returns>
-        private Dictionary<int, VertexByteData> GetImportData(List<ColladaMeshData> colladaMeshDataList, XivItemType itemType, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict)
+        private Dictionary<int, VertexByteData> GetImportData(List<ColladaMeshData> colladaMeshDataList, XivItemType itemType, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict, bool flipAlpha)
         {
             var importDataDictionary = new Dictionary<int, VertexByteData>();
 
@@ -4735,10 +4740,17 @@ namespace xivModdingFramework.Models.FileTypes
                         var blue  = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Z * 255), 0, 255));
                         var alpha = Convert.ToByte(Math.Round(colladaMeshData.VertexAlphas[i] * 255));
 
+                        if (!flipAlpha)
+                        {
+                            importData.VertexData1.Add(alpha);
+                        }
                         importData.VertexData1.Add(red);
                         importData.VertexData1.Add(green);
                         importData.VertexData1.Add(blue);
-                        importData.VertexData1.Add(alpha);
+                        if (flipAlpha)
+                        {
+                            importData.VertexData1.Add(alpha);
+                        }
                     }
                     else
                     {
