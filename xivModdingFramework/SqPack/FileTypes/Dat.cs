@@ -117,7 +117,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var datList = new List<string>();
 
-            for (var i = 1; i < 9; i++)
+            for (var i = 1; i < 20; i++)
             {
                 var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
 
