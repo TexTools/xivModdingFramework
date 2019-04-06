@@ -972,20 +972,23 @@ namespace xivModdingFramework.SqPack.FileTypes
             var fileLength = new FileInfo(modDatPath).Length;
 
             // Creates a new Dat if the current dat is at the 2GB limit
-            if (fileLength >= 2000000000)
+            if (modEntry == null)
             {
-                datNum = CreateNewDat(dataFile);
-
-                modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-            }
-            else
-            {
-                // If it is an original dat file, then create a new mod dat file
-                if (IsOriginalDat(dataFile))
+                if (fileLength >= 2000000000)
                 {
                     datNum = CreateNewDat(dataFile);
 
                     modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                }
+                else
+                {
+                    // If it is an original dat file, then create a new mod dat file
+                    if (IsOriginalDat(dataFile))
+                    {
+                        datNum = CreateNewDat(dataFile);
+
+                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                    }
                 }
             }
 
@@ -1140,6 +1143,27 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If there was no mod entry overwritten, write the new import data at the end of the dat file
                 if (!dataOverwritten)
                 {
+                    /*
+                     * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
+                     * and no empty slot was found for it, then write the data to the highest dat,
+                     * or create a new one if necessary
+                    */
+                    if (modEntry != null)
+                    {
+                        datNum = GetLargestDatNumber(dataFile);
+
+                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+
+                        fileLength = new FileInfo(modDatPath).Length;
+
+                        if (fileLength >= 2000000000)
+                        {
+                            datNum = CreateNewDat(dataFile);
+
+                            modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                        }
+                    }
+
                     using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                     {
                         bw.BaseStream.Seek(0, SeekOrigin.End);
@@ -1189,7 +1213,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     */
                     if (modEntry != null)
                     {
-
                         var entryToEmpty = (from entry in modList.Mods
                             where entry.fullPath.Equals(modEntry.fullPath)
                             select entry).FirstOrDefault();
