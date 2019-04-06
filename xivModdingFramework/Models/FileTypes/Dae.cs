@@ -1210,27 +1210,6 @@ namespace xivModdingFramework.Models.FileTypes
                     xmlWriter.WriteEndElement();
                     //</transparent>
                 }
-                else
-                {
-                    //<transparent>
-                    xmlWriter.WriteStartElement("transparent");
-                    if (_pluginTarget.Equals(XivStrings.AutodeskCollada))
-                    {
-                        xmlWriter.WriteAttributeString("opaque", "RGB_ZERO");
-                    }
-                    else
-                    {
-                        xmlWriter.WriteAttributeString("opaque", "A_ONE");
-                    }
-
-                    //<color>
-                    xmlWriter.WriteStartElement("color");
-                    xmlWriter.WriteString("1 1 1 1");
-                    xmlWriter.WriteEndElement();
-                    //</color>
-                    xmlWriter.WriteEndElement();
-                    //</transparent>
-                }
 
                 xmlWriter.WriteEndElement();
                 //</phong>
