@@ -687,6 +687,7 @@ namespace xivModdingFramework.Models.FileTypes
                             BiNormalHandedness = new List<byte>(),
                             Tangents = new Vector3Collection(),
                             Colors = new List<Color>(),
+                            Colors4 = new Color4Collection(),
                             TextureCoordinates0 = new Vector2Collection(),
                             TextureCoordinates1 = new Vector2Collection(),
                             Indices = new IntCollection()
@@ -1049,6 +1050,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 var b = br.ReadByte();
 
                                 vertexData.Colors.Add(new Color(r, g, b, a));
+                                vertexData.Colors4.Add(new Color4((r / 255f), (g / 255f), (b / 255f), (a / 255f)));
                             }
                         }
 

@@ -75,6 +75,11 @@ namespace xivModdingFramework.Models.DataContainers
         public List<Color> Colors { get; set; }
 
         /// <summary>
+        /// The vertex color data in Color4 format
+        /// </summary>
+        public Color4Collection Colors4 { get; set; }
+
+        /// <summary>
         /// The primary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
         public Vector2Collection TextureCoordinates0 { get; set; }
