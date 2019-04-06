@@ -66,6 +66,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="saveLocation">The location to save the dae file</param>
         public void MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation, XivRace race)
         {
+            FullSkel.Clear();
+            FullSkelNum.Clear();
+
             var hasBones = true;
 
             var modelName = Path.GetFileNameWithoutExtension(xivModel.MdlPath.File);
@@ -94,7 +97,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This would be the same name given to the skeleton file
                 var skelName = modelName.Substring(0, 5);
 
-                if (item.ItemCategory.Equals(XivStrings.Head))
+                if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair))
                 {
                     skelName = modelName.Substring(5, 5);
                 }
@@ -106,6 +109,11 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var sklb = new Sklb(_gameDirectory, _dataFile);
                         sklb.CreateSkelFromSklb(item, xivModel);
+
+                        if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair))
+                        {
+                            skelName = modelName.Substring(0, 5);
+                        }
                     }
                     catch (Exception e)
                     {
