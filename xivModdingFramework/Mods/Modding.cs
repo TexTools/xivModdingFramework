@@ -164,6 +164,11 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
+            if (string.IsNullOrEmpty(internalFilePath))
+            {
+                throw new Exception("File Path missing, unable to toggle mod.");
+            }
+
             var modEntry = TryGetModEntry(internalFilePath);
 
             if (modEntry == null)
