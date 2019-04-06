@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
 using System.IO;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.SqPack.FileTypes;
@@ -47,6 +48,41 @@ namespace xivModdingFramework.Helpers
             }
 
             if (indexDatCounts.Index2 != largestDatNum)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Checks the index for the number of dats the game will attempt to read
+        /// </summary>
+        /// <returns>True if there is a problem, False otherwise</returns>
+        public bool CheckForLargeDats(XivDataFile dataFile)
+        {
+            var dat = new Dat(_gameDirectory);
+
+            var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
+
+            var fileSizeList = new List<long>();
+
+            for (var i = 0; i < largestDatNum; i++)
+            {
+                var fileInfo = new FileInfo($"{_gameDirectory}\\{dataFile.GetDataFileName()}.win32.dat{i}");
+
+                try
+                {
+                    fileSizeList.Add(fileInfo.Length);
+                }
+                catch
+                {
+                    return true;
+                }
+
+            }
+
+            if (largestDatNum > 8 || fileSizeList.FindAll(x => x.Equals(2048)).Count > 1)
             {
                 return true;
             }
