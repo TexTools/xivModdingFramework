@@ -3255,7 +3255,6 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     if (additionalMeshCount > 0)
                     {
-                        partPadding = 0;
                         for (var i = 0; i < additionalMeshCount; i++)
                         {
                             var partNum = 0;
