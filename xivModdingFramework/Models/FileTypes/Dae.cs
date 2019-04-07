@@ -143,7 +143,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var skel = FullSkel[s];
 
-                        if (skel.BoneParent == -1)
+                        if (skel.BoneParent == -1 && !skelDict.ContainsKey(skel.BoneName))
                         {
                             skelDict.Add(skel.BoneName, skel);
                         }
@@ -271,36 +271,37 @@ namespace xivModdingFramework.Models.FileTypes
                                         {
                                             var name = reader["name"];
 
+                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
                                             // Throw an exception if there is a duplicate bone
                                             if (boneJointDict.ContainsKey(sid))
                                             {
                                                 throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
-                                            if(!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if(name.Contains("n_root")) continue;
-                                            if(name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
+                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+                                            if(boneString.Contains("n_root")) continue;
+                                            if(boneString.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
-                                            var sameBoneName = "";
-                                            foreach (var boneName in boneNames)
+                                            boneJointDict.Add(sid, boneString);
+                                        }
+                                        else
+                                        {
+                                            var name = reader["name"];
+
+                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                            // Throw an exception if there is a duplicate bone
+                                            if (boneJointDict.ContainsKey(name))
                                             {
-                                                if (name.Contains(boneName))
-                                                {
-                                                    sameBone = true;
-                                                    sameBoneName = boneName;
-                                                }
+                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
-                                            if (!sameBone)
-                                            {
-                                                boneJointDict.Add(sid, name);
-                                            }
-                                            else
-                                            {
-                                                boneJointDict.Add(sid, sameBoneName);
-                                            }
+                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+                                            if (boneString.Contains("n_root")) continue;
+                                            if (boneString.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
-                                            boneNames.Add(name);
+                                            boneJointDict.Add(name, boneString);
                                         }
                                     }
                                 }
@@ -671,8 +672,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         foreach (var extraBone in boneAdditionNames)
                                         {
-                                            colladaData.BoneNumDictionary.Add(boneJointDict[extraBone], boneNum);
-                                            boneNum++;
+                                            if (!colladaData.BoneNumDictionary.ContainsKey(boneJointDict[extraBone]))
+                                            {
+                                                colladaData.BoneNumDictionary.Add(boneJointDict[extraBone], boneNum);
+                                                boneNum++;
+                                            }
                                         }
                                     }
 
@@ -704,13 +708,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                                             var blendBoneName = boneJointDict[blendName];
 
-                                            var bString = blendBoneName;
-
-                                            // Fix for hair bones
-                                            if (!blendBoneName.Contains("h0"))
-                                            {
-                                                bString = Regex.Replace(blendBoneName, @"[\d]", string.Empty);
-                                            }
+                                            // Fix for bones with numbers at the end of the string
+                                            var bString = Regex.Replace(blendBoneName, "[0-9]+$", string.Empty);
 
                                             if (!colladaData.MeshBoneNames.Contains(bString))
                                             {
