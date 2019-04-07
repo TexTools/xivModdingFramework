@@ -2576,23 +2576,28 @@ namespace xivModdingFramework.Models.FileTypes
             // We do not remove parts if they are missing from the DAE, we just set their index count to 0
             if (importSettings != null)
             {
-                var importPartSum = 0;
+                var meshNum = 0;
+                var addedPartSum = 0;
+
                 foreach (var modelImportSettings in importSettings)
                 {
-                    importPartSum += modelImportSettings.Value.PartList.Count;
+                    var importMeshPartCount = modelImportSettings.Value.PartList.Count;
+
+                    var originalMeshPartCount = 0;
+                    if (xivMdl.LoDList[0].MeshDataList.Count > meshNum)
+                    {
+                        originalMeshPartCount = xivMdl.LoDList[0].MeshDataList[meshNum].MeshPartList.Count;
+                    }
+
+                    if (importMeshPartCount > originalMeshPartCount)
+                    {
+                        addedPartSum += (importMeshPartCount - originalMeshPartCount);
+                    }
+
+                    meshNum++;
                 }
 
-                var originalPartSum = 0;
-                foreach (var meshData in xivMdl.LoDList[0].MeshDataList)
-                {
-                    originalPartSum += meshData.MeshPartList.Count;
-                }
-
-                if (importPartSum > originalPartSum)
-                {
-                    var addedMeshPartCount = importPartSum - originalPartSum;
-                    meshPartCount += (short)addedMeshPartCount;
-                }
+                meshPartCount += (short)addedPartSum;
             }
 
             modelDataBlock.AddRange(BitConverter.GetBytes(meshPartCount));
