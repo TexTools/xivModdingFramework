@@ -892,6 +892,17 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
+            if (!meshPartDictionary.ContainsKey(0))
+            {
+                var meshes = "";
+                foreach (var key in meshPartDictionary.Keys)
+                {
+                    meshes += $"{key} ";
+                }
+
+                throw new Exception($"The DAE file does not contain Mesh 0.\nModels must have a Mesh 0.\n\nMesh Numbers Found: {meshes}");
+            }
+
             return (meshPartDictionary, boneStringList);
         }
 
