@@ -91,9 +91,23 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var dataFiles = from file in allFiles where file.Contains(dataFile.GetDataFileName()) && file.Contains(".dat") select file;
 
-            var max = dataFiles.Select(file => int.Parse(file.Substring(file.Length - 1))).Concat(new[] { 0 }).Max();
+            try
+            {
+                var max = dataFiles.Select(file => int.Parse(file.Substring(file.Length - 1))).Concat(new[] { 0 }).Max();
 
-            return max;
+                return max;
+            }
+            catch(Exception ex)
+            {
+                var fileList = "";
+                foreach (var file in dataFiles)
+                {
+                    fileList += $"{file}\n";
+                }
+
+                throw new Exception($"Unable to determine Dat Number from one of the following files\n\n{fileList}");
+            }
+
         }
 
         /// <summary>
