@@ -169,7 +169,19 @@ namespace xivModdingFramework.Exd.FileTypes
                 var exdFolderHash = HashGenerator.GetHash("exd");
                 var exdFileHash = HashGenerator.GetHash(exdFile);
 
-                exdOffsetList.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd));
+                //esrinzou for china ffxiv
+                //exdOffsetList.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd));
+                //esrinzou begin
+                var offset = index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
+                if ((offset == -1 || exFile == XivEx.item) && _langCode == XivLanguages.GetLanguageCode(XivLanguage.Chinese))
+                {
+                    exdFile = exFile + "_" + page + "_" + _langCode + ExdExtension;
+                    exdFolderHash = HashGenerator.GetHash("exd");
+                    exdFileHash = HashGenerator.GetHash(exdFile);
+                    offset = index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
+                }
+                exdOffsetList.Add(offset);
+                //esrinzou end
             }
 
             foreach (var offset in exdOffsetList)
