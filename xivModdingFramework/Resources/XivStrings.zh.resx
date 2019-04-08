@@ -123,6 +123,12 @@
   <data name="All" xml:space="preserve">
     <value>全部</value>
   </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>敖龙族 女性</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>敖龙族 男性</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>敖龙族</value>
   </data>
@@ -161,6 +167,12 @@
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>精灵族</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>精灵族 女性</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>精灵族 男性</value>
   </data>
   <data name="Eos" xml:space="preserve">
     <value>Eos</value>
@@ -210,8 +222,20 @@
   <data name="Hyur_H" xml:space="preserve">
     <value>人族 高地之民</value>
   </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>人族 高地之民 女性</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>人族 高地之民 男性</value>
+  </data>
   <data name="Hyur_M" xml:space="preserve">
     <value>人族 中原之民</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>人族 中原之民 女性</value>
+  </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>人族 中原之民 男性</value>
   </data>
   <data name="Ifrit_Egi" xml:space="preserve">
     <value>Ifrit-Egi</value>
@@ -221,6 +245,12 @@
   </data>
   <data name="Lalafell" xml:space="preserve">
     <value>拉拉菲尔族</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>拉拉菲尔族 女性</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>拉拉菲尔族 男性</value>
   </data>
   <data name="Language" xml:space="preserve">
     <value>chs</value>
@@ -249,6 +279,12 @@
   <data name="Miqote" xml:space="preserve">
     <value>猫魅族</value>
   </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>猫魅族 女性</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>猫魅族 男性</value>
+  </data>
   <data name="Monster" xml:space="preserve">
     <value>魔物</value>
   </data>
@@ -275,6 +311,12 @@
   </data>
   <data name="Roegadyn" xml:space="preserve">
     <value>鲁加族</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>鲁加族 女性</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>鲁加族 男性</value>
   </data>
   <data name="Rook_Autoturret" xml:space="preserve">
     <value>Rook Autoturret</value>
