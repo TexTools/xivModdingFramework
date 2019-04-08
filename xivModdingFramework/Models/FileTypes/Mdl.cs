@@ -1352,6 +1352,7 @@ namespace xivModdingFramework.Models.FileTypes
             var meshPartDataDictionary = dae.ReadColladaFile(xivMdl, daeLocation, advImportSettings);
 
             var textureCoordinateStride = 3;
+            var vertexColorStride = 3;
 
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
             {
@@ -1360,12 +1361,13 @@ namespace xivModdingFramework.Models.FileTypes
                 if (meshPartDict.ContainsKey(i))
                 {
                     textureCoordinateStride = meshPartDict[0].TextureCoordinateStride;
+                    vertexColorStride = meshPartDict[0].VertexColorStride;
                 }
 
                 meshDataDictionary.Add(i, new ColladaData
                 {
                     TextureCoordinateStride = textureCoordinateStride,
-                    VertexColorStride = meshPartDict[0].VertexColorStride
+                    VertexColorStride = vertexColorStride
                 });
             }
          
@@ -2716,7 +2718,7 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         var shapeDataCount = 0;
-                        if (meshData.ShapePositionsDictionary != null && !skipShapeData)
+                        if (meshData.ShapePositionsDictionary != null && !skipShapeData && importData.Value.VertexCount != 0)
                         {
                             var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                             if (!isAlreadyModified)
@@ -2905,7 +2907,7 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                         }
 
-                        if (xivMdl.HasShapeData && meshData.ShapePositionsDictionary != null)
+                        if (xivMdl.HasShapeData && meshData.ShapePositionsDictionary != null && vertexCount != 0)
                         {
                             // The shape positions count is added to the vertex count because it is not exported and therefore
                             // missing from the imported data.
@@ -2950,9 +2952,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (lodNum == 0 && importSettings != null)
                     {
-                        if (importSettings[meshNum.ToString()].PartList.Count > meshInfo.MeshPartCount)
+                        if (importSettings.ContainsKey(meshNum.ToString()))
                         {
-                            addedMeshParts = importSettings[meshNum.ToString()].PartList.Count - meshInfo.MeshPartCount;
+                            if (importSettings[meshNum.ToString()].PartList.Count > meshInfo.MeshPartCount)
+                            {
+                                addedMeshParts = importSettings[meshNum.ToString()].PartList.Count - meshInfo.MeshPartCount;
+                            }
                         }
                     }
 
@@ -3798,7 +3803,7 @@ namespace xivModdingFramework.Models.FileTypes
                             }
 
                             var shapeDataCount = 0;
-                            if (meshData.ShapePositionsDictionary != null && !skipShapeData)
+                            if (meshData.ShapePositionsDictionary != null && !skipShapeData && importData.Value.VertexCount != 0)
                             {
                                 var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                                 if (!isAlreadyModified)
@@ -4859,16 +4864,31 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < vertexData.Normals.Count; i++)
             {
-                // Normals
-                var x = new Half(vertexData.Normals[i].X);
-                var y = new Half(vertexData.Normals[i].Y);
-                var z = new Half(vertexData.Normals[i].Z);
-                var w = new Half(0);
+                if (vertexInfoDict[VertexUsageType.Normal] == VertexDataType.Float3)
+                {
+                    // Normals
+                    var x = new Half(vertexData.Normals[i].X);
+                    var y = new Half(vertexData.Normals[i].Y);
+                    var z = new Half(vertexData.Normals[i].Z);
+                    var w = new Half(0);
 
-                vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(x.RawValue));
-                vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(y.RawValue));
-                vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(z.RawValue));
-                vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(w.RawValue));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(x.RawValue));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(y.RawValue));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(z.RawValue));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(w.RawValue));
+                }
+                else
+                {
+                    // Normals
+                    var x = vertexData.Normals[i].X;
+                    var y = vertexData.Normals[i].Y;
+                    var z = vertexData.Normals[i].Z;
+
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(x));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(y));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(z));
+                }
+
 
                 // BiNormals
                 vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.BiNormals[i].X) * 255 + 255) / 2));
@@ -4896,21 +4916,44 @@ namespace xivModdingFramework.Models.FileTypes
                     vertexByteData.VertexData1.Add((byte)(colorVector.Z * 255));
                 }
 
-                // Texture Coordinates
-                var tc0x = new Half(vertexData.TextureCoordinates0[i].X);
-                var tc0y = new Half(vertexData.TextureCoordinates0[i].Y);
+                var texCoordDataType = vertexInfoDict[VertexUsageType.TextureCoordinate];
 
-                vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0x.RawValue));
-                vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0y.RawValue));
-
-                if (vertexData.TextureCoordinates1.Count > 0)
+                if (texCoordDataType == VertexDataType.Float2 || texCoordDataType == VertexDataType.Float4)
                 {
-                    var tc1x = new Half(vertexData.TextureCoordinates1[i].X);
-                    var tc1y = new Half(vertexData.TextureCoordinates1[i].Y);
+                    var tc0x = vertexData.TextureCoordinates0[i].X;
+                    var tc0y = vertexData.TextureCoordinates0[i].Y * -1f;
 
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1x.RawValue));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1y.RawValue));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0x));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0y));
+
+                    if (vertexData.TextureCoordinates1.Count > 0)
+                    {
+                        var tc1x = vertexData.TextureCoordinates1[i].X;
+                        var tc1y = vertexData.TextureCoordinates1[i].Y;
+
+                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1x));
+                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1y));
+                    }
                 }
+                else
+                {
+                    // Texture Coordinates
+                    var tc0x = new Half(vertexData.TextureCoordinates0[i].X);
+                    var tc0y = new Half(vertexData.TextureCoordinates0[i].Y);
+
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0x.RawValue));
+                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0y.RawValue));
+
+                    if (vertexData.TextureCoordinates1.Count > 0)
+                    {
+                        var tc1x = new Half(vertexData.TextureCoordinates1[i].X);
+                        var tc1y = new Half(vertexData.TextureCoordinates1[i].Y);
+
+                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1x.RawValue));
+                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1y.RawValue));
+                    }
+                }
+
             }
 
             // Indices
