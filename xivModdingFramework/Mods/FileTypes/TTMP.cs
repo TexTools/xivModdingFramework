@@ -118,7 +118,11 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var modsJson = new ModsJson
                                     {
                                         Name = modOptionMod.Value.Name,
-                                        Category = modOptionMod.Value.Category,
+                                        //esrinzou for chinese UI
+                                        //Category = modOptionMod.Value.Category,
+                                        //esrinzou begin
+                                        Category = modOptionMod.Value.Category.GetEnDisplayName(),
+                                        //esrinzou end
                                         FullPath = modOptionMod.Key,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
@@ -205,7 +209,11 @@ namespace xivModdingFramework.Mods.FileTypes
                         var modsJson = new ModsJson
                         {
                             Name = simpleModData.Name,
-                            Category = simpleModData.Category,
+                            //esrinzou for chinese UI
+                            //Category = simpleModData.Category,
+                            //esrinzou begin
+                            Category = simpleModData.Category.GetEnDisplayName(),
+                            //esrinzou end
                             FullPath = simpleModData.FullPath,
                             ModSize = simpleModData.ModSize,
                             DatFile = simpleModData.DatFile,
@@ -419,7 +427,11 @@ namespace xivModdingFramework.Mods.FileTypes
                                             var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                             dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                                modJson.Category, modJson.Name,
+                                                //esrinzou for chinese UI
+                                                //modJson.Category, modJson.Name,
+                                                //esrinzou begin
+                                                modJson.Category.GetDisplayName(), modJson.Name,
+                                                //esrinzou end
                                                 XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                                 GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                         }
@@ -430,7 +442,11 @@ namespace xivModdingFramework.Mods.FileTypes
                                             var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                             dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                                modJson.Category, modJson.Name,
+                                                //esrinzou for chinese UI
+                                                //modJson.Category, modJson.Name,
+                                                //esrinzou begin
+                                                modJson.Category.GetDisplayName(), modJson.Name,
+                                                //esrinzou end
                                                 XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                                 GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                         }
@@ -512,7 +528,11 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                     dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                        modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        //esrinzou for chinese UI
+                                        //modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        //esrinzou begin
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        //esrinzou end
                                         GetDataType(modJson.FullPath));
                                 }
                                 else
@@ -522,7 +542,11 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                     dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                        modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        //esrinzou for chinese UI
+                                        //modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        //esrinzou begin
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        //esrinzou end
                                         GetDataType(modJson.FullPath));
                                 }
                             }
