@@ -143,8 +143,9 @@ namespace xivModdingFramework.Exd.FileTypes
         /// <returns>A dictionary containing the Index and Raw Data of the ex file</returns>
         public Dictionary<int, byte[]> ReadExData(XivEx exFile)
         {
-            var exdOffsetList = new List<int>();
+            var exdNameOffsetDictionary = new Dictionary<int, string>();
             var exdDataDictionary = new Dictionary<int, byte[]>();
+            var errorString = "";
 
             ReadExHeader(exFile);
 
@@ -169,37 +170,49 @@ namespace xivModdingFramework.Exd.FileTypes
                 var exdFolderHash = HashGenerator.GetHash("exd");
                 var exdFileHash = HashGenerator.GetHash(exdFile);
 
-                exdOffsetList.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd));
+                exdNameOffsetDictionary.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd), exdFile);
             }
 
-            foreach (var offset in exdOffsetList)
+            foreach (var exdData in exdNameOffsetDictionary)
             {
-                var exData = dat.GetType2Data(offset, XivDataFile._0A_Exd);
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(exData)))
+                try
                 {
-                    br.ReadBytes(8);
-                    var offsetTableSize = br.ReadInt32();
+                    var exData = dat.GetType2Data(exdData.Key, XivDataFile._0A_Exd);
 
-                    for (var i = 0; i < offsetTableSize; i += 8)
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(exData)))
                     {
-                        br.BaseStream.Seek(i + 32, SeekOrigin.Begin);
+                        br.ReadBytes(8);
+                        var offsetTableSize = br.ReadInt32();
 
-                        var entryNum = br.ReadInt32();
-                        var entryOffset = br.ReadInt32();
-
-                        br.BaseStream.Seek(entryOffset, SeekOrigin.Begin);
-
-                        var entrySize = br.ReadInt32();
-                        br.ReadBytes(2);
-
-                        if (!exdDataDictionary.ContainsKey(entryNum))
+                        for (var i = 0; i < offsetTableSize; i += 8)
                         {
-                            exdDataDictionary.Add(entryNum, br.ReadBytes(entrySize));
+                            br.BaseStream.Seek(i + 32, SeekOrigin.Begin);
+
+                            var entryNum = br.ReadInt32();
+                            var entryOffset = br.ReadInt32();
+
+                            br.BaseStream.Seek(entryOffset, SeekOrigin.Begin);
+
+                            var entrySize = br.ReadInt32();
+                            br.ReadBytes(2);
+
+                            if (!exdDataDictionary.ContainsKey(entryNum))
+                            {
+                                exdDataDictionary.Add(entryNum, br.ReadBytes(entrySize));
+                            }
                         }
                     }
                 }
+                catch(Exception ex)
+                {
+                    errorString += $"File: {exdData.Value}\nError: {ex.Message}\n\n";
+                }
+            }
+
+            if (!string.IsNullOrEmpty(errorString))
+            {
+                throw new Exception($"There was an error reading EX data for the following\n\n{errorString}");
             }
 
             return exdDataDictionary;
