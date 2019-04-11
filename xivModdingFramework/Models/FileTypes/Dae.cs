@@ -858,7 +858,13 @@ namespace xivModdingFramework.Models.FileTypes
                             if (atr.Contains("."))
                             {
                                 // Get part number
-                                var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                //esrinzou for fix FBX dae
+                                //var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                //esrinzou begin
+                                var numStr = atr.Substring(atr.LastIndexOf(".") + 1);
+                                numStr = numStr.EndsWith("Mesh", StringComparison.OrdinalIgnoreCase) ? numStr.Remove(numStr.Length - 4):numStr;
+                                var meshPartNum = int.Parse(numStr);
+                                //esrinzou end                                
 
                                 if (meshPartDictionary.ContainsKey(meshNum))
                                 {
