@@ -748,11 +748,40 @@ namespace xivModdingFramework.Models.FileTypes
             // Reading Bone Data
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
-                var boneNames = new List<string>();
+                var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
+
                 while (reader.Read())
                 {
                     if (reader.IsStartElement())
                     {
+                        if (reader.Name.Equals("controller"))
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader.IsStartElement())
+                                {
+                                    if (reader.Name.Contains("Name_array"))
+                                    {
+                                        var bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
+
+                                        foreach (var bone in bones)
+                                        {
+                                            var boneName = bone;
+
+                                            if (!bone.Contains("joint"))
+                                            {
+                                                boneName = Regex.Replace(bone, "[0-9]+$", string.Empty);
+                                            }
+
+                                            uniqueBoneNames.Add(boneName);
+                                        }
+
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
                         if (reader.Name.Equals("visual_scene"))
                         {
                             while (reader.Read())
@@ -768,52 +797,43 @@ namespace xivModdingFramework.Models.FileTypes
                                         {
                                             var name = reader["name"];
 
+                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                            if (!uniqueBoneNames.Contains(sid))
+                                            {
+                                                continue;
+                                            }
+
                                             // Throw an exception if there is a duplicate bone
                                             if (boneStringList.Contains(sid))
                                             {
                                                 throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
                                             }
 
-                                            if (!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if (name.Contains("n_root")) continue;
-                                            if (name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
+                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
 
-                                            foreach (var boneName in boneNames)
+                                            if (!boneStringList.Contains(boneString))
                                             {
-                                                if (name.Contains(boneName))
-                                                {
-                                                    sameBone = true;
-                                                }
+                                                boneStringList.Add(boneString);
                                             }
-
-                                            if (!sameBone)
-                                            {
-                                                boneStringList.Add(name);
-                                            }
-
-                                            boneNames.Add(name);
                                         }
                                         else
                                         {
                                             var name = reader["name"];
-                                            if (!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if (name.Contains("n_root")) continue;
-                                            if (name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
-                                            foreach (var boneName in boneNames)
+                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                            if (!uniqueBoneNames.Contains(boneString))
                                             {
-                                                if (name.Contains(boneName))
-                                                {
-                                                    sameBone = true;
-                                                }
+                                                continue;
                                             }
 
-                                            if (!sameBone)
+                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+
+                                            if (!uniqueBoneNames.Contains(name))
                                             {
                                                 boneStringList.Add(name);
                                             }
-
-                                            boneNames.Add(name);
                                         }
                                     }
                                 }
