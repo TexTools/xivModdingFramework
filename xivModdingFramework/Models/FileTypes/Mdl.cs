@@ -1819,6 +1819,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Each item in this list contains the index for each data point
                 var indexList = new List<int[]>();
+                var uniquesList = new List<int[]>();
+                var uniqueCount = 0;
 
                 for (var i = 0; i < colladaData.Indices.Count; i += colladaData.IndexStride)
                 {
@@ -1828,111 +1830,139 @@ namespace xivModdingFramework.Models.FileTypes
                 // Create the new data point lists in their appropriate order from their indices
                 for (var i = 0; i < indexList.Count; i++)
                 {
-                    // Skip this index if it does not exist in the index list
-                    if (indexDict.ContainsKey(indexList[i][0])) continue;
-
                     if (!colladaData.IsBlender)
                     {
-                        var pos0 = indexList[i][0];
-                        var pos1 = indexList[i][1];
-                        var pos2 = indexList[i][2];
+                        var targetIndex = uniqueCount;
+                        var listEntry = indexList[i];
 
+                        for (var j = 0; j < uniqueCount; j++)
+                        {
+                            var targetEntry = uniquesList[j];
+
+                            if(listEntry[0] == targetEntry[0] && normalsCollection[listEntry[1]] == normalsCollection[targetEntry[1]] && texCoord0Collection[listEntry[2]] == texCoord0Collection[targetEntry[2]])
+                            {
+                                if (texCoord1Collection.Count > 0)
+                                {
+                                    if (texCoord1Collection[listEntry[3]] == texCoord1Collection[targetEntry[3]])
+                                    {
+                                        targetIndex = j;
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    targetIndex = j;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (targetIndex == uniqueCount)
+                        {
+                            var pos0 = listEntry[0];
+                            var pos1 = listEntry[1];
+                            var pos2 = listEntry[2];
+
+                            // If the index at index 0 is larger than the position collection, throw an exception
+                            if (pos0 > positionCollection.Count)
+                            {
+                                throw new IndexOutOfRangeException($"There is no position at index {pos0},  position count: {positionCollection.Count}");
+                            }
+                            nPositionCollection.Add(positionCollection[pos0]);
+
+                            if (!isHousingItem) // Housing items do not have bones
+                            {
+                                // If the index at index 0 is larger than the bone index collection, throw an exception
+                                if (pos0 > boneIndexCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no bone index at index {pos0},  bone index count: {boneIndexCollection.Count}");
+                                }
+                                nBoneIndexCollection.Add(boneIndexCollection[pos0]);
+
+                                // If the index at index 0 is larger than the bone weight collection, throw an exception
+                                if (pos0 > boneWeightCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no bone weight at index {pos0},  bone weight count: {boneWeightCollection.Count}");
+                                }
+                                nBoneWeightCollection.Add(boneWeightCollection[pos0]);
+                            }
+
+                            // If the index at index 1 is larger than the normals collection, throw an exception
+                            if (pos1 > normalsCollection.Count)
+                            {
+                                throw new IndexOutOfRangeException($"There is no normal at index {pos1},  normal count: {normalsCollection.Count}");
+                            }
+                            nNormalsCollection.Add(normalsCollection[pos1]);
+
+                            // If the index at index 2 is larger than the texture coordinate 0 collection, throw an exception
+                            if (pos2 > texCoord0Collection.Count)
+                            {
+                                throw new IndexOutOfRangeException($"There is no texture coordinate 0 at index {pos2},  texture coordinate 0 count: {texCoord0Collection.Count}");
+                            }
+                            nTexCoord0Collection.Add(texCoord0Collection[pos2]);
+
+                            if (texCoord1Collection.Count > 0)
+                            {
+                                var pos3 = listEntry[3];
+
+                                // If the index at index 3 is larger than the texture coordinate 1 collection, throw an exception
+                                if (pos3 > texCoord1Collection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
+                                }
+                                nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+                            }
+
+                            if (tangentsCollection.Count > 0)
+                            {
+                                var nPos = texCoord1Collection.Count > 0 ? listEntry[4] : listEntry[3];
+                                // If the index at index n is larger than the tangents collection, throw an exception
+                                if (nPos > tangentsCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no tangent at index {nPos},  tangent count: {tangentsCollection.Count}");
+                                }
+                                nTangentsCollection.Add(tangentsCollection[nPos]);
+                            }
+
+                            if (biNormalsCollection.Count > 0)
+                            {
+                                var nPos = texCoord1Collection.Count > 0 ? listEntry[4] : listEntry[3];
+                                // If the index at index n is larger than the binormals collection, throw an exception
+                                if (nPos > biNormalsCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no binormal at index {nPos},  binormal count: {biNormalsCollection.Count}");
+                                }
+                                nBiNormalsCollection.Add(biNormalsCollection[nPos]);
+                            }
+
+                            if (vertexColorCollection.Count > 0)
+                            {
+                                var colorPos = biNormalsCollection.Count > 0 ? listEntry[5] : listEntry[4];
+
+                                if (colorPos > vertexColorCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no vertex color at index {colorPos},  vertex color count: {vertexColorCollection.Count}");
+                                }
+                                nVertexColorCollection.Add(vertexColorCollection[colorPos]);
+                            }
+
+                            if (vertexAlphaCollection.Count > 0)
+                            {
+                                var alphaPos = biNormalsCollection.Count > 0 ? listEntry[6] : listEntry[5];
+
+                                if (alphaPos > vertexAlphaCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no vertex alpha at index {alphaPos},  vertex color count: {vertexAlphaCollection.Count}");
+                                }
+                                nVertexAlphaCollection.Add(vertexAlphaCollection[alphaPos]);
+                            }
+
+                            uniquesList.Add(listEntry);
+                            uniqueCount++;
+                        }
+                        
                         // Dictionary with <index, index number>
-                        indexDict.Add(pos0, indexNum);
-
-                        // If the index at index 0 is larger than the position collection, throw an exception
-                        if (pos0 > positionCollection.Count)
-                        {
-                            throw new IndexOutOfRangeException($"There is no position at index {pos0},  position count: {positionCollection.Count}");
-                        }
-                        nPositionCollection.Add(positionCollection[pos0]);
-
-                        if (!isHousingItem) // Housing items do not have bones
-                        {
-                            // If the index at index 0 is larger than the bone index collection, throw an exception
-                            if (pos0 > boneIndexCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no bone index at index {pos0},  bone index count: {boneIndexCollection.Count}");
-                            }
-                            nBoneIndexCollection.Add(boneIndexCollection[pos0]);
-
-                            // If the index at index 0 is larger than the bone weight collection, throw an exception
-                            if (pos0 > boneWeightCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no bone weight at index {pos0},  bone weight count: {boneWeightCollection.Count}");
-                            }
-                            nBoneWeightCollection.Add(boneWeightCollection[pos0]);
-                        }
-
-                        // If the index at index 1 is larger than the normals collection, throw an exception
-                        if (pos1 > normalsCollection.Count)
-                        {
-                            throw new IndexOutOfRangeException($"There is no normal at index {pos1},  normal count: {normalsCollection.Count}");
-                        }
-                        nNormalsCollection.Add(normalsCollection[pos1]);
-
-                        // If the index at index 2 is larger than the texture coordinate 0 collection, throw an exception
-                        if (pos2 > texCoord0Collection.Count)
-                        {
-                            throw new IndexOutOfRangeException($"There is no texture coordinate 0 at index {pos2},  texture coordinate 0 count: {texCoord0Collection.Count}");
-                        }
-                        nTexCoord0Collection.Add(texCoord0Collection[pos2]);
-
-                        if (texCoord1Collection.Count > 0)
-                        {
-                            var pos3 = indexList[i][3];
-
-                            // If the index at index 3 is larger than the texture coordinate 1 collection, throw an exception
-                            if (pos3 > texCoord1Collection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
-                            }
-                            nTexCoord1Collection.Add(texCoord1Collection[pos3]);
-                        }
-
-                        if (tangentsCollection.Count > 0)
-                        {
-                            var nPos = texCoord1Collection.Count > 0 ? indexList[i][4] : indexList[i][3];
-                            // If the index at index n is larger than the tangents collection, throw an exception
-                            if (nPos > tangentsCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no tangent at index {nPos},  tangent count: {tangentsCollection.Count}");
-                            }
-                            nTangentsCollection.Add(tangentsCollection[nPos]);
-                        }
-
-                        if (biNormalsCollection.Count > 0)
-                        {
-                            var nPos = texCoord1Collection.Count > 0 ? indexList[i][4] : indexList[i][3];
-                            // If the index at index n is larger than the binormals collection, throw an exception
-                            if (nPos > biNormalsCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no binormal at index {nPos},  binormal count: {biNormalsCollection.Count}");
-                            }
-                            nBiNormalsCollection.Add(biNormalsCollection[nPos]);
-                        }
-
-                        if (vertexColorCollection.Count > 0)
-                        {
-                            var colorPos = biNormalsCollection.Count > 0 ? indexList[i][5] : indexList[i][4];
-
-                            if (colorPos > vertexColorCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no vertex color at index {colorPos},  vertex color count: {vertexColorCollection.Count}");
-                            }
-                            nVertexColorCollection.Add(vertexColorCollection[colorPos]);
-                        }
-
-                        if (vertexAlphaCollection.Count > 0)
-                        {
-                            var alphaPos = biNormalsCollection.Count > 0 ? indexList[i][6] : indexList[i][5];
-
-                            if (alphaPos > vertexAlphaCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no vertex alpha at index {alphaPos},  vertex color count: {vertexAlphaCollection.Count}");
-                            }
-                            nVertexAlphaCollection.Add(vertexAlphaCollection[alphaPos]);
-                        }
+                        indexDict.Add(i, targetIndex);
                     }
                     // For blender there is only 1 index for all data points
                     else
@@ -2015,17 +2045,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Remake the indices
                 indexCollection.Clear();
-                for (var i = 0; i < indexList.Count; i++)
-                {
-                    if (!indexDict.ContainsKey(indexList[i][0]))
-                    {
-                        throw new Exception($"Could not find index {i} in the index dictionary");
-                    }
-
-                    var nIndex = indexDict[indexList[i][0]];
-                    indexCollection.Add(nIndex);
-                }
-
+                indexCollection = new IntCollection(indexDict.Values);
 
                 // TODO: Implement a better version of Fix for shape data
 
@@ -2108,8 +2128,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Computing the BiTangents with the below calculations have given better results
                 // than using the data directly from the dae file above
-                var tangents = new Vector3[positionCollection.Count];
-                var bitangents = new Vector3[positionCollection.Count];
+                var tangents = new Vector3[nPositionCollection.Count];
+                var bitangents = new Vector3[nPositionCollection.Count];
                 for (var a = 0; a < indexCollection.Count; a += 3)
                 {
                     var index1  = indexCollection[a];
