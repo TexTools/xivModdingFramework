@@ -1358,11 +1358,8 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var meshPartDict = meshPartDataDictionary[i];
 
-                if (meshPartDict.ContainsKey(i))
-                {
-                    textureCoordinateStride = meshPartDict[0].TextureCoordinateStride;
-                    vertexColorStride = meshPartDict[0].VertexColorStride;
-                }
+                textureCoordinateStride = meshPartDict.FirstOrDefault().Value.TextureCoordinateStride;
+                vertexColorStride = meshPartDict.FirstOrDefault().Value.VertexColorStride;
 
                 meshDataDictionary.Add(i, new ColladaData
                 {
@@ -2187,10 +2184,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 }
 
-                if (meshPartDataDictionary[meshNum].ContainsKey(0))
-                {
-                    colladaMeshData.BoneNumDictionary = meshPartDataDictionary[meshNum][0].BoneNumDictionary;
-                }
+                colladaMeshData.BoneNumDictionary = meshPartDataDictionary[meshNum].FirstOrDefault().Value.BoneNumDictionary;
 
                 foreach (var data in meshPartDataDictionary[meshNum])
                 {
