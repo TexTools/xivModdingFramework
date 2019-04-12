@@ -2181,7 +2181,6 @@ namespace xivModdingFramework.Models.FileTypes
                 foreach (var uv3Coordinate in nVertexAlphaCollection)
                 {
                     colladaMeshData.VertexAlphas.Add(MathUtil.Clamp(uv3Coordinate.X, 0, 1));
-
                 }
 
                 colladaMeshData.BoneNumDictionary = meshPartDataDictionary[meshNum].FirstOrDefault().Value.BoneNumDictionary;
@@ -2592,12 +2591,12 @@ namespace xivModdingFramework.Models.FileTypes
             // We do not remove parts if they are missing from the DAE, we just set their index count to 0
             if (importSettings != null)
             {
-                var meshNum = 0;
                 var addedPartSum = 0;
 
                 foreach (var modelImportSettings in importSettings)
                 {
                     var importMeshPartCount = modelImportSettings.Value.PartList.Count;
+                    var meshNum = int.Parse(modelImportSettings.Key);
 
                     var originalMeshPartCount = 0;
                     if (xivMdl.LoDList[0].MeshDataList.Count > meshNum)
@@ -2609,8 +2608,6 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         addedPartSum += (importMeshPartCount - originalMeshPartCount);
                     }
-
-                    meshNum++;
                 }
 
                 meshPartCount += (short)addedPartSum;
@@ -4017,7 +4014,6 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         for (var i = 0; i < importSettings.Count; i++)
                         {
-
                             var importData = importDataDictionary[meshNum];
 
                             // Because our imported data does not include mesh shape data, we must include it manually
