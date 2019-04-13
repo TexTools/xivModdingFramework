@@ -3251,7 +3251,9 @@ namespace xivModdingFramework.Models.FileTypes
                                     }
 
                                     var attributeIndex = importSettingsMesh.PartAttributeDictionary.ContainsKey(partNum) ? importSettingsMesh.PartAttributeDictionary[partNum] : 0;
-                                    var boneCount = (short)colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count;
+                                    var boneCount = colladaMeshDataList[meshNum].PartBoneDictionary.ContainsKey(partNum)
+                                        ? (short) colladaMeshDataList[meshNum].PartBoneDictionary[partNum].Count
+                                        : (short)0;
 
                                     meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
                                     meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
