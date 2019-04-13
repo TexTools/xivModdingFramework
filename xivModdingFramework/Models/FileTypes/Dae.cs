@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
 using xivModdingFramework.General.Enums;
@@ -232,9 +233,11 @@ namespace xivModdingFramework.Models.FileTypes
             var isHousingItem = xivMdl.MdlPath.Folder.Contains("bgcommon/hou/");
 
             var boneJointDict = new Dictionary<string, string>();
+            var boneStringList = new List<string>();
+            var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
 
             // A dictionary containing <Mesh Number, <Mesh Part Number, Collada Data>
-            var meshPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
+            var meshPartDataDictionary = new SortedDictionary<int, SortedDictionary<int, ColladaData>>();
 
             var meshCount = xivMdl.LoDList[0].MeshCount;
 
@@ -245,70 +248,121 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < meshCount; i++)
             {
-                meshPartDataDictionary.Add(i, new Dictionary<int, ColladaData>());
+                meshPartDataDictionary.Add(i, new SortedDictionary<int, ColladaData>());
+            }
+
+            // Reading Control Data to get bones that are used in model
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                string[] bones = null;
+                while (reader.Read())
+                {
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("controller")) continue;
+
+                    while (reader.Read())
+                    {
+                        if (reader.IsStartElement())
+                        {
+                            if (reader.Name.Contains("Name_array"))
+                            {
+                                bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
+                            }
+
+                            if (reader.Name.Equals("v"))
+                            {
+                                var uniqueJointIndices = new HashSet<int>();
+                                var vData = (int[])reader.ReadElementContentAs(typeof(int[]), null);
+
+                                for (var a = 0; a < vData.Length; a += 2)
+                                {
+                                    uniqueJointIndices.Add(vData[a]);
+                                }
+
+                                if (bones != null)
+                                {
+                                    foreach (var uniqueJointIndex in uniqueJointIndices)
+                                    {
+                                        var bone = bones[uniqueJointIndex];
+                                        var boneName = bone;
+
+                                        if (!bone.Contains("joint"))
+                                        {
+                                            boneName = Regex.Replace(bone, "[0-9]+$", string.Empty);
+                                        }
+
+                                        uniqueBoneNames.Add(boneName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Reading Bone Data
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
-                var boneNames = new List<string>();
                 while (reader.Read())
                 {
-                    if (reader.IsStartElement())
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("visual_scene")) continue;
+
+                    while (reader.Read())
                     {
-                        if (reader.Name.Equals("visual_scene"))
+                        var sameBone = false;
+
+                        if (reader.IsStartElement())
                         {
-                            while (reader.Read())
+                            if (reader.Name.Contains("node"))
                             {
-                                var sameBone = false;
-
-                                if (reader.IsStartElement())
+                                var sid = reader["sid"];
+                                if (sid != null)
                                 {
-                                    if (reader.Name.Contains("node"))
+                                    var name = reader["name"];
+
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                    if (!uniqueBoneNames.Contains(sid))
                                     {
-                                        var sid = reader["sid"];
-                                        if (sid != null)
-                                        {
-                                            var name = reader["name"];
+                                        continue;
+                                    }
 
-                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+                                    // Throw an exception if there is a duplicate bone
+                                    if (boneStringList.Contains(sid))
+                                    {
+                                        throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                    }
 
-                                            // Throw an exception if there is a duplicate bone
-                                            if (boneJointDict.ContainsKey(sid))
-                                            {
-                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
-                                            }
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
 
-                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if(boneString.Contains("n_root")) continue;
-                                            if(boneString.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
+                                    if (!boneStringList.Contains(boneString))
+                                    {
+                                        boneJointDict.Add(sid, boneString);
+                                    }
+                                }
+                                else
+                                {
+                                    var name = reader["name"];
 
-                                            boneJointDict.Add(sid, boneString);
-                                        }
-                                        else
-                                        {
-                                            var name = reader["name"];
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
 
-                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+                                    if (!uniqueBoneNames.Contains(boneString))
+                                    {
+                                        continue;
+                                    }
 
-                                            // Throw an exception if there is a duplicate bone
-                                            if (boneJointDict.ContainsKey(name))
-                                            {
-                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
-                                            }
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
 
-                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if (boneString.Contains("n_root")) continue;
-                                            if (boneString.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
-
-                                            boneJointDict.Add(name, boneString);
-                                        }
+                                    if (!uniqueBoneNames.Contains(name))
+                                    {
+                                        boneJointDict.Add(name, name);
                                     }
                                 }
                             }
-                            break;
                         }
                     }
+                    break;
                 }
             }
 
@@ -653,16 +707,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         colladaData.Bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
 
-                                        var boneAdditionNames = new List<string>();
-
-                                        foreach (var colladaDataBone in boneJointDict.Keys)
-                                        {
-                                            if (!boneDict.ContainsKey(boneJointDict[colladaDataBone]))
-                                            {
-                                                boneAdditionNames.Add(colladaDataBone);
-                                            }
-                                        }
-
                                         var boneNum = 0;
                                         foreach (var bone in boneDict.Keys)
                                         {
@@ -670,11 +714,11 @@ namespace xivModdingFramework.Models.FileTypes
                                             boneNum++;
                                         }
 
-                                        foreach (var extraBone in boneAdditionNames)
+                                        foreach (var boneName in boneJointDict.Values)
                                         {
-                                            if (!colladaData.BoneNumDictionary.ContainsKey(boneJointDict[extraBone]))
+                                            if (!colladaData.BoneNumDictionary.ContainsKey(boneName))
                                             {
-                                                colladaData.BoneNumDictionary.Add(boneJointDict[extraBone], boneNum);
+                                                colladaData.BoneNumDictionary.Add(boneName, boneNum);
                                                 boneNum++;
                                             }
                                         }
@@ -729,7 +773,26 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            return meshPartDataDictionary;
+            // Make sure that mesh parts are sequential
+            var fixedPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
+
+            foreach (var mesh in meshPartDataDictionary)
+            {
+                fixedPartDataDictionary.Add(mesh.Key, new Dictionary<int, ColladaData>());
+
+                var meshPartData = mesh.Value;
+                var partNum = meshPartData.First().Key - 1;
+                foreach (var part in meshPartData)
+                {
+                    var newPartNum = partNum + 1;
+
+                    fixedPartDataDictionary[mesh.Key].Add(newPartNum, part.Value);
+
+                    partNum++;
+                }
+            }
+
+            return fixedPartDataDictionary;
         }
 
         /// <summary>
@@ -745,102 +808,120 @@ namespace xivModdingFramework.Models.FileTypes
             // A dictionary containing <Mesh Number, List<Mesh Parts>>
             var meshPartDictionary = new Dictionary<int, List<int>>();
 
+            var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
+
+            // Reading Control Data to get bones that are used in model
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                string[] bones = null;
+                while (reader.Read())
+                {
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("controller")) continue;
+
+                    while (reader.Read())
+                    {
+                        if (reader.IsStartElement())
+                        {
+                            if (reader.Name.Contains("Name_array"))
+                            {
+                                bones = (string[]) reader.ReadElementContentAs(typeof(string[]), null);
+                            }
+
+                            if (reader.Name.Equals("v"))
+                            {
+                                var uniqueJointIndices = new HashSet<int>();
+                                var vData = (int[]) reader.ReadElementContentAs(typeof(int[]), null);
+
+                                for (var a = 0; a < vData.Length; a += 2)
+                                {
+                                    uniqueJointIndices.Add(vData[a]);
+                                }
+
+                                if (bones != null)
+                                {
+                                    foreach (var uniqueJointIndex in uniqueJointIndices)
+                                    {
+                                        var bone = bones[uniqueJointIndex];
+                                        var boneName = bone;
+
+                                        if (!bone.Contains("joint"))
+                                        {
+                                            boneName = Regex.Replace(bone, "[0-9]+$", string.Empty);
+                                        }
+
+                                        uniqueBoneNames.Add(boneName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Reading Bone Data
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
-                var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
-
                 while (reader.Read())
                 {
-                    if (reader.IsStartElement())
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("visual_scene")) continue;
+
+                    while (reader.Read())
                     {
-                        if (reader.Name.Equals("controller"))
+                        var sameBone = false;
+
+                        if (reader.IsStartElement())
                         {
-                            while (reader.Read())
+                            if (reader.Name.Contains("node"))
                             {
-                                if (reader.IsStartElement())
+                                var sid = reader["sid"];
+                                if (sid != null)
                                 {
-                                    if (reader.Name.Contains("Name_array"))
+                                    var name = reader["name"];
+
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                    if (!uniqueBoneNames.Contains(sid))
                                     {
-                                        var bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
+                                        continue;
+                                    }
 
-                                        foreach (var bone in bones)
-                                        {
-                                            var boneName = bone;
+                                    // Throw an exception if there is a duplicate bone
+                                    if (boneStringList.Contains(sid))
+                                    {
+                                        throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                    }
 
-                                            if (!bone.Contains("joint"))
-                                            {
-                                                boneName = Regex.Replace(bone, "[0-9]+$", string.Empty);
-                                            }
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
 
-                                            uniqueBoneNames.Add(boneName);
-                                        }
+                                    if (!boneStringList.Contains(boneString))
+                                    {
+                                        boneStringList.Add(boneString);
+                                    }
+                                }
+                                else
+                                {
+                                    var name = reader["name"];
 
-                                        break;
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                    if (!uniqueBoneNames.Contains(boneString))
+                                    {
+                                        continue;
+                                    }
+
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+
+                                    if (!uniqueBoneNames.Contains(name))
+                                    {
+                                        boneStringList.Add(name);
                                     }
                                 }
                             }
-                        }
-
-                        if (reader.Name.Equals("visual_scene"))
-                        {
-                            while (reader.Read())
-                            {
-                                var sameBone = false;
-
-                                if (reader.IsStartElement())
-                                {
-                                    if (reader.Name.Contains("node"))
-                                    {
-                                        var sid = reader["sid"];
-                                        if (sid != null)
-                                        {
-                                            var name = reader["name"];
-
-                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
-
-                                            if (!uniqueBoneNames.Contains(sid))
-                                            {
-                                                continue;
-                                            }
-
-                                            // Throw an exception if there is a duplicate bone
-                                            if (boneStringList.Contains(sid))
-                                            {
-                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
-                                            }
-
-                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-
-                                            if (!boneStringList.Contains(boneString))
-                                            {
-                                                boneStringList.Add(boneString);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            var name = reader["name"];
-
-                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
-
-                                            if (!uniqueBoneNames.Contains(boneString))
-                                            {
-                                                continue;
-                                            }
-
-                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-
-                                            if (!uniqueBoneNames.Contains(name))
-                                            {
-                                                boneStringList.Add(name);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            break;
                         }
                     }
+                    break;
                 }
             }
 
