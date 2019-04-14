@@ -1494,26 +1494,37 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                         }
 
+                        meshDataDictionary[i].IndexLocDictionary = new Dictionary<string, int>
+                        {
+                            {"position", 0},
+                            {"normal", 1},
+                            {"textureCoordinate", 2}
+                        };
+
                         // Set new index stride
                         var indexStride = 3;
 
                         if (partDataDict[partNum].TextureCoordinates1.Count > 0)
                         {
+                            meshDataDictionary[i].IndexLocDictionary.Add("textureCoordinate1", indexStride);
                             indexStride++;
                         }
 
                         if (partDataDict[partNum].BiNormals.Count > 0)
                         {
+                            meshDataDictionary[i].IndexLocDictionary.Add("biNormal", indexStride);
                             indexStride++;
                         }
 
                         if (partDataDict[partNum].VertexColors.Count > 0)
                         {
+                            meshDataDictionary[i].IndexLocDictionary.Add("vertexColor", indexStride);
                             indexStride++;
                         }
 
                         if (partDataDict[partNum].VertexAlphas.Count > 0)
                         {
+                            meshDataDictionary[i].IndexLocDictionary.Add("vertexAlpha", indexStride);
                             indexStride++;
                         }
 
@@ -1633,15 +1644,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.VertexColors.Count; i += colladaData.VertexColorStride)
                 {
+                    var colors = new float[] {colladaData.VertexColors[i], colladaData.VertexColors[i + 1], colladaData.VertexColors[i + 2]};
+                    
                     // Check vertex colors for bad data, if any is found replace with default of 1
-                    if (colladaData.VertexColors.Any(x => x < 0f || x > 1f))
+                    if (colors.Any(x => x < 0f || x > 1f))
                     {
                         vertexColorCollection.Add(new Vector3(1, 1, 1));
                     }
                     else
                     {
-                        vertexColorCollection.Add(new Vector3(colladaData.VertexColors[i], colladaData.VertexColors[i + 1],
-                            colladaData.VertexColors[i + 2]));
+                        vertexColorCollection.Add(new Vector3(colors[0], colors[1], colors[2]));
                     }
                 }
 
@@ -1677,14 +1689,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
                 {
+                    var alphas = new float[] {colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]};
+
                     // Check vertex alphas for bad data, if any is found replace with default of 1
-                    if (colladaData.VertexAlphas.Any(x => x < 0f || x > 1f))
+                    if (alphas.Any(x => x < 0f || x > 1f))
                     {
                         vertexAlphaCollection.Add(new Vector2(1, 0));
                     }
                     else
                     {
-                        vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]));
+                        vertexAlphaCollection.Add(new Vector2(alphas[0], alphas[1]));
                     }
                 }
 
@@ -1856,9 +1870,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (targetIndex == uniqueCount)
                         {
-                            var pos0 = listEntry[0];
-                            var pos1 = listEntry[1];
-                            var pos2 = listEntry[2];
+                            var pos0 = listEntry[colladaData.IndexLocDictionary["position"]];
+                            var pos1 = listEntry[colladaData.IndexLocDictionary["normal"]];
+                            var pos2 = listEntry[colladaData.IndexLocDictionary["textureCoordinate"]];
 
                             // If the index at index 0 is larger than the position collection, throw an exception
                             if (pos0 > positionCollection.Count)
@@ -1900,7 +1914,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (texCoord1Collection.Count > 0)
                             {
-                                var pos3 = listEntry[3];
+                                var pos3 = listEntry[colladaData.IndexLocDictionary["textureCoordinate1"]];
 
                                 // If the index at index 3 is larger than the texture coordinate 1 collection, throw an exception
                                 if (pos3 > texCoord1Collection.Count)
@@ -1912,7 +1926,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (tangentsCollection.Count > 0)
                             {
-                                var nPos = texCoord1Collection.Count > 0 ? listEntry[4] : listEntry[3];
+                                var nPos = listEntry[colladaData.IndexLocDictionary["biNormal"]];
                                 // If the index at index n is larger than the tangents collection, throw an exception
                                 if (nPos > tangentsCollection.Count)
                                 {
@@ -1923,7 +1937,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (biNormalsCollection.Count > 0)
                             {
-                                var nPos = texCoord1Collection.Count > 0 ? listEntry[4] : listEntry[3];
+                                var nPos = listEntry[colladaData.IndexLocDictionary["biNormal"]];
                                 // If the index at index n is larger than the binormals collection, throw an exception
                                 if (nPos > biNormalsCollection.Count)
                                 {
@@ -1934,7 +1948,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (vertexColorCollection.Count > 0)
                             {
-                                var colorPos = biNormalsCollection.Count > 0 ? listEntry[5] : listEntry[4];
+                                var colorPos = listEntry[colladaData.IndexLocDictionary["vertexColor"]];
 
                                 if (colorPos > vertexColorCollection.Count)
                                 {
@@ -1945,7 +1959,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (vertexAlphaCollection.Count > 0)
                             {
-                                var alphaPos = biNormalsCollection.Count > 0 ? listEntry[6] : listEntry[5];
+                                var alphaPos = listEntry[colladaData.IndexLocDictionary["vertexAlpha"]];
 
                                 if (alphaPos > vertexAlphaCollection.Count)
                                 {
@@ -4332,10 +4346,16 @@ namespace xivModdingFramework.Models.FileTypes
             // This is the most common size of header for models
             var headerLength = 256;
 
+            var blockCount = compressedMeshSizes.Count + modelDataPartCount + 3 + compressedIndexSizes.Count;
+
             // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
-            if ((compressedMeshSizes.Count + modelDataPartCount + 3 + compressedIndexSizes.Count) > 24)
+            if (blockCount > 24)
             {
-                headerLength = 384;
+                var remainingBlocks = blockCount - 24;
+                var bytesUsed = remainingBlocks * 2;
+                var extensionNeeeded = (bytesUsed / 128) + 1;
+                var newSize = 256 + (extensionNeeeded * 128);
+                headerLength = newSize;
             }
 
             // Header Length
@@ -4560,8 +4580,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Index Data Block LoD[2] padded size
             datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].CompressedIndexDataBlockSize));
 
-            // Rest of Header
-            if ((headerLength == 256 && datHeader.Count < 256) || (headerLength == 384 && datHeader.Count != 384)) 
+            if (datHeader.Count != headerLength)
             {
                 var headerEnd = headerLength - datHeader.Count % headerLength;
                 datHeader.AddRange(new byte[headerEnd]);
@@ -4761,7 +4780,12 @@ namespace xivModdingFramework.Models.FileTypes
                         var red   = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].X * 255), 0, 255));
                         var green = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Y * 255), 0, 255));
                         var blue  = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Z * 255), 0, 255));
-                        var alpha = Convert.ToByte(Math.Round(colladaMeshData.VertexAlphas[i] * 255));
+                        var alpha = (byte)255; 
+
+                        if (colladaMeshData.VertexAlphas.Count > 0)
+                        {
+                            alpha = Convert.ToByte(Math.Round(colladaMeshData.VertexAlphas[i] * 255));
+                        }
 
                         if (!flipAlpha)
                         {
