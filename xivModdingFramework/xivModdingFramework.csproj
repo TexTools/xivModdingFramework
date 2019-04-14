@@ -2,14 +2,14 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyVersion>1.0.2.0</AssemblyVersion>
-    <Version>1.0.2</Version>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HelixToolkit" Version="2.6.0" />
-    <PackageReference Include="HelixToolkit.Wpf" Version="2.6.0" />
-    <PackageReference Include="HelixToolkit.Wpf.SharpDX" Version="2.6.0" />
+    <PackageReference Include="HelixToolkit" Version="2.6.1" />
+    <PackageReference Include="HelixToolkit.Wpf" Version="2.6.1" />
+    <PackageReference Include="HelixToolkit.Wpf.SharpDX" Version="2.6.1" />
     <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="7.11.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
     <PackageReference Include="SharpDX" Version="4.2.0" />
