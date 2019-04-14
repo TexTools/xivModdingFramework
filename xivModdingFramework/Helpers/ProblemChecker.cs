@@ -16,6 +16,7 @@
 
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -101,6 +102,19 @@ namespace xivModdingFramework.Helpers
             var largestDatNum = dat.GetLargestDatNumber(dataFile);
 
             index.UpdateIndexDatCount(dataFile, largestDatNum);
+        }
+
+        public bool CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
+        {
+            var backupDataFile = new DirectoryInfo($"{backupsDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
+            var currentDataFile = new DirectoryInfo($"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
+
+            var index = new Index(_gameDirectory);
+
+            var backupHash = index.GetIndexSection1Hash(backupDataFile);
+            var currentHash = index.GetIndexSection1Hash(currentDataFile);
+
+            return backupHash.SequenceEqual(currentHash);
         }
     }
 }
