@@ -395,6 +395,7 @@ namespace xivModdingFramework.Models.FileTypes
             var indexStride = 4;
             var textureCoordinateStride = 2;
             var vertexColorStride = 3;
+            var toolType = "TexTools";
 
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
@@ -419,6 +420,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 tang   = "-map1-textangents";
                                 textureCoordinateStride = 3;
                                 indexStride = 6;
+                                toolType = "OpenCOLLADA";
                             }
                             else if (tool.Contains("FBX"))
                             {
@@ -430,6 +432,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 valpha = "-uv2-array";
                                 indexStride = 6;
                                 vertexColorStride = 4;
+                                toolType = "FBXCOLLADA";
                             }
                             else if (tool.Contains("Exporter for Blender"))
                             {
@@ -522,6 +525,8 @@ namespace xivModdingFramework.Models.FileTypes
                                         }
                                     }
 
+                                    var vertexIndexDict = new Dictionary<string, int>();
+
                                     var inputOffset = 0;
                                     if (reader.Name.Equals("triangles"))
                                     {
@@ -531,7 +536,72 @@ namespace xivModdingFramework.Models.FileTypes
                                             {
                                                 if (reader.Name.Contains("input"))
                                                 {
+                                                    var semantic = reader["semantic"];
+                                                    var source = reader["source"];
                                                     inputOffset = int.Parse(reader["offset"]);
+
+                                                    if (semantic.ToLower().Equals("vertex"))
+                                                    {
+                                                        vertexIndexDict.Add("position", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("normal"))
+                                                    {
+                                                        vertexIndexDict.Add("normal", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("color"))
+                                                    {
+                                                        vertexIndexDict.Add("vertexColor", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("textangent") &&
+                                                             (source.ToLower().Contains("map0") || source.ToLower().Contains("map1")))
+                                                    {
+                                                        vertexIndexDict.Add("tangent", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("texbinormal") &&
+                                                             (source.ToLower().Contains("map0") ||source.ToLower().Contains("map1")))
+                                                    {
+                                                        vertexIndexDict.Add("biNormal", inputOffset);
+                                                    }
+
+                                                    if (!toolType.Equals("TexTools"))
+                                                    {
+                                                        if (semantic.ToLower().Equals("texcoord") &&
+                                                                 (source.ToLower().Contains("map1") ||
+                                                                  source.ToLower().Contains("uv0")))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 (source.ToLower().Contains("map2") ||
+                                                                  source.ToLower().Contains("uv1")))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 (source.ToLower().Contains("map3") ||
+                                                                  source.ToLower().Contains("uv3")))
+                                                        {
+                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        if (semantic.ToLower().Equals("texcoord") &&
+                                                            source.ToLower().Contains("map0"))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 source.ToLower().Contains("map1"))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 source.ToLower().Contains("map2"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                    }
                                                 }
                                                 else
                                                 {
@@ -551,51 +621,28 @@ namespace xivModdingFramework.Models.FileTypes
                                         // Reads the indices for each data point and places them in a list
                                         for (var i = 0; i < cData.Indices.Count; i += indexStride)
                                         {
-                                            if (indexStride == 9)
+                                            cData.PositionIndices.Add(cData.Indices[i + vertexIndexDict["position"]]);
+                                            cData.NormalIndices.Add(cData.Indices[i + vertexIndexDict["normal"]]);
+                                            cData.TextureCoordinate0Indices.Add(cData.Indices[i + vertexIndexDict["textureCoordinate"]]);
+
+                                            if (cData.TextureCoordinates1.Count > 0)
                                             {
-                                                cData.PositionIndices.Add(cData.Indices[i]);
-                                                cData.NormalIndices.Add(cData.Indices[i + 1]);
-                                                cData.VertexColorIndices.Add(cData.Indices[i + 2]);
-                                                cData.TextureCoordinate0Indices.Add(cData.Indices[i + 3]);
-
-                                                if (cData.BiNormals.Count > 0)
-                                                {
-                                                    cData.BiNormalIndices.Add(cData.Indices[i + 4]);
-                                                }
-
-                                                if (cData.TextureCoordinates1.Count > 0)
-                                                {
-                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 5]);
-                                                }
-
-                                                cData.VertexAlphaIndices.Add(cData.Indices[i + 7]);
-
+                                                cData.TextureCoordinate1Indices.Add(cData.Indices[i + vertexIndexDict["textureCoordinate1"]]);
                                             }
-                                            else
+
+                                            if (cData.BiNormals.Count > 0)
                                             {
-                                                cData.PositionIndices.Add(cData.Indices[i]);
-                                                cData.NormalIndices.Add(cData.Indices[i + 1]);
-                                                cData.TextureCoordinate0Indices.Add(cData.Indices[i + 2]);
+                                                cData.BiNormalIndices.Add(cData.Indices[i + vertexIndexDict["biNormal"]]);
+                                            }
 
-                                                if (cData.TextureCoordinates1.Count > 0 && indexStride == 6)
-                                                {
-                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 4]);
-                                                }
-                                                else if (cData.TextureCoordinates1.Count > 0 && indexStride == 4)
-                                                {
-                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 2]);
-                                                }
+                                            if (cData.VertexColors.Count > 0)
+                                            {
+                                                cData.VertexColorIndices.Add(cData.Indices[i + vertexIndexDict["vertexColor"]]);
+                                            }
 
-                                                if (cData.BiNormals.Count > 0)
-                                                {
-                                                    cData.BiNormalIndices.Add(cData.Indices[i + 3]);
-                                                }
-
-                                                if (cData.VertexColors.Count > 0)
-                                                {
-                                                    cData.VertexColorIndices.Add(cData.Indices[i + 2]);
-                                                    cData.VertexAlphaIndices.Add(cData.Indices[i + 2]);
-                                                }
+                                            if (cData.VertexAlphas.Count > 0)
+                                            {
+                                                cData.VertexAlphaIndices.Add(cData.Indices[i + vertexIndexDict["vertexAlpha"]]);
                                             }
 
                                         }
