@@ -497,6 +497,13 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+
+                                            // If extra values were added, remove them to match the position count
+                                            if (cData.VertexColors.Count > cData.Positions.Count)
+                                            {
+                                                var extraData = cData.VertexColors.Count - cData.Positions.Count;
+                                                cData.VertexColors.RemoveRange(cData.Positions.Count, extraData);
+                                            }
                                         }
                                         //Texture Coordinates
                                         else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
@@ -512,6 +519,13 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if (reader["id"].ToLower().Contains(valpha) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexAlphas.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+
+                                            // If extra values were added, remove them to match the position count
+                                            if (cData.VertexAlphas.Count > cData.Positions.Count)
+                                            {
+                                                var extraData = cData.VertexAlphas.Count - cData.Positions.Count;
+                                                cData.VertexAlphas.RemoveRange(cData.Positions.Count, extraData);
+                                            }
                                         }
                                         //Tangents
                                         else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
@@ -828,7 +842,13 @@ namespace xivModdingFramework.Models.FileTypes
                 fixedPartDataDictionary.Add(mesh.Key, new Dictionary<int, ColladaData>());
 
                 var meshPartData = mesh.Value;
-                var partNum = meshPartData.First().Key - 1;
+
+                var partNum = -1;
+                if (mesh.Value.Count > 0)
+                {
+                    partNum = meshPartData.First().Key - 1;
+                }
+
                 foreach (var part in meshPartData)
                 {
                     var newPartNum = partNum + 1;
