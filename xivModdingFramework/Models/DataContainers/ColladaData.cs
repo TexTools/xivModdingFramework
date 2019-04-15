@@ -86,6 +86,11 @@ namespace xivModdingFramework.Models.DataContainers
         public List<int> Indices { get; set; } = new List<int>();
 
         /// <summary>
+        /// Dictionary containing the location of vertex type indices
+        /// </summary>
+        public Dictionary<string, int> IndexLocDictionary { get; set; }
+
+        /// <summary>
         /// The Vertex Bone Indices
         /// </summary>
         public List<int> BoneIndices { get; set; } = new List<int>();

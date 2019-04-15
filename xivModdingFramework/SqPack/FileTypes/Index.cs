@@ -99,6 +99,24 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets the SHA1 hash for the file section
+        /// </summary>
+        /// <param name="dataFile">The data file to get the hash for</param>
+        /// <returns>The byte array containing the hash value</returns>
+        public byte[] GetIndexSection1Hash(DirectoryInfo indexPath)
+        {
+            byte[] sha1Bytes;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+            {
+                br.BaseStream.Seek(1040, SeekOrigin.Begin);
+                sha1Bytes = br.ReadBytes(20);
+            }
+
+            return sha1Bytes;
+        }
+
+        /// <summary>
         /// Gets the offset for the data in the .dat file
         /// </summary>
         /// <param name="hashedFolder">The hashed value of the folder path</param>

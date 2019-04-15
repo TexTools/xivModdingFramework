@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
 using xivModdingFramework.General.Enums;
@@ -232,9 +233,11 @@ namespace xivModdingFramework.Models.FileTypes
             var isHousingItem = xivMdl.MdlPath.Folder.Contains("bgcommon/hou/");
 
             var boneJointDict = new Dictionary<string, string>();
+            var boneStringList = new List<string>();
+            var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
 
             // A dictionary containing <Mesh Number, <Mesh Part Number, Collada Data>
-            var meshPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
+            var meshPartDataDictionary = new SortedDictionary<int, SortedDictionary<int, ColladaData>>();
 
             var meshCount = xivMdl.LoDList[0].MeshCount;
 
@@ -245,70 +248,121 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < meshCount; i++)
             {
-                meshPartDataDictionary.Add(i, new Dictionary<int, ColladaData>());
+                meshPartDataDictionary.Add(i, new SortedDictionary<int, ColladaData>());
+            }
+
+            // Reading Control Data to get bones that are used in model
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                string[] bones = null;
+                while (reader.Read())
+                {
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("controller")) continue;
+
+                    while (reader.Read())
+                    {
+                        if (reader.IsStartElement())
+                        {
+                            if (reader.Name.Contains("Name_array"))
+                            {
+                                bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
+                            }
+
+                            if (reader.Name.Equals("v"))
+                            {
+                                var uniqueJointIndices = new HashSet<int>();
+                                var vData = (int[])reader.ReadElementContentAs(typeof(int[]), null);
+
+                                for (var a = 0; a < vData.Length; a += 2)
+                                {
+                                    uniqueJointIndices.Add(vData[a]);
+                                }
+
+                                if (bones != null)
+                                {
+                                    foreach (var uniqueJointIndex in uniqueJointIndices)
+                                    {
+                                        var bone = bones[uniqueJointIndex];
+                                        var boneName = bone;
+
+                                        if (!bone.Contains("joint"))
+                                        {
+                                            boneName = Regex.Replace(bone, "[0-9]+$", string.Empty);
+                                        }
+
+                                        uniqueBoneNames.Add(boneName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Reading Bone Data
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
-                var boneNames = new List<string>();
                 while (reader.Read())
                 {
-                    if (reader.IsStartElement())
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("visual_scene")) continue;
+
+                    while (reader.Read())
                     {
-                        if (reader.Name.Equals("visual_scene"))
+                        var sameBone = false;
+
+                        if (reader.IsStartElement())
                         {
-                            while (reader.Read())
+                            if (reader.Name.Contains("node"))
                             {
-                                var sameBone = false;
-
-                                if (reader.IsStartElement())
+                                var sid = reader["sid"];
+                                if (sid != null)
                                 {
-                                    if (reader.Name.Contains("node"))
+                                    var name = reader["name"];
+
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                    if (!uniqueBoneNames.Contains(sid))
                                     {
-                                        var sid = reader["sid"];
-                                        if (sid != null)
-                                        {
-                                            var name = reader["name"];
+                                        continue;
+                                    }
 
-                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+                                    // Throw an exception if there is a duplicate bone
+                                    if (boneStringList.Contains(sid))
+                                    {
+                                        throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                    }
 
-                                            // Throw an exception if there is a duplicate bone
-                                            if (boneJointDict.ContainsKey(sid))
-                                            {
-                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
-                                            }
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
 
-                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if(boneString.Contains("n_root")) continue;
-                                            if(boneString.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
+                                    if (!boneStringList.Contains(boneString))
+                                    {
+                                        boneJointDict.Add(sid, boneString);
+                                    }
+                                }
+                                else
+                                {
+                                    var name = reader["name"];
 
-                                            boneJointDict.Add(sid, boneString);
-                                        }
-                                        else
-                                        {
-                                            var name = reader["name"];
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
 
-                                            var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+                                    if (!uniqueBoneNames.Contains(boneString))
+                                    {
+                                        continue;
+                                    }
 
-                                            // Throw an exception if there is a duplicate bone
-                                            if (boneJointDict.ContainsKey(name))
-                                            {
-                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
-                                            }
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
 
-                                            if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if (boneString.Contains("n_root")) continue;
-                                            if (boneString.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
-
-                                            boneJointDict.Add(name, boneString);
-                                        }
+                                    if (!uniqueBoneNames.Contains(name))
+                                    {
+                                        boneJointDict.Add(name, name);
                                     }
                                 }
                             }
-                            break;
                         }
                     }
+                    break;
                 }
             }
 
@@ -341,6 +395,7 @@ namespace xivModdingFramework.Models.FileTypes
             var indexStride = 4;
             var textureCoordinateStride = 2;
             var vertexColorStride = 3;
+            var toolType = "TexTools";
 
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
@@ -365,6 +420,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 tang   = "-map1-textangents";
                                 textureCoordinateStride = 3;
                                 indexStride = 6;
+                                toolType = "OpenCOLLADA";
                             }
                             else if (tool.Contains("FBX"))
                             {
@@ -376,6 +432,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 valpha = "-uv2-array";
                                 indexStride = 6;
                                 vertexColorStride = 4;
+                                toolType = "FBXCOLLADA";
                             }
                             else if (tool.Contains("Exporter for Blender"))
                             {
@@ -440,6 +497,13 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+
+                                            // If extra values were added, remove them to match the position count
+                                            if (cData.VertexColors.Count > cData.Positions.Count)
+                                            {
+                                                var extraData = cData.VertexColors.Count - cData.Positions.Count;
+                                                cData.VertexColors.RemoveRange(cData.Positions.Count, extraData);
+                                            }
                                         }
                                         //Texture Coordinates
                                         else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
@@ -455,6 +519,13 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if (reader["id"].ToLower().Contains(valpha) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexAlphas.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
+
+                                            // If extra values were added, remove them to match the position count
+                                            if (cData.VertexAlphas.Count > cData.Positions.Count)
+                                            {
+                                                var extraData = cData.VertexAlphas.Count - cData.Positions.Count;
+                                                cData.VertexAlphas.RemoveRange(cData.Positions.Count, extraData);
+                                            }
                                         }
                                         //Tangents
                                         else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
@@ -468,6 +539,8 @@ namespace xivModdingFramework.Models.FileTypes
                                         }
                                     }
 
+                                    var vertexIndexDict = new Dictionary<string, int>();
+
                                     var inputOffset = 0;
                                     if (reader.Name.Equals("triangles"))
                                     {
@@ -477,7 +550,72 @@ namespace xivModdingFramework.Models.FileTypes
                                             {
                                                 if (reader.Name.Contains("input"))
                                                 {
+                                                    var semantic = reader["semantic"];
+                                                    var source = reader["source"];
                                                     inputOffset = int.Parse(reader["offset"]);
+
+                                                    if (semantic.ToLower().Equals("vertex"))
+                                                    {
+                                                        vertexIndexDict.Add("position", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("normal"))
+                                                    {
+                                                        vertexIndexDict.Add("normal", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("color"))
+                                                    {
+                                                        vertexIndexDict.Add("vertexColor", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("textangent") &&
+                                                             (source.ToLower().Contains("map0") || source.ToLower().Contains("map1")))
+                                                    {
+                                                        vertexIndexDict.Add("tangent", inputOffset);
+                                                    }
+                                                    else if (semantic.ToLower().Equals("texbinormal") &&
+                                                             (source.ToLower().Contains("map0") ||source.ToLower().Contains("map1")))
+                                                    {
+                                                        vertexIndexDict.Add("biNormal", inputOffset);
+                                                    }
+
+                                                    if (!toolType.Equals("TexTools"))
+                                                    {
+                                                        if (semantic.ToLower().Equals("texcoord") &&
+                                                                 (source.ToLower().Contains("map1") ||
+                                                                  source.ToLower().Contains("uv0")))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 (source.ToLower().Contains("map2") ||
+                                                                  source.ToLower().Contains("uv1")))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 (source.ToLower().Contains("map3") ||
+                                                                  source.ToLower().Contains("uv3")))
+                                                        {
+                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        if (semantic.ToLower().Equals("texcoord") &&
+                                                            source.ToLower().Contains("map0"))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 source.ToLower().Contains("map1"))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
+                                                        }
+                                                        else if (semantic.ToLower().Equals("texcoord") &&
+                                                                 source.ToLower().Contains("map2"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                    }
                                                 }
                                                 else
                                                 {
@@ -497,51 +635,28 @@ namespace xivModdingFramework.Models.FileTypes
                                         // Reads the indices for each data point and places them in a list
                                         for (var i = 0; i < cData.Indices.Count; i += indexStride)
                                         {
-                                            if (indexStride == 9)
+                                            cData.PositionIndices.Add(cData.Indices[i + vertexIndexDict["position"]]);
+                                            cData.NormalIndices.Add(cData.Indices[i + vertexIndexDict["normal"]]);
+                                            cData.TextureCoordinate0Indices.Add(cData.Indices[i + vertexIndexDict["textureCoordinate"]]);
+
+                                            if (cData.TextureCoordinates1.Count > 0)
                                             {
-                                                cData.PositionIndices.Add(cData.Indices[i]);
-                                                cData.NormalIndices.Add(cData.Indices[i + 1]);
-                                                cData.VertexColorIndices.Add(cData.Indices[i + 2]);
-                                                cData.TextureCoordinate0Indices.Add(cData.Indices[i + 3]);
-
-                                                if (cData.BiNormals.Count > 0)
-                                                {
-                                                    cData.BiNormalIndices.Add(cData.Indices[i + 4]);
-                                                }
-
-                                                if (cData.TextureCoordinates1.Count > 0)
-                                                {
-                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 5]);
-                                                }
-
-                                                cData.VertexAlphaIndices.Add(cData.Indices[i + 7]);
-
+                                                cData.TextureCoordinate1Indices.Add(cData.Indices[i + vertexIndexDict["textureCoordinate1"]]);
                                             }
-                                            else
+
+                                            if (cData.BiNormals.Count > 0)
                                             {
-                                                cData.PositionIndices.Add(cData.Indices[i]);
-                                                cData.NormalIndices.Add(cData.Indices[i + 1]);
-                                                cData.TextureCoordinate0Indices.Add(cData.Indices[i + 2]);
+                                                cData.BiNormalIndices.Add(cData.Indices[i + vertexIndexDict["biNormal"]]);
+                                            }
 
-                                                if (cData.TextureCoordinates1.Count > 0 && indexStride == 6)
-                                                {
-                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 4]);
-                                                }
-                                                else if (cData.TextureCoordinates1.Count > 0 && indexStride == 4)
-                                                {
-                                                    cData.TextureCoordinate1Indices.Add(cData.Indices[i + 2]);
-                                                }
+                                            if (cData.VertexColors.Count > 0)
+                                            {
+                                                cData.VertexColorIndices.Add(cData.Indices[i + vertexIndexDict["vertexColor"]]);
+                                            }
 
-                                                if (cData.BiNormals.Count > 0)
-                                                {
-                                                    cData.BiNormalIndices.Add(cData.Indices[i + 3]);
-                                                }
-
-                                                if (cData.VertexColors.Count > 0)
-                                                {
-                                                    cData.VertexColorIndices.Add(cData.Indices[i + 2]);
-                                                    cData.VertexAlphaIndices.Add(cData.Indices[i + 2]);
-                                                }
+                                            if (cData.VertexAlphas.Count > 0)
+                                            {
+                                                cData.VertexAlphaIndices.Add(cData.Indices[i + vertexIndexDict["vertexAlpha"]]);
                                             }
 
                                         }
@@ -653,16 +768,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         colladaData.Bones = (string[])reader.ReadElementContentAs(typeof(string[]), null);
 
-                                        var boneAdditionNames = new List<string>();
-
-                                        foreach (var colladaDataBone in boneJointDict.Keys)
-                                        {
-                                            if (!boneDict.ContainsKey(boneJointDict[colladaDataBone]))
-                                            {
-                                                boneAdditionNames.Add(colladaDataBone);
-                                            }
-                                        }
-
                                         var boneNum = 0;
                                         foreach (var bone in boneDict.Keys)
                                         {
@@ -670,11 +775,11 @@ namespace xivModdingFramework.Models.FileTypes
                                             boneNum++;
                                         }
 
-                                        foreach (var extraBone in boneAdditionNames)
+                                        foreach (var boneName in boneJointDict.Values)
                                         {
-                                            if (!colladaData.BoneNumDictionary.ContainsKey(boneJointDict[extraBone]))
+                                            if (!colladaData.BoneNumDictionary.ContainsKey(boneName))
                                             {
-                                                colladaData.BoneNumDictionary.Add(boneJointDict[extraBone], boneNum);
+                                                colladaData.BoneNumDictionary.Add(boneName, boneNum);
                                                 boneNum++;
                                             }
                                         }
@@ -729,7 +834,32 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            return meshPartDataDictionary;
+            // Make sure that mesh parts are sequential
+            var fixedPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
+
+            foreach (var mesh in meshPartDataDictionary)
+            {
+                fixedPartDataDictionary.Add(mesh.Key, new Dictionary<int, ColladaData>());
+
+                var meshPartData = mesh.Value;
+
+                var partNum = -1;
+                if (mesh.Value.Count > 0)
+                {
+                    partNum = meshPartData.First().Key - 1;
+                }
+
+                foreach (var part in meshPartData)
+                {
+                    var newPartNum = partNum + 1;
+
+                    fixedPartDataDictionary[mesh.Key].Add(newPartNum, part.Value);
+
+                    partNum++;
+                }
+            }
+
+            return fixedPartDataDictionary;
         }
 
         /// <summary>
@@ -745,82 +875,120 @@ namespace xivModdingFramework.Models.FileTypes
             // A dictionary containing <Mesh Number, List<Mesh Parts>>
             var meshPartDictionary = new Dictionary<int, List<int>>();
 
-            // Reading Bone Data
+            var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
+
+            // Reading Control Data to get bones that are used in model
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
-                var boneNames = new List<string>();
+                string[] bones = null;
                 while (reader.Read())
                 {
-                    if (reader.IsStartElement())
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("controller")) continue;
+
+                    while (reader.Read())
                     {
-                        if (reader.Name.Equals("visual_scene"))
+                        if (reader.IsStartElement())
                         {
-                            while (reader.Read())
+                            if (reader.Name.Contains("Name_array"))
                             {
-                                var sameBone = false;
+                                bones = (string[]) reader.ReadElementContentAs(typeof(string[]), null);
+                            }
 
-                                if (reader.IsStartElement())
+                            if (reader.Name.Equals("v"))
+                            {
+                                var uniqueJointIndices = new HashSet<int>();
+                                var vData = (int[]) reader.ReadElementContentAs(typeof(int[]), null);
+
+                                for (var a = 0; a < vData.Length; a += 2)
                                 {
-                                    if (reader.Name.Contains("node"))
+                                    uniqueJointIndices.Add(vData[a]);
+                                }
+
+                                if (bones != null)
+                                {
+                                    foreach (var uniqueJointIndex in uniqueJointIndices)
                                     {
-                                        var sid = reader["sid"];
-                                        if (sid != null)
+                                        var bone = bones[uniqueJointIndex];
+                                        var boneName = bone;
+
+                                        if (!bone.Contains("joint"))
                                         {
-                                            var name = reader["name"];
-
-                                            // Throw an exception if there is a duplicate bone
-                                            if (boneStringList.Contains(sid))
-                                            {
-                                                throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
-                                            }
-
-                                            if (!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if (name.Contains("n_root")) continue;
-                                            if (name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
-
-                                            foreach (var boneName in boneNames)
-                                            {
-                                                if (name.Contains(boneName))
-                                                {
-                                                    sameBone = true;
-                                                }
-                                            }
-
-                                            if (!sameBone)
-                                            {
-                                                boneStringList.Add(name);
-                                            }
-
-                                            boneNames.Add(name);
+                                            boneName = Regex.Replace(bone, "[0-9]+$", string.Empty);
                                         }
-                                        else
-                                        {
-                                            var name = reader["name"];
-                                            if (!name.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
-                                            if (name.Contains("n_root")) continue;
-                                            if (name.Contains("n_hara") && !xivMdl.PathData.BoneList.Contains("n_hara")) continue;
 
-                                            foreach (var boneName in boneNames)
-                                            {
-                                                if (name.Contains(boneName))
-                                                {
-                                                    sameBone = true;
-                                                }
-                                            }
-
-                                            if (!sameBone)
-                                            {
-                                                boneStringList.Add(name);
-                                            }
-
-                                            boneNames.Add(name);
-                                        }
+                                        uniqueBoneNames.Add(boneName);
                                     }
                                 }
                             }
-                            break;
                         }
                     }
+                }
+            }
+
+            // Reading Bone Data
+            using (var reader = XmlReader.Create(daeLocation.FullName))
+            {
+                while (reader.Read())
+                {
+                    if (!reader.IsStartElement()) continue;
+                    if (!reader.Name.Equals("visual_scene")) continue;
+
+                    while (reader.Read())
+                    {
+                        var sameBone = false;
+
+                        if (reader.IsStartElement())
+                        {
+                            if (reader.Name.Contains("node"))
+                            {
+                                var sid = reader["sid"];
+                                if (sid != null)
+                                {
+                                    var name = reader["name"];
+
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                    if (!uniqueBoneNames.Contains(sid))
+                                    {
+                                        continue;
+                                    }
+
+                                    // Throw an exception if there is a duplicate bone
+                                    if (boneStringList.Contains(sid))
+                                    {
+                                        throw new Exception($"Model cannot contain duplicate bones. Duplicate found: {sid}");
+                                    }
+
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+
+                                    if (!boneStringList.Contains(boneString))
+                                    {
+                                        boneStringList.Add(boneString);
+                                    }
+                                }
+                                else
+                                {
+                                    var name = reader["name"];
+
+                                    var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
+
+                                    if (!uniqueBoneNames.Contains(boneString))
+                                    {
+                                        continue;
+                                    }
+
+                                    if (!boneString.Substring(0, 2).Contains("n_") && !name.Substring(0, 2).Contains("j_")) continue;
+
+                                    if (!uniqueBoneNames.Contains(name))
+                                    {
+                                        boneStringList.Add(name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
                 }
             }
 
