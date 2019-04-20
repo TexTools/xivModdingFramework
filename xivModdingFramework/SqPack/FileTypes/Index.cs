@@ -126,7 +126,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         public int GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
         {
             var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
-            var offset = 0;
+            //esrinzou for china ffxiv
+            //var offset = 0;
+            //esrinzou begin
+            var offset = -1;
+            //esrinzou end
 
             // These are the offsets to relevant data
             const int fileCountOffset = 1036;

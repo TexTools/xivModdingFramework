@@ -154,7 +154,7 @@
     <value>石兽</value>
   </data>
   <data name="Character" xml:space="preserve">
-    <value>角色</value>
+    <value>Character</value>
   </data>
   <data name="ColorSet" xml:space="preserve">
     <value>ColorSet</value>
