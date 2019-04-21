@@ -482,7 +482,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             foreach (var texPathString in xivMtrl.TexturePathList)
             {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString));
+                pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
                 pathStringList.Add(0);
             }
 
