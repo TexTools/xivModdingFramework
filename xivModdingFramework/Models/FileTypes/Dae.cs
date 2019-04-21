@@ -1004,6 +1004,11 @@ namespace xivModdingFramework.Models.FileTypes
                             var atr = reader["name"];
                             var id = reader["id"];
 
+                            if (atr.Contains("Mesh"))
+                            {
+                                atr = atr.Replace("Mesh", string.Empty);
+                            }
+
                             if (meshNameDict.ContainsKey(id))
                             {
                                 throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}\n\n" +
