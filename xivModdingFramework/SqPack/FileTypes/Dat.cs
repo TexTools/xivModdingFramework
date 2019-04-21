@@ -567,18 +567,18 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 for (var i = 0; i < 11; i++)
                 {
-                    chunkBlockStart[i] = br.ReadInt16();
+                    chunkBlockStart[i] = br.ReadUInt16();
                 }
                 var totalBlocks = 0;
                 for (var i = 0; i < 11; i++)
                 {
-                    chunkNumBlocks[i] = br.ReadInt16();
+                    chunkNumBlocks[i] = br.ReadUInt16();
 
                     totalBlocks += chunkNumBlocks[i];
                 }
 
-                meshCount = br.ReadInt16();
-                materialCount = br.ReadInt16();
+                meshCount = br.ReadUInt16();
+                materialCount = br.ReadUInt16();
 
                 br.ReadBytes(4);
 
@@ -586,7 +586,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 for (var i = 0; i < totalBlocks; i++)
                 {
-                    blockSizes[i] = br.ReadInt16();
+                    blockSizes[i] = br.ReadUInt16();
                 }
 
                 br.BaseStream.Seek(offset + headerLength + chunkOffsets[0], SeekOrigin.Begin);
