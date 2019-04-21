@@ -51,6 +51,7 @@ namespace xivModdingFramework.Items.Categories
             var furnitureList = new List<XivFurniture>();
 
             furnitureList.AddRange(GetIndoorFurniture());
+            furnitureList.AddRange(GetPaintings());
             furnitureList.AddRange(GetOutdoorFurniture());
 
             return furnitureList;
@@ -103,6 +104,77 @@ namespace xivModdingFramework.Items.Categories
 
                     br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
                     var housingCategory = br.ReadByte();
+
+                    using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
+                    {
+                        br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
+                        var nameOffset = br1.ReadInt16();
+
+                        br1.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
+                        item.IconNumber = br1.ReadUInt16();
+
+                        var gearNameOffset = itemDataLength + nameOffset;
+                        var gearNameLength = itemDictionary[itemIndex].Length - gearNameOffset;
+                        br1.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
+                        var nameString = Encoding.UTF8.GetString(br1.ReadBytes(gearNameLength)).Replace("\0", "");
+                        item.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                    }
+                }
+
+                if (!item.Name.Equals(string.Empty))
+                {
+                    furnitureList.Add(item);
+                }
+            }
+
+            furnitureList.Sort();
+
+            return furnitureList;
+        }
+
+        /// <summary>
+        /// Gets the list of indoor furniture
+        /// </summary>
+        /// <remarks>
+        /// Housing items can be obtained one of two ways
+        /// One: checking the housingfurniture exd for the item index, and going to that item to grab the data
+        /// Two: iterating through the entire item list seeing if the item contains an index to a housing item (offset 112, 4 bytes)
+        /// This method does option one
+        /// </remarks>
+        /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
+        private List<XivFurniture> GetPaintings()
+        {
+            // These are the offsets to relevant data
+            // These will need to be changed if data gets added or removed with a patch
+            const int itemIndexOffset = 0;
+            const int iconNumberOffset = 4;
+
+            const int itemNameDataOffset = 14;
+            const int itemDataLength = 160;
+            const int itemIconDataOffset = 136;
+
+            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var pictureDictionary = ex.ReadExData(XivEx.picture);
+            var itemDictionary = ex.ReadExData(XivEx.item);
+
+            var furnitureList = new List<XivFurniture>();
+
+            foreach (var housingItem in pictureDictionary.Values)
+            {
+                var item = new XivFurniture
+                {
+                    Category = XivStrings.Housing,
+                    ItemCategory = XivStrings.Paintings,
+                    ModelInfo = new XivModelInfo()
+                };
+
+                using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
+                {
+                    br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
+                    var itemIndex = br.ReadInt32();
+
+                    br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
+                    item.ModelInfo.ModelID = br.ReadInt32();
 
                     using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
                     {
