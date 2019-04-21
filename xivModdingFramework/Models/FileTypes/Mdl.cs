@@ -3438,7 +3438,10 @@ namespace xivModdingFramework.Models.FileTypes
                         boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)0));
                     }
 
-                    boneIndexMeshBlock.AddRange(BitConverter.GetBytes((int)boneStringCount));
+                    if (remaining != -1)
+                    {
+                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes((int)boneStringCount));
+                    }
                 }
                 else
                 {
@@ -3447,13 +3450,14 @@ namespace xivModdingFramework.Models.FileTypes
                         boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndex));
                     }
 
-                    boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndexMesh.BoneIndexCount));
+                    if (boneIndexMesh.BoneIndexCount != 65)
+                    {
+                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndexMesh.BoneIndexCount));
+                    }
                 }
 
                 lodNum++;
             }
-
-
 
             #endregion
 
