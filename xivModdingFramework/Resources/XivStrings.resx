@@ -819,4 +819,7 @@
   <data name="OpenCollada" xml:space="preserve">
     <value>OpenCOLLADA</value>
   </data>
+  <data name="Paintings" xml:space="preserve">
+    <value>Paintings</value>
+  </data>
 </root>
