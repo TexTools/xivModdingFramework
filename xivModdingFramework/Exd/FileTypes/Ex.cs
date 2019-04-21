@@ -127,7 +127,10 @@ namespace xivModdingFramework.Exd.FileTypes
                 for (var i = 0; i < langTableCount; i++)
                 {
                     var langCode = br.ReadInt16();
-                    LanguageList.Add(langCode);
+                    if (langCode != 0)
+                    {
+                        LanguageList.Add(langCode);
+                    }
                 }
             }
         }
@@ -155,7 +158,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var language = "_" + _langCode;
 
             // Some Ex files are universal and do not have a language code
-            if (LanguageList.Count <= 1)
+            if (LanguageList.Count == 0)
             {
                 language = "";
             }
@@ -170,19 +173,7 @@ namespace xivModdingFramework.Exd.FileTypes
                 var exdFolderHash = HashGenerator.GetHash("exd");
                 var exdFileHash = HashGenerator.GetHash(exdFile);
 
-                //esrinzou for china ffxiv
-                //exdNameOffsetDictionary.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd), exdFile);
-                //esrinzou begin
-                var offset = index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
-                if ((offset == -1 || exFile == XivEx.item) && _langCode == XivLanguages.GetLanguageCode(XivLanguage.Chinese))
-                {
-                    exdFile = exFile + "_" + page + "_" + _langCode + ExdExtension;
-                    exdFolderHash = HashGenerator.GetHash("exd");
-                    exdFileHash = HashGenerator.GetHash(exdFile);
-                    offset = index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
-                }
-                exdNameOffsetDictionary.Add(offset, exdFile);
-                //esrinzou end
+                exdNameOffsetDictionary.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd), exdFile);
             }
 
             foreach (var exdData in exdNameOffsetDictionary)
