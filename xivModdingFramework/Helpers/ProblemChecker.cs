@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -35,86 +36,100 @@ namespace xivModdingFramework.Helpers
         /// Checks the index for the number of dats the game will attempt to read
         /// </summary>
         /// <returns>True if there is a problem, False otherwise</returns>
-        public bool CheckIndexDatCounts(XivDataFile dataFile)
+        public Task<bool> CheckIndexDatCounts(XivDataFile dataFile)
         {
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
-
-            var indexDatCounts = index.GetIndexDatCount(dataFile);
-            var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
-
-            if (indexDatCounts.Index1 != largestDatNum)
+            return Task.Run(() =>
             {
-                return true;
-            }
+                var index = new Index(_gameDirectory);
+                var dat = new Dat(_gameDirectory);
 
-            if (indexDatCounts.Index2 != largestDatNum)
-            {
-                return true;
-            }
+                var indexDatCounts = index.GetIndexDatCount(dataFile);
+                var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
 
-            return false;
+                if (indexDatCounts.Index1 != largestDatNum)
+                {
+                    return true;
+                }
+
+                if (indexDatCounts.Index2 != largestDatNum)
+                {
+                    return true;
+                }
+
+                return false;
+            });
         }
 
         /// <summary>
         /// Checks the index for the number of dats the game will attempt to read
         /// </summary>
         /// <returns>True if there is a problem, False otherwise</returns>
-        public bool CheckForLargeDats(XivDataFile dataFile)
+        public Task<bool> CheckForLargeDats(XivDataFile dataFile)
         {
-            var dat = new Dat(_gameDirectory);
-
-            var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
-
-            var fileSizeList = new List<long>();
-
-            for (var i = 0; i < largestDatNum; i++)
+            return Task.Run(() =>
             {
-                var fileInfo = new FileInfo($"{_gameDirectory}\\{dataFile.GetDataFileName()}.win32.dat{i}");
+                var dat = new Dat(_gameDirectory);
 
-                try
+                var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
+
+                var fileSizeList = new List<long>();
+
+                for (var i = 0; i < largestDatNum; i++)
                 {
-                    fileSizeList.Add(fileInfo.Length);
+                    var fileInfo = new FileInfo($"{_gameDirectory}\\{dataFile.GetDataFileName()}.win32.dat{i}");
+
+                    try
+                    {
+                        fileSizeList.Add(fileInfo.Length);
+                    }
+                    catch
+                    {
+                        return true;
+                    }
+
                 }
-                catch
+
+                if (largestDatNum > 8 || fileSizeList.FindAll(x => x.Equals(2048)).Count > 1)
                 {
                     return true;
                 }
 
-            }
-
-            if (largestDatNum > 8 || fileSizeList.FindAll(x => x.Equals(2048)).Count > 1)
-            {
-                return true;
-            }
-
-            return false;
+                return false;
+            });
         }
 
         /// <summary>
         /// Repairs the dat count in the index files
         /// </summary>
-        public void RepairIndexDatCounts(XivDataFile dataFile)
+        public Task RepairIndexDatCounts(XivDataFile dataFile)
         {
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
+            return Task.Run(() =>
+            {
+                var index = new Index(_gameDirectory);
+                var dat = new Dat(_gameDirectory);
 
-            var largestDatNum = dat.GetLargestDatNumber(dataFile);
+                var largestDatNum = dat.GetLargestDatNumber(dataFile);
 
-            index.UpdateIndexDatCount(dataFile, largestDatNum);
+                index.UpdateIndexDatCount(dataFile, largestDatNum);
+            });
         }
 
-        public bool CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
+        public Task<bool> CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
         {
-            var backupDataFile = new DirectoryInfo($"{backupsDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
-            var currentDataFile = new DirectoryInfo($"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
+            return Task.Run(() =>
+            {
+                var backupDataFile =
+                    new DirectoryInfo($"{backupsDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
+                var currentDataFile =
+                    new DirectoryInfo($"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
 
-            var index = new Index(_gameDirectory);
+                var index = new Index(_gameDirectory);
 
-            var backupHash = index.GetIndexSection1Hash(backupDataFile);
-            var currentHash = index.GetIndexSection1Hash(currentDataFile);
+                var backupHash = index.GetIndexSection1Hash(backupDataFile);
+                var currentHash = index.GetIndexSection1Hash(currentDataFile);
 
-            return backupHash.SequenceEqual(currentHash);
+                return backupHash.SequenceEqual(currentHash);
+            });
         }
     }
 }
