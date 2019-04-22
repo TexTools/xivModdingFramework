@@ -1436,6 +1436,15 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var partDataDict = meshPartDataDictionary[i];
 
+                var hasTextureCoordinate1 = false;
+                foreach (var partData in partDataDict.Values)
+                {
+                    if (partData.TextureCoordinates1.Count > 0)
+                    {
+                        hasTextureCoordinate1 = true;
+                    }
+                }
+
                 var bInList = new List<int>();
 
                 var partNum        = 0;
@@ -1469,6 +1478,14 @@ namespace xivModdingFramework.Models.FileTypes
                         meshDataDictionary[i].VertexColors.AddRange(partDataDict[partNum].VertexColors);
                         meshDataDictionary[i].VertexAlphas.AddRange(partDataDict[partNum].VertexAlphas);
 
+                        if (partDataDict[partNum].TextureCoordinates1.Count < 1 && hasTextureCoordinate1)
+                        {
+                            for (var k = 0; k < partDataDict[i].TextureCoordinateStride; k++)
+                            {
+                                meshDataDictionary[i].TextureCoordinates1.Add(0);
+                            }
+                        }
+
                         // Consolidate all index data into one Collada Data per mesh
                         for (var k = 0; k < partDataDict[partNum].PositionIndices.Count; k++)
                         {
@@ -1479,6 +1496,10 @@ namespace xivModdingFramework.Models.FileTypes
                             if (partDataDict[partNum].TextureCoordinates1.Count > 0)
                             {
                                 meshDataDictionary[i].Indices.Add(partDataDict[partNum].TextureCoordinate1Indices[k] + texCoord1Max);
+                            }
+                            else if (hasTextureCoordinate1)
+                            {
+                                meshDataDictionary[i].Indices.Add(0);
                             }
 
                             if (partDataDict[partNum].BiNormals.Count > 0)
@@ -1507,7 +1528,7 @@ namespace xivModdingFramework.Models.FileTypes
                         // Set new index stride
                         var indexStride = 3;
 
-                        if (partDataDict[partNum].TextureCoordinates1.Count > 0)
+                        if (partDataDict[partNum].TextureCoordinates1.Count > 0 || hasTextureCoordinate1)
                         {
                             meshDataDictionary[i].IndexLocDictionary.Add("textureCoordinate1", indexStride);
                             indexStride++;
@@ -1531,7 +1552,14 @@ namespace xivModdingFramework.Models.FileTypes
                             indexStride++;
                         }
 
-                        meshDataDictionary[i].IndexStride = indexStride;
+                        if (meshDataDictionary[i].IndexStride == 0)
+                        {
+                            meshDataDictionary[i].IndexStride = indexStride;
+                        }
+                        else if (indexStride > meshDataDictionary[i].IndexStride)
+                        {
+                            meshDataDictionary[i].IndexStride = indexStride;
+                        }
 
                         // Get the largest index for each data point
                         positionMax += partDataDict[partNum].PositionIndices.Max() + 1;
