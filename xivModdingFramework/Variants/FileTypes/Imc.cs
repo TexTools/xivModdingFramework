@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -50,7 +51,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item">The item to get the version for</param>
         /// <param name="modelInfo">The model info of the item</param>
         /// <returns>The XivImc Data</returns>
-        public XivImc GetImcInfo(IItemModel item, XivModelInfo modelInfo)
+        public async Task<XivImc> GetImcInfo(IItemModel item, XivModelInfo modelInfo)
         {
             var xivImc = new XivImc();
 
@@ -66,54 +67,59 @@ namespace xivModdingFramework.Variants.FileTypes
             var itemType = ItemType.GetItemType(item);
             var imcPath = GetImcPath(modelInfo, itemType);
 
-            var imcOffset = index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
+            var imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder),
+                HashGenerator.GetHash(imcPath.File), _dataFile);
 
             if (imcOffset == 0)
             {
                 throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
             }
 
-            var imcData = dat.GetType2Data(imcOffset, _dataFile);
+            var imcData = await dat.GetType2Data(imcOffset, _dataFile);
 
-            using (var br = new BinaryReader(new MemoryStream(imcData)))
+            await Task.Run(() =>
             {
-                int variantOffset;
-
-                if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
+                using (var br = new BinaryReader(new MemoryStream(imcData)))
                 {
-                    // weapons and monsters do not have variant sets
-                    variantOffset = (modelInfo.Variant * variantLength) + headerLength;
+                    int variantOffset;
 
-                    // use default if offset is out of range
-                    if (variantOffset >= imcData.Length)
+                    if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
                     {
-                        variantOffset = headerLength;
-                    }
-                }
-                else
-                {
-                    // Variant Sets contain 5 variants for each slot
-                    // These can be Head, Body, Hands, Legs, Feet  or  Ears, Neck, Wrists, LRing, RRing
-                    // This skips to the correct variant set, then to the correct slot within that set for the item
-                    variantOffset = (modelInfo.Variant * variantSetLength) + (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+                        // weapons and monsters do not have variant sets
+                        variantOffset = (modelInfo.Variant * variantLength) + headerLength;
 
-                    // use defalut if offset is out of range
-                    if (variantOffset >= imcData.Length)
+                        // use default if offset is out of range
+                        if (variantOffset >= imcData.Length)
+                        {
+                            variantOffset = headerLength;
+                        }
+                    }
+                    else
                     {
-                        variantOffset = (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+                        // Variant Sets contain 5 variants for each slot
+                        // These can be Head, Body, Hands, Legs, Feet  or  Ears, Neck, Wrists, LRing, RRing
+                        // This skips to the correct variant set, then to the correct slot within that set for the item
+                        variantOffset = (modelInfo.Variant * variantSetLength) +
+                                        (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+
+                        // use defalut if offset is out of range
+                        if (variantOffset >= imcData.Length)
+                        {
+                            variantOffset = (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+                        }
                     }
+
+                    br.BaseStream.Seek(variantOffset, SeekOrigin.Begin);
+
+                    // if(variantOffset)
+
+                    xivImc.Version = br.ReadByte();
+                    var unknown = br.ReadByte();
+                    xivImc.Mask = br.ReadUInt16();
+                    xivImc.Vfx = br.ReadByte();
+                    var unknown1 = br.ReadByte();
                 }
-
-                br.BaseStream.Seek(variantOffset, SeekOrigin.Begin);
-
-               // if(variantOffset)
-
-                xivImc.Version = br.ReadByte();
-                var unknown = br.ReadByte();
-                xivImc.Mask    = br.ReadUInt16();
-                xivImc.Vfx     = br.ReadByte();
-                var unknown1 = br.ReadByte();
-            }
+            });
 
             return xivImc;
         }
@@ -124,7 +130,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item"></param>
         /// <param name="modelInfo"></param>
         /// <returns>The ImcData data</returns>
-        public ImcData GetFullImcInfo(IItemModel item, XivModelInfo modelInfo)
+        public async Task<ImcData> GetFullImcInfo(IItemModel item, XivModelInfo modelInfo)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
@@ -132,72 +138,86 @@ namespace xivModdingFramework.Variants.FileTypes
             var itemType = ItemType.GetItemType(item);
             var imcPath = GetImcPath(modelInfo, itemType);
 
-            var imcOffset = index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
+            var imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
 
             if (imcOffset == 0)
             {
-                throw new Exception($"Could not find offest for {imcPath.Folder}/{imcPath.File}");
+                throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
             }
 
-            var imcByteData = dat.GetType2Data(imcOffset, _dataFile);
+            var imcByteData = await dat.GetType2Data(imcOffset, _dataFile);
 
-            using (var br = new BinaryReader(new MemoryStream(imcByteData)))
+            return await Task.Run(() =>
             {
-                var imcData = new ImcData()
+                using (var br = new BinaryReader(new MemoryStream(imcByteData)))
                 {
-                    VariantCount = br.ReadInt16(),
-                    Unknown = br.ReadInt16(),
-                    GearVariantList = new List<VariantSet>()
-                };
-
-                //weapons and monsters do not have variant sets
-                if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
-                {
-                    imcData.OtherVariantList = new List<XivImc>();
-
-                    imcData.DefaultVariant = new XivImc
+                    var imcData = new ImcData()
                     {
-                        Version = br.ReadUInt16(),
-                        Mask = br.ReadUInt16(),
-                        Vfx = br.ReadUInt16()
+                        VariantCount = br.ReadInt16(),
+                        Unknown = br.ReadInt16(),
+                        GearVariantList = new List<VariantSet>()
                     };
 
-                    for (var i = 0; i < imcData.VariantCount; i++)
+                    //weapons and monsters do not have variant sets
+                    if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
                     {
-                        imcData.OtherVariantList.Add(new XivImc{ Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() });
-                    }
-                }
-                else
-                {
-                    imcData.GearVariantList = new List<VariantSet>();
+                        imcData.OtherVariantList = new List<XivImc>();
 
-                    imcData.DefaultVariantSet = new VariantSet
-                    {
-                        Slot1 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                        Slot2 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                        Slot3 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                        Slot4 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                        Slot5 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                    };
-
-                    for (var i = 0; i < imcData.VariantCount; i++)
-                    {
-                        // gets the data for each slot in the current variant set
-                        var imcGear = new VariantSet
+                        imcData.DefaultVariant = new XivImc
                         {
-                            Slot1 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                            Slot2 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                            Slot3 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                            Slot4 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
-                            Slot5 = new XivImc { Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16() },
+                            Version = br.ReadUInt16(),
+                            Mask = br.ReadUInt16(),
+                            Vfx = br.ReadUInt16()
                         };
 
-                        imcData.GearVariantList.Add(imcGear);
+                        for (var i = 0; i < imcData.VariantCount; i++)
+                        {
+                            imcData.OtherVariantList.Add(new XivImc
+                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()});
+                        }
                     }
-                }
+                    else
+                    {
+                        imcData.GearVariantList = new List<VariantSet>();
 
-                return imcData;
-            }
+                        imcData.DefaultVariantSet = new VariantSet
+                        {
+                            Slot1 = new XivImc
+                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                            Slot2 = new XivImc
+                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                            Slot3 = new XivImc
+                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                            Slot4 = new XivImc
+                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                            Slot5 = new XivImc
+                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                        };
+
+                        for (var i = 0; i < imcData.VariantCount; i++)
+                        {
+                            // gets the data for each slot in the current variant set
+                            var imcGear = new VariantSet
+                            {
+                                Slot1 = new XivImc
+                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                Slot2 = new XivImc
+                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                Slot3 = new XivImc
+                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                Slot4 = new XivImc
+                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                Slot5 = new XivImc
+                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                            };
+
+                            imcData.GearVariantList.Add(imcGear);
+                        }
+                    }
+
+                    return imcData;
+                }
+            });
         }
 
         /// <summary>

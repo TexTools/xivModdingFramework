@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.IO.Compression;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
@@ -29,7 +30,7 @@ namespace xivModdingFramework.Helpers
         /// </summary>
         /// <param name="uncompressedBytes">The data to be compressed.</param>
         /// <returns>The compressed byte data.</returns>
-        public static byte[] Compressor(byte[] uncompressedBytes)
+        public static async Task<byte[]> Compressor(byte[] uncompressedBytes)
         {
             using (var uMemoryStream = new MemoryStream(uncompressedBytes))
             {
@@ -38,7 +39,7 @@ namespace xivModdingFramework.Helpers
                 {
                     using (var deflateStream = new DeflateStream(cMemoryStream, CompressionMode.Compress))
                     {
-                        uMemoryStream.CopyTo(deflateStream);
+                        await uMemoryStream.CopyToAsync(deflateStream);
                         deflateStream.Close();
                         compbytes = cMemoryStream.ToArray();
                     }
@@ -53,7 +54,7 @@ namespace xivModdingFramework.Helpers
         /// <param name="compressedBytes">The byte data to decompress.</param>
         /// <param name="uncompressedSize">The final size of the compressed data after decompression.</param>
         /// <returns>The decompressed byte data.</returns>
-        public static byte[] Decompressor(byte[] compressedBytes, int uncompressedSize)
+        public static async Task<byte[]> Decompressor(byte[] compressedBytes, int uncompressedSize)
         {
             var decompressedBytes = new byte[uncompressedSize];
 
@@ -61,7 +62,7 @@ namespace xivModdingFramework.Helpers
             {
                 using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
                 {
-                    ds.Read(decompressedBytes, 0, uncompressedSize);
+                    await ds.ReadAsync(decompressedBytes, 0, uncompressedSize);
                 }
             }
 

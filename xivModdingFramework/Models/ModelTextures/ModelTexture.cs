@@ -18,6 +18,7 @@ using ImageMagick;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -41,11 +42,11 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public ModelTextureData GetModelMaps(Color? customColor = null, bool colorChangeShader = false)
+        public async Task<ModelTextureData> GetModelMaps(Color? customColor = null, bool colorChangeShader = false)
         {
-            var texMapData = GetTexMapData();
+            var texMapData = await GetTexMapData();
 
-            var dimensions = EqualizeTextureSizes(texMapData);
+            var dimensions = await EqualizeTextureSizes(texMapData);
 
             var materialType = GetMaterialType(_mtrlData.MTRLPath);
 
@@ -59,65 +60,68 @@ namespace xivModdingFramework.Models.ModelTextures
             var specularColorList = new List<Color>();
             var emissiveColorList = new List<Color>();
 
-            if (texMapData.ColorSet != null)
+            await Task.Run(() =>
             {
-                var colorPixels = texMapData.ColorSet.Data;
-
-                for (var i = 0; i < texMapData.ColorSet.Data.Length; i += 16)
+                if (texMapData.ColorSet != null)
                 {
-                    int red = colorPixels[i];
-                    int green = colorPixels[i + 1];
-                    int blue = colorPixels[i + 2];
-                    int alpha = colorPixels[i + 3];
+                    var colorPixels = texMapData.ColorSet.Data;
 
-                    diffuseColorList.Add(new Color(red, green, blue));
-
-                    red = colorPixels[i + 4];
-                    green = colorPixels[i + 5];
-                    blue = colorPixels[i + 6];
-                    alpha = colorPixels[i + 7];
-
-                    specularColorList.Add(new Color(red, green, blue));
-
-                    red = colorPixels[i + 8];
-                    green = colorPixels[i + 9];
-                    blue = colorPixels[i + 10];
-                    alpha = colorPixels[i + 11];
-
-                    emissiveColorList.Add(new Color(red, green, blue));
-                }
-            }
-            else
-            {
-                for (var i = 0; i < 1024; i += 16)
-                {
-                    if (!materialType.Equals("other") && !materialType.Equals("housing"))
+                    for (var i = 0; i < texMapData.ColorSet.Data.Length; i += 16)
                     {
-                        if (customColor != null)
+                        int red = colorPixels[i];
+                        int green = colorPixels[i + 1];
+                        int blue = colorPixels[i + 2];
+                        int alpha = colorPixels[i + 3];
+
+                        diffuseColorList.Add(new Color(red, green, blue));
+
+                        red = colorPixels[i + 4];
+                        green = colorPixels[i + 5];
+                        blue = colorPixels[i + 6];
+                        alpha = colorPixels[i + 7];
+
+                        specularColorList.Add(new Color(red, green, blue));
+
+                        red = colorPixels[i + 8];
+                        green = colorPixels[i + 9];
+                        blue = colorPixels[i + 10];
+                        alpha = colorPixels[i + 11];
+
+                        emissiveColorList.Add(new Color(red, green, blue));
+                    }
+                }
+                else
+                {
+                    for (var i = 0; i < 1024; i += 16)
+                    {
+                        if (!materialType.Equals("other") && !materialType.Equals("housing"))
                         {
-                            diffuseColorList.Add(customColor.GetValueOrDefault());
-                        }
-                        else
-                        {
-                            if (!materialType.Equals("body"))
+                            if (customColor != null)
                             {
-                                diffuseColorList.Add(new Color(96, 57, 19));
+                                diffuseColorList.Add(customColor.GetValueOrDefault());
                             }
                             else
                             {
-                                diffuseColorList.Add(new Color(255, 255, 255));
+                                if (!materialType.Equals("body"))
+                                {
+                                    diffuseColorList.Add(new Color(96, 57, 19));
+                                }
+                                else
+                                {
+                                    diffuseColorList.Add(new Color(255, 255, 255));
+                                }
                             }
                         }
-                    }
-                    else
-                    {
-                        diffuseColorList.Add(new Color(255, 255, 255));
-                    }
+                        else
+                        {
+                            diffuseColorList.Add(new Color(255, 255, 255));
+                        }
 
-                    specularColorList.Add(new Color(25, 25, 25));
-                    emissiveColorList.Add(new Color(0, 0, 0));
+                        specularColorList.Add(new Color(25, 25, 25));
+                        emissiveColorList.Add(new Color(0, 0, 0));
+                    }
                 }
-            }
+            });
 
             byte[] diffusePixels = null, specularPixels = null, multiPixels = null, skinPixels = null, normalPixels = null;
 
@@ -161,183 +165,193 @@ namespace xivModdingFramework.Models.ModelTextures
                 dataLength = diffusePixels.Length;
             }
 
-            for (var i = 3; i < dataLength; i += 4)
+            await Task.Run(() =>
             {
-                var alpha = 255;
-
-                if (normalPixels != null)
+                for (var i = 3; i < dataLength; i += 4)
                 {
-                    normR = normalPixels[i - 3];
-                    normG = normalPixels[i - 2];
-                    alpha = normalPixels[i - 1]; // This is the normal maps blue channel, and usually acts as the alpha channel
+                    var alpha = 255;
 
-
-                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                    if (normalPixels != null)
                     {
                         normR = normalPixels[i - 3];
                         normG = normalPixels[i - 2];
-                        normB = normalPixels[i - 1];
-                        alpha = normalPixels[i];
-                    }
-                }
-                else if (diffusePixels != null)
-                {
-                    alpha = diffusePixels[i];
-                }
+                        alpha = normalPixels[i - 1]; // This is the normal maps blue channel, and usually acts as the alpha channel
 
-                if (materialType.Equals("housing"))
-                {
-                    if (colorChangeShader && normalPixels != null)
-                    {
-                        alpha = normalPixels[i];
-                    }
-                    else
-                    {
-                        if (diffusePixels != null)
+
+                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
                         {
-                            alpha = diffusePixels[i];
+                            normR = normalPixels[i - 3];
+                            normG = normalPixels[i - 2];
+                            normB = normalPixels[i - 1];
+                            alpha = normalPixels[i];
                         }
-                        else if (normalPixels != null)
+                    }
+                    else if (diffusePixels != null)
+                    {
+                        alpha = diffusePixels[i];
+                    }
+
+                    if (materialType.Equals("housing"))
+                    {
+                        if (colorChangeShader && normalPixels != null)
                         {
                             alpha = normalPixels[i];
                         }
                         else
                         {
-                            alpha = 255;
-                        }
-                    }
-                }
-
-                if (multiPixels != null)
-                {
-                    diffR = multiPixels[i - 3];
-                    diffG = multiPixels[i - 3];
-                    diffB = multiPixels[i - 3];
-
-                    specR = multiPixels[i - 1];
-                    specG = multiPixels[i - 1];
-                    specB = multiPixels[i - 1];
-                }
-                else
-                {
-                    if (diffusePixels != null)
-                    {
-                        diffR = diffusePixels[i - 3];
-                        diffG = diffusePixels[i - 2];
-                        diffB = diffusePixels[i - 1];
-                    }
-
-                    if (specularPixels != null)
-                    {
-                        if (specularPixels.Length > i)
-                        {
-                            specR = specularPixels[i - 3];
-                            specG = specularPixels[i - 2];
-                            specB = specularPixels[i - 1];
+                            if (diffusePixels != null)
+                            {
+                                alpha = diffusePixels[i];
+                            }
+                            else if (normalPixels != null)
+                            {
+                                alpha = normalPixels[i];
+                            }
+                            else
+                            {
+                                alpha = 255;
+                            }
                         }
                     }
 
-                    if (skinPixels != null)
+                    if (multiPixels != null)
                     {
-                        specR = skinPixels[i - 3];
-                        specG = skinPixels[i - 2];
-                        specB = skinPixels[i - 1];
-                    }
-                }
+                        diffR = multiPixels[i - 3];
+                        diffG = multiPixels[i - 3];
+                        diffB = multiPixels[i - 3];
 
-                Color diffuseColor, specularColor, emissiveColor, alphaColor;
-
-                var pixel = 0f;
-                var blendPercent = 0f;
-
-                if (normalPixels != null)
-                {
-                    pixel = (normalPixels[i] / 255f) * 15f;
-                    blendPercent = (float)(pixel - Math.Truncate(pixel));
-                }
-   
-                if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
-                {
-                    pixel = 0;
-                    blendPercent = 0;
-                }
-
-                if (blendPercent != 0)
-                {
-                    var firstColorLocation = (int)Math.Truncate(pixel);
-                    var secondColorLocation = firstColorLocation + 1;
-
-                    var diffColor1 = diffuseColorList[secondColorLocation];
-                    var diffColor2 = diffuseColorList[firstColorLocation];
-
-                    var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, alpha);
-                    var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, alpha);
-
-                    var diffuseBlend = Blend(firstColor, secondColor, blendPercent);
-
-                    var specColor1 = specularColorList[secondColorLocation];
-                    var specColor2 = specularColorList[firstColorLocation];
-
-                    firstColor = new Color(specColor1.R, specColor1.G, specColor1.B, (byte)255);
-                    secondColor = new Color(specColor2.R, specColor2.G, specColor2.B, (byte)255);
-
-                    var specBlend = Blend(firstColor, secondColor, blendPercent);
-
-                    var emisColor1 = emissiveColorList[secondColorLocation];
-                    var emisColor2 = emissiveColorList[firstColorLocation];
-
-                    firstColor = new Color(emisColor1.R, emisColor1.G, emisColor1.B, (byte)255);
-                    secondColor = new Color(emisColor2.R, emisColor2.G, emisColor2.B, (byte)255);
-
-                    var emisBlend = Blend(firstColor, secondColor, blendPercent);
-
-                    diffuseColor = new Color((int)((diffuseBlend.R / 255f) * diffR), (int)((diffuseBlend.G / 255f) * diffG), (int)((diffuseBlend.B / 255f) * diffB), alpha);
-                    specularColor = new Color((int)((specBlend.R / 255f) * specR), (int)((specBlend.G / 255f) * specG), (int)((specBlend.B / 255f) * specB), 255);
-                    emissiveColor = new Color((int)emisBlend.R, (int)emisBlend.G, (int)emisBlend.B, (int)255);
-                }
-                else
-                {
-                    var colorLoc = (int)Math.Floor(pixel + 0.5f);
-
-                    var diffColor = diffuseColorList[colorLoc];
-                    var specColor = specularColorList[colorLoc];
-                    var emisColor = emissiveColorList[colorLoc];
-
-                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
-                    {
-                        diffuseColor = new Color((int)((diffColor.R / 255f) * specR), (int)((diffColor.G / 255f) * specR), (int)((diffColor.B / 255f) * specR), alpha);
-                        specularColor = new Color((int)((specColor.R / 255f) * specG), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specG), 255);
+                        specR = multiPixels[i - 1];
+                        specG = multiPixels[i - 1];
+                        specB = multiPixels[i - 1];
                     }
                     else
                     {
-                        diffuseColor = new Color((int)((diffColor.R / 255f) * diffR), (int)((diffColor.G / 255f) * diffG), (int)((diffColor.B / 255f) * diffB), alpha);
+                        if (diffusePixels != null)
+                        {
+                            diffR = diffusePixels[i - 3];
+                            diffG = diffusePixels[i - 2];
+                            diffB = diffusePixels[i - 1];
+                        }
 
-                        if (materialType.Equals("body"))
+                        if (specularPixels != null)
                         {
-                            specularColor = new Color((int) ((specColor.R / 255f) * specG),
-                                (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
+                            if (specularPixels.Length > i)
+                            {
+                                specR = specularPixels[i - 3];
+                                specG = specularPixels[i - 2];
+                                specB = specularPixels[i - 1];
+                            }
                         }
-                        else if (materialType.Equals("housing"))
+
+                        if (skinPixels != null)
                         {
-                            specularColor = new Color((int)((specColor.R / 255f) * specG), (int)((specColor.G / 255f) * specG), (int)((specColor.B / 255f) * specG), 255);
-                        }
-                        else
-                        {
-                            specularColor = new Color((int)((specColor.R / 255f) * specB), (int)((specColor.G / 255f) * specB), (int)((specColor.B / 255f) * specB), 255);
+                            specR = skinPixels[i - 3];
+                            specG = skinPixels[i - 2];
+                            specB = skinPixels[i - 1];
                         }
                     }
 
-                    emissiveColor = new Color((int)emisColor.R, (int)emisColor.G, (int)emisColor.B, (int)255);
+                    Color diffuseColor, specularColor, emissiveColor, alphaColor;
+
+                    var pixel = 0f;
+                    var blendPercent = 0f;
+
+                    if (normalPixels != null)
+                    {
+                        pixel = (normalPixels[i] / 255f) * 15f;
+                        blendPercent = (float) (pixel - Math.Truncate(pixel));
+                    }
+
+                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                    {
+                        pixel = 0;
+                        blendPercent = 0;
+                    }
+
+                    if (blendPercent != 0)
+                    {
+                        var firstColorLocation = (int) Math.Truncate(pixel);
+                        var secondColorLocation = firstColorLocation + 1;
+
+                        var diffColor1 = diffuseColorList[secondColorLocation];
+                        var diffColor2 = diffuseColorList[firstColorLocation];
+
+                        var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, alpha);
+                        var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, alpha);
+
+                        var diffuseBlend = Blend(firstColor, secondColor, blendPercent);
+
+                        var specColor1 = specularColorList[secondColorLocation];
+                        var specColor2 = specularColorList[firstColorLocation];
+
+                        firstColor = new Color(specColor1.R, specColor1.G, specColor1.B, (byte) 255);
+                        secondColor = new Color(specColor2.R, specColor2.G, specColor2.B, (byte) 255);
+
+                        var specBlend = Blend(firstColor, secondColor, blendPercent);
+
+                        var emisColor1 = emissiveColorList[secondColorLocation];
+                        var emisColor2 = emissiveColorList[firstColorLocation];
+
+                        firstColor = new Color(emisColor1.R, emisColor1.G, emisColor1.B, (byte) 255);
+                        secondColor = new Color(emisColor2.R, emisColor2.G, emisColor2.B, (byte) 255);
+
+                        var emisBlend = Blend(firstColor, secondColor, blendPercent);
+
+                        diffuseColor = new Color((int) ((diffuseBlend.R / 255f) * diffR),
+                            (int) ((diffuseBlend.G / 255f) * diffG), (int) ((diffuseBlend.B / 255f) * diffB), alpha);
+                        specularColor = new Color((int) ((specBlend.R / 255f) * specR),
+                            (int) ((specBlend.G / 255f) * specG), (int) ((specBlend.B / 255f) * specB), 255);
+                        emissiveColor = new Color((int) emisBlend.R, (int) emisBlend.G, (int) emisBlend.B, (int) 255);
+                    }
+                    else
+                    {
+                        var colorLoc = (int) Math.Floor(pixel + 0.5f);
+
+                        var diffColor = diffuseColorList[colorLoc];
+                        var specColor = specularColorList[colorLoc];
+                        var emisColor = emissiveColorList[colorLoc];
+
+                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                        {
+                            diffuseColor = new Color((int) ((diffColor.R / 255f) * specR),
+                                (int) ((diffColor.G / 255f) * specR), (int) ((diffColor.B / 255f) * specR), alpha);
+                            specularColor = new Color((int) ((specColor.R / 255f) * specG),
+                                (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
+                        }
+                        else
+                        {
+                            diffuseColor = new Color((int) ((diffColor.R / 255f) * diffR),
+                                (int) ((diffColor.G / 255f) * diffG), (int) ((diffColor.B / 255f) * diffB), alpha);
+
+                            if (materialType.Equals("body"))
+                            {
+                                specularColor = new Color((int) ((specColor.R / 255f) * specG),
+                                    (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
+                            }
+                            else if (materialType.Equals("housing"))
+                            {
+                                specularColor = new Color((int) ((specColor.R / 255f) * specG),
+                                    (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
+                            }
+                            else
+                            {
+                                specularColor = new Color((int) ((specColor.R / 255f) * specB),
+                                    (int) ((specColor.G / 255f) * specB), (int) ((specColor.B / 255f) * specB), 255);
+                            }
+                        }
+
+                        emissiveColor = new Color((int) emisColor.R, (int) emisColor.G, (int) emisColor.B, (int) 255);
+                    }
+
+                    alphaColor = new Color((int) alpha, (int) alpha, (int) alpha, (int) alpha);
+
+                    diffuseMap.AddRange(BitConverter.GetBytes(diffuseColor.ToRgba()));
+                    specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
+                    emissiveMap.AddRange(BitConverter.GetBytes(emissiveColor.ToRgba()));
+                    alphaMap.AddRange(BitConverter.GetBytes(alphaColor.ToRgba()));
+                    normalMap.AddRange(BitConverter.GetBytes(new Color(normR, normG, normB, (byte) 255).ToRgba()));
                 }
-
-                alphaColor = new Color((int)alpha, (int)alpha, (int)alpha, (int)alpha);
-
-                diffuseMap.AddRange(BitConverter.GetBytes(diffuseColor.ToRgba()));
-                specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
-                emissiveMap.AddRange(BitConverter.GetBytes(emissiveColor.ToRgba()));
-                alphaMap.AddRange(BitConverter.GetBytes(alphaColor.ToRgba()));
-                normalMap.AddRange(BitConverter.GetBytes(new Color(normR, normG, normB, (byte)255).ToRgba()));
-            }
+            });
 
             var modelTextureData = new ModelTextureData
             {
@@ -357,7 +371,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Gets the data for the texture map
         /// </summary>
         /// <returns>The texure map data</returns>
-        private TexMapData GetTexMapData()
+        private async Task<TexMapData> GetTexMapData()
         {
             var tex = new Tex(_gameDirectory);
 
@@ -367,9 +381,9 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 if (texTypePath.Type != XivTexType.ColorSet)
                 {
-                    var texData = tex.GetTexData(texTypePath);
+                    var texData = await tex.GetTexData(texTypePath);
 
-                    var imageData = tex.GetImageData(texData);
+                    var imageData = await tex.GetImageData(texData);
 
                     switch (texTypePath.Type)
                     { 
@@ -430,7 +444,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// </summary>
         /// <param name="texMapData">The texture map data containing the texture bytes</param>
         /// <returns>The width and height that the textures were equalized to.</returns>
-        private (int Width, int Height) EqualizeTextureSizes(TexMapData texMapData)
+        private async Task<(int Width, int Height)> EqualizeTextureSizes(TexMapData texMapData)
         {
             // Normal map is chosen because almost every item has a normal map, diffuse is chosen otherwise
             var width = 0;
@@ -527,96 +541,109 @@ namespace xivModdingFramework.Models.ModelTextures
             height = height / scale;
             largestSize = width * height;
 
-            if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
+            await Task.Run(() =>
             {
-                var pixelSettings =
-                    new PixelReadSettings(texMapData.Normal.Width, texMapData.Normal.Height, StorageType.Char, PixelMapping.RGBA);
-
-                using (var image = new MagickImage(texMapData.Normal.Data, pixelSettings))
+                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height ||
+                    scaleDown)
                 {
-                    var size = new MagickGeometry(width, height);
-                    size.IgnoreAspectRatio = true;
-                    image.Resize(size);
+                    var pixelSettings =
+                        new PixelReadSettings(texMapData.Normal.Width, texMapData.Normal.Height, StorageType.Char,
+                            PixelMapping.RGBA);
 
-                    texMapData.Normal.Width = width;
-                    texMapData.Normal.Height = height;
+                    using (var image = new MagickImage(texMapData.Normal.Data, pixelSettings))
+                    {
+                        var size = new MagickGeometry(width, height);
+                        size.IgnoreAspectRatio = true;
+                        image.Resize(size);
 
-                    texMapData.Normal.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Normal.Width = width;
+                        texMapData.Normal.Height = height;
+
+                        texMapData.Normal.Data = image.ToByteArray(MagickFormat.Rgba);
+                    }
                 }
-            }
 
-            if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
-            {
-                var pixelSettings =
-                    new PixelReadSettings(texMapData.Diffuse.Width, texMapData.Diffuse.Height, StorageType.Char, PixelMapping.RGBA);
-
-                using (var image = new MagickImage(texMapData.Diffuse.Data, pixelSettings))
+                if (texMapData.Diffuse != null &&
+                    (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
                 {
-                    image.Alpha(AlphaOption.Off);
-                    var size = new MagickGeometry(width, height);
-                    size.IgnoreAspectRatio = true;
-                    image.Resize(size);
+                    var pixelSettings =
+                        new PixelReadSettings(texMapData.Diffuse.Width, texMapData.Diffuse.Height, StorageType.Char,
+                            PixelMapping.RGBA);
 
-                    texMapData.Diffuse.Width = width;
-                    texMapData.Diffuse.Height = height;
+                    using (var image = new MagickImage(texMapData.Diffuse.Data, pixelSettings))
+                    {
+                        image.Alpha(AlphaOption.Off);
+                        var size = new MagickGeometry(width, height);
+                        size.IgnoreAspectRatio = true;
+                        image.Resize(size);
 
-                    texMapData.Diffuse.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Diffuse.Width = width;
+                        texMapData.Diffuse.Height = height;
+
+                        texMapData.Diffuse.Data = image.ToByteArray(MagickFormat.Rgba);
+                    }
                 }
-            }
 
-            if (texMapData.Specular != null && (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
-            {
-                var pixelSettings =
-                    new PixelReadSettings(texMapData.Specular.Width, texMapData.Specular.Height, StorageType.Char, PixelMapping.RGBA);
-
-                using (var image = new MagickImage(texMapData.Specular.Data, pixelSettings))
+                if (texMapData.Specular != null &&
+                    (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
                 {
-                    var size = new MagickGeometry(width, height);
-                    size.IgnoreAspectRatio = true;
-                    image.Resize(size);
+                    var pixelSettings =
+                        new PixelReadSettings(texMapData.Specular.Width, texMapData.Specular.Height, StorageType.Char,
+                            PixelMapping.RGBA);
 
-                    texMapData.Specular.Width = width;
-                    texMapData.Specular.Height = height;
+                    using (var image = new MagickImage(texMapData.Specular.Data, pixelSettings))
+                    {
+                        var size = new MagickGeometry(width, height);
+                        size.IgnoreAspectRatio = true;
+                        image.Resize(size);
 
-                    texMapData.Specular.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Specular.Width = width;
+                        texMapData.Specular.Height = height;
+
+                        texMapData.Specular.Data = image.ToByteArray(MagickFormat.Rgba);
+                    }
                 }
-            }
 
-            if (texMapData.Multi != null && (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
-            {
-                var pixelSettings =
-                    new PixelReadSettings(texMapData.Multi.Width, texMapData.Multi.Height, StorageType.Char, PixelMapping.RGBA);
-
-                using (var image = new MagickImage(texMapData.Multi.Data, pixelSettings))
+                if (texMapData.Multi != null &&
+                    (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
                 {
-                    var size = new MagickGeometry(width, height);
-                    size.IgnoreAspectRatio = true;
-                    image.Resize(size);
+                    var pixelSettings =
+                        new PixelReadSettings(texMapData.Multi.Width, texMapData.Multi.Height, StorageType.Char,
+                            PixelMapping.RGBA);
 
-                    texMapData.Multi.Width = width;
-                    texMapData.Multi.Height = height;
+                    using (var image = new MagickImage(texMapData.Multi.Data, pixelSettings))
+                    {
+                        var size = new MagickGeometry(width, height);
+                        size.IgnoreAspectRatio = true;
+                        image.Resize(size);
 
-                    texMapData.Multi.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Multi.Width = width;
+                        texMapData.Multi.Height = height;
+
+                        texMapData.Multi.Data = image.ToByteArray(MagickFormat.Rgba);
+                    }
                 }
-            }
 
-            if (texMapData.Skin != null && (largestSize > texMapData.Skin.Width * texMapData.Skin.Height || scaleDown))
-            {
-                var pixelSettings =
-                    new PixelReadSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char, PixelMapping.RGBA);
-
-                using (var image = new MagickImage(texMapData.Skin.Data, pixelSettings))
+                if (texMapData.Skin != null &&
+                    (largestSize > texMapData.Skin.Width * texMapData.Skin.Height || scaleDown))
                 {
-                    var size = new MagickGeometry(width, height);
-                    size.IgnoreAspectRatio = true;
-                    image.Resize(size);
+                    var pixelSettings =
+                        new PixelReadSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char,
+                            PixelMapping.RGBA);
 
-                    texMapData.Skin.Width = width;
-                    texMapData.Skin.Height = height;
+                    using (var image = new MagickImage(texMapData.Skin.Data, pixelSettings))
+                    {
+                        var size = new MagickGeometry(width, height);
+                        size.IgnoreAspectRatio = true;
+                        image.Resize(size);
 
-                    texMapData.Skin.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Skin.Width = width;
+                        texMapData.Skin.Height = height;
+
+                        texMapData.Skin.Data = image.ToByteArray(MagickFormat.Rgba);
+                    }
                 }
-            }
+            });
 
             return (width, height);
         }

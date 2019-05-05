@@ -26,10 +26,14 @@ namespace xivModdingFramework.Helpers
     public class ProblemChecker
     {
         private readonly DirectoryInfo _gameDirectory;
+        private readonly Index _index;
+        private readonly Dat _dat;
 
         public ProblemChecker(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
+            _index = new Index(_gameDirectory);
+            _dat = new Dat(_gameDirectory);
         }
 
         /// <summary>
@@ -40,11 +44,8 @@ namespace xivModdingFramework.Helpers
         {
             return Task.Run(() =>
             {
-                var index = new Index(_gameDirectory);
-                var dat = new Dat(_gameDirectory);
-
-                var indexDatCounts = index.GetIndexDatCount(dataFile);
-                var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
+                var indexDatCounts = _index.GetIndexDatCount(dataFile);
+                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
 
                 if (indexDatCounts.Index1 != largestDatNum)
                 {
@@ -68,9 +69,7 @@ namespace xivModdingFramework.Helpers
         {
             return Task.Run(() =>
             {
-                var dat = new Dat(_gameDirectory);
-
-                var largestDatNum = dat.GetLargestDatNumber(dataFile) + 1;
+                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
 
                 var fileSizeList = new List<long>();
 
@@ -86,7 +85,6 @@ namespace xivModdingFramework.Helpers
                     {
                         return true;
                     }
-
                 }
 
                 if (largestDatNum > 8 || fileSizeList.FindAll(x => x.Equals(2048)).Count > 1)
@@ -105,12 +103,9 @@ namespace xivModdingFramework.Helpers
         {
             return Task.Run(() =>
             {
-                var index = new Index(_gameDirectory);
-                var dat = new Dat(_gameDirectory);
+                var largestDatNum = _dat.GetLargestDatNumber(dataFile);
 
-                var largestDatNum = dat.GetLargestDatNumber(dataFile);
-
-                index.UpdateIndexDatCount(dataFile, largestDatNum);
+                _index.UpdateIndexDatCount(dataFile, largestDatNum);
             });
         }
 
@@ -123,10 +118,8 @@ namespace xivModdingFramework.Helpers
                 var currentDataFile =
                     new DirectoryInfo($"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
 
-                var index = new Index(_gameDirectory);
-
-                var backupHash = index.GetIndexSection1Hash(backupDataFile);
-                var currentHash = index.GetIndexSection1Hash(currentDataFile);
+                var backupHash = _index.GetIndexSection1Hash(backupDataFile);
+                var currentHash = _index.GetIndexSection1Hash(currentDataFile);
 
                 return backupHash.SequenceEqual(currentHash);
             });

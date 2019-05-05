@@ -118,11 +118,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var modsJson = new ModsJson
                                     {
                                         Name = modOptionMod.Value.Name,
-                                        //esrinzou for chinese UI
-                                        //Category = modOptionMod.Value.Category,
-                                        //esrinzou begin
                                         Category = modOptionMod.Value.Category.GetEnDisplayName(),
-                                        //esrinzou end
                                         FullPath = modOptionMod.Key,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
@@ -209,11 +205,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         var modsJson = new ModsJson
                         {
                             Name = simpleModData.Name,
-                            //esrinzou for chinese UI
-                            //Category = simpleModData.Category,
-                            //esrinzou begin
                             Category = simpleModData.Category.GetEnDisplayName(),
-                            //esrinzou end
                             FullPath = simpleModData.FullPath,
                             ModSize = simpleModData.ModSize,
                             DatFile = simpleModData.DatFile,
@@ -276,33 +268,36 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public (ModPackJson ModPackJson, Dictionary<string, MagickImage> ImageDictionary) GetModPackJsonData(DirectoryInfo modPackDirectory)
+        public Task<(ModPackJson ModPackJson, Dictionary<string, MagickImage> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
         {
-            ModPackJson modPackJson = null;
-            var imageDictionary = new Dictionary<string, MagickImage>();
-
-            using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+            return Task.Run(() =>
             {
-                foreach (var entry in archive.Entries)
-                {
-                    if (entry.FullName.EndsWith(".mpl"))
-                    {
-                        using (var streamReader = new StreamReader(entry.Open()))
-                        {
-                            var jsonString = streamReader.ReadToEnd();
+                ModPackJson modPackJson = null;
+                var imageDictionary = new Dictionary<string, MagickImage>();
 
-                            modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.FullName.EndsWith(".mpl"))
+                        {
+                            using (var streamReader = new StreamReader(entry.Open()))
+                            {
+                                var jsonString = streamReader.ReadToEnd();
+
+                                modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                            }
+                        }
+
+                        if (entry.FullName.EndsWith(".png"))
+                        {
+                            imageDictionary.Add(entry.FullName, new MagickImage(entry.Open()));
                         }
                     }
-
-                    if (entry.FullName.EndsWith(".png"))
-                    {
-                        imageDictionary.Add(entry.FullName, new MagickImage(entry.Open()));
-                    }
                 }
-            }
 
-            return (modPackJson, imageDictionary);
+                return (modPackJson, imageDictionary);
+            });
         }
 
         /// <summary>
@@ -310,39 +305,42 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A list containing original mod pack json data</returns>
-        public List<OriginalModPackJson> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
+        public Task<List<OriginalModPackJson>> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
         {
-            var modPackJsonList = new List<OriginalModPackJson>();
-
-            using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+            return Task.Run(() =>
             {
-                foreach (var entry in archive.Entries)
-                {
-                    if (entry.FullName.EndsWith(".mpl"))
-                    {
-                        using (var streamReader = new StreamReader(entry.Open()))
-                        {
-                            var line = streamReader.ReadLine();
-                            if (line.ToLower().Contains("version"))
-                            {
-                                //mpInfo = JsonConvert.DeserializeObject<ModPackInfo>(line);
-                            }
-                            else
-                            {
-                                modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
-                            }
+                var modPackJsonList = new List<OriginalModPackJson>();
 
-                            while (streamReader.Peek() >= 0)
+                using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.FullName.EndsWith(".mpl"))
+                        {
+                            using (var streamReader = new StreamReader(entry.Open()))
                             {
-                                line = streamReader.ReadLine();
-                                modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
+                                var line = streamReader.ReadLine();
+                                if (line.ToLower().Contains("version"))
+                                {
+                                    //mpInfo = JsonConvert.DeserializeObject<ModPackInfo>(line);
+                                }
+                                else
+                                {
+                                    modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
+                                }
+
+                                while (streamReader.Peek() >= 0)
+                                {
+                                    line = streamReader.ReadLine();
+                                    modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            return modPackJsonList;
+                return modPackJsonList;
+            });
         }
 
         /// <summary>
@@ -385,22 +383,22 @@ namespace xivModdingFramework.Mods.FileTypes
         public async Task<(int ImportCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<double> progress)
         {
-            var importTask = await Task.Run<(int ImportCount, string Errors)>(() =>
+            var dat = new Dat(gameDirectory);
+            var modListFullPaths = new List<string>();
+            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+            var modCount = 1;
+            var importErrors = "";
+
+            foreach (var modListMod in modList.Mods)
             {
-                var dat = new Dat(gameDirectory);
-                var modListFullPaths = new List<string>();
-                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
-                var modCount = 1;
-                var importErrors = "";
-
-                foreach (var modListMod in modList.Mods)
+                if (!string.IsNullOrEmpty(modListMod.fullPath))
                 {
-                    if (!string.IsNullOrEmpty(modListMod.fullPath))
-                    {
-                        modListFullPaths.Add(modListMod.fullPath);
-                    }
+                    modListFullPaths.Add(modListMod.fullPath);
                 }
+            }
 
+            await Task.Run(async () =>
+            {
                 using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
                 {
                     foreach (var zipEntry in archive.Entries)
@@ -408,85 +406,88 @@ namespace xivModdingFramework.Mods.FileTypes
                         if (zipEntry.FullName.EndsWith(".mpd"))
                         {
                             _tempMPD = Path.GetTempFileName();
-                            zipEntry.ExtractToFile(_tempMPD, true);
 
-                            using (var binaryReader = new BinaryReader(File.OpenRead(_tempMPD)))
+                            using (var zipStream = zipEntry.Open())
                             {
-                                foreach (var modJson in modsJson)
+                                using (var fileStream = new FileStream(_tempMPD, FileMode.OpenOrCreate))
                                 {
-                                    try
+                                    await zipStream.CopyToAsync(fileStream);
+
+                                    using (var binaryReader = new BinaryReader(fileStream))
                                     {
-                                        if (modListFullPaths.Contains(modJson.FullPath))
+                                        foreach (var modJson in modsJson)
                                         {
-                                            var existingEntry = (from entry in modList.Mods
-                                                where entry.fullPath.Equals(modJson.FullPath)
-                                                select entry).FirstOrDefault();
+                                            try
+                                            {
+                                                if (modListFullPaths.Contains(modJson.FullPath))
+                                                {
+                                                    var existingEntry = (from entry in modList.Mods
+                                                                         where entry.fullPath.Equals(modJson.FullPath)
+                                                                         select entry).FirstOrDefault();
 
-                                            binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
+                                                    binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
 
-                                            var data = binaryReader.ReadBytes(modJson.ModSize);
+                                                    var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                            dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                                //esrinzou for chinese UI
-                                                //modJson.Category, modJson.Name,
-                                                //esrinzou begin
-                                                modJson.Category.GetDisplayName(), modJson.Name,
-                                                //esrinzou end
-                                                XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                GetDataType(modJson.FullPath), modJson.ModPackEntry);
-                                        }
-                                        else
-                                        {
-                                            binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
+                                                    await dat.WriteToDat(new List<byte>(data), existingEntry,
+                                                        modJson.FullPath,
+                                                        modJson.Category.GetDisplayName(), modJson.Name,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                }
+                                                else
+                                                {
+                                                    binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
 
-                                            var data = binaryReader.ReadBytes(modJson.ModSize);
+                                                    var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                            dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                                //esrinzou for chinese UI
-                                                //modJson.Category, modJson.Name,
-                                                //esrinzou begin
-                                                modJson.Category.GetDisplayName(), modJson.Name,
-                                                //esrinzou end
-                                                XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                    await dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
+                                                        modJson.Category.GetDisplayName(), modJson.Name,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                }
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                if (ex.GetType() == typeof(NotSupportedException))
+                                                {
+                                                    importErrors = ex.Message;
+                                                    break;
+                                                }
+
+                                                importErrors +=
+                                                    $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
+                                            }
+
+                                            progress?.Report((double)modCount / modsJson.Count);
+
+                                            modCount++;
                                         }
                                     }
-                                    catch (Exception ex)
-                                    {
-                                        importErrors +=
-                                            $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
-                                    }
-
-                                    progress?.Report((double)modCount/ modsJson.Count);
-
-                                    modCount++;
                                 }
                             }
 
-                            File.Delete(_tempMPD);
                             break;
                         }
                     }
                 }
-
-                if (modsJson[0].ModPackEntry != null)
-                {
-                    modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
-
-                    var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
-
-                    if (!modPackExists)
-                    {
-                        modList.ModPacks.Add(modsJson[0].ModPackEntry);
-                    }
-
-                    File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
-                }
-
-                return (modCount - 1, importErrors);
             });
 
-            return importTask;
+            if (modsJson[0].ModPackEntry != null)
+            {
+                modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+
+                var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
+
+                if (!modPackExists)
+                {
+                    modList.ModPacks.Add(modsJson[0].ModPackEntry);
+                }
+
+                File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            }
+
+            return (modCount - 1, importErrors);
         }
 
         /// <summary>
@@ -527,12 +528,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                    dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                        //esrinzou for chinese UI
-                                        //modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                        //esrinzou begin
+                                     dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
                                         modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                        //esrinzou end
                                         GetDataType(modJson.FullPath));
                                 }
                                 else
@@ -542,11 +539,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                     dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                        //esrinzou for chinese UI
-                                        //modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                        //esrinzou begin
                                         modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                        //esrinzou end
                                         GetDataType(modJson.FullPath));
                                 }
                             }

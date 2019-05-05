@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Newtonsoft.Json;
+using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Xml;
-using Newtonsoft.Json;
-using SharpDX;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
@@ -58,7 +59,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </remarks>
         /// <param name="item">The item we are getting the skeleton for</param>
         /// <param name="model">The model we are getting the skeleton for</param>
-        public void CreateSkelFromSklb(IItem item, XivMdl model)
+        public async Task CreateSkelFromSklb(IItem item, XivMdl model)
         {
             var hasAssetcc = File.Exists(Directory.GetCurrentDirectory() + "\\AssetCc2.exe");
             
@@ -97,7 +98,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (!File.Exists(skelLoc + sklbName + ".xml"))
                 {
-                    GetSkeleton(mdlFile, item.ItemCategory);
+                    await GetSkeleton(mdlFile, item.ItemCategory);
 
                     var proc = new Process
                     {
@@ -128,7 +129,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="modelName">The name of the model</param>
         /// <param name="category">The items category</param>
-        private void GetSkeleton(string modelName, string category)
+        private async Task GetSkeleton(string modelName, string category)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
@@ -171,17 +172,17 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Continue only if the skeleton file exists
-            if (!index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), _dataFile)
+            if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), _dataFile)
             ) return;
 
-            var offset = index.GetDataOffset(HashGenerator.GetHash(skelFolder), HashGenerator.GetHash(skelFile), _dataFile);
+            var offset = await index.GetDataOffset(HashGenerator.GetHash(skelFolder), HashGenerator.GetHash(skelFile), _dataFile);
 
             if (offset == 0)
             {
                 throw new Exception($"Could not find offest for {skelFolder}/{skelFile}");
             }
 
-            var sklbData = dat.GetType2Data(offset, _dataFile);
+            var sklbData = await dat.GetType2Data(offset, _dataFile);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))
             {

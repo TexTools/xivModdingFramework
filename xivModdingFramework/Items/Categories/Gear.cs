@@ -42,17 +42,21 @@ namespace xivModdingFramework.Items.Categories
     {
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivLanguage _xivLanguage;
+        private readonly Index _index;
+        private static object _gearLock = new object();
+
         public Gear(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
         {
             _gameDirectory = gameDirectory;
             _xivLanguage = xivLanguage;
+            _index = new Index(_gameDirectory);
         }
 
         /// <summary>
         /// A getter for available gear in the Item exd files
         /// </summary>
         /// <returns>A list containing XivGear data</returns>
-        public List<XivGear> GetGearList()
+        public async Task<List<XivGear>> GetGearList()
         {
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -68,15 +72,15 @@ namespace xivModdingFramework.Items.Categories
             xivGearList.AddRange(GetMissingGear());
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var itemDictionary = ex.ReadExData(XivEx.item);
+            var itemDictionary = await ex.ReadExData(XivEx.item);
 
             // Loops through all the items in the item exd files
             // Item files start at 0 and increment by 500 for each new file
             // Item_0, Item_500, Item_1000, etc.
-            foreach (var item in itemDictionary)
+            await Task.Run(() => Parallel.ForEach(itemDictionary, (item) =>
             {
                 // This checks whether there is any model data present in the current item
-                if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) continue;
+                if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) return;
 
                 // Gear can have 2 separate models (MNK weapons for example)
                 var primaryMi = new XivModelInfo();
@@ -175,7 +179,7 @@ namespace xivModdingFramework.Items.Categories
                     int slotNum = br.ReadByte();
 
                     // Waist items do not have texture or model data
-                    if (slotNum == 6) continue;
+                    if (slotNum == 6) return;
 
                     xivGear.EquipSlotCategory = slotNum;
                     xivGear.ItemCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
@@ -187,9 +191,13 @@ namespace xivModdingFramework.Items.Categories
                     var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
                     xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
 
-                    xivGearList.Add(xivGear);
+                    lock (_gearLock)
+                    {
+                        xivGearList.Add(xivGear);
+                    }
                 }
-            }
+            }));
+
             xivGearList.Sort();
 
             return xivGearList;
@@ -246,23 +254,22 @@ namespace xivModdingFramework.Items.Categories
         /// </remarks>
         /// <param name="xivGear">A gear item</param>
         /// <returns>A list of XivRace data</returns>
-        public List<XivRace> GetRacesForTextures(XivGear xivGear, XivDataFile dataFile)
+        public async Task<List<XivRace>> GetRacesForTextures(XivGear xivGear, XivDataFile dataFile)
         {
             // Get the material version for the item from the imc file
             var imc = new Imc(_gameDirectory, dataFile);
-            var gearVersion = imc.GetImcInfo(xivGear, xivGear.ModelInfo).Version.ToString().PadLeft(4, '0');
+            var gearVersion = (await imc.GetImcInfo(xivGear, xivGear.ModelInfo)).Version.ToString().PadLeft(4, '0');
 
             var modelID = xivGear.ModelInfo.ModelID.ToString().PadLeft(4, '0');
 
             var raceList = new List<XivRace>();
 
-            var index = new Index(_gameDirectory);
             var itemType = ItemType.GetItemType(xivGear);
             string mtrlFolder;
 
             if (itemType == XivItemType.weapon)
             {
-                return new List<XivRace>{XivRace.All_Races};
+                return new List<XivRace> { XivRace.All_Races };
             }
 
             switch (itemType)
@@ -302,7 +309,7 @@ namespace xivModdingFramework.Items.Categories
             }
 
             // get the list of hashed file names from the mtrl folder
-            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
+            var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
 
             // Loop through each entry in the dictionary
             foreach (var testFile in testFilesDictionary)
@@ -328,7 +335,7 @@ namespace xivModdingFramework.Items.Categories
         /// </remarks>
         /// <param name="xivGear">A gear item</param>
         /// <returns>A list of XivRace data</returns>
-        public List<XivRace> GetRacesForModels(XivGear xivGear, XivDataFile dataFile)
+        public async Task<List<XivRace>> GetRacesForModels(XivGear xivGear, XivDataFile dataFile)
         {
             var itemType = ItemType.GetItemType(xivGear);
 
@@ -340,8 +347,6 @@ namespace xivModdingFramework.Items.Categories
             {
                 return new List<XivRace> { XivRace.All_Races };
             }
-
-            var index = new Index(_gameDirectory);
 
             string mdlFolder;
             var id = xivGear.ModelInfo.ModelID.ToString().PadLeft(4, '0');
@@ -358,7 +363,6 @@ namespace xivModdingFramework.Items.Categories
                     mdlFolder = "";
                     break;
             }
-
 
             var testFilesDictionary = new Dictionary<int, string>();
 
@@ -384,7 +388,7 @@ namespace xivModdingFramework.Items.Categories
             }
 
             // get the list of hashed file names from the mtrl folder
-            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), dataFile);
+            var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), dataFile);
 
             // Loop through each entry in the dictionary
             foreach (var testFile in testFilesDictionary)
@@ -406,141 +410,143 @@ namespace xivModdingFramework.Items.Categories
         /// <param name="modelID"> The model id used for searching</param>
         /// <param name="type">The type of item</param>
         /// <returns>A list of SearchResults objects</returns>
-        public List<SearchResults> SearchGearByModelID(int modelID, string type)
+        public async Task<List<SearchResults>> SearchGearByModelID(int modelID, string type)
         {
+            var searchLock = new object();
+            var searchLock1 = new object();
             var searchResultsList = new List<SearchResults>();
             var resultCheckList = new List<string>();
-            var index = new Index(_gameDirectory);
 
-            var t1 = Task.Run(() =>
+            var equipmentSlots = new string[] { "met", "glv", "dwn", "sho", "top", };
+            var accessorySlots = new string[] { "ear", "nek", "rir", "ril", "wrs" };
+            var parts = new string[] { "a", "b", "c", "d", "e", "f" };
+
+            var id = modelID.ToString().PadLeft(4, '0');
+            var folder = "";
+
+            if (type.Equals("Equipment"))
             {
-                var equipmentSlots = new string[] { "met", "glv", "dwn", "sho", "top", };
-                var accessorySlots = new string[] { "ear", "nek", "rir", "ril", "wrs" };
-                var parts = new string[] { "a", "b", "c", "d", "e", "f" };
+                folder = $"chara/equipment/e{id}/material/v";
+            }
+            else if (type.Equals("Accessory"))
+            {
+                folder = $"chara/accessory/a{id}/material/v";
+            }
+            else if (type.Equals("Weapon"))
+            {
+                folder = $"chara/weapon/w{id}/obj/body/b";
+            }
 
-                var id = modelID.ToString().PadLeft(4, '0');
-                var folder = "";
-                var file = "";
+            var bodyVariantDictionary = new Dictionary<int, List<int>>();
+            List<int> variantList = null;
 
-                if (type.Equals("Equipment"))
-                {
-                    folder = $"chara/equipment/e{id}/material/v";
-                }
-                else if (type.Equals("Accessory"))
-                {
-                    folder = $"chara/accessory/a{id}/material/v";
-                }
-                else if (type.Equals("Weapon"))
-                {
-                    folder = $"chara/weapon/w{id}/obj/body/b";
-                }
-
-
-                var bodyVariantDictionary = new Dictionary<int, List<int>>();
-                List<int> variantList = null;
-
-                if (type.Equals("Weapon"))
-                {
-                    for (var i = 1; i < 200; i++)
-                    {
-                        var folderHashDictionary = new Dictionary<int, int>();
-
-                        var wFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
-
-                        for (var j = 1; j < 200; j++)
-                        {
-                            folderHashDictionary.Add(HashGenerator.GetHash($"{wFolder}{j.ToString().PadLeft(4, '0')}"), j);
-                        }
-
-                        variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
-
-                        if (variantList.Count > 0)
-                        {
-                            variantList.Sort();
-                            bodyVariantDictionary.Add(i, variantList);
-                        }
-                    }
-                }
-                else
+            if (type.Equals("Weapon"))
+            {
+                await Task.Run(() => Parallel.For(1, 200, (i) =>
                 {
                     var folderHashDictionary = new Dictionary<int, int>();
 
-                    for (var i = 1; i < 200; i++)
+                    var wFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
+
+                    Parallel.For(1, 200, (j) =>
+                    {
+                        lock (searchLock)
+                        {
+                            folderHashDictionary.Add(HashGenerator.GetHash($"{wFolder}{j.ToString().PadLeft(4, '0')}"), j);
+                        }
+                    });
+
+                    variantList = _index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
+
+                    if (variantList.Count > 0)
+                    {
+                        variantList.Sort();
+
+                        lock (searchLock1)
+                        {
+                            bodyVariantDictionary.Add(i, variantList);
+                        }
+                    }
+                }));
+            }
+            else
+            {
+                var folderHashDictionary = new Dictionary<int, int>();
+
+                await Task.Run(() => Parallel.For(1, 200, (i) =>
+                {
+                    lock (searchLock)
                     {
                         folderHashDictionary.Add(HashGenerator.GetHash($"{folder}{i.ToString().PadLeft(4, '0')}"), i);
                     }
+                }));
 
-                    variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
-                }
+                variantList = _index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
+            }
 
-
-                if (!type.Equals("Weapon"))
+            if (!type.Equals("Weapon"))
+            {
+                foreach (var variant in variantList)
                 {
-                    foreach (var variant in variantList)
+                    var mtrlFolder = $"{folder}{variant.ToString().PadLeft(4, '0')}";
+                    var mtrlFile = "";
+
+                    var mtrlFolderHashes =
+                        await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
+
+                    foreach (var race in IDRaceDictionary.Keys)
                     {
-                        var mtrlFolder = $"{folder}{variant.ToString().PadLeft(4, '0')}";
-                        var mtrlFile = "";
+                        string[] slots = null;
 
-                        var mtrlFolderHashes =
-                            index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
-
-                        foreach (var race in IDRaceDictionary.Keys)
+                        if (type.Equals("Equipment"))
                         {
-                            string[] slots = null;
+                            slots = equipmentSlots;
+                        }
+                        else if (type.Equals("Accessory"))
+                        {
+                            slots = accessorySlots;
+                        }
 
-                            if (type.Equals("Equipment"))
+                        foreach (var slot in slots)
+                        {
+                            foreach (var part in parts)
                             {
-                                slots = equipmentSlots;
-                            }
-                            else if (type.Equals("Accessory"))
-                            {
-                                slots = accessorySlots;
-                            }
-
-                            foreach (var slot in slots)
-                            {
-                                foreach (var part in parts)
+                                if (type.Equals("Equipment"))
                                 {
-                                    if (type.Equals("Equipment"))
+                                    mtrlFile = $"mt_c{race}e{id}_{slot}_{part}.mtrl";
+                                }
+                                else if (type.Equals("Accessory"))
+                                {
+                                    mtrlFile = $"mt_c{race}a{id}_{slot}_{part}.mtrl";
+                                }
+
+                                if (mtrlFolderHashes.Contains(HashGenerator.GetHash(mtrlFile)))
+                                {
+                                    var abbrSlot = AbbreviationSlotDictionary[slot];
+                                    if (!resultCheckList.Contains($"{abbrSlot}{variant.ToString()}"))
                                     {
-                                        mtrlFile = $"mt_c{race}e{id}_{slot}_{part}.mtrl";
-                                    }
-                                    else if (type.Equals("Accessory"))
-                                    {
-                                        mtrlFile = $"mt_c{race}a{id}_{slot}_{part}.mtrl";
+                                        searchResultsList.Add(new SearchResults { Body = "-", Slot = abbrSlot, Variant = variant });
+                                        resultCheckList.Add($"{abbrSlot}{variant.ToString()}");
                                     }
 
-                                    if (mtrlFolderHashes.Contains(HashGenerator.GetHash(mtrlFile)))
-                                    {
-                                        var abbrSlot = AbbreviationSlotDictionary[slot];
-                                        if (!resultCheckList.Contains($"{abbrSlot}{variant.ToString()}"))
-                                        {
-                                            searchResultsList.Add(new SearchResults { Body = "-", Slot = abbrSlot, Variant = variant});
-                                            resultCheckList.Add($"{abbrSlot}{variant.ToString()}");
-                                        }
-
-                                    }
                                 }
                             }
                         }
                     }
                 }
-                else
+            }
+            else
+            {
+                foreach (var bodyVariant in bodyVariantDictionary)
                 {
-                    foreach (var bodyVariant in bodyVariantDictionary)
+                    foreach (var variant in bodyVariant.Value)
                     {
-                        foreach (var variant in bodyVariant.Value)
-                        {
-                            searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Main_Hand, Variant = variant });
-                        }
+                        searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Main_Hand, Variant = variant });
                     }
                 }
+            }
 
-                searchResultsList.Sort();
-
-            });
-
-            t1.Wait();
+            searchResultsList.Sort();
 
 
             return searchResultsList;

@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using HelixToolkit.Wpf.SharpDX;
 using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using HelixToolkit.SharpDX.Core;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -69,7 +70,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivRace">The race for which to get the data</param>
         /// <param name="secondaryModel">The secondary model info if needed</param>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public XivMdl GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null, int originalOffset = 0, string ringSide = null)
+        public async Task<XivMdl> GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null, int originalOffset = 0, string ringSide = null)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
@@ -80,10 +81,10 @@ namespace xivModdingFramework.Models.FileTypes
 
             var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel, mdlStringPath, ringSide);
 
-            var offset = index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
+            var offset = await index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
                 _dataFile);
 
-            if (modding.IsModEnabled($"{mdlPath.Folder}/{mdlPath.File}", false) == XivModStatus.Enabled &&
+            if (await modding.IsModEnabled($"{mdlPath.Folder}/{mdlPath.File}", false) == XivModStatus.Enabled &&
                 originalOffset == 0)
             {
                 getShapeData = false;
@@ -99,7 +100,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new Exception($"Could not find offset for {mdlPath.Folder}/{mdlPath.File}");
             }
 
-            var mdlData = dat.GetType3Data(offset, _dataFile);
+            var mdlData = await dat.GetType3Data(offset, _dataFile);
 
             var xivMdl = new XivMdl {MdlPath = mdlPath};
 
@@ -124,7 +125,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This will be done when we obtain the path counts for each type
                 var pathBlock = br.ReadBytes(mdlPathData.PathBlockSize);
 
-                var mdlModelData = new MdlModelData()
+                var mdlModelData = new MdlModelData
                 {
                     Unknown0            = br.ReadInt32(),
                     MeshCount           = br.ReadInt16(),
@@ -1322,7 +1323,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="advImportSettings">The advanced import settings if any</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public Dictionary<string, string> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
+        public async Task<Dictionary<string, string>> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
             Dictionary<string, ModelImportSettings> advImportSettings, string source, string pluginTarget, bool rawDataOnly = false)
         {
             if (!File.Exists(daeLocation.FullName))
@@ -2143,7 +2144,13 @@ namespace xivModdingFramework.Models.FileTypes
                 // Try to compute the tangents and bitangents for the mesh
                 try
                 {
-                    MeshBuilder.ComputeTangents(meshGeometry);
+                    //MeshBuilder.ComputeTangents(meshGeometry);
+                    MeshBuilder.ComputeTangents(meshGeometry.Positions, meshGeometry.Normals,
+                        meshGeometry.TextureCoordinates, meshGeometry.Indices, out var computedTangents,
+                        out var computedBiTangents);
+
+                    meshGeometry.Tangents = computedTangents;
+                    meshGeometry.BiTangents = computedBiTangents;
                 }
                 catch (Exception e)
                 {
@@ -2243,7 +2250,7 @@ namespace xivModdingFramework.Models.FileTypes
                 meshNum++;
             }
 
-            MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source, rawDataOnly);
+            await MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source, rawDataOnly);
 
             return warningsDictionary;
         }
@@ -2256,7 +2263,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivMdl">The original model data</param>
         /// <param name="importSettings">The import settings if any</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        private void MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl, 
+        private async Task MakeNewMdlFile(List<ColladaMeshData> colladaMeshDataList, IItemModel item, XivMdl xivMdl, 
             Dictionary<string, ModelImportSettings> importSettings, string source, bool rawDataOnly)
         {
             var modding = new Modding(_gameDirectory);
@@ -2267,7 +2274,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
-            var modEntry = modding.TryGetModEntry(mdlPath);
+            var modEntry = await modding.TryGetModEntry(mdlPath);
 
             // Vertex Info
             #region Vertex Info Block
@@ -3998,7 +4005,7 @@ namespace xivModdingFramework.Models.FileTypes
             var compressedMDLData = new List<byte>();
 
             // Vertex Info Compression
-            var compressedVertexInfo = IOUtil.Compressor(vertexInfoBlock.ToArray());
+            var compressedVertexInfo = await IOUtil.Compressor(vertexInfoBlock.ToArray());
             compressedMDLData.AddRange(BitConverter.GetBytes(16));
             compressedMDLData.AddRange(BitConverter.GetBytes(0));
             compressedMDLData.AddRange(BitConverter.GetBytes(compressedVertexInfo.Length));
@@ -4033,7 +4040,7 @@ namespace xivModdingFramework.Models.FileTypes
             for (var i = 0; i < modelDataPartCount; i++)
             {
                 var compressedModelData =
-                    IOUtil.Compressor(fullModelDataBlock.GetRange(i * 16000, modelDataPartCountsList[i]).ToArray());
+                    await IOUtil.Compressor(fullModelDataBlock.GetRange(i * 16000, modelDataPartCountsList[i]).ToArray());
 
                 compressedMDLData.AddRange(BitConverter.GetBytes(16));
                 compressedMDLData.AddRange(BitConverter.GetBytes(0));
@@ -4312,7 +4319,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < vertexDataSection.VertexDataBlockPartCount; i++)
                 {
-                    var compressedVertexData = IOUtil.Compressor(vertexDataSection.VertexDataBlock
+                    var compressedVertexData = await IOUtil.Compressor(vertexDataSection.VertexDataBlock
                         .GetRange(i * 16000, vertexDataPartCounts[i]).ToArray());
 
                     compressedMDLData.AddRange(BitConverter.GetBytes(16));
@@ -4352,7 +4359,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < vertexDataSection.IndexDataBlockPartCount; i++)
                 {
-                    var compressedIndexData = IOUtil.Compressor(vertexDataSection.IndexDataBlock
+                    var compressedIndexData = await IOUtil.Compressor(vertexDataSection.IndexDataBlock
                         .GetRange(i * 16000, indexDataPartCounts[i]).ToArray());
 
                     compressedMDLData.AddRange(BitConverter.GetBytes(16));
@@ -4637,7 +4644,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else
             {
-                dat.WriteToDat(compressedMDLData, modEntry, filePath, item.ItemCategory, item.Name, _dataFile, source, 3);
+                await dat.WriteToDat(compressedMDLData, modEntry, filePath, item.ItemCategory, item.Name, _dataFile, source, 3);
             }
 
             #endregion
@@ -5059,7 +5066,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             string mdlFolder = "", mdlFile = "";
 
-            var mdlInfo = secondaryModel == null ? itemModel.ModelInfo : secondaryModel;
+            var mdlInfo = secondaryModel ?? itemModel.ModelInfo;
             var id = mdlInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = mdlInfo.Body.ToString().PadLeft(4, '0');
           

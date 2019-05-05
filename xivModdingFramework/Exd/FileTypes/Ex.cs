@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -36,6 +37,9 @@ namespace xivModdingFramework.Exd.FileTypes
 
         private readonly DirectoryInfo _gameDirectory;
 
+        private readonly Index _index;
+        private readonly Dat _dat;
+
         public Dictionary<int, int> OffsetTypeDict { get; private set; }
 
         public List<int> PageList { get; private set; }
@@ -52,6 +56,8 @@ namespace xivModdingFramework.Exd.FileTypes
         {
             _gameDirectory = gameDirectory;
             _langCode = lang.GetLanguageCode();
+            _index = new Index(_gameDirectory);
+            _dat = new Dat(_gameDirectory);
         }
 
         /// <summary>
@@ -65,13 +71,15 @@ namespace xivModdingFramework.Exd.FileTypes
         {
             _gameDirectory = gameDirectory;
             _langCode = XivLanguage.English.GetLanguageCode();
+            _index = new Index(_gameDirectory);
+            _dat = new Dat(_gameDirectory);
         }
 
         /// <summary>
         /// Reads and parses the ExHeader file
         /// </summary>
         /// <param name="exFile">The Ex file to use.</param>
-        private void ReadExHeader(XivEx exFile)
+        private async Task ReadExHeader(XivEx exFile)
         {
             OffsetTypeDict = new Dictionary<int, int>();
             PageList = new List<int>();
@@ -80,59 +88,59 @@ namespace xivModdingFramework.Exd.FileTypes
             var exdFolderHash = HashGenerator.GetHash("exd");
             var exdFileHash = HashGenerator.GetHash(exFile + ExhExtension);
 
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
-
-            var offset = index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
+            var offset = await _index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
 
             if (offset == 0)
             {
                 throw new Exception($"Could not find offest for exd/{exFile}{ExhExtension}");
             }
 
-            var exhData = dat.GetType2Data(offset, XivDataFile._0A_Exd);
+            var exhData = await _dat.GetType2Data(offset, XivDataFile._0A_Exd);
 
-            // Big Endian Byte Order 
-            using (var br = new BinaryReaderBE(new MemoryStream(exhData)))
+            await Task.Run(() =>
             {
-                var signature      = br.ReadInt32();
-                var version        = br.ReadInt16();
-                var dataSetChunk   = br.ReadInt16();
-                var dataSetCount   = br.ReadInt16();
-                var pageTableCount = br.ReadInt16();
-                var langTableCount = br.ReadInt16();
-                var unknown        = br.ReadInt16();
-                var unknown1       = br.ReadInt32();
-                var entryCount     = br.ReadInt32();
-                br.ReadBytes(8);
-
-                for (var i = 0; i < dataSetCount; i++)
+                // Big Endian Byte Order 
+                using (var br = new BinaryReaderBE(new MemoryStream(exhData)))
                 {
-                    var dataType = br.ReadInt16();
-                    var dataOffset = br.ReadInt16();
+                    var signature      = br.ReadInt32();
+                    var version        = br.ReadInt16();
+                    var dataSetChunk   = br.ReadInt16();
+                    var dataSetCount   = br.ReadInt16();
+                    var pageTableCount = br.ReadInt16();
+                    var langTableCount = br.ReadInt16();
+                    var unknown        = br.ReadInt16();
+                    var unknown1       = br.ReadInt32();
+                    var entryCount     = br.ReadInt32();
+                    br.ReadBytes(8);
 
-                    if (!OffsetTypeDict.ContainsKey(dataOffset))
+                    for (var i = 0; i < dataSetCount; i++)
                     {
-                        OffsetTypeDict.Add(dataOffset, dataType);
+                        var dataType = br.ReadInt16();
+                        var dataOffset = br.ReadInt16();
+
+                        if (!OffsetTypeDict.ContainsKey(dataOffset))
+                        {
+                            OffsetTypeDict.Add(dataOffset, dataType);
+                        }
+                    }
+
+                    for (var i = 0; i < pageTableCount; i++)
+                    {
+                        var pageNumber = br.ReadInt32();
+                        var pageSize = br.ReadInt32();
+                        PageList.Add(pageNumber);
+                    }
+
+                    for (var i = 0; i < langTableCount; i++)
+                    {
+                        var langCode = br.ReadInt16();
+                        if (langCode != 0)
+                        {
+                            LanguageList.Add(langCode);
+                        }
                     }
                 }
-
-                for (var i = 0; i < pageTableCount; i++)
-                {
-                    var pageNumber = br.ReadInt32();
-                    var pageSize = br.ReadInt32();
-                    PageList.Add(pageNumber);
-                }
-
-                for (var i = 0; i < langTableCount; i++)
-                {
-                    var langCode = br.ReadInt16();
-                    if (langCode != 0)
-                    {
-                        LanguageList.Add(langCode);
-                    }
-                }
-            }
+            });
         }
 
         /// <summary>
@@ -144,16 +152,13 @@ namespace xivModdingFramework.Exd.FileTypes
         /// </remarks>
         /// <param name="exFile"></param>
         /// <returns>A dictionary containing the Index and Raw Data of the ex file</returns>
-        public Dictionary<int, byte[]> ReadExData(XivEx exFile)
+        public async Task<Dictionary<int, byte[]>> ReadExData(XivEx exFile)
         {
             var exdNameOffsetDictionary = new Dictionary<int, string>();
             var exdDataDictionary = new Dictionary<int, byte[]>();
             var errorString = "";
 
-            ReadExHeader(exFile);
-
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
+            await ReadExHeader(exFile);
 
             var language = "_" + _langCode;
 
@@ -173,45 +178,49 @@ namespace xivModdingFramework.Exd.FileTypes
                 var exdFolderHash = HashGenerator.GetHash("exd");
                 var exdFileHash = HashGenerator.GetHash(exdFile);
 
-                exdNameOffsetDictionary.Add(index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd), exdFile);
+                exdNameOffsetDictionary.Add(await _index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd), exdFile);
             }
 
-            foreach (var exdData in exdNameOffsetDictionary)
+            await Task.Run(async () =>
             {
-                try
+                foreach (var exdData in exdNameOffsetDictionary)
                 {
-                    var exData = dat.GetType2Data(exdData.Key, XivDataFile._0A_Exd);
-
-                    // Big Endian Byte Order 
-                    using (var br = new BinaryReaderBE(new MemoryStream(exData)))
+                    try
                     {
-                        br.ReadBytes(8);
-                        var offsetTableSize = br.ReadInt32();
+                        var exData = await _dat.GetType2Data(exdData.Key, XivDataFile._0A_Exd);
 
-                        for (var i = 0; i < offsetTableSize; i += 8)
+                        // Big Endian Byte Order 
+                        using (var br = new BinaryReaderBE(new MemoryStream(exData)))
                         {
-                            br.BaseStream.Seek(i + 32, SeekOrigin.Begin);
+                            br.ReadBytes(8);
+                            var offsetTableSize = br.ReadInt32();
 
-                            var entryNum = br.ReadInt32();
-                            var entryOffset = br.ReadInt32();
-
-                            br.BaseStream.Seek(entryOffset, SeekOrigin.Begin);
-
-                            var entrySize = br.ReadInt32();
-                            br.ReadBytes(2);
-
-                            if (!exdDataDictionary.ContainsKey(entryNum))
+                            for (var i = 0; i < offsetTableSize; i += 8)
                             {
-                                exdDataDictionary.Add(entryNum, br.ReadBytes(entrySize));
+                                br.BaseStream.Seek(i + 32, SeekOrigin.Begin);
+
+                                var entryNum = br.ReadInt32();
+                                var entryOffset = br.ReadInt32();
+
+                                br.BaseStream.Seek(entryOffset, SeekOrigin.Begin);
+
+                                var entrySize = br.ReadInt32();
+                                br.ReadBytes(2);
+
+                                if (!exdDataDictionary.ContainsKey(entryNum))
+                                {
+                                    exdDataDictionary.Add(entryNum, br.ReadBytes(entrySize));
+                                }
                             }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        errorString += $"File: {exdData.Value}\nError: {ex.Message}\n\n";
+                    }
                 }
-                catch(Exception ex)
-                {
-                    errorString += $"File: {exdData.Value}\nError: {ex.Message}\n\n";
-                }
-            }
+            });
+
 
             if (!string.IsNullOrEmpty(errorString))
             {

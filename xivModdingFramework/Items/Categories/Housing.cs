@@ -19,6 +19,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.DataContainers;
@@ -46,13 +47,13 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of all Housing Items
         /// </summary>
         /// <returns>A list of XivFurniture objects containing housing items</returns>
-        public List<XivFurniture> GetFurnitureList()
+        public async Task<List<XivFurniture>> GetFurnitureList()
         {
             var furnitureList = new List<XivFurniture>();
 
-            furnitureList.AddRange(GetIndoorFurniture());
-            furnitureList.AddRange(GetPaintings());
-            furnitureList.AddRange(GetOutdoorFurniture());
+            furnitureList.AddRange(await GetIndoorFurniture());
+            furnitureList.AddRange(await GetPaintings());
+            furnitureList.AddRange(await GetOutdoorFurniture());
 
             return furnitureList;
         }
@@ -67,8 +68,9 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option one
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private List<XivFurniture> GetIndoorFurniture()
+        private async Task<List<XivFurniture>> GetIndoorFurniture()
         {
+            var indoorLock = new object();
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int itemIndexOffset = 10;
@@ -80,12 +82,12 @@ namespace xivModdingFramework.Items.Categories
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var housingDictionary = ex.ReadExData(XivEx.housingfurniture);
-            var itemDictionary = ex.ReadExData(XivEx.item);
+            var housingDictionary = await ex.ReadExData(XivEx.housingfurniture);
+            var itemDictionary = await ex.ReadExData(XivEx.item);
 
             var furnitureList = new List<XivFurniture>();
 
-            foreach (var housingItem in housingDictionary.Values)
+            await Task.Run(() => Parallel.ForEach(housingDictionary.Values, (housingItem) =>
             {
                 var item = new XivFurniture
                 {
@@ -123,9 +125,12 @@ namespace xivModdingFramework.Items.Categories
 
                 if (!item.Name.Equals(string.Empty))
                 {
-                    furnitureList.Add(item);
+                    lock (indoorLock)
+                    {
+                        furnitureList.Add(item);
+                    }
                 }
-            }
+            }));
 
             furnitureList.Sort();
 
@@ -142,8 +147,9 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option one
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private List<XivFurniture> GetPaintings()
+        private async Task<List<XivFurniture>> GetPaintings()
         {
+            var paintingsLock = new object();
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int itemIndexOffset = 0;
@@ -154,12 +160,12 @@ namespace xivModdingFramework.Items.Categories
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var pictureDictionary = ex.ReadExData(XivEx.picture);
-            var itemDictionary = ex.ReadExData(XivEx.item);
+            var pictureDictionary = await ex.ReadExData(XivEx.picture);
+            var itemDictionary = await ex.ReadExData(XivEx.item);
 
             var furnitureList = new List<XivFurniture>();
 
-            foreach (var housingItem in pictureDictionary.Values)
+            await Task.Run(() => Parallel.ForEach(pictureDictionary.Values, (housingItem) =>
             {
                 var item = new XivFurniture
                 {
@@ -194,9 +200,12 @@ namespace xivModdingFramework.Items.Categories
 
                 if (!item.Name.Equals(string.Empty))
                 {
-                    furnitureList.Add(item);
+                    lock (paintingsLock)
+                    {
+                        furnitureList.Add(item);
+                    }
                 }
-            }
+            }));
 
             furnitureList.Sort();
 
@@ -207,8 +216,9 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of outdoor furniture
         /// </summary>
         /// <returns>A list of XivFurniture objects containing outdoor furniture item info</returns>
-        private List<XivFurniture> GetOutdoorFurniture()
+        private async Task<List<XivFurniture>> GetOutdoorFurniture()
         {
+            var outdoorLock = new object();
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int itemIndexOffset = 10;
@@ -220,12 +230,12 @@ namespace xivModdingFramework.Items.Categories
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var housingDictionary = ex.ReadExData(XivEx.housingyardobject);
-            var itemDictionary = ex.ReadExData(XivEx.item);
+            var housingDictionary = await ex.ReadExData(XivEx.housingyardobject);
+            var itemDictionary = await ex.ReadExData(XivEx.item);
 
             var furnitureList = new List<XivFurniture>();
 
-            foreach (var housingItem in housingDictionary.Values)
+            await Task.Run(() => Parallel.ForEach(housingDictionary.Values, (housingItem) =>
             {
                 var item = new XivFurniture
                 {
@@ -263,9 +273,12 @@ namespace xivModdingFramework.Items.Categories
 
                 if (!item.Name.Equals(string.Empty))
                 {
-                    furnitureList.Add(item);
+                    lock (outdoorLock)
+                    {
+                        furnitureList.Add(item);
+                    }
                 }
-            }
+            }));
 
             furnitureList.Sort();
 
@@ -277,11 +290,11 @@ namespace xivModdingFramework.Items.Categories
         /// </summary>
         /// <param name="itemModel">The item to get the parts for</param>
         /// <returns>A dictionary containing the part string and mdl path string</returns>
-        public Dictionary<string, string> GetFurnitureModelParts(IItemModel itemModel)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel)
         {
             var furniturePartDict = new Dictionary<string, string>();
 
-            var assets = GetFurnitureAssets(itemModel.ModelInfo.ModelID, itemModel.ItemCategory);
+            var assets = await GetFurnitureAssets(itemModel.ModelInfo.ModelID, itemModel.ItemCategory);
 
             foreach (var mdl in assets.MdlList)
             {
@@ -325,7 +338,6 @@ namespace xivModdingFramework.Items.Categories
                         furniturePartDict.Add($"{part} ( {descriptor} )", mdl);
                     }
                 }
-
             }
 
             return furniturePartDict;
@@ -336,7 +348,7 @@ namespace xivModdingFramework.Items.Categories
         /// </summary>
         /// <param name="modelID">The model id to get the assets for</param>
         /// <returns>A HousingAssets object containing the asset info</returns>
-        private HousingAssets GetFurnitureAssets(int modelID, string category)
+        private async Task<HousingAssets> GetFurnitureAssets(int modelID, string category)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
@@ -357,107 +369,15 @@ namespace xivModdingFramework.Items.Categories
                 assetFile = $"gar_b0_m{id}.sgb";
             }
 
-            var assetOffset = index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile),
+            var assetOffset = await index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile),
                 XivDataFile._01_Bgcommon);
 
-            var assetData = dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
+            var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
 
             var housingAssets = new HousingAssets();
 
-            using (var br = new BinaryReader(new MemoryStream(assetData)))
+            await Task.Run(() =>
             {
-                br.BaseStream.Seek(20, SeekOrigin.Begin);
-
-                var skip = br.ReadInt32() + 20;
-
-                br.BaseStream.Seek(skip + 4, SeekOrigin.Begin);
-
-                var stringsOffset = br.ReadInt32();
-
-                br.BaseStream.Seek(skip + stringsOffset, SeekOrigin.Begin);
-
-                var pathCounts = 0;
-
-                while (true)
-                {
-                    // Because we don't know the length of the string, we read the data until we reach a 0 value
-                    // That 0 value is the space between strings
-                    byte a;
-                    var pathName = new List<byte>();
-                    while ((a = br.ReadByte()) != 0)
-                    {
-                        if (a == 0xFF) break;
-
-                        pathName.Add(a);
-                    }
-
-                    if (a == 0xFF) break;
-
-                    // Read the string from the byte array and remove null terminators
-                    var path = Encoding.ASCII.GetString(pathName.ToArray()).Replace("\0", "");
-
-                    if(path.Equals(string.Empty)) continue;
-
-                    // Add the attribute to the list
-                    if (pathCounts == 0)
-                    {
-                        housingAssets.Shared = path;
-                    }
-                    else if (pathCounts == 1)
-                    {
-                        housingAssets.BaseFileName = path;
-                    }
-                    else
-                    {
-                        if (path.Contains(".mdl"))
-                        {
-                            housingAssets.MdlList.Add(path);
-                        }
-                        else if (path.Contains(".sgb"))
-                        {
-                            housingAssets.AdditionalAssetList.Add(path);
-                        }
-                        else if (!path.Contains("."))
-                        {
-                            housingAssets.BaseFolder = path;
-                        }
-                        else
-                        {
-                            housingAssets.OthersList.Add(path);
-                        }
-                    }
-
-                    pathCounts++;
-                }
-            }
-
-            if (housingAssets.AdditionalAssetList.Count > 0)
-            {
-                GetAdditionalAssets(housingAssets);
-            }
-
-
-            return housingAssets;
-        }
-
-        /// <summary>
-        /// Gets additional assets when the original asset file contains asset file paths within it
-        /// </summary>
-        /// <param name="assets">The current asset object</param>
-        private void GetAdditionalAssets(HousingAssets assets)
-        {
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
-
-            foreach (var additionalAsset in assets.AdditionalAssetList)
-            {
-                var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
-                var assetFile = Path.GetFileName(additionalAsset);
-
-                var assetOffset = index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile), XivDataFile._01_Bgcommon);
-
-                var assetData = dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
-
                 using (var br = new BinaryReader(new MemoryStream(assetData)))
                 {
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
@@ -495,35 +415,133 @@ namespace xivModdingFramework.Items.Categories
                         // Add the attribute to the list
                         if (pathCounts == 0)
                         {
-                            assets.Shared = path;
+                            housingAssets.Shared = path;
                         }
                         else if (pathCounts == 1)
                         {
-                            assets.BaseFileName = path;
+                            housingAssets.BaseFileName = path;
                         }
                         else
                         {
                             if (path.Contains(".mdl"))
                             {
-                                assets.MdlList.Add(path);
+                                housingAssets.MdlList.Add(path);
                             }
                             else if (path.Contains(".sgb"))
                             {
-                                assets.AdditionalAssetList.Add(path);
+                                housingAssets.AdditionalAssetList.Add(path);
                             }
                             else if (!path.Contains("."))
                             {
-                                assets.BaseFolder = path;
+                                housingAssets.BaseFolder = path;
                             }
                             else
                             {
-                                assets.OthersList.Add(path);
+                                housingAssets.OthersList.Add(path);
                             }
                         }
 
                         pathCounts++;
                     }
                 }
+            });
+
+            if (housingAssets.AdditionalAssetList.Count > 0)
+            {
+                await GetAdditionalAssets(housingAssets);
+            }
+
+
+            return housingAssets;
+        }
+
+        /// <summary>
+        /// Gets additional assets when the original asset file contains asset file paths within it
+        /// </summary>
+        /// <param name="assets">The current asset object</param>
+        private async Task GetAdditionalAssets(HousingAssets assets)
+        {
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+
+            foreach (var additionalAsset in assets.AdditionalAssetList)
+            {
+                var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
+                var assetFile = Path.GetFileName(additionalAsset);
+
+                var assetOffset = await index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile), XivDataFile._01_Bgcommon);
+
+                var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
+
+                await Task.Run(() =>
+                {
+                    using (var br = new BinaryReader(new MemoryStream(assetData)))
+                    {
+                        br.BaseStream.Seek(20, SeekOrigin.Begin);
+
+                        var skip = br.ReadInt32() + 20;
+
+                        br.BaseStream.Seek(skip + 4, SeekOrigin.Begin);
+
+                        var stringsOffset = br.ReadInt32();
+
+                        br.BaseStream.Seek(skip + stringsOffset, SeekOrigin.Begin);
+
+                        var pathCounts = 0;
+
+                        while (true)
+                        {
+                            // Because we don't know the length of the string, we read the data until we reach a 0 value
+                            // That 0 value is the space between strings
+                            byte a;
+                            var pathName = new List<byte>();
+                            while ((a = br.ReadByte()) != 0)
+                            {
+                                if (a == 0xFF) break;
+
+                                pathName.Add(a);
+                            }
+
+                            if (a == 0xFF) break;
+
+                            // Read the string from the byte array and remove null terminators
+                            var path = Encoding.ASCII.GetString(pathName.ToArray()).Replace("\0", "");
+
+                            if (path.Equals(string.Empty)) continue;
+
+                            // Add the attribute to the list
+                            if (pathCounts == 0)
+                            {
+                                assets.Shared = path;
+                            }
+                            else if (pathCounts == 1)
+                            {
+                                assets.BaseFileName = path;
+                            }
+                            else
+                            {
+                                if (path.Contains(".mdl"))
+                                {
+                                    assets.MdlList.Add(path);
+                                }
+                                else if (path.Contains(".sgb"))
+                                {
+                                    assets.AdditionalAssetList.Add(path);
+                                }
+                                else if (!path.Contains("."))
+                                {
+                                    assets.BaseFolder = path;
+                                }
+                                else
+                                {
+                                    assets.OthersList.Add(path);
+                                }
+                            }
+
+                            pathCounts++;
+                        }
+                    }
+                });
             }
         }
 
@@ -533,7 +551,7 @@ namespace xivModdingFramework.Items.Categories
         /// <param name="modelID">The Model ID of the housing item</param>
         /// <param name="type">The type of housing item to search for</param>
         /// <returns>A list of Search Results</returns>
-        public List<SearchResults> SearchHousingByModelID(int modelID, XivItemType type)
+        public async Task<List<SearchResults>> SearchHousingByModelID(int modelID, XivItemType type)
         {
             var searchResultsList = new List<SearchResults>();
             var index = new Index(_gameDirectory);
@@ -546,12 +564,12 @@ namespace xivModdingFramework.Items.Categories
                 folder = $"bgcommon/hou/indoor/general/{id}/material";
             }
 
-            if (index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
+            if (await index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
             {
                 var searchResults = new SearchResults
                 {
                     Body = "-",
-                    Slot = "Indoor Furniture",
+                    Slot = XivStrings.Furniture_Indoor,
                     Variant = int.Parse(id)
                 };
 
@@ -560,12 +578,12 @@ namespace xivModdingFramework.Items.Categories
 
             folder = $"bgcommon/hou/outdoor/general/{id}/material";
 
-            if (index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
+            if (await index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
             {
                 var searchResults = new SearchResults
                 {
                     Body = "-",
-                    Slot = "Outdoor Furniture",
+                    Slot = XivStrings.Furniture_Outdoor,
                     Variant = int.Parse(id)
                 };
 

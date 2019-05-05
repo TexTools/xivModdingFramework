@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
@@ -34,11 +35,13 @@ namespace xivModdingFramework.Items.Categories
     {
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivLanguage _xivLanguage;
+        private readonly Ex _ex;
 
         public UI(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
         {
             _gameDirectory = gameDirectory;
             _xivLanguage = xivLanguage;
+            _ex = new Ex(_gameDirectory, _xivLanguage);
         }
 
         /// <summary>
@@ -49,15 +52,15 @@ namespace xivModdingFramework.Items.Categories
         /// They contain refrences to textures among other unknown things (likely placement data)
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetUldList()
+        public async Task<List<XivUi>> GetUldList()
         {
+            var uldLock = new object();
             var uldList = new List<XivUi>();
 
             var uld = new Uld(_gameDirectory);
-            var uldPaths = uld.GetTexFromUld();
+            var uldPaths = await uld.GetTexFromUld();
 
-            // Loops through the list of uld paths
-            foreach (var uldPath in uldPaths)
+            await Task.Run(() => Parallel.ForEach(uldPaths, (uldPath) =>
             {
                 var xivUi = new XivUi
                 {
@@ -67,10 +70,13 @@ namespace xivModdingFramework.Items.Categories
                     UiPath = "ui/uld"
                 };
 
-                if(xivUi.Name.Equals(string.Empty)) continue;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
-                uldList.Add(xivUi);
-            }
+                lock (uldLock)
+                {
+                    uldList.Add(xivUi);
+                }
+            }));
 
             uldList.Sort();
 
@@ -85,8 +91,9 @@ namespace xivModdingFramework.Items.Categories
         /// There may be unlisted maps which this does not check for
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetMapList()
+        public async Task<List<XivUi>> GetMapList()
         {
+            var mapLock = new object();
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int regionMapDataOffset = 12;
@@ -94,15 +101,14 @@ namespace xivModdingFramework.Items.Categories
 
             var mapList = new List<XivUi>();
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var placeNameData = ex.ReadExData(XivEx.placename);
-            var mapData = ex.ReadExData(XivEx.map);
+            var placeNameData = await _ex.ReadExData(XivEx.placename);
+            var mapData = await _ex.ReadExData(XivEx.map);
 
             var mapNameList = new List<string>();
 
             // Loops through all available maps in the map exd files
             // At present only one file exists (map_0)
-            foreach (var map in mapData.Values)
+            await Task.Run(() => Parallel.ForEach(mapData.Values, (map) =>
             {
                 int regionIndex;
                 int mapIndex;
@@ -121,7 +127,7 @@ namespace xivModdingFramework.Items.Categories
                     regionIndex = br.ReadInt16();
                     mapIndex = br.ReadInt16();
 
-                    if(mapIndex == 0) continue;
+                    if (mapIndex == 0) return;
 
                     br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
 
@@ -129,7 +135,7 @@ namespace xivModdingFramework.Items.Categories
                     // Size of the entire data chunk - size of the data portion
                     var mapPathLength = map.Length - dataLength;
 
-                    if(mapPathLength < 4) continue;
+                    if (mapPathLength < 4) return;
 
                     xivUi.UiPath = Encoding.UTF8.GetString(br.ReadBytes(mapPathLength)).Replace("\0", "");
                 }
@@ -138,7 +144,7 @@ namespace xivModdingFramework.Items.Categories
                 var regionName = GetPlaceName(placeNameData[regionIndex]);
                 var mapName = GetPlaceName(placeNameData[mapIndex]);
 
-                if (mapName.Equals(string.Empty)) continue;
+                if (mapName.Equals(string.Empty)) return;
 
                 xivUi.Name = mapName;
                 xivUi.ItemSubCategory = regionName;
@@ -148,10 +154,12 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = mapName + " " + xivUi.UiPath.Substring(xivUi.UiPath.Length - 2);
                 }
 
-                mapNameList.Add(mapName);
-
-                mapList.Add(xivUi);
-            }
+                lock (mapLock)
+                {
+                    mapNameList.Add(mapName);
+                    mapList.Add(xivUi);
+                }
+            }));
 
             mapList.Sort();
 
@@ -166,19 +174,19 @@ namespace xivModdingFramework.Items.Categories
         /// There may be some actions that are missing
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetActionList()
+        public async Task<List<XivUi>> GetActionList()
         {
-            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var actionLock = new object();
 
             // Data from the action_0 exd
-            var actionExData = ex.ReadExData(XivEx.action);
-            var actionCategoryExData = ex.ReadExData(XivEx.actioncategory);
+            var actionExData = await _ex.ReadExData(XivEx.action);
+            var actionCategoryExData = await _ex.ReadExData(XivEx.actioncategory);
 
             var actionList = new List<XivUi>();
 
             var actionNames = new List<string>();
 
-            foreach (var action in actionExData.Values)
+            await Task.Run(() => Parallel.ForEach(actionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -194,7 +202,7 @@ namespace xivModdingFramework.Items.Categories
                     br.BaseStream.Seek(8, SeekOrigin.Begin);
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(26, SeekOrigin.Begin);
                     actionCategory = br.ReadByte();
@@ -207,9 +215,8 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (xivUi.Name.Equals(string.Empty)) continue;
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (xivUi.Name.Equals(string.Empty)) return;
+                if (actionNames.Contains(xivUi.Name)) return;
 
                 var actionCategoryData = actionCategoryExData[actionCategory];
 
@@ -231,13 +238,17 @@ namespace xivModdingFramework.Items.Categories
                     }
                 }
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from generalaction_0
-            var generalActionExData = ex.ReadExData(XivEx.generalaction);
+            var generalActionExData = await _ex.ReadExData(XivEx.generalaction);
 
-            foreach (var action in generalActionExData.Values)
+            await Task.Run(() => Parallel.ForEach(generalActionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -257,7 +268,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
 
@@ -267,15 +278,17 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                actionNames.Add(xivUi.Name);
-
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from buddyaction_0
-            var buddyActionExData = ex.ReadExData(XivEx.buddyaction);
-             
-            foreach (var action in buddyActionExData.Values)
+            var buddyActionExData = await _ex.ReadExData(XivEx.buddyaction);
+
+            await Task.Run(() => Parallel.ForEach(buddyActionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -295,7 +308,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
 
@@ -305,16 +318,19 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from companyaction_0
-            var companyActionExData = ex.ReadExData(XivEx.companyaction);
+            var companyActionExData = await _ex.ReadExData(XivEx.companyaction);
 
-            foreach (var action in companyActionExData.Values)
+            await Task.Run(() => Parallel.ForEach(companyActionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -334,7 +350,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
 
@@ -344,16 +360,19 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from craftaction_100000
-            var craftActionExData = ex.ReadExData(XivEx.craftaction);
+            var craftActionExData = await _ex.ReadExData(XivEx.craftaction);
 
-            foreach (var action in craftActionExData.Values)
+            await Task.Run(() => Parallel.ForEach(craftActionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -373,7 +392,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(60, SeekOrigin.Begin);
 
@@ -383,16 +402,19 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from eventaction_0
-            var eventActionExData = ex.ReadExData(XivEx.eventaction);
+            var eventActionExData = await _ex.ReadExData(XivEx.eventaction);
 
-            foreach (var action in eventActionExData.Values)
+            await Task.Run(() => Parallel.ForEach(eventActionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -408,7 +430,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(16, SeekOrigin.Begin);
 
@@ -420,16 +442,19 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from emote_0
-            var emoteExData = ex.ReadExData(XivEx.emote);
+            var emoteExData = await _ex.ReadExData(XivEx.emote);
 
-            foreach (var action in emoteExData.Values)
+            await Task.Run(() => Parallel.ForEach(emoteExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -445,7 +470,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(40, SeekOrigin.Begin);
 
@@ -458,16 +483,19 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from marker_0
-            var markerExData = ex.ReadExData(XivEx.marker);
+            var markerExData = await _ex.ReadExData(XivEx.marker);
 
-            foreach (var action in markerExData.Values)
+            await Task.Run(() => Parallel.ForEach(markerExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -483,7 +511,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     var nameLength = action.Length - 6;
 
@@ -493,16 +521,19 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             // Data from fieldmarker_0
-            var fieldMarkerExData = ex.ReadExData(XivEx.fieldmarker);
+            var fieldMarkerExData = await _ex.ReadExData(XivEx.fieldmarker);
 
-            foreach (var action in fieldMarkerExData.Values)
+            await Task.Run(() => Parallel.ForEach(fieldMarkerExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -518,7 +549,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(12, SeekOrigin.Begin);
 
@@ -530,11 +561,14 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) continue;
-                actionNames.Add(xivUi.Name);
+                if (actionNames.Contains(xivUi.Name)) return;
 
-                actionList.Add(xivUi);
-            }
+                lock (actionLock)
+                {
+                    actionNames.Add(xivUi.Name);
+                    actionList.Add(xivUi);
+                }
+            }));
 
             actionList.Sort();
 
@@ -545,8 +579,9 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of status effect UI elements
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetStatusList()
+        public async Task<List<XivUi>> GetStatusList()
         {
+            var statusLock = new object();
             var statusList = new List<XivUi>();
 
             // These are the offsets to relevant data
@@ -555,10 +590,9 @@ namespace xivModdingFramework.Items.Categories
             const int typeDataOffset = 13;
             const int dataLength = 24;
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var statusExData = ex.ReadExData(XivEx.status);
+            var statusExData = await _ex.ReadExData(XivEx.status);
 
-            foreach (var status in statusExData.Values)
+            await Task.Run(() => Parallel.ForEach(statusExData.Values, (status) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -575,7 +609,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(typeDataOffset, SeekOrigin.Begin);
 
@@ -588,7 +622,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                     xivUi.Name = name;
 
-                    if(name.Equals(string.Empty)) continue;
+                    if (name.Equals(string.Empty)) return;
 
                     //Status effects have a byte that determines whether the effect is detrimental or beneficial
                     if (type == 1)
@@ -606,8 +640,11 @@ namespace xivModdingFramework.Items.Categories
                     }
                 }
 
-                statusList.Add(xivUi);
-            }
+                lock (statusLock)
+                {
+                    statusList.Add(xivUi);
+                }
+            }));
 
             statusList.Sort();
 
@@ -622,15 +659,15 @@ namespace xivModdingFramework.Items.Categories
         /// The names of the symbols are contained withing the placenamedata exd
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetMapSymbolList()
+        public async Task<List<XivUi>> GetMapSymbolList()
         {
+            var mapSymbolLock = new object();
             var mapSymbolList = new List<XivUi>();
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var mapSymbolExData = ex.ReadExData(XivEx.mapsymbol);
-            var placeNameData = ex.ReadExData(XivEx.placename);
+            var mapSymbolExData = await _ex.ReadExData(XivEx.mapsymbol);
+            var placeNameData = await _ex.ReadExData(XivEx.placename);
 
-            foreach (var mapSymbol in mapSymbolExData.Values)
+            await Task.Run(() => Parallel.ForEach(mapSymbolExData.Values, (mapSymbol) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -646,7 +683,7 @@ namespace xivModdingFramework.Items.Categories
 
                     placeNameIndex = br.ReadInt32();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     xivUi.IconNumber = iconNumber;
                 }
@@ -654,10 +691,13 @@ namespace xivModdingFramework.Items.Categories
                 // Gets the name of the map symbol from the placename exd
                 xivUi.Name = GetPlaceName(placeNameData[placeNameIndex]);
 
-                if(xivUi.Name.Equals(string.Empty)) continue;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
-                mapSymbolList.Add(xivUi);
-            }
+                lock (mapSymbolLock)
+                {
+                    mapSymbolList.Add(xivUi);
+                }
+            }));
 
             mapSymbolList.Sort();
 
@@ -668,8 +708,9 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of online status UI elements
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetOnlineStatusList()
+        public async Task<List<XivUi>> GetOnlineStatusList()
         {
+            var onlineStatusLock = new object();
             var onlineStatusList = new List<XivUi>();
 
             // These are the offsets to relevant data
@@ -677,10 +718,9 @@ namespace xivModdingFramework.Items.Categories
             const int iconNumberOffset = 6;
             const int dataSize = 12;
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var onlineStatusExData = ex.ReadExData(XivEx.onlinestatus);
+            var onlineStatusExData = await _ex.ReadExData(XivEx.onlinestatus);
 
-            foreach (var onlineStatus in onlineStatusExData.Values)
+            await Task.Run(() => Parallel.ForEach(onlineStatusExData.Values, (onlineStatus) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -695,7 +735,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     br.BaseStream.Seek(dataSize, SeekOrigin.Begin);
 
@@ -709,8 +749,11 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = name;
                 }
 
-                onlineStatusList.Add(xivUi);
-            }
+                lock (onlineStatusLock)
+                {
+                    onlineStatusList.Add(xivUi);
+                }
+            }));
 
             onlineStatusList.Sort();
 
@@ -721,8 +764,9 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of Weather UI elements
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetWeatherList()
+        public async Task<List<XivUi>> GetWeatherList()
         {
+            var weatherLock = new object();
             var weatherList = new List<XivUi>();
 
             // These are the offsets to relevant data
@@ -730,12 +774,11 @@ namespace xivModdingFramework.Items.Categories
             const int nameLengthOffset = 6;
             const int iconNumberOffest = 26;
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var weatherExData = ex.ReadExData(XivEx.weather);
+            var weatherExData = await _ex.ReadExData(XivEx.weather);
 
             var weatherNames = new List<string>();
 
-            foreach (var weather in weatherExData.Values)
+            await Task.Run(() => Parallel.ForEach(weatherExData.Values, (weather) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -754,7 +797,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) continue;
+                    if (iconNumber == 0) return;
 
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
 
@@ -762,11 +805,14 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = name;
                 }
 
-                if (weatherNames.Contains(xivUi.Name)) continue;
-                weatherNames.Add(xivUi.Name);
+                if (weatherNames.Contains(xivUi.Name)) return;
 
-                weatherList.Add(xivUi);
-            }
+                lock (weatherLock)
+                {
+                    weatherNames.Add(xivUi.Name);
+                    weatherList.Add(xivUi);
+                }
+            }));
 
             weatherList.Sort();
 
@@ -777,18 +823,18 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of available loading screen images
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public List<XivUi> GetLoadingImageList()
+        public async Task<List<XivUi>> GetLoadingImageList()
         {
+            var loadingImageLock = new object();
             var loadingImageList = new List<XivUi>();
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int dataLength = 4;
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var loadingImageExData = ex.ReadExData(XivEx.loadingimage);
+            var loadingImageExData = await _ex.ReadExData(XivEx.loadingimage);
 
-            foreach (var loadingImage in loadingImageExData.Values)
+            await Task.Run(() => Parallel.ForEach(loadingImageExData.Values, (loadingImage) =>
             {
                 var xivUi = new XivUi()
                 {
@@ -808,13 +854,16 @@ namespace xivModdingFramework.Items.Categories
 
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
 
-                    if(name.Equals("")) continue;
+                    if (name.Equals("")) return;
 
                     xivUi.Name = name;
                 }
 
-                loadingImageList.Add(xivUi);
-            }
+                lock (loadingImageLock)
+                {
+                    loadingImageList.Add(xivUi);
+                }
+            }));
 
             loadingImageList.Sort();
 
