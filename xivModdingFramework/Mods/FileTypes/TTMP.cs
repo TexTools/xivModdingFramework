@@ -24,6 +24,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes
@@ -381,7 +382,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="progress">The progress of the import</param>
         /// <returns>The number of total mods imported</returns>
         public async Task<(int ImportCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
-            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<double> progress)
+            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
             var dat = new Dat(gameDirectory);
             var modListFullPaths = new List<string>();
@@ -411,7 +412,9 @@ namespace xivModdingFramework.Mods.FileTypes
                             {
                                 using (var fileStream = new FileStream(_tempMPD, FileMode.OpenOrCreate))
                                 {
+                                    progress?.Report((0, modsJson.Count, GeneralStrings.TTMP_ReadingContent));
                                     await zipStream.CopyToAsync(fileStream);
+                                    progress?.Report((0, modsJson.Count, GeneralStrings.TTMP_StartImport));
 
                                     using (var binaryReader = new BinaryReader(fileStream))
                                     {
@@ -459,7 +462,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                     $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
                                             }
 
-                                            progress?.Report((double)modCount / modsJson.Count);
+                                            progress?.Report((modCount, modsJson.Count, string.Empty));
 
                                             modCount++;
                                         }
