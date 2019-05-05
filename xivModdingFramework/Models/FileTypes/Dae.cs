@@ -784,6 +784,11 @@ namespace xivModdingFramework.Models.FileTypes
                                                 boneNum++;
                                             }
                                         }
+
+                                        if (advImportSettings == null && (boneNum > boneDict.Count))
+                                        {
+                                            throw new Exception("Extra bones detected, please use Advanced Import.");
+                                        }
                                     }
 
                                     if (reader.Name.Contains("float_array"))
