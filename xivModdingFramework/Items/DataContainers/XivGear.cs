@@ -82,6 +82,19 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public int EquipSlotCategory { get; set; }
 
+        public object Clone()
+        {
+            var copy = (XivGear)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
+
+            if (SecondaryModelInfo != null)
+            {
+                copy.SecondaryModelInfo = (XivModelInfo)SecondaryModelInfo.Clone();
+            }
+
+            return copy;
+        }
+
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivGear) obj).Name, StringComparison.Ordinal);

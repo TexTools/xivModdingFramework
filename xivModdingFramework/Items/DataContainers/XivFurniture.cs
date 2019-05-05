@@ -66,10 +66,16 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public uint IconNumber { get; set; }
 
-
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivFurniture)obj).Name, StringComparison.Ordinal);
+        }
+
+        public object Clone()
+        {
+            var copy = (XivFurniture)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
+            return copy;
         }
     }
 }

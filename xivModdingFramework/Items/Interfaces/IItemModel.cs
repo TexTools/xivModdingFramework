@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using xivModdingFramework.Items.DataContainers;
 
 namespace xivModdingFramework.Items.Interfaces
@@ -21,7 +22,7 @@ namespace xivModdingFramework.Items.Interfaces
     /// <summary>
     /// Interface for Items that have model data
     /// </summary>
-    public interface IItemModel : IItem
+    public interface IItemModel : IItem, ICloneable
     {
         /// <summary>
         /// The Primary Model Information of the Item
