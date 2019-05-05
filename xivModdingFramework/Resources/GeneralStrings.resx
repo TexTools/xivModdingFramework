@@ -117,6 +117,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="TTMP_Creating" xml:space="preserve">
+    <value>Creating TTMP File...</value>
+  </data>
   <data name="TTMP_ReadingContent" xml:space="preserve">
     <value>Reading TTMP Content...</value>
   </data>

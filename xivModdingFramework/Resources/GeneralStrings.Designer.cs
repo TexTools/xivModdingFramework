@@ -61,6 +61,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Creating TTMP File....
+        /// </summary>
+        internal static string TTMP_Creating {
+            get {
+                return ResourceManager.GetString("TTMP_Creating", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Reading TTMP Content....
         /// </summary>
         internal static string TTMP_ReadingContent {

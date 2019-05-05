@@ -180,14 +180,14 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <returns>The number of mods processed for the mod pack</returns>
-        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, DirectoryInfo gameDirectory, IProgress<double> progress)
+        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress)
         {
             var processCount = await Task.Run<int>(() =>
             {
                 var dat = new Dat(gameDirectory);
                 _tempMPD = Path.GetTempFileName();
                 _tempMPL = Path.GetTempFileName();
-                var modCount = 1;
+                var modCount = 0;
 
                 var modPackJson = new ModPackJson
                 {
@@ -199,64 +199,70 @@ namespace xivModdingFramework.Mods.FileTypes
                     SimpleModsList = new List<ModsJson>()
                 };
 
-                using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Open)))
+                try
                 {
-                    foreach (var simpleModData in modPackData.SimpleModDataList)
+                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Open)))
                     {
-                        var modsJson = new ModsJson
+                        foreach (var simpleModData in modPackData.SimpleModDataList)
                         {
-                            Name = simpleModData.Name,
-                            Category = simpleModData.Category.GetEnDisplayName(),
-                            FullPath = simpleModData.FullPath,
-                            ModSize = simpleModData.ModSize,
-                            DatFile = simpleModData.DatFile,
-                            ModOffset = binaryWriter.BaseStream.Position
-                        };
+                            var modsJson = new ModsJson
+                            {
+                                Name = simpleModData.Name,
+                                Category = simpleModData.Category.GetEnDisplayName(),
+                                FullPath = simpleModData.FullPath,
+                                ModSize = simpleModData.ModSize,
+                                DatFile = simpleModData.DatFile,
+                                ModOffset = binaryWriter.BaseStream.Position
+                            };
 
-                        var rawData = dat.GetRawData((int)simpleModData.ModOffset, XivDataFiles.GetXivDataFile(simpleModData.DatFile),
-                            simpleModData.ModSize);
+                            var rawData = dat.GetRawData((int) simpleModData.ModOffset,
+                                XivDataFiles.GetXivDataFile(simpleModData.DatFile),
+                                simpleModData.ModSize);
 
-                        if (rawData == null)
-                        {
-                            throw new Exception("Unable to obtain data for the following mod\n\n" +
-                                                $"Name: {simpleModData.Name}\nFull Path: {simpleModData.FullPath}\n" +
-                                                $"Mod Offset: {simpleModData.ModOffset}\nData File: {simpleModData.DatFile}\n\n" +
-                                                $"Unselect the above mod and try again.");
+                            if (rawData == null)
+                            {
+                                throw new Exception("Unable to obtain data for the following mod\n\n" +
+                                                    $"Name: {simpleModData.Name}\nFull Path: {simpleModData.FullPath}\n" +
+                                                    $"Mod Offset: {simpleModData.ModOffset}\nData File: {simpleModData.DatFile}\n\n" +
+                                                    $"Unselect the above mod and try again.");
+                            }
+
+                            binaryWriter.Write(rawData);
+
+                            modPackJson.SimpleModsList.Add(modsJson);
+
+                            progress?.Report((++modCount, modPackData.SimpleModDataList.Count, string.Empty));
                         }
-
-                        binaryWriter.Write(rawData);
-
-                        modPackJson.SimpleModsList.Add(modsJson);
-
-                        progress?.Report((double)modCount / modPackData.SimpleModDataList.Count);
-
-                        modCount++;
                     }
-                }
 
-                File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
+                    progress?.Report((0, modPackData.SimpleModDataList.Count, GeneralStrings.TTMP_Creating));
 
-                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
+                    File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                if (File.Exists(modPackPath))
-                {
-                    var fileNum = 1;
-                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
-                    while (File.Exists(modPackPath))
+                    var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
+
+                    if (File.Exists(modPackPath))
                     {
-                        fileNum++;
+                        var fileNum = 1;
                         modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                        while (File.Exists(modPackPath))
+                        {
+                            fileNum++;
+                            modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                        }
+                    }
+
+                    using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
+                    {
+                        zip.CreateEntryFromFile(_tempMPL, "TTMPL.mpl");
+                        zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
                     }
                 }
-
-                using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
+                finally
                 {
-                    zip.CreateEntryFromFile(_tempMPL, "TTMPL.mpl");
-                    zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
+                    File.Delete(_tempMPD);
+                    File.Delete(_tempMPL);
                 }
-
-                File.Delete(_tempMPD);
-                File.Delete(_tempMPL);
 
                 return modCount;
             });
