@@ -77,16 +77,27 @@ namespace xivModdingFramework.Helpers
         /// <returns>A string containing the full save path for the given item</returns>
         public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
         {
-            string path;
+            string path, validItemName;
+
+            // Check for invalid characters and replace with dash 
+            if (item.Name.Equals("???"))
+            {
+                validItemName = "Unk";
+            }
+            else
+            {
+                validItemName = string.Join("：", item.Name.Split(Path.GetInvalidFileNameChars()));
+            }
+
             if (item.Category.Equals("UI"))
             {
                 if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.ItemSubCategory}/{item.Name}";
+                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.ItemSubCategory}/{validItemName}";
                 }
                 else
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.Name}";
+                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{validItemName}";
                 }
 
                 if (path.Contains("???"))
@@ -98,18 +109,18 @@ namespace xivModdingFramework.Helpers
             {
                 if (item.Name.Equals(XivStrings.Equipment_Decals) || item.Name.Equals(XivStrings.Face_Paint))
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{item.Name}";
+                    path = $"{saveDirectory.FullName}/{item.Category}/{validItemName}";
                 }
                 else
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{item.Name}/{race}/{((IItemModel)item).ModelInfo.Body}";
+                    path = $"{saveDirectory.FullName}/{item.Category}/{validItemName}/{race}/{((IItemModel)item).ModelInfo.Body}";
                 }
             }
             else
             {
-                path = $"{saveDirectory.FullName}/{item.ItemCategory}/{item.Name}";
+                path = $"{saveDirectory.FullName}/{item.ItemCategory}/{validItemName}";
             }
-
+            
             return path;
         }
 
