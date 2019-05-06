@@ -262,7 +262,7 @@ namespace xivModdingFramework.Mods
         /// Toggles all mods on or off
         /// </summary>
         /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
-        public async Task ToggleAllMods(bool enable)
+        public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null)
         {
             var index = new Index(_gameDirectory);
 
@@ -270,6 +270,7 @@ namespace xivModdingFramework.Mods
 
             if(modList == null || modList.modCount == 0) return;
 
+            var modNum = 0;
             foreach (var modEntry in modList.Mods)
             {
                 if(string.IsNullOrEmpty(modEntry.name)) continue;
@@ -287,6 +288,8 @@ namespace xivModdingFramework.Mods
                     await index.UpdateIndex2(modEntry.data.originalOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
                     modEntry.enabled = false;
                 }
+
+                progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
             using (var fileStream = new FileStream(ModListDirectory.FullName, FileMode.Create, FileAccess.Write,
