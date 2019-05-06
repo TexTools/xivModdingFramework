@@ -118,6 +118,11 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     catch (Exception e)
                     {
+                        if (e.GetType() == typeof(FileNotFoundException))
+                        {
+                            throw e;
+                        }
+
                         skelName = modelName.Substring(0, 5);
                         if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
                         {

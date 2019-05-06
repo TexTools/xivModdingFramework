@@ -120,7 +120,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else
             {
-                throw new Exception("AssetCc2 could not be found.");
+                throw new FileNotFoundException("AssetCc2 could not be found.");
             }
         }
 
