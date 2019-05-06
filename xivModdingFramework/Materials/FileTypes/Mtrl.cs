@@ -44,13 +44,19 @@ namespace xivModdingFramework.Materials.FileTypes
     {
         private const string MtrlExtension = ".mtrl";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
+        private XivDataFile _dataFile;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
         public Mtrl(DirectoryInfo gameDirectory, XivDataFile dataFile)
         {
             _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
+            DataFile = dataFile;
+        }
+
+        public XivDataFile DataFile
+        {
+            get => _dataFile;
+            set => _dataFile = value;
         }
 
         /// <summary>
@@ -76,7 +82,7 @@ namespace xivModdingFramework.Materials.FileTypes
             // Get mtrl offset
             var mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
                 HashGenerator.GetHash(mtrlPath.File),
-                _dataFile);
+                DataFile);
 
             if (mtrlOffset == 0 && itemType == XivItemType.furniture)
             {
@@ -86,7 +92,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 // Get mtrl offset
                 mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
                     HashGenerator.GetHash(mtrlPath.File),
-                    _dataFile);
+                    DataFile);
             }
 
             if (mtrlOffset == 0)
@@ -104,7 +110,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     // Get mtrl offset
                     mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
                         HashGenerator.GetHash(mtrlPath.File),
-                        _dataFile);
+                        DataFile);
 
                     // If secondary info with body at 1 does not give an offset, go back to primary
                     if (mtrlOffset == 0)
@@ -116,7 +122,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         // Get mtrl offset
                         mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
                             HashGenerator.GetHash(mtrlPath.File),
-                            _dataFile);
+                            DataFile);
 
                         if (mtrlOffset == 0)
                         {
@@ -134,7 +140,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (mtrlPath.HasVfx)
             {
-                var atex = new ATex(_gameDirectory, _dataFile);
+                var atex = new ATex(_gameDirectory, DataFile);
                 mtrlData.TextureTypePathList.AddRange(await atex.GetAtexPaths(itemModel));
             }
 
@@ -170,7 +176,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             // Get mtrl offset
             var mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlFolder), HashGenerator.GetHash(mtrlFile),
-                _dataFile);
+                DataFile);
 
             if (mtrlOffset == 0)
             {
@@ -194,7 +200,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var index = new Index(_gameDirectory);
 
             // Get uncompressed mtrl data
-            var mtrlData = await dat.GetType2Data(mtrlOffset, _dataFile);
+            var mtrlData = await dat.GetType2Data(mtrlOffset, DataFile);
 
             XivMtrl xivMtrl = null;
 
@@ -295,7 +301,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                             if (await index.FileExists(HashGenerator.GetHash(dx11FileName),
                                 HashGenerator.GetHash(Path.GetDirectoryName(texturePath).Replace("\\", "/")),
-                                _dataFile))
+                                DataFile))
                             {
                                 texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
                             }
@@ -305,7 +311,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
 
                         // add the textures to the TextureTypePathList
-                        xivMtrl.TextureTypePathList.AddRange(await GetTexNames(xivMtrl.TexturePathList, _dataFile));
+                        xivMtrl.TextureTypePathList.AddRange(await GetTexNames(xivMtrl.TexturePathList, DataFile));
 
                         // get the map path strings
                         xivMtrl.MapPathList = new List<string>(xivMtrl.MapCount);
@@ -332,7 +338,7 @@ namespace xivModdingFramework.Materials.FileTypes
                             {
                                 Path = mtrlPath,
                                 Type = XivTexType.ColorSet,
-                                DataFile = _dataFile
+                                DataFile = DataFile
                             };
                             xivMtrl.TextureTypePathList.Add(ttp);
                         }
@@ -771,7 +777,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, _dataFile);
+                var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
 
@@ -791,7 +797,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
                 bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
 
-                var imc = new Imc(_gameDirectory, _dataFile);
+                var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo);
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
             }
@@ -882,7 +888,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, _dataFile);
+                var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
             }
