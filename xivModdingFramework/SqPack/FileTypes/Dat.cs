@@ -1022,7 +1022,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (modEntry != null)
             {
                 datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+                modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
 
                 if (!File.Exists(modDatPath))
                 {
