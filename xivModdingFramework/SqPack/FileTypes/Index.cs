@@ -52,8 +52,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var indexPaths = new[]
             {
-                _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension,
-                _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension
+                Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}"),
+                Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}")
             };
 
             foreach (var indexPath in indexPaths)
@@ -76,8 +76,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var indexPaths = new[]
             {
-                _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension,
-                _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension
+                Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}"),
+                Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}")
             };
 
             for (var i = 0; i < indexPaths.Length; i++)
@@ -129,7 +129,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             return Task.Run(async () =>
             {
-                var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
                 var offset = 0;
 
                 // These are the offsets to relevant data
@@ -193,7 +193,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return Task.Run(() =>
             {
                 var fileDictionary = new Dictionary<string, int>();
-                var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
                 // These are the offsets to relevant data
                 const int fileCountOffset = 1036;
@@ -246,7 +246,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     const int fileCountOffset = 1036;
                     const int dataStartOffset = 2048;
 
-                    var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+                    var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
                     using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
@@ -292,7 +292,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if it exists, False otherwise</returns>
         public async Task<bool> FileExists(int fileHash, int folderHash, XivDataFile dataFile)
         {
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             // These are the offsets to relevant data
             const int fileCountOffset = 1036;
@@ -340,7 +340,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if it exists, False otherwise</returns>
         public async Task<bool> FolderExists(int folderHash, XivDataFile dataFile)
         {
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             // These are the offsets to relevant data
             const int fileCountOffset = 1036;
@@ -387,7 +387,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await Task.Run(() =>
             {
@@ -431,7 +431,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await Task.Run(() =>
             {
@@ -471,7 +471,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await Task.Run(() =>
             {
@@ -514,7 +514,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await Task.Run(() =>
             {
@@ -574,7 +574,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Index 1 Closure
             {
-                var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
                 // Dump the index into memory, since we're going to have to inject data.
                 byte[] originalIndex = File.ReadAllBytes(indexPath);
@@ -691,7 +691,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Index 2 Closure
             {
-                var index2Path = _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension;
+                var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
 
                 // Dump the index into memory, since we're going to have to inject data.
                 byte[] originalIndex = File.ReadAllBytes(index2Path);
@@ -817,7 +817,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Index 1 Closure
             {
-                var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
                 // Dump the index into memory, since we're going to have to inject data.
                 byte[] originalIndex = File.ReadAllBytes(indexPath);
@@ -956,7 +956,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Index 2 Closure
             {
-                var index2Path = _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension;
+                var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
 
                 // Dump the index into memory, since we're going to have to inject data.
                 byte[] originalIndex = File.ReadAllBytes(index2Path);
@@ -1064,7 +1064,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            var indexPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + IndexExtension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await Task.Run(() =>
             {
@@ -1125,7 +1125,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            var index2Path = _gameDirectory + "\\" + dataFile.GetDataFileName() + Index2Extension;
+            var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
 
             await Task.Run(() =>
             {
@@ -1168,11 +1168,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var fileName = dataFile.GetDataFileName();
 
-            var indexPath = _gameDirectory + "\\" + fileName + IndexExtension;
-            var index2Path = _gameDirectory + "\\" + fileName + Index2Extension;
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
+            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{Index2Extension}");
 
-            var indexBackupPath = backupsDirectory.FullName + "\\" + fileName + IndexExtension;
-            var index2BackupPath = backupsDirectory.FullName + "\\" + fileName + Index2Extension;
+            var indexBackupPath = Path.Combine(backupsDirectory.FullName, $"{fileName}{IndexExtension}");
+            var index2BackupPath = Path.Combine(backupsDirectory.FullName, $"{fileName}{Index2Extension}");
 
             Directory.CreateDirectory(backupsDirectory.FullName);
 
@@ -1205,8 +1205,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             var fileName = dataFile.GetDataFileName();
             var isLocked = false;
 
-            var indexPath = $"{_gameDirectory}\\{fileName}{IndexExtension}";
-            var index2Path = $"{_gameDirectory}\\{fileName}{Index2Extension}";
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
+            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
 
             FileStream stream = null;
             FileStream stream1 = null;
