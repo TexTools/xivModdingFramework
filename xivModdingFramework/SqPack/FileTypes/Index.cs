@@ -1206,7 +1206,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var isLocked = false;
 
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
-            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
+            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{Index2Extension}");
 
             FileStream stream = null;
             FileStream stream1 = null;
