@@ -75,7 +75,7 @@ namespace xivModdingFramework.Helpers
 
                 for (var i = 0; i < largestDatNum; i++)
                 {
-                    var fileInfo = new FileInfo($"{_gameDirectory}\\{dataFile.GetDataFileName()}.win32.dat{i}");
+                    var fileInfo = new FileInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.dat{i}"));
 
                     try
                     {
@@ -114,9 +114,9 @@ namespace xivModdingFramework.Helpers
             return Task.Run(() =>
             {
                 var backupDataFile =
-                    new DirectoryInfo($"{backupsDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
+                    new DirectoryInfo(Path.Combine(backupsDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
                 var currentDataFile =
-                    new DirectoryInfo($"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}.win32.index");
+                    new DirectoryInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
 
                 var backupHash = _index.GetIndexSection1Hash(backupDataFile);
                 var currentHash = _index.GetIndexSection1Hash(currentDataFile);
