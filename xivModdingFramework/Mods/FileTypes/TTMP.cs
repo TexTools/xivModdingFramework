@@ -141,16 +141,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
+                var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
 
                 if (File.Exists(modPackPath))
                 {
                     var fileNum = 1;
-                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                    modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                     while (File.Exists(modPackPath))
                     {
                         fileNum++;
-                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                     }
                 }
 
@@ -239,16 +239,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                    var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
+                    var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
 
                     if (File.Exists(modPackPath))
                     {
                         var fileNum = 1;
-                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                         while (File.Exists(modPackPath))
                         {
                             fileNum++;
-                            modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                            modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                         }
                     }
 

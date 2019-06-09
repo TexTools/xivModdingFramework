@@ -71,7 +71,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return 8;
             }
 
-            var datPath = $"{_gameDirectory.FullName}\\{dataFile.GetDataFileName()}{DatExtension}{nextDatNumber}";
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{nextDatNumber}");
 
             using (var fs = File.Create(datPath))
             {
@@ -301,7 +301,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = ((offset / 8) & 0x0F) / 2;
 
-            var datPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
             await _semaphoreSlim.WaitAsync();
 
@@ -545,7 +545,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             offset = OffsetCorrection(datNum, offset);
 
-            var datPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
             var byteList = new List<byte>();
             var meshCount = 0;
@@ -717,7 +717,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 offset = OffsetCorrection(datNum, offset);
 
-                var datPath = _gameDirectory + "\\" + dataFile.GetDataFileName() + DatExtension + datNum;
+                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
                 await Task.Run(async () =>
                 {
@@ -848,7 +848,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             offset = OffsetCorrection(datNum, offset);
 
-            var datPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
             if (File.Exists(datPath))
             {
@@ -873,7 +873,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             offset = OffsetCorrection(datNum, offset);
 
-            var datPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
             using (var br = new BinaryReader(File.OpenRead(datPath)))
             {
@@ -1011,7 +1011,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var datNum = GetLargestDatNumber(dataFile);
 
-            var modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            var modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
             if (category.Equals(itemName))
             {
@@ -1022,7 +1022,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (modEntry != null)
             {
                 datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                modDatPath = $"{_gameDirectory}\\{modEntry.datFile}{DatExtension}{datNum}";
+                modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
 
                 if (!File.Exists(modDatPath))
                 {
@@ -1040,7 +1040,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     datNum = CreateNewDat(dataFile);
 
-                    modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
                 }
                 else
                 {
@@ -1049,7 +1049,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         datNum = CreateNewDat(dataFile);
 
-                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
                     }
                 }
             }
@@ -1085,7 +1085,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var sizeDiff = modEntry.data.modSize - importData.Count;
 
                     datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                    modDatPath = _gameDirectory + "\\" + modEntry.datFile + DatExtension + datNum;
+                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
                     var datOffsetAmount = 16 * datNum;
 
                     using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
@@ -1145,7 +1145,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             var sizeDiff = emptyEntryLength - importData.Count;
 
                             datNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
-                            modDatPath = _gameDirectory + "\\" + mod.datFile + DatExtension + datNum;
+                            modDatPath = Path.Combine(_gameDirectory.FullName, $"{mod.datFile}{DatExtension}{datNum}");
                             var datOffsetAmount = 16 * datNum;
 
                             using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
@@ -1219,7 +1219,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         datNum = GetLargestDatNumber(dataFile);
 
-                        modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
                         fileLength = new FileInfo(modDatPath).Length;
 
@@ -1227,7 +1227,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             datNum = CreateNewDat(dataFile);
 
-                            modDatPath = $"{_gameDirectory}\\{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+                            modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
                         }
 
                         if (datNum >= 8)
