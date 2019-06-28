@@ -33,11 +33,7 @@ namespace xivModdingFramework.General.Enums
         [Description("de")] German,
         [Description("fr")] French,
         [Description("ko")] Korean,
-        //esrinzou for china ffxiv
-        //[Description("zh")] Chinese
-        //esrinzou begin
         [Description("chs")] Chinese
-        //esrinzou end
     }
 
     /// <summary>
