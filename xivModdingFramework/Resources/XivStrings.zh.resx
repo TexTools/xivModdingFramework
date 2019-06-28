@@ -123,11 +123,17 @@
   <data name="All" xml:space="preserve">
     <value>全部</value>
   </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>敖龙族 女性</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>敖龙族 男性</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>敖龙族</value>
   </data>
   <data name="Bishop_Autoturret" xml:space="preserve">
-    <value>Bishop Autoturret</value>
+    <value>象式浮空炮塔</value>
   </data>
   <data name="Body" xml:space="preserve">
     <value>身体</value>
@@ -162,8 +168,14 @@
   <data name="Elezen" xml:space="preserve">
     <value>精灵族</value>
   </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>精灵族 女性</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>精灵族 男性</value>
+  </data>
   <data name="Eos" xml:space="preserve">
-    <value>Eos</value>
+    <value>朝日小仙女</value>
   </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>Equipment Decals</value>
@@ -172,10 +184,10 @@
     <value>Directory Error</value>
   </data>
   <data name="Error_FileNotFound" xml:space="preserve">
-    <value>Unable to find file, please check your directories under settings</value>
+    <value>无法找到文件，请确定设置的目录是否有误</value>
   </data>
   <data name="Etc" xml:space="preserve">
-    <value>Etc</value>
+    <value>等等</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>面对</value>
@@ -192,8 +204,14 @@
   <data name="Food" xml:space="preserve">
     <value>食品</value>
   </data>
+  <data name="Furniture" xml:space="preserve">
+    <value>家具</value>
+  </data>
   <data name="Garuda_Egi" xml:space="preserve">
-    <value>Garuda-Egi</value>
+    <value>迦楼罗之灵</value>
+  </data>
+  <data name="Gear" xml:space="preserve">
+    <value>装备</value>
   </data>
   <data name="Hair" xml:space="preserve">
     <value>发型</value>
@@ -207,14 +225,32 @@
   <data name="Head_Body" xml:space="preserve">
     <value>头部 + 身体</value>
   </data>
+  <data name="Housing" xml:space="preserve">
+    <value>房屋</value>
+  </data>
   <data name="Hyur_H" xml:space="preserve">
     <value>人族 高地之民</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>人族 高地之民 女性</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>人族 高地之民 男性</value>
   </data>
   <data name="Hyur_M" xml:space="preserve">
     <value>人族 中原之民</value>
   </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>人族 中原之民 女性</value>
+  </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>人族 中原之民 男性</value>
+  </data>
+  <data name="Icon" xml:space="preserve">
+    <value>图标</value>
+  </data>
   <data name="Ifrit_Egi" xml:space="preserve">
-    <value>Ifrit-Egi</value>
+    <value>伊弗利特之灵</value>
   </data>
   <data name="Iris" xml:space="preserve">
     <value>眼</value>
@@ -222,14 +258,26 @@
   <data name="Lalafell" xml:space="preserve">
     <value>拉拉菲尔族</value>
   </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>拉拉菲尔族 女性</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>拉拉菲尔族 男性</value>
+  </data>
   <data name="Language" xml:space="preserve">
     <value>chs</value>
+  </data>
+  <data name="Left" xml:space="preserve">
+    <value>左</value>
   </data>
   <data name="Legs" xml:space="preserve">
     <value>腿部</value>
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>腿部 + 脚部</value>
+  </data>
+  <data name="Loading_Screen" xml:space="preserve">
+    <value>加载画面</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>主手</value>
@@ -240,6 +288,9 @@
   <data name="Male" xml:space="preserve">
     <value>男性</value>
   </data>
+  <data name="Maps" xml:space="preserve">
+    <value>地图</value>
+  </data>
   <data name="Mask" xml:space="preserve">
     <value>Mask</value>
   </data>
@@ -248,6 +299,12 @@
   </data>
   <data name="Miqote" xml:space="preserve">
     <value>猫魅族</value>
+  </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>猫魅族 女性</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>猫魅族 男性</value>
   </data>
   <data name="Monster" xml:space="preserve">
     <value>魔物</value>
@@ -261,29 +318,53 @@
   <data name="Normal" xml:space="preserve">
     <value>Normal</value>
   </data>
+  <data name="Number" xml:space="preserve">
+    <value>数</value>
+  </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>副手</value>
+  </data>
+  <data name="Part" xml:space="preserve">
+    <value>部分</value>
   </data>
   <data name="Pets" xml:space="preserve">
     <value>召唤兽</value>
   </data>
+  <data name="Race" xml:space="preserve">
+    <value>种族</value>
+  </data>
   <data name="Ramuh_Egi" xml:space="preserve">
-    <value>Ramuh Egi</value>
+    <value>拉姆之灵</value>
+  </data>
+  <data name="Right" xml:space="preserve">
+    <value>右</value>
   </data>
   <data name="Rings" xml:space="preserve">
     <value>戒指</value>
   </data>
+  <data name="Ring_Left" xml:space="preserve">
+    <value>左指</value>
+  </data>
+  <data name="Ring_Right" xml:space="preserve">
+    <value>右指</value>
+  </data>
   <data name="Roegadyn" xml:space="preserve">
     <value>鲁加族</value>
   </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>鲁加族 女性</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>鲁加族 男性</value>
+  </data>
   <data name="Rook_Autoturret" xml:space="preserve">
-    <value>Rook Autoturret</value>
+    <value>车式浮空炮塔</value>
   </data>
   <data name="SearchBox" xml:space="preserve">
     <value>搜索 Textures</value>
   </data>
   <data name="Selene" xml:space="preserve">
-    <value>Selene</value>
+    <value>夕月小仙女</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>灵魂水晶</value>
@@ -294,11 +375,17 @@
   <data name="Tail" xml:space="preserve">
     <value>尾巴</value>
   </data>
+  <data name="Texture_Map" xml:space="preserve">
+    <value>纹理</value>
+  </data>
   <data name="Titan_Egi" xml:space="preserve">
-    <value>Titan-Egi</value>
+    <value>泰坦之灵</value>
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>双手</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>类型</value>
   </data>
   <data name="Waist" xml:space="preserve">
     <value>腰带</value>

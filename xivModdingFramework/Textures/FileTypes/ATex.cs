@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -45,7 +46,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="itemModel">The item to get the atex paths for</param>
         /// <returns>A list of TexTypePath containing the atex info</returns>
-        public List<TexTypePath> GetAtexPaths(IItemModel itemModel)
+        public async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel)
         {
             var atexTexTypePathList = new List<TexTypePath>();
 
@@ -54,9 +55,9 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var itemType = ItemType.GetItemType(itemModel);
 
-            var vfxPath = GetVfxPath(itemModel, itemType);
+            var vfxPath = await GetVfxPath(itemModel, itemType);
 
-            var vfxOffset = index.GetDataOffset(HashGenerator.GetHash(vfxPath.Folder), HashGenerator.GetHash(vfxPath.File),
+            var vfxOffset = await index.GetDataOffset(HashGenerator.GetHash(vfxPath.Folder), HashGenerator.GetHash(vfxPath.File),
                 _dataFile);
 
             if (vfxOffset == 0)
@@ -64,7 +65,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new Exception($"Could not find offset for vfx path {vfxPath.Folder}/{vfxPath.File}");
             }
 
-            var aTexPaths = avfx.GetATexPaths(vfxOffset);
+            var aTexPaths = await avfx.GetATexPaths(vfxOffset);
 
             foreach (var atexPath in aTexPaths)
             {
@@ -86,10 +87,10 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the ATex file</param>
         /// <returns>An XivTex with all the texture data</returns>
-        public XivTex GetATexData(int offset)
+        public async Task<XivTex> GetATexData(int offset)
         {
             var dat = new Dat(_gameDirectory);
-            var atexData = dat.GetType2Data(offset, _dataFile);
+            var atexData = await dat.GetType2Data(offset, _dataFile);
 
             var xivTex = new XivTex();
 
@@ -118,11 +119,11 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="itemModel">The item to get the avfx path for</param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>A tuple containing the path folder and file</returns>
-        private (string Folder, string File) GetVfxPath(IItemModel itemModel, XivItemType itemType)
+        private async Task<(string Folder, string File)> GetVfxPath(IItemModel itemModel, XivItemType itemType)
         {
             // get the vfx version from the imc file
             var imc = new Imc(_gameDirectory, _dataFile);
-            var imcInfo = imc.GetImcInfo(itemModel, itemModel.ModelInfo);
+            var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
             int vfx = imcInfo.Vfx;
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');

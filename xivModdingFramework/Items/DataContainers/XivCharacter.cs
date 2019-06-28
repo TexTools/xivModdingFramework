@@ -72,5 +72,11 @@ namespace xivModdingFramework.Items.DataContainers
             return string.Compare(Name, ((XivCharacter)obj).Name, StringComparison.Ordinal);
         }
 
+        public object Clone()
+        {
+            var copy = (XivCharacter)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo) ModelInfo?.Clone();
+            return copy;
+        }
     }
 }

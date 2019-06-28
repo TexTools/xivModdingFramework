@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -38,52 +39,55 @@ namespace xivModdingFramework.VFX.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the avfx file</param>
         /// <returns>A list of atex paths</returns>
-        public List<string> GetATexPaths(int offset)
+        public async Task<List<string>> GetATexPaths(int offset)
         {
             var atexList = new List<string>();
 
             var dat = new Dat(_gameDirectory);
 
-            var avfxData = dat.GetType2Data(offset, _dataFile);
+            var avfxData = await dat.GetType2Data(offset, _dataFile);
 
-            using (var br = new BinaryReader(new MemoryStream(avfxData)))
+            await Task.Run(() =>
             {
-                var data = br.ReadInt32();
-
-                // Advance to the path data header
-                while (data != 5531000)
+                using (var br = new BinaryReader(new MemoryStream(avfxData)))
                 {
-                    data = br.ReadInt32();
-                }
+                    var data = br.ReadInt32();
 
-                // While the data is a path data header
-                while (data == 5531000)
-                {
-                    var pathLength = br.ReadInt32();
-
-                    atexList.Add(Encoding.UTF8.GetString(br.ReadBytes(pathLength)).Replace("\0", ""));
-
-                    try
+                    // Advance to the path data header
+                    while (data != 5531000)
                     {
-                        while (br.PeekChar() != 120)
-                        {
-                            if (br.PeekChar() == -1)
-                            {
-                                break;
-                            }
-
-                            br.ReadByte();
-                        }
-
                         data = br.ReadInt32();
                     }
-                    catch
-                    {
-                        break;
-                    }
 
+                    // While the data is a path data header
+                    while (data == 5531000)
+                    {
+                        var pathLength = br.ReadInt32();
+
+                        atexList.Add(Encoding.UTF8.GetString(br.ReadBytes(pathLength)).Replace("\0", ""));
+
+                        try
+                        {
+                            while (br.PeekChar() != 120)
+                            {
+                                if (br.PeekChar() == -1)
+                                {
+                                    break;
+                                }
+
+                                br.ReadByte();
+                            }
+
+                            data = br.ReadInt32();
+                        }
+                        catch
+                        {
+                            break;
+                        }
+
+                    }
                 }
-            }
+            });
 
             return atexList;
         }

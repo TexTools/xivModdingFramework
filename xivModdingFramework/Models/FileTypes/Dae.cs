@@ -22,6 +22,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Xml;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -65,7 +66,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="xivModel">The model to create a dae file for</param>
         /// <param name="saveLocation">The location to save the dae file</param>
-        public void MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation, XivRace race)
+        public async Task MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation, XivRace race)
         {
             FullSkel.Clear();
             FullSkelNum.Clear();
@@ -88,7 +89,6 @@ namespace xivModdingFramework.Models.FileTypes
                 hasBones = false;
             }
 
-
             var skelDict = new Dictionary<string, SkeletonData>();
 
             if (hasBones)
@@ -109,7 +109,7 @@ namespace xivModdingFramework.Models.FileTypes
                     try
                     {
                         var sklb = new Sklb(_gameDirectory, _dataFile);
-                        sklb.CreateSkelFromSklb(item, xivModel);
+                        await sklb.CreateSkelFromSklb(item, xivModel);
 
                         if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair))
                         {
@@ -118,6 +118,11 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     catch (Exception e)
                     {
+                        if (e.GetType() == typeof(FileNotFoundException))
+                        {
+                            throw e;
+                        }
+
                         skelName = modelName.Substring(0, 5);
                         if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
                         {
@@ -176,49 +181,52 @@ namespace xivModdingFramework.Models.FileTypes
                 Indent = true,
             };
 
-            using (var xmlWriter = XmlWriter.Create(savePath, xmlWriterSettings))
+            await Task.Run(() =>
             {
-                xmlWriter.WriteStartDocument();
-
-                //<COLLADA>
-                xmlWriter.WriteStartElement("COLLADA", "http://www.collada.org/2005/11/COLLADASchema");
-                xmlWriter.WriteAttributeString("xmlns", "http://www.collada.org/2005/11/COLLADASchema");
-                xmlWriter.WriteAttributeString("version", "1.4.1");
-                xmlWriter.WriteAttributeString("xmlns", "xsi", null, "http://www.w3.org/2001/XMLSchema-instance");
-
-                //Assets
-                XMLassets(xmlWriter);
-
-                //Images
-                XMLimages(xmlWriter, modelName, lod0.MeshCount, lod0.MeshDataList);
-
-                //effects
-                XMLeffects(xmlWriter, modelName, lod0.MeshCount, lod0.MeshDataList);
-
-                //Materials
-                XMLmaterials(xmlWriter, modelName, lod0.MeshCount);
-
-                //Geometries
-                XMLgeometries(xmlWriter, modelName, lod0.MeshDataList);
-
-                if (hasBones)
+                using (var xmlWriter = XmlWriter.Create(savePath, xmlWriterSettings))
                 {
-                    //Controllers
-                    XMLcontrollers(xmlWriter, modelName, lod0.MeshDataList, skelDict, xivModel);
+                    xmlWriter.WriteStartDocument();
+
+                    //<COLLADA>
+                    xmlWriter.WriteStartElement("COLLADA", "http://www.collada.org/2005/11/COLLADASchema");
+                    xmlWriter.WriteAttributeString("xmlns", "http://www.collada.org/2005/11/COLLADASchema");
+                    xmlWriter.WriteAttributeString("version", "1.4.1");
+                    xmlWriter.WriteAttributeString("xmlns", "xsi", null, "http://www.w3.org/2001/XMLSchema-instance");
+
+                    //Assets
+                    XMLassets(xmlWriter);
+
+                    //Images
+                    XMLimages(xmlWriter, modelName, lod0.MeshCount, lod0.MeshDataList);
+
+                    //effects
+                    XMLeffects(xmlWriter, modelName, lod0.MeshCount, lod0.MeshDataList);
+
+                    //Materials
+                    XMLmaterials(xmlWriter, modelName, lod0.MeshCount);
+
+                    //Geometries
+                    XMLgeometries(xmlWriter, modelName, lod0.MeshDataList);
+
+                    if (hasBones)
+                    {
+                        //Controllers
+                        XMLcontrollers(xmlWriter, modelName, lod0.MeshDataList, skelDict, xivModel);
+                    }
+
+                    //Scenes
+                    XMLscenes(xmlWriter, modelName, lod0.MeshDataList, skelDict);
+
+                    xmlWriter.WriteEndElement();
+                    //</COLLADA>
+
+                    xmlWriter.WriteEndDocument();
+
+                    xmlWriter.Flush();
+                    FullSkel.Clear();
+                    FullSkelNum.Clear();
                 }
-
-                //Scenes
-                XMLscenes(xmlWriter, modelName, lod0.MeshDataList, skelDict);
-
-                xmlWriter.WriteEndElement();
-                //</COLLADA>
-
-                xmlWriter.WriteEndDocument();
-
-                xmlWriter.Flush();
-                FullSkel.Clear();
-                FullSkelNum.Clear();
-            }
+            });
         }
 
         /// <summary>
@@ -310,8 +318,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                     while (reader.Read())
                     {
-                        var sameBone = false;
-
                         if (reader.IsStartElement())
                         {
                             if (reader.Name.Contains("node"))
@@ -783,6 +789,11 @@ namespace xivModdingFramework.Models.FileTypes
                                                 boneNum++;
                                             }
                                         }
+
+                                        if (advImportSettings == null && (boneNum > boneDict.Count))
+                                        {
+                                            throw new Exception("Extra bones detected, please use Advanced Import.");
+                                        }
                                     }
 
                                     if (reader.Name.Contains("float_array"))
@@ -936,8 +947,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                     while (reader.Read())
                     {
-                        var sameBone = false;
-
                         if (reader.IsStartElement())
                         {
                             if (reader.Name.Contains("node"))
@@ -1004,6 +1013,11 @@ namespace xivModdingFramework.Models.FileTypes
                             var atr = reader["name"];
                             var id = reader["id"];
 
+                            if (atr.Contains("Mesh"))
+                            {
+                                atr = atr.Replace("Mesh", string.Empty);
+                            }
+
                             if (meshNameDict.ContainsKey(id))
                             {
                                 throw new Exception($"Meshes cannot have duplicate names. Duplicate: {id}\n\n" +
@@ -1026,7 +1040,9 @@ namespace xivModdingFramework.Models.FileTypes
                             if (atr.Contains("."))
                             {
                                 // Get part number
-                                var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                var numStr = atr.Substring(atr.LastIndexOf(".") + 1);
+                                numStr = numStr.EndsWith("Mesh", StringComparison.OrdinalIgnoreCase) ? numStr.Remove(numStr.Length - 4):numStr;
+                                var meshPartNum = int.Parse(numStr);
 
                                 if (meshPartDictionary.ContainsKey(meshNum))
                                 {

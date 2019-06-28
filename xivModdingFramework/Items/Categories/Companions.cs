@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
@@ -41,11 +42,13 @@ namespace xivModdingFramework.Items.Categories
     {
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivLanguage _xivLanguage;
-        
+        private readonly Ex _ex;
+
         public Companions(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
         {
             _gameDirectory = gameDirectory;
             _xivLanguage = xivLanguage;
+            _ex = new Ex(_gameDirectory, _xivLanguage);
         }
 
         /// <summary>
@@ -56,8 +59,9 @@ namespace xivModdingFramework.Items.Categories
         /// The data within companion_0 exd contains a reference to the index for lookup in modelchara
         /// </remarks>
         /// <returns>A list containing XivMinion data</returns>
-        public List<XivMinion> GetMinionList()
+        public async Task<List<XivMinion>> GetMinionList()
         {
+            var minionLock = new object();
             var minionList = new List<XivMinion>();
 
             // These are the offsets to relevant data
@@ -66,12 +70,12 @@ namespace xivModdingFramework.Items.Categories
             const int nameDataOffset = 6;
             const int modelCharaIndexOffset = 16;
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var minionEx = ex.ReadExData(XivEx.companion);
+            var minionEx = await _ex.ReadExData(XivEx.companion);
+            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
 
             // Loops through all available minions in the companion exd files
             // At present only one file exists (companion_0)
-            foreach (var minion in minionEx.Values)
+            await Task.Run(() => Parallel.ForEach(minionEx.Values, (minion) =>
             {
                 var xivMinion = new XivMinion
                 {
@@ -91,17 +95,22 @@ namespace xivModdingFramework.Items.Categories
                     modelCharaIndex = br.ReadInt16();
 
                     br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-                    var nameString = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Encoding.UTF8.GetString(br.ReadBytes(nameOffset)).Replace("\0", ""));
+                    var nameString =
+                        CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Encoding.UTF8
+                            .GetString(br.ReadBytes(nameOffset)).Replace("\0", ""));
                     xivMinion.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
                 }
 
-                if (modelCharaIndex == 0) continue;
+                if (modelCharaIndex == 0) return;
 
                 // This will get the model data using the index obtained for the current minion
-                xivMinion.ModelInfo = XivModelChara.GetModelInfo(_gameDirectory, modelCharaIndex);
+                xivMinion.ModelInfo = XivModelChara.GetModelInfo(modelCharaEx, modelCharaIndex);
 
-                minionList.Add(xivMinion);
-            }
+                lock (minionLock)
+                {
+                    minionList.Add(xivMinion);
+                }
+            }));
 
             minionList.Sort();
 
@@ -116,8 +125,9 @@ namespace xivModdingFramework.Items.Categories
         /// The data within mount_0 exd contains a reference to the index for lookup in modelchara
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public List<XivMount> GetMountList()
+        public async Task<List<XivMount>> GetMountList()
         {
+            var mountLock = new object();
             var mountList = new List<XivMount>();
 
             // These are the offsets to relevant data
@@ -126,12 +136,12 @@ namespace xivModdingFramework.Items.Categories
             const int nameDataOffset = 6;
             const int modelCharaIndexOffset = 30;
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var mountEx = ex.ReadExData(XivEx.mount);
+            var mountEx = await _ex.ReadExData(XivEx.mount);
+            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
 
             // Loops through all available mounts in the mount exd files
             // At present only one file exists (mount_0)
-            foreach (var mount in mountEx.Values)
+            await Task.Run(() => Parallel.ForEach(mountEx.Values, (mount) =>
             {
                 var xivMount = new XivMount
                 {
@@ -151,17 +161,22 @@ namespace xivModdingFramework.Items.Categories
                     modelCharaIndex = br.ReadInt16();
 
                     br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-                    var nameString = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Encoding.UTF8.GetString(br.ReadBytes(nameOffset)).Replace("\0", ""));
+                    var nameString =
+                        CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Encoding.UTF8
+                            .GetString(br.ReadBytes(nameOffset)).Replace("\0", ""));
                     xivMount.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
                 }
 
-                if(modelCharaIndex == 0 || xivMount.Name.Equals("")) continue;
+                if (modelCharaIndex == 0 || xivMount.Name.Equals("")) return;
 
                 // This will get the model data using the index obtained for the current mount
-                xivMount.ModelInfo = XivModelChara.GetModelInfo(_gameDirectory, modelCharaIndex);
+                xivMount.ModelInfo = XivModelChara.GetModelInfo(modelCharaEx, modelCharaIndex);
 
-                mountList.Add(xivMount);
-            }
+                lock (mountLock)
+                {
+                    mountList.Add(xivMount);
+                }
+            }));
 
             mountList.Sort();
 
@@ -176,8 +191,9 @@ namespace xivModdingFramework.Items.Categories
         /// Because of this, the Pet data is hardcoded until a better way of obtaining it is found.
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public List<XivPet> GetPetList()
+        public async Task<List<XivPet>> GetPetList()
         {
+            var petLock = new object();
             var petList = new List<XivPet>();
 
             // A list of indices in modelchara that contain Pet model data
@@ -193,18 +209,20 @@ namespace xivModdingFramework.Items.Categories
             // This list does not contain Pets that are separate but share the same ID (Fairy, Turrets)
             var petModelDictionary = new Dictionary<int, string>()
             {
-                {7002, XivStrings.Carbuncle },
-                {7003, XivStrings.Ifrit_Egi },
-                {7004, XivStrings.Titan_Egi },
-                {7005, XivStrings.Garuda_Egi },
-                {7006, XivStrings.Ramuh_Egi },
-                {7007, XivStrings.Sephirot_Egi },
-                {7102, XivStrings.Bahamut_Egi },
-                {7103, XivStrings.Placeholder_Egi },
+                {7002, XivStrings.Carbuncle},
+                {7003, XivStrings.Ifrit_Egi},
+                {7004, XivStrings.Titan_Egi},
+                {7005, XivStrings.Garuda_Egi},
+                {7006, XivStrings.Ramuh_Egi},
+                {7007, XivStrings.Sephirot_Egi},
+                {7102, XivStrings.Bahamut_Egi},
+                {7103, XivStrings.Placeholder_Egi},
             };
 
+            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
+
             // Loops through the list of indices containing Pet model data
-            foreach (var petIndex in petModelIndexList)
+            await Task.Run(() => Parallel.ForEach(petModelIndexList, (petIndex) =>
             {
                 var xivPet = new XivPet
                 {
@@ -213,7 +231,7 @@ namespace xivModdingFramework.Items.Categories
                 };
 
                 // Gets the model info from modelchara for the given index
-                var modelInfo = XivModelChara.GetModelInfo(_gameDirectory, petIndex);
+                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx, petIndex);
 
                 // Finds the name of the pet using the model ID and the above dictionary
                 if (petModelDictionary.ContainsKey(modelInfo.ModelID))
@@ -236,7 +254,9 @@ namespace xivModdingFramework.Items.Categories
                             xivPet.Name = modelInfo.Body == 1 ? XivStrings.Eos : XivStrings.Selene;
                             break;
                         case 7101:
-                            xivPet.Name = modelInfo.Body == 1 ? XivStrings.Rook_Autoturret : XivStrings.Bishop_Autoturret;
+                            xivPet.Name = modelInfo.Body == 1
+                                ? XivStrings.Rook_Autoturret
+                                : XivStrings.Bishop_Autoturret;
                             break;
                         default:
                             xivPet.Name = "Unknown";
@@ -246,15 +266,18 @@ namespace xivModdingFramework.Items.Categories
 
                 xivPet.ModelInfo = modelInfo;
 
-                petList.Add(xivPet);
-            }
+                lock (petLock)
+                {
+                    petList.Add(xivPet);
+                }
+            }));
 
             petList.Sort();
 
             return petList;
         }
 
-        public Dictionary<string, char[]> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel)
+        public async Task<Dictionary<string, char[]>> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel)
         {
             var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
 
@@ -262,14 +285,14 @@ namespace xivModdingFramework.Items.Categories
 
             var index = new Index(_gameDirectory);
             var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
-            var version = imc.GetImcInfo(itemModel, itemModel.ModelInfo).Version.ToString().PadLeft(4, '0');
+            var version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
 
             var mtrlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
 
-            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
+            var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
 
             foreach (var slotAbr in SlotAbbreviationDictionary)
             {
@@ -288,7 +311,7 @@ namespace xivModdingFramework.Items.Categories
             return equipPartDictionary;
         }
 
-        public List<string> GetDemiHumanMountModelEquipPartList(IItemModel itemModel)
+        public async Task<List<string>> GetDemiHumanMountModelEquipPartList(IItemModel itemModel)
         {
             var equipPartList = new List<string>();
 
@@ -299,7 +322,7 @@ namespace xivModdingFramework.Items.Categories
 
             var mdlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/model";
 
-            var files = index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara);
+            var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara);
 
             foreach (var slotAbr in SlotAbbreviationDictionary)
             {
@@ -320,8 +343,10 @@ namespace xivModdingFramework.Items.Categories
         /// <param name="modelID">The ID of the monster model</param>
         /// <param name="type">The type of monster to look for</param>
         /// <returns>A list of Search Results</returns>
-        public List<SearchResults> SearchMonstersByModelID(int modelID, XivItemType type)
+        public async Task<List<SearchResults>> SearchMonstersByModelID(int modelID, XivItemType type)
         {
+            var monsterSearchLock = new object();
+            var monsterSearchLock1 = new object();
             var searchResultsList = new List<SearchResults>();
             var index = new Index(_gameDirectory);
             var id = modelID.ToString().PadLeft(4, '0');
@@ -332,8 +357,7 @@ namespace xivModdingFramework.Items.Categories
             {
                 var folder = $"chara/monster/m{id}/obj/body/b";
 
-
-                for (var i = 0; i < 100; i++)
+                await Task.Run(() => Parallel.For(0, 100, (i) =>
                 {
                     var folderHashDictionary = new Dictionary<int, int>();
 
@@ -341,23 +365,31 @@ namespace xivModdingFramework.Items.Categories
 
                     for (var j = 1; j < 100; j++)
                     {
-                        folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"), j);
+                        lock (monsterSearchLock)
+                        {
+                            folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"),
+                                j);
+                        }
                     }
 
-                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
+                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
 
                     if (variantList.Count > 0)
                     {
-                        variantList.Sort();
-                        bodyVariantDictionary.Add(i, variantList);
+                        lock (monsterSearchLock1)
+                        {
+                            variantList.Sort();
+                            bodyVariantDictionary.Add(i, variantList);
+                        }
+
                     }
-                }
+                }));
             }
             else if (type == XivItemType.demihuman)
             {
                 var folder = $"chara/demihuman/d{id}/obj/equipment/e";
 
-                for (var i = 0; i < 100; i++)
+                await Task.Run(() => Parallel.For(0, 100, (i) =>
                 {
                     var folderHashDictionary = new Dictionary<int, int>();
 
@@ -365,17 +397,24 @@ namespace xivModdingFramework.Items.Categories
 
                     for (var j = 1; j < 100; j++)
                     {
-                        folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"), j);
+                        lock (monsterSearchLock)
+                        {
+                            folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"),
+                                j);
+                        }
                     }
 
-                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara);
+                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
 
                     if (variantList.Count > 0)
                     {
-                        variantList.Sort();
-                        bodyVariantDictionary.Add(i, variantList);
+                        lock (monsterSearchLock1)
+                        {
+                            variantList.Sort();
+                            bodyVariantDictionary.Add(i, variantList);
+                        }
                     }
-                }
+                }));
             }
 
             foreach (var bodyVariant in bodyVariantDictionary)

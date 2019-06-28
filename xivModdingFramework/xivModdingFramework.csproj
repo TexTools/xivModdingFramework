@@ -8,8 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="HelixToolkit" Version="2.6.1" />
-    <PackageReference Include="HelixToolkit.Wpf" Version="2.6.1" />
-    <PackageReference Include="HelixToolkit.Wpf.SharpDX" Version="2.6.1" />
+    <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.6.1" />
     <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="7.12.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
     <PackageReference Include="SharpDX" Version="4.2.0" />
@@ -18,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Resources\GeneralStrings.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>GeneralStrings.resx</DependentUpon>
+    </Compile>
     <Compile Update="Resources\XivStrings.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
@@ -26,6 +30,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Update="Resources\GeneralStrings.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>GeneralStrings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
     <EmbeddedResource Update="Resources\XivStrings.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>XivStrings.Designer.cs</LastGenOutput>

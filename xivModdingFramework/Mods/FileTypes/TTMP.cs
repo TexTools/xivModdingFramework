@@ -24,6 +24,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes
@@ -118,7 +119,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var modsJson = new ModsJson
                                     {
                                         Name = modOptionMod.Value.Name,
-                                        Category = modOptionMod.Value.Category,
+                                        Category = modOptionMod.Value.Category.GetEnDisplayName(),
                                         FullPath = modOptionMod.Key,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
@@ -140,16 +141,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
+                var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
 
                 if (File.Exists(modPackPath))
                 {
                     var fileNum = 1;
-                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                    modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                     while (File.Exists(modPackPath))
                     {
                         fileNum++;
-                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                     }
                 }
 
@@ -179,14 +180,14 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <returns>The number of mods processed for the mod pack</returns>
-        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, DirectoryInfo gameDirectory, IProgress<double> progress)
+        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress)
         {
             var processCount = await Task.Run<int>(() =>
             {
                 var dat = new Dat(gameDirectory);
                 _tempMPD = Path.GetTempFileName();
                 _tempMPL = Path.GetTempFileName();
-                var modCount = 1;
+                var modCount = 0;
 
                 var modPackJson = new ModPackJson
                 {
@@ -198,64 +199,70 @@ namespace xivModdingFramework.Mods.FileTypes
                     SimpleModsList = new List<ModsJson>()
                 };
 
-                using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Open)))
+                try
                 {
-                    foreach (var simpleModData in modPackData.SimpleModDataList)
+                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Open)))
                     {
-                        var modsJson = new ModsJson
+                        foreach (var simpleModData in modPackData.SimpleModDataList)
                         {
-                            Name = simpleModData.Name,
-                            Category = simpleModData.Category,
-                            FullPath = simpleModData.FullPath,
-                            ModSize = simpleModData.ModSize,
-                            DatFile = simpleModData.DatFile,
-                            ModOffset = binaryWriter.BaseStream.Position
-                        };
+                            var modsJson = new ModsJson
+                            {
+                                Name = simpleModData.Name,
+                                Category = simpleModData.Category.GetEnDisplayName(),
+                                FullPath = simpleModData.FullPath,
+                                ModSize = simpleModData.ModSize,
+                                DatFile = simpleModData.DatFile,
+                                ModOffset = binaryWriter.BaseStream.Position
+                            };
 
-                        var rawData = dat.GetRawData((int)simpleModData.ModOffset, XivDataFiles.GetXivDataFile(simpleModData.DatFile),
-                            simpleModData.ModSize);
+                            var rawData = dat.GetRawData((int) simpleModData.ModOffset,
+                                XivDataFiles.GetXivDataFile(simpleModData.DatFile),
+                                simpleModData.ModSize);
 
-                        if (rawData == null)
-                        {
-                            throw new Exception("Unable to obtain data for the following mod\n\n" +
-                                                $"Name: {simpleModData.Name}\nFull Path: {simpleModData.FullPath}\n" +
-                                                $"Mod Offset: {simpleModData.ModOffset}\nData File: {simpleModData.DatFile}\n\n" +
-                                                $"Unselect the above mod and try again.");
+                            if (rawData == null)
+                            {
+                                throw new Exception("Unable to obtain data for the following mod\n\n" +
+                                                    $"Name: {simpleModData.Name}\nFull Path: {simpleModData.FullPath}\n" +
+                                                    $"Mod Offset: {simpleModData.ModOffset}\nData File: {simpleModData.DatFile}\n\n" +
+                                                    $"Unselect the above mod and try again.");
+                            }
+
+                            binaryWriter.Write(rawData);
+
+                            modPackJson.SimpleModsList.Add(modsJson);
+
+                            progress?.Report((++modCount, modPackData.SimpleModDataList.Count, string.Empty));
                         }
-
-                        binaryWriter.Write(rawData);
-
-                        modPackJson.SimpleModsList.Add(modsJson);
-
-                        progress?.Report((double)modCount / modPackData.SimpleModDataList.Count);
-
-                        modCount++;
                     }
-                }
 
-                File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
+                    progress?.Report((0, modPackData.SimpleModDataList.Count, GeneralStrings.TTMP_Creating));
 
-                var modPackPath = $"{_modPackDirectory}\\{modPackData.Name}.ttmp2";
+                    File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
 
-                if (File.Exists(modPackPath))
-                {
-                    var fileNum = 1;
-                    modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
-                    while (File.Exists(modPackPath))
+                    var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
+
+                    if (File.Exists(modPackPath))
                     {
-                        fileNum++;
-                        modPackPath = $"{_modPackDirectory}\\{modPackData.Name}({fileNum}).ttmp2";
+                        var fileNum = 1;
+                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
+                        while (File.Exists(modPackPath))
+                        {
+                            fileNum++;
+                            modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
+                        }
+                    }
+
+                    using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
+                    {
+                        zip.CreateEntryFromFile(_tempMPL, "TTMPL.mpl");
+                        zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
                     }
                 }
-
-                using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
+                finally
                 {
-                    zip.CreateEntryFromFile(_tempMPL, "TTMPL.mpl");
-                    zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
+                    File.Delete(_tempMPD);
+                    File.Delete(_tempMPL);
                 }
-
-                File.Delete(_tempMPD);
-                File.Delete(_tempMPL);
 
                 return modCount;
             });
@@ -268,33 +275,36 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public (ModPackJson ModPackJson, Dictionary<string, MagickImage> ImageDictionary) GetModPackJsonData(DirectoryInfo modPackDirectory)
+        public Task<(ModPackJson ModPackJson, Dictionary<string, MagickImage> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
         {
-            ModPackJson modPackJson = null;
-            var imageDictionary = new Dictionary<string, MagickImage>();
-
-            using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+            return Task.Run(() =>
             {
-                foreach (var entry in archive.Entries)
-                {
-                    if (entry.FullName.EndsWith(".mpl"))
-                    {
-                        using (var streamReader = new StreamReader(entry.Open()))
-                        {
-                            var jsonString = streamReader.ReadToEnd();
+                ModPackJson modPackJson = null;
+                var imageDictionary = new Dictionary<string, MagickImage>();
 
-                            modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.FullName.EndsWith(".mpl"))
+                        {
+                            using (var streamReader = new StreamReader(entry.Open()))
+                            {
+                                var jsonString = streamReader.ReadToEnd();
+
+                                modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                            }
+                        }
+
+                        if (entry.FullName.EndsWith(".png"))
+                        {
+                            imageDictionary.Add(entry.FullName, new MagickImage(entry.Open()));
                         }
                     }
-
-                    if (entry.FullName.EndsWith(".png"))
-                    {
-                        imageDictionary.Add(entry.FullName, new MagickImage(entry.Open()));
-                    }
                 }
-            }
 
-            return (modPackJson, imageDictionary);
+                return (modPackJson, imageDictionary);
+            });
         }
 
         /// <summary>
@@ -302,39 +312,42 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A list containing original mod pack json data</returns>
-        public List<OriginalModPackJson> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
+        public Task<List<OriginalModPackJson>> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
         {
-            var modPackJsonList = new List<OriginalModPackJson>();
-
-            using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+            return Task.Run(() =>
             {
-                foreach (var entry in archive.Entries)
-                {
-                    if (entry.FullName.EndsWith(".mpl"))
-                    {
-                        using (var streamReader = new StreamReader(entry.Open()))
-                        {
-                            var line = streamReader.ReadLine();
-                            if (line.ToLower().Contains("version"))
-                            {
-                                //mpInfo = JsonConvert.DeserializeObject<ModPackInfo>(line);
-                            }
-                            else
-                            {
-                                modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
-                            }
+                var modPackJsonList = new List<OriginalModPackJson>();
 
-                            while (streamReader.Peek() >= 0)
+                using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.FullName.EndsWith(".mpl"))
+                        {
+                            using (var streamReader = new StreamReader(entry.Open()))
                             {
-                                line = streamReader.ReadLine();
-                                modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
+                                var line = streamReader.ReadLine();
+                                if (line.ToLower().Contains("version"))
+                                {
+                                    //mpInfo = JsonConvert.DeserializeObject<ModPackInfo>(line);
+                                }
+                                else
+                                {
+                                    modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
+                                }
+
+                                while (streamReader.Peek() >= 0)
+                                {
+                                    line = streamReader.ReadLine();
+                                    modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            return modPackJsonList;
+                return modPackJsonList;
+            });
         }
 
         /// <summary>
@@ -375,24 +388,24 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="progress">The progress of the import</param>
         /// <returns>The number of total mods imported</returns>
         public async Task<(int ImportCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
-            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<double> progress)
+            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
-            var importTask = await Task.Run<(int ImportCount, string Errors)>(() =>
+            var dat = new Dat(gameDirectory);
+            var modListFullPaths = new List<string>();
+            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+            var modCount = 1;
+            var importErrors = "";
+
+            foreach (var modListMod in modList.Mods)
             {
-                var dat = new Dat(gameDirectory);
-                var modListFullPaths = new List<string>();
-                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
-                var modCount = 1;
-                var importErrors = "";
-
-                foreach (var modListMod in modList.Mods)
+                if (!string.IsNullOrEmpty(modListMod.fullPath))
                 {
-                    if (!string.IsNullOrEmpty(modListMod.fullPath))
-                    {
-                        modListFullPaths.Add(modListMod.fullPath);
-                    }
+                    modListFullPaths.Add(modListMod.fullPath);
                 }
+            }
 
+            await Task.Run(async () =>
+            {
                 using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
                 {
                     foreach (var zipEntry in archive.Entries)
@@ -400,77 +413,90 @@ namespace xivModdingFramework.Mods.FileTypes
                         if (zipEntry.FullName.EndsWith(".mpd"))
                         {
                             _tempMPD = Path.GetTempFileName();
-                            zipEntry.ExtractToFile(_tempMPD, true);
 
-                            using (var binaryReader = new BinaryReader(File.OpenRead(_tempMPD)))
+                            using (var zipStream = zipEntry.Open())
                             {
-                                foreach (var modJson in modsJson)
+                                using (var fileStream = new FileStream(_tempMPD, FileMode.OpenOrCreate))
                                 {
-                                    try
+                                    progress?.Report((0, modsJson.Count, GeneralStrings.TTMP_ReadingContent));
+                                    await zipStream.CopyToAsync(fileStream);
+                                    progress?.Report((0, modsJson.Count, GeneralStrings.TTMP_StartImport));
+
+                                    using (var binaryReader = new BinaryReader(fileStream))
                                     {
-                                        if (modListFullPaths.Contains(modJson.FullPath))
+                                        foreach (var modJson in modsJson)
                                         {
-                                            var existingEntry = (from entry in modList.Mods
-                                                where entry.fullPath.Equals(modJson.FullPath)
-                                                select entry).FirstOrDefault();
+                                            try
+                                            {
+                                                if (modListFullPaths.Contains(modJson.FullPath))
+                                                {
+                                                    var existingEntry = (from entry in modList.Mods
+                                                                         where entry.fullPath.Equals(modJson.FullPath)
+                                                                         select entry).FirstOrDefault();
 
-                                            binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
+                                                    binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
 
-                                            var data = binaryReader.ReadBytes(modJson.ModSize);
+                                                    var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                            dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                                modJson.Category, modJson.Name,
-                                                XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                GetDataType(modJson.FullPath), modJson.ModPackEntry);
-                                        }
-                                        else
-                                        {
-                                            binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
+                                                    await dat.WriteToDat(new List<byte>(data), existingEntry,
+                                                        modJson.FullPath,
+                                                        modJson.Category.GetDisplayName(), modJson.Name,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                }
+                                                else
+                                                {
+                                                    binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
 
-                                            var data = binaryReader.ReadBytes(modJson.ModSize);
+                                                    var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                            dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                                modJson.Category, modJson.Name,
-                                                XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                    await dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
+                                                        modJson.Category.GetDisplayName(), modJson.Name,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                }
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                if (ex.GetType() == typeof(NotSupportedException))
+                                                {
+                                                    importErrors = ex.Message;
+                                                    break;
+                                                }
+
+                                                importErrors +=
+                                                    $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
+                                            }
+
+                                            progress?.Report((modCount, modsJson.Count, string.Empty));
+
+                                            modCount++;
                                         }
                                     }
-                                    catch (Exception ex)
-                                    {
-                                        importErrors +=
-                                            $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
-                                    }
-
-                                    progress?.Report((double)modCount/ modsJson.Count);
-
-                                    modCount++;
                                 }
                             }
 
-                            File.Delete(_tempMPD);
                             break;
                         }
                     }
                 }
-
-                if (modsJson[0].ModPackEntry != null)
-                {
-                    modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
-
-                    var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
-
-                    if (!modPackExists)
-                    {
-                        modList.ModPacks.Add(modsJson[0].ModPackEntry);
-                    }
-
-                    File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
-                }
-
-                return (modCount - 1, importErrors);
             });
 
-            return importTask;
+            if (modsJson[0].ModPackEntry != null)
+            {
+                modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+
+                var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
+
+                if (!modPackExists)
+                {
+                    modList.ModPacks.Add(modsJson[0].ModPackEntry);
+                }
+
+                File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            }
+
+            return (modCount - 1, importErrors);
         }
 
         /// <summary>
@@ -511,8 +537,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                    dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                        modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                     dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                         GetDataType(modJson.FullPath));
                                 }
                                 else
@@ -522,7 +548,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                     dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                        modJson.Category, modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                         GetDataType(modJson.FullPath));
                                 }
                             }

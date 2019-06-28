@@ -17,9 +17,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using xivModdingFramework.Helpers;
-using xivModdingFramework.Items.Interfaces;
-using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -37,8 +36,6 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="xivTex">The Texture information</param>
         public static void MakeDDS(XivTex xivTex, string savePath)
         {
-
-
             var DDS = new List<byte>();
             switch (xivTex.TextureTypeAndPath.Type)
             {
@@ -408,7 +405,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
         /// <returns>A tuple containing the compressed DDS data, a list of offsets to the mipmap parts, a list with the number of parts per mipmap.</returns>
-        public static (List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts) ReadDDS(BinaryReader br, XivTex xivTex, int newWidth, int newHeight, int newMipCount)
+        public static async Task<(List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts)> ReadDDS(BinaryReader br, XivTex xivTex, int newWidth, int newHeight, int newMipCount)
         {
             var compressedDDS = new List<byte>();
             var mipPartOffsets = new List<short>();
@@ -468,7 +465,7 @@ namespace xivModdingFramework.Textures.FileTypes
                         }
 
                         var uncompBytes = br.ReadBytes(uncompLength);
-                        var compressed = IOUtil.Compressor(uncompBytes);
+                        var compressed = await IOUtil.Compressor(uncompBytes);
 
                         if (compressed.Length > uncompLength)
                         {
@@ -508,7 +505,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     }
 
                     var uncompBytes = br.ReadBytes(uncompLength);
-                    var compressed = IOUtil.Compressor(uncompBytes);
+                    var compressed = await IOUtil.Compressor(uncompBytes);
 
                     if (compressed.Length > uncompLength)
                     {

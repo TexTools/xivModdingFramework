@@ -20,6 +20,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -42,36 +43,37 @@ namespace xivModdingFramework.HUD.FileTypes
         /// Gets the texture paths from the uld file
         /// </summary>
         /// <returns>List of texture paths from the uld file</returns>
-        public List<string> GetTexFromUld()
+        public async Task<List<string>> GetTexFromUld()
         {
+            var uldLock = new object();
             var hashedFolder = HashGenerator.GetHash("ui/uld");
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var uldStringList = new HashSet<string>();
-            var uldOffsetList = index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui);
+            var uldOffsetList = await index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui);
 
-            foreach (var offset in uldOffsetList)
+            await Task.Run(() => Parallel.ForEach(uldOffsetList, (offset) =>
             {
                 byte[] uldData;
                 try
                 {
-                    uldData = dat.GetType2Data(offset, XivDataFile._06_Ui);
+                    uldData = dat.GetType2Data(offset, XivDataFile._06_Ui).Result;
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error at offset: {offset}");
                     Debug.WriteLine($"Message: {ex.Message}");
-                    continue;
+                    return;
                 }
 
-                if (uldData.Length < 10) continue;
+                if (uldData.Length < 10) return;
 
                 using (var br = new BinaryReader(new MemoryStream(uldData)))
                 {
                     var signature = br.ReadInt32();
 
-                    if (signature != 1751411829) continue;
+                    if (signature != 1751411829) return;
 
                     br.ReadBytes(56);
 
@@ -94,10 +96,13 @@ namespace xivModdingFramework.HUD.FileTypes
 
                         var uldPath = path.Substring(0, path.LastIndexOf(".", StringComparison.Ordinal) + 4);
 
-                        uldStringList.Add(uldPath);
+                        lock (uldLock)
+                        {
+                            uldStringList.Add(uldPath);
+                        }
                     }
                 }
-            }
+            }));
 
             return uldStringList.ToList();
         }

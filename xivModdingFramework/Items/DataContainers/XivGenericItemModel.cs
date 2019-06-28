@@ -60,5 +60,11 @@ namespace xivModdingFramework.Items.DataContainers
             return string.Compare(Name, ((XivGenericItemModel)obj).Name, StringComparison.Ordinal);
         }
 
+        public object Clone()
+        {
+            var copy = (XivGenericItemModel)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
+            return copy;
+        }
     }
 }

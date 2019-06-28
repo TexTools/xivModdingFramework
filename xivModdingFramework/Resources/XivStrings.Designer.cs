@@ -19,7 +19,7 @@ namespace xivModdingFramework.Resources {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class XivStrings {
@@ -340,11 +340,20 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material.
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material/v0001.
         /// </summary>
         internal static string BodyMtrlFolder {
             get {
                 return ResourceManager.GetString("BodyMtrlFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material.
+        /// </summary>
+        internal static string BodyMtrlFolderOld {
+            get {
+                return ResourceManager.GetString("BodyMtrlFolderOld", resourceCulture);
             }
         }
         
@@ -1078,6 +1087,24 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Hrothgar.
+        /// </summary>
+        internal static string Hrothgar {
+            get {
+                return ResourceManager.GetString("Hrothgar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar NPC.
+        /// </summary>
+        internal static string Hrothgar_NPC {
+            get {
+                return ResourceManager.GetString("Hrothgar_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Hyur Highlander.
         /// </summary>
         internal static string Hyur_H {
@@ -1771,6 +1798,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Paintings.
+        /// </summary>
+        internal static string Paintings {
+            get {
+                return ResourceManager.GetString("Paintings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to pet_0_{0}.exd.
         /// </summary>
         internal static string PetEXD {
@@ -1987,11 +2023,20 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material.
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material/v0001.
         /// </summary>
         internal static string TailMtrlFolder {
             get {
                 return ResourceManager.GetString("TailMtrlFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material.
+        /// </summary>
+        internal static string TailMtrlFolderOld {
+            get {
+                return ResourceManager.GetString("TailMtrlFolderOld", resourceCulture);
             }
         }
         
@@ -2028,6 +2073,24 @@ namespace xivModdingFramework.Resources {
         internal static string UIFile {
             get {
                 return ResourceManager.GetString("UIFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera.
+        /// </summary>
+        internal static string Viera {
+            get {
+                return ResourceManager.GetString("Viera", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera NPC.
+        /// </summary>
+        internal static string Viera_NPC {
+            get {
+                return ResourceManager.GetString("Viera_NPC", resourceCulture);
             }
         }
         

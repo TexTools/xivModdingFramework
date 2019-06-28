@@ -181,7 +181,7 @@
     <value>mt_c{0}b{1}_{2}.mtrl</value>
   </data>
   <data name="BodyMtrlFolder" xml:space="preserve">
-    <value>chara/human/c{0}/obj/body/b{1}/material</value>
+    <value>chara/human/c{0}/obj/body/b{1}/material/v0001</value>
   </data>
   <data name="Body_Hands" xml:space="preserve">
     <value>Body + Hands</value>
@@ -643,7 +643,7 @@
     <value>mt_c{0}t{1}_{2}.mtrl</value>
   </data>
   <data name="TailMtrlFolder" xml:space="preserve">
-    <value>chara/human/c{0}/obj/tail/t{1}/material</value>
+    <value>chara/human/c{0}/obj/tail/t{1}/material/v0001</value>
   </data>
   <data name="Titan_Egi" xml:space="preserve">
     <value>Titan-Egi</value>
@@ -818,5 +818,26 @@
   </data>
   <data name="OpenCollada" xml:space="preserve">
     <value>OpenCOLLADA</value>
+  </data>
+  <data name="Paintings" xml:space="preserve">
+    <value>Paintings</value>
+  </data>
+  <data name="Hrothgar" xml:space="preserve">
+    <value>Hrothgar</value>
+  </data>
+  <data name="Hrothgar_NPC" xml:space="preserve">
+    <value>Hrothgar NPC</value>
+  </data>
+  <data name="Viera" xml:space="preserve">
+    <value>Viera</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>Viera NPC</value>
+  </data>
+  <data name="BodyMtrlFolderOld" xml:space="preserve">
+    <value>chara/human/c{0}/obj/body/b{1}/material</value>
+  </data>
+  <data name="TailMtrlFolderOld" xml:space="preserve">
+    <value>chara/human/c{0}/obj/tail/t{1}/material</value>
   </data>
 </root>

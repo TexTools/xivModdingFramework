@@ -67,10 +67,16 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
 
-
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivMount)obj).Name, StringComparison.Ordinal);
+        }
+
+        public object Clone()
+        {
+            var copy = (XivMount)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
+            return copy;
         }
     }
 }

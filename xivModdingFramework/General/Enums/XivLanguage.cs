@@ -33,7 +33,7 @@ namespace xivModdingFramework.General.Enums
         [Description("de")] German,
         [Description("fr")] French,
         [Description("ko")] Korean,
-        [Description("zh")] Chinese
+        [Description("chs")] Chinese
     }
 
     /// <summary>
@@ -60,6 +60,10 @@ namespace xivModdingFramework.General.Enums
         /// <returns>The XivLanguage enum</returns>
         public static XivLanguage GetXivLanguage(string value)
         {
+            //esrinzou for china ffxiv
+            if (value == "zh")
+                return XivLanguage.Chinese;
+            //esrinzou end
             var languages = Enum.GetValues(typeof(XivLanguage)).Cast<XivLanguage>();
 
             return languages.FirstOrDefault(language => language.GetLanguageCode() == value);

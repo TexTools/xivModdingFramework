@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using xivModdingFramework.General;
 using xivModdingFramework.Items.Enums;
 
@@ -22,7 +23,7 @@ namespace xivModdingFramework.Items.DataContainers
     /// <summary>
     /// This class contains Model Information for an Item
     /// </summary>
-    public class XivModelInfo
+    public class XivModelInfo : ICloneable
     {
         /// <summary>
         /// Currently not used.
@@ -58,5 +59,10 @@ namespace xivModdingFramework.Items.DataContainers
         /// The items full model key value.
         /// </summary>
         public Quad ModelKey { get; set; }
+
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
     }
 }
