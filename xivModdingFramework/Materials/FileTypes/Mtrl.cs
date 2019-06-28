@@ -44,12 +44,14 @@ namespace xivModdingFramework.Materials.FileTypes
     {
         private const string MtrlExtension = ".mtrl";
         private readonly DirectoryInfo _gameDirectory;
+        private readonly XivLanguage _language;
         private XivDataFile _dataFile;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
-        public Mtrl(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        public Mtrl(DirectoryInfo gameDirectory, XivDataFile dataFile, XivLanguage lang)
         {
             _gameDirectory = gameDirectory;
+            _language = lang;
             DataFile = dataFile;
         }
 
@@ -832,7 +834,14 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
+                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
+                        }
+                        else
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
+                        }
                         mtrlFile = $"mt_c{race}b{bodyVer}_{part}{MtrlExtension}";
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
@@ -848,7 +857,14 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
+                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
+                        }
+                        else
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
+                        }
                         mtrlFile = $"mt_c{race}t{bodyVer}_{part}{MtrlExtension}";
                     }
                     break;
@@ -925,7 +941,14 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
+                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
+                        }
+                        else
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
+                        }
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
                     {
@@ -938,7 +961,14 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
                     {
-                        mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
+                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
+                        }
+                        else
+                        {
+                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
+                        }
                     }
                     break;
                 case XivItemType.furniture:
@@ -1025,6 +1055,10 @@ namespace xivModdingFramework.Materials.FileTypes
             {"1304", XivRace.AuRa_Male_NPC},
             {"1401", XivRace.AuRa_Female},
             {"1404", XivRace.AuRa_Female_NPC},
+            {"1501", XivRace.Hrothgar},
+            {"1504", XivRace.Hrothgar_NPC},
+            {"1801", XivRace.Viera},
+            {"1804", XivRace.Viera_NPC},
             {"9104", XivRace.NPC_Male},
             {"9204", XivRace.NPC_Female}
         };

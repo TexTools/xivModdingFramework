@@ -899,7 +899,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item</param>
         /// <param name="source">The source importing the file</param>
         /// <returns>The new offset</returns>
-        public async Task<int> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source)
+        public async Task<int> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang)
         {
             var colorSetData = new List<Half>();
             byte[] colorSetExtraData = null;
@@ -934,7 +934,7 @@ namespace xivModdingFramework.Textures.FileTypes
             xivMtrl.ColorSetData = colorSetData;
             xivMtrl.ColorSetExtraData = colorSetExtraData;
 
-            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile);
+            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
             return await mtrl.ImportMtrl(xivMtrl, item, source);
         }
 
@@ -945,7 +945,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="ddsFileDirectory">The dds directory of the new ColorSet</param>
         /// <param name="item">The item</param>
         /// <returns>The raw mtrl data</returns>
-        public byte[] DDStoMtrlData(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item)
+        public byte[] DDStoMtrlData(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, XivLanguage lang)
         {
             var colorSetData = new List<Half>();
 
@@ -984,7 +984,7 @@ namespace xivModdingFramework.Textures.FileTypes
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
 
-            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile);
+            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
             return mtrl.CreateMtrlFile(xivMtrl, item);
         }
 

@@ -8,10 +8,10 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace xivModdingFramework.Resources
-{
-
-
+namespace xivModdingFramework.Resources {
+    using System;
+    
+    
     /// <summary>
     ///   A strongly-typed resource class, for looking up localized strings, etc.
     /// </summary>
@@ -340,11 +340,20 @@ namespace xivModdingFramework.Resources
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material.
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material/v0001.
         /// </summary>
         internal static string BodyMtrlFolder {
             get {
                 return ResourceManager.GetString("BodyMtrlFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material.
+        /// </summary>
+        internal static string BodyMtrlFolderOld {
+            get {
+                return ResourceManager.GetString("BodyMtrlFolderOld", resourceCulture);
             }
         }
         
@@ -1074,6 +1083,24 @@ namespace xivModdingFramework.Resources
         internal static string Housing {
             get {
                 return ResourceManager.GetString("Housing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar.
+        /// </summary>
+        internal static string Hrothgar {
+            get {
+                return ResourceManager.GetString("Hrothgar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar NPC.
+        /// </summary>
+        internal static string Hrothgar_NPC {
+            get {
+                return ResourceManager.GetString("Hrothgar_NPC", resourceCulture);
             }
         }
         
@@ -1996,11 +2023,20 @@ namespace xivModdingFramework.Resources
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material.
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material/v0001.
         /// </summary>
         internal static string TailMtrlFolder {
             get {
                 return ResourceManager.GetString("TailMtrlFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material.
+        /// </summary>
+        internal static string TailMtrlFolderOld {
+            get {
+                return ResourceManager.GetString("TailMtrlFolderOld", resourceCulture);
             }
         }
         
@@ -2037,6 +2073,24 @@ namespace xivModdingFramework.Resources
         internal static string UIFile {
             get {
                 return ResourceManager.GetString("UIFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera.
+        /// </summary>
+        internal static string Viera {
+            get {
+                return ResourceManager.GetString("Viera", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera NPC.
+        /// </summary>
+        internal static string Viera_NPC {
+            get {
+                return ResourceManager.GetString("Viera_NPC", resourceCulture);
             }
         }
         

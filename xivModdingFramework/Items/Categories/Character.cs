@@ -31,11 +31,13 @@ namespace xivModdingFramework.Items.Categories
     {
 
         private readonly DirectoryInfo _gameDirectory;
+        private readonly XivLanguage _language;
         private readonly Index _index;
 
-        public Character(DirectoryInfo gameDirectory)
+        public Character(DirectoryInfo gameDirectory, XivLanguage lang)
         {
             _gameDirectory = gameDirectory;
+            _language = lang;
 
             _index = new Index(_gameDirectory);
         }
@@ -102,11 +104,26 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (charaItem.ItemCategory == XivStrings.Body)
             {
-                folder = XivStrings.BodyMtrlFolder;
+                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                {
+                    folder = XivStrings.BodyMtrlFolder;
+                }
+                else
+                {
+                    folder = XivStrings.BodyMtrlFolderOld;
+                }
+
             }
             else if (charaItem.ItemCategory == XivStrings.Tail)
             {
-                folder = XivStrings.TailMtrlFolder;
+                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                {
+                    folder = XivStrings.TailMtrlFolder;
+                }
+                else
+                {
+                    folder = XivStrings.TailMtrlFolderOld;
+                }
             }
 
             foreach (var race in IDRaceDictionary)
@@ -268,12 +285,26 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.ItemCategory == XivStrings.Body)
             {
-                folder = string.Format(XivStrings.BodyMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                {
+                    folder = string.Format(XivStrings.BodyMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                }
+                else
+                {
+                    folder = string.Format(XivStrings.BodyMtrlFolderOld, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                }
                 file = XivStrings.BodyMtrlFile;
             }
             else if (charaItem.ItemCategory == XivStrings.Tail)
             {
-                folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                {
+                    folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                }
+                else
+                {
+                    folder = string.Format(XivStrings.TailMtrlFolderOld, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                }
                 file = XivStrings.TailMtrlFile;
             }
 
@@ -424,6 +455,10 @@ namespace xivModdingFramework.Items.Categories
             {"1304", XivRace.AuRa_Male_NPC},
             {"1401", XivRace.AuRa_Female},
             {"1404", XivRace.AuRa_Female_NPC},
+            {"1501", XivRace.Hrothgar},
+            {"1504", XivRace.Hrothgar_NPC},
+            {"1801", XivRace.Viera},
+            {"1804", XivRace.Viera_NPC},
             {"9104", XivRace.NPC_Male},
             {"9204", XivRace.NPC_Female}
         };
