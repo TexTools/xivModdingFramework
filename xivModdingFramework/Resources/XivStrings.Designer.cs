@@ -358,6 +358,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material/v{2}.
+        /// </summary>
+        internal static string BodyMtrlFolderVar {
+            get {
+                return ResourceManager.GetString("BodyMtrlFolderVar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Buddy.
         /// </summary>
         internal static string Buddy {
@@ -2091,6 +2100,15 @@ namespace xivModdingFramework.Resources {
         internal static string TailMtrlFolderOld {
             get {
                 return ResourceManager.GetString("TailMtrlFolderOld", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material/v{2}.
+        /// </summary>
+        internal static string TailMtrlFolderVar {
+            get {
+                return ResourceManager.GetString("TailMtrlFolderVar", resourceCulture);
             }
         }
         

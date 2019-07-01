@@ -292,8 +292,9 @@ namespace xivModdingFramework.Items.Categories
         /// <param name="charaItem">The character item</param>
         /// <param name="race">The race</param>
         /// <param name="num">The character item number</param>
-        /// <returns>A dictionary containging [</returns>
-        public async Task<char[]> GetPartForTextures(XivCharacter charaItem, XivRace race, int num)
+        /// <param name="variant">the variant for the mtrl folder</param>
+        /// <returns>An array of characters containing the parts for the texture</returns>
+        public async Task<char[]> GetPartForTextures(XivCharacter charaItem, XivRace race, int num, int variant = 1)
         {
             var folder = "";
             var file = "";
@@ -304,7 +305,7 @@ namespace xivModdingFramework.Items.Categories
             {
                 if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
                 {
-                    folder = string.Format(XivStrings.BodyMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+                    folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), variant.ToString().PadLeft(4, '0'));
                 }
                 else
                 {
@@ -337,6 +338,55 @@ namespace xivModdingFramework.Items.Categories
                 let mtrlFile = string.Format(file, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), part)
                 where fileList.Contains(HashGenerator.GetHash(mtrlFile))
                 select part).ToArray();
+        }
+
+        public async Task<List<int>> GetVariantsForTextures(XivCharacter charaItem, XivRace race, int num)
+        {
+            var variantList = new List<int>();
+
+            if (charaItem.ItemCategory == XivStrings.Body)
+            {
+                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                {
+                    var testDictionary = new Dictionary<int, int>();
+
+                    for (var i = 0; i < 50; i++)
+                    {
+                        var folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
+                        testDictionary.Add(HashGenerator.GetHash(folder), i);
+
+                        variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                        variantList.Sort();
+                    }
+                }
+                else
+                {
+                    variantList.Add(1);
+                }
+            }
+
+            if (charaItem.ItemCategory == XivStrings.Tail)
+            {
+                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                {
+                    var testDictionary = new Dictionary<int, int>();
+
+                    for (var i = 0; i < 50; i++)
+                    {
+                        var folder = string.Format(XivStrings.TailMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
+                        testDictionary.Add(HashGenerator.GetHash(folder), i);
+
+                        variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                        variantList.Sort();
+                    }
+                }
+                else
+                {
+                    variantList.Add(1);
+                }
+            }
+
+            return variantList;
         }
 
         /// <summary>

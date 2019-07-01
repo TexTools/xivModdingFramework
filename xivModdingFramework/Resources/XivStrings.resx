@@ -858,4 +858,10 @@
   <data name="OuterEar" xml:space="preserve">
     <value>Outer Ear</value>
   </data>
+  <data name="BodyMtrlFolderVar" xml:space="preserve">
+    <value>chara/human/c{0}/obj/body/b{1}/material/v{2}</value>
+  </data>
+  <data name="TailMtrlFolderVar" xml:space="preserve">
+    <value>chara/human/c{0}/obj/tail/t{1}/material/v{2}</value>
+  </data>
 </root>

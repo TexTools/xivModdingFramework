@@ -804,6 +804,11 @@ namespace xivModdingFramework.Materials.FileTypes
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
             }
 
+            if (itemModel.Category.Equals(XivStrings.Character) && (itemModel.ItemCategory.Equals(XivStrings.Body) || itemModel.ItemCategory.Equals(XivStrings.Tail)))
+            {
+                version = type.PadLeft(4, '0');
+            }
+
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";
