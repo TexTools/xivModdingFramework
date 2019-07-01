@@ -136,6 +136,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             var skelFolder = "";
             var skelFile = "";
+            var slotAbr = "";
+
             if (modelName[0].Equals('w'))
             {
                 skelFolder = string.Format(XivStrings.WeapSkelFolder, modelName.Substring(1, 4), "0001");
@@ -153,7 +155,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else
             {
-                var abr = SlotAbbreviationDictionary[category];
+                slotAbr = SlotAbbreviationDictionary[category];
 
                 var id = modelName.Substring(6, 4);
 
@@ -162,18 +164,36 @@ namespace xivModdingFramework.Models.FileTypes
                     id = _hairSklbName.Substring(1);
                 }
 
-                if (abr.Equals("base"))
+                if (slotAbr.Equals("base"))
                 {
                     id = "0001";
                 }
 
-                skelFolder = string.Format(XivStrings.EquipSkelFolder, modelName.Substring(1, 4), abr, abr[0], id);
-                skelFile = string.Format(XivStrings.EquipSkelFile, modelName.Substring(1, 4), abr[0], id);
+                skelFolder = string.Format(XivStrings.EquipSkelFolder, modelName.Substring(1, 4), slotAbr, slotAbr[0], id);
+                skelFile = string.Format(XivStrings.EquipSkelFile, modelName.Substring(1, 4), slotAbr[0], id);
             }
 
             // Continue only if the skeleton file exists
-            if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), _dataFile)
-            ) return;
+            if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), _dataFile))
+            {
+                // Sometimes for face skeletons id 0001 does not exist but 0002 does
+                if (_item.ItemCategory.Equals(XivStrings.Face))
+                {
+
+                    skelFolder = string.Format(XivStrings.EquipSkelFolder, modelName.Substring(1, 4), slotAbr, slotAbr[0], "0002");
+                    skelFile = string.Format(XivStrings.EquipSkelFile, modelName.Substring(1, 4), slotAbr[0], "0002");
+
+                    if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder),
+                        _dataFile))
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    return;
+                }
+            }
 
             var offset = await index.GetDataOffset(HashGenerator.GetHash(skelFolder), HashGenerator.GetHash(skelFile), _dataFile);
 
@@ -387,7 +407,7 @@ namespace xivModdingFramework.Models.FileTypes
                 jsonBones.Add(JsonConvert.SerializeObject(skelData));
             }
 
-            if (_item.ItemCategory.Equals(XivStrings.Head) || _item.ItemCategory.Equals(XivStrings.Hair))
+            if (_item.ItemCategory.Equals(XivStrings.Head) || _item.ItemCategory.Equals(XivStrings.Hair) || _item.ItemCategory.Equals(XivStrings.Face))
             {
                 AddToRaceSkeleton(jsonBones);
             }
@@ -407,7 +427,7 @@ namespace xivModdingFramework.Models.FileTypes
             var newSkeletonData = new List<SkeletonData>();
             var raceBoneNames = new List<string>();
 
-            if (_item.ItemCategory.Equals(XivStrings.Head) || _item.ItemCategory.Equals(XivStrings.Hair))
+            if (_item.ItemCategory.Equals(XivStrings.Head) || _item.ItemCategory.Equals(XivStrings.Hair) || _item.ItemCategory.Equals(XivStrings.Face))
             {
                 race = _xivMdl.MdlPath.File.Substring(0, 5);
             }
