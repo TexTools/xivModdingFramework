@@ -503,13 +503,6 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
-
-                                            // If extra values were added, remove them to match the position count
-                                            if (cData.VertexColors.Count > cData.Positions.Count)
-                                            {
-                                                var extraData = cData.VertexColors.Count - cData.Positions.Count;
-                                                cData.VertexColors.RemoveRange(cData.Positions.Count, extraData);
-                                            }
                                         }
                                         //Texture Coordinates
                                         else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
@@ -525,13 +518,6 @@ namespace xivModdingFramework.Models.FileTypes
                                         else if (reader["id"].ToLower().Contains(valpha) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexAlphas.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
-
-                                            // If extra values were added, remove them to match the position count
-                                            if (cData.VertexAlphas.Count > cData.Positions.Count)
-                                            {
-                                                var extraData = cData.VertexAlphas.Count - cData.Positions.Count;
-                                                cData.VertexAlphas.RemoveRange(cData.Positions.Count, extraData);
-                                            }
                                         }
                                         //Tangents
                                         else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
@@ -543,6 +529,20 @@ namespace xivModdingFramework.Models.FileTypes
                                         {
                                             cData.BiNormals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
+                                    }
+
+                                    // If extra values were added, remove them to match the texture coordinate count
+                                    if (cData.VertexColors.Count > cData.TextureCoordinates0.Count)
+                                    {
+                                        var extraData = cData.VertexColors.Count - cData.TextureCoordinates0.Count;
+                                        cData.VertexColors.RemoveRange(cData.TextureCoordinates0.Count, extraData);
+                                    }
+
+                                    // If extra values were added, remove them to match the texture coordinate count
+                                    if (cData.VertexAlphas.Count > cData.TextureCoordinates0.Count)
+                                    {
+                                        var extraData = cData.VertexAlphas.Count - cData.TextureCoordinates0.Count;
+                                        cData.VertexAlphas.RemoveRange(cData.TextureCoordinates0.Count, extraData);
                                     }
 
                                     var vertexIndexDict = new Dictionary<string, int>();
