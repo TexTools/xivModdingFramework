@@ -61,6 +61,8 @@ namespace xivModdingFramework.Items.Categories
                     new XivCharacter
                         {Name = XivStrings.Tail, Category = XivStrings.Character, ItemCategory = XivStrings.Tail},
                     new XivCharacter
+                        {Name = XivStrings.Ears, Category = XivStrings.Character, ItemCategory = XivStrings.Ears},
+                    new XivCharacter
                     {
                         Name = XivStrings.Face_Paint, Category = XivStrings.Character,
                         ItemCategory = XivStrings.Face_Paint
@@ -125,6 +127,10 @@ namespace xivModdingFramework.Items.Categories
                     folder = XivStrings.TailMtrlFolderOld;
                 }
             }
+            else if (charaItem.ItemCategory == XivStrings.Ears)
+            {
+                folder = XivStrings.EarsMtrlFolder;
+            }
 
             foreach (var race in IDRaceDictionary)
             {
@@ -183,6 +189,10 @@ namespace xivModdingFramework.Items.Categories
             {
                 folder = XivStrings.TailMDLFolder;
             }
+            else if (charaItem.ItemCategory == XivStrings.Ears)
+            {
+                folder = XivStrings.EarsMDLFolder;
+            }
 
             foreach (var race in IDRaceDictionary)
             {
@@ -238,6 +248,13 @@ namespace xivModdingFramework.Items.Categories
                     num.ToString().PadLeft(4, '0'));
                 typeDict = FaceSlotAbbreviationDictionary;
                 file = XivStrings.FaceMtrlFile;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Ears)
+            {
+                folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(),
+                    num.ToString().PadLeft(4, '0'));
+                typeDict = EarsSlotAbbreviationDictionary;
+                file = XivStrings.EarsMtrlFile;
             }
 
             var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
@@ -307,6 +324,12 @@ namespace xivModdingFramework.Items.Categories
                 }
                 file = XivStrings.TailMtrlFile;
             }
+            else if (charaItem.ItemCategory == XivStrings.Ears)
+            {
+                folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
+
+                file = XivStrings.EarsMtrlFile;
+            }
 
             var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
 
@@ -356,6 +379,13 @@ namespace xivModdingFramework.Items.Categories
                     num.ToString().PadLeft(4, '0'));
                 typeDict = TailSlotAbbreviationDictionary;
                 file = XivStrings.TailMDLFile;
+            }
+            else if (charaItem.ItemCategory == XivStrings.Ears)
+            {
+                folder = string.Format(XivStrings.EarsMDLFolder, race.GetRaceCode(),
+                    num.ToString().PadLeft(4, '0'));
+                typeDict = EarsSlotAbbreviationDictionary;
+                file = XivStrings.EarsMDLFile;
             }
 
             var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
@@ -478,11 +508,20 @@ namespace xivModdingFramework.Items.Categories
         /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
         /// </summary>
         private static readonly Dictionary<string, string> HairSlotAbbreviationDictionary = new Dictionary<string, string>
-
         {
             {XivStrings.Hair, "hir"},
             {XivStrings.Accessory, "acc"}
 
+        };
+
+        /// <summary>
+        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
+        /// </summary>
+        private static readonly Dictionary<string, string> EarsSlotAbbreviationDictionary = new Dictionary<string, string>
+        {
+            {XivStrings.Ears, "zer"},
+            {XivStrings.InnerEar, "fac_"},
+            {XivStrings.OuterEar, "" }
         };
 
         /// <summary>

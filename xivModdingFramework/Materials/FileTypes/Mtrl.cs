@@ -867,6 +867,11 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
                         mtrlFile = $"mt_c{race}t{bodyVer}_{part}{MtrlExtension}";
                     }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
+                        mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{part}{MtrlExtension}";
+                    }
                     break;
                 case XivItemType.furniture:
                     if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
@@ -970,6 +975,10 @@ namespace xivModdingFramework.Materials.FileTypes
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
                         }
                     }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
+                    }
                     break;
                 case XivItemType.furniture:
                     if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
@@ -1019,7 +1028,9 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Iris, "iri"},
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
+            {XivStrings.Hair, "hir"},
+            {XivStrings.InnerEar, "fac_"},
+            {XivStrings.OuterEar, ""}
         };
 
         /// <summary>
