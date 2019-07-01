@@ -804,6 +804,11 @@ namespace xivModdingFramework.Materials.FileTypes
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
             }
 
+            if (itemModel.Category.Equals(XivStrings.Character) && (itemModel.ItemCategory.Equals(XivStrings.Body) || itemModel.ItemCategory.Equals(XivStrings.Tail)))
+            {
+                version = type.PadLeft(4, '0');
+            }
+
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";
@@ -866,6 +871,11 @@ namespace xivModdingFramework.Materials.FileTypes
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
                         }
                         mtrlFile = $"mt_c{race}t{bodyVer}_{part}{MtrlExtension}";
+                    }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
+                        mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{part}{MtrlExtension}";
                     }
                     break;
                 case XivItemType.furniture:
@@ -970,6 +980,10 @@ namespace xivModdingFramework.Materials.FileTypes
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
                         }
                     }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    {
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
+                    }
                     break;
                 case XivItemType.furniture:
                     if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
@@ -1019,7 +1033,9 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Iris, "iri"},
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
+            {XivStrings.Hair, "hir"},
+            {XivStrings.InnerEar, "fac_"},
+            {XivStrings.OuterEar, ""}
         };
 
         /// <summary>

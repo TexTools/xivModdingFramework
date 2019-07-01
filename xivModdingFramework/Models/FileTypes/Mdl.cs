@@ -5129,6 +5129,11 @@ namespace xivModdingFramework.Models.FileTypes
                         mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
                         mdlFile   = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
                     }
+                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    {
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/model";
+                        mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
+                    }
                     break;
                 case XivItemType.furniture:
                     var part = "";

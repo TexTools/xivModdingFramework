@@ -840,4 +840,28 @@
   <data name="TailMtrlFolderOld" xml:space="preserve">
     <value>chara/human/c{0}/obj/tail/t{1}/material</value>
   </data>
+  <data name="EarsMDLFile" xml:space="preserve">
+    <value>c{0}z{1}_{2}.mdl</value>
+  </data>
+  <data name="EarsMDLFolder" xml:space="preserve">
+    <value>chara/human/c{0}/obj/zear/z{1}/model</value>
+  </data>
+  <data name="EarsMtrlFile" xml:space="preserve">
+    <value>mt_c{0}z{1}_{2}{3}.mtrl</value>
+  </data>
+  <data name="EarsMtrlFolder" xml:space="preserve">
+    <value>chara/human/c{0}/obj/zear/z{1}/material</value>
+  </data>
+  <data name="InnerEar" xml:space="preserve">
+    <value>Inner Ear</value>
+  </data>
+  <data name="OuterEar" xml:space="preserve">
+    <value>Outer Ear</value>
+  </data>
+  <data name="BodyMtrlFolderVar" xml:space="preserve">
+    <value>chara/human/c{0}/obj/body/b{1}/material/v{2}</value>
+  </data>
+  <data name="TailMtrlFolderVar" xml:space="preserve">
+    <value>chara/human/c{0}/obj/tail/t{1}/material/v{2}</value>
+  </data>
 </root>

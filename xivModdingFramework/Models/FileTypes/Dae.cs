@@ -98,7 +98,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This would be the same name given to the skeleton file
                 var skelName = modelName.Substring(0, 5);
 
-                if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair))
+                if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair) || item.ItemCategory.Equals(XivStrings.Face))
                 {
                     skelName = modelName.Substring(5, 5);
                 }
@@ -111,7 +111,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var sklb = new Sklb(_gameDirectory, _dataFile);
                         await sklb.CreateSkelFromSklb(item, xivModel);
 
-                        if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair))
+                        if (item.ItemCategory.Equals(XivStrings.Head) || item.ItemCategory.Equals(XivStrings.Hair) || item.ItemCategory.Equals(XivStrings.Face))
                         {
                             skelName = modelName.Substring(0, 5);
                         }

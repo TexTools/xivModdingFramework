@@ -62,6 +62,31 @@ namespace xivModdingFramework.Helpers
         }
 
         /// <summary>
+        /// Checks the index for any empty dat files
+        /// </summary>
+        /// <returns>A list of dats which are empty if any</returns>
+        public Task<List<int>> CheckForEmptyDatFiles(XivDataFile dataFile)
+        {
+            return Task.Run(() =>
+            {
+                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
+                var emptyList = new List<int>();
+
+                for (var i = 0; i < largestDatNum; i++)
+                {
+                    var fileInfo = new FileInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.dat{i}"));
+
+                    if (fileInfo.Length == 0)
+                    {
+                        emptyList.Add(i);
+                    }
+                }
+
+                return emptyList;
+            });
+        }
+
+        /// <summary>
         /// Checks the index for the number of dats the game will attempt to read
         /// </summary>
         /// <returns>True if there is a problem, False otherwise</returns>

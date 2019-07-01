@@ -587,8 +587,14 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int nameLengthDataOffset = 6;
-            const int typeDataOffset = 13;
-            const int dataLength = 24;
+            var typeDataOffset = 13;
+            var dataLength = 24;
+
+            if (_xivLanguage != XivLanguage.Korean && _xivLanguage != XivLanguage.Chinese)
+            {
+                typeDataOffset = 16;
+                dataLength = 28;
+            }
 
             var statusExData = await _ex.ReadExData(XivEx.status);
 

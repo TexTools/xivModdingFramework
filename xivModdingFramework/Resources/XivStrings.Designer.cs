@@ -358,6 +358,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/body/b{1}/material/v{2}.
+        /// </summary>
+        internal static string BodyMtrlFolderVar {
+            get {
+                return ResourceManager.GetString("BodyMtrlFolderVar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Buddy.
         /// </summary>
         internal static string Buddy {
@@ -570,6 +579,42 @@ namespace xivModdingFramework.Resources {
         internal static string Ears {
             get {
                 return ResourceManager.GetString("Ears", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to c{0}z{1}_{2}.mdl.
+        /// </summary>
+        internal static string EarsMDLFile {
+            get {
+                return ResourceManager.GetString("EarsMDLFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/zear/z{1}/model.
+        /// </summary>
+        internal static string EarsMDLFolder {
+            get {
+                return ResourceManager.GetString("EarsMDLFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to mt_c{0}z{1}_{2}{3}.mtrl.
+        /// </summary>
+        internal static string EarsMtrlFile {
+            get {
+                return ResourceManager.GetString("EarsMtrlFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/zear/z{1}/material.
+        /// </summary>
+        internal static string EarsMtrlFolder {
+            get {
+                return ResourceManager.GetString("EarsMtrlFolder", resourceCulture);
             }
         }
         
@@ -1240,6 +1285,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Inner Ear.
+        /// </summary>
+        internal static string InnerEar {
+            get {
+                return ResourceManager.GetString("InnerEar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Iris.
         /// </summary>
         internal static string Iris {
@@ -1798,6 +1852,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Outer Ear.
+        /// </summary>
+        internal static string OuterEar {
+            get {
+                return ResourceManager.GetString("OuterEar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Paintings.
         /// </summary>
         internal static string Paintings {
@@ -2037,6 +2100,15 @@ namespace xivModdingFramework.Resources {
         internal static string TailMtrlFolderOld {
             get {
                 return ResourceManager.GetString("TailMtrlFolderOld", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to chara/human/c{0}/obj/tail/t{1}/material/v{2}.
+        /// </summary>
+        internal static string TailMtrlFolderVar {
+            get {
+                return ResourceManager.GetString("TailMtrlFolderVar", resourceCulture);
             }
         }
         

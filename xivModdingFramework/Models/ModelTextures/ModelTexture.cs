@@ -178,7 +178,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         alpha = normalPixels[i - 1]; // This is the normal maps blue channel, and usually acts as the alpha channel
 
 
-                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail") || materialType.Equals("ears"))
                         {
                             normR = normalPixels[i - 3];
                             normG = normalPixels[i - 2];
@@ -262,7 +262,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         blendPercent = (float) (pixel - Math.Truncate(pixel));
                     }
 
-                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail") || materialType.Equals("ears"))
                     {
                         pixel = 0;
                         blendPercent = 0;
@@ -311,7 +311,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         var specColor = specularColorList[colorLoc];
                         var emisColor = emissiveColorList[colorLoc];
 
-                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail"))
+                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail") || materialType.Equals("ears"))
                         {
                             diffuseColor = new Color((int) ((diffColor.R / 255f) * specR),
                                 (int) ((diffColor.G / 255f) * specR), (int) ((diffColor.B / 255f) * specR), alpha);
@@ -703,6 +703,11 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
 
                 return "tail";
+            }
+
+            if (mtrlPath.Contains("/zear/z") && !mtrlPath.Contains("_fac_"))
+            {
+                return "ears";
             }
 
             return "other";
