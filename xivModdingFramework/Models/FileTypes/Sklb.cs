@@ -92,7 +92,7 @@ namespace xivModdingFramework.Models.FileTypes
                     _hairSklbName = sklbName;
                 }
 
-                var skelLoc = Directory.GetCurrentDirectory() + "\\Skeletons\\";
+                var skelLoc = ".\\Skeletons\\";
 
                 Directory.CreateDirectory(skelLoc);
 
@@ -105,7 +105,7 @@ namespace xivModdingFramework.Models.FileTypes
                         StartInfo = new ProcessStartInfo
                         {
                             FileName = Directory.GetCurrentDirectory() + "/AssetCc2.exe",
-                            Arguments = "-s \"" + skelLoc + "\\" + sklbName + ".sklb\" \"" + skelLoc + "\\" + sklbName + ".xml\"",
+                            Arguments = "-s \"" + skelLoc + sklbName + ".sklb\" \"" + skelLoc + sklbName + ".xml\"",
                             RedirectStandardOutput = true,
                             UseShellExecute = false,
                             CreateNoWindow = true
