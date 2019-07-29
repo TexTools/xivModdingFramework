@@ -1009,6 +1009,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var index = new Index(_gameDirectory);
 
+            var offsetForAddNewTexturePart = await index.GetDataOffset(HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), HashGenerator.GetHash(Path.GetFileName(internalFilePath)), dataFile);
+
             var datNum = GetLargestDatNumber(dataFile);
 
             var modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
@@ -1156,7 +1158,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                 bw.Write(new byte[sizeDiff]);
                             }
-
+                            if (offsetForAddNewTexturePart == 0)
+                            {
+                                index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
+                                index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                            }
                             var originalOffset = await index.UpdateIndex(mod.data.modOffset, internalFilePath, dataFile) * 8;
                             await index.UpdateIndex2(mod.data.modOffset, internalFilePath, dataFile);
 
@@ -1274,7 +1280,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (offset != 0)
                 {
                     var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
-
+                    if (offsetForAddNewTexturePart == 0)
+                    {
+                        index.AddFileDescriptor(internalFilePath, offset, dataFile); 
+                        index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                    }
                     var oldOffset = await index.UpdateIndex(offset, internalFilePath, dataFile) * 8;
                     await index.UpdateIndex2(offset, internalFilePath, dataFile);
 
@@ -1320,7 +1330,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                             modSize = importData.Count
                         }
                     };
-
+                    if (newEntry.source == "AddNewTexturePart")
+                        newEntry.data.originalOffset = newEntry.data.modOffset;
                     modList.Mods.Add(newEntry);
 
                     modList.modCount += 1;

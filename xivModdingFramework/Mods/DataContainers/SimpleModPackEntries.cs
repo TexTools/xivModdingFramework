@@ -59,6 +59,10 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The mod entry
         /// </summary>
         public Mod ModEntry { get; set; }
+        /// <summary>
+        /// The Mod Source
+        /// </summary>
+        public string Source { get; set; }
 
         /// <summary>
         /// The json mod entry

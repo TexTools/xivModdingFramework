@@ -78,6 +78,10 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The raw mod data
         /// </summary>
         public byte[] ModDataBytes { get; set; }
+        /// <summary>
+        /// The mod source
+        /// </summary>
+        public string Source { get; set; }
 
     }
 }

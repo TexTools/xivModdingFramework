@@ -117,6 +117,50 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return sha1Bytes;
         }
+        /// <summary>
+        /// check files added by textools
+        /// </summary>
+        /// <param name="dataFile">XivDataFile</param>
+        /// <returns></returns>
+        public Task<bool> HaveFilesAddedByTexTools(XivDataFile dataFile)
+        {
+            return Task.Run(async () =>
+            {
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+
+                // These are the offsets to relevant data
+                const int fileCountOffset = 1036;
+                const int dataStartOffset = 2048;
+
+                await _semaphoreSlim.WaitAsync();
+
+                try
+                {
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                    {
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var fileCount = br.ReadInt32();
+
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+
+                        // loop through each file entry
+                        for (var i = 0; i < fileCount; i += 16)
+                        {
+                            br.BaseStream.Position += 8;
+                            var offset = br.ReadInt32();
+                            if (offset == -1)
+                                return true;
+                            br.BaseStream.Position += 4;
+                        }
+                    }
+                }
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
+                return false;
+            });
+        }
 
         /// <summary>
         /// Gets the offset for the data in the .dat file
@@ -786,7 +830,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return true;
         }
-
         /// <summary>
         /// Adds a new file descriptor/stub into the Index files.
         /// </summary>
@@ -1044,7 +1087,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return true;
         }
-
         /// <summary>
         /// Updates the .index files offset for a given item.
         /// </summary>
@@ -1108,7 +1150,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return oldOffset;
         }
-
         /// <summary>
         /// Updates the .index2 files offset for a given item.
         /// </summary>

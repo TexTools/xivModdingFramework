@@ -123,7 +123,8 @@ namespace xivModdingFramework.Mods.FileTypes
                                         FullPath = modOptionMod.Key,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
-                                        DatFile = dataFile.GetDataFileName()
+                                        DatFile = dataFile.GetDataFileName(),
+                                        Source=modOptionMod.Value.Source
                                     };
 
                                     binaryWriter.Write(modOptionMod.Value.ModDataBytes);
@@ -212,7 +213,8 @@ namespace xivModdingFramework.Mods.FileTypes
                                 FullPath = simpleModData.FullPath,
                                 ModSize = simpleModData.ModSize,
                                 DatFile = simpleModData.DatFile,
-                                ModOffset = binaryWriter.BaseStream.Position
+                                ModOffset = binaryWriter.BaseStream.Position,
+                                Source=simpleModData.Source
                             };
 
                             var rawData = dat.GetRawData((int) simpleModData.ModOffset,
@@ -441,7 +443,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                     await dat.WriteToDat(new List<byte>(data), existingEntry,
                                                         modJson.FullPath,
                                                         modJson.Category.GetDisplayName(), modJson.Name,
-                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source) ? _source : modJson.Source,
                                                         GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                                 }
                                                 else
@@ -452,7 +454,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                                     await dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                                         modJson.Category.GetDisplayName(), modJson.Name,
-                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source) ? _source : modJson.Source,
                                                         GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                                 }
                                             }
@@ -538,7 +540,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                      dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source)?_source:modJson.Source,
                                         GetDataType(modJson.FullPath));
                                 }
                                 else
@@ -548,7 +550,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                     dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source) ? _source : modJson.Source,
                                         GetDataType(modJson.FullPath));
                                 }
                             }
