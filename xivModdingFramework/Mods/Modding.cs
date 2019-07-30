@@ -54,7 +54,7 @@ namespace xivModdingFramework.Mods
         public async Task DeleteAllFilesAddedByTexTools()
         {
             var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
-            var modsToRemove = modList.Mods.Where(it => it.source == "AddNewTexturePart");
+            var modsToRemove = modList.Mods.Where(it => it.source == "FilesAddedByTexTools");
             foreach(var mod in modsToRemove)
             {
                 await DeleteMod(mod.fullPath);
@@ -351,7 +351,7 @@ namespace xivModdingFramework.Mods
             var modToRemove = (from mod in modList.Mods
                 where mod.fullPath.Equals(modItemPath)
                 select mod).FirstOrDefault();
-            if (modToRemove.source == "AddNewTexturePart")
+            if (modToRemove.source == "FilesAddedByTexTools")
             {
                 var index = new Index(_gameDirectory);
                 index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
@@ -400,7 +400,7 @@ namespace xivModdingFramework.Mods
 
             foreach (var modToRemove in modsToRemove)
             {
-                if (modToRemove.source == "AddNewTexturePart")
+                if (modToRemove.source == "FilesAddedByTexTools")
                 {
                     var index = new Index(_gameDirectory);
                     index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));

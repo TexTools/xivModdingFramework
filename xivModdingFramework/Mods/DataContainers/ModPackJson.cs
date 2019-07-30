@@ -164,9 +164,5 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The Mod Pack Entry
         /// </summary>
         public ModPack ModPackEntry { get; set; }
-        /// <summary>
-        /// The mod source
-        /// </summary>
-        public string Source { get; set; }
     }
 }

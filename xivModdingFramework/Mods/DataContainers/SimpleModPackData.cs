@@ -79,9 +79,5 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The dat file associated with the item
         /// </summary>
         public string DatFile { get; set; }
-        /// <summary>
-        /// The mod source
-        /// </summary>
-        public string Source { get; set; }
     }
 }

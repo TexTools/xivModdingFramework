@@ -124,7 +124,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
                                         DatFile = dataFile.GetDataFileName(),
-                                        Source=modOptionMod.Value.Source
                                     };
 
                                     binaryWriter.Write(modOptionMod.Value.ModDataBytes);
@@ -214,7 +213,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                 ModSize = simpleModData.ModSize,
                                 DatFile = simpleModData.DatFile,
                                 ModOffset = binaryWriter.BaseStream.Position,
-                                Source=simpleModData.Source
                             };
 
                             var rawData = dat.GetRawData((int) simpleModData.ModOffset,
@@ -443,7 +441,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                     await dat.WriteToDat(new List<byte>(data), existingEntry,
                                                         modJson.FullPath,
                                                         modJson.Category.GetDisplayName(), modJson.Name,
-                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source) ? _source : modJson.Source,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                                         GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                                 }
                                                 else
@@ -454,7 +452,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                                     await dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                                         modJson.Category.GetDisplayName(), modJson.Name,
-                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source) ? _source : modJson.Source,
+                                                        XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                                         GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                                 }
                                             }
@@ -540,7 +538,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                      dat.WriteToDat(new List<byte>(data), existingEntry, modJson.FullPath,
-                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source)?_source:modJson.Source,
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                         GetDataType(modJson.FullPath));
                                 }
                                 else
@@ -550,7 +548,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     var data = binaryReader.ReadBytes(modJson.ModSize);
 
                                     dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), string.IsNullOrEmpty(modJson.Source) ? _source : modJson.Source,
+                                        modJson.Category.GetDisplayName(), modJson.Name, XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                         GetDataType(modJson.FullPath));
                                 }
                             }
