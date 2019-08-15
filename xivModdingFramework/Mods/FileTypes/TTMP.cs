@@ -107,6 +107,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     ImagePath = randomFileName,
                                     GroupName = modOption.GroupName,
                                     SelectionType = modOption.SelectionType,
+                                    IsChecked=modOption.IsChecked,
                                     ModsJsons = new List<ModsJson>()
                                 };
 
