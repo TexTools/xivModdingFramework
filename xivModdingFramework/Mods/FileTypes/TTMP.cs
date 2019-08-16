@@ -96,8 +96,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 if (modOption.Image != null)
                                 {
-                                    randomFileName = $"{Path.GetRandomFileName()}.png";
-                                    imageList.Add(modOption.Image.FileName, randomFileName);
+                                    randomFileName = $"{Path.GetRandomFileName()}.png";                                    
+                                    imageList.Add(randomFileName, modOption.Image.FileName);
                                 }
 
                                 var modOptionJson = new ModOptionJson
@@ -107,6 +107,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     ImagePath = randomFileName,
                                     GroupName = modOption.GroupName,
                                     SelectionType = modOption.SelectionType,
+                                    IsChecked=modOption.IsChecked,
                                     ModsJsons = new List<ModsJson>()
                                 };
 
@@ -123,7 +124,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                         FullPath = modOptionMod.Key,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
-                                        DatFile = dataFile.GetDataFileName()
+                                        DatFile = dataFile.GetDataFileName(),
                                     };
 
                                     binaryWriter.Write(modOptionMod.Value.ModDataBytes);
@@ -160,7 +161,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
                     foreach (var image in imageList)
                     {
-                        zip.CreateEntryFromFile(image.Key, image.Value);
+                        zip.CreateEntryFromFile(image.Value, image.Key);
                     }
                 }
 
@@ -212,7 +213,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 FullPath = simpleModData.FullPath,
                                 ModSize = simpleModData.ModSize,
                                 DatFile = simpleModData.DatFile,
-                                ModOffset = binaryWriter.BaseStream.Position
+                                ModOffset = binaryWriter.BaseStream.Position,
                             };
 
                             var rawData = dat.GetRawData((int) simpleModData.ModOffset,

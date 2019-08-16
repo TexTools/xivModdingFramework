@@ -136,8 +136,11 @@ namespace xivModdingFramework.Helpers
 
         public Task<bool> CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
         {
-            return Task.Run(() =>
+            return Task.Run(async () =>
             {
+                var haveFilesAddedByTexTools = await _index.HaveFilesAddedByTexTools(dataFile);
+                if (haveFilesAddedByTexTools)
+                    return true;
                 var backupDataFile =
                     new DirectoryInfo(Path.Combine(backupsDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
                 var currentDataFile =
@@ -145,7 +148,7 @@ namespace xivModdingFramework.Helpers
 
                 var backupHash = _index.GetIndexSection1Hash(backupDataFile);
                 var currentHash = _index.GetIndexSection1Hash(currentDataFile);
-
+                
                 return backupHash.SequenceEqual(currentHash);
             });
         }
