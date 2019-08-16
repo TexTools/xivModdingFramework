@@ -51,7 +51,15 @@ namespace xivModdingFramework.Mods
             ModListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
         }
-
+        public async Task DeleteAllFilesAddedByTexTools()
+        {
+            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modsToRemove = modList.Mods.Where(it => it.source == "FilesAddedByTexTools");
+            foreach(var mod in modsToRemove)
+            {
+                await DeleteMod(mod.fullPath);
+            }
+        }
         /// <summary>
         /// Creates the Mod List that is used to keep track of mods.
         /// </summary>
@@ -343,7 +351,12 @@ namespace xivModdingFramework.Mods
             var modToRemove = (from mod in modList.Mods
                 where mod.fullPath.Equals(modItemPath)
                 select mod).FirstOrDefault();
-
+            if (modToRemove.source == "FilesAddedByTexTools")
+            {
+                var index = new Index(_gameDirectory);
+                index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+            }
             if (modToRemove.enabled)
             {
                 await ToggleModStatus(modItemPath, false);
@@ -387,6 +400,12 @@ namespace xivModdingFramework.Mods
 
             foreach (var modToRemove in modsToRemove)
             {
+                if (modToRemove.source == "FilesAddedByTexTools")
+                {
+                    var index = new Index(_gameDirectory);
+                    index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                    index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                }
                 if (modToRemove.enabled)
                 {
                     await ToggleModStatus(modToRemove.fullPath, false);

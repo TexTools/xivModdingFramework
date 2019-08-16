@@ -961,7 +961,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     colorSetData.Add(new Half(br.ReadUInt16()));
                 }
             }
-
+            var colorSetExtraData = new byte[32];
             // If the colorset size is 544, it contains extra data that must be imported
             if (xivMtrl.ColorSetDataSize == 544)
             {
@@ -969,20 +969,22 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (File.Exists(flagsPath))
                 {
-                    using (var br = new BinaryReader(File.OpenRead(flagsPath)))
-                    {
-                        // The extra data after the colorset is always 32 bytes 
-                        // This reads 16 ushort values which is 16 x 2 = 32
-                        for (var i = 0; i < 16; i++)
-                        {
-                            colorSetData.Add(new Half(br.ReadUInt16()));
-                        }
-                    }
+                    colorSetExtraData = File.ReadAllBytes(flagsPath);
+                    //using (var br = new BinaryReader(File.OpenRead(flagsPath)))
+                    //{
+                    //    // The extra data after the colorset is always 32 bytes 
+                    //    // This reads 16 ushort values which is 16 x 2 = 32
+                    //    for (var i = 0; i < 16; i++)
+                    //    {
+                    //        colorSetData.Add(new Half(br.ReadUInt16()));
+                    //    }
+                    //}
                 }
             }
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
+            xivMtrl.ColorSetExtraData = colorSetExtraData;
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
             return mtrl.CreateMtrlFile(xivMtrl, item);

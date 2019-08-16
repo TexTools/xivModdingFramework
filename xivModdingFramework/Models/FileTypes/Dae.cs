@@ -326,6 +326,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 if (sid != null)
                                 {
                                     var name = reader["name"];
+                                    if (name==null) continue;
 
                                     var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
 
@@ -350,6 +351,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 else
                                 {
                                     var name = reader["name"];
+                                    if (name==null) continue;
 
                                     var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
 
@@ -955,6 +957,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 if (sid != null)
                                 {
                                     var name = reader["name"];
+                                    if (name==null) continue;
 
                                     var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
 
@@ -979,6 +982,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 else
                                 {
                                     var name = reader["name"];
+                                    if (name==null) continue;
 
                                     var boneString = Regex.Replace(name, "[0-9]+$", string.Empty);
 
