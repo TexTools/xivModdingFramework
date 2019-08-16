@@ -96,8 +96,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 if (modOption.Image != null)
                                 {
-                                    randomFileName = $"{Path.GetRandomFileName()}.png";
-                                    imageList.Add(modOption.Image.FileName, randomFileName);
+                                    randomFileName = $"{Path.GetRandomFileName()}.png";                                    
+                                    imageList.Add(randomFileName, modOption.Image.FileName);
                                 }
 
                                 var modOptionJson = new ModOptionJson
@@ -161,7 +161,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
                     foreach (var image in imageList)
                     {
-                        zip.CreateEntryFromFile(image.Key, image.Value);
+                        zip.CreateEntryFromFile(image.Value, image.Key);
                     }
                 }
 
