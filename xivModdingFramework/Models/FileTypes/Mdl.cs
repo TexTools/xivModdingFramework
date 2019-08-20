@@ -1432,7 +1432,8 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
             }
-
+            var indexList = new List<int[]>();
+            var partStartingIndexDic = new Dictionary<(int Start,int End),Dictionary<string,int>>();
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
             {
                 var partDataDict = meshPartDataDictionary[i];
@@ -1459,6 +1460,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (partDataDict.Count > 0)
                 {
+                    var startingIndex = 0;
                     for (var j = 0; j < partDataDict.Count; j++)
                     {
                         // Check if the part number exists in the imported data
@@ -1518,38 +1520,65 @@ namespace xivModdingFramework.Models.FileTypes
                                 meshDataDictionary[i].Indices.Add(partDataDict[partNum].VertexAlphaIndices[k] + vColorAlphaMax);
                             }
                         }
-
                         meshDataDictionary[i].IndexLocDictionary = new Dictionary<string, int>
                         {
                             {"position", 0},
                             {"normal", 1},
                             {"textureCoordinate", 2}
                         };
-
                         // Set new index stride
                         var indexStride = 3;
+                        meshDataDictionary[i].IndexStride = 0;
 
                         if (partDataDict[partNum].TextureCoordinates1.Count > 0 || hasTextureCoordinate1)
                         {
-                            meshDataDictionary[i].IndexLocDictionary.Add("textureCoordinate1", indexStride);
+                            if (!meshDataDictionary[i].IndexLocDictionary.ContainsKey("textureCoordinate1"))
+                            {
+                                meshDataDictionary[i].IndexLocDictionary.Add("textureCoordinate1", indexStride);
+                            }
+                            else
+                            {
+                                meshDataDictionary[i].IndexLocDictionary["textureCoordinate1"] = indexStride;
+                            }
                             indexStride++;
                         }
 
                         if (partDataDict[partNum].BiNormals.Count > 0)
                         {
-                            meshDataDictionary[i].IndexLocDictionary.Add("biNormal", indexStride);
+                            if (!meshDataDictionary[i].IndexLocDictionary.ContainsKey("biNormal"))
+                            {
+                                meshDataDictionary[i].IndexLocDictionary.Add("biNormal", indexStride);
+                            }
+                            else
+                            {
+                                meshDataDictionary[i].IndexLocDictionary["biNormal"] = indexStride;
+                            }
                             indexStride++;
                         }
 
                         if (partDataDict[partNum].VertexColors.Count > 0)
                         {
-                            meshDataDictionary[i].IndexLocDictionary.Add("vertexColor", indexStride);
+                            if (!meshDataDictionary[i].IndexLocDictionary.ContainsKey("vertexColor"))
+                            {
+                                meshDataDictionary[i].IndexLocDictionary.Add("vertexColor", indexStride);
+                            }
+                            else
+                            {
+                                meshDataDictionary[i].IndexLocDictionary["vertexColor"] = indexStride;
+                            }
                             indexStride++;
                         }
 
                         if (partDataDict[partNum].VertexAlphas.Count > 0)
                         {
-                            meshDataDictionary[i].IndexLocDictionary.Add("vertexAlpha", indexStride);
+                            if (!meshDataDictionary[i].IndexLocDictionary.ContainsKey("vertexAlpha"))
+                            {
+                                meshDataDictionary[i].IndexLocDictionary.Add("vertexAlpha", indexStride);
+                            }
+                            else
+                            {
+                                meshDataDictionary[i].IndexLocDictionary["vertexAlpha"] = indexStride;
+                            }
                             indexStride++;
                         }
 
@@ -1622,6 +1651,18 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         partNum++;
+                        var indexListIndexOld = indexList.Count;
+                        for (var t = startingIndex; t < meshDataDictionary[i].Indices.Count; t += meshDataDictionary[i].IndexStride)
+                        {
+                            indexList.Add(meshDataDictionary[i].Indices.GetRange(t, meshDataDictionary[i].IndexStride).ToArray());
+                        }
+                        startingIndex = meshDataDictionary[i].Indices.Count;
+                        var dic = new Dictionary<string, int>();
+                        foreach (var ild in meshDataDictionary[i].IndexLocDictionary)
+                        {
+                            dic.Add(ild.Key, ild.Value);
+                        }
+                        partStartingIndexDic.Add((indexListIndexOld, indexList.Count), dic);
                     }
                 }
                 else // There are no parts in the mesh
@@ -1629,7 +1670,17 @@ namespace xivModdingFramework.Models.FileTypes
                     meshDataDictionary[i].PartsDictionary.Add(partNum, 0);
                 }
             }
-
+            Dictionary<string,int> GetIndexLocDictionary(int index,string key)
+            {
+                foreach(var it in partStartingIndexDic)
+                {
+                    if (!it.Value.ContainsKey(key))
+                        continue;
+                    if (index >= it.Key.Start && index < it.Key.End)
+                        return it.Value;
+                }
+                return null;
+            }
             var colladaMeshDataList = new List<ColladaMeshData>();
 
             var meshNum = 0;
@@ -1861,50 +1912,169 @@ namespace xivModdingFramework.Models.FileTypes
                 var indexNum = 0;
 
                 // Each item in this list contains the index for each data point
-                var indexList = new List<int[]>();
                 var uniquesList = new List<int[]>();
                 var uniqueCount = 0;
-
-                for (var i = 0; i < colladaData.Indices.Count; i += colladaData.IndexStride)
-                {
-                    indexList.Add(colladaData.Indices.GetRange(i, colladaData.IndexStride).ToArray());
-                }
 
                 // Create the new data point lists in their appropriate order from their indices
                 for (var i = 0; i < indexList.Count; i++)
                 {
-                    if (!colladaData.IsBlender)
+                    try
                     {
-                        var targetIndex = uniqueCount;
-                        var listEntry = indexList[i];
-
-                        for (var j = 0; j < uniqueCount; j++)
+                        if (!colladaData.IsBlender)
                         {
-                            var targetEntry = uniquesList[j];
+                            var targetIndex = uniqueCount;
+                            var listEntry = indexList[i];
 
-                            if(listEntry[0] == targetEntry[0] && normalsCollection[listEntry[1]] == normalsCollection[targetEntry[1]] && texCoord0Collection[listEntry[2]] == texCoord0Collection[targetEntry[2]])
+                            for (var j = 0; j < uniqueCount; j++)
                             {
-                                if (texCoord1Collection.Count > 0)
+                                var targetEntry = uniquesList[j];
+
+                                if (listEntry[0] == targetEntry[0] && normalsCollection[listEntry[1]] == normalsCollection[targetEntry[1]] && texCoord0Collection[listEntry[2]] == texCoord0Collection[targetEntry[2]])
                                 {
-                                    if (texCoord1Collection[listEntry[3]] == texCoord1Collection[targetEntry[3]])
+                                    if (texCoord1Collection.Count > 0)
+                                    {
+                                        if (texCoord1Collection[listEntry[3]] == texCoord1Collection[targetEntry[3]])
+                                        {
+                                            targetIndex = j;
+                                            break;
+                                        }
+                                    }
+                                    else
                                     {
                                         targetIndex = j;
                                         break;
                                     }
                                 }
-                                else
-                                {
-                                    targetIndex = j;
-                                    break;
-                                }
                             }
-                        }
+                            if (i == 11712)
+                            {
+                                var x = 0;
+                                x++;
+                            }
+                            if (targetIndex == uniqueCount)
+                            {
+                                colladaData.IndexLocDictionary = GetIndexLocDictionary(i,"position");
+                                var pos0 = listEntry[colladaData.IndexLocDictionary["position"]];
+                                colladaData.IndexLocDictionary = GetIndexLocDictionary(i,"normal");
+                                var pos1 = listEntry[colladaData.IndexLocDictionary["normal"]];
+                                colladaData.IndexLocDictionary = GetIndexLocDictionary(i, "textureCoordinate");
+                                var pos2 = listEntry[colladaData.IndexLocDictionary["textureCoordinate"]];
 
-                        if (targetIndex == uniqueCount)
+                                // If the index at index 0 is larger than the position collection, throw an exception
+                                if (pos0 > positionCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no position at index {pos0},  position count: {positionCollection.Count}");
+                                }
+                                nPositionCollection.Add(positionCollection[pos0]);
+
+                                if (!isHousingItem) // Housing items do not have bones
+                                {
+                                    // If the index at index 0 is larger than the bone index collection, throw an exception
+                                    if (pos0 > boneIndexCollection.Count)
+                                    {
+                                        throw new IndexOutOfRangeException($"There is no bone index at index {pos0},  bone index count: {boneIndexCollection.Count}");
+                                    }
+                                    nBoneIndexCollection.Add(boneIndexCollection[pos0]);
+
+                                    // If the index at index 0 is larger than the bone weight collection, throw an exception
+                                    if (pos0 > boneWeightCollection.Count)
+                                    {
+                                        throw new IndexOutOfRangeException($"There is no bone weight at index {pos0},  bone weight count: {boneWeightCollection.Count}");
+                                    }
+                                    nBoneWeightCollection.Add(boneWeightCollection[pos0]);
+                                }
+
+                                // If the index at index 1 is larger than the normals collection, throw an exception
+                                if (pos1 > normalsCollection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no normal at index {pos1},  normal count: {normalsCollection.Count}");
+                                }
+                                nNormalsCollection.Add(normalsCollection[pos1]);
+
+                                // If the index at index 2 is larger than the texture coordinate 0 collection, throw an exception
+                                if (pos2 > texCoord0Collection.Count)
+                                {
+                                    throw new IndexOutOfRangeException($"There is no texture coordinate 0 at index {pos2},  texture coordinate 0 count: {texCoord0Collection.Count}");
+                                }
+                                nTexCoord0Collection.Add(texCoord0Collection[pos2]);
+
+                                if (texCoord1Collection.Count > 0)
+                                {
+                                    var pos3 = listEntry[colladaData.IndexLocDictionary["textureCoordinate1"]];
+
+                                    // If the index at index 3 is larger than the texture coordinate 1 collection, throw an exception
+                                    if (pos3 > texCoord1Collection.Count)
+                                    {
+                                        throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
+                                    }
+                                    nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+                                }
+
+                                if (tangentsCollection.Count > 0)
+                                {
+                                    colladaData.IndexLocDictionary = GetIndexLocDictionary(i, "biNormal");
+                                    var nPos = listEntry[colladaData.IndexLocDictionary["biNormal"]];
+                                    // If the index at index n is larger than the tangents collection, throw an exception
+                                    if (nPos > tangentsCollection.Count)
+                                    {
+                                        throw new IndexOutOfRangeException($"There is no tangent at index {nPos},  tangent count: {tangentsCollection.Count}");
+                                    }
+                                    nTangentsCollection.Add(tangentsCollection[nPos]);
+                                }
+
+                                if (biNormalsCollection.Count > 0)
+                                {
+                                    colladaData.IndexLocDictionary = GetIndexLocDictionary(i, "biNormal");
+                                    var nPos = listEntry[colladaData.IndexLocDictionary["biNormal"]];
+                                    // If the index at index n is larger than the binormals collection, throw an exception
+                                    if (nPos > biNormalsCollection.Count)
+                                    {
+                                        throw new IndexOutOfRangeException($"There is no binormal at index {nPos},  binormal count: {biNormalsCollection.Count}");
+                                    }
+                                    nBiNormalsCollection.Add(biNormalsCollection[nPos]);
+                                }
+
+                                if (vertexColorCollection.Count > 0)
+                                {
+                                    colladaData.IndexLocDictionary = GetIndexLocDictionary(i, "vertexColor");
+                                    var colorPos = listEntry[colladaData.IndexLocDictionary["vertexColor"]];
+
+                                    if (colorPos > vertexColorCollection.Count)
+                                    {
+                                        throw new IndexOutOfRangeException($"There is no vertex color at index {colorPos},  vertex color count: {vertexColorCollection.Count}");
+                                    }
+                                    nVertexColorCollection.Add(vertexColorCollection[colorPos]);
+                                }
+
+                                if (vertexAlphaCollection.Count > 0)
+                                {
+                                    colladaData.IndexLocDictionary = GetIndexLocDictionary(i, "vertexAlpha");
+                                    if (colladaData.IndexLocDictionary != null)
+                                    {
+                                        var alphaPos = listEntry[colladaData.IndexLocDictionary["vertexAlpha"]];
+
+                                        if (alphaPos > vertexAlphaCollection.Count)
+                                        {
+                                            throw new IndexOutOfRangeException($"There is no vertex alpha at index {alphaPos},  vertex color count: {vertexAlphaCollection.Count}");
+                                        }
+                                        nVertexAlphaCollection.Add(vertexAlphaCollection[alphaPos]);
+                                    }
+                                }
+
+                                uniquesList.Add(listEntry);
+                                uniqueCount++;
+                            }
+
+                            // Dictionary with <index, index number>
+                            indexDict.Add(i, targetIndex);
+                        }
+                        // For blender there is only 1 index for all data points
+                        else
                         {
-                            var pos0 = listEntry[colladaData.IndexLocDictionary["position"]];
-                            var pos1 = listEntry[colladaData.IndexLocDictionary["normal"]];
-                            var pos2 = listEntry[colladaData.IndexLocDictionary["textureCoordinate"]];
+                            var pos0 = indexList[i][0];
+
+                            // Dictionary with <index, index number>
+                            indexDict.Add(pos0, indexNum);
 
                             // If the index at index 0 is larger than the position collection, throw an exception
                             if (pos0 > positionCollection.Count)
@@ -1930,158 +2100,54 @@ namespace xivModdingFramework.Models.FileTypes
                                 nBoneWeightCollection.Add(boneWeightCollection[pos0]);
                             }
 
-                            // If the index at index 1 is larger than the normals collection, throw an exception
-                            if (pos1 > normalsCollection.Count)
+                            // If the index at index 0 is larger than the normals collection, throw an exception
+                            if (pos0 > normalsCollection.Count)
                             {
-                                throw new IndexOutOfRangeException($"There is no normal at index {pos1},  normal count: {normalsCollection.Count}");
+                                throw new IndexOutOfRangeException($"There is no normals at index {pos0},  normals count: {normalsCollection.Count}");
                             }
-                            nNormalsCollection.Add(normalsCollection[pos1]);
+                            nNormalsCollection.Add(normalsCollection[pos0]);
 
-                            // If the index at index 2 is larger than the texture coordinate 0 collection, throw an exception
-                            if (pos2 > texCoord0Collection.Count)
+                            // If the index at index 0 is larger than the texture coordinates 0 collection, throw an exception
+                            if (pos0 > texCoord0Collection.Count)
                             {
-                                throw new IndexOutOfRangeException($"There is no texture coordinate 0 at index {pos2},  texture coordinate 0 count: {texCoord0Collection.Count}");
+                                throw new IndexOutOfRangeException($"There is no texture coordinates 0 at index {pos0},  texture coordinates 0 count: {texCoord0Collection.Count}");
                             }
-                            nTexCoord0Collection.Add(texCoord0Collection[pos2]);
+                            nTexCoord0Collection.Add(texCoord0Collection[pos0]);
 
                             if (texCoord1Collection.Count > 0)
                             {
-                                var pos3 = listEntry[colladaData.IndexLocDictionary["textureCoordinate1"]];
-
-                                // If the index at index 3 is larger than the texture coordinate 1 collection, throw an exception
-                                if (pos3 > texCoord1Collection.Count)
+                                // If the index at index 0 is larger than the texture coordinates 1 collection, throw an exception
+                                if (pos0 > texCoord1Collection.Count)
                                 {
-                                    throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
+                                    throw new IndexOutOfRangeException($"There is no texture coordinates 1 at index {pos0},  texture coordinates 1 count: {texCoord1Collection.Count}");
                                 }
-                                nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+                                nTexCoord1Collection.Add(texCoord1Collection[pos0]);
                             }
 
                             if (tangentsCollection.Count > 0)
                             {
-                                var nPos = listEntry[colladaData.IndexLocDictionary["biNormal"]];
-                                // If the index at index n is larger than the tangents collection, throw an exception
-                                if (nPos > tangentsCollection.Count)
+                                // If the index at index 0 is larger than the tangents collection, throw an exception
+                                if (pos0 > tangentsCollection.Count)
                                 {
-                                    throw new IndexOutOfRangeException($"There is no tangent at index {nPos},  tangent count: {tangentsCollection.Count}");
+                                    throw new IndexOutOfRangeException($"There is no tangents at index {pos0},  tangents count: {tangentsCollection.Count}");
                                 }
-                                nTangentsCollection.Add(tangentsCollection[nPos]);
-                            }
+                                nTangentsCollection.Add(tangentsCollection[pos0]);
 
-                            if (biNormalsCollection.Count > 0)
-                            {
-                                var nPos = listEntry[colladaData.IndexLocDictionary["biNormal"]];
-                                // If the index at index n is larger than the binormals collection, throw an exception
-                                if (nPos > biNormalsCollection.Count)
+                                // If the index at index 0 is larger than the binormals collection, throw an exception
+                                if (pos0 > biNormalsCollection.Count)
                                 {
-                                    throw new IndexOutOfRangeException($"There is no binormal at index {nPos},  binormal count: {biNormalsCollection.Count}");
+                                    throw new IndexOutOfRangeException($"There is no binormals at index {pos0},  binormals count: {biNormalsCollection.Count}");
                                 }
-                                nBiNormalsCollection.Add(biNormalsCollection[nPos]);
+                                nBiNormalsCollection.Add(biNormalsCollection[pos0]);
                             }
-
-                            if (vertexColorCollection.Count > 0)
-                            {
-                                var colorPos = listEntry[colladaData.IndexLocDictionary["vertexColor"]];
-
-                                if (colorPos > vertexColorCollection.Count)
-                                {
-                                    throw new IndexOutOfRangeException($"There is no vertex color at index {colorPos},  vertex color count: {vertexColorCollection.Count}");
-                                }
-                                nVertexColorCollection.Add(vertexColorCollection[colorPos]);
-                            }
-
-                            if (vertexAlphaCollection.Count > 0)
-                            {
-                                var alphaPos = listEntry[colladaData.IndexLocDictionary["vertexAlpha"]];
-
-                                if (alphaPos > vertexAlphaCollection.Count)
-                                {
-                                    throw new IndexOutOfRangeException($"There is no vertex alpha at index {alphaPos},  vertex color count: {vertexAlphaCollection.Count}");
-                                }
-                                nVertexAlphaCollection.Add(vertexAlphaCollection[alphaPos]);
-                            }
-
-                            uniquesList.Add(listEntry);
-                            uniqueCount++;
                         }
-                        
-                        // Dictionary with <index, index number>
-                        indexDict.Add(i, targetIndex);
+
+                        indexNum++;
                     }
-                    // For blender there is only 1 index for all data points
-                    else
+                    catch(Exception ex)
                     {
-                        var pos0 = indexList[i][0];
-
-                        // Dictionary with <index, index number>
-                        indexDict.Add(pos0, indexNum);
-
-                        // If the index at index 0 is larger than the position collection, throw an exception
-                        if (pos0 > positionCollection.Count)
-                        {
-                            throw new IndexOutOfRangeException($"There is no position at index {pos0},  position count: {positionCollection.Count}");
-                        }
-                        nPositionCollection.Add(positionCollection[pos0]);
-
-                        if (!isHousingItem) // Housing items do not have bones
-                        {
-                            // If the index at index 0 is larger than the bone index collection, throw an exception
-                            if (pos0 > boneIndexCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no bone index at index {pos0},  bone index count: {boneIndexCollection.Count}");
-                            }
-                            nBoneIndexCollection.Add(boneIndexCollection[pos0]);
-
-                            // If the index at index 0 is larger than the bone weight collection, throw an exception
-                            if (pos0 > boneWeightCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no bone weight at index {pos0},  bone weight count: {boneWeightCollection.Count}");
-                            }
-                            nBoneWeightCollection.Add(boneWeightCollection[pos0]);
-                        }
-
-                        // If the index at index 0 is larger than the normals collection, throw an exception
-                        if (pos0 > normalsCollection.Count)
-                        {
-                            throw new IndexOutOfRangeException($"There is no normals at index {pos0},  normals count: {normalsCollection.Count}");
-                        }
-                        nNormalsCollection.Add(normalsCollection[pos0]);
-
-                        // If the index at index 0 is larger than the texture coordinates 0 collection, throw an exception
-                        if (pos0 > texCoord0Collection.Count)
-                        {
-                            throw new IndexOutOfRangeException($"There is no texture coordinates 0 at index {pos0},  texture coordinates 0 count: {texCoord0Collection.Count}");
-                        }
-                        nTexCoord0Collection.Add(texCoord0Collection[pos0]);
-
-                        if (texCoord1Collection.Count > 0)
-                        {
-                            // If the index at index 0 is larger than the texture coordinates 1 collection, throw an exception
-                            if (pos0 > texCoord1Collection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no texture coordinates 1 at index {pos0},  texture coordinates 1 count: {texCoord1Collection.Count}");
-                            }
-                            nTexCoord1Collection.Add(texCoord1Collection[pos0]);
-                        }
-
-                        if (tangentsCollection.Count > 0)
-                        {
-                            // If the index at index 0 is larger than the tangents collection, throw an exception
-                            if (pos0 > tangentsCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no tangents at index {pos0},  tangents count: {tangentsCollection.Count}");
-                            }
-                            nTangentsCollection.Add(tangentsCollection[pos0]);
-
-                            // If the index at index 0 is larger than the binormals collection, throw an exception
-                            if (pos0 > biNormalsCollection.Count)
-                            {
-                                throw new IndexOutOfRangeException($"There is no binormals at index {pos0},  binormals count: {biNormalsCollection.Count}");
-                            }
-                            nBiNormalsCollection.Add(biNormalsCollection[pos0]);
-                        }
+                        throw ex;
                     }
-
-                    indexNum++;
                 }
 
                 var nPositionsList = new HashSet<int>();
