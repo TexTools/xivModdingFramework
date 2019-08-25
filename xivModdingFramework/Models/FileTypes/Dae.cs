@@ -501,7 +501,7 @@ namespace xivModdingFramework.Models.FileTypes
                                         {
                                             cData.Normals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
-                                        // Vertex Colors
+                                        // Vertex Colors                                        
                                         else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
@@ -532,21 +532,7 @@ namespace xivModdingFramework.Models.FileTypes
                                             cData.BiNormals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                     }
-
-                                    // If extra values were added, remove them to match the texture coordinate count
-                                    if (cData.VertexColors.Count > cData.TextureCoordinates0.Count)
-                                    {
-                                        var extraData = cData.VertexColors.Count - cData.TextureCoordinates0.Count;
-                                        cData.VertexColors.RemoveRange(cData.TextureCoordinates0.Count, extraData);
-                                    }
-
-                                    // If extra values were added, remove them to match the texture coordinate count
-                                    if (cData.VertexAlphas.Count > cData.TextureCoordinates0.Count)
-                                    {
-                                        var extraData = cData.VertexAlphas.Count - cData.TextureCoordinates0.Count;
-                                        cData.VertexAlphas.RemoveRange(cData.TextureCoordinates0.Count, extraData);
-                                    }
-
+                                    
                                     var vertexIndexDict = new Dictionary<string, int>();
 
                                     var inputOffset = 0;
@@ -636,6 +622,20 @@ namespace xivModdingFramework.Models.FileTypes
                                     // Indices
                                     if (reader.Name.Equals("p"))
                                     {
+                                        // If extra values were added, remove them to match the texture coordinate count
+                                        //if (cData.VertexColors.Count > cData.TextureCoordinates0.Count)
+                                        //{
+                                        //    var extraData = cData.VertexColors.Count - cData.TextureCoordinates0.Count;
+                                        //    cData.VertexColors.RemoveRange(cData.TextureCoordinates0.Count, extraData);
+                                        //}
+
+                                        // If extra values were added, remove them to match the texture coordinate count
+                                        //if (cData.VertexAlphas.Count > cData.TextureCoordinates0.Count)
+                                        //{
+                                        //    var extraData = cData.VertexAlphas.Count - cData.TextureCoordinates0.Count;
+                                        //    cData.VertexAlphas.RemoveRange(cData.TextureCoordinates0.Count, extraData);
+                                        //}
+
                                         cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
 
                                         indexStride = inputOffset + 1;
@@ -673,7 +673,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     }
                                 }
                             }
-
+                            
                             cData.IndexStride = indexStride;
                             cData.TextureCoordinateStride = textureCoordinateStride;
                             cData.VertexColorStride = vertexColorStride;

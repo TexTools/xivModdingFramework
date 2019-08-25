@@ -1450,6 +1450,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 var bInList = new List<int>();
+                var lastIndex = 0;
 
                 var partNum        = 0;
                 var positionMax    = 0;
@@ -1594,29 +1595,29 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // Get the largest index for each data point
-                        positionMax += partDataDict[partNum].PositionIndices.Max() + 1;
-                        normalMax += partDataDict[partNum].NormalIndices.Max() + 1;
+                        positionMax += partDataDict[partNum].Positions.Count/3;
+                        normalMax += partDataDict[partNum].Normals.Count / 3;
 
                         if (partDataDict[partNum].VertexColors.Count > 0)
                         {
-                            vColorMax += partDataDict[partNum].VertexColorIndices.Max() + 1;
+                            vColorMax += partDataDict[partNum].VertexColors.Count/3;
                         }
 
-                        texCoord0Max += partDataDict[partNum].TextureCoordinate0Indices.Max() + 1;
+                        texCoord0Max += partDataDict[partNum].TextureCoordinates0.Count / partDataDict[partNum].TextureCoordinateStride;
 
                         if (partDataDict[partNum].TextureCoordinates1.Count > 0)
                         {
-                            texCoord1Max += partDataDict[partNum].TextureCoordinate1Indices.Max() + 1;
+                            texCoord1Max += partDataDict[partNum].TextureCoordinates1.Count/3;
                         }
 
                         if (partDataDict[partNum].BiNormals.Count > 0)
                         {
-                            biNormalMax += partDataDict[partNum].BiNormalIndices.Max() + 1;
+                            biNormalMax += partDataDict[partNum].BiNormals.Count/3;
                         }
 
                         if (partDataDict[partNum].VertexAlphas.Count > 0)
                         {
-                            vColorAlphaMax += partDataDict[partNum].VertexAlphaIndices.Max() + 1;
+                            vColorAlphaMax += partDataDict[partNum].VertexAlphas.Count/3;
                         }
 
 
@@ -1632,14 +1633,13 @@ namespace xivModdingFramework.Models.FileTypes
                             // Consolidate all bone index data into one Collada Data per mesh
                             if (j > 0)
                             {
-                                var lastIndex = bInList.Max() + 1;
-
                                 for (var a = 0; a < partDataDict[partNum].BoneIndices.Count; a += 2)
                                 {
                                     meshDataDictionary[i].BoneIndices.Add(partDataDict[partNum].BoneIndices[a]);
                                     meshDataDictionary[i].BoneIndices.Add(partDataDict[partNum].BoneIndices[a + 1] + lastIndex);
                                     bInList.Add(partDataDict[partNum].BoneIndices[a + 1] + lastIndex);
                                 }
+                                lastIndex = partDataDict[partNum].Bones.Length;
                             }
                             else
                             {
@@ -1759,7 +1759,6 @@ namespace xivModdingFramework.Models.FileTypes
                             colladaData.Tangents[i + 2]));
                     }
                 }
-
                 for (var i = 0; i < colladaData.TextureCoordinates0.Count; i += colladaData.TextureCoordinateStride)
                 {
                     texCoord0Collection.Add(
@@ -1965,14 +1964,14 @@ namespace xivModdingFramework.Models.FileTypes
                             if (!isHousingItem) // Housing items do not have bones
                             {
                                 // If the index at index 0 is larger than the bone index collection, throw an exception
-                                if (pos0 > boneIndexCollection.Count)
+                                if (pos0 >= boneIndexCollection.Count)
                                 {
                                     throw new IndexOutOfRangeException($"There is no bone index at index {pos0},  bone index count: {boneIndexCollection.Count}");
                                 }
                                 nBoneIndexCollection.Add(boneIndexCollection[pos0]);
 
                                 // If the index at index 0 is larger than the bone weight collection, throw an exception
-                                if (pos0 > boneWeightCollection.Count)
+                                if (pos0 >= boneWeightCollection.Count)
                                 {
                                     throw new IndexOutOfRangeException($"There is no bone weight at index {pos0},  bone weight count: {boneWeightCollection.Count}");
                                 }
@@ -1980,14 +1979,14 @@ namespace xivModdingFramework.Models.FileTypes
                             }
 
                             // If the index at index 1 is larger than the normals collection, throw an exception
-                            if (pos1 > normalsCollection.Count)
+                            if (pos1 >= normalsCollection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no normal at index {pos1},  normal count: {normalsCollection.Count}");
                             }
                             nNormalsCollection.Add(normalsCollection[pos1]);
 
                             // If the index at index 2 is larger than the texture coordinate 0 collection, throw an exception
-                            if (pos2 > texCoord0Collection.Count)
+                            if (pos2 >= texCoord0Collection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no texture coordinate 0 at index {pos2},  texture coordinate 0 count: {texCoord0Collection.Count}");
                             }
@@ -1995,10 +1994,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                             if (texCoord1Collection.Count > 0)
                             {
+                                colladaData.IndexLocDictionary = GetIndexLocDictionary(meshNum, i, "textureCoordinate1");
                                 var pos3 = listEntry[colladaData.IndexLocDictionary["textureCoordinate1"]];
 
                                 // If the index at index 3 is larger than the texture coordinate 1 collection, throw an exception
-                                if (pos3 > texCoord1Collection.Count)
+                                if (pos3 >= texCoord1Collection.Count)
                                 {
                                     throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
                                 }
@@ -2034,7 +2034,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 colladaData.IndexLocDictionary = GetIndexLocDictionary(meshNum, i, "vertexColor");
                                 var colorPos = listEntry[colladaData.IndexLocDictionary["vertexColor"]];
 
-                                if (colorPos > vertexColorCollection.Count)
+                                if (colorPos >= vertexColorCollection.Count)
                                 {
                                     throw new IndexOutOfRangeException($"There is no vertex color at index {colorPos},  vertex color count: {vertexColorCollection.Count}");
                                 }
@@ -2072,7 +2072,7 @@ namespace xivModdingFramework.Models.FileTypes
                         indexDict.Add(pos0, indexNum);
 
                         // If the index at index 0 is larger than the position collection, throw an exception
-                        if (pos0 > positionCollection.Count)
+                        if (pos0 >= positionCollection.Count)
                         {
                             throw new IndexOutOfRangeException($"There is no position at index {pos0},  position count: {positionCollection.Count}");
                         }
@@ -2081,14 +2081,14 @@ namespace xivModdingFramework.Models.FileTypes
                         if (!isHousingItem) // Housing items do not have bones
                         {
                             // If the index at index 0 is larger than the bone index collection, throw an exception
-                            if (pos0 > boneIndexCollection.Count)
+                            if (pos0 >= boneIndexCollection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no bone index at index {pos0},  bone index count: {boneIndexCollection.Count}");
                             }
                             nBoneIndexCollection.Add(boneIndexCollection[pos0]);
 
                             // If the index at index 0 is larger than the bone weight collection, throw an exception
-                            if (pos0 > boneWeightCollection.Count)
+                            if (pos0 >= boneWeightCollection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no bone weight at index {pos0},  bone weight count: {boneWeightCollection.Count}");
                             }
@@ -2096,14 +2096,14 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // If the index at index 0 is larger than the normals collection, throw an exception
-                        if (pos0 > normalsCollection.Count)
+                        if (pos0 >= normalsCollection.Count)
                         {
                             throw new IndexOutOfRangeException($"There is no normals at index {pos0},  normals count: {normalsCollection.Count}");
                         }
                         nNormalsCollection.Add(normalsCollection[pos0]);
 
                         // If the index at index 0 is larger than the texture coordinates 0 collection, throw an exception
-                        if (pos0 > texCoord0Collection.Count)
+                        if (pos0 >= texCoord0Collection.Count)
                         {
                             throw new IndexOutOfRangeException($"There is no texture coordinates 0 at index {pos0},  texture coordinates 0 count: {texCoord0Collection.Count}");
                         }
@@ -2112,7 +2112,7 @@ namespace xivModdingFramework.Models.FileTypes
                         if (texCoord1Collection.Count > 0)
                         {
                             // If the index at index 0 is larger than the texture coordinates 1 collection, throw an exception
-                            if (pos0 > texCoord1Collection.Count)
+                            if (pos0 >= texCoord1Collection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no texture coordinates 1 at index {pos0},  texture coordinates 1 count: {texCoord1Collection.Count}");
                             }
@@ -2122,14 +2122,14 @@ namespace xivModdingFramework.Models.FileTypes
                         if (tangentsCollection.Count > 0)
                         {
                             // If the index at index 0 is larger than the tangents collection, throw an exception
-                            if (pos0 > tangentsCollection.Count)
+                            if (pos0 >= tangentsCollection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no tangents at index {pos0},  tangents count: {tangentsCollection.Count}");
                             }
                             nTangentsCollection.Add(tangentsCollection[pos0]);
 
                             // If the index at index 0 is larger than the binormals collection, throw an exception
-                            if (pos0 > biNormalsCollection.Count)
+                            if (pos0 >= biNormalsCollection.Count)
                             {
                                 throw new IndexOutOfRangeException($"There is no binormals at index {pos0},  binormals count: {biNormalsCollection.Count}");
                             }
@@ -2237,15 +2237,15 @@ namespace xivModdingFramework.Models.FileTypes
                 var bitangents = new Vector3[nPositionCollection.Count];
                 for (var a = 0; a < indexCollection.Count; a += 3)
                 {
-                    var index1  = indexCollection[a];
-                    var index2  = indexCollection[a + 1];
-                    var index3  = indexCollection[a + 2];
+                    var index1 = indexCollection[a];
+                    var index2 = indexCollection[a + 1];
+                    var index3 = indexCollection[a + 2];
                     var vertex1 = nPositionCollection[index1];
                     var vertex2 = nPositionCollection[index2];
                     var vertex3 = nPositionCollection[index3];
-                    var uv1     = nTexCoord0Collection[index1];
-                    var uv2     = nTexCoord0Collection[index2];
-                    var uv3     = nTexCoord0Collection[index3];
+                    var uv1 = nTexCoord0Collection[index1];
+                    var uv2 = nTexCoord0Collection[index2];
+                    var uv3 = nTexCoord0Collection[index3];
                     var deltaX1 = vertex2.X - vertex1.X;
                     var deltaX2 = vertex3.X - vertex1.X;
                     var deltaY1 = vertex2.Y - vertex1.Y;
@@ -2265,6 +2265,12 @@ namespace xivModdingFramework.Models.FileTypes
                     bitangents[index1] += tdir;
                     bitangents[index2] += tdir;
                     bitangents[index3] += tdir;
+                    //tangents[index1] += vertex1;
+                    //tangents[index2] += vertex2;
+                    //tangents[index3] += vertex3;
+                    //bitangents[index1] += vertex1;
+                    //bitangents[index2] += vertex2;
+                    //bitangents[index3] += vertex3;
                 }
 
                 var colladaMeshData = new ColladaMeshData();
