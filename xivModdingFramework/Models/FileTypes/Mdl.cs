@@ -1924,15 +1924,15 @@ namespace xivModdingFramework.Models.FileTypes
                         var targetIndex = uniqueCount;
                         var listEntry = indexListList[meshNum][i];
 
-                        for (var j = 0; j < uniqueCount; j++)
+                        for (var j = 0; j < uniquesList.Count; j++)
                         {
                             var targetEntry = uniquesList[j];
 
-                            if (listEntry[0] == targetEntry[0] && normalsCollection[listEntry[1]] == normalsCollection[targetEntry[1]] && texCoord0Collection[listEntry[2]] == texCoord0Collection[targetEntry[2]])
+                            if (listEntry[0] == targetEntry[0] && listEntry[1] == targetEntry[1] && listEntry[2] == targetEntry[2])
                             {
                                 if (texCoord1Collection.Count > 0)
                                 {
-                                    if (texCoord1Collection[listEntry[3]] == texCoord1Collection[targetEntry[3]])
+                                    if (listEntry[3] == targetEntry[3])
                                     {
                                         targetIndex = j;
                                         break;
