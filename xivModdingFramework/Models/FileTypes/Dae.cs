@@ -623,20 +623,20 @@ namespace xivModdingFramework.Models.FileTypes
                                     if (reader.Name.Equals("p"))
                                     {
                                         //If extra values were added, remove them to match the texture coordinate count
-                                        if (cData.VertexColors.Count > cData.TextureCoordinates0.Count)
-                                        {
-                                            //var extraData = cData.VertexColors.Count - cData.TextureCoordinates0.Count;
-                                            //cData.VertexColors.RemoveRange(cData.TextureCoordinates0.Count, extraData);
-                                            cData.VertexColors.Clear();
-                                        }
+                                        //if (cData.VertexColors.Count > cData.TextureCoordinates0.Count)
+                                        //{
+                                        //    //var extraData = cData.VertexColors.Count - cData.TextureCoordinates0.Count;
+                                        //    //cData.VertexColors.RemoveRange(cData.TextureCoordinates0.Count, extraData);
+                                        //    //cData.VertexColors.Clear();
+                                        //}
 
-                                        //If extra values were added, remove them to match the texture coordinate count
-                                        if (cData.VertexAlphas.Count > cData.TextureCoordinates0.Count)
-                                        {
-                                            //var extraData = cData.VertexAlphas.Count - cData.TextureCoordinates0.Count;
-                                            //cData.VertexAlphas.RemoveRange(cData.TextureCoordinates0.Count, extraData);
-                                            cData.VertexAlphas.Clear();
-                                        }
+                                        ////If extra values were added, remove them to match the texture coordinate count
+                                        //if (cData.VertexAlphas.Count > cData.TextureCoordinates0.Count)
+                                        //{
+                                        //    //var extraData = cData.VertexAlphas.Count - cData.TextureCoordinates0.Count;
+                                        //    //cData.VertexAlphas.RemoveRange(cData.TextureCoordinates0.Count, extraData);
+                                        //    //cData.VertexAlphas.Clear();
+                                        //}
 
                                         cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
 
