@@ -351,12 +351,13 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
+                        xivMtrl.ColorSetData = new List<Half>();
+                        xivMtrl.ColorSetExtraData = new byte[0];
                         if (xivMtrl.ColorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
                             var colorDataSize = 512;
 
-                            xivMtrl.ColorSetData = new List<Half>();
                             for (var i = 0; i < colorDataSize / 2; i++)
                             {
                                 xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
@@ -493,109 +494,116 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new offset</returns>
         public async Task<int> ImportMtrl(XivMtrl xivMtrl, IItem item, string source)
         {
-            var mtrlBytes = new List<byte>();
-
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.FileSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ColorSetDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TexturePathsDataSize));
-            mtrlBytes.Add(xivMtrl.TextureCount);
-            mtrlBytes.Add(xivMtrl.MapCount);
-            mtrlBytes.Add(xivMtrl.ColorSetCount);
-            mtrlBytes.Add(xivMtrl.UnknownDataSize);
-
-            for (var i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
+            try
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathUnknownList[i]));
-            }
+                var mtrlBytes = new List<byte>();
 
-            for (var i = 0; i < xivMtrl.MapPathOffsetList.Count; i++)
-            {
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathUnknownList[i]));
-            }
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.FileSize));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ColorSetDataSize));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialDataSize));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TexturePathsDataSize));
+                mtrlBytes.Add(xivMtrl.TextureCount);
+                mtrlBytes.Add(xivMtrl.MapCount);
+                mtrlBytes.Add(xivMtrl.ColorSetCount);
+                mtrlBytes.Add(xivMtrl.UnknownDataSize);
 
-            for (var i = 0; i < xivMtrl.ColorSetPathOffsetList.Count; i++)
-            {
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathUnknownList[i]));
-            }
+                for (var i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
+                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathUnknownList[i]));
+                }
 
-            var pathStringList = new List<byte>();
+                for (var i = 0; i < xivMtrl.MapPathOffsetList.Count; i++)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathOffsetList[i]));
+                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathUnknownList[i]));
+                }
 
-            foreach (var texPathString in xivMtrl.TexturePathList)
-            {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
+                for (var i = 0; i < xivMtrl.ColorSetPathOffsetList.Count; i++)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathOffsetList[i]));
+                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathUnknownList[i]));
+                }
+
+                var pathStringList = new List<byte>();
+
+                foreach (var texPathString in xivMtrl.TexturePathList)
+                {
+                    pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
+                    pathStringList.Add(0);
+                }
+
+                foreach (var mapPathString in xivMtrl.MapPathList)
+                {
+                    pathStringList.AddRange(Encoding.UTF8.GetBytes(mapPathString));
+                    pathStringList.Add(0);
+                }
+
+                foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
+                {
+                    pathStringList.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
+                    pathStringList.Add(0);
+                }
+
+                pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
                 pathStringList.Add(0);
-            }
 
-            foreach (var mapPathString in xivMtrl.MapPathList)
+                var paddingSize = xivMtrl.MaterialDataSize - pathStringList.Count;
+
+                pathStringList.AddRange(new byte[paddingSize]);
+
+                mtrlBytes.AddRange(pathStringList);
+
+                mtrlBytes.AddRange(xivMtrl.Unknown2);
+
+                foreach (var colorSetHalf in xivMtrl.ColorSetData)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes(colorSetHalf.RawValue));
+                }
+
+                if (xivMtrl.ColorSetDataSize == 544)
+                {
+                    mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
+                }
+
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.AdditionalDataSize));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct1Count));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct2Count));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ParameterStructCount));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderNumber));
+                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
+
+                foreach (var dataStruct1 in xivMtrl.DataStruct1List)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.ID));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown1));
+                }
+
+                foreach (var dataStruct2 in xivMtrl.DataStruct2List)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.ID));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Offset));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Size));
+                }
+
+                foreach (var parameterStruct in xivMtrl.ParameterStructList)
+                {
+                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.ID));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown1));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown2));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
+                }
+
+                mtrlBytes.AddRange(xivMtrl.AdditionalData);
+
+                var dat = new Dat(_gameDirectory);
+                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category, source);
+            }
+            catch(Exception ex)
             {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(mapPathString));
-                pathStringList.Add(0);
+                throw ex;
             }
-
-            foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
-            {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
-                pathStringList.Add(0);
-            }
-
-            pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
-            pathStringList.Add(0);
-
-            var paddingSize = xivMtrl.MaterialDataSize - pathStringList.Count;
-
-            pathStringList.AddRange(new byte[paddingSize]);
-
-            mtrlBytes.AddRange(pathStringList);
-
-            mtrlBytes.AddRange(xivMtrl.Unknown2);
-
-            foreach (var colorSetHalf in xivMtrl.ColorSetData)
-            {
-                mtrlBytes.AddRange(BitConverter.GetBytes(colorSetHalf.RawValue));
-            }
-
-            if (xivMtrl.ColorSetDataSize == 544)
-            {
-                mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
-            }
-
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.AdditionalDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct1Count));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct2Count));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ParameterStructCount));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderNumber));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
-
-            foreach (var dataStruct1 in xivMtrl.DataStruct1List)
-            {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.ID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown1));
-            }
-
-            foreach (var dataStruct2 in xivMtrl.DataStruct2List)
-            {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.ID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Offset));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Size));
-            }
-
-            foreach (var parameterStruct in xivMtrl.ParameterStructList)
-            {
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.ID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown1));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown2));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
-            }
-
-            mtrlBytes.AddRange(xivMtrl.AdditionalData);
-
-            var dat = new Dat(_gameDirectory);
-            return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category, source);
         }
 
         /// <summary>
