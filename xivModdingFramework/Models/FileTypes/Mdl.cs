@@ -4892,14 +4892,14 @@ namespace xivModdingFramework.Models.FileTypes
                     //    importData.VertexData1.AddRange(BitConverter.GetBytes(0xFFFFFFFF));
                     //}
 
-                    if (colladaMeshData.VertexColors.Count > 0)
+                    if (colladaMeshData.VertexColors.Count > 0&&i <colladaMeshData.VertexColors.Count)
                     {
                         var red   = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].X * 255), 0, 255));
                         var green = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Y * 255), 0, 255));
                         var blue  = Convert.ToByte(MathUtil.Clamp((int) Math.Round(colladaMeshData.VertexColors[i].Z * 255), 0, 255));
                         var alpha = (byte)255; 
 
-                        if (colladaMeshData.VertexAlphas.Count > 0&&i<colladaMeshData.VertexColors.Count)
+                        if (colladaMeshData.VertexAlphas.Count > 0&&i<colladaMeshData.VertexAlphas.Count)
                         {
                             alpha = Convert.ToByte(Math.Round(colladaMeshData.VertexAlphas[i] * 255));
                         }
