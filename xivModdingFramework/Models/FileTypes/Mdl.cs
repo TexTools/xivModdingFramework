@@ -3529,8 +3529,9 @@ namespace xivModdingFramework.Models.FileTypes
                         var boneMaxEntries = 64;
 
                         var remaining = boneMaxEntries - boneStringCount;
+                        var count = remaining > 0 ? boneStringCount:boneMaxEntries;
 
-                        for (var i = 0; i < boneStringCount; i++)
+                        for (var i = 0; i < count; i++)
                         {
                             boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)i));
                         }
@@ -3540,10 +3541,7 @@ namespace xivModdingFramework.Models.FileTypes
                             boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)0));
                         }
 
-                        if (remaining != -1)
-                        {
-                            boneIndexMeshBlock.AddRange(BitConverter.GetBytes((int)boneStringCount));
-                        }
+                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes((int)count));
                     }
                     else
                     {
