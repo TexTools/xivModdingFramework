@@ -3675,8 +3675,8 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         foreach (var indexOffset in shapeData)
                                         {
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)-1));
+                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)-1));
                                         }
                                     }
                                     else if (importSettings[indexMeshLocation.ToString()].Fix)
