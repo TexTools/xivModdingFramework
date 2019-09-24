@@ -602,7 +602,11 @@ namespace xivModdingFramework.Models.FileTypes
                         ReferenceIndexOffset  = br.ReadUInt16(),
                         ShapeIndex            = br.ReadUInt16()
                     };
-
+                    if ((short)shapeData.ReferenceIndexOffset == -1 && (short)shapeData.ShapeIndex == -1)
+                    {
+                        shapeData.ReferenceIndexOffset = 0;
+                        shapeData.ShapeIndex = 0;
+                    }
                     shapeDataLists.ShapeDataList.Add(shapeData);
                 }
 
