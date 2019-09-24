@@ -602,11 +602,6 @@ namespace xivModdingFramework.Models.FileTypes
                         ReferenceIndexOffset  = br.ReadUInt16(),
                         ShapeIndex            = br.ReadUInt16()
                     };
-                    if ((short)shapeData.ReferenceIndexOffset == -1 && (short)shapeData.ShapeIndex == -1)
-                    {
-                        shapeData.ReferenceIndexOffset = 0;
-                        shapeData.ShapeIndex = 0;
-                    }
                     shapeDataLists.ShapeDataList.Add(shapeData);
                 }
 
@@ -3589,15 +3584,33 @@ namespace xivModdingFramework.Models.FileTypes
                             meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(info.ShapePathOffset));
                         }
 
-
+                        var disable = false;
+                        foreach(var value in importSettings.Values)
+                        {
+                            disable = disable || value.Disable;
+                        }
                         foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                         {
-                            meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.DataInfoIndex));
+                            if (disable)
+                            {
+                                meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                            }
+                            else
+                            {
+                                meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.DataInfoIndex));
+                            }
                         }
 
                         foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                         {
-                            meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.PartCount));
+                            if (disable)
+                            {
+                                meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                            }
+                            else
+                            {
+                                meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeInfoShapeIndexPart.PartCount));
+                            }                            
                         }
 
                         infoNum++;
@@ -3679,8 +3692,8 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         foreach (var indexOffset in shapeData)
                                         {
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)-1));
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)-1));
+                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
                                         }
                                     }
                                     else if (importSettings[indexMeshLocation.ToString()].Fix)
