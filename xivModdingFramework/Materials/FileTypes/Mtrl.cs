@@ -179,7 +179,6 @@ namespace xivModdingFramework.Materials.FileTypes
             // Get mtrl offset
             var mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlFolder), HashGenerator.GetHash(mtrlFile),
                 DataFile);
-
             if (mtrlOffset == 0)
             {
                 throw new Exception($"Could not find offest for {mtrlStringPath}");
@@ -847,7 +846,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
                     {
-                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        if (_language != XivLanguage.Korean )
                         {
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
                         }
@@ -870,7 +869,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
                     {
-                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        if (_language != XivLanguage.Korean )
                         {
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                         }
@@ -959,7 +958,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.ItemCategory.Equals(XivStrings.Body))
                     {
-                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        if (_language != XivLanguage.Korean )
                         {
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
                         }
@@ -979,7 +978,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
                     {
-                        if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                        if (_language != XivLanguage.Korean )
                         {
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                         }

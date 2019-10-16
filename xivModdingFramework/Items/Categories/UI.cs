@@ -590,7 +590,7 @@ namespace xivModdingFramework.Items.Categories
             var typeDataOffset = 13;
             var dataLength = 24;
 
-            if (_xivLanguage != XivLanguage.Korean && _xivLanguage != XivLanguage.Chinese)
+            if (_xivLanguage != XivLanguage.Korean )
             {
                 typeDataOffset = 16;
                 dataLength = 28;
