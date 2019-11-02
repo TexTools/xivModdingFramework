@@ -331,6 +331,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 if (line.ToLower().Contains("version"))
                                 {
                                     //mpInfo = JsonConvert.DeserializeObject<ModPackInfo>(line);
+                                    return null;
                                 }
                                 else
                                 {
