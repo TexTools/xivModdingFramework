@@ -106,7 +106,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (charaItem.ItemCategory == XivStrings.Body)
             {
-                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                if (_language != XivLanguage.Korean )
                 {
                     folder = XivStrings.BodyMtrlFolder;
                 }
@@ -118,7 +118,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (charaItem.ItemCategory == XivStrings.Tail)
             {
-                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                if (_language != XivLanguage.Korean )
                 {
                     folder = XivStrings.TailMtrlFolder;
                 }
@@ -303,7 +303,7 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.ItemCategory == XivStrings.Body)
             {
-                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                if (_language != XivLanguage.Korean )
                 {
                     folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), variant.ToString().PadLeft(4, '0'));
                 }
@@ -315,7 +315,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (charaItem.ItemCategory == XivStrings.Tail)
             {
-                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                if (_language != XivLanguage.Korean )
                 {
                     folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
                 }
@@ -346,7 +346,7 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.ItemCategory == XivStrings.Body)
             {
-                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                if (_language != XivLanguage.Korean )
                 {
                     var testDictionary = new Dictionary<int, int>();
 
@@ -367,7 +367,7 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.ItemCategory == XivStrings.Tail)
             {
-                if (_language != XivLanguage.Korean && _language != XivLanguage.Chinese)
+                if (_language != XivLanguage.Korean )
                 {
                     var testDictionary = new Dictionary<int, int>();
 
