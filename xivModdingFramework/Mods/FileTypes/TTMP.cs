@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using ImageMagick;
 using Newtonsoft.Json;
+using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -97,7 +97,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 if (modOption.Image != null)
                                 {
                                     randomFileName = $"{Path.GetRandomFileName()}.png";                                    
-                                    imageList.Add(randomFileName, modOption.Image.FileName);
+                                    imageList.Add(randomFileName, modOption.ImageFileName);
                                 }
 
                                 var modOptionJson = new ModOptionJson
@@ -276,12 +276,12 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public Task<(ModPackJson ModPackJson, Dictionary<string, MagickImage> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
+        public Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
         {
             return Task.Run(() =>
             {
                 ModPackJson modPackJson = null;
-                var imageDictionary = new Dictionary<string, MagickImage>();
+                var imageDictionary = new Dictionary<string, Image>();
 
                 using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
                 {
@@ -299,7 +299,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                         if (entry.FullName.EndsWith(".png"))
                         {
-                            imageDictionary.Add(entry.FullName, new MagickImage(entry.Open()));
+                            imageDictionary.Add(entry.FullName, Image.Load(entry.Open()));
                         }
                     }
                 }
