@@ -293,6 +293,16 @@ namespace xivModdingFramework.Items.Categories
 
             xivGearList.Add(xivGear);
 
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Feet 2 (NPC)",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[8],
+                ModelInfo = new XivModelInfo { ModelID = 9901, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
             return xivGearList;
         }
 
