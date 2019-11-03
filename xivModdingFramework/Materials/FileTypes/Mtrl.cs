@@ -181,7 +181,25 @@ namespace xivModdingFramework.Materials.FileTypes
                 DataFile);
             if (mtrlOffset == 0)
             {
-                throw new Exception($"Could not find offest for {mtrlStringPath}");
+                // Change to default version if no offset is found and try to get offset again
+                if (!mtrlFolder.Contains("v0001"))
+                {
+                    var newMtrlFolder = mtrlFolder.Substring(0, mtrlFolder.LastIndexOf("v")) + "v0001";
+
+                    mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(newMtrlFolder), HashGenerator.GetHash(mtrlFile), DataFile);
+
+                    if (mtrlOffset == 0)
+                    {
+                        throw new Exception($"Could not find offest for {mtrlStringPath}");
+                    }
+
+                    mtrlStringPath = $"{newMtrlFolder}/{mtrlFile}";
+                }
+                else
+                {
+                    throw new Exception($"Could not find offest for {mtrlStringPath}");
+
+                }
             }
 
             var mtrlData = await GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
