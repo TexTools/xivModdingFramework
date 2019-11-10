@@ -628,7 +628,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
                 var dat = new Dat(_gameDirectory);
-                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category, source);
+                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.ItemCategory, source);
             }
             catch(Exception ex)
             {
