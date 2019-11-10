@@ -145,9 +145,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var s in xivModel.PathData.BoneList)
                 {
-                    if (FullSkel.ContainsKey(s))
+                    var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);
+
+                    if (FullSkel.ContainsKey(fixedBone))
                     {
-                        var skel = FullSkel[s];
+                        var skel = FullSkel[fixedBone];
 
                         if (skel.BoneParent == -1 && !skelDict.ContainsKey(skel.BoneName))
                         {
