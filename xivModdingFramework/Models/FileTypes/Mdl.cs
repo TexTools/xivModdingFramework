@@ -5160,6 +5160,18 @@ namespace xivModdingFramework.Models.FileTypes
             var mdlInfo = secondaryModel ?? itemModel.ModelInfo;
             var id = mdlInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = mdlInfo.Body.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.ItemCategory;
+
+            if (secondaryModel != null)
+            {
+                // Secondary model is gear if between 8800 and 8900 instead of weapon
+                if (secondaryModel.ModelID > 8800 && secondaryModel.ModelID < 8900)
+                {
+                    itemType = XivItemType.equipment;
+                    xivRace = XivRace.Hyur_Midlander_Male;
+                    itemCategory = XivStrings.Hands;
+                }
+            }
           
             var race = xivRace.GetRaceCode();
 
@@ -5167,7 +5179,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 case XivItemType.equipment:
                     mdlFolder = $"chara/{itemType}/e{id}/model";
-                    mdlFile   = $"c{race}e{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                    mdlFile   = $"c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     break;
                 case XivItemType.accessory:
                     mdlFolder = $"chara/{itemType}/a{id}/model";
@@ -5184,7 +5196,7 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     else
                     {
-                        mdlFile = $"c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                        mdlFile = $"c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
                     break;
                 case XivItemType.weapon:
@@ -5200,27 +5212,27 @@ namespace xivModdingFramework.Models.FileTypes
                     mdlFile   = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{MdlExtension}";
                     break;
                 case XivItemType.human:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    if (itemCategory.Equals(XivStrings.Body))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/model";
                         mdlFile   = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{MdlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    else if (itemCategory.Equals(XivStrings.Hair))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/model";
-                        mdlFile   = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                        mdlFile   = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    else if (itemCategory.Equals(XivStrings.Face))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/model";
-                        mdlFile   = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                        mdlFile   = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    else if (itemCategory.Equals(XivStrings.Tail))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
-                        mdlFile   = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}{MdlExtension}";
+                        mdlFile   = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    else if (itemCategory.Equals(XivStrings.Ears))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/model";
                         mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
@@ -5233,12 +5245,12 @@ namespace xivModdingFramework.Models.FileTypes
                         part = itemModel.ItemSubCategory;
                     }
 
-                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                     {
                         mdlFolder = $"bgcommon/hou/indoor/general/{id}/bgparts";
                         mdlFile = $"fun_b0_m{id}{part}{MdlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                     {
                         mdlFolder = $"bgcommon/hou/outdoor/general/{id}/bgparts";
                         mdlFile = $"gar_b0_m{id}{part}{MdlExtension}";

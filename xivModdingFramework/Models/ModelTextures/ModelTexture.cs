@@ -23,6 +23,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using SixLabors.ImageSharp.Processing.Processors;
+using SixLabors.ImageSharp.Processing.Processors.Filters;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -566,6 +568,14 @@ namespace xivModdingFramework.Models.ModelTextures
                     using (var img = Image.LoadPixelData<Rgba32>(texMapData.Diffuse.Data, texMapData.Diffuse.Width,
                         texMapData.Diffuse.Height))
                     {
+                        for (int i = 0; i < img.Height; i++)
+                        {
+                            var pixelRowSpan = img.GetPixelRowSpan(i);
+                            for (int j = 0; j < img.Width; j++)
+                            {
+                                pixelRowSpan[j] = new Rgba32(pixelRowSpan[j].R, pixelRowSpan[j].G, pixelRowSpan[j].B, 255);
+                            }
+                        }
                         img.Mutate(x => x.Resize(width, height));
 
                         texMapData.Diffuse.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();

@@ -145,9 +145,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var s in xivModel.PathData.BoneList)
                 {
-                    if (FullSkel.ContainsKey(s))
+                    var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);
+
+                    if (FullSkel.ContainsKey(fixedBone))
                     {
-                        var skel = FullSkel[s];
+                        var skel = FullSkel[fixedBone];
 
                         if (skel.BoneParent == -1 && !skelDict.ContainsKey(skel.BoneName))
                         {
@@ -622,7 +624,12 @@ namespace xivModdingFramework.Models.FileTypes
                                     // Indices
                                     if (reader.Name.Equals("p"))
                                     {
+                                        // This was done to reduce the memory footprint because 3ds exports can increase the number of vertex colors by a large amount.
+                                        // Disabled as of 2.0.9 since it seems to be causing issues.
+
+                                        /*
                                         //If extra values were added, remove them to match the position or texture coordinates count, whichever is larger
+
                                         var matchCount = cData.TextureCoordinates0.Count > cData.Positions.Count
                                             ? cData.TextureCoordinates0.Count
                                             : cData.Positions.Count;
@@ -638,6 +645,7 @@ namespace xivModdingFramework.Models.FileTypes
                                             var extraData = cData.VertexAlphas.Count - matchCount;
                                             cData.VertexAlphas.RemoveRange(matchCount, extraData);
                                         }
+                                        */
 
                                         cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
 

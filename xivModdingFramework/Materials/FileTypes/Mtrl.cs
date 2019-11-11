@@ -106,6 +106,13 @@ namespace xivModdingFramework.Materials.FileTypes
                     // Get mtrl path
                     var originalBody = xivGear.SecondaryModelInfo.Body;
                     xivGear.SecondaryModelInfo.Body = 1;
+
+                    if (xivGear.SecondaryModelInfo.ModelID > 8800 && xivGear.SecondaryModelInfo.ModelID < 8900)
+                    {
+                        itemType = XivItemType.equipment;
+                        race = XivRace.Hyur_Midlander_Male;
+                    }
+
                     mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, type);
                     mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
 
@@ -164,6 +171,12 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             var index = new Index(_gameDirectory);
             var itemType = ItemType.GetItemType(itemModel);
+
+            // Secondary model is gear if between 8800 and 8900 instead of weapon
+            if (itemModel.ModelInfo.ModelID > 8800 && itemModel.ModelInfo.ModelID < 8900)
+            {
+                itemType = XivItemType.equipment;
+            }
 
             // Get mtrl path
             var mtrlFolder = await GetMtrlFolder(itemModel, race, itemType);
@@ -615,7 +628,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
                 var dat = new Dat(_gameDirectory);
-                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.Category, source);
+                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.ItemCategory, source);
             }
             catch(Exception ex)
             {
@@ -801,7 +814,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var hasVfx = false;
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture && !type.Equals("Secondary"))
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
@@ -816,6 +829,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.ItemCategory;
 
             if (type.Equals("Secondary"))
             {
@@ -827,9 +841,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo);
                 version = imcInfo.Version.ToString().PadLeft(4, '0');
+
+                if (imc.ChangedType)
+                {
+                    itemCategory = XivStrings.Hands;
+                    itemType = XivItemType.equipment;
+                    xivRace = XivRace.Hyur_Midlander_Male;
+                }
             }
 
-            if (itemModel.Category.Equals(XivStrings.Character) && (itemModel.ItemCategory.Equals(XivStrings.Body) || itemModel.ItemCategory.Equals(XivStrings.Tail)))
+            if (itemModel.Category.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
             {
                 version = type.PadLeft(4, '0');
             }
@@ -842,11 +863,11 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 case XivItemType.equipment:
                     mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
+                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}_{part}{MtrlExtension}";
                     break;
                 case XivItemType.accessory:
                     mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_{part}{MtrlExtension}";
+                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}_{part}{MtrlExtension}";
                     break;
                 case XivItemType.weapon:
                     mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
@@ -862,7 +883,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     mtrlFile = $"mt_d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{part}{MtrlExtension}";
                     break;
                 case XivItemType.human:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    if (itemCategory.Equals(XivStrings.Body))
                     {
                         if (_language != XivLanguage.Korean )
                         {
@@ -874,18 +895,18 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
                         mtrlFile = $"mt_c{race}b{bodyVer}_{part}{MtrlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    else if (itemCategory.Equals(XivStrings.Hair))
                     {
                         // Hair has a version number, but no IMC, so we leave it at the default 0001
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/material/v{version}";
                         mtrlFile = $"mt_c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{part}{MtrlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    else if (itemCategory.Equals(XivStrings.Face))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/material";
                         mtrlFile = $"mt_c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{part}{MtrlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    else if (itemCategory.Equals(XivStrings.Tail))
                     {
                         if (_language != XivLanguage.Korean )
                         {
@@ -897,19 +918,19 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
                         mtrlFile = $"mt_c{race}t{bodyVer}_{part}{MtrlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    else if (itemCategory.Equals(XivStrings.Ears))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
                         mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{part}{MtrlExtension}";
                     }
                     break;
                 case XivItemType.furniture:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                     {
                         mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
                         mtrlFile = $"fun_b0_m{id}_0{part}{MtrlExtension}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                     {
                         mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
                         mtrlFile = $"gar_b0_m{id}_0{part}{MtrlExtension}";

@@ -173,15 +173,9 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var version = "0001";
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
-            {
-                // Get the mtrl version for the given item from the imc file
-                var imc = new Imc(_gameDirectory, dataFile);
-                version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
-            }
-
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.ItemCategory;
 
             if (type.Equals("Secondary"))
             {
@@ -191,7 +185,23 @@ namespace xivModdingFramework.Textures.FileTypes
                 bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, xivGear.DataFile);
-                version = (await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo)).Version.ToString().PadLeft(4, '0'); ;
+                version = (await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo)).Version.ToString().PadLeft(4, '0');
+
+                if (imc.ChangedType)
+                {
+                    itemType = XivItemType.equipment;
+                    xivRace = XivRace.Hyur_Midlander_Male;
+                    itemCategory = XivStrings.Hands;
+                }
+            }
+            else
+            {
+                if (itemType != XivItemType.human && itemType != XivItemType.furniture)
+                {
+                    // Get the mtrl version for the given item from the imc file
+                    var imc = new Imc(_gameDirectory, dataFile);
+                    version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
+                }
             }
 
             var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
@@ -203,11 +213,11 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 case XivItemType.equipment:
                     mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}_";
                     break;
                 case XivItemType.accessory:
                     mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}_";
                     break;
                 case XivItemType.weapon:
                     mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
@@ -222,34 +232,34 @@ namespace xivModdingFramework.Textures.FileTypes
                     mtrlFile = $"mt_d{id}e{bodyVer}_";
                     break;
                 case XivItemType.human:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    if (itemCategory.Equals(XivStrings.Body))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/material/v{version}";
                         mtrlFile = $"mt_c{id}b{bodyVer}_";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    else if (itemCategory.Equals(XivStrings.Hair))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}_";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    else if (itemCategory.Equals(XivStrings.Face))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}_";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    else if (itemCategory.Equals(XivStrings.Tail))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/material/v{version}";
                         mtrlFile = $"mt_c{id}t{bodyVer}_";
                     }
                     break;
                 case XivItemType.furniture:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                     {
                         mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
                         mtrlFile = $"fun_b0_m{id}_0";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                     {
                         mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
                         mtrlFile = $"gar_b0_m{id}_0";
@@ -273,11 +283,11 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (partList.Count < 1 && itemType == XivItemType.furniture)
             {
-                if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                 {
                     mtrlFile = $"fun_b0_m{id}_1";
                 }
-                else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                 {
                     mtrlFile = $"gar_b0_m{id}_1";
                 }
