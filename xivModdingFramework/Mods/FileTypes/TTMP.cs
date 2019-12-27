@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using ImageMagick;
 using Newtonsoft.Json;
+using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -96,8 +96,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 if (modOption.Image != null)
                                 {
-                                    randomFileName = $"{Path.GetRandomFileName()}.png";
-                                    imageList.Add(modOption.Image.FileName, randomFileName);
+                                    randomFileName = $"{Path.GetRandomFileName()}.png";                                    
+                                    imageList.Add(randomFileName, modOption.ImageFileName);
                                 }
 
                                 var modOptionJson = new ModOptionJson
@@ -107,6 +107,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     ImagePath = randomFileName,
                                     GroupName = modOption.GroupName,
                                     SelectionType = modOption.SelectionType,
+                                    IsChecked=modOption.IsChecked,
                                     ModsJsons = new List<ModsJson>()
                                 };
 
@@ -123,7 +124,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                         FullPath = modOptionMod.Key,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
-                                        DatFile = dataFile.GetDataFileName()
+                                        DatFile = dataFile.GetDataFileName(),
                                     };
 
                                     binaryWriter.Write(modOptionMod.Value.ModDataBytes);
@@ -160,7 +161,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
                     foreach (var image in imageList)
                     {
-                        zip.CreateEntryFromFile(image.Key, image.Value);
+                        zip.CreateEntryFromFile(image.Value, image.Key);
                     }
                 }
 
@@ -212,7 +213,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 FullPath = simpleModData.FullPath,
                                 ModSize = simpleModData.ModSize,
                                 DatFile = simpleModData.DatFile,
-                                ModOffset = binaryWriter.BaseStream.Position
+                                ModOffset = binaryWriter.BaseStream.Position,
                             };
 
                             var rawData = dat.GetRawData((int) simpleModData.ModOffset,
@@ -275,12 +276,12 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public Task<(ModPackJson ModPackJson, Dictionary<string, MagickImage> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
+        public Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
         {
             return Task.Run(() =>
             {
                 ModPackJson modPackJson = null;
-                var imageDictionary = new Dictionary<string, MagickImage>();
+                var imageDictionary = new Dictionary<string, Image>();
 
                 using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
                 {
@@ -298,7 +299,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                         if (entry.FullName.EndsWith(".png"))
                         {
-                            imageDictionary.Add(entry.FullName, new MagickImage(entry.Open()));
+                            imageDictionary.Add(entry.FullName, Image.Load(entry.Open()));
                         }
                     }
                 }
@@ -330,6 +331,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 if (line.ToLower().Contains("version"))
                                 {
                                     //mpInfo = JsonConvert.DeserializeObject<ModPackInfo>(line);
+                                    return null;
                                 }
                                 else
                                 {

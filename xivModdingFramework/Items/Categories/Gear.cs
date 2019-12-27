@@ -225,6 +225,16 @@ namespace xivModdingFramework.Items.Categories
 
             xivGear = new XivGear
             {
+                Name = "SmallClothes Hands",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[5],
+                ModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
                 Name = "SmallClothes Legs",
                 Category = XivStrings.Gear,
                 ItemCategory = _slotNameDictionary[7],
@@ -239,6 +249,56 @@ namespace xivModdingFramework.Items.Categories
                 Category = XivStrings.Gear,
                 ItemCategory = _slotNameDictionary[8],
                 ModelInfo = new XivModelInfo { ModelID = 0, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Body (NPC)",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[4],
+                ModelInfo = new XivModelInfo { ModelID = 9903, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Hands (NPC)",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[5],
+                ModelInfo = new XivModelInfo { ModelID = 9903, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Legs (NPC)",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[7],
+                ModelInfo = new XivModelInfo { ModelID = 9903, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Feet (NPC)",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[8],
+                ModelInfo = new XivModelInfo { ModelID = 9903, Variant = 1, Body = 0 }
+            };
+
+            xivGearList.Add(xivGear);
+
+            xivGear = new XivGear
+            {
+                Name = "SmallClothes Feet 2 (NPC)",
+                Category = XivStrings.Gear,
+                ItemCategory = _slotNameDictionary[8],
+                ModelInfo = new XivModelInfo { ModelID = 9901, Variant = 1, Body = 0 }
             };
 
             xivGearList.Add(xivGear);

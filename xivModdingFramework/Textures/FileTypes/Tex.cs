@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using ImageMagick;
-using ImageMagick.Defines;
 using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using TeximpNet.Compression;
+using TeximpNet.DDS;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -36,6 +36,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Variants.FileTypes;
+using Surface = TeximpNet.Surface;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -172,15 +173,9 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var version = "0001";
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
-            {
-                // Get the mtrl version for the given item from the imc file
-                var imc = new Imc(_gameDirectory, dataFile);
-                version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
-            }
-
             var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.ItemCategory;
 
             if (type.Equals("Secondary"))
             {
@@ -190,7 +185,23 @@ namespace xivModdingFramework.Textures.FileTypes
                 bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, xivGear.DataFile);
-                version = (await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo)).Version.ToString().PadLeft(4, '0'); ;
+                version = (await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo)).Version.ToString().PadLeft(4, '0');
+
+                if (imc.ChangedType)
+                {
+                    itemType = XivItemType.equipment;
+                    xivRace = XivRace.Hyur_Midlander_Male;
+                    itemCategory = XivStrings.Hands;
+                }
+            }
+            else
+            {
+                if (itemType != XivItemType.human && itemType != XivItemType.furniture)
+                {
+                    // Get the mtrl version for the given item from the imc file
+                    var imc = new Imc(_gameDirectory, dataFile);
+                    version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
+                }
             }
 
             var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
@@ -202,11 +213,11 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 case XivItemType.equipment:
                     mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}_";
                     break;
                 case XivItemType.accessory:
                     mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}_";
                     break;
                 case XivItemType.weapon:
                     mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
@@ -221,34 +232,34 @@ namespace xivModdingFramework.Textures.FileTypes
                     mtrlFile = $"mt_d{id}e{bodyVer}_";
                     break;
                 case XivItemType.human:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    if (itemCategory.Equals(XivStrings.Body))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/material/v{version}";
                         mtrlFile = $"mt_c{id}b{bodyVer}_";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    else if (itemCategory.Equals(XivStrings.Hair))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}_";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    else if (itemCategory.Equals(XivStrings.Face))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemCategory]}_";
+                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}_";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    else if (itemCategory.Equals(XivStrings.Tail))
                     {
                         mtrlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/material/v{version}";
                         mtrlFile = $"mt_c{id}t{bodyVer}_";
                     }
                     break;
                 case XivItemType.furniture:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                     {
                         mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
                         mtrlFile = $"fun_b0_m{id}_0";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                     {
                         mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
                         mtrlFile = $"gar_b0_m{id}_0";
@@ -272,11 +283,11 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (partList.Count < 1 && itemType == XivItemType.furniture)
             {
-                if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                 {
                     mtrlFile = $"fun_b0_m{id}_1";
                 }
-                else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                 {
                     mtrlFile = $"gar_b0_m{id}_1";
                 }
@@ -662,31 +673,44 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 // Check if the texture being imported has been imported before
                 var modEntry = await modding.TryGetModEntry(xivTex.TextureTypeAndPath.Path);
+                var ddsContainer = new DDSContainer();
+                CompressionFormat compressionFormat;
 
-                using (var magickImage = new MagickImage(bmpFileDirectory.FullName))
+                switch (xivTex.TextureFormat)
                 {
-                    switch (xivTex.TextureFormat)
+                    case XivTexFormat.DXT1:
+                        compressionFormat = CompressionFormat.BC1;
+                        break;
+                    case XivTexFormat.DXT5:
+                        compressionFormat = CompressionFormat.BC3;
+                        break;
+                    case XivTexFormat.A8R8G8B8:
+                        compressionFormat = CompressionFormat.BGRA;
+                        break;
+                    default:
+                        throw new Exception($"Format {xivTex.TextureFormat} is not currently supported for BMP import\n\nPlease use the DDS import option instead.");
+                }
+
+                using (var surface = Surface.LoadFromFile(bmpFileDirectory.FullName))
+                {
+                    surface.FlipVertically();
+
+                    using (var compressor = new Compressor())
                     {
-                        case XivTexFormat.DXT1:
-                            magickImage.Format = MagickFormat.Dxt1;
-                            break;
-                        case XivTexFormat.DXT5:
-                            magickImage.Format = MagickFormat.Dxt5;
-                            break;
-                        case XivTexFormat.A8R8G8B8:
-                            magickImage.Format = MagickFormat.Dds;
-                            magickImage.Settings.SetDefines(new DdsWriteDefines
-                            {
-                                Compression = DdsCompression.None
-                            });
-                            break;
-                        default:
-                            throw new Exception($"Format {xivTex.TextureFormat} is not currently supported for BMP import\n\nPlease use the DDS import option instead.");
+                        compressor.Input.GenerateMipmaps = true;
+                        compressor.Input.SetData(surface);
+                        compressor.Compression.Format = compressionFormat;
+                        compressor.Compression.SetBGRAPixelFormat();
+
+                        compressor.Process(out ddsContainer);
                     }
+                }
 
-                    var data = magickImage.ToByteArray();
+                using (var ddsMemoryStream = new MemoryStream())
+                {
+                    ddsContainer.Write(ddsMemoryStream, DDSFlags.None);
 
-                    using (var br = new BinaryReader(new MemoryStream(data)))
+                    using (var br = new BinaryReader(ddsMemoryStream))
                     {
                         br.BaseStream.Seek(12, SeekOrigin.Begin);
 
@@ -746,14 +770,14 @@ namespace xivModdingFramework.Textures.FileTypes
 
                         if (textureType == xivTex.TextureFormat)
                         {
-                            var uncompressedLength = data.Length;
+                            var uncompressedLength = ddsMemoryStream.Length;
                             var newTex = new List<byte>();
 
                             if (!xivTex.TextureTypeAndPath.Path.Contains(".atex"))
                             {
                                 var DDSInfo = await DDS.ReadDDS(br, xivTex, newWidth, newHeight, newMipCount);
 
-                                newTex.AddRange(_dat.MakeType4DatHeader(xivTex, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, uncompressedLength, newMipCount, newWidth, newHeight));
+                                newTex.AddRange(_dat.MakeType4DatHeader(xivTex, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, (int)uncompressedLength, newMipCount, newWidth, newHeight));
                                 newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
                                 newTex.AddRange(DDSInfo.compressedDDS);
 
@@ -764,7 +788,7 @@ namespace xivModdingFramework.Textures.FileTypes
                             {
                                 br.BaseStream.Seek(128, SeekOrigin.Begin);
                                 newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
-                                newTex.AddRange(br.ReadBytes(uncompressedLength));
+                                newTex.AddRange(br.ReadBytes((int)uncompressedLength));
 
                                 offset = await _dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
                                     item.ItemCategory, source);
@@ -776,6 +800,8 @@ namespace xivModdingFramework.Textures.FileTypes
                         }
                     }
                 }
+
+                ddsContainer.Dispose();
             }
             else
             {
@@ -961,7 +987,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     colorSetData.Add(new Half(br.ReadUInt16()));
                 }
             }
-
+            var colorSetExtraData = new byte[32];
             // If the colorset size is 544, it contains extra data that must be imported
             if (xivMtrl.ColorSetDataSize == 544)
             {
@@ -969,20 +995,22 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (File.Exists(flagsPath))
                 {
-                    using (var br = new BinaryReader(File.OpenRead(flagsPath)))
-                    {
-                        // The extra data after the colorset is always 32 bytes 
-                        // This reads 16 ushort values which is 16 x 2 = 32
-                        for (var i = 0; i < 16; i++)
-                        {
-                            colorSetData.Add(new Half(br.ReadUInt16()));
-                        }
-                    }
+                    colorSetExtraData = File.ReadAllBytes(flagsPath);
+                    //using (var br = new BinaryReader(File.OpenRead(flagsPath)))
+                    //{
+                    //    // The extra data after the colorset is always 32 bytes 
+                    //    // This reads 16 ushort values which is 16 x 2 = 32
+                    //    for (var i = 0; i < 16; i++)
+                    //    {
+                    //        colorSetData.Add(new Half(br.ReadUInt16()));
+                    //    }
+                    //}
                 }
             }
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
+            xivMtrl.ColorSetExtraData = colorSetExtraData;
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
             return mtrl.CreateMtrlFile(xivMtrl, item);

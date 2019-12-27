@@ -45,6 +45,8 @@ namespace xivModdingFramework.Variants.FileTypes
             _dataFile = dataFile;
         }
 
+        public bool ChangedType { get; set; }
+
         /// <summary>
         /// Gets the relevant IMC information for a given item
         /// </summary>
@@ -67,12 +69,33 @@ namespace xivModdingFramework.Variants.FileTypes
             var itemType = ItemType.GetItemType(item);
             var imcPath = GetImcPath(modelInfo, itemType);
 
+            var itemCategory = item.ItemCategory;
+
             var imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder),
                 HashGenerator.GetHash(imcPath.File), _dataFile);
 
             if (imcOffset == 0)
             {
-                throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
+                if (item.ItemCategory == XivStrings.Two_Handed)
+                {
+                    itemCategory = XivStrings.Hands;
+                    itemType = XivItemType.equipment;
+                    imcPath = GetImcPath(modelInfo, itemType);
+
+                    imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder),
+                        HashGenerator.GetHash(imcPath.File), _dataFile);
+
+                    if (imcOffset == 0)
+                    {
+                        throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
+                    }
+
+                    ChangedType = true;
+                }
+                else
+                {
+                    throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
+                }
             }
 
             var imcData = await dat.GetType2Data(imcOffset, _dataFile);
@@ -100,12 +123,12 @@ namespace xivModdingFramework.Variants.FileTypes
                         // These can be Head, Body, Hands, Legs, Feet  or  Ears, Neck, Wrists, LRing, RRing
                         // This skips to the correct variant set, then to the correct slot within that set for the item
                         variantOffset = (modelInfo.Variant * variantSetLength) +
-                                        (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+                                        (_slotOffsetDictionary[itemCategory] * variantLength) + headerLength;
 
                         // use defalut if offset is out of range
                         if (variantOffset >= imcData.Length)
                         {
-                            variantOffset = (_slotOffsetDictionary[item.ItemCategory] * variantLength) + headerLength;
+                            variantOffset = (_slotOffsetDictionary[itemCategory] * variantLength) + headerLength;
                         }
                     }
 

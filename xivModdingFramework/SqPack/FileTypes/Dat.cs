@@ -482,7 +482,97 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return newOffset;
         }
+        /// <summary>
+        /// Create any Type 2 data
+        /// </summary>
+        /// <param name="dataToCreate">Bytes to Type 2data</param>
+        /// <returns></returns>
+        public async Task<byte[]> CreateType2Data(byte[] dataToCreate)
+        {
+            var newData = new List<byte>();
+            var headerData = new List<byte>();
+            var dataBlocks = new List<byte>();
 
+            // Header size is defaulted to 128, but may need to change if the data being imported is very large.
+            headerData.AddRange(BitConverter.GetBytes(128));
+            headerData.AddRange(BitConverter.GetBytes(2));
+            headerData.AddRange(BitConverter.GetBytes(dataToCreate.Length));
+
+            var dataOffset = 0;
+            var totalCompSize = 0;
+            var uncompressedLength = dataToCreate.Length;
+
+            var partCount = (int)Math.Ceiling(uncompressedLength / 16000f);
+
+            headerData.AddRange(BitConverter.GetBytes(partCount));
+
+            var remainder = uncompressedLength;
+
+            using (var binaryReader = new BinaryReader(new MemoryStream(dataToCreate)))
+            {
+                binaryReader.BaseStream.Seek(0, SeekOrigin.Begin);
+
+                for (var i = 1; i <= partCount; i++)
+                {
+                    if (i == partCount)
+                    {
+                        var compressedData = await IOUtil.Compressor(binaryReader.ReadBytes(remainder));
+                        var padding = 128 - ((compressedData.Length + 16) % 128);
+
+                        dataBlocks.AddRange(BitConverter.GetBytes(16));
+                        dataBlocks.AddRange(BitConverter.GetBytes(0));
+                        dataBlocks.AddRange(BitConverter.GetBytes(compressedData.Length));
+                        dataBlocks.AddRange(BitConverter.GetBytes(remainder));
+                        dataBlocks.AddRange(compressedData);
+                        dataBlocks.AddRange(new byte[padding]);
+
+                        headerData.AddRange(BitConverter.GetBytes(dataOffset));
+                        headerData.AddRange(BitConverter.GetBytes((short)((compressedData.Length + 16) + padding)));
+                        headerData.AddRange(BitConverter.GetBytes((short)remainder));
+
+                        totalCompSize = dataOffset + ((compressedData.Length + 16) + padding);
+                    }
+                    else
+                    {
+                        var compressedData = await IOUtil.Compressor(binaryReader.ReadBytes(16000));
+                        var padding = 128 - ((compressedData.Length + 16) % 128);
+
+                        dataBlocks.AddRange(BitConverter.GetBytes(16));
+                        dataBlocks.AddRange(BitConverter.GetBytes(0));
+                        dataBlocks.AddRange(BitConverter.GetBytes(compressedData.Length));
+                        dataBlocks.AddRange(BitConverter.GetBytes(16000));
+                        dataBlocks.AddRange(compressedData);
+                        dataBlocks.AddRange(new byte[padding]);
+
+                        headerData.AddRange(BitConverter.GetBytes(dataOffset));
+                        headerData.AddRange(BitConverter.GetBytes((short)((compressedData.Length + 16) + padding)));
+                        headerData.AddRange(BitConverter.GetBytes((short)16000));
+
+                        dataOffset += ((compressedData.Length + 16) + padding);
+                        remainder -= 16000;
+                    }
+                }
+            }
+
+            headerData.InsertRange(12, BitConverter.GetBytes(totalCompSize / 128));
+            headerData.InsertRange(16, BitConverter.GetBytes(totalCompSize / 128));
+
+            var headerSize = 128;
+
+            if (headerData.Count > 128)
+            {
+                headerData.RemoveRange(0, 4);
+                headerData.InsertRange(0, BitConverter.GetBytes(256));
+                headerSize = 256;
+            }
+            var headerPadding = headerSize - headerData.Count;
+
+            headerData.AddRange(new byte[headerPadding]);
+
+            newData.AddRange(headerData);
+            newData.AddRange(dataBlocks);
+            return newData.ToArray();
+        }
         /// <summary>
         /// Gets the original or modded data for type 3 files based on the path specified.
         /// </summary>
@@ -1009,6 +1099,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var index = new Index(_gameDirectory);
 
+            var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)),HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}") , dataFile);
+            var IsTexToolsAddedFileFlag= await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath+".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
+            if (NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag)
+                source = "FilesAddedByTexTools";
+
             var datNum = GetLargestDatNumber(dataFile);
 
             var modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
@@ -1156,7 +1251,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                 bw.Write(new byte[sizeDiff]);
                             }
-
+                            if (NewFilesNeedToBeAdded)
+                            {
+                                index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
+                                index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                            }
                             var originalOffset = await index.UpdateIndex(mod.data.modOffset, internalFilePath, dataFile) * 8;
                             await index.UpdateIndex2(mod.data.modOffset, internalFilePath, dataFile);
 
@@ -1274,7 +1373,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (offset != 0)
                 {
                     var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
-
+                    if (NewFilesNeedToBeAdded)
+                    {
+                        index.AddFileDescriptor(internalFilePath, offset, dataFile); 
+                        index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                    }
                     var oldOffset = await index.UpdateIndex(offset, internalFilePath, dataFile) * 8;
                     await index.UpdateIndex2(offset, internalFilePath, dataFile);
 
@@ -1320,7 +1423,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                             modSize = importData.Count
                         }
                     };
-
+                    if (newEntry.source == "FilesAddedByTexTools")
+                        newEntry.data.originalOffset = newEntry.data.modOffset;
                     modList.Mods.Add(newEntry);
 
                     modList.modCount += 1;
