@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using ImageMagick;
+using SixLabors.ImageSharp;
 using System.Collections.Generic;
 
 namespace xivModdingFramework.Mods.DataContainers
@@ -34,7 +34,12 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The preview image for the option
         /// </summary>
-        public MagickImage Image { get; set; }
+        public Image Image { get; set; }
+
+        /// <summary>
+        /// This is the path for the Image
+        /// </summary>
+        public string ImageFileName { get; set; }
 
         /// <summary>
         /// A dictionary containing the (key)mod path and (value)mod data

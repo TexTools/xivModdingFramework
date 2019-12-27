@@ -14,11 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using ImageMagick;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using SixLabors.ImageSharp.Processing.Processors;
+using SixLabors.ImageSharp.Processing.Processors.Filters;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -543,104 +549,72 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
+
                 if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height ||
                     scaleDown)
                 {
-                    var pixelSettings =
-                        new PixelReadSettings(texMapData.Normal.Width, texMapData.Normal.Height, StorageType.Char,
-                            PixelMapping.RGBA);
-
-                    using (var image = new MagickImage(texMapData.Normal.Data, pixelSettings))
+                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Normal.Data, texMapData.Normal.Width,
+                        texMapData.Normal.Height))
                     {
-                        var size = new MagickGeometry(width, height);
-                        size.IgnoreAspectRatio = true;
-                        image.Resize(size);
+                        img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Normal.Width = width;
-                        texMapData.Normal.Height = height;
-
-                        texMapData.Normal.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Normal.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
                     }
                 }
 
                 if (texMapData.Diffuse != null &&
                     (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
                 {
-                    var pixelSettings =
-                        new PixelReadSettings(texMapData.Diffuse.Width, texMapData.Diffuse.Height, StorageType.Char,
-                            PixelMapping.RGBA);
-
-                    using (var image = new MagickImage(texMapData.Diffuse.Data, pixelSettings))
+                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Diffuse.Data, texMapData.Diffuse.Width,
+                        texMapData.Diffuse.Height))
                     {
-                        image.Alpha(AlphaOption.Off);
-                        var size = new MagickGeometry(width, height);
-                        size.IgnoreAspectRatio = true;
-                        image.Resize(size);
+                        for (int i = 0; i < img.Height; i++)
+                        {
+                            var pixelRowSpan = img.GetPixelRowSpan(i);
+                            for (int j = 0; j < img.Width; j++)
+                            {
+                                pixelRowSpan[j] = new Rgba32(pixelRowSpan[j].R, pixelRowSpan[j].G, pixelRowSpan[j].B, 255);
+                            }
+                        }
+                        img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Diffuse.Width = width;
-                        texMapData.Diffuse.Height = height;
-
-                        texMapData.Diffuse.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Diffuse.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
                     }
                 }
 
                 if (texMapData.Specular != null &&
                     (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
                 {
-                    var pixelSettings =
-                        new PixelReadSettings(texMapData.Specular.Width, texMapData.Specular.Height, StorageType.Char,
-                            PixelMapping.RGBA);
-
-                    using (var image = new MagickImage(texMapData.Specular.Data, pixelSettings))
+                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Specular.Data, texMapData.Specular.Width,
+                        texMapData.Specular.Height))
                     {
-                        var size = new MagickGeometry(width, height);
-                        size.IgnoreAspectRatio = true;
-                        image.Resize(size);
+                        img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Specular.Width = width;
-                        texMapData.Specular.Height = height;
-
-                        texMapData.Specular.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Specular.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
                     }
                 }
 
                 if (texMapData.Multi != null &&
                     (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
                 {
-                    var pixelSettings =
-                        new PixelReadSettings(texMapData.Multi.Width, texMapData.Multi.Height, StorageType.Char,
-                            PixelMapping.RGBA);
-
-                    using (var image = new MagickImage(texMapData.Multi.Data, pixelSettings))
+                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Multi.Data, texMapData.Multi.Width,
+                        texMapData.Multi.Height))
                     {
-                        var size = new MagickGeometry(width, height);
-                        size.IgnoreAspectRatio = true;
-                        image.Resize(size);
+                        img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Multi.Width = width;
-                        texMapData.Multi.Height = height;
-
-                        texMapData.Multi.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Multi.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
                     }
                 }
 
                 if (texMapData.Skin != null &&
                     (largestSize > texMapData.Skin.Width * texMapData.Skin.Height || scaleDown))
                 {
-                    var pixelSettings =
-                        new PixelReadSettings(texMapData.Skin.Width, texMapData.Skin.Height, StorageType.Char,
-                            PixelMapping.RGBA);
-
-                    using (var image = new MagickImage(texMapData.Skin.Data, pixelSettings))
+                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Skin.Data, texMapData.Skin.Width,
+                        texMapData.Skin.Height))
                     {
-                        var size = new MagickGeometry(width, height);
-                        size.IgnoreAspectRatio = true;
-                        image.Resize(size);
+                        img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Skin.Width = width;
-                        texMapData.Skin.Height = height;
-
-                        texMapData.Skin.Data = image.ToByteArray(MagickFormat.Rgba);
+                        texMapData.Skin.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
                     }
                 }
             });
