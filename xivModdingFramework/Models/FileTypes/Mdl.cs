@@ -1370,7 +1370,10 @@ namespace xivModdingFramework.Models.FileTypes
                     VertexColorStride = vertexColorStride
                 });
             }
-         
+
+            // A dictionary containing error messages if there are any so that a single exception can be thrown with all available context
+            var errorDictionary = new Dictionary<int, string>();
+
             // Check for missing data and throw exception if no data is found
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
             {
@@ -1380,57 +1383,30 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     if (partData.Value.TextureCoordinates0.Count < 1)
                     {
-                        throw new Exception($"Missing Texture Coordinates at Mesh: {i}  Part: {partData.Key}");
+                        errorDictionary.Add(errorDictionary.Count, $"Missing Texture Coordinates at Mesh: {i}  Part: {partData.Key}\n");
                     }
 
                     if (isHousingItem) continue; // Housing items do not have bones
 
-                    if (partData.Value.BoneWeights.Count < 1)
+                    if (partData.Value.BoneWeights.Count < 1 || partData.Value.BoneIndices.Count < 1)
                     {
-                        //throw new Exception($"Missing Bone Weights at Mesh: {i}  Part: {partData.Key}");
-                        warningsDictionary.Add("Missing Bones", $"There were missing bones at Mesh: {i}  Part: {partData.Key}\n\nDummy data was added. This may cause unintentional effects");
-
-                        // Add dummy data for missing bones
-                        partData.Value.BoneWeights.AddRange(new float[partData.Value.Positions.Count]);
-                    }
-
-                    if (partData.Value.BoneIndices.Count < 1)
-                    {
-                        //throw new Exception($"Missing Bone Indices at Mesh: {i}  Part: {partData.Key}");
-
-                        var boneDict = meshPartDataDictionary[0][0].BoneNumDictionary;
-
-                        // Find the closest bone to the root and get its index
-                        var boneIndex = 0;
-                        if (boneDict.ContainsKey("n_hara"))
-                        {
-                            boneIndex = boneDict["n_hara"];
-                        }
-                        else if (boneDict.ContainsKey("j_kosi"))
-                        {
-                            boneIndex = boneDict["j_kosi"];
-                        }
-                        else if (boneDict.ContainsKey("j_sebo_a"))
-                        {
-                            boneIndex = boneDict["j_sebo_a"];
-                        }
-
-                        // Add dummy data for missing bones
-                        for (var j = 0; j < partData.Value.Positions.Count; j++)
-                        {
-                            partData.Value.BoneIndices.Add(boneIndex);
-                        }
-                    }
-
-                    if (partData.Value.Vcounts.Count < 1)
-                    {
-                        for (var j = 0; j < partData.Value.Positions.Count; j++)
-                        {
-                            partData.Value.Vcounts.Add(1);
-                        }
+                        errorDictionary.Add(errorDictionary.Count, $"There were missing bone weights or indices at Mesh: {i} Part: {partData.Key}\n");
                     }
                 }
             }
+
+            // If an error message was added to the error dictionary
+            if ( errorDictionary.Count > 0 )
+            {
+                // Loop through the dictionary and contatenate the strings
+                var errorString = "";
+                foreach (var error in errorDictionary)
+                {
+                    errorString += error.Value;
+                }
+                throw new Exception(errorString);
+            }
+
             var indexListList = new List<List<int[]>>();
             var partStartingIndexDicList = new List<Dictionary<(int Start,int End),Dictionary<string,int>>>();
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
