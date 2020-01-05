@@ -953,9 +953,16 @@ namespace xivModdingFramework.Textures.FileTypes
                     // The extra data after the colorset is always 32 bytes 
                     // This reads 16 ushort values which is 16 x 2 = 32
                     colorSetExtraData = File.ReadAllBytes(flagsPath);
+                    
+                    // If for whatever reason there is a .dat file but it's missing data
+                    if ( colorSetExtraData.Length != 32)
+                    {
+                        // Set all dye modifiers to 0 (undyeable)
+                        colorSetExtraData = new byte[32];
+                    }
                 }
                 else
-                {                    
+                {
                     // If .dat file is missing set all values to 0 (undyeable)
                     colorSetExtraData = new byte[32];
                 }
