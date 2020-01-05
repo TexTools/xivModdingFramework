@@ -1177,7 +1177,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Diffuse_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Diffuse.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Diffuse.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
@@ -1188,7 +1188,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Normal_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Normal.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Normal.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
@@ -1203,7 +1203,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Specular_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Specular.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Specular.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
@@ -1214,7 +1214,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Alpha_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Alpha.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Alpha.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
