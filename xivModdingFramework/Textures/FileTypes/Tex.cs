@@ -954,6 +954,11 @@ namespace xivModdingFramework.Textures.FileTypes
                     // This reads 16 ushort values which is 16 x 2 = 32
                     colorSetExtraData = File.ReadAllBytes(flagsPath);
                 }
+                else
+                {                    
+                    // If .dat file is missing set all values to 0 (undyeable)
+                    colorSetExtraData = new byte[32];
+                }
             }
 
             // Replace the color set data with the imported data
