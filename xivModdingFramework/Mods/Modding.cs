@@ -163,6 +163,12 @@ namespace xivModdingFramework.Mods
                 {
                     return XivModStatus.Original;
                 }
+                // If modEntry not null but modded offset and original offset are the same as is the case with matadd textures
+                if (modEntry.data.modOffset == modEntry.data.originalOffset)
+                {
+                    // Return original to disable the disable/enable button as there's nothing to toggle between
+                    return XivModStatus.Original;
+                }
 
                 return modEntry.enabled ? XivModStatus.Enabled : XivModStatus.Disabled;
             }
@@ -187,6 +193,12 @@ namespace xivModdingFramework.Mods
             if (modEntry == null)
             {
                 throw new Exception("Unable to find mod entry in modlist.");
+            }
+
+            // Matadd textures have the same mod offset as original so nothing to toggle
+            if (modEntry.data.originalOffset == modEntry.data.modOffset)
+            {
+                return;
             }
 
             if (enable)
@@ -247,7 +259,9 @@ namespace xivModdingFramework.Mods
 
             foreach (var modEntry in mods)
             {
-                if(modEntry.name.Equals(string.Empty)) continue;
+                if (modEntry.name.Equals(string.Empty)) continue;
+                // Matadd textures have the same mod offset as original so nothing to toggle
+                if (modEntry.data.modOffset == modEntry.data.originalOffset) continue;
 
                 if (enable)
                 {
@@ -283,7 +297,9 @@ namespace xivModdingFramework.Mods
             {
                 if(string.IsNullOrEmpty(modEntry.name)) continue;
                 if(string.IsNullOrEmpty(modEntry.fullPath)) continue;
-                
+                // Matadd textures have the same mod offset as original so nothing to toggle
+                if (modEntry.data.modOffset == modEntry.data.originalOffset) continue;
+
                 if (enable && !modEntry.enabled)
                 {
                     await index.UpdateIndex(modEntry.data.modOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
