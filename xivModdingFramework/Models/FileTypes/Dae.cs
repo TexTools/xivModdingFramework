@@ -477,14 +477,24 @@ namespace xivModdingFramework.Models.FileTypes
 
                             meshNameDict.Add(id, atr);
 
-                            var meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+                            var meshNum = 0;
 
-                            // Determines whether the mesh has parts and gets the mesh number
-                            if (atr.Contains("."))
+                            try
                             {
-                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
-                                    atr.LastIndexOf(".", StringComparison.Ordinal) -
-                                    (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+
+                                // Determines whether the mesh has parts and gets the mesh number
+                                if (atr.Contains("."))
+                                {
+                                    meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
+                                        atr.LastIndexOf(".", StringComparison.Ordinal) -
+                                        (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                                }
+                            }
+                            catch
+                            {
+                                throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                    $"Please make sure your mesh name ends with the mesh/part number.");
                             }
 
                             while (reader.Read())
@@ -692,8 +702,17 @@ namespace xivModdingFramework.Models.FileTypes
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
-                                // Get part number
-                                var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                var meshPartNum = 0;
+                                try
+                                {
+                                    // Get part number
+                                    meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                }
+                                catch
+                                {
+                                    throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                    $"Please make sure your mesh name ends with the mesh/part number.");
+                                }                                
 
                                 if (!meshPartDataDictionary.ContainsKey(meshNum))
                                 {
