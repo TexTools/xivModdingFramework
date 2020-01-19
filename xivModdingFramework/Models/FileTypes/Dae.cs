@@ -1064,10 +1064,19 @@ namespace xivModdingFramework.Models.FileTypes
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
-                                // Get part number
-                                var numStr = atr.Substring(atr.LastIndexOf(".") + 1);
-                                numStr = numStr.EndsWith("Mesh", StringComparison.OrdinalIgnoreCase) ? numStr.Remove(numStr.Length - 4):numStr;
-                                var meshPartNum = int.Parse(numStr);
+                                var meshPartNum = 0;
+                                try
+                                {
+                                    // Get part number
+                                    var numStr = atr.Substring(atr.LastIndexOf(".") + 1);
+                                    numStr = numStr.EndsWith("Mesh", StringComparison.OrdinalIgnoreCase) ? numStr.Remove(numStr.Length - 4):numStr;
+                                    meshPartNum = int.Parse(numStr);
+                                }
+                                catch
+                                {
+                                    throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                        $"Please make sure your mesh name ends with the mesh/part number.");
+                                }                            
 
                                 if (meshPartDictionary.ContainsKey(meshNum))
                                 {
