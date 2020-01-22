@@ -3561,9 +3561,12 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         var disable = false;
-                        foreach(var value in importSettings.Values)
+                        if (importSettings != null)
                         {
-                            disable = disable || value.Disable;
+                            foreach (var value in importSettings.Values)
+                            {
+                                disable = disable || value.Disable;
+                            }
                         }
                         foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                         {
