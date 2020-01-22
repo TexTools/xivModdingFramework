@@ -472,7 +472,7 @@ namespace xivModdingFramework.Models.FileTypes
                         bone.BoneParent = raceMatchBone.BoneNumber;
 
                         raceSkeletonData.Add(bone);
-                        File.AppendAllText(skelLoc + race + ".skel", Environment.NewLine + JsonConvert.SerializeObject(bone));
+                        File.AppendAllText(skelLoc + race + ".skel", JsonConvert.SerializeObject(bone) + Environment.NewLine);
                     }
                 }
             }
