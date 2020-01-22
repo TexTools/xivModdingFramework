@@ -204,11 +204,18 @@ namespace xivModdingFramework.Items.Categories
 
                     if (iconNumber == 0) return;
 
-                    br.BaseStream.Seek(28, SeekOrigin.Begin);
+                    var dataOffset = 28;
+                    var dataLength = 60;
+                    if (_xivLanguage == XivLanguage.Chinese)
+                    {
+                        dataOffset = 26;
+                        dataLength = 56;
+                    }
+                    br.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
                     actionCategory = br.ReadByte();
 
-                    br.BaseStream.Seek(60, SeekOrigin.Begin);
-                    var nameLength = action.Length - 60;
+                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
+                    var nameLength = action.Length - dataLength;
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
 
                     xivUi.Name = name;
