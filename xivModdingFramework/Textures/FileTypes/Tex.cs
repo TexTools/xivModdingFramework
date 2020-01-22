@@ -932,7 +932,27 @@ namespace xivModdingFramework.Textures.FileTypes
 
             using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
             {
-                // skip DDS header
+                // Check DDS type
+                br.BaseStream.Seek(84, SeekOrigin.Begin);
+
+                var texType = br.ReadInt32();
+                XivTexFormat textureType;
+
+                if (DDSType.ContainsKey(texType))
+                {
+                    textureType = DDSType[texType];
+                }
+                else
+                {
+                    throw new Exception($"DDS Type ({texType}) not recognized. Expecting A16B16G16R16F.");
+                }
+
+                if (textureType != XivTexFormat.A16B16G16R16F)
+                {
+                    throw new Exception($"Incorrect file type. Expected: A16B16G16R16F  Given: {textureType}");
+                }
+
+                // Skip past rest of the DDS header
                 br.BaseStream.Seek(128, SeekOrigin.Begin);
 
                 // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
