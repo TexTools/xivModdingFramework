@@ -41,7 +41,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         private readonly DirectoryInfo _gameDirectory;
         private readonly DirectoryInfo _modListDirectory;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
-        private ModList _modList = null;
 
         public Dat(DirectoryInfo gameDirectory)
         {
@@ -1091,7 +1090,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>The new offset in which the modified data was placed.</returns>
         public async Task<int> WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
             string category, string itemName, XivDataFile dataFile, string source, int dataType,
-            ModPack modPack = null, bool writeModList = true)
+            ModPack modPack = null)
         {
             var offset = 0;
             var dataOverwritten = false;
@@ -1200,9 +1199,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     dataOverwritten = true;
 
-                    InitModListIfNecessary();
+                    var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
 
-                    var entryEnableUpdate = (from entry in _modList.Mods
+                    var entryEnableUpdate = (from entry in modList.Mods
                         where entry.fullPath.Equals(modEntry.fullPath)
                         select entry).FirstOrDefault();
 
@@ -1213,7 +1212,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         entryEnableUpdate.modPack = modPack;
                     }
 
-                    if (writeModList) WriteModList();
+                    File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
             }
             else
@@ -1223,11 +1222,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 *  write the compressed data in the existing space.
                 */
 
-                InitModListIfNecessary();
+                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
 
-                if (_modList != null && _modList.emptyCount > 0)
+                if (modList != null && modList.emptyCount > 0)
                 {
-                    foreach (var mod in _modList.Mods)
+                    foreach (var mod in modList.Mods)
                     {
                         if (!mod.fullPath.Equals(string.Empty) || !mod.datFile.Equals(dataFile.GetDataFileName()))
                             continue;
@@ -1265,7 +1264,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             // so we need to empty out the original entry so it may be used later
                             if (modEntry != null)
                             {
-                                var entryToEmpty = (from entry in _modList.Mods
+                                var entryToEmpty = (from entry in modList.Mods
                                     where entry.fullPath.Equals(modEntry.fullPath)
                                     select entry).FirstOrDefault();
 
@@ -1280,7 +1279,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 entryToEmpty.data.originalOffset = 0;
                                 entryToEmpty.data.dataType = 0;
 
-                                _modList.emptyCount += 1;
+                                modList.emptyCount += 1;
                             }
 
                             // Replace the empty entry with the new data
@@ -1294,10 +1293,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                             mod.enabled = true;
                             mod.modPack = modPack;
 
-                            _modList.emptyCount -= 1;
-                            _modList.modCount += 1;
+                            modList.emptyCount -= 1;
+                            modList.modCount += 1;
 
-                            if (writeModList) WriteModList();
+                            File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
 
                             offset = mod.data.modOffset;
 
@@ -1373,7 +1372,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (offset != 0)
                 {
-                    InitModListIfNecessary();
+                    var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
                     if (NewFilesNeedToBeAdded)
                     {
                         index.AddFileDescriptor(internalFilePath, offset, dataFile); 
@@ -1389,7 +1388,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     */
                     if (modEntry != null)
                     {
-                        var entryToEmpty = (from entry in _modList.Mods
+                        var entryToEmpty = (from entry in modList.Mods
                             where entry.fullPath.Equals(modEntry.fullPath)
                             select entry).FirstOrDefault();
 
@@ -1404,7 +1403,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         entryToEmpty.data.originalOffset = 0;
                         entryToEmpty.data.dataType = 0;
 
-                        _modList.emptyCount += 1;
+                        modList.emptyCount += 1;
                     }
 
                     var newEntry = new Mod
@@ -1426,11 +1425,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                     };
                     if (newEntry.source == "FilesAddedByTexTools")
                         newEntry.data.originalOffset = newEntry.data.modOffset;
-                    _modList.Mods.Add(newEntry);
+                    modList.Mods.Add(newEntry);
 
-                    _modList.modCount += 1;
+                    modList.modCount += 1;
 
-                    if (writeModList) WriteModList();
+                    File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
             }
 
@@ -1471,19 +1470,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         public static int OffsetCorrection(int datNum, int offset)
         {
             return offset - (16 * datNum);
-        }
-
-        private void InitModListIfNecessary()
-        {
-            if (_modList == null)
-            {
-                _modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
-            }
-        }
-
-        public void WriteModList()
-        {
-            File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(_modList, Formatting.Indented));
         }
     }
 }

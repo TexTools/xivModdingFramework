@@ -444,7 +444,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                         modJson.FullPath,
                                                         modJson.Category.GetDisplayName(), modJson.Name,
                                                         XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry, false);
+                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                                 }
                                                 else
                                                 {
@@ -455,7 +455,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                     await dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                                         modJson.Category.GetDisplayName(), modJson.Name,
                                                         XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry, false);
+                                                        GetDataType(modJson.FullPath), modJson.ModPackEntry);
                                                 }
                                             }
                                             catch (Exception ex)
@@ -474,8 +474,6 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                             modCount++;
                                         }
-
-                                        dat.WriteModList();
                                     }
                                 }
                             }
