@@ -167,7 +167,7 @@ namespace xivModdingFramework.Mods
                 if (modEntry.data.modOffset == modEntry.data.originalOffset)
                 {
                     // Return original to disable the disable/enable button as there's nothing to toggle between
-                    return XivModStatus.Original;
+                    return XivModStatus.MatAdd;
                 }
 
                 return modEntry.enabled ? XivModStatus.Enabled : XivModStatus.Disabled;
