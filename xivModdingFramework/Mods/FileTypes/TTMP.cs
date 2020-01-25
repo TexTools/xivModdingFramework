@@ -48,7 +48,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="modPackData">The data that will go into the mod pack</param>
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <returns>The number of pages created for the mod pack</returns>
-        public async Task<int> CreateWizardModPack(ModPackData modPackData, IProgress<double> progress)
+        public async Task<int> CreateWizardModPack(ModPackData modPackData, IProgress<double> progress, bool overwriteModpack)
         {
             var processCount = await Task.Run<int>(() =>
             {
@@ -144,7 +144,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
 
-                if (File.Exists(modPackPath))
+                if (File.Exists(modPackPath) && !overwriteModpack)
                 {
                     var fileNum = 1;
                     modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
@@ -153,6 +153,10 @@ namespace xivModdingFramework.Mods.FileTypes
                         fileNum++;
                         modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
                     }
+                }
+                else if (File.Exists(modPackPath) && overwriteModpack)
+                {
+                    File.Delete(modPackPath);
                 }
 
                 using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
