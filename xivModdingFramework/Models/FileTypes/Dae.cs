@@ -137,6 +137,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
                 foreach (var b in skeletonData)
                 {
+                    if (b == "") continue;
                     var j = JsonConvert.DeserializeObject<SkeletonData>(b);
 
                     FullSkel.Add(j.BoneName, j);

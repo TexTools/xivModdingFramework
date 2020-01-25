@@ -440,6 +440,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var b in skeletonData)
                 {
+                    if (b == "") continue;
                     var j = JsonConvert.DeserializeObject<SkeletonData>(b);
 
                     raceSkeletonData.Add(j);
@@ -472,7 +473,7 @@ namespace xivModdingFramework.Models.FileTypes
                         bone.BoneParent = raceMatchBone.BoneNumber;
 
                         raceSkeletonData.Add(bone);
-                        File.AppendAllText(skelLoc + race + ".skel", JsonConvert.SerializeObject(bone) + Environment.NewLine);
+                        File.AppendAllText(skelLoc + race + ".skel", Environment.NewLine + JsonConvert.SerializeObject(bone));
                     }
                 }
             }
