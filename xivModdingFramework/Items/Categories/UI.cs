@@ -206,11 +206,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var dataOffset = 28;
                     var dataLength = 60;
-                    if (_xivLanguage == XivLanguage.Chinese)
-                    {
-                        dataOffset = 26;
-                        dataLength = 56;
-                    }
+
                     br.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
                     actionCategory = br.ReadByte();
 
