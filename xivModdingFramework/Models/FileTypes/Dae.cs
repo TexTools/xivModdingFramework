@@ -137,6 +137,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
                 foreach (var b in skeletonData)
                 {
+                    if (b == "") continue;
                     var j = JsonConvert.DeserializeObject<SkeletonData>(b);
 
                     FullSkel.Add(j.BoneName, j);
@@ -477,14 +478,24 @@ namespace xivModdingFramework.Models.FileTypes
 
                             meshNameDict.Add(id, atr);
 
-                            var meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+                            var meshNum = 0;
 
-                            // Determines whether the mesh has parts and gets the mesh number
-                            if (atr.Contains("."))
+                            try
                             {
-                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
-                                    atr.LastIndexOf(".", StringComparison.Ordinal) -
-                                    (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+
+                                // Determines whether the mesh has parts and gets the mesh number
+                                if (atr.Contains("."))
+                                {
+                                    meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
+                                        atr.LastIndexOf(".", StringComparison.Ordinal) -
+                                        (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                                }
+                            }
+                            catch
+                            {
+                                throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                    $"Please make sure your mesh name ends with the mesh/part number.");
                             }
 
                             while (reader.Read())
@@ -692,8 +703,17 @@ namespace xivModdingFramework.Models.FileTypes
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
-                                // Get part number
-                                var meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                var meshPartNum = 0;
+                                try
+                                {
+                                    // Get part number
+                                    meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+                                }
+                                catch
+                                {
+                                    throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                    $"Please make sure your mesh name ends with the mesh/part number.");
+                                }                                
 
                                 if (!meshPartDataDictionary.ContainsKey(meshNum))
                                 {
@@ -1041,23 +1061,42 @@ namespace xivModdingFramework.Models.FileTypes
 
                             meshNameDict.Add(id, atr);
 
-                            var meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
+                            var meshNum = 0;
 
-                            // Determines whether the mesh has parts and gets the mesh number
-                            if (atr.Contains("."))
+                            try
                             {
-                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
-                                    atr.LastIndexOf(".", StringComparison.Ordinal) -
-                                    (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
-                            }
+                                meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1, 1));
 
+                                // Determines whether the mesh has parts and gets the mesh number
+                                if (atr.Contains("."))
+                                {
+                                    meshNum = int.Parse(atr.Substring(atr.LastIndexOf("_", StringComparison.Ordinal) + 1,
+                                        atr.LastIndexOf(".", StringComparison.Ordinal) -
+                                        (atr.LastIndexOf("_", StringComparison.Ordinal) + 1)));
+                                }
+                            }
+                            catch
+                            {
+                                throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                    $"Please make sure your mesh name ends with the mesh/part number.");
+                            }
+                        
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
-                                // Get part number
-                                var numStr = atr.Substring(atr.LastIndexOf(".") + 1);
-                                numStr = numStr.EndsWith("Mesh", StringComparison.OrdinalIgnoreCase) ? numStr.Remove(numStr.Length - 4):numStr;
-                                var meshPartNum = int.Parse(numStr);
+                                var meshPartNum = 0;
+                                try
+                                {
+                                    // Get part number
+                                    var numStr = atr.Substring(atr.LastIndexOf(".") + 1);
+                                    numStr = numStr.EndsWith("Mesh", StringComparison.OrdinalIgnoreCase) ? numStr.Remove(numStr.Length - 4):numStr;
+                                    meshPartNum = int.Parse(numStr);
+                                }
+                                catch
+                                {
+                                    throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
+                                                        $"Please make sure your mesh name ends with the mesh/part number.");
+                                }                            
 
                                 if (meshPartDictionary.ContainsKey(meshNum))
                                 {
@@ -1177,7 +1216,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Diffuse_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Diffuse.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Diffuse.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
@@ -1188,7 +1227,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Normal_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Normal.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Normal.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
@@ -1203,7 +1242,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Specular_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Specular.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Specular.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();
@@ -1214,7 +1253,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xmlWriter.WriteAttributeString("name", modelName + "_" + i + "_Alpha_bmp");
                 //<init_from>
                 xmlWriter.WriteStartElement("init_from");
-                xmlWriter.WriteString(modelName + "_" + i + "_Alpha.bmp");
+                xmlWriter.WriteString(modelName + "_" + meshData[i].MeshInfo.MaterialIndex.ToString() + "_Alpha.bmp");
                 xmlWriter.WriteEndElement();
                 //</init_from>
                 xmlWriter.WriteEndElement();

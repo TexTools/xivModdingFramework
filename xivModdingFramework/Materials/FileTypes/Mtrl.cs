@@ -382,7 +382,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
                         xivMtrl.ColorSetData = new List<Half>();
-                        xivMtrl.ColorSetExtraData = new byte[0];
+                        xivMtrl.ColorSetExtraData = null;
                         if (xivMtrl.ColorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)

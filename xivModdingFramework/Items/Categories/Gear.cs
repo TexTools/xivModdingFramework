@@ -192,6 +192,7 @@ namespace xivModdingFramework.Items.Categories
                     br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
                     var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
                     xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                    xivGear.Name = xivGear.Name.Trim();
 
                     lock (_gearLock)
                     {

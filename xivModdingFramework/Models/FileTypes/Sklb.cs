@@ -440,6 +440,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var b in skeletonData)
                 {
+                    if (b == "") continue;
                     var j = JsonConvert.DeserializeObject<SkeletonData>(b);
 
                     raceSkeletonData.Add(j);
