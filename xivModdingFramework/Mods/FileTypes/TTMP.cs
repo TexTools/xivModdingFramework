@@ -340,6 +340,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 {
                                     // Skip this line and read the next
                                     line = streamReader.ReadLine();
+                                    if (line == null) return null;
                                     modPackJsonList.Add(JsonConvert.DeserializeObject<OriginalModPackJson>(line));
                                 }
                                 else
