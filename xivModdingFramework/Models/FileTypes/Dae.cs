@@ -893,13 +893,23 @@ namespace xivModdingFramework.Models.FileTypes
                     partNum = meshPartData.First().Key - 1;
                 }
 
+                var totalVerts = 0;
                 foreach (var part in meshPartData)
                 {
                     var newPartNum = partNum + 1;
 
                     fixedPartDataDictionary[mesh.Key].Add(newPartNum, part.Value);
 
+                    totalVerts += part.Value.Vcounts.Count;
+
                     partNum++;
+                }
+
+                if (totalVerts >= ushort.MaxValue)
+                {
+                    throw new Exception($"Maximum amount of 65535 vertices per mesh group exceeded.\n\n" +
+                        $"Vertex count for group {mesh.Key}: {totalVerts}");
+
                 }
             }
 
