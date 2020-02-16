@@ -1140,7 +1140,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            if (!meshPartDictionary.ContainsKey(0))
+            if (!meshPartDictionary.ContainsKey(0) || (meshPartDictionary.Keys.Max() + 1) != meshPartDictionary.Keys.Count)
             {
                 var meshes = "";
                 foreach (var key in meshPartDictionary.Keys)
@@ -1148,7 +1148,7 @@ namespace xivModdingFramework.Models.FileTypes
                     meshes += $"{key} ";
                 }
 
-                throw new Exception($"The DAE file does not contain Mesh 0.\nModels must have a Mesh 0.\n\nMesh Numbers Found: {meshes}");
+                throw new Exception($"The DAE file does not contain consecutive mesh numbers.\nModels must have consecutive mesh numbers starting at 0.\n\nMesh Numbers Found: {meshes}");
             }
 
             return (meshPartDictionary, boneStringList);
