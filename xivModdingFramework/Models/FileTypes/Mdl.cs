@@ -1392,6 +1392,14 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         errorDictionary.Add(errorDictionary.Count, $"There were missing bone weights or indices at Mesh: {i} Part: {partData.Key}\n");
                     }
+
+                    // If vertex colour data is missing use full colour
+                    if (partData.Value.VertexColors.Count < 1)
+                    {
+                        partData.Value.VertexColors.Add(1.0f);
+                        partData.Value.VertexColors.Add(1.0f);
+                        partData.Value.VertexColors.Add(1.0f);
+                    }
                 }
             }
 

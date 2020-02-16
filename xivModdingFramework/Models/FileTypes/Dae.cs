@@ -691,6 +691,17 @@ namespace xivModdingFramework.Models.FileTypes
 
                                         }
 
+                                        if (cData.VertexColorIndices.Count == 0)
+                                        {
+                                            // If there are no vertex colour indices, initialize to 0 and add them
+                                            var dummyVertexColorIndices = new List<int>(cData.PositionIndices.Count);
+                                            foreach(var index in cData.PositionIndices)
+                                            {
+                                                dummyVertexColorIndices.Add(0);
+                                            }
+                                            cData.VertexColorIndices.AddRange(dummyVertexColorIndices);
+                                        }
+
                                         break;
                                     }
                                 }
