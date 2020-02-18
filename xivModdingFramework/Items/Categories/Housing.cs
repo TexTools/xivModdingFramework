@@ -78,7 +78,7 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 14;
 
             const int itemNameDataOffset = 14;
-            const int itemDataLength = 160;
+            const int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -144,19 +144,19 @@ namespace xivModdingFramework.Items.Categories
         /// Housing items can be obtained one of two ways
         /// One: checking the housingfurniture exd for the item index, and going to that item to grab the data
         /// Two: iterating through the entire item list seeing if the item contains an index to a housing item (offset 112, 4 bytes)
-        /// This method does option one
+        /// This method does option two as the item index was removed from the picture exd file in patch 5.2
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
         private async Task<List<XivFurniture>> GetPaintings()
         {
             var paintingsLock = new object();
             // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int itemIndexOffset = 0;
-            const int iconNumberOffset = 4;
+            // These will need to be changed if data gets added or removed with a patch            
+            const int iconNumberOffset = 0;
 
             const int itemNameDataOffset = 14;
-            const int itemDataLength = 160;
+            const int housingIndexOffset = 112;
+            const int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -165,44 +165,46 @@ namespace xivModdingFramework.Items.Categories
 
             var furnitureList = new List<XivFurniture>();
 
-            await Task.Run(() => Parallel.ForEach(pictureDictionary.Values, (housingItem) =>
+            await Task.Run(() => Parallel.ForEach(itemDictionary.Values, (item) =>
             {
-                var item = new XivFurniture
+                var painting = new XivFurniture
                 {
                     Category = XivStrings.Housing,
                     ItemCategory = XivStrings.Paintings,
                     ModelInfo = new XivModelInfo()
                 };
 
-                using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
+                using (var br = new BinaryReaderBE(new MemoryStream(item)))
                 {
-                    br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                    var itemIndex = br.ReadInt32();
+                    br.BaseStream.Seek(housingIndexOffset, SeekOrigin.Begin);
+                    var pictureIndex = br.ReadInt32();
 
-                    br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-                    item.ModelInfo.ModelID = br.ReadInt32();
+                    if (pictureIndex == 0 || pictureIndex > (pictureDictionary.Count - 1)) return;
 
-                    using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
+                    br.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
+                    var nameOffset = br.ReadInt16();
+
+                    br.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
+                    painting.IconNumber = br.ReadUInt16();
+
+                    var gearNameOffset = itemDataLength + nameOffset;
+                    var gearNameLength = item.Length - gearNameOffset;
+                    br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
+                    var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
+                    painting.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+
+                    using (var br1 = new BinaryReaderBE(new MemoryStream(pictureDictionary[pictureIndex])))
                     {
-                        br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
-                        var nameOffset = br1.ReadInt16();
-
-                        br1.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
-                        item.IconNumber = br1.ReadUInt16();
-
-                        var gearNameOffset = itemDataLength + nameOffset;
-                        var gearNameLength = itemDictionary[itemIndex].Length - gearNameOffset;
-                        br1.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                        var nameString = Encoding.UTF8.GetString(br1.ReadBytes(gearNameLength)).Replace("\0", "");
-                        item.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                        br1.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
+                        painting.ModelInfo.ModelID = br1.ReadInt32();
                     }
                 }
 
-                if (!item.Name.Equals(string.Empty))
+                if (!painting.Name.Equals(string.Empty) && (painting.Name.IndexOf("painting", System.StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     lock (paintingsLock)
                     {
-                        furnitureList.Add(item);
+                        furnitureList.Add(painting);
                     }
                 }
             }));
@@ -226,7 +228,7 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 13;
 
             const int itemNameDataOffset = 14;
-            const int itemDataLength = 160;
+            const int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
