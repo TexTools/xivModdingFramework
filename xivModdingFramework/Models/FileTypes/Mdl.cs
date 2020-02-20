@@ -1374,7 +1374,7 @@ namespace xivModdingFramework.Models.FileTypes
             // A dictionary containing error messages if there are any so that a single exception can be thrown with all available context
             var errorDictionary = new Dictionary<int, string>();
 
-            // Check for missing data and throw exception if no data is found
+            // Check for missing data and add dummy data if possible or throw exception
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
             {
                 var partDataDict = meshPartDataDictionary[i];
@@ -1393,12 +1393,36 @@ namespace xivModdingFramework.Models.FileTypes
                         errorDictionary.Add(errorDictionary.Count, $"There were missing bone weights or indices at Mesh: {i} Part: {partData.Key}\n");
                     }
 
-                    // If vertex colour data is missing use full colour
+                    // Vertex colour
                     if (partData.Value.VertexColors.Count < 1)
                     {
+                        // If there are no vertex colour indices, initialize to 0 and add them
+                        var dummyVertexColorIndices = new List<int>(partData.Value.PositionIndices.Count);
+                        foreach (var index in partData.Value.PositionIndices)
+                        {
+                            dummyVertexColorIndices.Add(0);
+                        }
+                        partData.Value.VertexColorIndices.AddRange(dummyVertexColorIndices);
+                        // Set to full colour
                         partData.Value.VertexColors.Add(1.0f);
                         partData.Value.VertexColors.Add(1.0f);
                         partData.Value.VertexColors.Add(1.0f);
+                    }
+
+                    // Vertex alpha
+                    if (partData.Value.VertexAlphas.Count < 1)
+                    {
+                        // If there are no vertex alpha indices, initialize to 0 and add them
+                        var dummyVertexAlphaIndices = new List<int>(partData.Value.PositionIndices.Count);
+                        foreach (var index in partData.Value.PositionIndices)
+                        {
+                            dummyVertexAlphaIndices.Add(0);
+                        }
+                        partData.Value.VertexAlphaIndices.AddRange(dummyVertexAlphaIndices);
+                        // Set vertex alpha to 1.0 for all indices
+                        partData.Value.VertexAlphas.Add(1.0f);
+                        partData.Value.VertexAlphas.Add(0.0f);
+                        partData.Value.VertexAlphas.Add(0.0f);
                     }
                 }
             }
