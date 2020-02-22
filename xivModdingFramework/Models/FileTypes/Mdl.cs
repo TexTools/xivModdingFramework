@@ -1402,8 +1402,8 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             dummyVertexColorIndices.Add(0);
                         }
-                        partData.Value.VertexColorIndices.AddRange(dummyVertexColorIndices);
-                        // Set to full colour
+                        partData.Value.VertexColorIndices = dummyVertexColorIndices;
+                        // Set to full colour for all indices
                         partData.Value.VertexColors.Add(1.0f);
                         partData.Value.VertexColors.Add(1.0f);
                         partData.Value.VertexColors.Add(1.0f);
@@ -1418,7 +1418,7 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             dummyVertexAlphaIndices.Add(0);
                         }
-                        partData.Value.VertexAlphaIndices.AddRange(dummyVertexAlphaIndices);
+                        partData.Value.VertexAlphaIndices = dummyVertexAlphaIndices;
                         // Set vertex alpha to 1.0 for all indices
                         partData.Value.VertexAlphas.Add(1.0f);
                         partData.Value.VertexAlphas.Add(0.0f);
