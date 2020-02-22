@@ -1760,8 +1760,8 @@ namespace xivModdingFramework.Models.FileTypes
                     var u = colladaData.TextureCoordinates0[i];
                     var v = colladaData.TextureCoordinates0[i + 1];
 
-                    // Force UV1 coordinates into [-1, 1] for gear models
-                    if (item.Category == XivStrings.Gear)
+                    // Force UV1 coordinates into [1,-1] quadrant for gear and character models except faces
+                    if (item.Category == XivStrings.Gear || item.Category == XivStrings.Character && item.ItemSubCategory != XivStrings.Face)
                     {
                         if (u < 0 || u > 1)
                         {
@@ -1787,17 +1787,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
                 {
-                    var alphas = new float[] {colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]};
-
-                    // Check vertex alphas for bad data, if any is found replace with default of 1
-                    if (alphas.Any(x => x < 0f || x > 1f))
-                    {
-                        vertexAlphaCollection.Add(new Vector2(1, 0));
-                    }
-                    else
-                    {
-                        vertexAlphaCollection.Add(new Vector2(alphas[0], alphas[1]));
-                    }
+                    // Vertex alphas never seem to have values other than (1, 0) in FFXIV
+                    // so default to that for all models regardless of the DAE's values
+                    vertexAlphaCollection.Add(new Vector2(1, 0));
                 }
 
                 if (!isHousingItem) // housing items do not have bones
