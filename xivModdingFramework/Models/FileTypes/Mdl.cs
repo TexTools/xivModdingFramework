@@ -1754,10 +1754,29 @@ namespace xivModdingFramework.Models.FileTypes
                             colladaData.Tangents[i + 2]));
                     }
                 }
+
                 for (var i = 0; i < colladaData.TextureCoordinates0.Count; i += colladaData.TextureCoordinateStride)
                 {
-                    texCoord0Collection.Add(
-                        new Vector2(colladaData.TextureCoordinates0[i], colladaData.TextureCoordinates0[i + 1]));
+                    var u = colladaData.TextureCoordinates0[i];
+                    var v = colladaData.TextureCoordinates0[i + 1];
+
+                    // Force UV1 coordinates into [-1, 1] for gear models
+                    if (item.Category == XivStrings.Gear)
+                    {
+                        if (u < 0 || u > 1)
+                        {
+                            int diff = (int)Math.Floor(u);
+                            u = u - diff;
+                        }
+
+                        if (v > 0 || v < -1)
+                        {
+                            int diff = (int)Math.Ceiling(v);
+                            v = v - diff;
+                        }
+                    }
+
+                    texCoord0Collection.Add(new Vector2(u, v));
                 }
 
                 for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
