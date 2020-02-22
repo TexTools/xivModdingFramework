@@ -2743,7 +2743,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     foreach (var modelImportSettings in importSettings)
                     {
-                        var importMeshPartCount = modelImportSettings.Value.PartList.Count;
+                        var importMeshPartCount = modelImportSettings.Value.PartList.Max() + 1;
                         var meshNum = int.Parse(modelImportSettings.Key);
 
                         var originalMeshPartCount = 0;
@@ -3113,9 +3113,9 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             if (importSettings.ContainsKey(meshNum.ToString()))
                             {
-                                if (importSettings[meshNum.ToString()].PartList.Count > meshInfo.MeshPartCount)
+                                if ((importSettings[meshNum.ToString()].PartList.Max() + 1) > meshInfo.MeshPartCount)
                                 {
-                                    addedMeshParts = importSettings[meshNum.ToString()].PartList.Count - meshInfo.MeshPartCount;
+                                    addedMeshParts = importSettings[meshNum.ToString()].PartList.Max() + 1 - meshInfo.MeshPartCount;
                                 }
                             }
                         }
@@ -3367,9 +3367,9 @@ namespace xivModdingFramework.Models.FileTypes
                                 var importSettingsMesh = importSettings[meshNum.ToString()];
 
                                 // Add additional mesh parts if there are any from advanced importing
-                                if (importSettingsMesh.PartList.Count > partCount)
+                                if ((importSettingsMesh.PartList.Max() + 1) > partCount)
                                 {
-                                    var extraPartCount = importSettingsMesh.PartList.Count - partCount;
+                                    var extraPartCount = importSettingsMesh.PartList.Max() + 1 - partCount;
 
                                     for (var i = 0; i < extraPartCount; i++)
                                     {

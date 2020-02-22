@@ -877,31 +877,15 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            // Make sure that mesh parts are sequential
-            var fixedPartDataDictionary = new Dictionary<int, Dictionary<int, ColladaData>>();
-
+            // Check if the vertex count limit has been exceeded
             foreach (var mesh in meshPartDataDictionary)
             {
-                fixedPartDataDictionary.Add(mesh.Key, new Dictionary<int, ColladaData>());
-
                 var meshPartData = mesh.Value;
-
-                var partNum = -1;
-                if (mesh.Value.Count > 0)
-                {
-                    partNum = meshPartData.First().Key - 1;
-                }
-
                 var totalVerts = 0;
+
                 foreach (var part in meshPartData)
                 {
-                    var newPartNum = partNum + 1;
-
-                    fixedPartDataDictionary[mesh.Key].Add(newPartNum, part.Value);
-
                     totalVerts += part.Value.Vcounts.Count;
-
-                    partNum++;
                 }
 
                 if (totalVerts >= ushort.MaxValue)
@@ -912,7 +896,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            return fixedPartDataDictionary;
+            return meshPartDataDictionary.ToDictionary(x => x.Key, x => x.Value.ToDictionary(y => y.Key, y => y.Value));
         }
 
         /// <summary>
