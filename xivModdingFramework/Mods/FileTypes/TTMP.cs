@@ -488,6 +488,8 @@ namespace xivModdingFramework.Mods.FileTypes
                                 }
                             }
 
+                            File.Delete(_tempMPD);
+
                             break;
                         }
                     }
