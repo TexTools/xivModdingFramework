@@ -207,6 +207,9 @@
   <data name="Head_Body" xml:space="preserve">
     <value>머리 + 몸통</value>
   </data>
+  <data name="Housing" xml:space="preserve">
+    <value>하우징</value>
+  </data>
   <data name="Hyur_H" xml:space="preserve">
     <value>휴런 고원 부족</value>
   </data>
@@ -230,6 +233,9 @@
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>다리 + 발</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>로딩 화면</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>주 무기</value>

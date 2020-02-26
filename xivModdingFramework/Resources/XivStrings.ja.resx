@@ -240,6 +240,9 @@
   <data name="Head_Body" xml:space="preserve">
     <value>頭 + 胴</value>
   </data>
+  <data name="Housing" xml:space="preserve">
+    <value>ハウジング</value>
+  </data>
   <data name="Hyur_H" xml:space="preserve">
     <value>Hyur Highlander</value>
   </data>
@@ -269,6 +272,9 @@
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>脚 + 足</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>Loading Screen</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>メインアーム</value>
