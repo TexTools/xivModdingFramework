@@ -117,6 +117,43 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return sha1Bytes;
         }
+
+        /// <summary>
+        /// Gets the SHA1 hash for the file section
+        /// </summary>
+        /// <param name="dataFile">The data file to get the hash for</param>
+        /// <returns>The byte array containing the hash value</returns>
+        public byte[] GetIndexSection2Hash(DirectoryInfo indexPath)
+        {
+            byte[] sha1Bytes;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+            {
+                br.BaseStream.Seek(1116, SeekOrigin.Begin);
+                sha1Bytes = br.ReadBytes(20);
+            }
+
+            return sha1Bytes;
+        }
+
+        /// <summary>
+        /// Gets the SHA1 hash for the file section
+        /// </summary>
+        /// <param name="dataFile">The data file to get the hash for</param>
+        /// <returns>The byte array containing the hash value</returns>
+        public byte[] GetIndexSection3Hash(DirectoryInfo indexPath)
+        {
+            byte[] sha1Bytes;
+
+            using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+            {
+                br.BaseStream.Seek(1188, SeekOrigin.Begin);
+                sha1Bytes = br.ReadBytes(20);
+            }
+
+            return sha1Bytes;
+        }
+
         /// <summary>
         /// check files added by textools
         /// </summary>
