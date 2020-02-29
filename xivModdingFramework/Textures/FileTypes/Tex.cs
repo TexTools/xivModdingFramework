@@ -134,7 +134,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {ttp.Path}");
+                throw new Exception($"Could not find offset for {ttp.Path}");
             }
 
             XivTex xivTex;

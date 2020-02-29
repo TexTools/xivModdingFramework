@@ -199,7 +199,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {skelFolder}/{skelFile}");
+                throw new Exception($"Could not find offset for {skelFolder}/{skelFile}");
             }
 
             var sklbData = await dat.GetType2Data(offset, _dataFile);

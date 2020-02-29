@@ -203,14 +203,14 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     if (mtrlOffset == 0)
                     {
-                        throw new Exception($"Could not find offest for {mtrlStringPath}");
+                        throw new Exception($"Could not find offset for {mtrlStringPath}");
                     }
 
                     mtrlStringPath = $"{newMtrlFolder}/{mtrlFile}";
                 }
                 else
                 {
-                    throw new Exception($"Could not find offest for {mtrlStringPath}");
+                    throw new Exception($"Could not find offset for {mtrlStringPath}");
 
                 }
             }

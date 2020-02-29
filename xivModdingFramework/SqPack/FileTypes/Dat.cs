@@ -279,7 +279,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {internalPath}");
+                throw new Exception($"Could not find offset for {internalPath}");
             }
 
             return await GetType2Data(offset, dataFile);
@@ -613,7 +613,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {internalPath}");
+                throw new Exception($"Could not find offset for {internalPath}");
             }
 
             return await GetType3Data(offset, dataFile);
@@ -776,7 +776,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {internalPath}");
+                throw new Exception($"Could not find offset for {internalPath}");
             }
 
             return await GetType4Data(offset, dataFile);

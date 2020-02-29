@@ -781,7 +781,7 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int nameLengthOffset = 6;
-            const int iconNumberOffest = 26;
+            const int iconNumberOffset = 26;
 
             var weatherExData = await _ex.ReadExData(XivEx.weather);
 
@@ -802,7 +802,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var nameLength = br.ReadInt16();
 
-                    br.BaseStream.Seek(iconNumberOffest, SeekOrigin.Begin);
+                    br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
 
                     var iconNumber = br.ReadUInt16();
 

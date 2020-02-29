@@ -92,7 +92,7 @@ namespace xivModdingFramework.Exd.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for exd/{exFile}{ExhExtension}");
+                throw new Exception($"Could not find offset for exd/{exFile}{ExhExtension}");
             }
 
             var exhData = await _dat.GetType2Data(offset, XivDataFile._0A_Exd);
