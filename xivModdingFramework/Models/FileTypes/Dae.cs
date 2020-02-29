@@ -435,6 +435,9 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else if (tool.Contains("FBX"))
                             {
+                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
+                                    $"TexTools requires the use of OpenCOLLADA.");
+                                /*
                                 pos    = "-position-array";
                                 norm   = "-normal0-array";
                                 vcol   = "_color0-array";
@@ -444,19 +447,25 @@ namespace xivModdingFramework.Models.FileTypes
                                 indexStride = 6;
                                 vertexColorStride = 4;
                                 toolType = "FBXCOLLADA";
+                                */
                             }
                             else if (tool.Contains("Exporter for Blender"))
                             {
+                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
+                                    $"TexTools requires the use of OpenCOLLADA.");
+                                /*
                                 biNorm = "-bitangents-array";
                                 tang   = "-tangents-array";
                                 texc   = "-texcoord-0-array";
                                 texc2  = "-texcoord-1-array";
                                 indexStride = 1;
                                 blender = true;
+                                */
                             }
                             else if (!tool.Contains("TexTools"))
                             {
-                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}");
+                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
+                                    $"TexTools requires the use of OpenCOLLADA.");
                             }
                         }
 
