@@ -1760,8 +1760,8 @@ namespace xivModdingFramework.Models.FileTypes
                     var u = colladaData.TextureCoordinates0[i];
                     var v = colladaData.TextureCoordinates0[i + 1];
 
-                    // Force UV1 coordinates into [1,-1] quadrant for gear and character models except faces
-                    if (item.Category == XivStrings.Gear || item.Category == XivStrings.Character && item.ItemSubCategory != XivStrings.Face)
+                    // Force UV1 coordinates into [1,-1] if checkbox is checked (on by default for gear unless manually unchecked)
+                    if (advImportSettings[meshNum.ToString()].ForceUV1Quadrant)
                     {
                         if (u < 0 || u > 1)
                         {
@@ -1778,12 +1778,22 @@ namespace xivModdingFramework.Models.FileTypes
 
                     texCoord0Collection.Add(new Vector2(u, v));
                 }
-
-                for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
+                
+                // Clone UV1 to UV2 if checkbox checked (on by default for hair unless manually unchecked)
+                if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
                 {
-                    texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
-                        colladaData.TextureCoordinates1[i + 1]));
+                    texCoord1Collection.AddRange(texCoord0Collection);
                 }
+                else
+                {
+                    // Otherwise just read the data from the DAE
+                    for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
+                    {
+                        texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
+                            colladaData.TextureCoordinates1[i + 1]));
+                    }
+                }
+
 
                 for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
                 {
