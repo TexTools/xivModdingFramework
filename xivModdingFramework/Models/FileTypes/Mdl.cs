@@ -1761,18 +1761,21 @@ namespace xivModdingFramework.Models.FileTypes
                     var v = colladaData.TextureCoordinates0[i + 1];
 
                     // Force UV1 coordinates into [1,-1] if checkbox is checked (on by default for gear unless manually unchecked)
-                    if (advImportSettings[meshNum.ToString()].ForceUV1Quadrant)
+                    if (advImportSettings.ContainsKey(meshNum.ToString()))
                     {
-                        if (u < 0 || u > 1)
+                        if (advImportSettings[meshNum.ToString()].ForceUV1Quadrant)
                         {
-                            int diff = (int)Math.Floor(u);
-                            u = u - diff;
-                        }
+                            if (u < 0 || u > 1)
+                            {
+                                int diff = (int)Math.Floor(u);
+                                u = u - diff;
+                            }
 
-                        if (v > 0 || v < -1)
-                        {
-                            int diff = (int)Math.Ceiling(v);
-                            v = v - diff;
+                            if (v > 0 || v < -1)
+                            {
+                                int diff = (int)Math.Ceiling(v);
+                                v = v - diff;
+                            }
                         }
                     }
 
@@ -1780,9 +1783,12 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 
                 // Clone UV1 to UV2 if checkbox checked (on by default for hair unless manually unchecked)
-                if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
+                if (advImportSettings.ContainsKey(meshNum.ToString()))
                 {
-                    texCoord1Collection.AddRange(texCoord0Collection);
+                    if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
+                    {
+                        texCoord1Collection.AddRange(texCoord0Collection);
+                    }
                 }
                 else
                 {
