@@ -2026,7 +2026,19 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
                                     }
-                                    nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+
+                                    // If the checkbox to clone UV1 to UV2 was checked, also clone UV1s indices 
+                                    if (advImportSettings.ContainsKey(meshNum.ToString()))
+                                    {
+                                        if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
+                                        {
+                                            nTexCoord1Collection.Add(texCoord0Collection[pos2]);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+                                    }
                                 }
                             }
 
