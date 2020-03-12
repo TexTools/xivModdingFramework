@@ -49,7 +49,7 @@ namespace xivModdingFramework.Items
                 itemType = XivItemType.accessory;
             }
             else if (item.ItemCategory.Equals(XivStrings.Mounts) || item.ItemCategory.Equals(XivStrings.Minions) || item.ItemCategory.Equals(XivStrings.Pets)
-                     || item.ItemCategory.Equals(XivStrings.Monster))
+                     || item.ItemCategory.Equals(XivStrings.Monster) || item.ItemCategory.Equals(XivStrings.Ornaments))
             {
                 itemType = item.ModelInfo.ModelType;
             }
