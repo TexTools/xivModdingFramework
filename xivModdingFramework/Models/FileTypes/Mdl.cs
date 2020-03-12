@@ -1761,7 +1761,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var v = colladaData.TextureCoordinates0[i + 1];
 
                     // Force UV1 coordinates into [1,-1] if checkbox is checked (on by default for gear unless manually unchecked)
-                    if (advImportSettings.ContainsKey(meshNum.ToString()))
+                    if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
                     {
                         if (advImportSettings[meshNum.ToString()].ForceUV1Quadrant)
                         {
@@ -1783,7 +1783,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 
                 // Clone UV1 to UV2 if checkbox checked (on by default for hair unless manually unchecked)
-                if (advImportSettings.ContainsKey(meshNum.ToString()))
+                if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
                 {
                     if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
                     {
@@ -2028,7 +2028,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     }
 
                                     // If the checkbox to clone UV1 to UV2 was checked, also clone UV1s indices 
-                                    if (advImportSettings.ContainsKey(meshNum.ToString()))
+                                    if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
                                     {
                                         if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
                                         {
