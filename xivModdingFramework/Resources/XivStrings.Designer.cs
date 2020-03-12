@@ -1843,6 +1843,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Ornaments.
+        /// </summary>
+        internal static string Ornaments {
+            get {
+                return ResourceManager.GetString("Ornaments", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Other.
         /// </summary>
         internal static string Other {

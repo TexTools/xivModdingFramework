@@ -864,4 +864,7 @@
   <data name="TailMtrlFolderVar" xml:space="preserve">
     <value>chara/human/c{0}/obj/tail/t{1}/material/v{2}</value>
   </data>
+  <data name="Ornaments" xml:space="preserve">
+    <value>Ornaments</value>
+  </data>
 </root>

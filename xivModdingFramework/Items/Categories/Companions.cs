@@ -184,6 +184,73 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
+        /// Gets the list to be displayed in the Ornaments category
+        /// </summary>
+        /// <remarks>
+        /// The model data for the ornament is held separately in modelchara_0.exd
+        /// The data within Ornament exd contains a reference to the index for lookup in modelchara
+        /// The data format used by Ornaments is identical to mounts so XivMount can be used to store the data
+        /// </remarks>
+        /// <returns>A list containing XivMount data</returns>
+        public async Task<List<XivMount>> GetOrnamentList()
+        {
+            var mountLock = new object();
+            var ornamentList = new List<XivMount>();
+
+            // These are the offsets to relevant data
+            // These will need to be changed if data gets added or removed with a patch
+            const int dataLength = 28;
+            const int nameDataOffset = 6;
+            const int modelCharaIndexOffset = 16;
+
+            var ornamentEx = await _ex.ReadExData(XivEx.ornament);
+            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
+
+            // Loops through all available mounts in the mount exd files
+            // At present only one file exists (mount_0)
+            await Task.Run(() => Parallel.ForEach(ornamentEx.Values, (ornament) =>
+            {
+                var xivOrnament = new XivMount
+                {
+                    Category = XivStrings.Companions,
+                    ItemCategory = XivStrings.Ornaments,
+                };
+
+                int modelCharaIndex;
+
+                //Big Endian Byte Order 
+                using (var br = new BinaryReaderBE(new MemoryStream(ornament)))
+                {
+                    br.BaseStream.Seek(nameDataOffset, SeekOrigin.Begin);
+                    var nameOffset = br.ReadInt16();
+
+                    br.BaseStream.Seek(modelCharaIndexOffset, SeekOrigin.Begin);
+                    modelCharaIndex = br.ReadInt16();
+
+                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
+                    var nameString =
+                        CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Encoding.UTF8
+                            .GetString(br.ReadBytes(nameOffset)).Replace("\0", ""));
+                    xivOrnament.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                }
+
+                if (modelCharaIndex == 0 || xivOrnament.Name.Equals("")) return;
+
+                // This will get the model data using the index obtained for the current mount
+                xivOrnament.ModelInfo = XivModelChara.GetModelInfo(modelCharaEx, modelCharaIndex);
+
+                lock (mountLock)
+                {
+                    ornamentList.Add(xivOrnament);
+                }
+            }));
+
+            ornamentList.Sort();
+
+            return ornamentList;
+        }
+
+        /// <summary>
         /// Gets the list to be displayed in the Pets category
         /// </summary>
         /// <remarks>
