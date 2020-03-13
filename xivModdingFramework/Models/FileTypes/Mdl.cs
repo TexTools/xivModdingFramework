@@ -1830,7 +1830,7 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var colladaBoneIndex = currentBoneIndex * 2 + j;
 
-                            if (colladaBoneIndex > colladaData.BoneIndices.Count)
+                            if (colladaBoneIndex >= colladaData.BoneIndices.Count)
                             {
                                 throw new Exception($"Could not find bone index '{colladaBoneIndex}' in Mesh: {meshNum}");
                             }
@@ -1839,7 +1839,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             var boneWeightIndex = colladaData.BoneIndices[colladaBoneIndex + 1];
 
-                            if (boneWeightIndex > colladaData.BoneWeights.Count)
+                            if (boneWeightIndex >= colladaData.BoneWeights.Count)
                             {
                                 throw new Exception($"There is no bone weight at index {boneWeightIndex} in Mesh: {meshNum}");
                             }

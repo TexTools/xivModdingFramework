@@ -886,7 +886,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            // Check if the vertex count limit has been exceeded
+            // Check for vertex limit and missing weights
             foreach (var mesh in meshPartDataDictionary)
             {
                 var meshPartData = mesh.Value;
@@ -894,6 +894,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var part in meshPartData)
                 {
+                    if (part.Value.Vcounts.Count < (part.Value.Positions.Count / 3))
+                    {
+                        throw new Exception($"Vertices with missing weights detected in mesh {mesh.Key}.{part.Key}");
+                    }
                     totalVerts += part.Value.Vcounts.Count;
                 }
 
