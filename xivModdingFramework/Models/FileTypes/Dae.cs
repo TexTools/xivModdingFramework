@@ -3304,20 +3304,26 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var meshPartCount = meshDataList[i].MeshPartList.Count;
 
-                if (meshPartCount == 0)
-                {
-                    meshPartCount = 1;
-                }
+                // Determine the last non-dummy mesh part
+                var lastNonDummy = meshPartCount;
 
                 for (var j = 0; j < meshPartCount; j++)
                 {
-                    var partString = "." + j;
+                    if (meshDataList[i].MeshPartList[j].IndexCount != 0)
+                    {
+                        lastNonDummy = j;
+                    }
+                }
 
-                    if (j == 0)
+                // Only add nodes up until the last non-dummy mesh to not clutter the DAE with dummies
+                for (var k = 0; k <= lastNonDummy; k++)
+                {
+                    var partString = "." + k;
+
+                    if (k == 0)
                     {
                         partString = "";
                     }
-
 
                     //<node>
                     xmlWriter.WriteStartElement("node");
