@@ -1789,10 +1789,19 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         texCoord1Collection.AddRange(texCoord0Collection);
                     }
+                    else
+                    {
+                        // Otherwise just read the data from the DAE
+                        for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
+                        {
+                            texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
+                                colladaData.TextureCoordinates1[i + 1]));
+                        }
+                    }
                 }
                 else
                 {
-                    // Otherwise just read the data from the DAE
+                    // Basic import reads data from DAE by default
                     for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
                     {
                         texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
@@ -2033,6 +2042,10 @@ namespace xivModdingFramework.Models.FileTypes
                                         if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
                                         {
                                             nTexCoord1Collection.Add(texCoord0Collection[pos2]);
+                                        }
+                                        else
+                                        {
+                                            nTexCoord1Collection.Add(texCoord1Collection[pos3]);
                                         }
                                     }
                                     else
