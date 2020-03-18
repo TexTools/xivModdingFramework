@@ -894,7 +894,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var part in meshPartData)
                 {
-                    if (part.Value.Vcounts.Count < (part.Value.Positions.Count / 3))
+                    if (part.Value.Vcounts.Count < (part.Value.Positions.Count / 3) && !isHousingItem)
                     {
                         throw new Exception($"Vertices with missing weights detected in mesh {mesh.Key}.{part.Key}");
                     }
