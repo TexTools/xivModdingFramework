@@ -199,7 +199,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {skelFolder}/{skelFile}");
+                throw new Exception($"Could not find offset for {skelFolder}/{skelFile}");
             }
 
             var sklbData = await dat.GetType2Data(offset, _dataFile);
@@ -440,6 +440,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 foreach (var b in skeletonData)
                 {
+                    if (b == "") continue;
                     var j = JsonConvert.DeserializeObject<SkeletonData>(b);
 
                     raceSkeletonData.Add(j);

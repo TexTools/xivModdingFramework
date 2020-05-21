@@ -59,5 +59,15 @@ namespace xivModdingFramework.Models.DataContainers
         /// Determines whether the vertex alpha value is flipped for vertex colors
         /// </summary>
         public bool FlipAlpha { get; set; }
+
+        /// <summary>
+        /// Determines whether the UV1 coordinates should be forced into quadrant U1V-1
+        /// </summary>
+        public bool ForceUV1Quadrant { get; set; }
+
+        /// <summary>
+        /// Determines whether UV1 coordinates should be cloned to UV2
+        /// </summary>
+        public bool CloneUV1toUV2 { get; set; }
     }
 }

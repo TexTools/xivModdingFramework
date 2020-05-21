@@ -203,14 +203,14 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     if (mtrlOffset == 0)
                     {
-                        throw new Exception($"Could not find offest for {mtrlStringPath}");
+                        throw new Exception($"Could not find offset for {mtrlStringPath}");
                     }
 
                     mtrlStringPath = $"{newMtrlFolder}/{mtrlFile}";
                 }
                 else
                 {
-                    throw new Exception($"Could not find offest for {mtrlStringPath}");
+                    throw new Exception($"Could not find offset for {mtrlStringPath}");
 
                 }
             }
@@ -382,7 +382,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
                         xivMtrl.ColorSetData = new List<Half>();
-                        xivMtrl.ColorSetExtraData = new byte[0];
+                        xivMtrl.ColorSetExtraData = null;
                         if (xivMtrl.ColorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)

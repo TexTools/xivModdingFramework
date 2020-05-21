@@ -134,7 +134,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {ttp.Path}");
+                throw new Exception($"Could not find offset for {ttp.Path}");
             }
 
             XivTex xivTex;
@@ -932,7 +932,27 @@ namespace xivModdingFramework.Textures.FileTypes
 
             using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
             {
-                // skip DDS header
+                // Check DDS type
+                br.BaseStream.Seek(84, SeekOrigin.Begin);
+
+                var texType = br.ReadInt32();
+                XivTexFormat textureType;
+
+                if (DDSType.ContainsKey(texType))
+                {
+                    textureType = DDSType[texType];
+                }
+                else
+                {
+                    throw new Exception($"DDS Type ({texType}) not recognized. Expecting A16B16G16R16F.");
+                }
+
+                if (textureType != XivTexFormat.A16B16G16R16F)
+                {
+                    throw new Exception($"Incorrect file type. Expected: A16B16G16R16F  Given: {textureType}");
+                }
+
+                // Skip past rest of the DDS header
                 br.BaseStream.Seek(128, SeekOrigin.Begin);
 
                 // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
@@ -953,6 +973,18 @@ namespace xivModdingFramework.Textures.FileTypes
                     // The extra data after the colorset is always 32 bytes 
                     // This reads 16 ushort values which is 16 x 2 = 32
                     colorSetExtraData = File.ReadAllBytes(flagsPath);
+                    
+                    // If for whatever reason there is a .dat file but it's missing data
+                    if ( colorSetExtraData.Length != 32)
+                    {
+                        // Set all dye modifiers to 0 (undyeable)
+                        colorSetExtraData = new byte[32];
+                    }
+                }
+                else
+                {
+                    // If .dat file is missing set all values to 0 (undyeable)
+                    colorSetExtraData = new byte[32];
                 }
             }
 

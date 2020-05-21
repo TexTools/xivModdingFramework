@@ -63,11 +63,16 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int modelDataCheckOffset = 30;
-            const int dataLength = 160;
+            int dataLength = 168;
             const int nameDataOffset = 14;
             const int modelDataOffset = 24;
             const int iconDataOffset = 136;
-            const int slotDataOffset = 154;
+            int slotDataOffset = 156;
+            if(_xivLanguage == XivLanguage.Chinese)
+            {
+                dataLength = 160;
+                slotDataOffset = 154;
+            }
 
             var xivGearList = new List<XivGear>();
 
@@ -192,6 +197,7 @@ namespace xivModdingFramework.Items.Categories
                     br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
                     var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
                     xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                    xivGear.Name = xivGear.Name.Trim();
 
                     lock (_gearLock)
                     {

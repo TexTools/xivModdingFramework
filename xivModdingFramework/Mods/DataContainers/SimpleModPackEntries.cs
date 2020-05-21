@@ -41,6 +41,11 @@ namespace xivModdingFramework.Mods.DataContainers
         public string Part { get; set; }
 
         /// <summary>
+        /// The item type
+        /// </summary>
+        public string Type { get; set; }
+
+        /// <summary>
         /// The item number
         /// </summary>
         public string Num { get; set; }

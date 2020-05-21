@@ -279,7 +279,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {internalPath}");
+                throw new Exception($"Could not find offset for {internalPath}");
             }
 
             return await GetType2Data(offset, dataFile);
@@ -613,7 +613,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {internalPath}");
+                throw new Exception($"Could not find offset for {internalPath}");
             }
 
             return await GetType3Data(offset, dataFile);
@@ -776,7 +776,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offest for {internalPath}");
+                throw new Exception($"Could not find offset for {internalPath}");
             }
 
             return await GetType4Data(offset, dataFile);
@@ -1151,7 +1151,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (datNum >= 8)
             {
-                throw new NotSupportedException($"Dat limit has been reached, no new mods can be imported for {dataFile.GetDataFileName()}");
+                throw new NotSupportedException($"Mod data limit has been reached, no new mods can be imported for dat file {dataFile.GetDataFileName()}.\n\n" +
+                    $"Back up any mods you'd like to keep and perform a start over to be able to import new mods.");
             }
 
             // Checks to make sure the offsets in the mod list are not 0

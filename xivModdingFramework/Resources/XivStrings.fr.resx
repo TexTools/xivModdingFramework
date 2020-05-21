@@ -219,6 +219,9 @@
   <data name="Food" xml:space="preserve">
     <value>Plat ou boisson</value>
   </data>
+  <data name="Furniture" xml:space="preserve">
+    <value>Ameublement</value>
+  </data>
   <data name="Garuda_Egi" xml:space="preserve">
     <value>Garuda-Egi</value>
   </data>
@@ -239,6 +242,9 @@
   </data>
   <data name="Head_Body" xml:space="preserve">
     <value>Tête + Torse</value>
+  </data>
+  <data name="Housing" xml:space="preserve">
+    <value>Logement</value>
   </data>
   <data name="Hyur_H" xml:space="preserve">
     <value>Hyur Highlander</value>
@@ -266,6 +272,9 @@
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>Jambes + Pieds</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>Ecran de chargement</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>Main directrice</value>

@@ -1044,10 +1044,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 br.BaseStream.Seek(colorOffset, SeekOrigin.Begin);
 
-                                var a = br.ReadByte();
                                 var r = br.ReadByte();
                                 var g = br.ReadByte();
                                 var b = br.ReadByte();
+                                var a = br.ReadByte();
 
                                 vertexData.Colors.Add(new Color(r, g, b, a));
                                 vertexData.Colors4.Add(new Color4((r / 255f), (g / 255f), (b / 255f), (a / 255f)));
@@ -1370,8 +1370,11 @@ namespace xivModdingFramework.Models.FileTypes
                     VertexColorStride = vertexColorStride
                 });
             }
-         
-            // Check for missing data and throw exception if no data is found
+
+            // A dictionary containing error messages if there are any so that a single exception can be thrown with all available context
+            var errorDictionary = new Dictionary<int, string>();
+
+            // Check for missing data and add dummy data if possible or throw exception
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
             {
                 var partDataDict = meshPartDataDictionary[i];
@@ -1380,57 +1383,62 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     if (partData.Value.TextureCoordinates0.Count < 1)
                     {
-                        throw new Exception($"Missing Texture Coordinates at Mesh: {i}  Part: {partData.Key}");
+                        errorDictionary.Add(errorDictionary.Count, $"Missing Texture Coordinates at Mesh: {i}  Part: {partData.Key}\n");
                     }
 
                     if (isHousingItem) continue; // Housing items do not have bones
 
-                    if (partData.Value.BoneWeights.Count < 1)
+                    if (partData.Value.BoneWeights.Count < 1 || partData.Value.BoneIndices.Count < 1)
                     {
-                        //throw new Exception($"Missing Bone Weights at Mesh: {i}  Part: {partData.Key}");
-                        warningsDictionary.Add("Missing Bones", $"There were missing bones at Mesh: {i}  Part: {partData.Key}\n\nDummy data was added. This may cause unintentional effects");
-
-                        // Add dummy data for missing bones
-                        partData.Value.BoneWeights.AddRange(new float[partData.Value.Positions.Count]);
+                        errorDictionary.Add(errorDictionary.Count, $"There were missing bone weights or indices at Mesh: {i} Part: {partData.Key}\n");
                     }
 
-                    if (partData.Value.BoneIndices.Count < 1)
+                    // Vertex colour
+                    if (partData.Value.VertexColors.Count < 1)
                     {
-                        //throw new Exception($"Missing Bone Indices at Mesh: {i}  Part: {partData.Key}");
-
-                        var boneDict = meshPartDataDictionary[0][0].BoneNumDictionary;
-
-                        // Find the closest bone to the root and get its index
-                        var boneIndex = 0;
-                        if (boneDict.ContainsKey("n_hara"))
+                        // If there are no vertex colour indices, initialize to 0 and add them
+                        var dummyVertexColorIndices = new List<int>(partData.Value.PositionIndices.Count);
+                        foreach (var index in partData.Value.PositionIndices)
                         {
-                            boneIndex = boneDict["n_hara"];
+                            dummyVertexColorIndices.Add(0);
                         }
-                        else if (boneDict.ContainsKey("j_kosi"))
-                        {
-                            boneIndex = boneDict["j_kosi"];
-                        }
-                        else if (boneDict.ContainsKey("j_sebo_a"))
-                        {
-                            boneIndex = boneDict["j_sebo_a"];
-                        }
-
-                        // Add dummy data for missing bones
-                        for (var j = 0; j < partData.Value.Positions.Count; j++)
-                        {
-                            partData.Value.BoneIndices.Add(boneIndex);
-                        }
+                        partData.Value.VertexColorIndices = dummyVertexColorIndices;
+                        // Set to full colour for all indices
+                        partData.Value.VertexColors.Add(1.0f);
+                        partData.Value.VertexColors.Add(1.0f);
+                        partData.Value.VertexColors.Add(1.0f);
                     }
 
-                    if (partData.Value.Vcounts.Count < 1)
+                    // Vertex alpha
+                    if (partData.Value.VertexAlphas.Count < 1)
                     {
-                        for (var j = 0; j < partData.Value.Positions.Count; j++)
+                        // If there are no vertex alpha indices, initialize to 0 and add them
+                        var dummyVertexAlphaIndices = new List<int>(partData.Value.PositionIndices.Count);
+                        foreach (var index in partData.Value.PositionIndices)
                         {
-                            partData.Value.Vcounts.Add(1);
+                            dummyVertexAlphaIndices.Add(0);
                         }
+                        partData.Value.VertexAlphaIndices = dummyVertexAlphaIndices;
+                        // Set vertex alpha to 1.0 for all indices
+                        partData.Value.VertexAlphas.Add(1.0f);
+                        partData.Value.VertexAlphas.Add(0.0f);
+                        partData.Value.VertexAlphas.Add(0.0f);
                     }
                 }
             }
+
+            // If an error message was added to the error dictionary
+            if ( errorDictionary.Count > 0 )
+            {
+                // Loop through the dictionary and contatenate the strings
+                var errorString = "";
+                foreach (var error in errorDictionary)
+                {
+                    errorString += error.Value;
+                }
+                throw new Exception(errorString);
+            }
+
             var indexListList = new List<List<int[]>>();
             var partStartingIndexDicList = new List<Dictionary<(int Start,int End),Dictionary<string,int>>>();
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
@@ -1746,31 +1754,67 @@ namespace xivModdingFramework.Models.FileTypes
                             colladaData.Tangents[i + 2]));
                     }
                 }
+
                 for (var i = 0; i < colladaData.TextureCoordinates0.Count; i += colladaData.TextureCoordinateStride)
                 {
-                    texCoord0Collection.Add(
-                        new Vector2(colladaData.TextureCoordinates0[i], colladaData.TextureCoordinates0[i + 1]));
-                }
+                    var u = colladaData.TextureCoordinates0[i];
+                    var v = colladaData.TextureCoordinates0[i + 1];
 
-                for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
-                {
-                    texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
-                        colladaData.TextureCoordinates1[i + 1]));
-                }
-
-                for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
-                {
-                    var alphas = new float[] {colladaData.VertexAlphas[i], colladaData.VertexAlphas[i + 1]};
-
-                    // Check vertex alphas for bad data, if any is found replace with default of 1
-                    if (alphas.Any(x => x < 0f || x > 1f))
+                    // Force UV1 coordinates into [1,-1] if checkbox is checked (on by default for gear unless manually unchecked)
+                    if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
                     {
-                        vertexAlphaCollection.Add(new Vector2(1, 0));
+                        if (advImportSettings[meshNum.ToString()].ForceUV1Quadrant)
+                        {
+                            if (u < 0 || u > 1)
+                            {
+                                int diff = (int)Math.Floor(u);
+                                u = u - diff;
+                            }
+
+                            if (v > 0 || v < -1)
+                            {
+                                int diff = (int)Math.Ceiling(v);
+                                v = v - diff;
+                            }
+                        }
+                    }
+
+                    texCoord0Collection.Add(new Vector2(u, v));
+                }
+                
+                // Clone UV1 to UV2 if checkbox checked (on by default for hair unless manually unchecked)
+                if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
+                {
+                    if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
+                    {
+                        texCoord1Collection.AddRange(texCoord0Collection);
                     }
                     else
                     {
-                        vertexAlphaCollection.Add(new Vector2(alphas[0], alphas[1]));
+                        // Otherwise just read the data from the DAE
+                        for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
+                        {
+                            texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
+                                colladaData.TextureCoordinates1[i + 1]));
+                        }
                     }
+                }
+                else
+                {
+                    // Basic import reads data from DAE by default
+                    for (var i = 0; i < colladaData.TextureCoordinates1.Count; i += colladaData.TextureCoordinateStride)
+                    {
+                        texCoord1Collection.Add(new Vector2(colladaData.TextureCoordinates1[i],
+                            colladaData.TextureCoordinates1[i + 1]));
+                    }
+                }
+
+
+                for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
+                {
+                    // Vertex alphas never seem to have values other than (1, 0) in FFXIV
+                    // so default to that for all models regardless of the DAE's values
+                    vertexAlphaCollection.Add(new Vector2(1, 0));
                 }
 
                 if (!isHousingItem) // housing items do not have bones
@@ -1795,7 +1839,7 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var colladaBoneIndex = currentBoneIndex * 2 + j;
 
-                            if (colladaBoneIndex > colladaData.BoneIndices.Count)
+                            if (colladaBoneIndex >= colladaData.BoneIndices.Count)
                             {
                                 throw new Exception($"Could not find bone index '{colladaBoneIndex}' in Mesh: {meshNum}");
                             }
@@ -1804,7 +1848,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             var boneWeightIndex = colladaData.BoneIndices[colladaBoneIndex + 1];
 
-                            if (boneWeightIndex > colladaData.BoneWeights.Count)
+                            if (boneWeightIndex >= colladaData.BoneWeights.Count)
                             {
                                 throw new Exception($"There is no bone weight at index {boneWeightIndex} in Mesh: {meshNum}");
                             }
@@ -1991,7 +2035,23 @@ namespace xivModdingFramework.Models.FileTypes
                                     {
                                         throw new IndexOutOfRangeException($"There is no texture coordinate 1 at index {pos3},  texture coordinate 1 count: {texCoord1Collection.Count}");
                                     }
-                                    nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+
+                                    // If the checkbox to clone UV1 to UV2 was checked, also clone UV1s indices 
+                                    if (advImportSettings != null && advImportSettings.ContainsKey(meshNum.ToString()))
+                                    {
+                                        if (advImportSettings[meshNum.ToString()].CloneUV1toUV2)
+                                        {
+                                            nTexCoord1Collection.Add(texCoord0Collection[pos2]);
+                                        }
+                                        else
+                                        {
+                                            nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        nTexCoord1Collection.Add(texCoord1Collection[pos3]);
+                                    }
                                 }
                             }
 
@@ -2716,7 +2776,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     foreach (var modelImportSettings in importSettings)
                     {
-                        var importMeshPartCount = modelImportSettings.Value.PartList.Count;
+                        var importMeshPartCount = modelImportSettings.Value.PartList.Max() + 1;
                         var meshNum = int.Parse(modelImportSettings.Key);
 
                         var originalMeshPartCount = 0;
@@ -3086,9 +3146,9 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             if (importSettings.ContainsKey(meshNum.ToString()))
                             {
-                                if (importSettings[meshNum.ToString()].PartList.Count > meshInfo.MeshPartCount)
+                                if ((importSettings[meshNum.ToString()].PartList.Max() + 1) > meshInfo.MeshPartCount)
                                 {
-                                    addedMeshParts = importSettings[meshNum.ToString()].PartList.Count - meshInfo.MeshPartCount;
+                                    addedMeshParts = importSettings[meshNum.ToString()].PartList.Max() + 1 - meshInfo.MeshPartCount;
                                 }
                             }
                         }
@@ -3340,9 +3400,9 @@ namespace xivModdingFramework.Models.FileTypes
                                 var importSettingsMesh = importSettings[meshNum.ToString()];
 
                                 // Add additional mesh parts if there are any from advanced importing
-                                if (importSettingsMesh.PartList.Count > partCount)
+                                if ((importSettingsMesh.PartList.Max() + 1) > partCount)
                                 {
-                                    var extraPartCount = importSettingsMesh.PartList.Count - partCount;
+                                    var extraPartCount = importSettingsMesh.PartList.Max() + 1 - partCount;
 
                                     for (var i = 0; i < extraPartCount; i++)
                                     {
@@ -3585,9 +3645,12 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         var disable = false;
-                        foreach(var value in importSettings.Values)
+                        if (importSettings != null)
                         {
-                            disable = disable || value.Disable;
+                            foreach (var value in importSettings.Values)
+                            {
+                                disable = disable || value.Disable;
+                            }
                         }
                         foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                         {
@@ -4919,14 +4982,14 @@ namespace xivModdingFramework.Models.FileTypes
                             alpha = Convert.ToByte(Math.Round(colladaMeshData.VertexAlphas[i] * 255));
                         }
 
-                        if (!flipAlpha)
+                        if (flipAlpha)
                         {
                             importData.VertexData1.Add(alpha);
                         }
                         importData.VertexData1.Add(red);
                         importData.VertexData1.Add(green);
                         importData.VertexData1.Add(blue);
-                        if (flipAlpha)
+                        if (!flipAlpha)
                         {
                             importData.VertexData1.Add(alpha);
                         }

@@ -204,11 +204,14 @@ namespace xivModdingFramework.Items.Categories
 
                     if (iconNumber == 0) return;
 
-                    br.BaseStream.Seek(28, SeekOrigin.Begin);
+                    var dataOffset = 28;
+                    var dataLength = 60;
+
+                    br.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
                     actionCategory = br.ReadByte();
 
-                    br.BaseStream.Seek(60, SeekOrigin.Begin);
-                    var nameLength = action.Length - 60;
+                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
+                    var nameLength = action.Length - dataLength;
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
 
                     xivUi.Name = name;
@@ -778,7 +781,7 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int nameLengthOffset = 6;
-            const int iconNumberOffest = 26;
+            const int iconNumberOffset = 26;
 
             var weatherExData = await _ex.ReadExData(XivEx.weather);
 
@@ -799,7 +802,7 @@ namespace xivModdingFramework.Items.Categories
 
                     var nameLength = br.ReadInt16();
 
-                    br.BaseStream.Seek(iconNumberOffest, SeekOrigin.Begin);
+                    br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
 
                     var iconNumber = br.ReadUInt16();
 
