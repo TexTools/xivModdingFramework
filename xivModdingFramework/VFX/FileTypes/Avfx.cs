@@ -56,7 +56,15 @@ namespace xivModdingFramework.VFX.FileTypes
                     // Advance to the path data header
                     while (data != 5531000)
                     {
-                        data = br.ReadInt32();
+                        try
+                        {
+                            data = br.ReadInt32();
+                        }
+                        catch (EndOfStreamException e)
+                        {
+                            throw new System.Exception("VFX textures were detected but no texture paths could be found.\n" +
+                                "VFX textures will not be accessible.");
+                        }                        
                     }
 
                     // While the data is a path data header

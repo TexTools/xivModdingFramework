@@ -65,7 +65,16 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new Exception($"Could not find offset for vfx path {vfxPath.Folder}/{vfxPath.File}");
             }
 
-            var aTexPaths = await avfx.GetATexPaths(vfxOffset);
+            var aTexPaths = new List<string>();
+
+            try
+            {
+                aTexPaths = await avfx.GetATexPaths(vfxOffset);
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }            
 
             foreach (var atexPath in aTexPaths)
             {

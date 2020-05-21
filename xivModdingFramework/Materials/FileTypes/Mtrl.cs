@@ -150,7 +150,14 @@ namespace xivModdingFramework.Materials.FileTypes
             if (mtrlPath.HasVfx)
             {
                 var atex = new ATex(_gameDirectory, DataFile);
-                mtrlData.TextureTypePathList.AddRange(await atex.GetAtexPaths(itemModel));
+                try
+                {
+                    mtrlData.TextureTypePathList.AddRange(await atex.GetAtexPaths(itemModel));
+                }
+                catch
+                {
+                    return mtrlData;
+                }                
             }
 
             return mtrlData;
