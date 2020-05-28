@@ -1812,9 +1812,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
                 {
-                    // Vertex alphas never seem to have values other than (1, 0) in FFXIV
-                    // so default to that for all models regardless of the DAE's values
-                    vertexAlphaCollection.Add(new Vector2(1, 0));
+                    // Sanity check
+                    if (colladaData.VertexAlphas[i] > 0 && colladaData.VertexAlphas[i] < 1)
+                    {
+                        vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], 0));
+                    } else
+                    {
+                        vertexAlphaCollection.Add(new Vector2(1, 0));
+                    }
                 }
 
                 if (!isHousingItem) // housing items do not have bones
@@ -4280,10 +4285,10 @@ namespace xivModdingFramework.Models.FileTypes
                                             importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
                                             importData.VertexData1.Add(0);
 
-                                            importData.VertexData1.Add(color.A);
                                             importData.VertexData1.Add(color.R);
                                             importData.VertexData1.Add(color.G);
                                             importData.VertexData1.Add(color.B);
+                                            importData.VertexData1.Add(color.A);
 
 
                                             importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.X));
