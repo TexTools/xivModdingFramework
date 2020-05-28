@@ -1681,8 +1681,19 @@ namespace xivModdingFramework.Models.FileTypes
             var colladaMeshDataList = new List<ColladaMeshData>();
 
             var meshNum = 0;
+
+            var minorWeightCorrections = new List<int>(meshDataDictionary.Values.Count);
+            var majorWeightCorrections = new List<int>(meshDataDictionary.Values.Count);
+
+            // Make sure they're actually filled out to the set length to avoid any indexing errors.
+            minorWeightCorrections.AddRange(Enumerable.Repeat(0, meshDataDictionary.Values.Count));
+            majorWeightCorrections.AddRange(Enumerable.Repeat(0, meshDataDictionary.Values.Count));
+
+            var meshIdx = -1;
             foreach (var colladaData in meshDataDictionary.Values)
             {
+                meshIdx++;
+
                 // Make the data into collections of vectors
                 var positionCollection    = new Vector3Collection();
                 var texCoord0Collection   = new Vector2Collection();
@@ -1932,16 +1943,25 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // If there were bones that needed to be corrected a string of the corrected data will be made
                     // and added to the warnings dictionary
+                    var totalSmalls = 0;
+                    var totalMajors = 0;
                     if (errorDict.Count > 0)
                     {
-                        var errorString = "";
                         foreach (var er in errorDict)
                         {
-                            errorString += "Vertex: " + er.Key + "\t Correction Amount: " + er.Value + "\n";
+                            if (Math.Abs(er.Value) <= 1)
+                            {
+                                totalSmalls++;
+                            }
+                            else
+                            {
+                                totalMajors++;
+                                //majorString += "Vertex: " + er.Key + "\t Correction Amount: " + er.Value + "\n";
+                            }
                         }
-
-                        warningsDictionary.Add($"Weight Correction {meshNum}", "Corrected bone weights on the following vertices :\n\n" + errorString);
                     }
+                    minorWeightCorrections[meshIdx] = totalSmalls;
+                    majorWeightCorrections[meshIdx] = totalMajors;
                 }
 
                 // Dictionary with <index, index number>
@@ -2377,6 +2397,34 @@ namespace xivModdingFramework.Models.FileTypes
                 colladaMeshDataList.Add(colladaMeshData);
 
                 meshNum++;
+            }
+
+
+            // Build the weights warning if needed.
+            bool anyWeightErrors = false;
+            var weightErrorString = "Bone weights were adjusted on some vertices:\n\n";
+            for(var idx = 0; idx < meshDataDictionary.Values.Count; idx++)
+            {
+                var meshNumber = idx;
+                var minor = minorWeightCorrections[idx];
+                var major = majorWeightCorrections[idx];
+
+                if(minor > 0 || major > 0)
+                {
+                    anyWeightErrors = true;
+                    weightErrorString += "Mesh " + idx + ":\n";
+                    weightErrorString += "\t" + minor + " Minor Adjustments\n";
+                    weightErrorString += "\t" + major + " Major Adjustments\n\n";
+
+
+                }
+
+            }
+            weightErrorString += "Minor adjustments are generally harmless and can be ignored.\nMajor adjustments may cause more serious animation problems,\nand are usually caused by missing weight data or vertices with more than 4 bones affecting them.";
+
+            if (anyWeightErrors)
+            {
+                warningsDictionary.Add($"Weight Corrections", weightErrorString);
             }
 
             await MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source, rawDataOnly);
