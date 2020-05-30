@@ -4320,6 +4320,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                                             var normal = meshData.VertexData.Normals[vertIndex];
                                             var binormal = meshData.VertexData.BiNormals[vertIndex];
+                                            var binormalHandedness = meshData.VertexData.BiNormalHandedness[vertIndex];
                                             var color = meshData.VertexData.Colors[vertIndex];
                                             var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
                                             var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
@@ -4331,7 +4332,7 @@ namespace xivModdingFramework.Models.FileTypes
                                             importData.VertexData1.Add((byte)((Math.Abs(binormal.X) * 255 + 255) / 2));
                                             importData.VertexData1.Add((byte)((Math.Abs(binormal.Y) * 255 + 255) / 2));
                                             importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
-                                            importData.VertexData1.Add(0);
+                                            importData.VertexData1.Add(binormalHandedness);
 
                                             importData.VertexData1.Add(color.R);
                                             importData.VertexData1.Add(color.G);
@@ -5152,7 +5153,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < vertexData.Normals.Count; i++)
             {
-                if (vertexInfoDict[VertexUsageType.Normal] == VertexDataType.Float3)
+                if (vertexInfoDict[VertexUsageType.Normal] == VertexDataType.Half4)
                 {
                     // Normals
                     var x = new Half(vertexData.Normals[i].X);
