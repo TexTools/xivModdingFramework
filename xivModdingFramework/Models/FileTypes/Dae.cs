@@ -1748,69 +1748,73 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var vertexColors = meshList[i].VertexData.Colors.GetRange(totalVertices, totalCount);
 
-                        //<source>
-                        xmlWriter.WriteStartElement("source");
-                        xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-col0");
-                        //<float_array>
-                        xmlWriter.WriteStartElement("float_array");
-                        xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-col0-array");
-                        xmlWriter.WriteAttributeString("count", (totalCount * 3).ToString());
-
-                        foreach (var vc in vertexColors)
+                        // Indexcount <= 3 because the Autodesk importer crashes when there is only a single tri for whatever reason
+                        if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
                         {
-                            var red = vc.R / 255.0f;
-                            var green = vc.G / 255.0f;
-                            var blue = vc.B / 255.0f;
-                            //float a = vc.A / 255.0f;
+                            //<source>
+                            xmlWriter.WriteStartElement("source");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-col0");
+                            //<float_array>
+                            xmlWriter.WriteStartElement("float_array");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-col0-array");
+                            xmlWriter.WriteAttributeString("count", (totalCount * 3).ToString());
 
-                            xmlWriter.WriteString(red.ToString() + " " + green.ToString() + " " + blue.ToString() + " ");
+                            foreach (var vc in vertexColors)
+                            {
+                                var red = vc.R / 255.0f;
+                                var green = vc.G / 255.0f;
+                                var blue = vc.B / 255.0f;
+                                //float a = vc.A / 255.0f;
+
+                                xmlWriter.WriteString(red.ToString() + " " + green.ToString() + " " + blue.ToString() + " ");
+                            }
+
+                            xmlWriter.WriteEndElement();
+                            //</float_array>
+
+                            //<technique_common>
+                            xmlWriter.WriteStartElement("technique_common");
+                            //<accessor>
+                            xmlWriter.WriteStartElement("accessor");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-col0-array");
+                            xmlWriter.WriteAttributeString("count", totalCount.ToString());
+                            xmlWriter.WriteAttributeString("stride", "3");
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "R");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "G");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "B");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            /*xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "A");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();*/
+                            //</param>
+
+                            xmlWriter.WriteEndElement();
+                            //</accessor>
+                            xmlWriter.WriteEndElement();
+                            //</technique_common>
+                            xmlWriter.WriteEndElement();
+                            //</source>
                         }
-
-                        xmlWriter.WriteEndElement();
-                        //</float_array>
-
-                        //<technique_common>
-                        xmlWriter.WriteStartElement("technique_common");
-                        //<accessor>
-                        xmlWriter.WriteStartElement("accessor");
-                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-col0-array");
-                        xmlWriter.WriteAttributeString("count", totalCount.ToString());
-                        xmlWriter.WriteAttributeString("stride", "3");
-
-                        //<param>
-                        xmlWriter.WriteStartElement("param");
-                        xmlWriter.WriteAttributeString("name", "R");
-                        xmlWriter.WriteAttributeString("type", "float");
-                        xmlWriter.WriteEndElement();
-                        //</param>
-
-                        //<param>
-                        xmlWriter.WriteStartElement("param");
-                        xmlWriter.WriteAttributeString("name", "G");
-                        xmlWriter.WriteAttributeString("type", "float");
-                        xmlWriter.WriteEndElement();
-                        //</param>
-
-                        //<param>
-                        xmlWriter.WriteStartElement("param");
-                        xmlWriter.WriteAttributeString("name", "B");
-                        xmlWriter.WriteAttributeString("type", "float");
-                        xmlWriter.WriteEndElement();
-                        //</param>
-
-                        //<param>
-                        /*xmlWriter.WriteStartElement("param");
-                        xmlWriter.WriteAttributeString("name", "A");
-                        xmlWriter.WriteAttributeString("type", "float");
-                        xmlWriter.WriteEndElement();*/
-                        //</param>
-
-                        xmlWriter.WriteEndElement();
-                        //</accessor>
-                        xmlWriter.WriteEndElement();
-                        //</technique_common>
-                        xmlWriter.WriteEndElement();
-                        //</source>
                     }
 
 
@@ -1934,55 +1938,59 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (meshList[i].VertexData.Colors != null && meshList[i].VertexData.Colors.Count > 0)
                     {
-                        //<source>
-                        xmlWriter.WriteStartElement("source");
-                        xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map2");
-                        //<float_array>
-                        xmlWriter.WriteStartElement("float_array");
-                        xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map2-array");
-                        xmlWriter.WriteAttributeString("count", (totalCount * 2).ToString());
-
-                        var vertexColors = meshList[i].VertexData.Colors.GetRange(totalVertices, totalCount);
-
-                        foreach (var vc in vertexColors)
+                        // Indexcount <= 3 because the Autodesk importer crashes when there is only a single tri for whatever reason
+                        if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
                         {
-                            var a = vc.A / 255.0f;
+                            //<source>
+                            xmlWriter.WriteStartElement("source");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map2");
+                            //<float_array>
+                            xmlWriter.WriteStartElement("float_array");
+                            xmlWriter.WriteAttributeString("id", "geom-" + modelName + "_" + i + partString + "-map2-array");
+                            xmlWriter.WriteAttributeString("count", (totalCount * 2).ToString());
 
-                            // Use the UV S channel for the Alpha data, since OpenCollada doesn't play with it nicely.
-                            xmlWriter.WriteString(a.ToString() + " 0 ");
+                            var vertexColors = meshList[i].VertexData.Colors.GetRange(totalVertices, totalCount);
+
+                            foreach (var vc in vertexColors)
+                            {
+                                var a = vc.A / 255.0f;
+
+                                // Use the UV S channel for the Alpha data, since OpenCollada doesn't play with it nicely.
+                                xmlWriter.WriteString(a.ToString() + " 0 ");
+                            }
+
+                            xmlWriter.WriteEndElement();
+                            //</float_array>
+
+                            //<technique_common>
+                            xmlWriter.WriteStartElement("technique_common");
+                            //<accessor>
+                            xmlWriter.WriteStartElement("accessor");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map2-array");
+                            xmlWriter.WriteAttributeString("count", totalCount.ToString());
+                            xmlWriter.WriteAttributeString("stride", "2");
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "S");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            //<param>
+                            xmlWriter.WriteStartElement("param");
+                            xmlWriter.WriteAttributeString("name", "T");
+                            xmlWriter.WriteAttributeString("type", "float");
+                            xmlWriter.WriteEndElement();
+                            //</param>
+
+                            xmlWriter.WriteEndElement();
+                            //</accessor>
+                            xmlWriter.WriteEndElement();
+                            //</technique_common>
+                            xmlWriter.WriteEndElement();
+                            //</source>
                         }
-
-                        xmlWriter.WriteEndElement();
-                        //</float_array>
-
-                        //<technique_common>
-                        xmlWriter.WriteStartElement("technique_common");
-                        //<accessor>
-                        xmlWriter.WriteStartElement("accessor");
-                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map2-array");
-                        xmlWriter.WriteAttributeString("count", totalCount.ToString());
-                        xmlWriter.WriteAttributeString("stride", "2");
-
-                        //<param>
-                        xmlWriter.WriteStartElement("param");
-                        xmlWriter.WriteAttributeString("name", "S");
-                        xmlWriter.WriteAttributeString("type", "float");
-                        xmlWriter.WriteEndElement();
-                        //</param>
-
-                        //<param>
-                        xmlWriter.WriteStartElement("param");
-                        xmlWriter.WriteAttributeString("name", "T");
-                        xmlWriter.WriteAttributeString("type", "float");
-                        xmlWriter.WriteEndElement();
-                        //</param>
-
-                        xmlWriter.WriteEndElement();
-                        //</accessor>
-                        xmlWriter.WriteEndElement();
-                        //</technique_common>
-                        xmlWriter.WriteEndElement();
-                        //</source>
                     }
 
 
@@ -2147,8 +2155,8 @@ namespace xivModdingFramework.Models.FileTypes
                     xmlWriter.WriteEndElement();
                     //</input>
 
-                    // The > 3 is because there's a crash error for some reason with the DAE importers when you have exactly 1 entry here.
-                    if (indexCount > 3)
+                    // Indexcount <= 3 because the Autodesk importer crashes when there is only a single tri for whatever reason
+                    if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
                     {
                         if (meshList[i].VertexData.Colors.Count > 0)
                         {
@@ -2206,23 +2214,26 @@ namespace xivModdingFramework.Models.FileTypes
                         hasTexCoord1 = true;
                     }
 
-                    if (meshList[i].VertexData.Colors.Count > 0)
+                    if (!(indexCount <= 3 && _pluginTarget.Equals(XivStrings.AutodeskCollada)))
                     {
-                        //<input>
-                        xmlWriter.WriteStartElement("input");
-                        xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
-                        xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map2");
-                        xmlWriter.WriteAttributeString("offset", "2");
-                        if (_pluginTarget == XivStrings.AutodeskCollada)
+                        if (meshList[i].VertexData.Colors.Count > 0)
                         {
-                            xmlWriter.WriteAttributeString("set", hasTexCoord1 ? "2" : "1");
+                            //<input>
+                            xmlWriter.WriteStartElement("input");
+                            xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
+                            xmlWriter.WriteAttributeString("source", "#geom-" + modelName + "_" + i + partString + "-map2");
+                            xmlWriter.WriteAttributeString("offset", "2");
+                            if (_pluginTarget == XivStrings.AutodeskCollada)
+                            {
+                                xmlWriter.WriteAttributeString("set", hasTexCoord1 ? "2" : "1");
+                            }
+                            else
+                            {
+                                xmlWriter.WriteAttributeString("set", hasTexCoord1 ? "3" : "2");
+                            }
+                            xmlWriter.WriteEndElement();
+                            //</input>
                         }
-                        else
-                        {
-                            xmlWriter.WriteAttributeString("set", hasTexCoord1 ? "3" : "2");
-                        }
-                        xmlWriter.WriteEndElement();
-                        //</input>
                     }
 
                     var pCount = 3;
