@@ -449,18 +449,22 @@ namespace xivModdingFramework.Models.FileTypes
                                 toolType = "FBXCOLLADA";
                                 */
                             }
-                            else if (tool.Contains("Exporter for Blender"))
+                            else if (tool.Contains("Blender"))
                             {
-                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
-                                    $"TexTools requires the use of OpenCOLLADA.");
-                                /*
+                                //// throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
+                                ////     $"TexTools requires the use of OpenCOLLADA.");
+                                texc = "-map-0-array";
+                                texc2 = "-map-1-array";
+                                valpha = "-map-2-array";
+                                vcol = "-col-0-array";
+                                pos = "-mesh-positions-array";
+                                norm = "-mesh-normals-array";
+                                biNorm = "-texbinormals";
+                                tang = "-textangents";
                                 biNorm = "-bitangents-array";
                                 tang   = "-tangents-array";
-                                texc   = "-texcoord-0-array";
-                                texc2  = "-texcoord-1-array";
                                 indexStride = 1;
                                 blender = true;
-                                */
                             }
                             else if (!tool.Contains("TexTools"))
                             {
@@ -616,18 +620,23 @@ namespace xivModdingFramework.Models.FileTypes
                                                     }
                                                     else
                                                     {
+                                                        string sourceName = source.ToLower();
+
+                                                        if (blender)
+                                                            sourceName = sourceName.Replace("-", string.Empty);
+
                                                         if (semantic.ToLower().Equals("texcoord") &&
-                                                            source.ToLower().Contains("map0"))
+                                                            sourceName.Contains("map0"))
                                                         {
                                                             vertexIndexDict.Add("textureCoordinate", inputOffset);
                                                         }
                                                         else if (semantic.ToLower().Equals("texcoord") &&
-                                                                 source.ToLower().Contains("map1"))
+                                                                 sourceName.Contains("map1"))
                                                         {
                                                             vertexIndexDict.Add("textureCoordinate1", inputOffset);
                                                         }
                                                         else if (semantic.ToLower().Equals("texcoord") &&
-                                                                 source.ToLower().Contains("map2"))
+                                                                 sourceName.Contains("map2"))
                                                         {
                                                             vertexIndexDict.Add("vertexAlpha", inputOffset);
                                                         }
@@ -798,8 +807,16 @@ namespace xivModdingFramework.Models.FileTypes
                             // If it is a mesh part get part number, and get the Collada Data associated with it
                             if (atr.Contains("."))
                             {
-                                var meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.LastIndexOf("-") - (atr.LastIndexOf(".") + 1)));
-                                colladaData = partDataDictionary[meshPartNum];
+                                if (blender)
+                                {
+                                    int meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.Length - (atr.LastIndexOf(".") + 1)));
+                                    colladaData = partDataDictionary[meshPartNum];
+                                }
+                                else
+                                {
+                                    int meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.LastIndexOf("-") - (atr.LastIndexOf(".") + 1)));
+                                    colladaData = partDataDictionary[meshPartNum];
+                                }
                             }
                             else
                             {
