@@ -24,6 +24,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
+using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
@@ -44,6 +45,13 @@ namespace xivModdingFramework.Models.FileTypes
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivDataFile _dataFile;
         private readonly string _pluginTarget, _appVersion;
+
+        private enum ToolType
+		{
+            TexTools,
+            OpenCOLLADA,
+            Blender,
+		}
 
         public Dae(DirectoryInfo gameDirectory, XivDataFile dataFile, string pluginTarget, string appVersion = "1.0.0")
         {
@@ -401,12 +409,11 @@ namespace xivModdingFramework.Models.FileTypes
             var norm   = "-normals-array";
             var biNorm = "-texbinormals";
             var tang   = "-textangents";
-            var blender = false;
 
             var indexStride = 4;
             var textureCoordinateStride = 2;
             var vertexColorStride = 3;
-            var toolType = "TexTools";
+            ToolType toolType = ToolType.TexTools;
 
             using (var reader = XmlReader.Create(daeLocation.FullName))
             {
@@ -431,7 +438,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 tang   = "-map1-textangents";
                                 textureCoordinateStride = 3;
                                 indexStride = 6;
-                                toolType = "OpenCOLLADA";
+                                toolType = ToolType.OpenCOLLADA;
                             }
                             else if (tool.Contains("FBX"))
                             {
@@ -449,23 +456,23 @@ namespace xivModdingFramework.Models.FileTypes
                                 toolType = "FBXCOLLADA";
                                 */
                             }
-                            else if (tool.Contains("Exporter for Blender"))
+                            else if (tool.Contains("Blender"))
                             {
-                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
-                                    $"TexTools requires the use of OpenCOLLADA.");
-                                /*
-                                biNorm = "-bitangents-array";
-                                tang   = "-tangents-array";
-                                texc   = "-texcoord-0-array";
-                                texc2  = "-texcoord-1-array";
+                                texc = "-map-0-array";
+                                texc2 = "-map-1-array";
+                                valpha = "-map-2-array";
+                                vcol = "-col-0-array";
+                                pos = "-mesh-positions-array";
+                                norm = "-mesh-normals-array";
+                                biNorm = "-mesh-bitangents-array";
+                                tang   = "-mesh-tangents-array";
                                 indexStride = 1;
-                                blender = true;
-                                */
+                                toolType = ToolType.Blender;
                             }
                             else if (!tool.Contains("TexTools"))
                             {
                                 throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
-                                    $"TexTools requires the use of OpenCOLLADA.");
+                                    $"TexTools requires the use of 3ds Max OpenCOLLADA or Blender.");
                             }
                         }
 
@@ -566,71 +573,81 @@ namespace xivModdingFramework.Models.FileTypes
                                             {
                                                 if (reader.Name.Contains("input"))
                                                 {
-                                                    var semantic = reader["semantic"];
-                                                    var source = reader["source"];
+                                                    string semantic = reader["semantic"].ToLower();
+                                                    string source = reader["source"].ToLower();
+
                                                     inputOffset = int.Parse(reader["offset"]);
 
-                                                    if (semantic.ToLower().Equals("vertex"))
+                                                    if (semantic.Equals("vertex"))
                                                     {
                                                         vertexIndexDict.Add("position", inputOffset);
                                                     }
-                                                    else if (semantic.ToLower().Equals("normal"))
+                                                    else if (semantic.Equals("normal"))
                                                     {
                                                         vertexIndexDict.Add("normal", inputOffset);
                                                     }
-                                                    else if (semantic.ToLower().Equals("color"))
+                                                    else if (semantic.Equals("color"))
                                                     {
                                                         vertexIndexDict.Add("vertexColor", inputOffset);
                                                     }
-                                                    else if (semantic.ToLower().Equals("textangent") &&
-                                                             (source.ToLower().Contains("map0") || source.ToLower().Contains("map1")))
+                                                    else if (semantic.Equals("textangent") && (source.Contains("map0") || source.Contains("map1")))
                                                     {
                                                         vertexIndexDict.Add("tangent", inputOffset);
                                                     }
-                                                    else if (semantic.ToLower().Equals("texbinormal") &&
-                                                             (source.ToLower().Contains("map0") ||source.ToLower().Contains("map1")))
+                                                    else if (semantic.Equals("texbinormal") && (source.Contains("map0") ||source.Contains("map1")))
                                                     {
                                                         vertexIndexDict.Add("biNormal", inputOffset);
                                                     }
 
-                                                    if (!toolType.Equals("TexTools"))
+
+                                                    if (toolType == ToolType.TexTools)
                                                     {
-                                                        if (semantic.ToLower().Equals("texcoord") &&
-                                                                 (source.ToLower().Contains("map1") ||
-                                                                  source.ToLower().Contains("uv0")))
+                                                        if (semantic.Equals("texcoord") && source.Contains("map0"))
                                                         {
                                                             vertexIndexDict.Add("textureCoordinate", inputOffset);
                                                         }
-                                                        else if (semantic.ToLower().Equals("texcoord") &&
-                                                                 (source.ToLower().Contains("map2") ||
-                                                                  source.ToLower().Contains("uv1")))
+                                                        else if (semantic.Equals("texcoord") && source.Contains("map1"))
                                                         {
                                                             vertexIndexDict.Add("textureCoordinate1", inputOffset);
                                                         }
-                                                        else if (semantic.ToLower().Equals("texcoord") &&
-                                                                 (source.ToLower().Contains("map3") ||
-                                                                  source.ToLower().Contains("uv3")))
+                                                        else if (semantic.Equals("texcoord") && source.Contains("map2"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                    }
+                                                    else if (toolType == ToolType.Blender)
+													{
+                                                        if (semantic.Equals("texcoord") && source.Contains("map-0"))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
+                                                        }
+                                                        else if (semantic.Equals("texcoord") && source.Contains("map-1"))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
+                                                        }
+                                                        else if (semantic.Equals("texcoord") && source.Contains("map-2"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                    }
+                                                    else if (toolType == ToolType.OpenCOLLADA)
+													{
+                                                        if (semantic.Equals("texcoord") && (source.Contains("map1") || source.Contains("uv0")))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
+                                                        }
+                                                        else if (semantic.Equals("texcoord") && (source.Contains("map2") || source.Contains("uv1")))
+                                                        {
+                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
+                                                        }
+                                                        else if (semantic.Equals("texcoord") && (source.Contains("map3") || source.Contains("uv3")))
                                                         {
                                                             vertexIndexDict.Add("vertexAlpha", inputOffset);
                                                         }
                                                     }
                                                     else
-                                                    {
-                                                        if (semantic.ToLower().Equals("texcoord") &&
-                                                            source.ToLower().Contains("map0"))
-                                                        {
-                                                            vertexIndexDict.Add("textureCoordinate", inputOffset);
-                                                        }
-                                                        else if (semantic.ToLower().Equals("texcoord") &&
-                                                                 source.ToLower().Contains("map1"))
-                                                        {
-                                                            vertexIndexDict.Add("textureCoordinate1", inputOffset);
-                                                        }
-                                                        else if (semantic.ToLower().Equals("texcoord") &&
-                                                                 source.ToLower().Contains("map2"))
-                                                        {
-                                                            vertexIndexDict.Add("vertexAlpha", inputOffset);
-                                                        }
+													{
+                                                        throw new Exception($"Tool not supported: {toolType}");
                                                     }
                                                 }
                                                 else
@@ -769,7 +786,7 @@ namespace xivModdingFramework.Models.FileTypes
                             ColladaData colladaData;
 
                             // If the collada file was saved in blender
-                            if (blender)
+                            if (toolType == ToolType.Blender)
                             {
                                 while (reader.Read())
                                 {
@@ -798,8 +815,16 @@ namespace xivModdingFramework.Models.FileTypes
                             // If it is a mesh part get part number, and get the Collada Data associated with it
                             if (atr.Contains("."))
                             {
-                                var meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.LastIndexOf("-") - (atr.LastIndexOf(".") + 1)));
-                                colladaData = partDataDictionary[meshPartNum];
+                                if (toolType == ToolType.Blender)
+                                {
+                                    int meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.Length - (atr.LastIndexOf(".") + 1)));
+                                    colladaData = partDataDictionary[meshPartNum];
+                                }
+                                else
+                                {
+                                    int meshPartNum = int.Parse(atr.Substring((atr.LastIndexOf(".") + 1), atr.LastIndexOf("-") - (atr.LastIndexOf(".") + 1)));
+                                    colladaData = partDataDictionary[meshPartNum];
+                                }
                             }
                             else
                             {
