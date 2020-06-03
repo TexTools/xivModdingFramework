@@ -472,7 +472,7 @@ namespace xivModdingFramework.Models.FileTypes
                             else if (!tool.Contains("TexTools"))
                             {
                                 throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
-                                    $"TexTools requires the use of OpenCOLLADA.");
+                                    $"TexTools requires the use of 3ds Max OpenCOLLADA or Blender.");
                             }
                         }
 
