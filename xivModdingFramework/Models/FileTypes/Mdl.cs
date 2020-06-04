@@ -2288,7 +2288,7 @@ namespace xivModdingFramework.Models.FileTypes
                 List<Vector3> bitangents;
                 List<int> handedness;
 
-                calculateTangentData(indexCollection.ToList(), nPositionCollection.ToList(), nNormalsCollection.ToList(), nTexCoord0Collection.ToList(), out tangents, out bitangents, out handedness);
+                CalculateTangentData(indexCollection.ToList(), nPositionCollection.ToList(), nNormalsCollection.ToList(), nTexCoord0Collection.ToList(), out tangents, out bitangents, out handedness);
 
                 var colladaMeshData = new ColladaMeshData();
                 meshGeometry.Tangents = new Vector3Collection(tangents);
@@ -4224,327 +4224,188 @@ namespace xivModdingFramework.Models.FileTypes
                     var vertexDataSection = new VertexDataSection();
                     var meshNum = 0;
 
-                    if (importSettings != null)
+                    if (lodNum == 0)
                     {
-                        if (lodNum == 0)
+                        var totalMeshes = importSettings != null ? importSettings.Count : lod.MeshCount;
+                        for (var i = 0; i < totalMeshes; i++)
                         {
-                            for (var i = 0; i < importSettings.Count; i++)
+                            var importData = importDataDictionary[meshNum];
+
+                            // Because our imported data does not include mesh shape data, we must include it manually
+                            if (xivMdl.HasShapeData && meshNum < lod.MeshDataList.Count)
                             {
-                                var importData = importDataDictionary[meshNum];
+                                var meshData = lod.MeshDataList[meshNum];
 
-                                // Because our imported data does not include mesh shape data, we must include it manually
-                                if (xivMdl.HasShapeData && meshNum < lod.MeshDataList.Count)
+                                if (meshData.ShapePositionsDictionary != null)
                                 {
-                                    var meshData = lod.MeshDataList[meshNum];
 
-                                    if (meshData.ShapePositionsDictionary != null)
+                                    var idx = -1;
+                                    foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
                                     {
-                                        // We add the data from the mesh vertex data
+                                        idx++;
 
-                                        var indices = new List<int>(importData.IndexCount);
-                                        var totalVerts = meshData.ShapePositionsDictionary.Keys.Count;
-                                        var tangents = new List<Vector3>(totalVerts);
-                                        var bitangents = new List<Vector3>(totalVerts);
-                                        var handedness= new List<int>(totalVerts);
+                                        var len0 = importData.VertexData0.Count;
+                                        var len1 = importData.VertexData1.Count;
+                                        var position = meshData.VertexData.Positions[vertIndex];
+                                        var boneWeights = meshData.VertexData.BoneWeights[vertIndex];
+                                        var boneIndices = meshData.VertexData.BoneIndices[vertIndex];
 
+                                        var posDataType = vertexInfoDict[0][VertexUsageType.Position];
 
-                                        for (var f = 0; f < importData.IndexCount; f ++)
+                                        if (posDataType == VertexDataType.Half4)
                                         {
-                                            var triangleIndex = checked((int)BitConverter.ToUInt16(importData.IndexData.GetRange(f * 2, 2).ToArray(), 0));
-                                            indices.Add(triangleIndex);
+                                            var x = new Half(position.X);
+                                            var y = new Half(position.Y);
+                                            var z = new Half(position.Z);
+                                            var w = new Half(1);
+
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
+                                        }
+                                        else
+                                        {
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.X));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.Y));
+                                            importData.VertexData0.AddRange(BitConverter.GetBytes(position.Z));
                                         }
 
-                                        calculateTangentData(indices, meshData.VertexData.Positions.ToList(), meshData.VertexData.Normals.ToList(), meshData.VertexData.TextureCoordinates0.ToList(), out tangents, out bitangents, out handedness);
-
-
-                                        var idx = -1;
-                                        foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
+                                        // Furniture does not have bone data
+                                        if (itemType != XivItemType.furniture)
                                         {
-                                            idx++;
-
-                                            var len0 = importData.VertexData0.Count;
-                                            var len1 = importData.VertexData1.Count;
-                                            var position = meshData.VertexData.Positions[vertIndex];
-                                            var boneWeights = meshData.VertexData.BoneWeights[vertIndex];
-                                            var boneIndices = meshData.VertexData.BoneIndices[vertIndex];
-
-                                            var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
-                                            if (posDataType == VertexDataType.Half4)
-                                            {
-                                                var x = new Half(position.X);
-                                                var y = new Half(position.Y);
-                                                var z = new Half(position.Z);
-                                                var w = new Half(1);
-
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
-                                            }
-                                            else
-                                            {
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(position.X));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(position.Y));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(position.Z));
-                                            }
-
-                                            // Furniture does not have bone data
-                                            if (itemType != XivItemType.furniture)
-                                            {
-                                                foreach (var boneWeight in boneWeights)
-                                                {
-                                                    importData.VertexData0.Add((byte)Math.Round(boneWeight * 255f));
-                                                }
-
-                                                importData.VertexData0.AddRange(boneIndices);
-                                            }
-
-
-                                            var normal = meshData.VertexData.Normals[vertIndex];
-                                            //var binormal = meshData.VertexData.BiNormals[vertIndex];
-                                            var binormal = bitangents[idx];
-                                            var binormalHandedness = ((byte)(handedness[idx] > 0 ? 255 : 0));
-                                            //var binormalHandedness = meshData.VertexData.BiNormalHandedness[vertIndex];
-
-                                            var color = meshData.VertexData.Colors[vertIndex];
-                                            var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
-                                            var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
-
-                                            // Normals!
-                                            if (vertexInfoDict[lodNum][VertexUsageType.Normal] == VertexDataType.Half4)
-                                            {
-                                                // Normals
-                                                var x = new Half(normal.X);
-                                                var y = new Half(normal.Y);
-                                                var z = new Half(normal.Z);
-                                                var w = new Half(0);
-
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(x.RawValue));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(y.RawValue));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(z.RawValue));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(w.RawValue));
-                                            }
-                                            else
-                                            {
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(normal.X));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Y));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Z));
-                                            }
-
-                                            // Binormals
-                                            binormal = binormalHandedness > 0 ? Vector3.Normalize(-binormal) : Vector3.Normalize(binormal);
-                                            importData.VertexData1.Add((byte)((Math.Abs(binormal.X) * 255 + 255) / 2));
-                                            importData.VertexData1.Add((byte)((Math.Abs(binormal.Y) * 255 + 255) / 2));
-                                            importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
-                                            importData.VertexData1.Add(binormalHandedness);
-
-                                            // Tangents
-                                            if (vertexInfoDict[lodNum].ContainsKey(VertexUsageType.Tangent))
-                                            {
-                                                var tangent = tangents[idx];
-                                                tangent = binormalHandedness > 0 ? Vector3.Normalize(-tangent) : Vector3.Normalize(tangent);
-                                                importData.VertexData1.Add((byte)((Math.Abs(tangent.X) * 255 + 255) / 2));
-                                                importData.VertexData1.Add((byte)((Math.Abs(tangent.Y) * 255 + 255) / 2));
-                                                importData.VertexData1.Add((byte)((Math.Abs(tangent.Z) * 255 + 255) / 2));
-                                                importData.VertexData1.Add(binormalHandedness);
-                                            }
-
-                                            // Vertex Colors / Vertex Alpha
-                                            importData.VertexData1.Add(color.R);
-                                            importData.VertexData1.Add(color.G);
-                                            importData.VertexData1.Add(color.B);
-                                            importData.VertexData1.Add(color.A);
-
-
-                                            // Textures / UV Coordinates
-
-                                            var texCoordDataType = vertexInfoDict[lodNum][VertexUsageType.TextureCoordinate];
-                                            if (texCoordDataType == VertexDataType.Float2 || texCoordDataType == VertexDataType.Float4)
-                                            {
-                                                var tc0x = meshData.VertexData.TextureCoordinates0[vertIndex].X;
-                                                var tc0y = meshData.VertexData.TextureCoordinates0[vertIndex].Y;
-
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc0x));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc0y));
-
-                                                if (meshData.VertexData.TextureCoordinates1.Count > 0)
-                                                {
-                                                    var tc1x = meshData.VertexData.TextureCoordinates1[vertIndex].X;
-                                                    var tc1y = meshData.VertexData.TextureCoordinates1[vertIndex].Y;
-
-                                                    importData.VertexData1.AddRange(BitConverter.GetBytes(tc1x));
-                                                    importData.VertexData1.AddRange(BitConverter.GetBytes(tc1y));
-                                                }
-                                            }
-                                            else
-                                            {
-                                                var tc0x = new Half(meshData.VertexData.TextureCoordinates0[vertIndex].X);
-                                                var tc0y = new Half(meshData.VertexData.TextureCoordinates0[vertIndex].Y);
-
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc0x.RawValue));
-                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc0y.RawValue));
-
-                                                if (meshData.VertexData.TextureCoordinates1.Count > 0)
-                                                {
-                                                    var tc1x = new Half(meshData.VertexData.TextureCoordinates1[vertIndex].X);
-                                                    var tc1y = new Half(meshData.VertexData.TextureCoordinates1[vertIndex].Y);
-
-                                                    importData.VertexData1.AddRange(BitConverter.GetBytes(tc1x.RawValue));
-                                                    importData.VertexData1.AddRange(BitConverter.GetBytes(tc1y.RawValue));
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
-                                vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
-                                vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
-
-                                var indexPadding = (importData.IndexCount * 2) % 16;
-                                if (indexPadding != 0)
-                                {
-                                    vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
-                                }
-
-                                meshNum++;
-                            }
-                        }
-
-                        if (lodNum > 0)
-                        {
-                            foreach (var meshData in lod.MeshDataList)
-                            {
-                                var vertexInfo = vertexInfoDict[lodNum];
-                                var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
-
-                                vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
-                                vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
-                                vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
-
-                                var indexPadding = (vertexData.IndexCount * 2) % 16;
-
-                                if (indexPadding != 0)
-                                {
-                                    vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        foreach (var meshData in lod.MeshDataList)
-                        {
-                            // We only make changes to LoD 0
-                            if (lodNum == 0)
-                            {
-                                var importData = importDataDictionary[meshNum];
-
-                                // Because our imported data does not include mesh shape data, we must include it manually
-                                if (xivMdl.HasShapeData)
-                                {
-                                    if (meshData.ShapePositionsDictionary != null)
-                                    {
-                                        // We add the data from the mesh vertex data
-                                        foreach (var vertIndex in meshData.ShapePositionsDictionary.Keys)
-                                        {
-                                            var position = meshData.VertexData.Positions[vertIndex];
-                                            var boneWeights = meshData.VertexData.BoneWeights[vertIndex];
-                                            var boneIndices = meshData.VertexData.BoneIndices[vertIndex];
-
-                                            var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
-                                            if (posDataType == VertexDataType.Half4)
-                                            {
-                                                var x = new Half(position.X);
-                                                var y = new Half(position.Y);
-                                                var z = new Half(position.Z);
-                                                var w = new Half(1);
-
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
-                                            }
-                                            else
-                                            {
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(position.X));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(position.Y));
-                                                importData.VertexData0.AddRange(BitConverter.GetBytes(position.Z));
-                                            }
-
                                             foreach (var boneWeight in boneWeights)
                                             {
                                                 importData.VertexData0.Add((byte)Math.Round(boneWeight * 255f));
                                             }
 
                                             importData.VertexData0.AddRange(boneIndices);
+                                        }
 
 
-                                            var normal = meshData.VertexData.Normals[vertIndex];
-                                            var binormal = meshData.VertexData.BiNormals[vertIndex];
-                                            var color = meshData.VertexData.Colors[vertIndex];
-                                            var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
-                                            var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
+                                        var normal = meshData.VertexData.Normals[vertIndex];
+                                        var binormal = meshData.VertexData.BiNormals[vertIndex];
+                                        var binormalHandedness = meshData.VertexData.BiNormalHandedness[vertIndex];
 
+                                        var color = meshData.VertexData.Colors[vertIndex];
+                                        var textureCoordinates0 = meshData.VertexData.TextureCoordinates0[vertIndex];
+                                        var textureCoordinates1 = meshData.VertexData.TextureCoordinates1[vertIndex];
+
+                                        // Normals!
+                                        if (vertexInfoDict[lodNum][VertexUsageType.Normal] == VertexDataType.Half4)
+                                        {
+                                            // Normals
+                                            var x = new Half(normal.X);
+                                            var y = new Half(normal.Y);
+                                            var z = new Half(normal.Z);
+                                            var w = new Half(0);
+
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(x.RawValue));
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(y.RawValue));
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(z.RawValue));
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(w.RawValue));
+                                        }
+                                        else
+                                        {
                                             importData.VertexData1.AddRange(BitConverter.GetBytes(normal.X));
                                             importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Y));
                                             importData.VertexData1.AddRange(BitConverter.GetBytes(normal.Z));
+                                        }
 
-                                            importData.VertexData1.Add((byte)((Math.Abs(binormal.X) * 255 + 255) / 2));
-                                            importData.VertexData1.Add((byte)((Math.Abs(binormal.Y) * 255 + 255) / 2));
-                                            importData.VertexData1.Add((byte)((Math.Abs(binormal.Z) * 255 + 255) / 2));
-                                            importData.VertexData1.Add(0);
+                                        // Binormals - Extra Data w/ Advanced Import
+                                        var handed = binormalHandedness > 0 ? 1 : -1;
+                                        importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(binormal, handed));
 
-                                            importData.VertexData1.Add(color.A);
-                                            importData.VertexData1.Add(color.R);
-                                            importData.VertexData1.Add(color.G);
-                                            importData.VertexData1.Add(color.B);
+                                        // Tangents
+                                        if (vertexInfoDict[lodNum].ContainsKey(VertexUsageType.Tangent))
+                                        {
+                                            var tangent = CalculateTangentFromBinormal(normal, binormal, binormalHandedness);
+                                            importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(tangent, handed));
+                                        }
+
+                                        // Vertex Colors / Vertex Alpha
+                                        importData.VertexData1.Add(color.R);
+                                        importData.VertexData1.Add(color.G);
+                                        importData.VertexData1.Add(color.B);
+                                        importData.VertexData1.Add(color.A);
 
 
-                                            importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.X));
-                                            importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates0.Y));
+                                        // Textures / UV Coordinates
 
-                                            importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.X));
-                                            importData.VertexData1.AddRange(BitConverter.GetBytes(textureCoordinates1.Y));
+                                        var texCoordDataType = vertexInfoDict[lodNum][VertexUsageType.TextureCoordinate];
+                                        if (texCoordDataType == VertexDataType.Float2 || texCoordDataType == VertexDataType.Float4)
+                                        {
+                                            var tc0x = meshData.VertexData.TextureCoordinates0[vertIndex].X;
+                                            var tc0y = meshData.VertexData.TextureCoordinates0[vertIndex].Y;
+
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(tc0x));
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(tc0y));
+
+                                            if (meshData.VertexData.TextureCoordinates1.Count > 0)
+                                            {
+                                                var tc1x = meshData.VertexData.TextureCoordinates1[vertIndex].X;
+                                                var tc1y = meshData.VertexData.TextureCoordinates1[vertIndex].Y;
+
+                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc1x));
+                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc1y));
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var tc0x = new Half(meshData.VertexData.TextureCoordinates0[vertIndex].X);
+                                            var tc0y = new Half(meshData.VertexData.TextureCoordinates0[vertIndex].Y);
+
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(tc0x.RawValue));
+                                            importData.VertexData1.AddRange(BitConverter.GetBytes(tc0y.RawValue));
+
+                                            if (meshData.VertexData.TextureCoordinates1.Count > 0)
+                                            {
+                                                var tc1x = new Half(meshData.VertexData.TextureCoordinates1[vertIndex].X);
+                                                var tc1y = new Half(meshData.VertexData.TextureCoordinates1[vertIndex].Y);
+
+                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc1x.RawValue));
+                                                importData.VertexData1.AddRange(BitConverter.GetBytes(tc1y.RawValue));
+                                            }
                                         }
                                     }
-
                                 }
 
-                                vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
-                                vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
-                                vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
-
-                                var indexPadding = (importData.IndexCount * 2) % 16;
-                                if (indexPadding != 0)
-                                {
-                                    vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
-                                }
                             }
-                            // All other LoDs
-                            else
+
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
+
+                            var indexPadding = (importData.IndexCount * 2) % 16;
+                            if (indexPadding != 0)
                             {
-                                var vertexInfo = vertexInfoDict[lodNum];
-                                var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
-
-                                vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
-                                vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
-                                vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
-
-                                var indexPadding = (vertexData.IndexCount * 2) % 16;
-
-                                if (indexPadding != 0)
-                                {
-                                    vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
-                                }
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
                             }
 
                             meshNum++;
                         }
                     }
+
+                    if (lodNum > 0)
+                    {
+                        foreach (var meshData in lod.MeshDataList)
+                        {
+                            var vertexInfo = vertexInfoDict[lodNum];
+                            var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
+
+                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
+
+                            var indexPadding = (vertexData.IndexCount * 2) % 16;
+
+                            if (indexPadding != 0)
+                            {
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
+                            }
+                        }
+                    }
+
 
                     // Vertex Compression
                     vertexDataSection.VertexDataBlockPartCount =
@@ -4989,35 +4850,14 @@ namespace xivModdingFramework.Models.FileTypes
                     // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
                     // But the data gets written into the game, too, so why do we need to pre-flip it?
 
-                    biNormal = handedness > 0 ? Vector3.Normalize(-biNormal) : Vector3.Normalize(biNormal);
+                    importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
 
-                    importData.VertexData1.Add((byte)((Math.Abs(biNormal.X) * 255 + 255) / 2));
-                    importData.VertexData1.Add((byte)((Math.Abs(biNormal.Y) * 255 + 255) / 2));
-                    importData.VertexData1.Add((byte)((Math.Abs(biNormal.Z) * 255 + 255) / 2));
 
-                    // The W coordinate of BiNormals reflects its handedness
-                    var w = handedness == 1 ? 255 : 0;
-
-                    importData.VertexData1.Add((byte)w);
-
-                    // Tangents
+                    // Tangents - Does anything actually use Tangents?  So far I haven't found it, but if the code exists, maybe something does.
                     if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
                     {
                         var tangent = meshGeometry.Tangents[i];
-                        //var tangentHandedness = colladaMeshData.Handedness[i];
-
-
-                        tangent = handedness > 0 ? Vector3.Normalize(-tangent) : Vector3.Normalize(tangent);
-
-                        importData.VertexData1.Add((byte)((Math.Abs(tangent.X) * 255 + 255) / 2));
-                        importData.VertexData1.Add((byte)((Math.Abs(tangent.Y) * 255 + 255) / 2));
-                        importData.VertexData1.Add((byte)((Math.Abs(tangent.Z) * 255 + 255) / 2));
-
-
-                        // The W coordinate of BiNormals reflects its handedness
-                        w = handedness == 1 ? 255 : 0;
-
-                        importData.VertexData1.Add((byte)w);
+                        importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(tangent, handedness));
                     }
 
                     // Vertex Color
@@ -5103,6 +4943,60 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
+        /// Converts a given Vector 3 Binormal into the the byte4 format SE uses for storing Binormal data.
+        /// </summary>
+        /// <param name="normal"></param>
+        /// <param name="handedness"></param>
+        /// <returns></returns>
+        private static List<byte> ConvertVectorBinormalToBytes(Vector3 normal, int handedness)
+        {
+            // These four byte vector values are represented as
+            // [ Byte x, Byte y, Byte z, Byte handedness(0/255) ]
+
+
+            // Now, this is where things get a little weird compared to storing most 3D Models.
+            // SE's standard format is to include BINOMRAL(aka Bitangent) data, but leave TANGENT data out, to be calculated on the fly from the BINORMAL data.
+            // This is kind of reverse compared to most math you'll find where the TANGENT is kept, and the BINORMAL is calculated on the fly. (Or both are kept/both are generated on load)
+
+            // The Binormal data has already had the handedness applied to generate an appropriate binormal, but we store
+            // that handedness after for use when the game (or textools) regenerates the Tangent from the Normal + Binormal.
+
+            var bytes = new List<byte>(4);
+            var vec = normal;
+            vec.Normalize();
+
+
+            // The possible range of -1 to 1 Vector X/Y/Z Values are compressed
+            // into a 0-255 range.
+
+            // A simple way to solve this cleanly is to translate the vector by [1] in all directions
+            // So the vector's range is 0 to 2.
+            vec += Vector3.One;
+
+            // And then multiply the resulting value times (255 / 2), and round off the result.
+            // This helps minimize errors that arise from quirks in floating point arithmetic.
+            var x = (byte) Math.Round(vec.X * (255f / 2f));
+            var y = (byte) Math.Round(vec.Y * (255f / 2f));
+            var z = (byte) Math.Round(vec.Z * (255f / 2f));
+
+
+            bytes.Add(x);
+            bytes.Add(y);
+            bytes.Add(z);
+
+            // Add handedness bit
+            if (handedness < 0)
+            {
+                bytes.Add(0);
+            } else
+            {
+                bytes.Add(255);
+            }
+
+            return bytes;
+        }
+
+        /// <summary>
         /// Get the vertex data in byte format
         /// </summary>
         /// <param name="vertexData">The vertex data to convert</param>
@@ -5184,19 +5078,13 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
-                // BiNormals
-                vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.BiNormals[i].X) * 255 + 255) / 2));
-                vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.BiNormals[i].Y) * 255 + 255) / 2));
-                vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.BiNormals[i].Z) * 255 + 255) / 2));
-                vertexByteData.VertexData1.Add(vertexData.BiNormalHandedness[i]);
+                // BiNormals - GetVertexByteData
+                vertexByteData.VertexData1.AddRange(ConvertVectorBinormalToBytes(vertexData.BiNormals[i], vertexData.BiNormalHandedness[i]));
 
                 // Tangents
                 if (vertexInfoDict.ContainsKey(VertexUsageType.Tangent))
                 {
-                    vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.Tangents[i].X) * 255 + 255) / 2));
-                    vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.Tangents[i].Y) * 255 + 255) / 2));
-                    vertexByteData.VertexData1.Add((byte)((Math.Abs(vertexData.Tangents[i].Z) * 255 + 255) / 2));
-                    vertexByteData.VertexData1.Add(vertexData.BiNormalHandedness[i]);
+                    vertexByteData.VertexData1.AddRange(ConvertVectorBinormalToBytes(vertexData.Tangents[i], vertexData.BiNormalHandedness[i]));
                 }
 
                 // Colors
@@ -5259,7 +5147,49 @@ namespace xivModdingFramework.Models.FileTypes
             return vertexByteData;
         }
 
-        private void calculateTangentData(List<int> triangleIndices, List<Vector3> positions, List<Vector3> normals, List<Vector2> uvCoordinates, out List<Vector3> outTangents, out List<Vector3> outBitangents, out List<int> outHandedness)
+        /// <summary>
+        /// Calculate the missing Tangent data from a model based on the existent Normal and Binormal data.
+        /// </summary>
+        /// <param name="normals"></param>
+        /// <param name="binormals"></param>
+        /// <param name="handedness"></param>
+        /// <returns></returns>
+        public static Vector3Collection CalculateTangentsFromBinormals(Vector3Collection normals, Vector3Collection binormals, List<byte> handedness)
+        {
+            var tangents = new Vector3Collection(binormals.Count);
+            for(var idx = 0; idx < normals.Count; idx++)
+            {
+                var tangent = Vector3.Cross(normals[idx], binormals[idx]);
+                tangent*= (handedness[idx] == 0 ? 1 : -1 );
+                tangents.Add(tangent);
+            }
+            return tangents;
+        }
+        /// <summary>
+        /// Calculate the missing Tangent data from a model based on a single point of existent Normal and Binormal data.
+        /// </summary>
+        /// <param name="normals"></param>
+        /// <param name="binormals"></param>
+        /// <param name="handedness"></param>
+        /// <returns></returns>
+        public static Vector3 CalculateTangentFromBinormal(Vector3 normal, Vector3 binormal, byte handedness)
+        {
+            var tangent = Vector3.Cross(normal, binormal);
+            tangent *= (handedness == 0 ? 1 : -1);
+            return tangent;
+        }
+
+        /// <summary>
+        /// Calculates the tangent data for given mesh.
+        /// </summary>
+        /// <param name="triangleIndices">The list of indexes to serve when generating triangles from the other fields</param>
+        /// <param name="positions"></param>
+        /// <param name="normals"></param>
+        /// <param name="uvCoordinates"></param>
+        /// <param name="outTangents"></param>
+        /// <param name="outBitangents"></param>
+        /// <param name="outHandedness"></param>
+        public static void CalculateTangentData(List<int> triangleIndices, List<Vector3> positions, List<Vector3> normals, List<Vector2> uvCoordinates, out List<Vector3> outTangents, out List<Vector3> outBitangents, out List<int> outHandedness)
         {
             // Sanity checks on argument structure.
             if (positions.Count != normals.Count || positions.Count != uvCoordinates.Count || triangleIndices.Count % 3 != 0)
@@ -5289,6 +5219,13 @@ namespace xivModdingFramework.Models.FileTypes
                 return;
             }
 
+            var maxIndex = triangleIndices.Max();
+            if (maxIndex >= positions.Count || maxIndex >= normals.Count || maxIndex > uvCoordinates.Count)
+            {
+                // Some unknown amount of indexes are invalid, just fail the whole thing.
+                return;
+            }
+
 
             // Calculate Tangent, Bitangent/Binormal and Handedness.
 
@@ -5299,6 +5236,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var vertex1 = triangleIndices[a];
                 var vertex2 = triangleIndices[a + 1];
                 var vertex3 = triangleIndices[a + 2];
+
+                /*var posIdx1 = vDict[vertex1];
+                var posIdx2 = vDict[vertex2];
+                var posIdx3 = vDict[vertex3];*/
 
                 var position1 = positions[vertex1];
                 var position2 = positions[vertex2];
@@ -5337,6 +5278,8 @@ namespace xivModdingFramework.Models.FileTypes
                 // using the other results before.  Better to kill the previous computations and use these numbers
                 // for everything to avoid minor differences causing errors.
 
+                //var posIdx = vDict[a];
+
                 var n = normals[a];
 
                 var t = tangents[a];
@@ -5346,14 +5289,21 @@ namespace xivModdingFramework.Models.FileTypes
                 var tangent = t - (n * Vector3.Dot(n, t));
                 tangent = Vector3.Normalize(tangent);
 
-                // Compute handedness
+                // Compute binormal
                 var binormal = Vector3.Cross(n, tangent);
-                int handedness = Vector3.Dot(binormal, b) < 0 ? -1 : 1;
+                binormal.Normalize();
+
+                // Compute handedness
+                int handedness = Vector3.Dot(Vector3.Cross(t, b), n) > 0 ? 1 : -1;
+
+                // Apply handedness
+                binormal *= handedness;
 
                 outTangents[a] = tangent;
                 outBitangents[a] = binormal;
                 outHandedness[a] = handedness;
             }
+
         }
 
         /// <summary>
