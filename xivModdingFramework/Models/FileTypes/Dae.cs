@@ -586,7 +586,6 @@ namespace xivModdingFramework.Models.FileTypes
                                                     {
                                                         vertexIndexDict.Add("normal", inputOffset);
                                                     }
-                                                    else if (semantic.Equals("color"))
                                
                                                     else if (semantic.Equals("textangent") && (source.Contains("map0") || source.Contains("map1")))
                                                     {
