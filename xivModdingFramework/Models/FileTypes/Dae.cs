@@ -586,10 +586,7 @@ namespace xivModdingFramework.Models.FileTypes
                                                     {
                                                         vertexIndexDict.Add("normal", inputOffset);
                                                     }
-                                                    else if (semantic.Equals("color"))
-                                                    {
-                                                        vertexIndexDict.Add("vertexColor", inputOffset);
-                                                    }
+                               
                                                     else if (semantic.Equals("textangent") && (source.Contains("map0") || source.Contains("map1")))
                                                     {
                                                         vertexIndexDict.Add("tangent", inputOffset);
@@ -614,6 +611,10 @@ namespace xivModdingFramework.Models.FileTypes
                                                         {
                                                             vertexIndexDict.Add("vertexAlpha", inputOffset);
                                                         }
+                                                        else if (semantic.Equals("color"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexColor", inputOffset);
+                                                        }
                                                     }
                                                     else if (toolType == ToolType.Blender)
 													{
@@ -629,6 +630,10 @@ namespace xivModdingFramework.Models.FileTypes
                                                         {
                                                             vertexIndexDict.Add("vertexAlpha", inputOffset);
                                                         }
+                                                        else if (semantic.Equals("color") && !vertexIndexDict.ContainsKey("vertexColor"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexColor", inputOffset);
+                                                        }
                                                     }
                                                     else if (toolType == ToolType.OpenCOLLADA)
 													{
@@ -643,6 +648,10 @@ namespace xivModdingFramework.Models.FileTypes
                                                         else if (semantic.Equals("texcoord") && (source.Contains("map3") || source.Contains("uv3")))
                                                         {
                                                             vertexIndexDict.Add("vertexAlpha", inputOffset);
+                                                        }
+                                                        else if (semantic.Equals("color"))
+                                                        {
+                                                            vertexIndexDict.Add("vertexColor", inputOffset);
                                                         }
                                                     }
                                                     else
