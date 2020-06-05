@@ -103,6 +103,7 @@ namespace xivModdingFramework.Models.FileTypes
             var mdlData = await dat.GetType3Data(offset, _dataFile);
 
             var xivMdl = new XivMdl {MdlPath = mdlPath};
+            int totalNonNullMaterials = 0;
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
             {
@@ -209,9 +210,17 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         var mat = Encoding.ASCII.GetString(materialName.ToArray()).Replace("\0", "");
-
-                        mdlPathData.MaterialList.Add(mat);
+                        if(mat.StartsWith("shp_"))
+                        {
+                            // Catch case for situation where there's null values at the end of the materials list.
+                            mdlPathData.ShapeList.Add(mat);
+                        } else
+                        {
+                            totalNonNullMaterials++;
+                            mdlPathData.MaterialList.Add(mat);
+                        }
                     }
+
 
                     // Shape Paths
                     for (var i = 0; i < mdlModelData.ShapeCount; i++)
@@ -425,12 +434,26 @@ namespace xivModdingFramework.Models.FileTypes
 
                         lod.MeshDataList[i].MeshInfo = meshDataInfo;
 
-                        var materialString = xivMdl.PathData.MaterialList[meshDataInfo.MaterialIndex];
-                        var typeChar = materialString[4].ToString() + materialString[9].ToString();
-
-                        if (typeChar.Equals("cb"))
+                        // In the event we have a null material reference, set it to material 0 to be safe.
+                        if(meshDataInfo.MaterialIndex >= totalNonNullMaterials)
                         {
-                            lod.MeshDataList[i].IsBody = true;
+                            meshDataInfo.MaterialIndex = 0;
+                        }
+
+                        var materialString = xivMdl.PathData.MaterialList[meshDataInfo.MaterialIndex];
+                        // Try block to cover odd cases like Au Ra Male Face #92 where for some reason the
+                        // Last LoD points to using a shp for a material for some reason.
+                        try
+                        {
+                            var typeChar = materialString[4].ToString() + materialString[9].ToString();
+
+                            if (typeChar.Equals("cb"))
+                            {
+                                lod.MeshDataList[i].IsBody = true;
+                            }
+                        } catch(Exception e)
+                        {
+
                         }
 
                         meshNum++;
