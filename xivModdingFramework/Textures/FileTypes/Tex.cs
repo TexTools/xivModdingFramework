@@ -663,13 +663,13 @@ namespace xivModdingFramework.Textures.FileTypes
             return offset;
         }
 
-        public async Task<int> TexBMPImporter(XivTex xivTex, IItem item, DirectoryInfo bmpFileDirectory, string source)
+        public async Task<int> TexImporter(XivTex xivTex, IItem item, DirectoryInfo fileDirectory, string source)
         {
             var offset = 0;
 
             var modding = new Modding(_gameDirectory);
 
-            if (File.Exists(bmpFileDirectory.FullName))
+            if (File.Exists(fileDirectory.FullName))
             {
                 // Check if the texture being imported has been imported before
                 var modEntry = await modding.TryGetModEntry(xivTex.TextureTypeAndPath.Path);
@@ -679,7 +679,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 switch (xivTex.TextureFormat)
                 {
                     case XivTexFormat.DXT1:
-                        compressionFormat = CompressionFormat.BC1;
+                        compressionFormat = CompressionFormat.BC1a;
                         break;
                     case XivTexFormat.DXT5:
                         compressionFormat = CompressionFormat.BC3;
@@ -691,8 +691,11 @@ namespace xivModdingFramework.Textures.FileTypes
                         throw new Exception($"Format {xivTex.TextureFormat} is not currently supported for BMP import\n\nPlease use the DDS import option instead.");
                 }
 
-                using (var surface = Surface.LoadFromFile(bmpFileDirectory.FullName))
+                using (var surface = Surface.LoadFromFile(fileDirectory.FullName))
                 {
+                    if (surface == null)
+                        throw new FormatException($"Unsupported texture format");
+
                     surface.FlipVertically();
 
                     using (var compressor = new Compressor())
@@ -805,7 +808,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             else
             {
-                throw new IOException($"Could not find file: {bmpFileDirectory.FullName}");
+                throw new IOException($"Could not find file: {fileDirectory.FullName}");
             }
 
             return offset;
