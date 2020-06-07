@@ -518,9 +518,6 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 if (reader.IsStartElement())
                                 {
-                                    if (reader.Name.Equals("lines"))
-                                        continue;
-
                                     if (reader.Name.Contains("float_array"))
                                     {
                                         // Positions 
