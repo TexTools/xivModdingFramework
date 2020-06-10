@@ -700,7 +700,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                     using (var compressor = new Compressor())
                     {
-                        compressor.Input.GenerateMipmaps = true;
+                        compressor.Input.SetMipmapGeneration(xivTex.MipMapCount > 0, xivTex.MipMapCount);
                         compressor.Input.SetData(surface);
                         compressor.Compression.Format = compressionFormat;
                         compressor.Compression.SetBGRAPixelFormat();

@@ -5180,6 +5180,10 @@ namespace xivModdingFramework.Models.FileTypes
         public static Vector3Collection CalculateTangentsFromBinormals(Vector3Collection normals, Vector3Collection binormals, List<byte> handedness)
         {
             var tangents = new Vector3Collection(binormals.Count);
+            if (normals.Count != binormals.Count || normals.Count != handedness.Count)
+            {
+                return tangents;
+            }
             for(var idx = 0; idx < normals.Count; idx++)
             {
                 var tangent = Vector3.Cross(normals[idx], binormals[idx]);
