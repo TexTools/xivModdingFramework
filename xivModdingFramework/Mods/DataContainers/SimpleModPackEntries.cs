@@ -15,11 +15,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.ComponentModel;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
-    public class SimpleModPackEntries : IComparable<SimpleModPackEntries>
+    public class SimpleModPackEntries : IComparable<SimpleModPackEntries>, INotifyPropertyChanged
     {
+        private bool isSelected;
+
         /// <summary>
         /// The name of the item
         /// </summary>
@@ -69,6 +72,24 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The json mod entry
         /// </summary>
         public ModsJson JsonEntry { get; set; }
+
+        /// <summary>
+        /// Is this entry selected in the ui
+        /// </summary>
+        public bool IsSelected
+        {
+            get
+            {
+                return isSelected;
+            }
+            set
+            {
+                isSelected = value;
+                this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         public int CompareTo(SimpleModPackEntries obj)
         {
