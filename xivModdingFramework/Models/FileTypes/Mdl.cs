@@ -1397,6 +1397,10 @@ namespace xivModdingFramework.Models.FileTypes
             // A dictionary containing error messages if there are any so that a single exception can be thrown with all available context
             var errorDictionary = new Dictionary<int, string>();
 
+            // Calculations for bounding boxes.
+            var maxPos = Vector3.Zero;
+            var minPos = Vector3.Zero;
+
             // Check for missing data and add dummy data if possible or throw exception
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
             {
@@ -1462,6 +1466,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new Exception(errorString);
             }
 
+
             var indexListList = new List<List<int[]>>();
             var partStartingIndexDicList = new List<Dictionary<(int Start,int End),Dictionary<string,int>>>();
             for (var i = 0; i < meshPartDataDictionary.Count; i++)
@@ -1490,6 +1495,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var texCoord1Max   = 0;
                 var biNormalMax    = 0;
                 var vColorAlphaMax = 0;
+
 
                 if (partDataDict.Count > 0)
                 {
@@ -1523,8 +1529,10 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // Consolidate all index data into one Collada Data per mesh
+
                         for (var k = 0; k < partDataDict[partNum].PositionIndices.Count; k++)
                         {
+
                             meshDataDictionary[i].Indices.Add(partDataDict[partNum].PositionIndices[k] + positionMax);
                             meshDataDictionary[i].Indices.Add(partDataDict[partNum].NormalIndices[k] + normalMax);
                             meshDataDictionary[i].Indices.Add(partDataDict[partNum].TextureCoordinate0Indices[k] + texCoord0Max);
@@ -1745,9 +1753,18 @@ namespace xivModdingFramework.Models.FileTypes
 
                 for (var i = 0; i < colladaData.Positions.Count; i += 3)
                 {
-                    positionCollection.Add(new Vector3((colladaData.Positions[i] / ModelMultiplier),
+
+                    var pos = new Vector3((colladaData.Positions[i] / ModelMultiplier),
                         (colladaData.Positions[i + 1] / ModelMultiplier),
-                        (colladaData.Positions[i + 2] / ModelMultiplier)));
+                        (colladaData.Positions[i + 2] / ModelMultiplier));
+
+                    maxPos.X = maxPos.X > pos.X ? maxPos.X : pos.X;
+                    maxPos.Y = maxPos.Y > pos.Y ? maxPos.Y : pos.Y;
+                    maxPos.Z = maxPos.Z > pos.Z ? maxPos.Z : pos.Z;
+                    minPos.X = minPos.X < pos.X ? minPos.X : pos.X;
+                    minPos.Y = minPos.Y < pos.Y ? minPos.Y : pos.Y;
+                    minPos.Z = minPos.Z < pos.Z ? minPos.Z : pos.Z;
+                    positionCollection.Add(pos);
                 }
 
                 for (var i = 0; i < colladaData.Normals.Count; i += 3)
@@ -2376,6 +2393,17 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 warningsDictionary.Add($"Weight Corrections", weightErrorString);
             }
+
+            xivMdl.BoundBox.PointList[0] = new Vector4(minPos, 1);
+            xivMdl.BoundBox.PointList[1] = new Vector4(maxPos, 1);
+            xivMdl.BoundBox.PointList[2] = new Vector4(minPos, 1);
+            xivMdl.BoundBox.PointList[3] = new Vector4(maxPos, 1);
+            xivMdl.BoundBox.PointList[4] = new Vector4(0,0,0,0);
+            xivMdl.BoundBox.PointList[5] = new Vector4(0, 0, 0, 0);
+            xivMdl.BoundBox.PointList[6] = new Vector4(0, 0, 0, 0);
+            xivMdl.BoundBox.PointList[7] = new Vector4(0, 0, 0, 0);
+            //xivMdl.BoundBox.PointList[1] = Vector(;
+            //xivMdl.BoundBox.PointList[2] = minPos;
 
             await MakeNewMdlFile(colladaMeshDataList, item, xivMdl, advImportSettings, source, rawDataOnly);
 
@@ -3934,7 +3962,7 @@ namespace xivModdingFramework.Models.FileTypes
                 #region Bounding Box Data Block
 
                 var boundingBoxDataBlock = new List<byte>();
-
+                
                 var boundingBox = xivMdl.BoundBox;
 
                 foreach (var point in boundingBox.PointList)
