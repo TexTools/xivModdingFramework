@@ -1364,6 +1364,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             // A dictionary containing any warnings raised by the import in the format <Warning Title, Warning Message>
             var warningsDictionary = new Dictionary<string, string>();
+            var colorWarnings = new List<int>();
+            var alphaWarnings = new List<int>();
 
             var dae = new Dae(_gameDirectory, _dataFile, pluginTarget);
 
@@ -1773,19 +1775,27 @@ namespace xivModdingFramework.Models.FileTypes
                         colladaData.Normals[i + 2]));
                 }
 
+
+                bool badColorData = false;
                 for (var i = 0; i < colladaData.VertexColors.Count; i += colladaData.VertexColorStride)
                 {
                     var colors = new float[] {colladaData.VertexColors[i], colladaData.VertexColors[i + 1], colladaData.VertexColors[i + 2]};
                     
-                    // Check vertex colors for bad data, if any is found replace with default of 1
+                    // Check vertex colors for bad data, if any is found, reset the entire mesh's color data.
                     if (colors.Any(x => x < 0f || x > 1f))
                     {
-                        vertexColorCollection.Add(new Vector3(1, 1, 1));
+                        badColorData = true;
+                        break;
                     }
-                    else
-                    {
-                        vertexColorCollection.Add(new Vector3(colors[0], colors[1], colors[2]));
-                    }
+
+                    vertexColorCollection.Add(new Vector3(colors[0], colors[1], colors[2]));
+                }
+                // Reset the Color data with blanks if it was invalid.
+                if (badColorData)
+                {
+                    vertexColorCollection.Clear();
+                    vertexColorCollection.AddRange(Enumerable.Repeat(new Vector3(1, 1, 1), colladaData.VertexColors.Count / colladaData.VertexColorStride));
+                    colorWarnings.Add(meshIdx);
                 }
 
                 if (colladaData.BiNormals.Count > 0)
@@ -1861,16 +1871,24 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
+                bool badAlphaData = false;
                 for (var i = 0; i < colladaData.VertexAlphas.Count; i += colladaData.TextureCoordinateStride)
                 {
-                    // Sanity check
-                    if (colladaData.VertexAlphas[i] > 0 && colladaData.VertexAlphas[i] < 1)
+                    // To be considered valid, Vertex Alpha U channel must be [0-1], and Vertex Alpha V channel must be [0/1]
+                    if (colladaData.VertexAlphas[i] > 1 || colladaData.VertexAlphas[i] < 0 || (colladaData.VertexAlphas[i+1] != 0 && colladaData.VertexAlphas[i] != 1))
                     {
-                        vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], 0));
-                    } else
-                    {
-                        vertexAlphaCollection.Add(new Vector2(1, 0));
+                        badAlphaData = true;
+                        break;
                     }
+                    vertexAlphaCollection.Add(new Vector2(colladaData.VertexAlphas[i], 0));
+                }
+
+                // Reset the Alpha data with blanks if it was invalid.
+                if(badAlphaData)
+                {
+                    vertexAlphaCollection.Clear();
+                    vertexAlphaCollection.AddRange(Enumerable.Repeat(new Vector2(1, 0), colladaData.VertexAlphas.Count / colladaData.TextureCoordinateStride));
+                    alphaWarnings.Add(meshIdx);
                 }
 
                 if (!isHousingItem) // housing items do not have bones
@@ -2393,6 +2411,39 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 warningsDictionary.Add($"Weight Corrections", weightErrorString);
             }
+
+            if(alphaWarnings.Any() || colorWarnings.Any())
+            {
+                var warningString = "";
+                if (colorWarnings.Any())
+                {
+
+                    warningString += "The following Meshes had their Vertex Color(UV0) data reset due to having bad/invalid data:\n\tMesh(es): ";
+                    foreach (var mId in colorWarnings)
+                    {
+                        warningString += mId.ToString() + ' ';
+
+                    }
+                    warningString += "\n\n";
+                }
+                if (alphaWarnings.Any())
+                {
+                    warningString += "The following Meshes had their Vertex Alpha(UV3) data reset due to bad/invalid data:\n\tMesh(es): ";
+                    foreach (var mId in alphaWarnings)
+                    {
+                        warningString += mId.ToString() + ' ';
+                    }
+                    warningString += "\n\n";
+                }
+                warningsDictionary.Add($"Vertex Color/Alpha Correction", warningString);
+            }
+
+
+            // -- Update bounding box with calculated bounding box data --
+            // This is kind of a janky way to do this -- Technically this is overwriting the base MDL object,
+            // Rather than passing the data forwards in a way that indicates it's been modified.  However
+            // There was no convenient spot in the next function to calculate the data there without doing
+            // another full iterration over the entire vertex array, which is extremely costly.
 
             xivMdl.BoundBox.PointList[0] = new Vector4(minPos, 1);
             xivMdl.BoundBox.PointList[1] = new Vector4(maxPos, 1);
