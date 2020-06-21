@@ -61,6 +61,68 @@ namespace xivModdingFramework.Materials.FileTypes
             set => _dataFile = value;
         }
 
+        // Various subtypes of Mtrls.  May be irrelevant to have this Enum later, but for now it's a good dictionary key.
+        public enum MtrlType
+        {
+            Multi,
+            DiffuseSpec,
+            DiffuseOnly,
+            SpecOnly
+        };
+
+
+        // MtrlParam constants for texture types.
+        public static Dictionary<XivTexType, uint> _MtrlParamUsage = new Dictionary<XivTexType, uint>()
+        {
+            { XivTexType.Normal, 207536625 },
+            { XivTexType.Diffuse, 290653886 },
+            { XivTexType.Specular, 731504677 },
+            { XivTexType.Multi, 2320401078 }
+        };
+
+        // MtrlParam constants for file compressions/formats.
+        public static Dictionary<XivTexFormat, short> _MtrlParamFormat = new Dictionary<XivTexFormat, short>()
+        {
+            { XivTexFormat.DXT5, -32747 }, // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { XivTexFormat.DXT1, -31936 }  // To have an appreciable change (Either [000000] or [010101])
+            // Furthermore, just using [0] in place of these values seems to work fine and auto-detect the file format.  So it may be redundant data.
+        };
+
+
+        // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
+        // The exact order of these structs does not seem to be important, only the data in question.
+        // Ut may be viable (though inefficient) to simply include all of them.
+        public static Dictionary<MtrlType, List<DataStruct1>> _MtrlStruct1Data = new Dictionary<MtrlType, List<DataStruct1>>()
+        {
+            { MtrlType.Multi, new List<DataStruct1>() {
+                new DataStruct1() { ID = 4113354501, Unknown1 = 2815623008 }, // Normal
+                new DataStruct1() { ID = 3531043187, Unknown1 = 4083110193 }  // Multi
+            } },
+            {
+                MtrlType.DiffuseSpec, new List<DataStruct1>() {
+                new DataStruct1() { ID = 4113354501, Unknown1 = 2815623008 }, // Normal
+                new DataStruct1() { ID = 3054951514, Unknown1 = 1611594207 }, // Diffuse
+                new DataStruct1() { ID = 3367837167, Unknown1 = 2687453224 }  // Spec
+            } }
+        };
+
+        // Unknown exactly what this data represents.  It rarely changes other than the addition of a single extra values in rare cases.
+        // Like the above, it may be viable (though inefficient) to simply include all the values in all items.
+        public static Dictionary<MtrlType, List<DataStruct2>> _MtrlStruct2Data = new Dictionary<MtrlType, List<DataStruct2>>()
+        {
+            { MtrlType.Multi, new List<DataStruct2>() {
+                new DataStruct2() { ID = 699138595, Offset = 0, Size = 4  }, // Always used.
+                new DataStruct2() { ID = 1465565106, Offset = 4, Size = 4 }, // Always used.
+            } },
+            { MtrlType.DiffuseSpec, new List<DataStruct2>() {
+                new DataStruct2() { ID = 699138595, Offset = 0, Size = 4  }, // Always used.
+                new DataStruct2() { ID = 1465565106, Offset = 4, Size = 4 }, // Always used.
+                new DataStruct2() { ID = 364318261, Offset = 8, Size = 4  }  // Sometimes used. Unknown effect, but doesn't seem to hurt to include it.
+            } },
+        };
+
+
+
         /// <summary>
         /// Gets the MTRL data for the given item 
         /// </summary>
@@ -533,6 +595,17 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             try
             {
+                /* Testing stuff for shader changes.
+                var shNew = "characterglass.shpk";
+                var oldSize = Encoding.UTF8.GetBytes(xivMtrl.Shader).Length;
+                var newSize = Encoding.UTF8.GetBytes(shNew).Length;
+                var diff = newSize - oldSize;
+
+                xivMtrl.Shader = shNew;
+                xivMtrl.MaterialDataSize = (ushort)(xivMtrl.MaterialDataSize + diff);
+                xivMtrl.FileSize = (short)(xivMtrl.FileSize + diff);
+                xivMtrl.ShaderNumber = 29;*/
+
                 var mtrlBytes = new List<byte>();
 
                 mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
@@ -609,6 +682,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct2Count));
                 mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ParameterStructCount));
                 mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderNumber));
+
                 mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
 
                 foreach (var dataStruct1 in xivMtrl.DataStruct1List)
@@ -631,6 +705,20 @@ namespace xivModdingFramework.Materials.FileTypes
                     mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown2));
                     mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
                 }
+
+
+                // AdditionalData setup used by most gear materials.
+                //xivMtrl.AdditionalData[2] = 0;
+                //xivMtrl.AdditionalData[3] = 63;
+                //xivMtrl.AdditionalData[6] = 128;
+                //xivMtrl.AdditionalData[7] = 62;
+
+                // AdditionalData setup used by characterglass materials.
+                //xivMtrl.AdditionalData[2] = 128;
+                //xivMtrl.AdditionalData[3] = 62;
+                //xivMtrl.AdditionalData[6] = 128;
+                //xivMtrl.AdditionalData[7] = 63;
+
 
                 mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
