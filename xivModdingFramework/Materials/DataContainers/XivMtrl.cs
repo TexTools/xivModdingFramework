@@ -17,6 +17,7 @@
 using SharpDX;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Resources;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -305,23 +306,8 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 if (paramSet.ID == Mtrl._MtrlParamUsage[MapType])
                 {
-                    mapIndex = (int) paramSet.TextureIndex; 
-
-                    // Pare format short down of extraneous data.
-                    short clearLast6Bits = -64; // Hex 0xFFC0
-                    short format = (short)(paramSet.FileFormat & clearLast6Bits);
-                    short setFirstBit = -32768;
-                    format = (short)(format | setFirstBit);
-
-                    // Scan through known formats.
-                    info.Format = MtrlMapFormat.Other;
-                    foreach (var formatEntry in Mtrl._MtrlParamFormat)
-                    {
-                        if(format == formatEntry.Value)
-                        {
-                            info.Format = formatEntry.Key;
-                        }
-                    }
+                    mapIndex = (int) paramSet.TextureIndex;
+                    info.Format = GetFormat(paramSet.FileFormat);
                 }
             }
 
@@ -337,6 +323,26 @@ namespace xivModdingFramework.Materials.DataContainers
             }
 
             return info;
+        }
+
+        private static MtrlMapFormat GetFormat(short raw)
+        {
+
+            // Pare format short down of extraneous data.
+            short clearLast6Bits = -64; // Hex 0xFFC0
+            short format = (short)(raw & clearLast6Bits);
+            short setFirstBit = -32768;
+            format = (short)(format | setFirstBit);
+
+            // Scan through known formats.
+            foreach (var formatEntry in Mtrl._MtrlParamFormat)
+            {
+                if (format == formatEntry.Value)
+                {
+                    return formatEntry.Key;
+                }
+            }
+            return MtrlMapFormat.Other;
         }
 
         public void SetMapInfo(XivTexType MapType, MapInfo info)
@@ -460,6 +466,45 @@ namespace xivModdingFramework.Materials.DataContainers
 
         }
 
+
+        public List<MapInfo> GetAllMapInfos()
+        {
+            var ret = new List<MapInfo>();
+            for(var i = 0; i < TexturePathList.Count; i++)
+            {
+                var info = new MapInfo();
+                info.path = TexturePathList[i];
+                info.Format = MtrlMapFormat.Other;
+                info.Usage = XivTexType.Other;
+
+                // Check if the texture appears in the parameter list.
+                foreach(var p in ParameterStructList)
+                {
+                    if(p.TextureIndex == i)
+                    {
+                        // This is a known parameter.
+                        if(Mtrl._MtrlParamUsage.ContainsValue(p.ID))
+                        {
+                            var usage = Mtrl._MtrlParamUsage.First(x =>
+                            {
+                                return (x.Value == p.ID);
+                            }).Key;
+                            info.Usage = usage;
+                        } else
+                        {
+                            info.Usage = XivTexType.Other;
+                        }
+
+                        info.Format = GetFormat(p.FileFormat);
+                        break;
+                    }
+                }
+
+                ret.Add(info);
+            }
+
+            return ret;
+        }
     }
 
     /// <summary>

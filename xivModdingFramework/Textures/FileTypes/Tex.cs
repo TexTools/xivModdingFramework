@@ -52,7 +52,18 @@ namespace xivModdingFramework.Textures.FileTypes
         private readonly XivDataFile _dataFile;
         private Dictionary<string, int> _indexFileDictionary;
         private readonly object texLock = new object();
-        private readonly Dictionary<XivTexFormat, string> defaultTexturePaths;
+
+        /// <summary>
+        /// Gets the path to the default blank texture for a given texture format.
+        /// For use when making new texture files.
+        /// </summary>
+        /// <param name="format"></param>
+        /// <returns></returns>
+        public static DirectoryInfo GetDefaultTexturePath(XivTexFormat format)
+        {
+            //new DirectoryInfo(Directory.GetFiles("AddNewTexturePartTexTmps", $"{Path.GetFileNameWithoutExtension(oldTexPath)}.dds", SearchOption.AllDirectories)[0]);
+            return new DirectoryInfo(Directory.GetFiles("Resources\\DefaultTextures", format.ToString() + ".dds", SearchOption.AllDirectories)[0]);
+        }
 
         public Tex(DirectoryInfo gameDirectory)
         {

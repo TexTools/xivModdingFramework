@@ -751,6 +751,49 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
                 var dat = new Dat(_gameDirectory);
+
+
+                // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
+                var mapInfoList = xivMtrl.GetAllMapInfos();
+                var _index = new Index(_gameDirectory);
+                var _tex = new Tex(_gameDirectory);
+                foreach (var mapInfo in mapInfoList)
+                {
+                    var path = mapInfo.path;
+                    var fileHash = HashGenerator.GetHash(Path.GetFileName(path));
+                    var pathHash = HashGenerator.GetHash(path.Substring(0, path.LastIndexOf("/", StringComparison.Ordinal)));
+                    var exists = await _index.FileExists(fileHash, pathHash, XivDataFile._04_Chara);
+
+                    if(exists)
+                    {
+                        continue;
+                    }
+
+                    var format = XivTexFormat.DXT1;
+                    if(mapInfo.Usage == XivTexType.Normal)
+                    {
+                        if(mapInfo.Format == MtrlMapFormat.WithAlpha)
+                        {
+                            format = XivTexFormat.DXT5;
+                        } else
+                        {
+                            format = XivTexFormat.A8R8G8B8;
+                        }
+                    }
+
+                    var xivTex = new XivTex();
+                    xivTex.TextureTypeAndPath = new TexTypePath()
+                    {
+                        DataFile = XivDataFile._04_Chara, Path = path, Type = mapInfo.Usage
+                    };
+                    xivTex.TextureFormat = format;
+
+                    var di = Tex.GetDefaultTexturePath(xivTex.TextureFormat);
+
+                    var newOffset = await _tex.TexDDSImporter(xivTex, item, di, "AddNewTextureNameToMaterial");
+
+                }
+               
                 return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.ItemCategory, source);
             }
             catch(Exception ex)
