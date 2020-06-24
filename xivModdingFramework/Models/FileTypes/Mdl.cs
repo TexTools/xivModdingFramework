@@ -35,6 +35,7 @@ using xivModdingFramework.Mods.Enums;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
+using System.Diagnostics;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -1647,7 +1648,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (partDataDict[partNum].TextureCoordinates1.Count > 0)
                         {
-                            texCoord1Max += partDataDict[partNum].TextureCoordinates1.Count/3;
+                            texCoord1Max += partDataDict[partNum].TextureCoordinates1.Count / partDataDict[partNum].TextureCoordinateStride;
                         }
 
                         if (partDataDict[partNum].BiNormals.Count > 0)
@@ -1657,7 +1658,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (partDataDict[partNum].VertexAlphas.Count > 0)
                         {
-                            vColorAlphaMax += partDataDict[partNum].VertexAlphas.Count/3;
+                            vColorAlphaMax += partDataDict[partNum].VertexAlphas.Count / partDataDict[partNum].TextureCoordinateStride;
                         }
 
 
@@ -2362,6 +2363,7 @@ namespace xivModdingFramework.Models.FileTypes
                 colladaMeshData.PartsDictionary = colladaData.PartsDictionary;
                 colladaMeshData.TextureCoordintes1 = nTexCoord1Collection;
                 colladaMeshData.VertexColors = nVertexColorCollection;
+
 
                 // Go ahead and distill this down into just the single value we care about.
                 foreach (var uv3Coordinate in nVertexAlphaCollection)
@@ -5347,7 +5349,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var posIdx2 = vDict[vertex2];
                 var posIdx3 = vDict[vertex3];*/
 
-                var position1 = positions[vertex1];
+                    var position1 = positions[vertex1];
                 var position2 = positions[vertex2];
                 var position3 = positions[vertex3];
                 var uv1 = uvCoordinates[vertex1];

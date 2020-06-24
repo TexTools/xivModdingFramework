@@ -16,7 +16,11 @@
 
 using SharpDX;
 using System.Collections.Generic;
+using System.IO;
+using System.Resources;
+using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
+using xivModdingFramework.Textures.Enums;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
@@ -212,6 +216,250 @@ namespace xivModdingFramework.Materials.DataContainers
         /// The internal MTRL path
         /// </summary>
         public string MTRLPath { get; set; }
+
+        public ShaderInfo GetShaderInfo()
+        {
+            var info = new ShaderInfo();
+            switch (Shader)
+            {
+                case "character.shpk":
+                    info.Shader = MtrlShader.Standard;
+                    break;
+                case "characterglass.shpk":
+                    info.Shader = MtrlShader.Glass;
+                    break;
+                case "skin.shpk":
+                    info.Shader = MtrlShader.Skin;
+                    break;
+                case "hair.shpk":
+                    info.Shader = MtrlShader.Hair;
+                    break;
+                case "iris.shpk":
+                    info.Shader = MtrlShader.Iris;
+                    break;
+                default:
+                    info.Shader = MtrlShader.Other;
+                    break;
+            }
+
+            // Check the transparency bit.
+            const ushort transparencyBit = 16;
+            var bit = (ushort)(ShaderNumber & transparencyBit);
+
+            if(bit > 0)
+            {
+                info.TransparencyEnabled = true;
+            } else
+            {
+                info.TransparencyEnabled = false;
+            }
+
+
+            return info;
+        }
+
+        public void SetShaderInfo(ShaderInfo info)
+        {
+            switch (info.Shader)
+            {
+                case MtrlShader.Standard:
+                    Shader = "character.shpk";
+                    break;
+                case MtrlShader.Glass:
+                    Shader = "characterglass.shpk";
+                    break;
+                case MtrlShader.Hair:
+                    Shader = "hair.shpk";
+                    break;
+                case MtrlShader.Iris:
+                    Shader = "iris.shpk";
+                    break;
+                case MtrlShader.Skin:
+                    Shader = "skin.shpk";
+                    break;
+                default:
+                    // No change to the Shader for 'Other' type entries.
+                    break;
+            }
+
+            // Set transparency bit as needed.
+            const ushort transparencyBit = 16;
+            if(info.TransparencyEnabled)
+            {
+                ShaderNumber = (ushort)(ShaderNumber | transparencyBit);
+            } else
+            {
+                ShaderNumber = (ushort)(ShaderNumber & (~transparencyBit));
+            }
+        }
+
+        public MapInfo GetMapInfo(XivTexType MapType)
+        {
+            var info = new MapInfo();
+            int mapIndex = -1;
+
+            info.Usage = MapType;
+
+            // Look for the right map type in the parameter list.
+            foreach (var paramSet in ParameterStructList)
+            {
+                if (paramSet.ID == Mtrl._MtrlParamUsage[MapType])
+                {
+                    mapIndex = (int) paramSet.TextureIndex; 
+
+                    // Pare format short down of extraneous data.
+                    short clearLast6Bits = -64; // Hex 0xFFC0
+                    short format = (short)(paramSet.FileFormat & clearLast6Bits);
+                    short setFirstBit = -32768;
+                    format = (short)(format | setFirstBit);
+
+                    // Scan through known formats.
+                    info.Format = MtrlMapFormat.Other;
+                    foreach (var formatEntry in Mtrl._MtrlParamFormat)
+                    {
+                        if(format == formatEntry.Value)
+                        {
+                            info.Format = formatEntry.Key;
+                        }
+                    }
+                }
+            }
+
+            if(mapIndex < 0)
+            {
+                return null;
+            }
+
+            info.path = "";
+            if ( mapIndex < TexturePathList.Count )
+            {
+                info.path = TexturePathList[mapIndex];
+            }
+
+            return info;
+        }
+
+        public void SetMapInfo(XivTexType MapType, MapInfo info)
+        {
+            // Sanity check.
+            if(info != null && info.Usage != MapType)
+            {
+                throw new System.Exception("Invalid attempt to reassign map materials.");
+            }
+           
+            var paramIdx = -1;
+            ParameterStruct oldInfo = new ParameterStruct();
+            // Look for the right map type in the parameter list.
+            for( var i = 0; i < ParameterStructList.Count; i++)
+            {
+                var paramSet = ParameterStructList[i];
+
+                if (paramSet.ID == Mtrl._MtrlParamUsage[MapType])
+                {
+                    paramIdx = i;
+                    oldInfo = paramSet;
+                    break;
+                }
+            }
+
+
+            // Deleting existing info.
+            if (info == null)
+            {
+                if(paramIdx < 0)
+                {
+                    // Didn't exist to start, nothing to do.
+                    return;
+                }
+
+                // Remove texture from path list if it exists.
+                if (TexturePathList.Count > oldInfo.TextureIndex)
+                {
+                    TexturePathList.RemoveAt((int)oldInfo.TextureIndex);
+                    TexturePathUnknownList.RemoveAt((int)oldInfo.TextureIndex);
+                }
+
+                // Remove Parameter List
+                ParameterStructList.RemoveAt(paramIdx);
+
+                // Update other texture offsets
+                for(var i = 0; i < ParameterStructList.Count; i++)
+                {
+                    var p = ParameterStructList[i];
+                    if(p.TextureIndex > oldInfo.TextureIndex)
+                    {
+                        p.TextureIndex--;
+                    }
+                    ParameterStructList[i] = p;
+                }
+
+                // Remove struct1 entry for the removed map type, if it exists.
+                for(var i = 0; i < DataStruct1List.Count; i++)
+                {
+                    var s = DataStruct1List[i];
+                    if(s.ID == Mtrl._MtrlStruct1Data[MapType].ID)
+                    {
+                        DataStruct1List.RemoveAt(i);
+                        break;
+                    }
+                }
+
+                return;
+
+            }
+
+
+
+            var raw = new ParameterStruct();
+            raw.ID = Mtrl._MtrlParamUsage[info.Usage];
+            raw.Unknown2 = 15;
+            raw.FileFormat = Mtrl._MtrlParamFormat[info.Format];
+            raw.TextureIndex = (paramIdx >= 0 ? (uint)oldInfo.TextureIndex : (uint)TexturePathList.Count);
+
+            // Inject the new parameters.
+            if(paramIdx >= 0)
+            {
+                ParameterStructList[paramIdx] = raw;
+            } else
+            {
+                ParameterStructList.Add(raw);
+            }
+
+            // Inject the new string
+            if(raw.TextureIndex == TexturePathList.Count)
+            {
+                TexturePathList.Add(info.path);
+                TexturePathUnknownList.Add((short) 0); // This value seems to always be 0 for textures.
+            } else
+            {
+                TexturePathList[(int) raw.TextureIndex] = info.path;
+            }
+
+            // Update struct1 entry with the appropriate entry if it's not already there.
+            bool foundEntry = false;
+            for (var i = 0; i < DataStruct1List.Count; i++)
+            {
+                var s = DataStruct1List[i];
+                if (s.ID == Mtrl._MtrlStruct1Data[MapType].ID)
+                {
+                    foundEntry = true;
+                    break;
+                }
+            }
+
+            if(!foundEntry)
+            {
+                var s1 = new DataStruct1()
+                {
+                    ID = Mtrl._MtrlStruct1Data[MapType].ID,
+                    Unknown1 = Mtrl._MtrlStruct1Data[MapType].Unknown1
+                };
+
+                DataStruct1List.Add(s1);
+            }
+
+        }
+
     }
 
     /// <summary>
@@ -243,10 +491,45 @@ namespace xivModdingFramework.Materials.DataContainers
     {
         public uint ID;
 
-        public short Unknown1;
+        public short FileFormat;
 
         public short Unknown2;
 
         public uint TextureIndex;
     }
+
+
+    // Enum representation of the format map data is used as.
+    public enum MtrlMapFormat
+    {
+        WithAlpha,
+        WithoutAlpha,
+        Other
+    }
+
+    // Enum representation of the shader names used in mtrl files.
+    public enum MtrlShader
+    {
+        Standard,       // character.shpk
+        Glass,          // characterglass.shpk
+        Skin,           // skin.shpk
+        Hair,           // hair.shpk
+        Iris,           // iris.shpk
+        Other           // Unknown Shader
+    }
+
+    public class ShaderInfo
+    {
+        public MtrlShader Shader;
+        public bool TransparencyEnabled;
+    }
+
+    public class MapInfo
+    {
+        public XivTexType Usage;
+        public MtrlMapFormat Format;
+        public string path;
+    }
+
+
 }

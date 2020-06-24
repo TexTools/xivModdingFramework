@@ -14,8 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
@@ -122,6 +125,20 @@ namespace xivModdingFramework.Helpers
             }
             
             return path;
+        }
+    
+        /// <summary>
+        /// Replaces the bytes in a given byte array with the bytes from another array, starting at the given index of the original array.
+        /// </summary>
+        /// <param name="original"></param>
+        /// <param name="toInject"></param>
+        /// <param name="index"></param>
+        public static void ReplaceBytesAt(List<byte> original, byte[] toInject, int index)
+        {
+            for(var i = 0; i < toInject.Length; i++)
+            {
+                original[index + i] = toInject[i];
+            };
         }
     }
 }

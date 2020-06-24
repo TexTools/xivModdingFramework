@@ -47,4 +47,16 @@
     <Folder Include="Models\Interfaces\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Resources\DefaultTextures\8888.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\DefaultTextures\dxt1.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\DefaultTextures\dxt5.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -456,6 +456,18 @@ namespace xivModdingFramework.Models.FileTypes
                                 toolType = "FBXCOLLADA";
                                 */
                             }
+                            else if (tool.Contains("FFXIV TexTools"))
+                            {
+                                vcol = "-col0-array";
+                                texc = "-map0-array";
+                                texc2 = "-map1-array";
+                                valpha = "-map2-array";
+                                norm = "-normals-array";
+                                pos = "-positions-array";
+                                textureCoordinateStride = 2;
+                                indexStride = 4;
+                                toolType = ToolType.TexTools;
+                            }
                             else if (tool.Contains("Blender"))
                             {
                                 texc = "-map-0-array";
@@ -520,43 +532,44 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     if (reader.Name.Contains("float_array"))
                                     {
+                                        var currentId = reader["id"].ToLower();
                                         // Positions 
-                                        if (reader["id"].ToLower().Contains(pos))
+                                        if (currentId.EndsWith(pos))
                                         {
                                             cData.Positions.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         // Normals
-                                        else if (reader["id"].ToLower().Contains(norm) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(norm) && cData.Positions.Count > 0)
                                         {
                                             cData.Normals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         // Vertex Colors                                        
-                                        else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
+                                        else if(currentId.EndsWith(vcol) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Texture Coordinates
-                                        else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(texc) && cData.Positions.Count > 0)
                                         {
                                             cData.TextureCoordinates0.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Texture Coordinates2
-                                        else if (reader["id"].ToLower().Contains(texc2) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(texc2) && cData.Positions.Count > 0)
                                         {
                                             cData.TextureCoordinates1.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         // Vertex Alphas
-                                        else if (reader["id"].ToLower().Contains(valpha) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(valpha) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexAlphas.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Tangents
-                                        else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(tang) && cData.Positions.Count > 0)
                                         {
                                             cData.Tangents.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //BiNormals
-                                        else if (reader["id"].ToLower().Contains(biNorm) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(biNorm) && cData.Positions.Count > 0)
                                         {
                                             cData.BiNormals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
