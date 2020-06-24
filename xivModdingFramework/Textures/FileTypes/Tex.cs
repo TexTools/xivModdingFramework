@@ -1105,7 +1105,7 @@ namespace xivModdingFramework.Textures.FileTypes
             xivMtrl.ColorSetExtraData = colorSetExtraData;
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
-            return mtrl.CreateMtrlFile(xivMtrl, item);
+            return  mtrl.CreateMtrlFile(xivMtrl, item);
         }
 
         /// <summary>
