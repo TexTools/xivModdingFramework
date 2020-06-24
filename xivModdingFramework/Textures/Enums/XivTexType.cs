@@ -26,6 +26,7 @@ namespace xivModdingFramework.Textures.Enums
         Normal,
         Multi,
         Mask,
+        Reflection,
         Skin,
         ColorSet,
         Map,

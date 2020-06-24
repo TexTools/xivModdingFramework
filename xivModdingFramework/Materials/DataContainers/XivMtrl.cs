@@ -15,10 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using SharpDX;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Resources;
+using System.Text.RegularExpressions;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -30,6 +32,11 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class XivMtrl
     {
+        public const string ItemPathToken = "{ItemPath}";
+        public const string VersionToken = "{Version}";
+        public const string TextureNameToken = "{TextureName}";
+        public const string CommonPathToken = "{CommonPath}";
+
         /// <summary>
         /// The MTRL file signature
         /// </summary>
@@ -163,23 +170,44 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The number of type 1 data sturctures 
         /// </summary>
-        public ushort DataStruct1Count { get; set; }
+        public ushort TextureUsageCount { get { return (ushort)TextureUsageList.Count; } set
+            {
+                //No-Op
+                throw new Exception("Attempted to directly set TextureUsageCount");
+            }
+        }
 
         /// <summary>
         /// The number of type 2 data structures
         /// </summary>
-        public ushort DataStruct2Count { get; set; }
-
+        public ushort ShaderParameterCount
+        {
+            get { return (ushort)ShaderParameterList.Count; }
+            set
+            {
+                //No-Op
+                throw new Exception("Attempted to directly set ShaderParameterCount");
+            }
+        }
         /// <summary>
         /// The number of parameter stuctures
         /// </summary>
-        public ushort ParameterStructCount { get; set; }
+        public ushort TextureDescriptorCount
+        {
+            get { return (ushort)TextureDescriptorList.Count; }
+            set
+            {
+                //No-Op
+                throw new Exception("Attempted to directly set TextureDescriptorCount");
+            }
+        }
 
         /// <summary>
         /// The shader number used by the item
         /// </summary>
         /// <remarks>
         /// This is a guess and has not been tested to be true
+        /// Seems to be more likely that this is some base argument passed into the shader.
         /// </remarks>
         public ushort ShaderNumber { get; set; }
 
@@ -191,17 +219,17 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The list of Type 1 data structures
         /// </summary>
-        public List<DataStruct1> DataStruct1List { get; set; }
+        public List<TextureUsageStruct> TextureUsageList { get; set; }
 
         /// <summary>
         /// The list of Type 2 data structures
         /// </summary>
-        public List<DataStruct2> DataStruct2List { get; set; }
+        public List<ShaderParameterStruct> ShaderParameterList { get; set; }
 
         /// <summary>
         /// The list of Parameter data structures
         /// </summary>
-        public List<ParameterStruct> ParameterStructList { get; set; }
+        public List<TextureDescriptorStruct> TextureDescriptorList { get; set; }
 
         /// <summary>
         /// The byte array of additional data
@@ -218,6 +246,10 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public string MTRLPath { get; set; }
 
+        /// <summary>
+        /// Retreives the Shader information for this Mtrl file.
+        /// </summary>
+        /// <returns></returns>
         public ShaderInfo GetShaderInfo()
         {
             var info = new ShaderInfo();
@@ -259,6 +291,10 @@ namespace xivModdingFramework.Materials.DataContainers
             return info;
         }
 
+        /// <summary>
+        /// Sets the shader info for this Mtrl file.
+        /// </summary>
+        /// <param name="info"></param>
         public void SetShaderInfo(ShaderInfo info)
         {
             switch (info.Shader)
@@ -294,6 +330,11 @@ namespace xivModdingFramework.Materials.DataContainers
             }
         }
 
+        /// <summary>
+        /// Gets the given texture map info based on the textures used in this mtrl file.
+        /// </summary>
+        /// <param name="MapType"></param>
+        /// <returns></returns>
         public MapInfo GetMapInfo(XivTexType MapType)
         {
             var info = new MapInfo();
@@ -302,9 +343,9 @@ namespace xivModdingFramework.Materials.DataContainers
             info.Usage = MapType;
 
             // Look for the right map type in the parameter list.
-            foreach (var paramSet in ParameterStructList)
+            foreach (var paramSet in TextureDescriptorList)
             {
-                if (paramSet.ID == Mtrl._MtrlParamUsage[MapType])
+                if (paramSet.TextureType == Mtrl.TextureDescriptorValues[MapType])
                 {
                     mapIndex = (int) paramSet.TextureIndex;
                     info.Format = GetFormat(paramSet.FileFormat);
@@ -325,7 +366,13 @@ namespace xivModdingFramework.Materials.DataContainers
             return info;
         }
 
-        private static MtrlMapFormat GetFormat(short raw)
+        /// <summary>
+        /// Converts raw Mtrl format data into the appropriate enum.
+        /// Does a bit of math to ignore extraneous bits that don't have known purpose yet.
+        /// </summary>
+        /// <param name="raw"></param>
+        /// <returns></returns>
+        private static MtrlTextureDescriptorFormat GetFormat(short raw)
         {
 
             // Pare format short down of extraneous data.
@@ -335,16 +382,22 @@ namespace xivModdingFramework.Materials.DataContainers
             format = (short)(format | setFirstBit);
 
             // Scan through known formats.
-            foreach (var formatEntry in Mtrl._MtrlParamFormat)
+            foreach (var formatEntry in Mtrl.TextureDescriptorFormatValues)
             {
                 if (format == formatEntry.Value)
                 {
                     return formatEntry.Key;
                 }
             }
-            return MtrlMapFormat.Other;
+            return MtrlTextureDescriptorFormat.Other;
         }
 
+        /// <summary>
+        /// Sets or deletes the texture information from the Mtrl based on the
+        /// incoming usage and info.
+        /// </summary>
+        /// <param name="MapType"></param>
+        /// <param name="info"></param>
         public void SetMapInfo(XivTexType MapType, MapInfo info)
         {
             // Sanity check.
@@ -354,13 +407,13 @@ namespace xivModdingFramework.Materials.DataContainers
             }
            
             var paramIdx = -1;
-            ParameterStruct oldInfo = new ParameterStruct();
+            TextureDescriptorStruct oldInfo = new TextureDescriptorStruct();
             // Look for the right map type in the parameter list.
-            for( var i = 0; i < ParameterStructList.Count; i++)
+            for( var i = 0; i < TextureDescriptorList.Count; i++)
             {
-                var paramSet = ParameterStructList[i];
+                var paramSet = TextureDescriptorList[i];
 
-                if (paramSet.ID == Mtrl._MtrlParamUsage[MapType])
+                if (paramSet.TextureType == Mtrl.TextureDescriptorValues[MapType])
                 {
                     paramIdx = i;
                     oldInfo = paramSet;
@@ -386,26 +439,26 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
 
                 // Remove Parameter List
-                ParameterStructList.RemoveAt(paramIdx);
+                TextureDescriptorList.RemoveAt(paramIdx);
 
                 // Update other texture offsets
-                for(var i = 0; i < ParameterStructList.Count; i++)
+                for(var i = 0; i < TextureDescriptorList.Count; i++)
                 {
-                    var p = ParameterStructList[i];
+                    var p = TextureDescriptorList[i];
                     if(p.TextureIndex > oldInfo.TextureIndex)
                     {
                         p.TextureIndex--;
                     }
-                    ParameterStructList[i] = p;
+                    TextureDescriptorList[i] = p;
                 }
 
                 // Remove struct1 entry for the removed map type, if it exists.
-                for(var i = 0; i < DataStruct1List.Count; i++)
+                for(var i = 0; i < TextureUsageList.Count; i++)
                 {
-                    var s = DataStruct1List[i];
-                    if(s.ID == Mtrl._MtrlStruct1Data[MapType].ID)
+                    var s = TextureUsageList[i];
+                    if(s.TextureType == Mtrl.TextureUsageValues[MapType].TextureType)
                     {
-                        DataStruct1List.RemoveAt(i);
+                        TextureUsageList.RemoveAt(i);
                         break;
                     }
                 }
@@ -414,21 +467,42 @@ namespace xivModdingFramework.Materials.DataContainers
 
             }
 
+            var rootPath = GetTextureRootDirectoy();
+            var defaultFileName = GetDefaultTexureName(info.Usage);
+
+            // No path, assign it by default.
+            if (info.path.Trim() == "")
+            {
+                info.path = rootPath + defaultFileName;
+            }
+
+            var rootPathWithVersion = rootPath;
+            var versionString = GetVersionString();
 
 
-            var raw = new ParameterStruct();
-            raw.ID = Mtrl._MtrlParamUsage[info.Usage];
-            raw.Unknown2 = 15;
-            raw.FileFormat = Mtrl._MtrlParamFormat[info.Format];
+            var defaultFileNameWithoutVersion = GetDefaultTexureName(info.Usage, false);
+
+            // Detokenize paths
+            info.path = info.path.Replace(ItemPathToken, rootPath);
+            info.path = info.path.Replace(VersionToken, versionString);
+            info.path = info.path.Replace(TextureNameToken, defaultFileNameWithoutVersion);
+            info.path = info.path.Replace(CommonPathToken, GetCommonTextureDirectory());
+
+
+
+            var raw = new TextureDescriptorStruct();
+            raw.TextureType = Mtrl.TextureDescriptorValues[info.Usage];
+            raw.Unknown = 15;
+            raw.FileFormat = Mtrl.TextureDescriptorFormatValues[info.Format];
             raw.TextureIndex = (paramIdx >= 0 ? (uint)oldInfo.TextureIndex : (uint)TexturePathList.Count);
 
             // Inject the new parameters.
             if(paramIdx >= 0)
             {
-                ParameterStructList[paramIdx] = raw;
+                TextureDescriptorList[paramIdx] = raw;
             } else
             {
-                ParameterStructList.Add(raw);
+                TextureDescriptorList.Add(raw);
             }
 
             // Inject the new string
@@ -443,10 +517,10 @@ namespace xivModdingFramework.Materials.DataContainers
 
             // Update struct1 entry with the appropriate entry if it's not already there.
             bool foundEntry = false;
-            for (var i = 0; i < DataStruct1List.Count; i++)
+            for (var i = 0; i < TextureUsageList.Count; i++)
             {
-                var s = DataStruct1List[i];
-                if (s.ID == Mtrl._MtrlStruct1Data[MapType].ID)
+                var s = TextureUsageList[i];
+                if (s.TextureType == Mtrl.TextureUsageValues[MapType].TextureType)
                 {
                     foundEntry = true;
                     break;
@@ -455,18 +529,22 @@ namespace xivModdingFramework.Materials.DataContainers
 
             if(!foundEntry)
             {
-                var s1 = new DataStruct1()
+                var s1 = new TextureUsageStruct()
                 {
-                    ID = Mtrl._MtrlStruct1Data[MapType].ID,
-                    Unknown1 = Mtrl._MtrlStruct1Data[MapType].Unknown1
+                    TextureType = Mtrl.TextureUsageValues[MapType].TextureType,
+                    Unknown = Mtrl.TextureUsageValues[MapType].Unknown
                 };
 
-                DataStruct1List.Add(s1);
+                TextureUsageList.Add(s1);
             }
 
         }
 
-
+        /// <summary>
+        /// Retrieve all MapInfo structs for all textures associated with this MTRL,
+        /// Including textures with unknown usage.
+        /// </summary>
+        /// <returns></returns>
         public List<MapInfo> GetAllMapInfos()
         {
             var ret = new List<MapInfo>();
@@ -474,20 +552,20 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 var info = new MapInfo();
                 info.path = TexturePathList[i];
-                info.Format = MtrlMapFormat.Other;
+                info.Format = MtrlTextureDescriptorFormat.Other;
                 info.Usage = XivTexType.Other;
 
                 // Check if the texture appears in the parameter list.
-                foreach(var p in ParameterStructList)
+                foreach(var p in TextureDescriptorList)
                 {
                     if(p.TextureIndex == i)
                     {
                         // This is a known parameter.
-                        if(Mtrl._MtrlParamUsage.ContainsValue(p.ID))
+                        if(Mtrl.TextureDescriptorValues.ContainsValue(p.TextureType))
                         {
-                            var usage = Mtrl._MtrlParamUsage.First(x =>
+                            var usage = Mtrl.TextureDescriptorValues.First(x =>
                             {
-                                return (x.Value == p.ID);
+                                return (x.Value == p.TextureType);
                             }).Key;
                             info.Usage = usage;
                         } else
@@ -505,47 +583,182 @@ namespace xivModdingFramework.Materials.DataContainers
 
             return ret;
         }
+
+
+        /// <summary>
+        /// Retreives the base texture directory this material references.
+        /// </summary>
+        /// <returns></returns>
+        public string GetTextureRootDirectoy()
+        {
+            string root = "";
+            // Attempt to logically deduce base texture path.
+            if (MTRLPath.Contains("material/"))
+            {
+                var match = Regex.Match(MTRLPath, "(.*)material/");
+                if(match.Success)
+                {
+                    root = match.Groups[1].Value + "texture/";
+                }
+            } else
+            {
+                // Default to common texture root.
+                root = GetCommonTextureDirectory();
+            }
+
+            return root;
+        }
+
+        /// <summary>
+        /// Gets the item version this MTRL is attached to, based on directory.
+        /// </summary>
+        /// <returns></returns>
+        public uint GetVersion()
+        {
+            var match = Regex.Match(MTRLPath, "/v([0-9]{4})/");
+            if (match.Success)
+            {
+                return (uint)Int32.Parse(match.Groups[1].Value);
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Gets the version string based on the item version. Ex. 'v03_'
+        /// </summary>
+        /// <returns></returns>
+        public string GetVersionString()
+        {
+            var version = GetVersion();
+
+            var versionString = "";
+            if (version > 0)
+            {
+                versionString += 'v' + (version.ToString().PadLeft(2, '0')) + '_';
+            }
+            return versionString;
+        }
+
+        /// <summary>
+        /// Gets the default texture name for this material for a given texture type.
+        /// </summary>
+        /// <returns></returns>
+        public string GetDefaultTexureName(XivTexType texType, bool includeVersion = true)
+        {
+
+            var ret = "";
+
+            // When available, version number prefixes the texture name.
+            if (includeVersion)
+            {
+                ret += GetVersionString();
+            }
+
+            // Followed by the character and secondary identifier.
+            var match = Regex.Match(MTRLPath, "c[0-9]{4}[a-z][0-9]{4}");
+            if (match.Success)
+            {
+                ret += match.Value;
+            }
+            else {
+                ret += "unknown";
+            }
+
+            // Followed by the material identifier, if above [a].
+            var identifier = GetMaterialIdentifier();
+            if(identifier != 'a')
+            {
+                ret += "_" + identifier;
+            }
+
+            ret += "_met";
+
+            if(texType == XivTexType.Normal)
+            {
+                ret += "_n";
+            } else if(texType == XivTexType.Specular)
+            {
+                ret += "_s";
+            }
+            else if (texType == XivTexType.Multi)
+            {
+                ret += "_m";
+            } else
+            {
+                ret += "_o";
+            }
+
+            ret += ".tex";
+            return ret;
+        }
+
+        /// <summary>
+        /// Gets the Material/Part identifier letter based on the file path.
+        /// </summary>
+        /// <returns></returns>
+        public char GetMaterialIdentifier()
+        {
+            var match = Regex.Match(MTRLPath, "_([a-z])\\.mtrl");
+            if(match.Success)
+            {
+                return match.Groups[1].Value[0];
+            }
+            return 'a';
+        }
+
+
+        /// <summary>
+        /// Get the root shared common texture directory for FFXIV.
+        /// </summary>
+        /// <returns></returns>
+        public static string GetCommonTextureDirectory()
+        {
+            return "chara/common/texture/";
+        }
+
     }
 
     /// <summary>
-    /// This class contains the information for a Type 1 MTRL data structure
+    /// This class contains the information for the texture usage structs in MTRL data.
     /// </summary>
-    public class DataStruct1
+    public class TextureUsageStruct
     {
-        public uint ID;
+        public uint TextureType; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
 
-        public uint Unknown1;
+        public uint Unknown;
     }
 
     /// <summary>
-    /// This class contains the information for a Type 2 MTRL data structure
+    /// This class containst he information for the shader parameters at the end the MTRL File
     /// </summary>
-    public class DataStruct2
+    public class ShaderParameterStruct
     {
-        public uint ID;
+        public uint ParameterID;
 
         public short Offset;
 
         public short Size;
+
+        public List<byte> Bytes;
     }
 
     /// <summary>
-    /// This class contains the information for a MTRL Parameter data structure
+    /// This class contains the information for MTRL texture parameters.
     /// </summary>
-    public class ParameterStruct
+    public class TextureDescriptorStruct
     {
-        public uint ID;
+        public uint TextureType; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
 
-        public short FileFormat;
+        public short FileFormat; // Mappings for this FileFormat value to MtrlTextureDescriptorFormat value are available in Mtrl.cs 
 
-        public short Unknown2;
+        public short Unknown;   // Always seems to be [15]?
 
         public uint TextureIndex;
     }
 
 
     // Enum representation of the format map data is used as.
-    public enum MtrlMapFormat
+    public enum MtrlTextureDescriptorFormat
     {
         WithAlpha,
         WithoutAlpha,
@@ -567,12 +780,13 @@ namespace xivModdingFramework.Materials.DataContainers
     {
         public MtrlShader Shader;
         public bool TransparencyEnabled;
+        // public List<ShaderParameterStruct> AdditionalParameters; - Does this need to be exposed here?
     }
 
     public class MapInfo
     {
         public XivTexType Usage;
-        public MtrlMapFormat Format;
+        public MtrlTextureDescriptorFormat Format;
         public string path;
     }
 
