@@ -635,8 +635,9 @@ namespace xivModdingFramework.Textures.FileTypes
                             break;
                     }
 
-                    if (textureType == xivTex.TextureFormat)
+                    if (true)//textureType == xivTex.TextureFormat)
                     {
+                        xivTex.TextureFormat = textureType;
                         var uncompressedLength = (int)new FileInfo(ddsFileDirectory.FullName).Length - 128;
                         var newTex = new List<byte>();
 
