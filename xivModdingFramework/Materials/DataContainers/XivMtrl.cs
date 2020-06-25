@@ -27,15 +27,15 @@ using xivModdingFramework.Textures.Enums;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
-    /// <summary>
+    /// <summary>Wi
     /// This class holds the information for an MTRL file
     /// </summary>
     public class XivMtrl
     {
-        public const string ItemPathToken = "{ItemPath}";
-        public const string VariantToken = "{Variant}";
-        public const string TextureNameToken = "{TextureName}";
-        public const string CommonPathToken = "{CommonPath}";
+        public const string ItemPathToken = "{item_path}";
+        public const string VariantToken = "{variant}";
+        public const string TextureNameToken = "{texture_name}";
+        public const string CommonPathToken = "{common_path}";
 
         /// <summary>
         /// The MTRL file signature
@@ -906,8 +906,8 @@ namespace xivModdingFramework.Materials.DataContainers
     // Enum representation of the format map data is used as.
     public enum MtrlTextureDescriptorFormat
     {
-        WithAlpha,
-        WithoutAlpha,
+        UsesColorset,
+        NoColorset,
         Other
     }
 

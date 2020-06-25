@@ -76,8 +76,8 @@ namespace xivModdingFramework.Materials.FileTypes
         // MtrlParam constants for file compressions/formats.
         public static Dictionary<MtrlTextureDescriptorFormat, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureDescriptorFormat, short>()
         {
-            { MtrlTextureDescriptorFormat.WithAlpha, -32768 }, // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
-            { MtrlTextureDescriptorFormat.WithoutAlpha, -31936 }  // To have an appreciable change (Either [000000] or [010101])
+            { MtrlTextureDescriptorFormat.UsesColorset, -32768 }, // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { MtrlTextureDescriptorFormat.NoColorset, -31936 }  // To have an appreciable change (Either [000000] or [010101])
             // Non-normal maps are always [WithoutAlpha].  Normal maps are always [WithAlpha], 
             // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
 
@@ -637,7 +637,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     var format = XivTexFormat.DXT1;
                     if(mapInfo.Usage == XivTexType.Normal)
                     {
-                        if(mapInfo.Format == MtrlTextureDescriptorFormat.WithAlpha)
+                        if(mapInfo.Format == MtrlTextureDescriptorFormat.UsesColorset)
                         {
                             format = XivTexFormat.DXT5;
                         } else
