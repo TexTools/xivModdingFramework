@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using TeximpNet.Compression;
 using TeximpNet.DDS;
@@ -59,10 +60,15 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="format"></param>
         /// <returns></returns>
-        public static DirectoryInfo GetDefaultTexturePath(XivTexFormat format)
+        public static DirectoryInfo GetDefaultTexturePath(XivTexType usageType)
         {
             //new DirectoryInfo(Directory.GetFiles("AddNewTexturePartTexTmps", $"{Path.GetFileNameWithoutExtension(oldTexPath)}.dds", SearchOption.AllDirectories)[0]);
-            return new DirectoryInfo(Directory.GetFiles("Resources\\DefaultTextures", format.ToString() + ".dds", SearchOption.AllDirectories)[0]);
+            var strings = Directory.GetFiles("Resources\\DefaultTextures", usageType.ToString() + ".dds", SearchOption.AllDirectories);
+            if(strings.Length == 0)
+            {
+                strings = Directory.GetFiles("Resources\\DefaultTextures", XivTexType.Other.ToString() + ".dds", SearchOption.AllDirectories);
+            }
+            return new DirectoryInfo(strings[0]);
         }
 
         public Tex(DirectoryInfo gameDirectory)
@@ -984,6 +990,32 @@ namespace xivModdingFramework.Textures.FileTypes
             var colorSetData = new List<Half>();
             byte[] colorSetExtraData = null;
 
+
+            colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
+
+            // If the colorset size is 544, it contains extra data that must be imported
+            if (xivMtrl.ColorSetDataSize == 544)
+            {
+                colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
+            }
+
+            // Replace the color set data with the imported data
+            xivMtrl.ColorSetData = colorSetData;
+            xivMtrl.ColorSetExtraData = colorSetExtraData;
+
+            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
+            return await mtrl.ImportMtrl(xivMtrl, item, source);
+        }
+
+
+
+        /// <summary>
+        /// Gets the raw Colorset data list from a dds file.
+        /// </summary>
+        /// <param name="ddsFileDirectory"></param>
+        /// <returns></returns>
+        public List<Half> GetColorsetDataFromDDS(DirectoryInfo ddsFileDirectory)
+        {
             using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
             {
                 // Check DDS type
@@ -1005,49 +1037,52 @@ namespace xivModdingFramework.Textures.FileTypes
                 {
                     throw new Exception($"Incorrect file type. Expected: A16B16G16R16F  Given: {textureType}");
                 }
+                var colorSetData = new List<Half>(256);
 
-                // Skip past rest of the DDS header
+                // skip DDS header
                 br.BaseStream.Seek(128, SeekOrigin.Begin);
 
                 // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
                 // this reads 256 ushort values which is 256 x 2 = 512
                 for (var i = 0; i < 256; i++)
                 {
-                    colorSetData.Add(new Half(br.ReadUInt16()));
+                    colorSetData.Add((new Half(br.ReadUInt16())));
                 }
+
+                return colorSetData;
             }
+        }
 
-            // If the colorset size is 544, it contains extra data that must be imported
-            if (xivMtrl.ColorSetDataSize == 544)
+        /// <summary>
+        /// Retreives the associated .dat file for colorset dye data, if it exists.
+        /// This takes in the .DDS FILE path, not the .DAT file path.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public byte[] GetColorsetExtraDataFromDDS(DirectoryInfo file)
+        {
+            var flagsPath = Path.Combine(Path.GetDirectoryName(file.FullName), (Path.GetFileNameWithoutExtension(file.FullName) + ".dat"));
+
+            byte[] colorSetExtraData;
+            if (File.Exists(flagsPath))
             {
-                var flagsPath = Path.Combine(Path.GetDirectoryName(ddsFileDirectory.FullName), (Path.GetFileNameWithoutExtension(ddsFileDirectory.FullName) + ".dat"));
+                // The extra data after the colorset is always 32 bytes 
+                // This reads 16 ushort values which is 16 x 2 = 32
+                colorSetExtraData = File.ReadAllBytes(flagsPath);
 
-                if (File.Exists(flagsPath))
+                // If for whatever reason there is a .dat file but it's missing data
+                if (colorSetExtraData.Length != 32)
                 {
-                    // The extra data after the colorset is always 32 bytes 
-                    // This reads 16 ushort values which is 16 x 2 = 32
-                    colorSetExtraData = File.ReadAllBytes(flagsPath);
-                    
-                    // If for whatever reason there is a .dat file but it's missing data
-                    if ( colorSetExtraData.Length != 32)
-                    {
-                        // Set all dye modifiers to 0 (undyeable)
-                        colorSetExtraData = new byte[32];
-                    }
-                }
-                else
-                {
-                    // If .dat file is missing set all values to 0 (undyeable)
+                    // Set all dye modifiers to 0 (undyeable)
                     colorSetExtraData = new byte[32];
                 }
             }
-
-            // Replace the color set data with the imported data
-            xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetExtraData = colorSetExtraData;
-
-            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
-            return await mtrl.ImportMtrl(xivMtrl, item, source);
+            else
+            {
+                // If .dat file is missing set all values to 0 (undyeable)
+                colorSetExtraData = new byte[32];
+            }
+            return colorSetExtraData;
         }
 
         /// <summary>
@@ -1059,39 +1094,13 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>The raw mtrl data</returns>
         public byte[] DDStoMtrlData(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, XivLanguage lang)
         {
-            var colorSetData = new List<Half>();
+            var colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
 
-            using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
-            {
-                // skip DDS header
-                br.BaseStream.Seek(128, SeekOrigin.Begin);
-
-                // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
-                // this reads 256 ushort values which is 256 x 2 = 512
-                for (var i = 0; i < 256; i++)
-                {
-                    colorSetData.Add(new Half(br.ReadUInt16()));
-                }
-            }
             var colorSetExtraData = new byte[32];
             // If the colorset size is 544, it contains extra data that must be imported
             if (xivMtrl.ColorSetDataSize == 544)
             {
-                var flagsPath = Path.Combine(Path.GetDirectoryName(ddsFileDirectory.FullName), (Path.GetFileNameWithoutExtension(ddsFileDirectory.FullName) + ".dat"));
-
-                if (File.Exists(flagsPath))
-                {
-                    colorSetExtraData = File.ReadAllBytes(flagsPath);
-                    //using (var br = new BinaryReader(File.OpenRead(flagsPath)))
-                    //{
-                    //    // The extra data after the colorset is always 32 bytes 
-                    //    // This reads 16 ushort values which is 16 x 2 = 32
-                    //    for (var i = 0; i < 16; i++)
-                    //    {
-                    //        colorSetData.Add(new Half(br.ReadUInt16()));
-                    //    }
-                    //}
-                }
+                colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
             }
 
             // Replace the color set data with the imported data
