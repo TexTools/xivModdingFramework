@@ -5,6 +5,7 @@
     <AssemblyVersion>1.0.8.0</AssemblyVersion>
     <Version>1.0.8</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
