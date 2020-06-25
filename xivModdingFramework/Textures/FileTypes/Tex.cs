@@ -635,36 +635,29 @@ namespace xivModdingFramework.Textures.FileTypes
                             break;
                     }
 
-                    if (textureType == xivTex.TextureFormat)
+                    xivTex.TextureFormat = textureType;
+                    var uncompressedLength = (int)new FileInfo(ddsFileDirectory.FullName).Length - 128;
+                    var newTex = new List<byte>();
+
+                    if (!xivTex.TextureTypeAndPath.Path.Contains(".atex"))
                     {
-                        xivTex.TextureFormat = textureType;
-                        var uncompressedLength = (int)new FileInfo(ddsFileDirectory.FullName).Length - 128;
-                        var newTex = new List<byte>();
+                        var DDSInfo = await DDS.ReadDDS(br, xivTex, newWidth, newHeight, newMipCount);
 
-                        if (!xivTex.TextureTypeAndPath.Path.Contains(".atex"))
-                        {
-                            var DDSInfo = await DDS.ReadDDS(br, xivTex, newWidth, newHeight, newMipCount);
+                        newTex.AddRange(_dat.MakeType4DatHeader(xivTex, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, uncompressedLength, newMipCount, newWidth, newHeight));
+                        newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
+                        newTex.AddRange(DDSInfo.compressedDDS);
 
-                            newTex.AddRange(_dat.MakeType4DatHeader(xivTex, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, uncompressedLength, newMipCount, newWidth, newHeight));
-                            newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
-                            newTex.AddRange(DDSInfo.compressedDDS);
-
-                            offset = await _dat.WriteToDat(newTex, modEntry, xivTex.TextureTypeAndPath.Path,
-                                item.ItemCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
-                        }
-                        else
-                        {
-                            br.BaseStream.Seek(128, SeekOrigin.Begin);
-                            newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
-                            newTex.AddRange(br.ReadBytes(uncompressedLength));
-
-                            offset = await _dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
-                                item.ItemCategory, source);
-                        }
+                        offset = await _dat.WriteToDat(newTex, modEntry, xivTex.TextureTypeAndPath.Path,
+                            item.ItemCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
                     }
                     else
                     {
-                        throw new Exception($"Incorrect file type. Expected: {xivTex.TextureFormat}  Given: {textureType}");
+                        br.BaseStream.Seek(128, SeekOrigin.Begin);
+                        newTex.AddRange(MakeTextureInfoHeader(xivTex, newWidth, newHeight, newMipCount));
+                        newTex.AddRange(br.ReadBytes(uncompressedLength));
+
+                        offset = await _dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
+                            item.ItemCategory, source);
                     }
                 }
             }
