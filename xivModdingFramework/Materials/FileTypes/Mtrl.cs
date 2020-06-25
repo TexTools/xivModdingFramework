@@ -654,7 +654,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     var di = Tex.GetDefaultTexturePath(xivTex.TextureFormat);
 
-                    var newOffset = await _tex.TexDDSImporter(xivTex, item, di, "AddNewTextureNameToMaterial");
+                    var newOffset = await _tex.TexDDSImporter(xivTex, item, di, source);
 
                 }
                
