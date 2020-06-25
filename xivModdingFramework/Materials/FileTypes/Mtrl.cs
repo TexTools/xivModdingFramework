@@ -18,6 +18,7 @@ using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -60,6 +61,80 @@ namespace xivModdingFramework.Materials.FileTypes
             get => _dataFile;
             set => _dataFile = value;
         }
+
+
+        // MtrlParam constants for texture types.
+        public static Dictionary<XivTexType, uint> TextureDescriptorValues = new Dictionary<XivTexType, uint>()
+        {
+            { XivTexType.Normal, 207536625 },
+            { XivTexType.Diffuse, 290653886 },
+            { XivTexType.Specular, 731504677 },
+            { XivTexType.Multi, 2320401078 },
+            { XivTexType.Reflection, 4271961042 }   // Used for the Catchlight texture in Iris Materials.
+        };
+
+        // MtrlParam constants for file compressions/formats.
+        public static Dictionary<MtrlTextureDescriptorFormat, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureDescriptorFormat, short>()
+        {
+            { MtrlTextureDescriptorFormat.UsesColorset, -32768 }, // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { MtrlTextureDescriptorFormat.NoColorset, -31936 }  // To have an appreciable change (Either [000000] or [010101])
+            // Non-normal maps are always [WithoutAlpha].  Normal maps are always [WithAlpha], 
+            // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
+
+            // In the case of faces, the first bit is also flipped to 0 for the normal maps.  Unknown why.
+        };
+
+
+        // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
+        // The exact order of these structs does not seem to be important, only the data in question.
+        // It may be viable (though inefficient) to simply include all of them.
+        public static Dictionary<XivTexType, TextureUsageStruct> TextureUsageValues = new Dictionary<XivTexType, TextureUsageStruct>()
+        {
+            { XivTexType.Normal, new TextureUsageStruct() { TextureType = 4113354501, Unknown = 2815623008 } },
+            { XivTexType.Multi, new TextureUsageStruct() { TextureType = 3531043187, Unknown = 4083110193 } },
+            { XivTexType.Diffuse, new TextureUsageStruct() { TextureType = 3054951514, Unknown = 1611594207 } },
+            { XivTexType.Specular, new TextureUsageStruct() { TextureType = 3367837167, Unknown = 2687453224 } },
+        };
+
+        
+        // References to the additional shader data at the end of MTRL files.
+        // Stored by ID, though unknown yet what the IDs correspond to.
+        // I suspect the IDs are used for piping additional maps/values to the shader, such as cube maps for reflection
+        // and skin/hair/iris color, etc. -Sel
+        // The actual byte array values do change a bit, but thus far I haven't been able to notice differences when they're changed.
+        public static Dictionary<MtrlShaderParameterId, List<byte>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<byte>>() {
+            { MtrlShaderParameterId.Common1, new List<byte>(){ 0,0,0,63 } },
+            { MtrlShaderParameterId.Common2, new List<byte>(){ 0,0,128,63 } },
+            { MtrlShaderParameterId.Skin1, new List<byte>(){ 51, 51, 179, 63, 51, 51, 179, 63, 51, 51, 179, 63 } },
+            { MtrlShaderParameterId.Skin2, new List<byte>(){ 0,0,128,63 } },
+            { MtrlShaderParameterId.Skin3, new List<byte>(){ 0,0,64,64 } },
+            { MtrlShaderParameterId.Skin4, new List<byte>(){ 10, 215, 163, 60, 10, 215, 163, 60, 10, 215, 163, 60 } },
+            { MtrlShaderParameterId.Skin5, new List<byte>(){ 205, 204, 204, 62, 205, 204, 204, 62, 205, 204, 204, 62 } },
+            { MtrlShaderParameterId.Skin6, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { MtrlShaderParameterId.Skin7, new List<byte>(){ 0, 0, 130, 66, 0, 0, 200, 66 } },
+            { MtrlShaderParameterId.Skin8, new List<byte>(){ 0, 0, 124, 66 } },
+            { MtrlShaderParameterId.Equipment1, new List<byte>(){ 0, 0, 0, 0 } },
+            { MtrlShaderParameterId.Face1, new List<byte>(){ 0, 0, 0, 66 } },
+            { MtrlShaderParameterId.Hair1, new List<byte>(){ 51, 51, 179, 62 } },
+            { MtrlShaderParameterId.Hair2, new List<byte>(){ 0, 0, 0, 63 } },
+
+
+            { MtrlShaderParameterId.Furniture1, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture2, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture3, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { MtrlShaderParameterId.Furniture4, new List<byte>(){ 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture5, new List<byte>(){ 143, 194, 117, 60 } },
+            { MtrlShaderParameterId.Furniture6, new List<byte>(){ 143, 194, 117, 60 } },
+            { MtrlShaderParameterId.Furniture7, new List<byte>(){ 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture8, new List<byte>(){ 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture9, new List<byte>(){ 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture10, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture11, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture12, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
+            { MtrlShaderParameterId.Furniture13, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63 } },
+        };
+
+
 
         /// <summary>
         /// Gets the MTRL data for the given item 
@@ -247,7 +322,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             try
             {
-                await Task.Run(async () =>
+                await Task.Run((Func<Task>)(async () =>
                 {
                     using (var br = new BinaryReader(new MemoryStream(mtrlData)))
                     {
@@ -299,8 +374,11 @@ namespace xivModdingFramework.Materials.FileTypes
                             }
                             else
                             {
-                                pathSizeList.Add(xivMtrl.MapPathOffsetList[i] -
-                                                 xivMtrl.TexturePathOffsetList[xivMtrl.TextureCount - 1]);
+                                if (xivMtrl.TextureCount > 0)
+                                {
+                                    pathSizeList.Add(xivMtrl.MapPathOffsetList[i] -
+                                                     xivMtrl.TexturePathOffsetList[xivMtrl.TextureCount - 1]);
+                                }
                             }
                         }
 
@@ -348,6 +426,7 @@ namespace xivModdingFramework.Materials.FileTypes
                             xivMtrl.TexturePathList.Add(texturePath);
                             count++;
                         }
+
 
                         // add the textures to the TextureTypePathList
                         xivMtrl.TextureTypePathList.AddRange(await GetTexNames(xivMtrl.TexturePathList, DataFile));
@@ -407,47 +486,62 @@ namespace xivModdingFramework.Materials.FileTypes
                             }
                         }
 
-                        xivMtrl.AdditionalDataSize = br.ReadUInt16();
+                        var originalShaderParameterDataSize = br.ReadUInt16();
 
-                        xivMtrl.DataStruct1Count = br.ReadUInt16();
+                        var originalTextureUsageCount = br.ReadUInt16();
 
-                        xivMtrl.DataStruct2Count = br.ReadUInt16();
+                        var originalShaderParameterCount = br.ReadUInt16();
 
-                        xivMtrl.ParameterStructCount = br.ReadUInt16();
+                        var originalTextureDescriptorCount = br.ReadUInt16();
 
                         xivMtrl.ShaderNumber = br.ReadUInt16();
 
                         xivMtrl.Unknown3 = br.ReadUInt16();
 
-                        xivMtrl.DataStruct1List = new List<DataStruct1>(xivMtrl.DataStruct1Count);
-                        for (var i = 0; i < xivMtrl.DataStruct1Count; i++)
+                        xivMtrl.TextureUsageList = new List<TextureUsageStruct>((int)originalTextureUsageCount);
+                        for (var i = 0; i < originalTextureUsageCount; i++)
                         {
-                            xivMtrl.DataStruct1List.Add(new DataStruct1
-                                {ID = br.ReadUInt32(), Unknown1 = br.ReadUInt32()});
-                        }
-
-                        xivMtrl.DataStruct2List = new List<DataStruct2>(xivMtrl.DataStruct2Count);
-                        for (var i = 0; i < xivMtrl.DataStruct2Count; i++)
-                        {
-                            xivMtrl.DataStruct2List.Add(new DataStruct2
-                                {ID = br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()});
-                        }
-
-                        xivMtrl.ParameterStructList = new List<ParameterStruct>(xivMtrl.ParameterStructCount);
-                        for (var i = 0; i < xivMtrl.ParameterStructCount; i++)
-                        {
-                            xivMtrl.ParameterStructList.Add(new ParameterStruct
+                            xivMtrl.TextureUsageList.Add(new TextureUsageStruct
                             {
-                                ID = br.ReadUInt32(),
-                                Unknown1 = br.ReadInt16(),
-                                Unknown2 = br.ReadInt16(),
+                                TextureType = br.ReadUInt32(), Unknown = br.ReadUInt32()});
+                        }
+
+                        xivMtrl.ShaderParameterList = new List<ShaderParameterStruct>(originalShaderParameterCount);
+                        for (var i = 0; i < originalShaderParameterCount; i++)
+                        {
+                            xivMtrl.ShaderParameterList.Add(new ShaderParameterStruct
+                            {
+                                ParameterID = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()});
+                        }
+
+                        xivMtrl.TextureDescriptorList = new List<TextureDescriptorStruct>(originalTextureDescriptorCount);
+                        for (var i = 0; i < originalTextureDescriptorCount; i++)
+                        {
+                            xivMtrl.TextureDescriptorList.Add(new TextureDescriptorStruct
+                            {
+                                TextureType = br.ReadUInt32(),
+                                FileFormat = br.ReadInt16(),
+                                Unknown = br.ReadInt16(),
                                 TextureIndex = br.ReadUInt32()
                             });
                         }
 
-                        xivMtrl.AdditionalData = br.ReadBytes(xivMtrl.AdditionalDataSize);
+                        var shaderBytes = br.ReadBytes(originalShaderParameterDataSize);
+
+                        foreach (var shaderParam in xivMtrl.ShaderParameterList)
+                        {
+                            var offset = shaderParam.Offset;
+                            var size = shaderParam.Size;
+                            shaderParam.Bytes = new List<byte>();
+                            for(var idx = offset; idx < offset + size; idx++)
+                            {
+                                shaderParam.Bytes.Add(shaderBytes[idx]);
+                            }
+                        }
+
+
                     }
-                });
+                }));
             }
             finally
             {
@@ -508,22 +602,9 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        /// <summary>
-        /// Toggles Translucency for an item on or off
-        /// </summary>
-        /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
-        /// <param name="item">The item to toggle translucency for</param>
-        /// <param name="translucencyEnabled">Flag determining if translucency is to be enabled or disabled</param>
-        /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task ToggleTranslucency(XivMtrl xivMtrl, IItem item, bool translucencyEnabled, string source)
-        {
-            xivMtrl.ShaderNumber = !translucencyEnabled ? (ushort) 0x0D : (ushort) 0x1D;
-
-            await ImportMtrl(xivMtrl, item, source);
-        }
 
         /// <summary>
-        /// Imports an MTRL file
+        /// Imports a XivMtrl by converting it to bytes, then injecting it.
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item whos mtrl is being imported</param>
@@ -533,108 +614,51 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             try
             {
-                var mtrlBytes = new List<byte>();
-
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.FileSize));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ColorSetDataSize));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialDataSize));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TexturePathsDataSize));
-                mtrlBytes.Add(xivMtrl.TextureCount);
-                mtrlBytes.Add(xivMtrl.MapCount);
-                mtrlBytes.Add(xivMtrl.ColorSetCount);
-                mtrlBytes.Add(xivMtrl.UnknownDataSize);
-
-                for (var i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
-                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathUnknownList[i]));
-                }
-
-                for (var i = 0; i < xivMtrl.MapPathOffsetList.Count; i++)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathOffsetList[i]));
-                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathUnknownList[i]));
-                }
-
-                for (var i = 0; i < xivMtrl.ColorSetPathOffsetList.Count; i++)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathOffsetList[i]));
-                    mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathUnknownList[i]));
-                }
-
-                var pathStringList = new List<byte>();
-
-                foreach (var texPathString in xivMtrl.TexturePathList)
-                {
-                    pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
-                    pathStringList.Add(0);
-                }
-
-                foreach (var mapPathString in xivMtrl.MapPathList)
-                {
-                    pathStringList.AddRange(Encoding.UTF8.GetBytes(mapPathString));
-                    pathStringList.Add(0);
-                }
-
-                foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
-                {
-                    pathStringList.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
-                    pathStringList.Add(0);
-                }
-
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
-                pathStringList.Add(0);
-
-                var paddingSize = xivMtrl.MaterialDataSize - pathStringList.Count;
-
-                pathStringList.AddRange(new byte[paddingSize]);
-
-                mtrlBytes.AddRange(pathStringList);
-
-                mtrlBytes.AddRange(xivMtrl.Unknown2);
-
-                foreach (var colorSetHalf in xivMtrl.ColorSetData)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes(colorSetHalf.RawValue));
-                }
-
-                if (xivMtrl.ColorSetDataSize == 544)
-                {
-                    mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
-                }
-
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.AdditionalDataSize));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct1Count));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct2Count));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ParameterStructCount));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderNumber));
-                mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
-
-                foreach (var dataStruct1 in xivMtrl.DataStruct1List)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.ID));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown1));
-                }
-
-                foreach (var dataStruct2 in xivMtrl.DataStruct2List)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.ID));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Offset));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Size));
-                }
-
-                foreach (var parameterStruct in xivMtrl.ParameterStructList)
-                {
-                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.ID));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown1));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown2));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
-                }
-
-                mtrlBytes.AddRange(xivMtrl.AdditionalData);
-
+                var mtrlBytes = CreateMtrlFile(xivMtrl, item);
                 var dat = new Dat(_gameDirectory);
+
+
+                // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
+                var mapInfoList = xivMtrl.GetAllMapInfos(false);
+                var _index = new Index(_gameDirectory);
+                var _tex = new Tex(_gameDirectory);
+                foreach (var mapInfo in mapInfoList)
+                {
+                    var path = mapInfo.path;
+                    var fileHash = HashGenerator.GetHash(Path.GetFileName(path));
+                    var pathHash = HashGenerator.GetHash(path.Substring(0, path.LastIndexOf("/", StringComparison.Ordinal)));
+                    var exists = await _index.FileExists(fileHash, pathHash, XivDataFile._04_Chara);
+
+                    if(exists)
+                    {
+                        continue;
+                    }
+
+                    var format = XivTexFormat.DXT1;
+                    if(mapInfo.Usage == XivTexType.Normal)
+                    {
+                        if(mapInfo.Format == MtrlTextureDescriptorFormat.UsesColorset)
+                        {
+                            format = XivTexFormat.DXT5;
+                        } else
+                        {
+                            format = XivTexFormat.A8R8G8B8;
+                        }
+                    }
+
+                    var xivTex = new XivTex();
+                    xivTex.TextureTypeAndPath = new TexTypePath()
+                    {
+                        DataFile = XivDataFile._04_Chara, Path = path, Type = mapInfo.Usage
+                    };
+                    xivTex.TextureFormat = format;
+
+                    var di = Tex.GetDefaultTexturePath(xivTex.TextureFormat);
+
+                    var newOffset = await _tex.TexDDSImporter(xivTex, item, di, "AddNewTextureNameToMaterial");
+
+                }
+               
                 return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.ItemCategory, source);
             }
             catch(Exception ex)
@@ -644,25 +668,80 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         /// <summary>
-        /// Creates an MTRL file
+        /// Converts an XivMtrl object into the raw bytes of a Mtrl file.
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item</param>
         /// <returns>The new mtrl file byte data</returns>
         public byte[] CreateMtrlFile(XivMtrl xivMtrl, IItem item)
         {
+
             var mtrlBytes = new List<byte>();
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.FileSize));
+
+            var fileSizePointer = mtrlBytes.Count;
+            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)0)); //Backfilled later
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ColorSetDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TexturePathsDataSize));
-            mtrlBytes.Add(xivMtrl.TextureCount);
-            mtrlBytes.Add(xivMtrl.MapCount);
-            mtrlBytes.Add(xivMtrl.ColorSetCount);
+
+            var materialDataSizePointer = mtrlBytes.Count;
+            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)0)); //Backfilled later
+
+            var texturePathsDataSizePointer = mtrlBytes.Count;
+            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)0)); //Backfilled later
+
+            mtrlBytes.Add((byte)xivMtrl.TexturePathList.Count);
+            mtrlBytes.Add((byte)xivMtrl.MapPathList.Count);
+            mtrlBytes.Add((byte)xivMtrl.ColorSetPathList.Count);
             mtrlBytes.Add(xivMtrl.UnknownDataSize);
 
+            // Regenerate offset list as we build the string list.
+            xivMtrl.TexturePathOffsetList.Clear();
+            xivMtrl.MapPathOffsetList.Clear();
+            xivMtrl.ColorSetPathOffsetList.Clear();
+
+
+            var stringListBytes = new List<byte>();
+
+            foreach (var texPathString in xivMtrl.TexturePathList)
+            {
+                xivMtrl.TexturePathOffsetList.Add(stringListBytes.Count);
+                stringListBytes.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
+                stringListBytes.Add(0);
+            }
+
+            foreach (var mapPathString in xivMtrl.MapPathList)
+            {
+                xivMtrl.MapPathOffsetList.Add(stringListBytes.Count);
+                stringListBytes.AddRange(Encoding.UTF8.GetBytes(mapPathString));
+                stringListBytes.Add(0);
+            }
+
+            foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
+            {
+                xivMtrl.ColorSetPathOffsetList.Add(stringListBytes.Count);
+                stringListBytes.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
+                stringListBytes.Add(0);
+            }
+
+            xivMtrl.TexturePathsDataSize = (ushort)stringListBytes.Count;
+
+            stringListBytes.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
+            stringListBytes.Add(0);
+
+            var padding = (stringListBytes.Count % 8);
+            if (padding != 0)
+            {
+                padding = 8 - padding;
+            }
+
+            stringListBytes.AddRange(new byte[padding]);
+            xivMtrl.MaterialDataSize = (ushort)stringListBytes.Count;
+
+
+
+
+            // Write the new offset list.
             for (var i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
             {
                 mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
@@ -681,34 +760,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathUnknownList[i]));
             }
 
-            var pathStringList = new List<byte>();
-
-            foreach (var texPathString in xivMtrl.TexturePathList)
-            {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
-                pathStringList.Add(0);
-            }
-
-            foreach (var mapPathString in xivMtrl.MapPathList)
-            {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(mapPathString));
-                pathStringList.Add(0);
-            }
-
-            foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
-            {
-                pathStringList.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
-                pathStringList.Add(0);
-            }
-
-            pathStringList.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
-            pathStringList.Add(0);
-
-            var paddingSize = xivMtrl.MaterialDataSize - pathStringList.Count;
-
-            pathStringList.AddRange(new byte[paddingSize]);
-
-            mtrlBytes.AddRange(pathStringList);
+            // Write the actual string list (including padding).
+            mtrlBytes.AddRange(stringListBytes);
 
             mtrlBytes.AddRange(xivMtrl.Unknown2);
 
@@ -722,36 +775,65 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
             }
 
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.AdditionalDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct1Count));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.DataStruct2Count));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ParameterStructCount));
+
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderParameterDataSize));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TextureUsageCount));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderParameterCount));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TextureDescriptorCount));
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderNumber));
+
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
 
-            foreach (var dataStruct1 in xivMtrl.DataStruct1List)
+            foreach (var dataStruct1 in xivMtrl.TextureUsageList)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.ID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown1));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.TextureType));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown));
             }
 
-            foreach (var dataStruct2 in xivMtrl.DataStruct2List)
+            foreach (var dataStruct2 in xivMtrl.ShaderParameterList)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.ID));
+                mtrlBytes.AddRange(BitConverter.GetBytes((uint)dataStruct2.ParameterID));
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Size));
             }
 
-            foreach (var parameterStruct in xivMtrl.ParameterStructList)
+            foreach (var parameterStruct in xivMtrl.TextureDescriptorList)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.ID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown1));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown2));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureType));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.FileFormat));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
             }
 
-            mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
+
+            var ordered = (IEnumerable<ShaderParameterStruct>)xivMtrl.ShaderParameterList.OrderBy(x => x.Offset);
+            var shaderBytes = new List<byte>();
+            foreach (var shaderParam in ordered)
+            {
+                //shaderBytes.AddRange(Mtrl.ShaderParameterValues[shaderParam.ParameterID]);
+                //shaderBytes.AddRange(new byte[shaderParam.Bytes.Count]);
+                shaderBytes.AddRange(shaderParam.Bytes);
+            }
+
+            // Pad out if we're missing anything.
+            if (shaderBytes.Count < xivMtrl.ShaderParameterDataSize)
+            {
+                shaderBytes.AddRange(new byte[xivMtrl.ShaderParameterDataSize - shaderBytes.Count]);
+            }
+            mtrlBytes.AddRange(shaderBytes);
+
+            //mtrlBytes.AddRange(xivMtrl.AdditionalData);
+
+
+            // Backfill the actual file size data.
+            xivMtrl.FileSize = (short)mtrlBytes.Count;
+            IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes(xivMtrl.FileSize), fileSizePointer);
+
+            xivMtrl.MaterialDataSize = (ushort)stringListBytes.Count;
+            IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes(xivMtrl.MaterialDataSize), materialDataSizePointer);
+
+            IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes(xivMtrl.TexturePathsDataSize), texturePathsDataSizePointer);
             return mtrlBytes.ToArray();
         }
 
