@@ -427,7 +427,6 @@ namespace xivModdingFramework.Materials.FileTypes
                             count++;
                         }
 
-
                         // add the textures to the TextureTypePathList
                         xivMtrl.TextureTypePathList.AddRange(await GetTexNames(xivMtrl.TexturePathList, DataFile));
 

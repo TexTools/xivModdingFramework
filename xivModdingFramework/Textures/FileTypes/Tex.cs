@@ -635,7 +635,7 @@ namespace xivModdingFramework.Textures.FileTypes
                             break;
                     }
 
-                    if (true)//textureType == xivTex.TextureFormat)
+                    if (textureType == xivTex.TextureFormat)
                     {
                         xivTex.TextureFormat = textureType;
                         var uncompressedLength = (int)new FileInfo(ddsFileDirectory.FullName).Length - 128;
@@ -1106,7 +1106,7 @@ namespace xivModdingFramework.Textures.FileTypes
             xivMtrl.ColorSetExtraData = colorSetExtraData;
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
-            return  mtrl.CreateMtrlFile(xivMtrl, item);
+            return mtrl.CreateMtrlFile(xivMtrl, item);
         }
 
         /// <summary>

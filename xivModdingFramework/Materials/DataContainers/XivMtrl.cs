@@ -27,7 +27,7 @@ using xivModdingFramework.Textures.Enums;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
-    /// <summary>Wi
+    /// <summary>
     /// This class holds the information for an MTRL file
     /// </summary>
     public class XivMtrl

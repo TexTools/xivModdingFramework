@@ -1525,7 +1525,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (partDataDict[partNum].TextureCoordinates1.Count < 1 && hasTextureCoordinate1)
                         {
-                            for (var k = 0; k < partDataDict[i].TextureCoordinateStride; k++)
+                            for (var k = 0; k < partDataDict[partNum].TextureCoordinateStride; k++)
                             {
                                 meshDataDictionary[i].TextureCoordinates1.Add(0);
                             }

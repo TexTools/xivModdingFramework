@@ -440,44 +440,16 @@ namespace xivModdingFramework.Models.FileTypes
                                 indexStride = 6;
                                 toolType = ToolType.OpenCOLLADA;
                             }
-                            else if (tool.Contains("FBX"))
-                            {
-                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
-                                    $"TexTools requires the use of OpenCOLLADA.");
-                                /*
-                                pos    = "-position-array";
-                                norm   = "-normal0-array";
-                                vcol   = "_color0-array";
-                                texc   = "-uv0-array";
-                                texc2  = "-uv1-array";
-                                valpha = "-uv2-array";
-                                indexStride = 6;
-                                vertexColorStride = 4;
-                                toolType = "FBXCOLLADA";
-                                */
-                            }
-                            else if (tool.Contains("FFXIV TexTools"))
-                            {
-                                vcol = "-col0-array";
-                                texc = "-map0-array";
-                                texc2 = "-map1-array";
-                                valpha = "-map2-array";
-                                norm = "-normals-array";
-                                pos = "-positions-array";
-                                textureCoordinateStride = 2;
-                                indexStride = 4;
-                                toolType = ToolType.TexTools;
-                            }
                             else if (tool.Contains("Blender"))
                             {
-                                texc = "-map-0-array";
-                                texc2 = "-map-1-array";
-                                valpha = "-map-2-array";
-                                vcol = "-col-0-array";
-                                pos = "-mesh-positions-array";
-                                norm = "-mesh-normals-array";
-                                biNorm = "-mesh-bitangents-array";
-                                tang   = "-mesh-tangents-array";
+                                texc    = "-map-0-array";
+                                texc2   = "-map-1-array";
+                                valpha  = "-map-2-array";
+                                vcol    = "-col-0-array";
+                                pos     = "-mesh-positions-array";
+                                norm    = "-mesh-normals-array";
+                                biNorm  = "-mesh-bitangents-array";
+                                tang    = "-mesh-tangents-array";
                                 indexStride = 1;
                                 toolType = ToolType.Blender;
                             }
