@@ -688,7 +688,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Gets the item version this MTRL is attached to, based on directory.
         /// </summary>
         /// <returns></returns>
-        public uint GetVersion()
+        public uint GetVariant()
         {
             var match = Regex.Match(MTRLPath, "/v([0-9]{4})/");
             if (match.Success)
@@ -704,7 +704,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public string GetVariantString()
         {
-            var version = GetVersion();
+            var version = GetVariant();
 
             var versionString = "";
             if (version > 0)

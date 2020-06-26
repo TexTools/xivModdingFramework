@@ -892,7 +892,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="itemType">The type of the item</param>
         /// <param name="type">The item type whether Primary or Secondary</param>
         /// <returns>A tuple containing the mtrl folder and file, and whether it has a vfx</returns>
-        private async Task<(string Folder, string File, bool HasVfx)> GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType, string type)
+        public async Task<(string Folder, string File, bool HasVfx)> GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType, string type)
         {
             // The default version number
             var version = "0001";
