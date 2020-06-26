@@ -532,9 +532,16 @@ namespace xivModdingFramework.Materials.FileTypes
                             var offset = shaderParam.Offset;
                             var size = shaderParam.Size;
                             shaderParam.Bytes = new List<byte>();
-                            for(var idx = offset; idx < offset + size; idx++)
+                            if (offset + size <= shaderBytes.Length)
                             {
-                                shaderParam.Bytes.Add(shaderBytes[idx]);
+                                for (var idx = offset; idx < offset + size; idx++)
+                                {
+                                    shaderParam.Bytes.Add(shaderBytes[idx]);
+                                }
+                            } else
+                            {
+                                // Just use a blank array if we have missing/invalid shader data.
+                                shaderParam.Bytes = new List<byte>(new byte[size]);
                             }
                         }
 
