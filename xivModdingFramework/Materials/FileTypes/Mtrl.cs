@@ -633,17 +633,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         continue;
                     }
 
-                    var format = XivTexFormat.DXT1;
-                    if(mapInfo.Usage == XivTexType.Normal)
-                    {
-                        if(mapInfo.Format == MtrlTextureDescriptorFormat.UsesColorset)
-                        {
-                            format = XivTexFormat.DXT5;
-                        } else
-                        {
-                            format = XivTexFormat.A8R8G8B8;
-                        }
-                    }
+                    var format = XivTexFormat.A8R8G8B8;
 
                     var xivTex = new XivTex();
                     xivTex.TextureTypeAndPath = new TexTypePath()
@@ -652,7 +642,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     };
                     xivTex.TextureFormat = format;
 
-                    var di = Tex.GetDefaultTexturePath(xivTex.TextureFormat);
+                    var di = Tex.GetDefaultTexturePath(mapInfo.Usage);
 
                     var newOffset = await _tex.TexDDSImporter(xivTex, item, di, source);
 
