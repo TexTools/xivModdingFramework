@@ -867,6 +867,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return true;
         }
+
         /// <summary>
         /// Adds a new file descriptor/stub into the Index files.
         /// </summary>
@@ -1124,6 +1125,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return true;
         }
+
         /// <summary>
         /// Updates the .index files offset for a given item.
         /// </summary>
@@ -1187,6 +1189,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return oldOffset;
         }
+
         /// <summary>
         /// Updates the .index2 files offset for a given item.
         /// </summary>

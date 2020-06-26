@@ -440,32 +440,16 @@ namespace xivModdingFramework.Models.FileTypes
                                 indexStride = 6;
                                 toolType = ToolType.OpenCOLLADA;
                             }
-                            else if (tool.Contains("FBX"))
-                            {
-                                throw new FormatException($"The Authoring Tool being used is unsupported.  Tool:{tool}\n" +
-                                    $"TexTools requires the use of OpenCOLLADA.");
-                                /*
-                                pos    = "-position-array";
-                                norm   = "-normal0-array";
-                                vcol   = "_color0-array";
-                                texc   = "-uv0-array";
-                                texc2  = "-uv1-array";
-                                valpha = "-uv2-array";
-                                indexStride = 6;
-                                vertexColorStride = 4;
-                                toolType = "FBXCOLLADA";
-                                */
-                            }
                             else if (tool.Contains("Blender"))
                             {
-                                texc = "-map-0-array";
-                                texc2 = "-map-1-array";
-                                valpha = "-map-2-array";
-                                vcol = "-col-0-array";
-                                pos = "-mesh-positions-array";
-                                norm = "-mesh-normals-array";
-                                biNorm = "-mesh-bitangents-array";
-                                tang   = "-mesh-tangents-array";
+                                texc    = "-map-0-array";
+                                texc2   = "-map-1-array";
+                                valpha  = "-map-2-array";
+                                vcol    = "-col-0-array";
+                                pos     = "-mesh-positions-array";
+                                norm    = "-mesh-normals-array";
+                                biNorm  = "-mesh-bitangents-array";
+                                tang    = "-mesh-tangents-array";
                                 indexStride = 1;
                                 toolType = ToolType.Blender;
                             }
@@ -520,43 +504,44 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     if (reader.Name.Contains("float_array"))
                                     {
+                                        var currentId = reader["id"].ToLower();
                                         // Positions 
-                                        if (reader["id"].ToLower().Contains(pos))
+                                        if (currentId.EndsWith(pos))
                                         {
                                             cData.Positions.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         // Normals
-                                        else if (reader["id"].ToLower().Contains(norm) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(norm) && cData.Positions.Count > 0)
                                         {
                                             cData.Normals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         // Vertex Colors                                        
-                                        else if(reader["id"].ToLower().Contains(vcol) && cData.Positions.Count > 0)
+                                        else if(currentId.EndsWith(vcol) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexColors.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Texture Coordinates
-                                        else if (reader["id"].ToLower().Contains(texc) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(texc) && cData.Positions.Count > 0)
                                         {
                                             cData.TextureCoordinates0.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Texture Coordinates2
-                                        else if (reader["id"].ToLower().Contains(texc2) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(texc2) && cData.Positions.Count > 0)
                                         {
                                             cData.TextureCoordinates1.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         // Vertex Alphas
-                                        else if (reader["id"].ToLower().Contains(valpha) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(valpha) && cData.Positions.Count > 0)
                                         {
                                             cData.VertexAlphas.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //Tangents
-                                        else if (reader["id"].ToLower().Contains(tang) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(tang) && cData.Positions.Count > 0)
                                         {
                                             cData.Tangents.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }
                                         //BiNormals
-                                        else if (reader["id"].ToLower().Contains(biNorm) && cData.Positions.Count > 0)
+                                        else if (currentId.EndsWith(biNorm) && cData.Positions.Count > 0)
                                         {
                                             cData.BiNormals.AddRange((float[])reader.ReadElementContentAs(typeof(float[]), null));
                                         }

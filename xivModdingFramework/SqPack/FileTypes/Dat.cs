@@ -1254,8 +1254,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                             }
                             if (NewFilesNeedToBeAdded)
                             {
-                                index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
-                                index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                                var success = true;
+                                success = success && index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
+                                success = success && index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                                if(!success)
+                                {
+                                    throw new Exception("Failed to create file descriptor.");
+                                }
                             }
                             var originalOffset = await index.UpdateIndex(mod.data.modOffset, internalFilePath, dataFile) * 8;
                             await index.UpdateIndex2(mod.data.modOffset, internalFilePath, dataFile);
@@ -1376,8 +1381,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
                     if (NewFilesNeedToBeAdded)
                     {
-                        index.AddFileDescriptor(internalFilePath, offset, dataFile); 
-                        index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                        var success = true;
+                        success = success && index.AddFileDescriptor(internalFilePath, offset, dataFile);
+                        success = success && index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
+                        if (!success)
+                        {
+                            throw new Exception("Failed to create file descriptor.");
+                        }
                     }
                     var oldOffset = await index.UpdateIndex(offset, internalFilePath, dataFile) * 8;
                     await index.UpdateIndex2(offset, internalFilePath, dataFile);
