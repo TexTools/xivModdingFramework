@@ -53,9 +53,21 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item">The item to get the version for</param>
         /// <param name="modelInfo">The model info of the item</param>
         /// <returns>The XivImc Data</returns>
-        public async Task<XivImc> GetImcInfo(IItemModel item, XivModelInfo modelInfo)
+        public async Task<XivImc> GetImcInfo(IItemModel item, XivModelInfo modelInfo = null)
         {
             var xivImc = new XivImc();
+
+            // Set based on item if we don't have one provided directly.
+            if(modelInfo == null)
+            {
+                modelInfo = item.ModelInfo;
+            }
+
+            // If it's still null, error.
+            if(modelInfo == null)
+            {
+               throw new NotSupportedException("Cannot get IMC info.");
+            }
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -90,6 +102,8 @@ namespace xivModdingFramework.Variants.FileTypes
                         throw new Exception($"Could not find offset for {imcPath.Folder}/{imcPath.File}");
                     }
 
+                    // This is changing a public GLOBAL variable in the IMC class.
+                    // This is begging to cause really awful to diagnose errors.
                     ChangedType = true;
                 }
                 else

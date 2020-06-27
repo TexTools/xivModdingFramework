@@ -36,6 +36,7 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
 using System.Diagnostics;
+using xivModdingFramework.Items.Categories;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -63,6 +64,86 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         public byte[] MDLRawData { get; set; }
+
+
+        /// <summary>
+        /// Retrieves all items that share the same model.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="language"></param>
+        /// <returns></returns>
+        public async Task<List<IItemModel>> GetSameModelList(IItemModel item, XivLanguage language = XivLanguage.English)
+        {
+            var sameModelItems = new List<IItemModel>();
+            var gear = new Gear(_gameDirectory, language);
+            var character = new Character(_gameDirectory, language);
+            var companions = new Companions(_gameDirectory, language);
+            var ui = new UI(_gameDirectory, language);
+            var housing = new Housing(_gameDirectory, language);
+
+            if (item.Category.Equals(XivStrings.Gear))
+            {
+
+                // Scan the gear list for anything using the same model ID and slot.
+                sameModelItems.AddRange(
+                    (await gear.GetGearList())
+                    .Where(it =>
+                    it.ModelInfo.ModelID == item.ModelInfo.ModelID
+                    && it.ItemCategory == item.ItemCategory).Select(it => it as IItemModel).ToList()
+                );
+            }
+            else if (item.Category.Equals(XivStrings.Character))
+            {
+                
+                // Character models are assumed to have no shared models,
+                // So return a copy of the original item.
+                sameModelItems.Add(
+                    new XivGenericItemModel
+                    {
+                        Category = item.Category,
+                        ItemCategory = item.ItemCategory,
+                        ItemSubCategory = item.ItemSubCategory,
+                        ModelInfo = new XivModelInfo
+                        {
+                            Body = item.ModelInfo.Body,
+                            ModelID = item.ModelInfo.ModelID,
+                            ModelType = item.ModelInfo.ModelType,
+                            Variant = item.ModelInfo.Variant
+                        },
+                        Name = item.Name
+                    }
+                    as IItemModel
+                );
+            }
+            //companions
+            //sameModelItems.AddRange(
+            //    (await companions.GetMinionList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            //sameModelItems.AddRange(
+            //    (await companions.GetMountList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            //sameModelItems.AddRange(
+            //    (await companions.GetPetList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            //housing
+            //sameModelItems.AddRange(
+            //    (await housing.GetFurnitureList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            return sameModelItems;
+        }
+
 
         /// <summary>
         /// Gets the MDL Data given a model and race

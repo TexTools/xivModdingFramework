@@ -346,7 +346,7 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<Dictionary<string, char[]>> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel)
         {
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
 
             var equipPartDictionary = new Dictionary<string, char[]>();
 

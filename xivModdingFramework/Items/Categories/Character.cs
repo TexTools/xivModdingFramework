@@ -234,7 +234,7 @@ namespace xivModdingFramework.Items.Categories
             var file = "";
             var typeDict = HairSlotAbbreviationDictionary;
 
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
 
             if (charaItem.ItemCategory == XivStrings.Hair)
             {
@@ -299,7 +299,7 @@ namespace xivModdingFramework.Items.Categories
             var folder = "";
             var file = "";
 
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
 
             if (charaItem.ItemCategory == XivStrings.Body)
             {

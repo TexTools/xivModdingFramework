@@ -222,7 +222,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";
