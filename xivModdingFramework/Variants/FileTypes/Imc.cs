@@ -78,17 +78,17 @@ namespace xivModdingFramework.Variants.FileTypes
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            var itemType = ItemType.GetItemType(item);
+            var itemType = ItemType.GetPrimaryItemType(item);
             var imcPath = GetImcPath(modelInfo, itemType);
 
-            var itemCategory = item.ItemCategory;
+            var itemCategory = item.SecondaryCategory;
 
             var imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder),
                 HashGenerator.GetHash(imcPath.File), _dataFile);
 
             if (imcOffset == 0)
             {
-                if (item.ItemCategory == XivStrings.Two_Handed)
+                if (item.SecondaryCategory == XivStrings.Two_Handed)
                 {
                     itemCategory = XivStrings.Hands;
                     itemType = XivItemType.equipment;
@@ -123,7 +123,7 @@ namespace xivModdingFramework.Variants.FileTypes
                     if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
                     {
                         // weapons and monsters do not have variant sets
-                        variantOffset = (modelInfo.Variant * variantLength) + headerLength;
+                        variantOffset = (modelInfo.ImcSubsetID * variantLength) + headerLength;
 
                         // use default if offset is out of range
                         if (variantOffset >= imcData.Length)
@@ -136,7 +136,7 @@ namespace xivModdingFramework.Variants.FileTypes
                         // Variant Sets contain 5 variants for each slot
                         // These can be Head, Body, Hands, Legs, Feet  or  Ears, Neck, Wrists, LRing, RRing
                         // This skips to the correct variant set, then to the correct slot within that set for the item
-                        variantOffset = (modelInfo.Variant * variantSetLength) +
+                        variantOffset = (modelInfo.ImcSubsetID * variantSetLength) +
                                         (_slotOffsetDictionary[itemCategory] * variantLength) + headerLength;
 
                         // use defalut if offset is out of range
@@ -150,7 +150,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
                     // if(variantOffset)
 
-                    xivImc.Version = br.ReadByte();
+                    xivImc.Variant = br.ReadByte();
                     var unknown = br.ReadByte();
                     xivImc.Mask = br.ReadUInt16();
                     xivImc.Vfx = br.ReadByte();
@@ -172,7 +172,7 @@ namespace xivModdingFramework.Variants.FileTypes
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            var itemType = ItemType.GetItemType(item);
+            var itemType = ItemType.GetPrimaryItemType(item);
             var imcPath = GetImcPath(modelInfo, itemType);
 
             var imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
@@ -202,7 +202,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
                         imcData.DefaultVariant = new XivImc
                         {
-                            Version = br.ReadUInt16(),
+                            Variant = br.ReadUInt16(),
                             Mask = br.ReadUInt16(),
                             Vfx = br.ReadUInt16()
                         };
@@ -210,7 +210,7 @@ namespace xivModdingFramework.Variants.FileTypes
                         for (var i = 0; i < imcData.VariantCount; i++)
                         {
                             imcData.OtherVariantList.Add(new XivImc
-                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()});
+                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()});
                         }
                     }
                     else
@@ -220,15 +220,15 @@ namespace xivModdingFramework.Variants.FileTypes
                         imcData.DefaultVariantSet = new VariantSet
                         {
                             Slot1 = new XivImc
-                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             Slot2 = new XivImc
-                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             Slot3 = new XivImc
-                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             Slot4 = new XivImc
-                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             Slot5 = new XivImc
-                                {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                         };
 
                         for (var i = 0; i < imcData.VariantCount; i++)
@@ -237,15 +237,15 @@ namespace xivModdingFramework.Variants.FileTypes
                             var imcGear = new VariantSet
                             {
                                 Slot1 = new XivImc
-                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 Slot2 = new XivImc
-                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 Slot3 = new XivImc
-                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 Slot4 = new XivImc
-                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 Slot5 = new XivImc
-                                    {Version = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             };
 
                             imcData.GearVariantList.Add(imcGear);
@@ -268,8 +268,8 @@ namespace xivModdingFramework.Variants.FileTypes
             string imcFolder;
             string imcFile;
 
-            var modelID = modelInfo.ModelID.ToString().PadLeft(4, '0');
-            var body = modelInfo.Body.ToString().PadLeft(4, '0');
+            var modelID = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var body = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
             switch (itemType)
             {

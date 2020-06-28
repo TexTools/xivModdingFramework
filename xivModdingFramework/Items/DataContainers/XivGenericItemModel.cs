@@ -33,17 +33,17 @@ namespace xivModdingFramework.Items.DataContainers
         /// <summary>
         /// The Main Category
         /// </summary>
-        public string Category { get; set; }
+        public string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The item Category
         /// </summary>
-        public string ItemCategory { get; set; }
+        public string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The item SubCategory
         /// </summary>
-        public string ItemSubCategory { get; set; }
+        public string TertiaryCategory { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

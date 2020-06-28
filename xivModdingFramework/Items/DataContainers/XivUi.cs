@@ -36,7 +36,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// For UI the Main Category is "UI"
         /// </remarks>
-        public string Category { get; set; }
+        public string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The items category
@@ -44,7 +44,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This would be a category such as Maps, Actions, Status, Weather
         /// </remarks>
-        public string ItemCategory { get; set; }
+        public string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The items SubCategory
@@ -52,7 +52,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This would be a category such as a maps region names and action types
         /// </remarks>
-        public string ItemSubCategory { get; set; }
+        public string TertiaryCategory { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

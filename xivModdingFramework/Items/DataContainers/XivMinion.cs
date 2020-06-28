@@ -36,7 +36,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// For Minions the main category is "Companions"
         /// </remarks>
-        public string Category { get; set; }
+        public string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The item Category
@@ -44,7 +44,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// For minions the item category is "Minions"
         /// </remarks>
-        public string ItemCategory { get; set; }
+        public string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The item SubCategory
@@ -52,7 +52,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This is currently not used for the Minion Category, but may be used in the future
         /// </remarks>
-        public string ItemSubCategory { get; set; }
+        public string TertiaryCategory { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

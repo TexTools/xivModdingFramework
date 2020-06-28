@@ -151,7 +151,7 @@ namespace xivModdingFramework.Materials.FileTypes
         public async Task<XivMtrl> GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion, string type = "Primary")
         {
             var index = new Index(_gameDirectory);
-            var itemType = ItemType.GetItemType(itemModel);
+            var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             // Get mtrl path
             var mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, type);
@@ -180,10 +180,10 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     var xivGear = itemModel as XivGear;
                     // Get mtrl path
-                    var originalBody = xivGear.SecondaryModelInfo.Body;
-                    xivGear.SecondaryModelInfo.Body = 1;
+                    var originalBody = xivGear.SecondaryModelInfo.SecondaryID;
+                    xivGear.SecondaryModelInfo.SecondaryID = 1;
 
-                    if (xivGear.SecondaryModelInfo.ModelID > 8800 && xivGear.SecondaryModelInfo.ModelID < 8900)
+                    if (xivGear.SecondaryModelInfo.PrimaryID > 8800 && xivGear.SecondaryModelInfo.PrimaryID < 8900)
                     {
                         itemType = XivItemType.equipment;
                         race = XivRace.Hyur_Midlander_Male;
@@ -253,10 +253,10 @@ namespace xivModdingFramework.Materials.FileTypes
         public async Task<XivMtrl> GetMtrlData(IItemModel itemModel, XivRace race, string mtrlFile, int dxVersion)
         {
             var index = new Index(_gameDirectory);
-            var itemType = ItemType.GetItemType(itemModel);
+            var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             // Secondary model is gear if between 8800 and 8900 instead of weapon
-            if (itemModel.ModelInfo.ModelID > 8800 && itemModel.ModelInfo.ModelID < 8900)
+            if (itemModel.ModelInfo.PrimaryID > 8800 && itemModel.ModelInfo.PrimaryID < 8900)
             {
                 itemType = XivItemType.equipment;
             }
@@ -656,7 +656,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 }
                
-                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.ItemCategory, source);
+                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.SecondaryCategory, source);
             }
             catch(Exception ex)
             {
@@ -896,7 +896,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(item, item.ModelInfo);
-                variant = imcInfo.Version;
+                variant = imcInfo.Variant;
 
                 if (imcInfo.Vfx > 0)
                 {
@@ -904,21 +904,21 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            var id = item.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = item.ModelInfo.Body.ToString().PadLeft(4, '0');
-            var itemCategory = item.ItemCategory;
+            var id = item.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = item.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var itemCategory = item.SecondaryCategory;
 
             if (type.Equals("Secondary"))
             {
                 var xivGear = item as XivGear;
 
-                id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
+                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(item, xivGear.SecondaryModelInfo);
                 var imcChangedType = imc.ChangedType;
-                variant = imcInfo.Version;
+                variant = imcInfo.Variant;
 
                 if (imcChangedType)
                 {
@@ -965,7 +965,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
-                variant = imcInfo.Version;
+                variant = imcInfo.Variant;
 
                 if (imcInfo.Vfx > 0)
                 {
@@ -973,21 +973,21 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
-            var itemCategory = itemModel.ItemCategory;
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.SecondaryCategory;
 
             if (type.Equals("Secondary"))
             {
                 var xivGear = itemModel as XivGear;
 
-                id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
+                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo);
                 var imcChangedType = imc.ChangedType;
-                variant = imcInfo.Version;
+                variant = imcInfo.Variant;
 
                 if (imcChangedType)
                 {
@@ -1027,7 +1027,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
-                variant = imcInfo.Version;
+                variant = imcInfo.Variant;
             }
 
             if (variant == 0)
@@ -1049,8 +1049,8 @@ namespace xivModdingFramework.Materials.FileTypes
         private string GetMtrlFolder(IItemModel itemModel, XivItemType itemType, XivRace xivRace = XivRace.Hyur_Midlander_Male, int variant = 1)
         {
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var version = variant.ToString().PadLeft(4, '0');
 
             var race = xivRace.GetRaceCode();
@@ -1075,7 +1075,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     mtrlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
                     break;
                 case XivItemType.human:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Body))
+                    if (itemModel.SecondaryCategory.Equals(XivStrings.Body))
                     {
                         if (_language != XivLanguage.Korean)
                         {
@@ -1086,16 +1086,16 @@ namespace xivModdingFramework.Materials.FileTypes
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
                         }
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Hair))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Hair))
                     {
                         // Hair has a version number, but no IMC, so we leave it at the default 0001
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/material/v{version}";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Face))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Face))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/material";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Tail))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Tail))
                     {
                         if (_language != XivLanguage.Korean)
                         {
@@ -1106,17 +1106,17 @@ namespace xivModdingFramework.Materials.FileTypes
                             mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
                         }
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Ears))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Ears))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
                     }
                     break;
                 case XivItemType.furniture:
-                    if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Indoor))
+                    if (itemModel.SecondaryCategory.Equals(XivStrings.Furniture_Indoor))
                     {
                         mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
                     }
-                    else if (itemModel.ItemCategory.Equals(XivStrings.Furniture_Outdoor))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Furniture_Outdoor))
                     {
                         mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
                     }
@@ -1144,23 +1144,23 @@ namespace xivModdingFramework.Materials.FileTypes
         private string GetMtrlFileName(IItemModel itemModel, XivItemType itemType, XivRace xivRace = XivRace.Hyur_Midlander_Male, char materialIdenfitier = 'a',  int variant = 1, string type = "Primary", string itemCategory = "")
         {
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
             // This only needs to be pre-set in the case of IMC-force changed categories.
             // This is so janky.
             if (itemCategory == "") {
-                itemCategory = itemModel.ItemCategory;
+                itemCategory = itemModel.SecondaryCategory;
             }
 
             if (type.Equals("Secondary"))
             {
                 var xivGear = itemModel as XivGear;
-                id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
+                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             }
 
-            if (itemModel.Category.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
+            if (itemModel.PrimaryCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
             {
                 variant = 0;
             }
@@ -1186,7 +1186,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     mtrlFile = $"mt_m{id}b{bodyVer}_{materialIdenfitier}{MtrlExtension}";
                     break;
                 case XivItemType.demihuman:
-                    mtrlFile = $"mt_d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{materialIdenfitier}{MtrlExtension}";
+                    mtrlFile = $"mt_d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}_{materialIdenfitier}{MtrlExtension}";
                     break;
                 case XivItemType.human:
                     if (itemCategory.Equals(XivStrings.Body))
@@ -1195,11 +1195,11 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemCategory.Equals(XivStrings.Hair))
                     {
-                        mtrlFile = $"mt_c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{materialIdenfitier}{MtrlExtension}";
+                        mtrlFile = $"mt_c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}_{materialIdenfitier}{MtrlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Face))
                     {
-                        mtrlFile = $"mt_c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}_{materialIdenfitier}{MtrlExtension}";
+                        mtrlFile = $"mt_c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}_{materialIdenfitier}{MtrlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Tail))
                     {
@@ -1207,7 +1207,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemCategory.Equals(XivStrings.Ears))
                     {
-                        mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{materialIdenfitier}{MtrlExtension}";
+                        mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{materialIdenfitier}{MtrlExtension}";
                     }
                     break;
                 case XivItemType.furniture:

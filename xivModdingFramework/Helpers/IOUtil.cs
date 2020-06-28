@@ -92,15 +92,15 @@ namespace xivModdingFramework.Helpers
                 validItemName = string.Join("：", item.Name.Split(Path.GetInvalidFileNameChars()));
             }
 
-            if (item.Category.Equals("UI"))
+            if (item.PrimaryCategory.Equals("UI"))
             {
-                if (item.ItemSubCategory != null && !item.ItemCategory.Equals(string.Empty))
+                if (item.TertiaryCategory != null && !item.SecondaryCategory.Equals(string.Empty))
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{item.ItemSubCategory}/{validItemName}";
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{item.SecondaryCategory}/{item.TertiaryCategory}/{validItemName}";
                 }
                 else
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{item.ItemCategory}/{validItemName}";
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{item.SecondaryCategory}/{validItemName}";
                 }
 
                 if (path.Contains("???"))
@@ -108,20 +108,20 @@ namespace xivModdingFramework.Helpers
                     path = path.Replace("???", "Unk");
                 }
             }
-            else if (item.Category.Equals(XivStrings.Character))
+            else if (item.PrimaryCategory.Equals(XivStrings.Character))
             {
                 if (item.Name.Equals(XivStrings.Equipment_Decals) || item.Name.Equals(XivStrings.Face_Paint))
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{validItemName}";
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{validItemName}";
                 }
                 else
                 {
-                    path = $"{saveDirectory.FullName}/{item.Category}/{validItemName}/{race}/{((IItemModel)item).ModelInfo.Body}";
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{validItemName}/{race}/{((IItemModel)item).ModelInfo.SecondaryID}";
                 }
             }
             else
             {
-                path = $"{saveDirectory.FullName}/{item.ItemCategory}/{validItemName}";
+                path = $"{saveDirectory.FullName}/{item.SecondaryCategory}/{validItemName}";
             }
             
             return path;
