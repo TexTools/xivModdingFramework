@@ -739,6 +739,8 @@ namespace xivModdingFramework.Materials.DataContainers
                 ret += "unknown";
             }
 
+            ret += GetItemTypeIdentifier();
+
             // Followed by the material identifier, if above [a].
             var identifier = GetMaterialIdentifier();
             if(identifier != 'a')
@@ -747,7 +749,6 @@ namespace xivModdingFramework.Materials.DataContainers
             }
 
             
-            ret += GetItemTypeIdentifier();
 
             if(texType == XivTexType.Normal)
             {
