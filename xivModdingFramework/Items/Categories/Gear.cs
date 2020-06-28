@@ -27,6 +27,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -663,6 +664,55 @@ namespace xivModdingFramework.Items.Categories
 
             return ttpList;
         }
+        public async Task<List<IItemModel>> GetSameVariantList(IItemModel item)
+        {
+            var sameModelItems = new List<IItemModel>();
+            if (!item.PrimaryCategory.Equals(XivStrings.Gear))
+
+            {
+                sameModelItems.Add((IItemModel)item.Clone());
+                return sameModelItems;
+            }
+            sameModelItems = await GetSameModelList(item);
+
+            var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
+            var originalInfo = await imc.GetImcInfo(item);
+
+            var sameMaterialItems = new List<IItemModel>();
+            foreach (var i in sameModelItems)
+            {
+                var info = await imc.GetImcInfo(i);
+                if (info.Variant == originalInfo.Variant)
+                {
+                    sameMaterialItems.Add(i);
+                }
+            }
+
+            return sameMaterialItems;
+        }
+
+        public async Task<List<IItemModel>> GetSameModelList(IItemModel item)
+        {
+            var sameModelItems = new List<IItemModel>();
+
+            //gear
+            if (item.PrimaryCategory.Equals(XivStrings.Gear))
+            {
+                sameModelItems.AddRange(
+                    (await GetGearList())
+                    .Where(it =>
+                    it.ModelInfo.PrimaryID == item.ModelInfo.PrimaryID
+                    && it.SecondaryCategory == item.SecondaryCategory).Select(it => it as IItemModel).ToList()
+                );
+            }
+            else
+            {
+                //character
+                sameModelItems.Add((IItemModel)item.Clone());
+            }
+            return sameModelItems;
+        }
+
 
         // A dictionary containg <Slot ID, Gear Category>
         private readonly Dictionary<int, string> _slotNameDictionary = new Dictionary<int, string>

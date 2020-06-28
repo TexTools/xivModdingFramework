@@ -80,7 +80,13 @@ namespace xivModdingFramework.Items
             }
             else if (item.PrimaryCategory.Equals(XivStrings.Housing))
             {
-                itemType = XivItemType.furniture;
+                if(item.SecondaryCategory.Equals(XivStrings.Paintings))
+                {
+                    itemType = XivItemType.ui;
+                } else
+                {
+                    itemType = XivItemType.furniture;
+                }
             } else if(item.SecondaryCategory.Equals(XivStrings.Equipment_Decals) || item.SecondaryCategory.Equals(XivStrings.Face_Paint))
             {
                 itemType = XivItemType.decal;
@@ -115,6 +121,10 @@ namespace xivModdingFramework.Items
             else if (item.SecondaryCategory.Equals( XivStrings.Tail ))
             {
                 itemType = XivItemType.tail;
+            }
+            else if (item.SecondaryCategory.Equals(XivStrings.Hair))
+            {
+                itemType = XivItemType.hair;
             }
             else if (item.PrimaryCategory.Equals(XivStrings.Character) && item.SecondaryCategory.Equals( XivStrings.Ears ))
             {

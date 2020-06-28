@@ -167,8 +167,17 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item"></param>
         /// <param name="modelInfo"></param>
         /// <returns>The ImcData data</returns>
-        public async Task<ImcData> GetFullImcInfo(IItemModel item, XivModelInfo modelInfo)
+        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item, XivModelInfo modelInfo = null)
         {
+            if(modelInfo == null)
+            {
+                modelInfo = item.ModelInfo;
+            }
+            if(modelInfo == null)
+            {
+                throw new NotSupportedException("Attempted to get IMC info for invalid item.");
+            }
+
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
@@ -188,67 +197,66 @@ namespace xivModdingFramework.Variants.FileTypes
             {
                 using (var br = new BinaryReader(new MemoryStream(imcByteData)))
                 {
-                    var imcData = new ImcData()
+                    var subsetCount = br.ReadInt16();
+                    var imcData = new FullImcInfo()
                     {
-                        VariantCount = br.ReadInt16(),
                         Unknown = br.ReadInt16(),
-                        GearVariantList = new List<VariantSet>()
+                        DefaultSubset = new List<XivImc>(),
+                        SubsetList = new List<List<XivImc>>(subsetCount)
                     };
 
                     //weapons and monsters do not have variant sets
                     if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
                     {
-                        imcData.OtherVariantList = new List<XivImc>();
 
-                        imcData.DefaultVariant = new XivImc
+                        imcData.DefaultSubset.Add(new XivImc
                         {
                             Variant = br.ReadUInt16(),
                             Mask = br.ReadUInt16(),
                             Vfx = br.ReadUInt16()
-                        };
+                        });
 
-                        for (var i = 0; i < imcData.VariantCount; i++)
+                        for (var i = 0; i < subsetCount; i++)
                         {
-                            imcData.OtherVariantList.Add(new XivImc
-                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()});
+                            var subset = new List<XivImc>() {
+                                new XivImc {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()}
+                            };
                         }
                     }
                     else
                     {
-                        imcData.GearVariantList = new List<VariantSet>();
-
-                        imcData.DefaultVariantSet = new VariantSet
+                        imcData.DefaultSubset = new List<XivImc>()
                         {
-                            Slot1 = new XivImc
+                            new XivImc
                                 {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                            Slot2 = new XivImc
+                            new XivImc
                                 {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                            Slot3 = new XivImc
+                            new XivImc
                                 {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                            Slot4 = new XivImc
+                            new XivImc
                                 {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                            Slot5 = new XivImc
+                            new XivImc
                                 {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                         };
 
-                        for (var i = 0; i < imcData.VariantCount; i++)
+                        for (var i = 0; i < subsetCount; i++)
                         {
                             // gets the data for each slot in the current variant set
-                            var imcGear = new VariantSet
+                            var imcGear = new List<XivImc>()
                             {
-                                Slot1 = new XivImc
+                                new XivImc
                                     {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                                Slot2 = new XivImc
+                                new XivImc
                                     {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                                Slot3 = new XivImc
+                                new XivImc
                                     {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                                Slot4 = new XivImc
+                                new XivImc
                                     {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
-                                Slot5 = new XivImc
+                                new XivImc
                                     {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             };
 
-                            imcData.GearVariantList.Add(imcGear);
+                            imcData.SubsetList.Add(imcGear);
                         }
                     }
 
@@ -305,7 +313,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <summary>
         /// A dictionary containing slot offset data in format [Slot Name, Offset within variant set]
         /// </summary>
-        private readonly Dictionary<string, int> _slotOffsetDictionary = new Dictionary<string, int>
+        private static readonly Dictionary<string, int> _slotOffsetDictionary = new Dictionary<string, int>
         {
             {XivStrings.Main_Hand, 0},
             {XivStrings.Off_Hand, 0},
@@ -338,12 +346,35 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <summary>
         /// Class containing the information for and IMC file
         /// </summary>
-        public class ImcData
+        public class FullImcInfo
         {
             /// <summary>
-            /// The amount of Variants contained in the IMC file
+            /// Get the number of subsets.
+            ///  -NOT- the same as number of material variants.
             /// </summary>
-            public int VariantCount { get; set; }
+            public int SubsetCount { get
+                {
+                    return SubsetList.Count;
+                }
+                set {
+                    throw new NotSupportedException("Attempted to directly set SubsetCount.");
+                }
+            }
+
+            /// <summary>
+            /// Get the size of each subset (Either 1 or 5)
+            /// </summary>
+            public int SubsetSize
+            {
+                get
+                {
+                    return DefaultSubset.Count;
+                }
+                set
+                {
+                    throw new NotSupportedException("Attempted to directly set SubsetSize.");
+                }
+            }
 
             /// <summary>
             /// Unknown Value
@@ -351,70 +382,52 @@ namespace xivModdingFramework.Variants.FileTypes
             public int Unknown { get; set; }
 
             /// <summary>
-            /// Variant List for Gear which contains variant sets
+            /// Total # of Gear Subsets.
+            /// NOT the same as number of material variants.
+            /// IItemModel->ImcSubsetID can be used as an index accessory in this list.
             /// </summary>
-            public List<VariantSet> GearVariantList { get; set; }
-
-            /// <summary>
-            /// Variant List for other items that do not contain varian sets
-            /// </summary>
-            public List<XivImc> OtherVariantList { get; set; }
-
-            /// <summary>
-            /// The default variant for the item, always the variant immediatly following the header
-            /// </summary>
-            public XivImc DefaultVariant { get; set; }
+            public List<List<XivImc>> SubsetList { get; set; }
 
             /// <summary>
             /// The default variant set for the item, always the variant immediatly following the header
             /// </summary>
-            public VariantSet DefaultVariantSet { get; set; }
+            public List<XivImc> DefaultSubset { get; set; }
+
+
+            /// <summary>
+            /// Retrieve a given IMC info. Negative values retrieve the default set.
+            /// </summary>
+            /// <param name="index"></param>
+            /// <param name="slot"></param>
+            /// <returns></returns>
+            public XivImc GetImcInfo(int subsetID = -1, string fullSlotName = "")
+            {
+                // Variant IDs are 1 based, not 0 based.
+                var index = subsetID - 1;
+
+                // Invalid Index, return default.
+                if (index >= SubsetCount)
+                {
+                    index = -1;
+                }
+
+                // Test for getting default set.
+                var subset = DefaultSubset;
+                if(index > 0)
+                {
+                    subset = SubsetList[index];
+                }
+
+                // Get which offset the slot uses.
+                var idx = 0;
+                if(_slotOffsetDictionary.ContainsKey(fullSlotName))
+                {
+                    idx = _slotOffsetDictionary[fullSlotName];
+                }
+
+                return subset[idx];
+            }
         }
 
-        /// <summary>
-        /// A class that contains the information for a variant set
-        /// </summary>
-        public class VariantSet
-        {
-            /// <summary>
-            /// Slot 1 of the variant set
-            /// </summary>
-            /// <remarks>
-            /// Head for Gear, Ears for Accessories
-            /// </remarks>
-            public XivImc Slot1 { get; set; }
-
-            /// <summary>
-            /// Slot 2 of the variant set
-            /// </summary>
-            /// <remarks>
-            /// Body for Gear, Neck for Accessories
-            /// </remarks>
-            public XivImc Slot2 { get; set; }
-
-            /// <summary>
-            /// Slot 3 of the variant set
-            /// </summary>
-            /// <remarks>
-            /// Hands for Gear, Wrists for Accessories
-            /// </remarks>
-            public XivImc Slot3 { get; set; }
-
-            /// <summary>
-            /// Slot 4 of the variant set
-            /// </summary>
-            /// <remarks>
-            /// Legs for Gear, Left Ring for Accessories
-            /// </remarks>
-            public XivImc Slot4 { get; set; }
-
-            /// <summary>
-            /// Slot 5 of the variant set
-            /// </summary>
-            /// <remarks>
-            /// Feet for Gear, Right Ring for Accessories
-            /// </remarks>
-            public XivImc Slot5 { get; set; }
-        }
     }
 }
