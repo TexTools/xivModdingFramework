@@ -53,24 +53,24 @@ namespace xivModdingFramework.Items.Categories
                 var characterList = new List<XivCharacter>
                 {
                     new XivCharacter
-                        {Name = XivStrings.Body, Category = XivStrings.Character, ItemCategory = XivStrings.Body},
+                        {Name = XivStrings.Body, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Body},
                     new XivCharacter
-                        {Name = XivStrings.Face, Category = XivStrings.Character, ItemCategory = XivStrings.Face},
+                        {Name = XivStrings.Face, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Face},
                     new XivCharacter
-                        {Name = XivStrings.Hair, Category = XivStrings.Character, ItemCategory = XivStrings.Hair},
+                        {Name = XivStrings.Hair, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Hair},
                     new XivCharacter
-                        {Name = XivStrings.Tail, Category = XivStrings.Character, ItemCategory = XivStrings.Tail},
+                        {Name = XivStrings.Tail, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Tail},
                     new XivCharacter
-                        {Name = XivStrings.Ears, Category = XivStrings.Character, ItemCategory = XivStrings.Ears},
+                        {Name = XivStrings.Ears, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Ears},
                     new XivCharacter
                     {
-                        Name = XivStrings.Face_Paint, Category = XivStrings.Character,
-                        ItemCategory = XivStrings.Face_Paint
+                        Name = XivStrings.Face_Paint, PrimaryCategory = XivStrings.Character,
+                        SecondaryCategory = XivStrings.Face_Paint
                     },
                     new XivCharacter
                     {
-                        Name = XivStrings.Equipment_Decals, Category = XivStrings.Character,
-                        ItemCategory = XivStrings.Equipment_Decals
+                        Name = XivStrings.Equipment_Decals, PrimaryCategory = XivStrings.Character,
+                        SecondaryCategory = XivStrings.Equipment_Decals
                     }
                 };
 
@@ -96,15 +96,15 @@ namespace xivModdingFramework.Items.Categories
 
             var folder = "";
 
-            if (charaItem.ItemCategory == XivStrings.Hair)
+            if (charaItem.SecondaryCategory == XivStrings.Hair)
             {
                 folder = XivStrings.HairMtrlFolder;
             }
-            else if (charaItem.ItemCategory == XivStrings.Face)
+            else if (charaItem.SecondaryCategory == XivStrings.Face)
             {
                 folder = XivStrings.FaceMtrlFolder;
             }
-            else if (charaItem.ItemCategory == XivStrings.Body)
+            else if (charaItem.SecondaryCategory == XivStrings.Body)
             {
                 if (_language != XivLanguage.Korean )
                 {
@@ -116,7 +116,7 @@ namespace xivModdingFramework.Items.Categories
                 }
 
             }
-            else if (charaItem.ItemCategory == XivStrings.Tail)
+            else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
                 if (_language != XivLanguage.Korean )
                 {
@@ -127,7 +127,7 @@ namespace xivModdingFramework.Items.Categories
                     folder = XivStrings.TailMtrlFolderOld;
                 }
             }
-            else if (charaItem.ItemCategory == XivStrings.Ears)
+            else if (charaItem.SecondaryCategory == XivStrings.Ears)
             {
                 folder = XivStrings.EarsMtrlFolder;
             }
@@ -173,23 +173,23 @@ namespace xivModdingFramework.Items.Categories
 
             var folder = "";
 
-            if (charaItem.ItemCategory == XivStrings.Hair)
+            if (charaItem.SecondaryCategory == XivStrings.Hair)
             {
                 folder = XivStrings.HairMDLFolder;
             }
-            else if (charaItem.ItemCategory == XivStrings.Face)
+            else if (charaItem.SecondaryCategory == XivStrings.Face)
             {
                 folder = XivStrings.FaceMDLFolder;
             }
-            else if (charaItem.ItemCategory == XivStrings.Body)
+            else if (charaItem.SecondaryCategory == XivStrings.Body)
             {
                 folder = XivStrings.BodyMDLFolder;
             }
-            else if (charaItem.ItemCategory == XivStrings.Tail)
+            else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
                 folder = XivStrings.TailMDLFolder;
             }
-            else if (charaItem.ItemCategory == XivStrings.Ears)
+            else if (charaItem.SecondaryCategory == XivStrings.Ears)
             {
                 folder = XivStrings.EarsMDLFolder;
             }
@@ -234,22 +234,22 @@ namespace xivModdingFramework.Items.Categories
             var file = "";
             var typeDict = HairSlotAbbreviationDictionary;
 
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
 
-            if (charaItem.ItemCategory == XivStrings.Hair)
+            if (charaItem.SecondaryCategory == XivStrings.Hair)
             {
                 folder = string.Format(XivStrings.HairMtrlFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
                 file = XivStrings.HairMtrlFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Face)
+            else if (charaItem.SecondaryCategory == XivStrings.Face)
             {
                 folder = string.Format(XivStrings.FaceMtrlFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
                 typeDict = FaceSlotAbbreviationDictionary;
                 file = XivStrings.FaceMtrlFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Ears)
+            else if (charaItem.SecondaryCategory == XivStrings.Ears)
             {
                 folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
@@ -299,9 +299,9 @@ namespace xivModdingFramework.Items.Categories
             var folder = "";
             var file = "";
 
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
 
-            if (charaItem.ItemCategory == XivStrings.Body)
+            if (charaItem.SecondaryCategory == XivStrings.Body)
             {
                 if (_language != XivLanguage.Korean )
                 {
@@ -313,7 +313,7 @@ namespace xivModdingFramework.Items.Categories
                 }
                 file = XivStrings.BodyMtrlFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Tail)
+            else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
                 if (_language != XivLanguage.Korean )
                 {
@@ -325,7 +325,7 @@ namespace xivModdingFramework.Items.Categories
                 }
                 file = XivStrings.TailMtrlFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Ears)
+            else if (charaItem.SecondaryCategory == XivStrings.Ears)
             {
                 folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
 
@@ -344,7 +344,7 @@ namespace xivModdingFramework.Items.Categories
         {
             var variantList = new List<int>();
 
-            if (charaItem.ItemCategory == XivStrings.Body)
+            if (charaItem.SecondaryCategory == XivStrings.Body)
             {
                 if (_language != XivLanguage.Korean )
                 {
@@ -365,7 +365,7 @@ namespace xivModdingFramework.Items.Categories
                 }
             }
 
-            if (charaItem.ItemCategory == XivStrings.Tail)
+            if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
                 if (_language != XivLanguage.Korean )
                 {
@@ -402,35 +402,35 @@ namespace xivModdingFramework.Items.Categories
             var file = "";
             var typeDict = HairSlotAbbreviationDictionary;
 
-            if (charaItem.ItemCategory == XivStrings.Body)
+            if (charaItem.SecondaryCategory == XivStrings.Body)
             {
                 folder = string.Format(XivStrings.BodyMDLFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
                 typeDict = BodySlotAbbreviationDictionary;
                 file = XivStrings.BodyMDLFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Hair)
+            else if (charaItem.SecondaryCategory == XivStrings.Hair)
             {
                 folder = string.Format(XivStrings.HairMDLFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
                 typeDict = HairSlotAbbreviationDictionary;
                 file = XivStrings.HairMDLFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Face)
+            else if (charaItem.SecondaryCategory == XivStrings.Face)
             {
                 folder = string.Format(XivStrings.FaceMDLFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
                 typeDict = FaceSlotAbbreviationDictionary;
                 file = XivStrings.FaceMDLFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Tail)
+            else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
                 folder = string.Format(XivStrings.TailMDLFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
                 typeDict = TailSlotAbbreviationDictionary;
                 file = XivStrings.TailMDLFile;
             }
-            else if (charaItem.ItemCategory == XivStrings.Ears)
+            else if (charaItem.SecondaryCategory == XivStrings.Ears)
             {
                 folder = string.Format(XivStrings.EarsMDLFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
@@ -460,7 +460,7 @@ namespace xivModdingFramework.Items.Categories
             var decalList = new List<int>();
             List<int> fileList;
 
-            if (item.ItemCategory.Equals(XivStrings.Face_Paint))
+            if (item.SecondaryCategory.Equals(XivStrings.Face_Paint))
             {
                 fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
                     XivDataFile._04_Chara);

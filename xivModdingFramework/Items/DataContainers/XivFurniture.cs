@@ -33,12 +33,12 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// For Furniture, the main category is "Furniture"
         /// </remarks>
-        public string Category { get; set; }
+        public string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The furniture item Category
         /// </summary>
-        public string ItemCategory { get; set; }
+        public string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The furniture item SubCategory
@@ -46,7 +46,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This is currently not used for Furniture, but may be used in the future
         /// </remarks>
-        public string ItemSubCategory { get; set; }
+        public string TertiaryCategory { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

@@ -36,6 +36,7 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
 using System.Diagnostics;
+using xivModdingFramework.Items.Categories;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -64,6 +65,70 @@ namespace xivModdingFramework.Models.FileTypes
 
         public byte[] MDLRawData { get; set; }
 
+
+        /// <summary>
+        /// Retrieves all items that share the same model.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="language"></param>
+        /// <returns></returns>
+        public async Task<List<IItemModel>> GetSameModelList(IItemModel item, XivLanguage language = XivLanguage.English)
+        {
+            var sameModelItems = new List<IItemModel>();
+            var gear = new Gear(_gameDirectory, language);
+            var character = new Character(_gameDirectory, language);
+            var companions = new Companions(_gameDirectory, language);
+            var ui = new UI(_gameDirectory, language);
+            var housing = new Housing(_gameDirectory, language);
+
+            if (item.PrimaryCategory.Equals(XivStrings.Gear))
+            {
+
+                // Scan the gear list for anything using the same model ID and slot.
+                sameModelItems.AddRange(
+                    (await gear.GetGearList())
+                    .Where(it =>
+                    it.ModelInfo.PrimaryID == item.ModelInfo.PrimaryID
+                    && it.SecondaryCategory == item.SecondaryCategory).Select(it => it as IItemModel).ToList()
+                );
+            }
+            else if (item.PrimaryCategory.Equals(XivStrings.Character))
+            {
+
+                // Character models are assumed to have no shared models,
+                // So return a copy of the original item.
+                sameModelItems.Add((IItemModel) item.Clone());
+            }
+            //companions
+            //sameModelItems.AddRange(
+            //    (await companions.GetMinionList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            //sameModelItems.AddRange(
+            //    (await companions.GetMountList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            //sameModelItems.AddRange(
+            //    (await companions.GetPetList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            //housing
+            //sameModelItems.AddRange(
+            //    (await housing.GetFurnitureList())
+            //    .Where(it =>
+            //    it.ModelInfo.ModelID == _item.ModelInfo.ModelID
+            //    && it.ItemCategory == _item.ItemCategory).Select(it => it as IItemModel).ToList()
+            //);
+            return sameModelItems;
+        }
+
+
         /// <summary>
         /// Gets the MDL Data given a model and race
         /// </summary>
@@ -78,7 +143,7 @@ namespace xivModdingFramework.Models.FileTypes
             var modding = new Modding(_gameDirectory);
             var getShapeData = true;
 
-            var itemType = ItemType.GetItemType(itemModel);
+            var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel, mdlStringPath, ringSide);
 
@@ -1359,7 +1424,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new FormatException("The file provided is not a collada .dae file");
             }
 
-            var isHousingItem = item.Category.Equals(XivStrings.Housing);
+            var isHousingItem = item.PrimaryCategory.Equals(XivStrings.Housing);
 
             var meshShapeDictionary = new Dictionary<int, int>();
 
@@ -2481,7 +2546,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var isAlreadyModified = false;
                 var isAlreadyModified2 = false;
 
-                var itemType = ItemType.GetItemType(item);
+                var itemType = ItemType.GetPrimaryItemType(item);
 
                 var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
 
@@ -4857,7 +4922,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else
                 {
-                    await dat.WriteToDat(compressedMDLData, modEntry, filePath, item.ItemCategory, item.Name, _dataFile, source, 3);
+                    await dat.WriteToDat(compressedMDLData, modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
                 }
 
                 #endregion
@@ -5435,14 +5500,14 @@ namespace xivModdingFramework.Models.FileTypes
             string mdlFolder = "", mdlFile = "";
 
             var mdlInfo = secondaryModel ?? itemModel.ModelInfo;
-            var id = mdlInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = mdlInfo.Body.ToString().PadLeft(4, '0');
-            var itemCategory = itemModel.ItemCategory;
+            var id = mdlInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = mdlInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.SecondaryCategory;
 
             if (secondaryModel != null)
             {
                 // Secondary model is gear if between 8800 and 8900 instead of weapon
-                if (secondaryModel.ModelID > 8800 && secondaryModel.ModelID < 8900)
+                if (secondaryModel.PrimaryID > 8800 && secondaryModel.PrimaryID < 8900)
                 {
                     itemType = XivItemType.equipment;
                     xivRace = XivRace.Hyur_Midlander_Male;
@@ -5486,13 +5551,13 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case XivItemType.demihuman:
                     mdlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/model";
-                    mdlFile   = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{MdlExtension}";
+                    mdlFile   = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
                     break;
                 case XivItemType.human:
                     if (itemCategory.Equals(XivStrings.Body))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/model";
-                        mdlFile   = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.ItemSubCategory]}{MdlExtension}";
+                        mdlFile   = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Hair))
                     {
@@ -5517,9 +5582,9 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case XivItemType.furniture:
                     var part = "";
-                    if (itemModel.ItemSubCategory != "base")
+                    if (itemModel.TertiaryCategory != "base")
                     {
-                        part = itemModel.ItemSubCategory;
+                        part = itemModel.TertiaryCategory;
                     }
 
                     if (itemCategory.Equals(XivStrings.Furniture_Indoor))
@@ -5543,7 +5608,7 @@ namespace xivModdingFramework.Models.FileTypes
             return (mdlFolder, mdlFile);
         }
 
-        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
+        public static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
         {
             {XivStrings.Head, "met"},
             {XivStrings.Hands, "glv"},

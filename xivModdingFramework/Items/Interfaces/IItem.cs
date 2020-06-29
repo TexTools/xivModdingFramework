@@ -30,29 +30,31 @@ namespace xivModdingFramework.Items.Interfaces
         string Name { get; }
 
         /// <summary>
-        /// The Main Category
+        /// The top level category
+        /// -- This has no relevance in actual game file structure.  This is purely a 
+        /// -- custom generated Human Readable convention for the sake of TexTools sorting.
         /// </summary>
         /// <remarks>
         /// This would be a category such as Gear, Character, Companion, and UI
         /// </remarks>
-        string Category { get; }
+        string PrimaryCategory { get; }
 
         /// <summary>
-        /// The items Category
+        /// The second level category.
         /// </summary>
         /// <remarks>
         /// This would be a category such as Body, Legs, Ears, Hair, Minions, Maps
         /// </remarks>
-        string ItemCategory { get; }
+        string SecondaryCategory { get; }
 
         /// <summary>
-        /// The items Sub-Category
+        /// The third level category.
         /// </summary>
         /// <remarks>
         /// This would be a category such as La Noscea within Maps, Marker within Actions, Detrimental within Status
         /// This is mostly used in the UI main category
         /// </remarks>
-        string ItemSubCategory { get; }
+        string TertiaryCategory { get; }
 
         /// <summary>
         /// The data file the item belongs to

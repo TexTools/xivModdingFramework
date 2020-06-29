@@ -187,23 +187,23 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>A list of part characters</returns>
         public async Task<List<string>> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile, string type = "Primary")
         {
-            var itemType = ItemType.GetItemType(itemModel);
+            var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             var version = "0001";
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
-            var itemCategory = itemModel.ItemCategory;
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.SecondaryCategory;
 
             if (type.Equals("Secondary"))
             {
                 var xivGear = itemModel as XivGear;
 
-                id = xivGear.SecondaryModelInfo.ModelID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.Body.ToString().PadLeft(4, '0');
+                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, xivGear.DataFile);
-                version = (await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo)).Version.ToString().PadLeft(4, '0');
+                version = (await imc.GetImcInfo(itemModel, true)).Variant.ToString().PadLeft(4, '0');
 
                 if (imc.ChangedType)
                 {
@@ -218,11 +218,11 @@ namespace xivModdingFramework.Textures.FileTypes
                 {
                     // Get the mtrl version for the given item from the imc file
                     var imc = new Imc(_gameDirectory, dataFile);
-                    version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
+                    version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
                 }
             }
 
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";
@@ -654,7 +654,7 @@ namespace xivModdingFramework.Textures.FileTypes
                         newTex.AddRange(DDSInfo.compressedDDS);
 
                         offset = await _dat.WriteToDat(newTex, modEntry, xivTex.TextureTypeAndPath.Path,
-                            item.ItemCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
+                            item.SecondaryCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
                     }
                     else
                     {
@@ -663,7 +663,7 @@ namespace xivModdingFramework.Textures.FileTypes
                         newTex.AddRange(br.ReadBytes(uncompressedLength));
 
                         offset = await _dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
-                            item.ItemCategory, source);
+                            item.SecondaryCategory, source);
                     }
                 }
             }
@@ -797,7 +797,7 @@ namespace xivModdingFramework.Textures.FileTypes
                                 newTex.AddRange(DDSInfo.compressedDDS);
 
                                 offset = await _dat.WriteToDat(newTex, modEntry, xivTex.TextureTypeAndPath.Path,
-                                    item.ItemCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
+                                    item.SecondaryCategory, item.Name, xivTex.TextureTypeAndPath.DataFile, source, 4);
                             }
                             else
                             {
@@ -806,7 +806,7 @@ namespace xivModdingFramework.Textures.FileTypes
                                 newTex.AddRange(br.ReadBytes((int)uncompressedLength));
 
                                 offset = await _dat.ImportType2Data(newTex.ToArray(), item.Name, xivTex.TextureTypeAndPath.Path,
-                                    item.ItemCategory, source);
+                                    item.SecondaryCategory, source);
                             }
                         }
                         else

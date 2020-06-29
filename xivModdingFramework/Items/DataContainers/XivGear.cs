@@ -36,7 +36,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// For Gear, the main category is "Gear"
         /// </remarks>
-        public string Category { get; set; }
+        public string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The gear item Category
@@ -44,7 +44,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This would be a category such as Body, Legs, Hands, Feet, Rings, Main Hand
         /// </remarks>
-        public string ItemCategory { get; set; }
+        public string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The gear item SubCategory
@@ -52,7 +52,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This is currently not used for Gear, but may be used in the future
         /// </remarks>
-        public string ItemSubCategory { get; set; }
+        public string TertiaryCategory { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

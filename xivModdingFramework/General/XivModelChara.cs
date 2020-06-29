@@ -50,7 +50,7 @@ namespace xivModdingFramework.General
         /// <returns>The XivModelInfo data</returns>
         public static async Task<XivModelInfo> GetModelInfo(DirectoryInfo gameDirectory, int index)
         {
-            var xivModelInfo = new XivModelInfo();
+            var xivModelInfo = new XivMonsterModelInfo();
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -62,12 +62,12 @@ namespace xivModdingFramework.General
             // Big Endian Byte Order 
             using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
             {
-                xivModelInfo.ModelID = br.ReadInt16();
+                xivModelInfo.PrimaryID = br.ReadInt16();
 
                 br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
                 var modelType = br.ReadByte();
-                xivModelInfo.Body = br.ReadByte();
-                xivModelInfo.Variant = br.ReadByte();
+                xivModelInfo.SecondaryID = br.ReadByte();
+                xivModelInfo.ImcSubsetID = br.ReadByte();
 
                 if (modelType == 2)
                 {
@@ -94,7 +94,7 @@ namespace xivModdingFramework.General
         /// <returns>The XivModelInfo data</returns>
         public static XivModelInfo GetModelInfo(Dictionary<int, byte[]> modelCharaEx, int index)
         {
-            var xivModelInfo = new XivModelInfo();
+            var xivModelInfo = new XivMonsterModelInfo();
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -103,12 +103,12 @@ namespace xivModdingFramework.General
             // Big Endian Byte Order 
             using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
             {
-                xivModelInfo.ModelID = br.ReadInt16();
+                xivModelInfo.PrimaryID = br.ReadInt16();
 
                 br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
                 var modelType = br.ReadByte();
-                xivModelInfo.Body = br.ReadByte();
-                xivModelInfo.Variant = br.ReadByte();
+                xivModelInfo.SecondaryID = br.ReadByte();
+                xivModelInfo.ImcSubsetID = br.ReadByte();
 
                 if (modelType == 2)
                 {

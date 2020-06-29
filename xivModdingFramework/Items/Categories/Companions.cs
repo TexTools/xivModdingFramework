@@ -79,8 +79,8 @@ namespace xivModdingFramework.Items.Categories
             {
                 var xivMinion = new XivMinion
                 {
-                    Category = XivStrings.Companions,
-                    ItemCategory = XivStrings.Minions
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = XivStrings.Minions
                 };
 
                 int modelCharaIndex;
@@ -145,8 +145,8 @@ namespace xivModdingFramework.Items.Categories
             {
                 var xivMount = new XivMount
                 {
-                    Category = XivStrings.Companions,
-                    ItemCategory = XivStrings.Mounts,
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = XivStrings.Mounts,
                 };
 
                 int modelCharaIndex;
@@ -212,8 +212,8 @@ namespace xivModdingFramework.Items.Categories
             {
                 var xivOrnament = new XivMount
                 {
-                    Category = XivStrings.Companions,
-                    ItemCategory = XivStrings.Ornaments,
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = XivStrings.Ornaments,
                 };
 
                 int modelCharaIndex;
@@ -293,21 +293,21 @@ namespace xivModdingFramework.Items.Categories
             {
                 var xivPet = new XivPet
                 {
-                    Category = XivStrings.Companions,
-                    ItemCategory = XivStrings.Pets,
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = XivStrings.Pets,
                 };
 
                 // Gets the model info from modelchara for the given index
                 var modelInfo = XivModelChara.GetModelInfo(modelCharaEx, petIndex);
 
                 // Finds the name of the pet using the model ID and the above dictionary
-                if (petModelDictionary.ContainsKey(modelInfo.ModelID))
+                if (petModelDictionary.ContainsKey(modelInfo.PrimaryID))
                 {
-                    var petName = petModelDictionary[modelInfo.ModelID];
+                    var petName = petModelDictionary[modelInfo.PrimaryID];
 
-                    if (modelInfo.Variant > 1)
+                    if (modelInfo.ImcSubsetID > 1)
                     {
-                        petName += $" {modelInfo.Variant - 1}";
+                        petName += $" {modelInfo.ImcSubsetID - 1}";
                     }
 
                     xivPet.Name = petName;
@@ -315,13 +315,13 @@ namespace xivModdingFramework.Items.Categories
                 // For cases where there are separate pets under the same model ID with different body IDs
                 else
                 {
-                    switch (modelInfo.ModelID)
+                    switch (modelInfo.PrimaryID)
                     {
                         case 7001:
-                            xivPet.Name = modelInfo.Body == 1 ? XivStrings.Eos : XivStrings.Selene;
+                            xivPet.Name = modelInfo.SecondaryID == 1 ? XivStrings.Eos : XivStrings.Selene;
                             break;
                         case 7101:
-                            xivPet.Name = modelInfo.Body == 1
+                            xivPet.Name = modelInfo.SecondaryID == 1
                                 ? XivStrings.Rook_Autoturret
                                 : XivStrings.Bishop_Autoturret;
                             break;
@@ -346,16 +346,16 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<Dictionary<string, char[]>> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel)
         {
-            var parts = new[] { 'a', 'b', 'c', 'd', 'e', 'f' };
+            var parts = Constants.Alphabet;
 
             var equipPartDictionary = new Dictionary<string, char[]>();
 
             var index = new Index(_gameDirectory);
             var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
-            var version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Version.ToString().PadLeft(4, '0');
+            var version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
             var mtrlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
 
@@ -384,8 +384,8 @@ namespace xivModdingFramework.Items.Categories
 
             var index = new Index(_gameDirectory);
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
             var mdlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/model";
 

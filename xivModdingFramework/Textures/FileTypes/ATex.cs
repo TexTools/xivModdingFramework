@@ -53,7 +53,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var index = new Index(_gameDirectory);
             var avfx = new Avfx(_gameDirectory, _dataFile);
 
-            var itemType = ItemType.GetItemType(itemModel);
+            var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             var vfxPath = await GetVfxPath(itemModel, itemType);
 
@@ -81,7 +81,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 var ttp = new TexTypePath
                 {
                     DataFile = _dataFile,
-                    Name = Path.GetFileNameWithoutExtension(atexPath),
+                    Name = "VFX: " + Path.GetFileNameWithoutExtension(atexPath),
                     Path = atexPath
                 };
 
@@ -132,11 +132,11 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             // get the vfx version from the imc file
             var imc = new Imc(_gameDirectory, _dataFile);
-            var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
+            var imcInfo = await imc.GetImcInfo(itemModel);
             int vfx = imcInfo.Vfx;
 
-            var id = itemModel.ModelInfo.ModelID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.Body.ToString().PadLeft(4, '0');
+            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
             string vfxFolder, vfxFile;
 

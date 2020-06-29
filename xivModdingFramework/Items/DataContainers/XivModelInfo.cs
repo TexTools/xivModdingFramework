@@ -22,41 +22,47 @@ namespace xivModdingFramework.Items.DataContainers
 {
     /// <summary>
     /// This class contains Model Information for an Item
+    /// Note - This is a partial class effectively, and 
+    /// cannot actually be resolved into a full model without
+    /// it's parent IIitem, as it lacks a slot identifier (top, dwn, glv, ...)
     /// </summary>
     public class XivModelInfo : ICloneable
     {
-        /// <summary>
-        /// Currently not used.
-        /// </summary>
-        /// <remarks>
-        /// There are always 2 empty bytes at the start of the model info
-        /// So far there has been no instance of there being any data in those bytes
-        /// Keeping this here in case it starts being used
-        /// </remarks>
-        public int Unused { get; set; }
 
         /// <summary>
-        /// The items Model ID
+        /// The Item's primary ID.  This is one of:
+        /// - (e)quipment number
+        /// - (a)ccessory number
+        /// - (w)eapon number
+        /// - (d)emihuman number
+        /// - (m)onster number
+        /// - bg/furniture number
+        /// - ui/icon number
         /// </summary>
-        public int ModelID { get; set; }
+        public int PrimaryID { get; set; }
 
         /// <summary>
-        /// The items Variant
+        /// The Item's secondary ID.  This is one of
+        /// - (b)ody number (Monster/Companion/Weapon)
+        /// - (e)quipment number (Demihuman)
+        /// - (z)ear number (Human)
+        /// - (f)ace number (Human)
+        /// - (t)ail number (Human)
+        /// - (h)air number (Human)
+        /// - None
         /// </summary>
-        public int Variant { get; set; }
+        public int SecondaryID { get; set; }
 
         /// <summary>
-        /// The items Body
+        /// The item's Model SubSet ID - This can be resolved to
+        /// Material Set ID/Variant via use of IMC->GetImcInfo()
+        /// Only available for equipment items.
         /// </summary>
-        public int Body { get; set; }
-
-        /// <summary>
-        /// The model type, this is only used when an item has a reference to ModelChara
-        /// </summary>
-        public XivItemType ModelType { get; set; }
+        public int ImcSubsetID { get; set; }
 
         /// <summary>
         /// The items full model key value.
+        /// This is not actually used anywhere, and may be invalid/misunderstood data.
         /// </summary>
         public Quad ModelKey { get; set; }
 

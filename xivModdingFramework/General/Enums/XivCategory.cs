@@ -7,10 +7,10 @@ using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.General.Enums
 {
-    public static class XivCategorys
+    public static class XivCategories
     {
         static List<string> _keys = null;
-        static XivCategorys()
+        static XivCategories()
         {
             _keys = typeof(XivStrings).GetProperties(BindingFlags.Static|BindingFlags.NonPublic).Select(it => it.Name).ToList();
         }
