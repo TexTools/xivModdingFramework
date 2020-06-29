@@ -81,7 +81,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 var ttp = new TexTypePath
                 {
                     DataFile = _dataFile,
-                    Name = Path.GetFileNameWithoutExtension(atexPath),
+                    Name = "VFX: " + Path.GetFileNameWithoutExtension(atexPath),
                     Path = atexPath
                 };
 

@@ -21,6 +21,7 @@ using System.IO;
 using System.Linq;
 using System.Resources;
 using System.Text.RegularExpressions;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -259,9 +260,22 @@ namespace xivModdingFramework.Materials.DataContainers
         public List<TextureDescriptorStruct> TextureDescriptorList { get; set; }
 
         /// <summary>
-        /// A list of TexTypePath for the mtrl <see cref="TexTypePath"/>
+        /// The TexTools expected list of textures in the item, including colorset 'texture'.
         /// </summary>
-        public List<TexTypePath> TextureTypePathList { get; set; }
+        public List<TexTypePath> TextureTypePathList
+        {
+            get
+            {
+                return GetTextureTypePathList();
+            }
+        }
+
+        /// <summary>
+        /// Whether or not this Material's Variant has VFX associated with it.
+        /// Used to indicate if TexTools should retrieve the VFX textures
+        /// for the Texture Listing.
+        /// </summary>
+        public bool hasVfx { get; set; }
 
         /// <summary>
         /// The internal MTRL path
@@ -559,6 +573,14 @@ namespace xivModdingFramework.Materials.DataContainers
             // Detokenize paths
             info.path = DetokenizePath(info.path, info.Usage);
 
+            // Ensure .tex or .atex ending for sanity.
+            var match = Regex.Match(info.path, "\\.a?tex$");
+            if(!match.Success)
+            {
+                info.path = info.path += ".tex";
+            }
+
+
 
 
             var raw = new TextureDescriptorStruct();
@@ -659,6 +681,54 @@ namespace xivModdingFramework.Materials.DataContainers
             return ret;
         }
 
+        /// <summary>
+        /// Get the 'TexTypePath' List that TT expects to populate the texture listing.
+        /// Generated via using GetAllMapInfos to scan based on actual MTRL settings,
+        /// Rather than file names.
+        /// </summary>
+        /// <returns></returns>
+        public List<TexTypePath> GetTextureTypePathList()
+        {
+            var ret = new List<TexTypePath>();
+            var maps = GetAllMapInfos(false);
+            TexTypePath ttp;
+            foreach (var map in maps)
+            {
+                ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = map.Usage};
+
+                var fName = Path.GetFileNameWithoutExtension(map.path);
+                if (fName != "") {
+                    var name = map.Usage.ToString() + ": " + fName;
+                    ttp.Name = name;
+                }
+
+                ret.Add(ttp);
+            }
+
+
+            // Include the colorset as its own texture if we have one.
+            if (ColorSetCount > 0 && ColorSetData.Count > 0)
+            {
+                ttp = new TexTypePath
+                {
+                    Path = MTRLPath,
+                    Type = XivTexType.ColorSet,
+                    DataFile = GetDataFile()
+                };
+                ret.Add(ttp);
+            }
+
+            return ret;
+        }
+
+        /// <summary>
+        /// Retrieves the Data File this MTRL resides in based on the path of the MTRL file.
+        /// </summary>
+        /// <returns></returns>
+        public XivDataFile GetDataFile()
+        {
+            return Helpers.IOUtil.GetDataFileFromPath(MTRLPath);
+        }
 
         /// <summary>
         /// Retreives the base texture directory this material references.

@@ -222,19 +222,8 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var mtrlData = await GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
+            mtrlData.hasVfx = true;
 
-            if (mtrlPath.HasVfx)
-            {
-                var atex = new ATex(_gameDirectory, DataFile);
-                try
-                {
-                    mtrlData.TextureTypePathList.AddRange(await atex.GetAtexPaths(itemModel));
-                }
-                catch
-                {
-                    return mtrlData;
-                }                
-            }
 
             return mtrlData;
         }
@@ -338,7 +327,6 @@ namespace xivModdingFramework.Materials.FileTypes
                             MapCount = br.ReadByte(),
                             ColorSetCount = br.ReadByte(),
                             UnknownDataSize = br.ReadByte(),
-                            TextureTypePathList = new List<TexTypePath>(),
                             MTRLPath = mtrlPath
                         };
 
@@ -428,9 +416,6 @@ namespace xivModdingFramework.Materials.FileTypes
                             count++;
                         }
 
-                        // add the textures to the TextureTypePathList
-                        xivMtrl.TextureTypePathList.AddRange(await GetTexNames(xivMtrl.TexturePathList, DataFile));
-
                         // get the map path strings
                         xivMtrl.MapPathList = new List<string>(xivMtrl.MapCount);
                         for (var i = 0; i < xivMtrl.MapCount; i++)
@@ -447,18 +432,6 @@ namespace xivModdingFramework.Materials.FileTypes
                             xivMtrl.ColorSetPathList.Add(Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count]))
                                 .Replace("\0", ""));
                             count++;
-                        }
-
-                        // If the mtrl file contains a color set, add it to the TextureTypePathList
-                        if (xivMtrl.ColorSetDataSize > 0)
-                        {
-                            var ttp = new TexTypePath
-                            {
-                                Path = mtrlPath,
-                                Type = XivTexType.ColorSet,
-                                DataFile = DataFile
-                            };
-                            xivMtrl.TextureTypePathList.Add(ttp);
                         }
 
                         var shaderPathSize = xivMtrl.MaterialDataSize - xivMtrl.TexturePathsDataSize;

@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
@@ -139,6 +141,31 @@ namespace xivModdingFramework.Helpers
             {
                 original[index + i] = toInject[i];
             };
+        }
+
+
+
+        /// <summary>
+        /// Resolves what XivDataFile a file lives in based upon its internal FFXIV directory path.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static XivDataFile GetDataFileFromPath(string path)
+        {
+            var files = Enum.GetValues(typeof(XivDataFile));
+            foreach (var f in files)
+            {
+                var file = (XivDataFile)f;
+                var prefix = file.GetFolderKey();
+
+                var match = Regex.Match(path, "^" + prefix);
+                if (match.Success)
+                {
+                    return file;
+                }
+            }
+
+            throw new Exception("Could not resolve data file - Invalid internal FFXIV path.");
         }
     }
 }
