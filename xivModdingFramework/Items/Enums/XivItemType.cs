@@ -18,17 +18,25 @@ namespace xivModdingFramework.Items.Enums
 {
     /// <summary>
     /// Enum containing the types of items
+    /// These are the FFXIV file system divisions of item types.
     /// </summary>
     public enum XivItemType
     {
         unknown,
+        none,
         weapon,
         equipment,
         accessory,
         monster,
         demihuman,
+        body,
+        hair,
+        tail,
+        ear,
+        face,
         human,
+        decal,
         ui,
-        furniture
+        furniture // This one's a little vague and encompasses really all of /bgcommon/
     }
 }

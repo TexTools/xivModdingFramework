@@ -72,11 +72,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var sklbName = mdlFile.Substring(0, 5);
 
-                if (item.ItemCategory.Equals(XivStrings.Head))
+                if (item.SecondaryCategory.Equals(XivStrings.Head))
                 {
                     sklbName = mdlFile.Substring(5, 5);
                 }
-                else if (item.ItemCategory.Equals(XivStrings.Hair))
+                else if (item.SecondaryCategory.Equals(XivStrings.Hair))
                 {
                     var hBones = (from bone in model.PathData.BoneList where bone.Contains("x_h") select bone).ToList();
 
@@ -98,7 +98,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (!File.Exists(skelLoc + sklbName + ".xml"))
                 {
-                    await GetSkeleton(mdlFile, item.ItemCategory);
+                    await GetSkeleton(mdlFile, item.SecondaryCategory);
 
                     var proc = new Process
                     {
@@ -159,7 +159,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var id = modelName.Substring(6, 4);
 
-                if (_item.ItemCategory.Equals(XivStrings.Hair))
+                if (_item.SecondaryCategory.Equals(XivStrings.Hair))
                 {
                     id = _hairSklbName.Substring(1);
                 }
@@ -177,7 +177,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), _dataFile))
             {
                 // Sometimes for face skeletons id 0001 does not exist but 0002 does
-                if (_item.ItemCategory.Equals(XivStrings.Face))
+                if (_item.SecondaryCategory.Equals(XivStrings.Face))
                 {
 
                     skelFolder = string.Format(XivStrings.EquipSkelFolder, modelName.Substring(1, 4), slotAbr, slotAbr[0], "0002");
@@ -407,7 +407,7 @@ namespace xivModdingFramework.Models.FileTypes
                 jsonBones.Add(JsonConvert.SerializeObject(skelData));
             }
 
-            if (_item.ItemCategory.Equals(XivStrings.Head) || _item.ItemCategory.Equals(XivStrings.Hair) || _item.ItemCategory.Equals(XivStrings.Face))
+            if (_item.SecondaryCategory.Equals(XivStrings.Head) || _item.SecondaryCategory.Equals(XivStrings.Hair) || _item.SecondaryCategory.Equals(XivStrings.Face))
             {
                 AddToRaceSkeleton(jsonBones);
             }
@@ -427,7 +427,7 @@ namespace xivModdingFramework.Models.FileTypes
             var newSkeletonData = new List<SkeletonData>();
             var raceBoneNames = new List<string>();
 
-            if (_item.ItemCategory.Equals(XivStrings.Head) || _item.ItemCategory.Equals(XivStrings.Hair) || _item.ItemCategory.Equals(XivStrings.Face))
+            if (_item.SecondaryCategory.Equals(XivStrings.Head) || _item.SecondaryCategory.Equals(XivStrings.Hair) || _item.SecondaryCategory.Equals(XivStrings.Face))
             {
                 race = _xivMdl.MdlPath.File.Substring(0, 5);
             }

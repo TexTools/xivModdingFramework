@@ -96,8 +96,8 @@ namespace xivModdingFramework.Items.Categories
             {
                 var item = new XivFurniture
                 {
-                    Category = XivStrings.Housing,
-                    ItemCategory = XivStrings.Furniture_Indoor,
+                    PrimaryCategory = XivStrings.Housing,
+                    SecondaryCategory = XivStrings.Furniture_Indoor,
                     ModelInfo = new XivModelInfo()
                 };
 
@@ -107,7 +107,7 @@ namespace xivModdingFramework.Items.Categories
                     var itemIndex = br.ReadInt16();
 
                     br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
-                    item.ModelInfo.ModelID = br.ReadInt16();
+                    item.ModelInfo.PrimaryID = br.ReadInt16();
 
                     br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
                     var housingCategory = br.ReadByte();
@@ -176,8 +176,8 @@ namespace xivModdingFramework.Items.Categories
                 {
                     var item = new XivFurniture
                     {
-                        Category = XivStrings.Housing,
-                        ItemCategory = XivStrings.Paintings,
+                        PrimaryCategory = XivStrings.Housing,
+                        SecondaryCategory = XivStrings.Paintings,
                         ModelInfo = new XivModelInfo()
                     };
 
@@ -187,7 +187,7 @@ namespace xivModdingFramework.Items.Categories
                         var itemIndex = br.ReadInt32();
 
                         br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-                        item.ModelInfo.ModelID = br.ReadInt32();
+                        item.ModelInfo.PrimaryID = br.ReadInt32();
 
                         using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
                         {
@@ -245,8 +245,8 @@ namespace xivModdingFramework.Items.Categories
                 {
                     var painting = new XivFurniture
                     {
-                        Category = XivStrings.Housing,
-                        ItemCategory = XivStrings.Paintings,
+                        PrimaryCategory = XivStrings.Housing,
+                        SecondaryCategory = XivStrings.Paintings,
                         ModelInfo = new XivModelInfo()
                     };
 
@@ -272,7 +272,7 @@ namespace xivModdingFramework.Items.Categories
                         using (var br1 = new BinaryReaderBE(new MemoryStream(pictureDictionary[pictureIndex])))
                         {
                             br1.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-                            painting.ModelInfo.ModelID = br1.ReadInt32();
+                            painting.ModelInfo.PrimaryID = br1.ReadInt32();
                         }
                     }
 
@@ -323,8 +323,8 @@ namespace xivModdingFramework.Items.Categories
             {
                 var item = new XivFurniture
                 {
-                    Category = XivStrings.Housing,
-                    ItemCategory = XivStrings.Furniture_Outdoor,
+                    PrimaryCategory = XivStrings.Housing,
+                    SecondaryCategory = XivStrings.Furniture_Outdoor,
                     ModelInfo = new XivModelInfo()
                 };
 
@@ -334,7 +334,7 @@ namespace xivModdingFramework.Items.Categories
                     var itemIndex = br.ReadInt16();
 
                     br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
-                    item.ModelInfo.ModelID = br.ReadByte();
+                    item.ModelInfo.PrimaryID = br.ReadByte();
 
                     br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
                     var housingCategory = br.ReadByte();
@@ -378,7 +378,7 @@ namespace xivModdingFramework.Items.Categories
         {
             var furniturePartDict = new Dictionary<string, string>();
 
-            var assets = await GetFurnitureAssets(itemModel.ModelInfo.ModelID, itemModel.ItemCategory);
+            var assets = await GetFurnitureAssets(itemModel.ModelInfo.PrimaryID, itemModel.SecondaryCategory);
 
             foreach (var mdl in assets.MdlList)
             {

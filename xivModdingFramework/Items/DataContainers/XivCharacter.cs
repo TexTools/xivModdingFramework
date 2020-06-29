@@ -36,7 +36,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// For character items, the category is "Character"
         /// </remarks>
-        public string Category { get; set; }
+        public string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The item Category
@@ -44,7 +44,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This would be a category such as Hair, Face, Body, Tail
         /// </remarks>
-        public string ItemCategory { get; set; }
+        public string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The item SubCategory
@@ -52,7 +52,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <remarks>
         /// This is currently not used for the Character Category, but may be used in the future
         /// </remarks>
-        public string ItemSubCategory { get; set; }
+        public string TertiaryCategory { get; set; }
 
         /// <summary>
         /// The data file the item belongs to
@@ -71,7 +71,6 @@ namespace xivModdingFramework.Items.DataContainers
         {
             return string.Compare(Name, ((XivCharacter)obj).Name, StringComparison.Ordinal);
         }
-
         public object Clone()
         {
             var copy = (XivCharacter)this.MemberwiseClone();

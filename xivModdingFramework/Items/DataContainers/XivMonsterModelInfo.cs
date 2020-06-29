@@ -14,34 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace xivModdingFramework.Variants.DataContainers
+using System;
+using xivModdingFramework.General;
+using xivModdingFramework.Items.Enums;
+
+namespace xivModdingFramework.Items.DataContainers
 {
     /// <summary>
-    /// The IMC information for a Specific Variant of a Specific Slot in a Gear Set.
+    /// This class contains Model Information for an Item
+    /// Note - This is a partial class effectively, and 
+    /// cannot actually be resolved into a full model without
+    /// it's parent IIitem, as it lacks a slot identifier (top, dwn, glv, ...)
     /// </summary>
-    public class XivImc
+    public class XivMonsterModelInfo: XivModelInfo
     {
-        /// <summary>
-        /// The Material Set / Variant #
-        /// </summary>
-        public ushort Variant { get; set; }
 
         /// <summary>
-        /// The IMC mask data
+        /// Model type as pulled from the ModelChara EXD.
         /// </summary>
-        /// <remarks>
-        /// This is used with a models mesh part mask data
-        /// It is used to determine what parts of the mesh are hidden
-        /// </remarks>
-        public ushort Mask { get; set; }
-
-        /// <summary>
-        /// The IMC VFX data
-        /// </summary>
-        /// <remarks>
-        /// Only a few items have VFX data associated with them
-        /// Some examples would be any of the Lux weapons
-        /// </remarks>
-        public ushort Vfx { get; set; }
+        public XivItemType ModelType;
     }
 }
