@@ -352,7 +352,7 @@ namespace xivModdingFramework.Items.Categories
 
             var index = new Index(_gameDirectory);
             var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
-            var version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Variant.ToString().PadLeft(4, '0');
+            var version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');

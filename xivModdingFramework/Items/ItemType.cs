@@ -203,7 +203,7 @@ namespace xivModdingFramework.Items
             try {
                 modelInfo = ((IItemModel)item).ModelInfo;
                 primaryId = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                secondaryId = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
+                secondaryId = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
             } catch(Exception ex)
             {
                 // No-op.  If it failed it's one of the types we're not going to use it modelInfo on anyways.
@@ -212,30 +212,30 @@ namespace xivModdingFramework.Items
 
             if (primaryType == XivItemType.monster)
             {
-                return "chara/monster/m" + primaryId + "/obj/body/b" + secondaryId + "/";
+                return "chara/monster/m" + primaryId + "/obj/body/b" + secondaryId;
             }
             else if (primaryType == XivItemType.demihuman)
             {
-                return "chara/demihuman/d" + primaryId + "/obj/equipment/e" + secondaryId + "/";
+                return "chara/demihuman/d" + primaryId + "/obj/equipment/e" + secondaryId;
             }
             else if(primaryType == XivItemType.equipment)
             {
-                return "chara/equipment/e" + primaryId + "/";
+                return "chara/equipment/e" + primaryId;
             }
             else if (primaryType == XivItemType.accessory)
             {
-                return "chara/accessory/a" + primaryId + "/";
+                return "chara/accessory/a" + primaryId;
             }
             else if (primaryType == XivItemType.ui)
             {
                 var uiItem = (XivUi)item;
-                return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0') + '/';
+                return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
             }
             else if (primaryType == XivItemType.furniture)
             {
                 if (item.SecondaryCategory == XivStrings.Paintings)
                 {
-                    return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0') + "/";
+                    return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
                 }
                 else
                 {
@@ -249,14 +249,15 @@ namespace xivModdingFramework.Items
                         ret += "outdoor/";
                     }
 
-                    ret += "general/" + primaryId + "/";
+                    ret += "general/" + primaryId;
                     return ret;
                 }
             }
             else if (primaryType == XivItemType.weapon)
             {
-                return "chara/weapon/w" + primaryId + "/obj/body/b" + secondaryId + "/";
-            } else if(primaryType == XivItemType.human)
+                return "chara/weapon/w" + primaryId + "/obj/body/b" + secondaryId;
+            } 
+            else if(primaryType == XivItemType.human)
             {
                 var ret = "chara/human/c" + primaryId + "/obj/";
                 if (secondaryType == XivItemType.body)
@@ -280,17 +281,18 @@ namespace xivModdingFramework.Items
                     ret += "ears/z";
                 }
 
-                ret += secondaryId + "/";
+                ret += secondaryId;
                 return ret;
-            } else if(primaryType == XivItemType.decal)
+            } 
+            else if(primaryType == XivItemType.decal)
             {
                 if (item.SecondaryCategory == XivStrings.Face_Paint)
                 {
-                    return "chara/common/texture/decal_face/";
+                    return "chara/common/texture/decal_face";
                 }
                 if (item.SecondaryCategory == XivStrings.Equipment_Decals)
                 {
-                    return "chara/common/texture/decal_equip/";
+                    return "chara/common/texture/decal_equip";
                 }
             }
             return "";

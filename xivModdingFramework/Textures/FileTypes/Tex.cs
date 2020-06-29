@@ -203,7 +203,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, xivGear.DataFile);
-                version = (await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo)).Variant.ToString().PadLeft(4, '0');
+                version = (await imc.GetImcInfo(itemModel, true)).Variant.ToString().PadLeft(4, '0');
 
                 if (imc.ChangedType)
                 {
@@ -218,7 +218,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 {
                     // Get the mtrl version for the given item from the imc file
                     var imc = new Imc(_gameDirectory, dataFile);
-                    version = (await imc.GetImcInfo(itemModel, itemModel.ModelInfo)).Variant.ToString().PadLeft(4, '0');
+                    version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
                 }
             }
 

@@ -53,21 +53,9 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item">The item to get the version for</param>
         /// <param name="modelInfo">The model info of the item</param>
         /// <returns>The XivImc Data</returns>
-        public async Task<XivImc> GetImcInfo(IItemModel item, XivModelInfo modelInfo = null)
+        public async Task<XivImc> GetImcInfo(IItemModel item, bool useSecondary = false)
         {
             var xivImc = new XivImc();
-
-            // Set based on item if we don't have one provided directly.
-            if(modelInfo == null)
-            {
-                modelInfo = item.ModelInfo;
-            }
-
-            // If it's still null, error.
-            if(modelInfo == null)
-            {
-               throw new NotSupportedException("Cannot get IMC info.");
-            }
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -78,8 +66,8 @@ namespace xivModdingFramework.Variants.FileTypes
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            var itemType = ItemType.GetPrimaryItemType(item);
-            var imcPath = GetImcPath(modelInfo, itemType);
+            var itemType = item.GetPrimaryItemType();
+            var imcPath = GetImcPath(item, useSecondary);
 
             var itemCategory = item.SecondaryCategory;
 
@@ -90,9 +78,15 @@ namespace xivModdingFramework.Variants.FileTypes
             {
                 if (item.SecondaryCategory == XivStrings.Two_Handed)
                 {
-                    itemCategory = XivStrings.Hands;
-                    itemType = XivItemType.equipment;
-                    imcPath = GetImcPath(modelInfo, itemType);
+                    // Jank workaround for two handed weapons that are actually gloves.
+                    var tempItem = new XivGear()
+                    {
+                        PrimaryCategory = XivStrings.Gear,
+                        SecondaryCategory = XivStrings.Hands,
+                        Name = item.Name,
+                        ModelInfo = (XivModelInfo) item.ModelInfo.Clone()
+                    };
+                    imcPath = GetImcPath(tempItem);
 
                     imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder),
                         HashGenerator.GetHash(imcPath.File), _dataFile);
@@ -123,7 +117,12 @@ namespace xivModdingFramework.Variants.FileTypes
                     if (itemType == XivItemType.weapon || itemType == XivItemType.monster)
                     {
                         // weapons and monsters do not have variant sets
-                        variantOffset = (modelInfo.ImcSubsetID * variantLength) + headerLength;
+                        variantOffset = (item.ModelInfo.ImcSubsetID * variantLength) + headerLength;
+                        if (useSecondary)
+                        {
+                            XivGear gear = (XivGear)item;
+                            variantOffset = (gear.SecondaryModelInfo.ImcSubsetID * variantLength) + headerLength;
+                        }
 
                         // use default if offset is out of range
                         if (variantOffset >= imcData.Length)
@@ -136,7 +135,7 @@ namespace xivModdingFramework.Variants.FileTypes
                         // Variant Sets contain 5 variants for each slot
                         // These can be Head, Body, Hands, Legs, Feet  or  Ears, Neck, Wrists, LRing, RRing
                         // This skips to the correct variant set, then to the correct slot within that set for the item
-                        variantOffset = (modelInfo.ImcSubsetID * variantSetLength) +
+                        variantOffset = (item.ModelInfo.ImcSubsetID * variantSetLength) +
                                         (_slotOffsetDictionary[itemCategory] * variantLength) + headerLength;
 
                         // use defalut if offset is out of range
@@ -165,24 +164,15 @@ namespace xivModdingFramework.Variants.FileTypes
         /// Gets the full IMC information for a given item
         /// </summary>
         /// <param name="item"></param>
-        /// <param name="modelInfo"></param>
+        /// <param name="useSecondary">Determines if the SecondaryModelInfo should be used instead.(XivGear only)</param>
         /// <returns>The ImcData data</returns>
-        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item, XivModelInfo modelInfo = null)
+        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item, bool useSecondary = false)
         {
-            if(modelInfo == null)
-            {
-                modelInfo = item.ModelInfo;
-            }
-            if(modelInfo == null)
-            {
-                throw new NotSupportedException("Attempted to get IMC info for invalid item.");
-            }
-
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var itemType = ItemType.GetPrimaryItemType(item);
-            var imcPath = GetImcPath(modelInfo, itemType);
+            var imcPath = GetImcPath(item, useSecondary);
 
             var imcOffset = await index.GetDataOffset(HashGenerator.GetHash(imcPath.Folder), HashGenerator.GetHash(imcPath.File), _dataFile);
 
@@ -271,35 +261,39 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="modelInfo">The model info of the item</param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>A touple containing the Folder and File strings</returns>
-        private static (string Folder, string File) GetImcPath(XivModelInfo modelInfo, XivItemType itemType)
+        private static (string Folder, string File) GetImcPath(IItemModel item, bool useSecondary = false)
         {
-            string imcFolder;
+            string imcFolder = item.GetItemRootFolder();
             string imcFile;
 
-            var modelID = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
-            var body = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var primaryId = item.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var secondaryId = item.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var itemType = item.GetPrimaryItemType();
 
             switch (itemType)
             {
                 case XivItemType.equipment:
-                    imcFolder = $"chara/{itemType}/e{modelID}";
-                    imcFile = $"e{modelID}{ImcExtension}";
+                    imcFile = $"e{primaryId}{ImcExtension}";
+                    if(useSecondary)
+                    {
+                        XivGear gear = (XivGear)item;
+                        var alternateId = gear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
+
+                        imcFile = $"e{alternateId}{ImcExtension}";
+                    }
+
                     break;
                 case XivItemType.accessory:
-                    imcFolder = $"chara/{itemType}/a{modelID}";
-                    imcFile = $"a{modelID}{ImcExtension}";
+                    imcFile = $"a{primaryId}{ImcExtension}";
                     break;
                 case XivItemType.weapon:
-                    imcFolder = $"chara/{itemType}/w{modelID}/obj/body/b{body}";
-                    imcFile = $"b{body}{ImcExtension}";
+                    imcFile = $"b{secondaryId}{ImcExtension}";
                     break;
                 case XivItemType.monster:
-                    imcFolder = $"chara/{itemType}/m{modelID}/obj/body/b{body}";
-                    imcFile = $"b{body}{ImcExtension}";
+                    imcFile = $"b{secondaryId}{ImcExtension}";
                     break;
                 case XivItemType.demihuman:
-                    imcFolder = $"chara/{itemType}/d{modelID}/obj/equipment/e{body}";
-                    imcFile = $"e{body}{ImcExtension}";
+                    imcFile = $"e{secondaryId}{ImcExtension}";
                     break;
                 default:
                     imcFolder = "";

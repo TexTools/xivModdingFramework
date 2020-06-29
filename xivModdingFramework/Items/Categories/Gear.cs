@@ -327,7 +327,7 @@ namespace xivModdingFramework.Items.Categories
         {
             // Get the material version for the item from the imc file
             var imc = new Imc(_gameDirectory, dataFile);
-            var gearVersion = (await imc.GetImcInfo(xivGear, xivGear.ModelInfo)).Variant.ToString().PadLeft(4, '0');
+            var gearVersion = (await imc.GetImcInfo(xivGear)).Variant.ToString().PadLeft(4, '0');
 
             var modelID = xivGear.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
 
@@ -702,6 +702,7 @@ namespace xivModdingFramework.Items.Categories
                     (await GetGearList())
                     .Where(it =>
                     it.ModelInfo.PrimaryID == item.ModelInfo.PrimaryID
+                    && it.ModelInfo.SecondaryID == item.ModelInfo.SecondaryID
                     && it.SecondaryCategory == item.SecondaryCategory).Select(it => it as IItemModel).ToList()
                 );
             }

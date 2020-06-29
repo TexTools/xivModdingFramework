@@ -895,7 +895,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
-                var imcInfo = await imc.GetImcInfo(item, item.ModelInfo);
+                var imcInfo = await imc.GetImcInfo(item);
                 variant = imcInfo.Variant;
 
                 if (imcInfo.Vfx > 0)
@@ -916,7 +916,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, DataFile);
-                var imcInfo = await imc.GetImcInfo(item, xivGear.SecondaryModelInfo);
+
+                var imcInfo = await imc.GetImcInfo(item, true);
                 var imcChangedType = imc.ChangedType;
                 variant = imcInfo.Variant;
 
@@ -964,7 +965,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
-                var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
+                var imcInfo = await imc.GetImcInfo(itemModel);
                 variant = imcInfo.Variant;
 
                 if (imcInfo.Vfx > 0)
@@ -985,7 +986,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
                 var imc = new Imc(_gameDirectory, DataFile);
-                var imcInfo = await imc.GetImcInfo(itemModel, xivGear.SecondaryModelInfo);
+                // Use secondary model info instead.
+                var imcInfo = await imc.GetImcInfo(itemModel, true);
                 var imcChangedType = imc.ChangedType;
                 variant = imcInfo.Variant;
 
@@ -1026,7 +1028,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
-                var imcInfo = await imc.GetImcInfo(itemModel, itemModel.ModelInfo);
+                var imcInfo = await imc.GetImcInfo(itemModel);
                 variant = imcInfo.Variant;
             }
 
