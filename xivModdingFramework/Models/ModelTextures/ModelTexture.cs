@@ -409,7 +409,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             texMapData.Skin = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
                             break;
                         default:
-                            throw new ArgumentOutOfRangeException();
+                            // Do not render textures that we do not know how to use
+                            break;
                     }
                 }
             }
