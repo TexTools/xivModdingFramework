@@ -691,13 +691,24 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             var ret = new List<TexTypePath>();
             var maps = GetAllMapInfos(false);
+            var shaderInfo = GetShaderInfo();
             TexTypePath ttp;
             foreach (var map in maps)
             {
-                ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = map.Usage};
 
+
+                if (shaderInfo.Shader == MtrlShader.Skin && map.Usage == XivTexType.Multi)
+                {
+                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = XivTexType.Skin };
+
+                }
+                else
+                {
+                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = map.Usage };
+                }
                 var fName = Path.GetFileNameWithoutExtension(map.path);
-                if (fName != "") {
+                if (fName != "")
+                {
                     var name = map.Usage.ToString() + ": " + fName;
                     ttp.Name = name;
                 }
