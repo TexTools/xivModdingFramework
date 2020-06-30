@@ -309,6 +309,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 case "bg.shpk":
                     info.Shader = MtrlShader.Furniture;
                     break;
+                case "bgcolorchange.shpk":
+                    info.Shader = MtrlShader.DyeableFurniture;
+                    break;
                 default:
                     info.Shader = MtrlShader.Other;
                     break;
@@ -355,6 +358,9 @@ namespace xivModdingFramework.Materials.DataContainers
                     break;
                 case MtrlShader.Furniture:
                     Shader = "bg.shpk";
+                    break;
+                case MtrlShader.DyeableFurniture:
+                    Shader = "bgcolorchange.shpk";
                     break;
                 default:
                     // No change to the Shader for 'Other' type entries.
@@ -419,6 +425,11 @@ namespace xivModdingFramework.Materials.DataContainers
                     mapIndex = (int) paramSet.TextureIndex;
                     info.Format = GetFormat(paramSet.FileFormat);
                 }
+                else if (paramSet.TextureType == Mtrl.FurnitureTextureDescriptorValues[MapType])
+                {
+                    mapIndex = (int)paramSet.TextureIndex;
+                    info.Format = GetFormat(paramSet.FileFormat);
+                }
             }
 
             if(mapIndex < 0)
@@ -472,7 +483,12 @@ namespace xivModdingFramework.Materials.DataContainers
                     if(Mtrl.TextureDescriptorValues.ContainsValue(descriptor.TextureType))
                     {
                         info.Usage = Mtrl.TextureDescriptorValues.First(x => x.Value == descriptor.TextureType).Key;
-                    } else
+                    }
+                    else if (Mtrl.FurnitureTextureDescriptorValues.ContainsValue(descriptor.TextureType))
+                    {
+                        info.Usage = Mtrl.FurnitureTextureDescriptorValues.First(x => x.Value == descriptor.TextureType).Key;
+                    }
+                    else
                     {
                         info.Usage = XivTexType.Other;
                     }
@@ -519,43 +535,33 @@ namespace xivModdingFramework.Materials.DataContainers
             // Deleting existing info.
             if (info == null)
             {
-                if(paramIdx < 0)
-                {
-                    // Didn't exist to start, nothing to do.
-                    return;
-                }
 
-                // Remove texture from path list if it exists.
-                if (TexturePathList.Count > oldInfo.TextureIndex)
-                {
-                    TexturePathList.RemoveAt((int)oldInfo.TextureIndex);
-                    TexturePathUnknownList.RemoveAt((int)oldInfo.TextureIndex);
-                }
 
-                // Remove Parameter List
-                TextureDescriptorList.RemoveAt(paramIdx);
-
-                // Update other texture offsets
-                for(var i = 0; i < TextureDescriptorList.Count; i++)
+                if (paramIdx >= 0)
                 {
-                    var p = TextureDescriptorList[i];
-                    if(p.TextureIndex > oldInfo.TextureIndex)
+                    // Remove texture from path list if it exists.
+                    if (TexturePathList.Count > oldInfo.TextureIndex)
                     {
-                        p.TextureIndex--;
+                        TexturePathList.RemoveAt((int)oldInfo.TextureIndex);
+                        TexturePathUnknownList.RemoveAt((int)oldInfo.TextureIndex);
                     }
-                    TextureDescriptorList[i] = p;
-                }
 
-                // Remove struct1 entry for the removed map type, if it exists.
-                for(var i = 0; i < TextureUsageList.Count; i++)
-                {
-                    var s = TextureUsageList[i];
-                    if(s.TextureType == Mtrl.TextureUsageValues[MapType].TextureType)
+                    // Remove Parameter List
+                    TextureDescriptorList.RemoveAt(paramIdx);
+
+                    // Update other texture offsets
+                    for (var i = 0; i < TextureDescriptorList.Count; i++)
                     {
-                        TextureUsageList.RemoveAt(i);
-                        break;
+                        var p = TextureDescriptorList[i];
+                        if (p.TextureIndex > oldInfo.TextureIndex)
+                        {
+                            p.TextureIndex--;
+                        }
+                        TextureDescriptorList[i] = p;
                     }
                 }
+
+                RegenerateTextureUsageList();
 
                 return;
 
@@ -608,29 +614,101 @@ namespace xivModdingFramework.Materials.DataContainers
                 TexturePathList[(int) raw.TextureIndex] = info.path;
             }
 
-            // Update struct1 entry with the appropriate entry if it's not already there.
-            bool foundEntry = false;
-            for (var i = 0; i < TextureUsageList.Count; i++)
+            RegenerateTextureUsageList();
+        }
+
+        /// <summary>
+        /// Regenerates/Cleans up the texture usage list based on the 
+        /// Texture Maps that are set in the Texture Description Fields.
+        /// </summary>
+        private void RegenerateTextureUsageList()
+        {
+            var shaderInfo = GetShaderInfo();
+            
+            // Furniture shaders do not use the texture usage list at all.
+            if(shaderInfo.Shader == MtrlShader.Furniture || shaderInfo.Shader == MtrlShader.DyeableFurniture)
             {
-                var s = TextureUsageList[i];
-                if (s.TextureType == Mtrl.TextureUsageValues[MapType].TextureType)
+                TextureUsageList.Clear();
+                return;
+            }
+
+            // Everything (should) have a normal, so this is redundant.
+            // bool hasNormal = GetMapInfo(XivTexType.Normal) != null;
+            bool hasSpec = GetMapInfo(XivTexType.Specular) != null;
+            bool hasDiffuse = GetMapInfo(XivTexType.Diffuse) != null;
+            bool hasMulti = GetMapInfo(XivTexType.Multi) != null; 
+
+            ClearTextureUsage(XivTexType.Normal);
+            ClearTextureUsage(XivTexType.Diffuse);
+            ClearTextureUsage(XivTexType.Specular);
+            ClearTextureUsage(XivTexType.Multi);
+
+            // These need to be set in relatively specific order
+            // in order to use the maps correctly
+
+            SetTextureUsage(XivTexType.Normal);
+
+            if (hasDiffuse)
+            {
+                // Diffuse
+                SetTextureUsage(XivTexType.Diffuse);
+            }
+
+            if (hasSpec || hasMulti)
+            {
+                // Including both of these seems to guarantee best results,
+                // vs including only one or the other.
+                SetTextureUsage(XivTexType.Multi);
+                SetTextureUsage(XivTexType.Specular);
+            }
+
+        }
+
+        /// <summary>
+        /// Clears a texture usage value.
+        /// </summary>
+        /// <param name="usage"></param>
+        private bool ClearTextureUsage(XivTexType usage)
+        {
+            var oldCount = TextureUsageList.Count;
+            TextureUsageList = TextureUsageList.Where(x => x.TextureType != Mtrl.TextureUsageValues[usage].TextureType).ToList();
+            return oldCount != TextureUsageList.Count;
+        }
+
+        /// <summary>
+        /// Adds or changes a texture usage value.
+        /// </summary>
+        /// <param name="usage"></param>
+        /// <param name="unknownValue"></param>
+        private void SetTextureUsage(XivTexType usage, uint? unknownValue = null)
+        {
+            if(unknownValue == null)
+            {
+                unknownValue = Mtrl.TextureUsageValues[usage].Unknown;
+            }
+            try
+            {
+                var val = TextureUsageList.First(x => x.TextureType == Mtrl.TextureUsageValues[usage].TextureType);
+                if(val != null)
                 {
-                    foundEntry = true;
-                    break;
+                    // Despite being named 'Struct' this is actually a class.
+                    val.Unknown = (uint) unknownValue;
+                } else
+                {
+                    TextureUsageList.Add(new TextureUsageStruct()
+                    {
+                        TextureType = Mtrl.TextureUsageValues[usage].TextureType,
+                        Unknown = (uint) unknownValue
+                    });
                 }
-            }
-
-            if(!foundEntry)
+            } catch(Exception ex)
             {
-                var s1 = new TextureUsageStruct()
+                TextureUsageList.Add(new TextureUsageStruct()
                 {
-                    TextureType = Mtrl.TextureUsageValues[MapType].TextureType,
-                    Unknown = Mtrl.TextureUsageValues[MapType].Unknown
-                };
-
-                TextureUsageList.Add(s1);
+                    TextureType = Mtrl.TextureUsageValues[usage].TextureType,
+                    Unknown = (uint) unknownValue
+                });
             }
-
         }
 
         /// <summary>
@@ -641,6 +719,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public List<MapInfo> GetAllMapInfos(bool tokenize = true)
         {
             var ret = new List<MapInfo>();
+            var shaderInfo = GetShaderInfo();
             for(var i = 0; i < TexturePathList.Count; i++)
             {
                 var info = new MapInfo();
@@ -661,7 +740,16 @@ namespace xivModdingFramework.Materials.DataContainers
                                 return (x.Value == p.TextureType);
                             }).Key;
                             info.Usage = usage;
-                        } else
+                        } else if(Mtrl.FurnitureTextureDescriptorValues.ContainsValue(p.TextureType))
+                        {
+                            // Known parameter for the furniture shaders.
+                            var usage = Mtrl.FurnitureTextureDescriptorValues.First(x =>
+                            {
+                                return (x.Value == p.TextureType);
+                            }).Key;
+                            info.Usage = usage;
+
+                        } else 
                         {
                             info.Usage = XivTexType.Other;
                         }
@@ -695,12 +783,13 @@ namespace xivModdingFramework.Materials.DataContainers
             TexTypePath ttp;
             foreach (var map in maps)
             {
-
-
                 if (shaderInfo.Shader == MtrlShader.Skin && map.Usage == XivTexType.Multi)
                 {
                     ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = XivTexType.Skin };
 
+                } else if (shaderInfo.Shader == MtrlShader.Furniture && map.path.Contains("dummy")) {
+                    // Dummy textures are skipped.
+                    continue;
                 }
                 else
                 {
@@ -996,13 +1085,14 @@ namespace xivModdingFramework.Materials.DataContainers
     // Enum representation of the shader names used in mtrl files.
     public enum MtrlShader
     {
-        Standard,       // character.shpk
-        Glass,          // characterglass.shpk
-        Skin,           // skin.shpk
-        Hair,           // hair.shpk
-        Iris,           // iris.shpk
-        Furniture,      // bg.shpk
-        Other           // Unknown Shader
+        Standard,           // character.shpk
+        Glass,              // characterglass.shpk
+        Skin,               // skin.shpk
+        Hair,               // hair.shpk
+        Iris,               // iris.shpk
+        Furniture,          // bg.shpk
+        DyeableFurniture,   //bgcolorchange.shpk 
+        Other               // Unknown Shader
     }
 
     /// <summary>
