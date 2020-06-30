@@ -29,6 +29,7 @@ using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -104,6 +105,7 @@ namespace xivModdingFramework.Materials.FileTypes
             { XivTexType.Multi, new TextureUsageStruct() { TextureType = 3531043187, Unknown = 4083110193 } },
             { XivTexType.Diffuse, new TextureUsageStruct() { TextureType = 3054951514, Unknown = 1611594207 } },
             { XivTexType.Specular, new TextureUsageStruct() { TextureType = 3367837167, Unknown = 2687453224 } },
+            { XivTexType.Skin, new TextureUsageStruct() { TextureType = 940355280, Unknown = 735790577 } },
         };
 
         
@@ -115,14 +117,14 @@ namespace xivModdingFramework.Materials.FileTypes
         public static Dictionary<MtrlShaderParameterId, List<byte>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<byte>>() {
             { MtrlShaderParameterId.Common1, new List<byte>(){ 0,0,0,63 } },
             { MtrlShaderParameterId.Common2, new List<byte>(){ 0,0,128,63 } },
-            { MtrlShaderParameterId.Skin1, new List<byte>(){ 51, 51, 179, 63, 51, 51, 179, 63, 51, 51, 179, 63 } },
-            { MtrlShaderParameterId.Skin2, new List<byte>(){ 0,0,128,63 } },
-            { MtrlShaderParameterId.Skin3, new List<byte>(){ 0,0,64,64 } },
-            { MtrlShaderParameterId.Skin4, new List<byte>(){ 10, 215, 163, 60, 10, 215, 163, 60, 10, 215, 163, 60 } },
-            { MtrlShaderParameterId.Skin5, new List<byte>(){ 205, 204, 204, 62, 205, 204, 204, 62, 205, 204, 204, 62 } },
-            { MtrlShaderParameterId.Skin6, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { MtrlShaderParameterId.Skin7, new List<byte>(){ 0, 0, 130, 66, 0, 0, 200, 66 } },
-            { MtrlShaderParameterId.Skin8, new List<byte>(){ 0, 0, 124, 66 } },
+            { MtrlShaderParameterId.SkinColor, new List<byte>(){ 51, 51, 179, 63, 51, 51, 179, 63, 51, 51, 179, 63 } },
+            { MtrlShaderParameterId.Reflection1, new List<byte>(){ 0,0,128,63 } },
+            { MtrlShaderParameterId.SkinOutline, new List<byte>(){ 0,0,64,64 } },
+            { MtrlShaderParameterId.RacialSkin1, new List<byte>(){ 10, 215, 163, 60, 10, 215, 163, 60, 10, 215, 163, 60 } },
+            { MtrlShaderParameterId.SkinUnknown1, new List<byte>(){ 205, 204, 204, 62, 205, 204, 204, 62, 205, 204, 204, 62 } },
+            { MtrlShaderParameterId.SkinUnknown2, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
+            { MtrlShaderParameterId.RacialSkin2, new List<byte>(){ 0, 0, 130, 66, 0, 0, 200, 66 } },
+            { MtrlShaderParameterId.SkinUnknown3, new List<byte>(){ 0, 0, 124, 66 } },
             { MtrlShaderParameterId.Equipment1, new List<byte>(){ 0, 0, 0, 0 } },
             { MtrlShaderParameterId.Face1, new List<byte>(){ 0, 0, 0, 66 } },
             { MtrlShaderParameterId.Hair1, new List<byte>(){ 51, 51, 179, 62 } },
@@ -493,7 +495,8 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             xivMtrl.ShaderParameterList.Add(new ShaderParameterStruct
                             {
-                                ParameterID = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()});
+                                ParameterID = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
+                            });
                         }
 
                         xivMtrl.TextureDescriptorList = new List<TextureDescriptorStruct>(originalTextureDescriptorCount);
@@ -508,24 +511,36 @@ namespace xivModdingFramework.Materials.FileTypes
                             });
                         }
 
-                        var shaderBytes = br.ReadBytes(originalShaderParameterDataSize);
 
+                        var bytesRead = 0;
                         foreach (var shaderParam in xivMtrl.ShaderParameterList)
                         {
                             var offset = shaderParam.Offset;
                             var size = shaderParam.Size;
                             shaderParam.Bytes = new List<byte>();
-                            if (offset + size <= shaderBytes.Length)
+                            shaderParam.Args = new List<uint>();
+                            if (bytesRead + size <= originalShaderParameterDataSize)
                             {
-                                for (var idx = offset; idx < offset + size; idx++)
+                                for (var idx = offset; idx < offset + size; idx+=4)
                                 {
-                                    shaderParam.Bytes.Add(shaderBytes[idx]);
+                                    var arg = br.ReadUInt32();
+                                    shaderParam.Args.Add(arg);
+                                    bytesRead += 4;
+                                    shaderParam.Bytes.AddRange(BitConverter.GetBytes(arg));
                                 }
                             } else
                             {
                                 // Just use a blank array if we have missing/invalid shader data.
                                 shaderParam.Bytes = new List<byte>(new byte[size]);
+                                shaderParam.Args = new List<uint>(new uint[size / 4]);
                             }
+                        }
+
+                        // Chew through any remaining padding.
+                        while(bytesRead < originalShaderParameterDataSize)
+                        {
+                            br.ReadByte();
+                            bytesRead++;
                         }
 
 
@@ -769,8 +784,14 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown));
             }
 
+            var offset = 0;
             foreach (var dataStruct2 in xivMtrl.ShaderParameterList)
             {
+                // Ensure we're writing correctly calculated data.
+                dataStruct2.Offset = (short) offset;
+                dataStruct2.Size = (short) dataStruct2.Bytes.Count;
+                offset += dataStruct2.Size;
+
                 mtrlBytes.AddRange(BitConverter.GetBytes((uint)dataStruct2.ParameterID));
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Size));
@@ -786,9 +807,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
 
-            var ordered = (IEnumerable<ShaderParameterStruct>)xivMtrl.ShaderParameterList.OrderBy(x => x.Offset);
             var shaderBytes = new List<byte>();
-            foreach (var shaderParam in ordered)
+            foreach (var shaderParam in xivMtrl.ShaderParameterList)
             {
                 //shaderBytes.AddRange(Mtrl.ShaderParameterValues[shaderParam.ParameterID]);
                 //shaderBytes.AddRange(new byte[shaderParam.Bytes.Count]);

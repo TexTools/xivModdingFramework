@@ -168,25 +168,19 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public ushort ShaderParameterDataSize { 
             get {
-                var highestOffset =0;
                 var size = 0;
                 ShaderParameterList.ForEach(x => {
-                    if(x.Offset > highestOffset)
-                    {
-                        highestOffset = x.Offset;
-                        size = x.Size;
-                    }
+                    size += x.Bytes.Count;
                 }
                 );
-                var fullSize = highestOffset + size;
 
-                if(fullSize % 8 != 0)
+                if(size % 8 != 0)
                 {
-                    var padding = 8 - (fullSize % 8);
-                    fullSize += padding;
+                    var padding = 8 - (size % 8);
+                    size += padding;
                 }
 
-                return (ushort)fullSize;
+                return (ushort)size;
             }
             set
             {
@@ -329,6 +323,35 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.TransparencyEnabled = false;
             }
 
+            info.Preset = MtrlShaderPreset.Default;
+            if (info.Shader == MtrlShader.Standard)
+            {
+                bool hasSpec = GetMapInfo(XivTexType.Specular) != null;
+                bool hasDiffuse = GetMapInfo(XivTexType.Diffuse) != null;
+                bool hasMulti = GetMapInfo(XivTexType.Multi) != null;
+
+                if (hasDiffuse)
+                {
+                    if(hasSpec)
+                    {
+                        info.Preset = MtrlShaderPreset.DiffuseSpecular;
+                    } else
+                    {
+                        info.Preset = MtrlShaderPreset.DiffuseMulti;
+                    }
+                } else
+                {
+                    info.Preset = MtrlShaderPreset.Default;
+                }
+            }
+            else if (info.Shader == MtrlShader.Skin)
+            {
+                if(GetTextureUsage(XivTexType.Skin) == null)
+                {
+                    info.Preset = MtrlShaderPreset.Face;
+                }
+            }
+
 
             return info;
         }
@@ -337,8 +360,34 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Sets the shader info for this Mtrl file.
         /// </summary>
         /// <param name="info"></param>
-        public void SetShaderInfo(ShaderInfo info)
+        public void SetShaderInfo(ShaderInfo info, bool forced = false)
         {
+            var old = GetShaderInfo();
+
+            // Set transparency bit as needed.
+            const ushort transparencyBit = 16;
+            var transparency = info.ForcedTransparency == null ? info.TransparencyEnabled : (bool)info.ForcedTransparency;
+            if (transparency)
+            {
+                ShaderNumber = (ushort)(ShaderNumber | transparencyBit);
+            }
+            else
+            {
+                ShaderNumber = (ushort)(ShaderNumber & (~transparencyBit));
+            }
+
+
+            if (forced == false && info.Shader == old.Shader && info.Preset == old.Preset)
+            {
+                // Nothing needs to be changed.
+                // Returning here ensures shader information
+                // is not bashed unless edited.
+                return;
+            }
+
+            RegenerateTextureUsageList(info);
+            RegenerateShaderParameterList(info);
+
             switch (info.Shader)
             {
                 case MtrlShader.Standard:
@@ -367,15 +416,25 @@ namespace xivModdingFramework.Materials.DataContainers
                     break;
             }
 
-            // Set transparency bit as needed.
-            const ushort transparencyBit = 16;
-            if(info.TransparencyEnabled)
+            // Clear unused maps.
+            if (!info.HasDiffuse)
             {
-                ShaderNumber = (ushort)(ShaderNumber | transparencyBit);
-            } else
-            {
-                ShaderNumber = (ushort)(ShaderNumber & (~transparencyBit));
+                SetMapInfo(XivTexType.Diffuse, null);
             }
+            if (!info.HasSpec)
+            {
+                SetMapInfo(XivTexType.Specular, null);
+            }
+            if (!info.HasMulti)
+            {
+                SetMapInfo(XivTexType.Multi, null);
+            }
+            if (!info.HasReflection)
+            {
+                SetMapInfo(XivTexType.Reflection, null);
+            }
+
+
         }
 
         /// <summary>
@@ -536,7 +595,6 @@ namespace xivModdingFramework.Materials.DataContainers
             if (info == null)
             {
 
-
                 if (paramIdx >= 0)
                 {
                     // Remove texture from path list if it exists.
@@ -560,8 +618,6 @@ namespace xivModdingFramework.Materials.DataContainers
                         TextureDescriptorList[i] = p;
                     }
                 }
-
-                RegenerateTextureUsageList();
 
                 return;
 
@@ -613,55 +669,179 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 TexturePathList[(int) raw.TextureIndex] = info.path;
             }
-
-            RegenerateTextureUsageList();
         }
 
         /// <summary>
         /// Regenerates/Cleans up the texture usage list based on the 
         /// Texture Maps that are set in the Texture Description Fields.
         /// </summary>
-        private void RegenerateTextureUsageList()
+        private void RegenerateTextureUsageList(ShaderInfo info)
         {
-            var shaderInfo = GetShaderInfo();
-            
-            // Furniture shaders do not use the texture usage list at all.
-            if(shaderInfo.Shader == MtrlShader.Furniture || shaderInfo.Shader == MtrlShader.DyeableFurniture)
+            TextureUsageList.Clear();
+
+            // These shaders do not use the texture usage list at all.
+            if (info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture || info.Shader == MtrlShader.Iris || info.Shader == MtrlShader.Hair)
             {
-                TextureUsageList.Clear();
                 return;
             }
 
-            // Everything (should) have a normal, so this is redundant.
-            // bool hasNormal = GetMapInfo(XivTexType.Normal) != null;
-            bool hasSpec = GetMapInfo(XivTexType.Specular) != null;
-            bool hasDiffuse = GetMapInfo(XivTexType.Diffuse) != null;
-            bool hasMulti = GetMapInfo(XivTexType.Multi) != null; 
-
-            ClearTextureUsage(XivTexType.Normal);
-            ClearTextureUsage(XivTexType.Diffuse);
-            ClearTextureUsage(XivTexType.Specular);
-            ClearTextureUsage(XivTexType.Multi);
-
-            // These need to be set in relatively specific order
-            // in order to use the maps correctly
-
-            SetTextureUsage(XivTexType.Normal);
-
-            if (hasDiffuse)
+            if (info.Shader == MtrlShader.Skin)
             {
-                // Diffuse
-                SetTextureUsage(XivTexType.Diffuse);
+                if (info.Preset == MtrlShaderPreset.Face)
+                {
+                    SetTextureUsage(XivTexType.Normal);
+                    SetTextureUsage(XivTexType.Diffuse);
+                    SetTextureUsage(XivTexType.Multi);
+                    SetTextureUsage(XivTexType.Specular);
+                }
+                else
+                {
+                    // Non-Face Skin textures use a single custom usage value.
+                    SetTextureUsage(XivTexType.Skin);
+                }
+
             }
-
-            if (hasSpec || hasMulti)
+            else if (info.Shader == MtrlShader.Standard)
             {
-                // Including both of these seems to guarantee best results,
-                // vs including only one or the other.
+                SetTextureUsage(XivTexType.Normal);
+                if (info.HasDiffuse)
+                {
+                    SetTextureUsage(XivTexType.Diffuse);
+                }
+                if (info.HasMulti || info.HasSpec)
+                {
+                    SetTextureUsage(XivTexType.Multi);
+                    SetTextureUsage(XivTexType.Specular);
+                }
+            }
+            else
+            {
+                SetTextureUsage(XivTexType.Normal);
+                SetTextureUsage(XivTexType.Diffuse);
                 SetTextureUsage(XivTexType.Multi);
                 SetTextureUsage(XivTexType.Specular);
             }
 
+        }
+
+        /// <summary>
+        /// Regenerates the Shader Parameter list based on shader and texture information.
+        /// </summary>
+        private void RegenerateShaderParameterList(ShaderInfo info)
+        {
+            var args = new List<MtrlShaderParameterId>();
+
+            args.Add(MtrlShaderParameterId.Common1);
+            args.Add(MtrlShaderParameterId.Common2);
+
+            if (info.Shader == MtrlShader.Skin)
+            {
+                args.Add(MtrlShaderParameterId.SkinColor);
+                args.Add(MtrlShaderParameterId.SkinOutline);
+                args.Add(MtrlShaderParameterId.SkinUnknown1);
+                args.Add(MtrlShaderParameterId.SkinUnknown2);
+                args.Add(MtrlShaderParameterId.SkinUnknown3);
+                args.Add(MtrlShaderParameterId.RacialSkin1);
+                args.Add(MtrlShaderParameterId.RacialSkin2);
+                args.Add(MtrlShaderParameterId.Reflection1);
+
+                if (info.Preset == MtrlShaderPreset.Face)
+                {
+                    args.Add(MtrlShaderParameterId.Face1);
+                }
+            }
+            else if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
+            {
+                args.Add(MtrlShaderParameterId.Equipment1);
+                args.Add(MtrlShaderParameterId.Reflection1);
+            }
+            else if (info.Shader == MtrlShader.Iris)
+            {
+                args.Add(MtrlShaderParameterId.Equipment1);
+                args.Add(MtrlShaderParameterId.Reflection1);
+                args.Add(MtrlShaderParameterId.RacialSkin1);
+                args.Add(MtrlShaderParameterId.SkinColor);
+                args.Add(MtrlShaderParameterId.SkinOutline);
+            }
+            else if(info.Shader == MtrlShader.Hair)
+            {
+                args.Add(MtrlShaderParameterId.Equipment1);
+                args.Add(MtrlShaderParameterId.Reflection1);
+                args.Add(MtrlShaderParameterId.SkinColor);
+                args.Add(MtrlShaderParameterId.SkinOutline);
+                args.Add(MtrlShaderParameterId.Hair1);
+                args.Add(MtrlShaderParameterId.Hair2);
+            }
+
+
+            // Regenerate the list.
+            ShaderParameterList.Clear();
+            args.ForEach(x => SetShaderParameter(x));
+        }
+
+
+        /// <summary>
+        /// Gets a given shader Parameter by ID.
+        /// </summary>
+        /// <param name="parameterId"></param>
+        /// <returns></returns>
+        private ShaderParameterStruct GetShaderParameter(MtrlShaderParameterId parameterId)
+        {
+            return ShaderParameterList.FirstOrDefault(x => x.ParameterID == parameterId);
+        }
+
+        /// <summary>
+        /// Sets or adds a given shader parameter.
+        /// </summary>
+        /// <param name="parameterId"></param>
+        /// <param name="data"></param>
+        private void SetShaderParameter(MtrlShaderParameterId parameterId, List<byte> data = null)
+        {
+
+
+            try
+            {
+                var value = ShaderParameterList.First(x => x.ParameterID == parameterId);
+
+                // Only overwrite if we were given explicit data.
+                if (value != null && data != null)
+                {
+                    value.Bytes = data;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (data == null)
+                {
+                    data = Mtrl.ShaderParameterValues[parameterId];
+                }
+
+                ShaderParameterList.Add(new ShaderParameterStruct
+                {
+                    ParameterID = parameterId,
+                    Bytes = data
+                });
+            }
+        }
+
+        /// <summary>
+        /// Removes a given shader parameter.
+        /// </summary>
+        /// <param name="parameterId"></param>
+        private void ClearShaderParameter(MtrlShaderParameterId parameterId)
+        {
+            ShaderParameterList = ShaderParameterList.Where(x => x.ParameterID != parameterId).ToList();
+        }
+
+
+        /// <summary>
+        /// Gets a given texture usage object by its usage value.
+        /// </summary>
+        /// <param name="usage"></param>
+        /// <returns></returns>
+        private TextureUsageStruct GetTextureUsage(XivTexType usage)
+        {
+            return TextureUsageList.FirstOrDefault(x => x.TextureType == Mtrl.TextureUsageValues[usage].TextureType);
         }
 
         /// <summary>
@@ -1058,6 +1238,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public short Size;
 
         public List<byte> Bytes;
+        public List<uint> Args;
     }
 
     /// <summary>
@@ -1095,6 +1276,16 @@ namespace xivModdingFramework.Materials.DataContainers
         Other               // Unknown Shader
     }
 
+    // Enum representation of the shader presets that the framework
+    // Knows how to build.
+    public enum MtrlShaderPreset
+    {
+        Default,           
+        DiffuseMulti,               
+        DiffuseSpecular,
+        Face,    
+    }
+
     /// <summary>
     /// Enums for the various shader parameter Ids.  These likely are used to pipe extra data from elsewhere into the shader.
     /// Ex. Local Reflection Maps, Character Skin/Hair Color, Dye Color, etc.
@@ -1103,18 +1294,23 @@ namespace xivModdingFramework.Materials.DataContainers
     {
         Common1 = 699138595,        // Used in every material.  Overwriting bytes with 0s seems to have no effect.
         Common2 = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
-        Skin1 = 740963549,
-        Skin2 = 906496720,
-        Skin3 = 2569562539,
-        Skin4 = 1659128399,
-        Skin5 = 390837838,
-        Skin6 = 950420322,          // Always all 0 data?
-        Skin7 = 778088561,
-        Skin8 = 1112929012,
+
+        SkinColor = 740963549,          // This skin args seem to be the same for all races.
+        SkinOutline = 2569562539,
+        SkinUnknown1 = 390837838,
+        SkinUnknown2 = 950420322,          // Always all 0 data?
+        SkinUnknown3 = 1112929012,
+
         Face1 = 2274043692,
+
         Equipment1 = 3036724004,    // Used in some equipment rarely, particularly Legacy items.  Always seems to have [0]'s for data.
+        Reflection1 = 906496720,     // This seems to be some kind of setting related to reflecitivty/specular intensity.
+
         Hair1 = 364318261,          // Character Hair Color?
-        Hair2 = 3042205627,         // Character Highlight Color?
+        Hair2 = 3042205627,         // Character Highlight Color
+
+        RacialSkin1 = 1659128399,         // This arg is the same for most races, but Highlander and Roe M use a different value
+        RacialSkin2 = 778088561,          // Roe M is the only one that has a change to this arg's data.?
 
         Furniture1 = 1066058257,
         Furniture2 = 337060565,
@@ -1135,8 +1331,119 @@ namespace xivModdingFramework.Materials.DataContainers
     public class ShaderInfo
     {
         public MtrlShader Shader;
+        public MtrlShaderPreset Preset;
         public bool TransparencyEnabled;
-        // public List<ShaderParameterStruct> AdditionalParameters; - Does this need to be exposed here?
+        public bool HasColorset
+        {
+            get
+            {
+                if(Shader == MtrlShader.Standard || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
+        public bool HasDiffuse
+        {
+            get
+            {
+                if (Shader == MtrlShader.Standard && Preset == MtrlShaderPreset.Default)
+                {
+                    return false;
+                }
+                else if (Shader == MtrlShader.Hair)
+                {
+                    return false;
+                }
+                else if (Shader == MtrlShader.Iris)
+                {
+                    return false;
+                }
+                else if (Shader == MtrlShader.Glass)
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+        public bool HasReflection
+        {
+            get
+            {
+                if (Shader == MtrlShader.Iris)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+        }
+        public bool HasSpec
+        {
+            get
+            {
+                if (Shader == MtrlShader.Standard && Preset == MtrlShaderPreset.DiffuseSpecular)
+                {
+                    return true;
+                } else if(Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                {
+                    return true;
+                } else
+                {
+                    return false;
+                }
+
+            }
+        }
+        public bool HasMulti
+        {
+            get
+            {
+                return !HasSpec;
+            }
+        }
+        public bool? ForcedTransparency
+        {
+            get
+            {
+                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                {
+                    // These shaders allow variable transparency.
+                    return null;
+                }
+                else
+                {
+                    // These shaders require transparency to be strictly On or Off.
+                    if(Shader == MtrlShader.Hair || Shader == MtrlShader.Glass)
+                    {
+                        return true;
+                    } else
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        public static List<MtrlShaderPreset> GetAvailablePresets(MtrlShader shader)
+        {
+            var presets = new List<MtrlShaderPreset>();
+            presets.Add(MtrlShaderPreset.Default);
+            if (shader == MtrlShader.Standard)
+            {
+                presets.Add(MtrlShaderPreset.DiffuseMulti);
+                presets.Add(MtrlShaderPreset.DiffuseSpecular);
+            } else if(shader == MtrlShader.Skin)
+            {
+                presets.Add(MtrlShaderPreset.Face);
+            }
+
+            return presets;
+        }
     }
 
     public class MapInfo
