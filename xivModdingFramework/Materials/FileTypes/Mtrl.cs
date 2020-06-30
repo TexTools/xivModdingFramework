@@ -74,11 +74,20 @@ namespace xivModdingFramework.Materials.FileTypes
             { XivTexType.Reflection, 4271961042 }   // Used for the Catchlight texture in Iris Materials.
         };
 
+        public static Dictionary<XivTexType, uint> FurnitureTextureDescriptorValues = new Dictionary<XivTexType, uint>()
+        {
+            { XivTexType.Normal, 2863978985 },
+            { XivTexType.Diffuse, 510652316 },
+            { XivTexType.Specular, 465317650 },
+            { XivTexType.Multi, 0 },
+            { XivTexType.Reflection, 0 }
+        };
+
         // MtrlParam constants for file compressions/formats.
         public static Dictionary<MtrlTextureDescriptorFormat, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureDescriptorFormat, short>()
         {
-            { MtrlTextureDescriptorFormat.UsesColorset, -32768 }, // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
-            { MtrlTextureDescriptorFormat.NoColorset, -31936 }  // To have an appreciable change (Either [000000] or [010101])
+            { MtrlTextureDescriptorFormat.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { MtrlTextureDescriptorFormat.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
             // Non-normal maps are always [WithoutAlpha].  Normal maps are always [WithAlpha], 
             // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
 
@@ -607,7 +616,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     var path = mapInfo.path;
                     var fileHash = HashGenerator.GetHash(Path.GetFileName(path));
                     var pathHash = HashGenerator.GetHash(path.Substring(0, path.LastIndexOf("/", StringComparison.Ordinal)));
-                    var exists = await _index.FileExists(fileHash, pathHash, XivDataFile._04_Chara);
+                    var exists = await _index.FileExists(fileHash, pathHash, IOUtil.GetDataFileFromPath(path));
 
                     if(exists)
                     {
@@ -619,7 +628,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     var xivTex = new XivTex();
                     xivTex.TextureTypeAndPath = new TexTypePath()
                     {
-                        DataFile = XivDataFile._04_Chara, Path = path, Type = mapInfo.Usage
+                        DataFile = IOUtil.GetDataFileFromPath(path), Path = path, Type = mapInfo.Usage
                     };
                     xivTex.TextureFormat = format;
 
