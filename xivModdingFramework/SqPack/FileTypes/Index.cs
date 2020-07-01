@@ -363,15 +363,23 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
+        public async Task<bool> FileExists(string fullPath)
+        {
+            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
 
-        /// <summary>
-        /// Determines whether the given file path exists
-        /// </summary>
-        /// <param name="fileHash">The hashed file</param>
-        /// <param name="folderHash">The hashed folder</param>
-        /// <param name="dataFile">The data file</param>
-        /// <returns>True if it exists, False otherwise</returns>
-        public async Task<bool> FileExists(int fileHash, int folderHash, XivDataFile dataFile)
+            var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
+            var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
+            return await FileExists(fileHash, pathHash, dataFile);
+        }
+
+            /// <summary>
+            /// Determines whether the given file path exists
+            /// </summary>
+            /// <param name="fileHash">The hashed file</param>
+            /// <param name="folderHash">The hashed folder</param>
+            /// <param name="dataFile">The data file</param>
+            /// <returns>True if it exists, False otherwise</returns>
+            public async Task<bool> FileExists(int fileHash, int folderHash, XivDataFile dataFile)
         {
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 

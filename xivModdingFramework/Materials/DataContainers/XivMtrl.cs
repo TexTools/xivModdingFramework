@@ -1173,6 +1173,21 @@ namespace xivModdingFramework.Materials.DataContainers
             return "";
         }
 
+        public XivRace GetRace()
+        {
+            var races= Enum.GetValues(typeof(XivRace)).Cast<XivRace>();
+            foreach(var race in races)
+            {
+                // Test the root path for the racial identifier.
+                var match = Regex.Match(MTRLPath, "c" + race.GetRaceCode());
+                if(match.Success)
+                {
+                    return race;
+                }
+            }
+            return XivRace.All_Races;
+        }
+
 
         /// <summary>
         /// Get the root shared common texture directory for FFXIV.
