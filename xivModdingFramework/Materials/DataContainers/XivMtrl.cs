@@ -25,6 +25,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
+using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
@@ -432,6 +433,30 @@ namespace xivModdingFramework.Materials.DataContainers
             if (!info.HasReflection)
             {
                 SetMapInfo(XivTexType.Reflection, null);
+            }
+
+            // Clear or set the Colorset if needed.
+            if(!info.HasColorset)
+            {
+                // ColorSetCount seems to always be 1, even when the data is empty.
+                ColorSetCount = 1;
+                ColorSetData = new List<Half>();
+                ColorSetExtraData = null;
+                ColorSetDataSize = 0;
+            } else
+            {
+                if(ColorSetCount == 0 || ColorSetData == null || ColorSetData.Count != 256)
+                {
+                    // Get default Colorset Data.
+                    ColorSetData = Tex.GetColorsetDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
+                }
+                if(ColorSetExtraData == null || ColorSetExtraData.Length != 32)
+                {
+                    ColorSetExtraData = Tex.GetColorsetExtraDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
+                }
+
+                // Standard Colorset Size. -- This could really be generated automatically later.
+                ColorSetDataSize = 544;
             }
 
 

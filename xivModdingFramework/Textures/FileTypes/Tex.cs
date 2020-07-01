@@ -1014,7 +1014,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="ddsFileDirectory"></param>
         /// <returns></returns>
-        public List<Half> GetColorsetDataFromDDS(DirectoryInfo ddsFileDirectory)
+        public static List<Half> GetColorsetDataFromDDS(DirectoryInfo ddsFileDirectory)
         {
             using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
             {
@@ -1059,7 +1059,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public byte[] GetColorsetExtraDataFromDDS(DirectoryInfo file)
+        public static byte[] GetColorsetExtraDataFromDDS(DirectoryInfo file)
         {
             var flagsPath = Path.Combine(Path.GetDirectoryName(file.FullName), (Path.GetFileNameWithoutExtension(file.FullName) + ".dat"));
 
@@ -1195,7 +1195,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <summary>
         /// A dictionary containing the int represntations of known file types for DDS
         /// </summary>
-        private readonly Dictionary<int, XivTexFormat> DDSType = new Dictionary<int, XivTexFormat>
+        private static readonly Dictionary<int, XivTexFormat> DDSType = new Dictionary<int, XivTexFormat>
         {
             //DXT1
             {827611204, XivTexFormat.DXT1 },
