@@ -790,8 +790,8 @@ namespace xivModdingFramework.Materials.DataContainers
             }
             else if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
             {
-                //args.Add(MtrlShaderParameterId.Equipment1);
-                //args.Add(MtrlShaderParameterId.Reflection1);
+                args.Add(MtrlShaderParameterId.Equipment1);
+                args.Add(MtrlShaderParameterId.Reflection1);
             }
             else if (info.Shader == MtrlShader.Iris)
             {
