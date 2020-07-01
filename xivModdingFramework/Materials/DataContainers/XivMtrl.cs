@@ -459,7 +459,20 @@ namespace xivModdingFramework.Materials.DataContainers
                 ColorSetDataSize = 544;
             }
 
-
+            
+            // Clear out the unknown lists back to known default working values.
+            for(var idx = 0; idx < TexturePathUnknownList.Count; idx++)
+            {
+                TexturePathUnknownList[idx] = 0;
+            }
+            for (var idx = 0; idx < Unknown2.Length; idx++)
+            {
+                Unknown2[idx] = 0;
+            }
+            if (Unknown2.Length > 0)
+            {
+                Unknown2[0] = 12;
+            }
         }
 
         /// <summary>
@@ -777,8 +790,8 @@ namespace xivModdingFramework.Materials.DataContainers
             }
             else if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
             {
-                args.Add(MtrlShaderParameterId.Equipment1);
-                args.Add(MtrlShaderParameterId.Reflection1);
+                //args.Add(MtrlShaderParameterId.Equipment1);
+                //args.Add(MtrlShaderParameterId.Reflection1);
             }
             else if (info.Shader == MtrlShader.Iris)
             {
