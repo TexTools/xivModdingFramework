@@ -403,6 +403,7 @@ namespace xivModdingFramework.Mods.FileTypes
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
             var dat = new Dat(gameDirectory);
+            var modding = new Modding(gameDirectory);
             var modListFullPaths = new List<string>();
             var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
             var modCount = 1;
@@ -466,6 +467,15 @@ namespace xivModdingFramework.Mods.FileTypes
                                                         modJson.Category.GetDisplayName(), modJson.Name,
                                                         XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
                                                         GetDataType(modJson.FullPath), modJson.ModPackEntry);
+
+                                                    // Add this new entry into the mod list we're testing against
+                                                    // so we don't redundantly add files.
+                                                    var modListEntry = await modding.TryGetModEntry(modJson.FullPath);
+                                                    if(modListEntry != null)
+                                                    {
+                                                        modListFullPaths.Add(modJson.FullPath);
+                                                        modList.Mods.Add(modListEntry);
+                                                    }
                                                 }
                                             }
                                             catch (Exception ex)
