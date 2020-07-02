@@ -372,14 +372,32 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await FileExists(fileHash, pathHash, dataFile);
         }
 
-            /// <summary>
-            /// Determines whether the given file path exists
-            /// </summary>
-            /// <param name="fileHash">The hashed file</param>
-            /// <param name="folderHash">The hashed folder</param>
-            /// <param name="dataFile">The data file</param>
-            /// <returns>True if it exists, False otherwise</returns>
-            public async Task<bool> FileExists(int fileHash, int folderHash, XivDataFile dataFile)
+
+        /// <summary>
+        /// Tests if a given file path in FFXIV's internal directory structure
+        /// is one that ships with FFXIV, or something added by the framework.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<bool> IsDefaultFilePath(string fullPath)
+        {
+            // The framework adds flag files alongside every custom created file.
+            // This lets you check for them even if the Modlist gets corrupted/lost.
+            var exists = await FileExists(fullPath);
+            var hasFlag = await FileExists(fullPath + ".flag");
+
+            // In order to be considered a DEFAULT file, the file must both EXIST *and* not have a flag.
+            var stockFile = exists && hasFlag;
+            return stockFile;
+        }
+
+        /// <summary>
+        /// Determines whether the given file path exists
+        /// </summary>
+        /// <param name="fileHash">The hashed file</param>
+        /// <param name="folderHash">The hashed folder</param>
+        /// <param name="dataFile">The data file</param>
+        /// <returns>True if it exists, False otherwise</returns>
+        public async Task<bool> FileExists(int fileHash, int folderHash, XivDataFile dataFile)
         {
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
@@ -747,13 +765,26 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Update folder size
                     if (iHash == uPathHash)
                     {
-                        foundFolder = true;
-                        Array.Copy(BitConverter.GetBytes(iFolderSize - 16), 0, modifiedIndex, position + 8, 4);
+                        if(iFolderSize == 0)
+                        {
+                            // No more files in the folder, the folder needs to be deleted from the listing
+                            // (0 size folders are not listed, even if they're parent folders for other folders)
+                            remainder = modifiedIndex.Length - position - 16;
+                            Array.Copy(modifiedIndex, position + 16, modifiedIndex, position, remainder);
+
+                            var newIndex = new byte[modifiedIndex.Length - 16];
+                            Array.Copy(modifiedIndex, 0, modifiedIndex, 0, newIndex.Length);
+                            foundFolder = true;
+                        } else
+                        {
+                            Array.Copy(BitConverter.GetBytes(iFolderSize - 16), 0, modifiedIndex, position + 8, 4);
+                        }
                     }
                 }
 
                 if (!foundFolder)
                 {
+                    // Something went wrong here / The index is in a bad state.
                     return false;
                 }
 
@@ -876,14 +907,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             return true;
         }
 
-        /// <summary>
-        /// Adds a new file descriptor/stub into the Index files.
-        /// </summary>
-        /// <param name="fullPath">Full path to the new file.</param>
-        /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
-        /// <param name="dataFile">Which data file set to use.</param>
-        /// <returns></returns>
-        public bool AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
+
+                /// <summary>
+                /// Adds a new file descriptor/stub into the Index files.
+                /// </summary>
+                /// <param name="fullPath">Full path to the new file.</param>
+                /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
+                /// <param name="dataFile">Which data file set to use.</param>
+                /// <returns></returns>
+                public bool AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
         {
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
@@ -910,7 +942,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Dump the index into memory, since we're going to have to inject data.
                 byte[] originalIndex = File.ReadAllBytes(indexPath);
-                byte[] modifiedIndex = new byte[originalIndex.Length + 16];
 
                 // Get all the segment header data
                 for (int i = 0; i < SegmentHeaders.Length; i++)
@@ -946,6 +977,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                             injectLocation = position;
                             break;
                         }
+                    } else if (iPathHash > uPathHash)
+                    {
+                        // This is where the folder should go, it just has no files currently.
+                        injectLocation = position;
+                        break;
                     }
                     else
                     {
@@ -958,11 +994,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
 
-                // Cancel if we failed to find the path.
-                if (foundFolder == false)
-                {
-                    return false;
-                }
+
+                var totalInjectSize = foundFolder ? 16 : 32;
+                byte[] modifiedIndex = new byte[originalIndex.Length + totalInjectSize];
 
                 // Split the file at the injection point.
                 int remainder = originalIndex.Length - injectLocation;
@@ -983,8 +1017,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Update other segments' offsets.
                     else
                     {
+
                         SegmentOffsets[i] += 16;
                         Array.Copy(BitConverter.GetBytes(SegmentOffsets[i]), 0, modifiedIndex, SegmentHeaders[i] + 4, 4);
+
+                        // We need to create the folder as well.
+                        if (i == 3 && !foundFolder)
+                        {
+                            SegmentSizes[i] += 16;
+                            Array.Copy(BitConverter.GetBytes(SegmentSizes[i]), 0, modifiedIndex, SegmentHeaders[i] + 8, 4);
+                        }
                     }
                 }
 
@@ -995,7 +1037,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Update the folder structure
                 var folderCount = SegmentSizes[3] / 16;
-                foundFolder = false;
+                var foundFolder2 = false;
 
                 for (int i = 0; i < folderCount; i++)
                 {
@@ -1010,19 +1052,24 @@ namespace xivModdingFramework.SqPack.FileTypes
                         Array.Copy(BitConverter.GetBytes(iOffset + 16), 0, modifiedIndex, position + 4, 4);
                     }
 
-                    // Update folder size
+                    // Folder exists, but needs its size updated.
                     if (iHash == uPathHash)
                     {
-                        foundFolder = true;
                         Array.Copy(BitConverter.GetBytes(iFolderSize + 16), 0, modifiedIndex, position + 8, 4);
+                    } else if (foundFolder == false && iHash > uPathHash) {
+                        foundFolder = true;
+                        // This is where we need to cut the index the second time to make room for the folder data.
+                        remainder = modifiedIndex.Length - position - 16;
+                        Array.Copy(modifiedIndex, position, modifiedIndex, position +16, remainder);
+
+                        // The new folder entry now goes at the 16 bytes starting at position
+                        Array.Copy(BitConverter.GetBytes(uPathHash), 0, modifiedIndex, position, 4);
+                        Array.Copy(BitConverter.GetBytes(injectLocation), 0, modifiedIndex, position + 4, 4);
+                        Array.Copy(BitConverter.GetBytes(16), 0, modifiedIndex, position + 8, 4);
+                        Array.Copy(BitConverter.GetBytes(16), 0, modifiedIndex, position + 12, 4);
                     }
                 }
 
-                if(!foundFolder)
-                {
-                    return false;
-                }
-                
                 // Update SHA-1 Hashes.
                 SHA1 sha = new SHA1CryptoServiceProvider();
                 byte[] shaHash;
