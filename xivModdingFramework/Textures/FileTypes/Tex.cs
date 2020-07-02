@@ -1098,9 +1098,12 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var colorSetExtraData = new byte[32];
             // If the colorset size is 544, it contains extra data that must be imported
-            if (xivMtrl.ColorSetDataSize == 544)
+            try
             {
                 colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
+            } catch
+            {
+                colorSetExtraData = new byte[32];
             }
 
             // Replace the color set data with the imported data
