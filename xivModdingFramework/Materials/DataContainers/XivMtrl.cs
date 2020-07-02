@@ -465,13 +465,16 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 TexturePathUnknownList[idx] = 0;
             }
+
             for (var idx = 0; idx < Unknown2.Length; idx++)
             {
-                Unknown2[idx] = 0;
-            }
-            if (Unknown2.Length > 0)
-            {
-                Unknown2[0] = 12;
+                if(idx == 0)
+                {
+                    Unknown2[idx] = 12;
+                } else
+                {
+                    Unknown2[idx] = 0;
+                } 
             }
         }
 

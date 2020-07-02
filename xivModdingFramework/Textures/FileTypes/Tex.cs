@@ -992,16 +992,16 @@ namespace xivModdingFramework.Textures.FileTypes
 
 
             colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
-
-            // If the colorset size is 544, it contains extra data that must be imported
-            if (xivMtrl.ColorSetDataSize == 544)
-            {
-                colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
-            }
+            colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
             xivMtrl.ColorSetExtraData = colorSetExtraData;
+            if (xivMtrl.Unknown2.Length > 0)
+            {
+                // This byte enables the dye set if it's not already enabled.
+                xivMtrl.Unknown2[0] = 12;
+            }
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
             return await mtrl.ImportMtrl(xivMtrl, item, source);
@@ -1109,6 +1109,12 @@ namespace xivModdingFramework.Textures.FileTypes
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
             xivMtrl.ColorSetExtraData = colorSetExtraData;
+
+            if (xivMtrl.Unknown2.Length > 0)
+            {
+                // This byte enables the dye set if it's not already enabled.
+                xivMtrl.Unknown2[0] = 12;
+            }
 
             var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
             return mtrl.CreateMtrlFile(xivMtrl, item);
