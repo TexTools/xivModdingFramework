@@ -199,6 +199,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
+        public async Task<int> GetDataOffset(string fullPath)
+        {
+            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
+
+            var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
+            var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
+            return await GetDataOffset(pathHash, fileHash, dataFile);
+
+        }
         /// <summary>
         /// Gets the offset for the data in the .dat file
         /// </summary>
@@ -915,7 +924,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
                 /// <param name="dataFile">Which data file set to use.</param>
                 /// <returns></returns>
-                public bool AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
+        public bool AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
         {
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
