@@ -58,7 +58,11 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <remarks>
         /// Can be 0 if there is no ColorSet Data
         /// </remarks>
-        public ushort ColorSetDataSize { get; set; }
+        public ushort ColorSetDataSize { get {
+            var size = ColorSetData.Count * 2;
+            size += ColorSetExtraData == null ? 0 : ColorSetExtraData.Length;
+            return (ushort) size;
+        } }
 
         /// <summary>
         /// The size of the Material Data section
@@ -442,7 +446,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 ColorSetCount = 1;
                 ColorSetData = new List<Half>();
                 ColorSetExtraData = null;
-                ColorSetDataSize = 0;
             } else
             {
                 if(ColorSetCount == 0 || ColorSetData == null || ColorSetData.Count != 256)
@@ -454,9 +457,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     ColorSetExtraData = Tex.GetColorsetExtraDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
                 }
-
-                // Standard Colorset Size. -- This could really be generated automatically later.
-                ColorSetDataSize = 544;
             }
 
             
@@ -465,13 +465,16 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 TexturePathUnknownList[idx] = 0;
             }
+
             for (var idx = 0; idx < Unknown2.Length; idx++)
             {
-                Unknown2[idx] = 0;
-            }
-            if (Unknown2.Length > 0)
-            {
-                Unknown2[0] = 12;
+                if(idx == 0)
+                {
+                    Unknown2[idx] = 12;
+                } else
+                {
+                    Unknown2[idx] = 0;
+                } 
             }
         }
 
