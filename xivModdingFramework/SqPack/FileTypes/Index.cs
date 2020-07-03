@@ -395,7 +395,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var hasFlag = await FileExists(fullPath + ".flag");
 
             // In order to be considered a DEFAULT file, the file must both EXIST *and* not have a flag.
-            var stockFile = exists && hasFlag;
+            var stockFile = exists && !hasFlag;
             return stockFile;
         }
 
@@ -1046,7 +1046,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Update the folder structure
                 var folderCount = SegmentSizes[3] / 16;
-                var foundFolder2 = false;
 
                 for (int i = 0; i < folderCount; i++)
                 {
