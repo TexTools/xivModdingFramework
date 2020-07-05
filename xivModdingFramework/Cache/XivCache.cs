@@ -281,7 +281,12 @@ namespace xivModdingFramework.Cache
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
                 var list = await _companions.GetUncachedMountList();
-                list.AddRange(await _companions.GetUncachedOrnamentList());
+
+                // Don't get the ornament list for the Chinese or Korean clients as they don't have them yet
+                if (_gameInfo.GameLanguage != XivLanguage.Chinese && _gameInfo.GameLanguage != XivLanguage.Korean)
+                {
+                    list.AddRange(await _companions.GetUncachedOrnamentList());
+                }                
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
