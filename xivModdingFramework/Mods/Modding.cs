@@ -370,8 +370,16 @@ namespace xivModdingFramework.Mods
             if (modToRemove.source == "FilesAddedByTexTools")
             {
                 var index = new Index(_gameDirectory);
-                index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                var success = index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                if(!success)
+                {
+                    throw new Exception("Failed to delete file descriptor.");
+                }
                 index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                if (!success)
+                {
+                    throw new Exception("Failed to delete file descriptor.");
+                }
             }
             if (modToRemove.enabled)
             {
