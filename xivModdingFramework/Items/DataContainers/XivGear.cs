@@ -25,6 +25,12 @@ namespace xivModdingFramework.Items.DataContainers
     /// </summary>
     public class XivGear : IItemModel
     {
+
+        /// <summary>
+        /// The ID of this item in items.exd
+        /// </summary>
+        public int ExdID { get; set; }
+
         /// <summary>
         /// The name of the gear item
         /// </summary>

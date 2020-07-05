@@ -786,6 +786,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             foundFolder = true;
                         } else
                         {
+                            foundFolder = true;
                             Array.Copy(BitConverter.GetBytes(iFolderSize - 16), 0, modifiedIndex, position + 8, 4);
                         }
                     }
