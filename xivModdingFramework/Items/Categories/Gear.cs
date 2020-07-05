@@ -62,11 +62,11 @@ namespace xivModdingFramework.Items.Categories
             return await cache.GetCachedGearList(substring);
         }
 
-            /// <summary>
-            /// A getter for available gear in the Item exd files
-            /// </summary>
-            /// <returns>A list containing XivGear data</returns>
-            public async Task<List<XivGear>> GetUnCachedGearList()
+        /// <summary>
+        /// A getter for available gear in the Item exd files
+        /// </summary>
+        /// <returns>A list containing XivGear data</returns>
+        public async Task<List<XivGear>> GetUnCachedGearList()
         {
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch

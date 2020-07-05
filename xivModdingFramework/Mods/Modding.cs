@@ -375,7 +375,7 @@ namespace xivModdingFramework.Mods
                 {
                     throw new Exception("Failed to delete file descriptor.");
                 }
-                index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                success = index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
                 if (!success)
                 {
                     throw new Exception("Failed to delete file descriptor.");
