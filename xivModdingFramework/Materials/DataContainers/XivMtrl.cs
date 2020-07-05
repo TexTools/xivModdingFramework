@@ -22,6 +22,7 @@ using System.Linq;
 using System.Resources;
 using System.Text.RegularExpressions;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -34,10 +35,10 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class XivMtrl
     {
-        public const string ItemPathToken = "{item_path}";
+        public const string ItemPathToken = "{item_folder}";
         public const string VariantToken = "{variant}";
-        public const string TextureNameToken = "{texture_name}";
-        public const string CommonPathToken = "{common_path}";
+        public const string TextureNameToken = "{default_name}";
+        public const string CommonPathToken = "{shared_folder}";
 
         /// <summary>
         /// The MTRL file signature
@@ -670,11 +671,22 @@ namespace xivModdingFramework.Materials.DataContainers
             // No path, assign it by default.
             if (info.path.Trim() == "")
             {
-                info.path = rootPath + defaultFileName;
+                info.path = rootPath + "/" + defaultFileName;
             }
 
             // Detokenize paths
             info.path = DetokenizePath(info.path, info.Usage);
+
+            // Test the path goes to a legitimate DAT file.
+            try
+            {
+                IOUtil.GetDataFileFromPath(info.path);
+            } catch
+            {
+                // Prefix the item's personal path onto it.
+                info.path = "{item_path}/" + info.path;
+                info.path = DetokenizePath(info.path, info.Usage);
+            }
 
             // Ensure .tex or .atex ending for sanity.
             var match = Regex.Match(info.path, "\\.a?tex$");
@@ -1064,7 +1076,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 var match = Regex.Match(MTRLPath, "(.*)material/");
                 if(match.Success)
                 {
-                    root = match.Groups[1].Value + "texture/";
+                    root = match.Groups[1].Value + "texture";
                 }
             } else
             {
@@ -1100,7 +1112,7 @@ namespace xivModdingFramework.Materials.DataContainers
             var versionString = "";
             if (version > 0)
             {
-                versionString += 'v' + (version.ToString().PadLeft(2, '0')) + '_';
+                versionString += 'v' + (version.ToString().PadLeft(2, '0'));
             }
             return versionString;
         }
@@ -1117,7 +1129,7 @@ namespace xivModdingFramework.Materials.DataContainers
             // When available, version number prefixes the texture name.
             if (includeVersion)
             {
-                ret += GetVariantString();
+                ret += GetVariantString() + "_";
             }
 
             // Followed by the character and secondary identifier.
@@ -1150,7 +1162,16 @@ namespace xivModdingFramework.Materials.DataContainers
             }
             else if (texType == XivTexType.Multi)
             {
-                ret += "_m";
+                var path = MTRLPath;
+                if (path.Contains("chara/human/c"))
+                {
+                    // The character folder uses _s instead of _m despite the textures being multis.
+                    ret += "_s";
+                }
+                else
+                {
+                    ret += "_m";
+                }
             }
             else if (texType == XivTexType.Diffuse)
             {
@@ -1185,6 +1206,9 @@ namespace xivModdingFramework.Materials.DataContainers
             if (match.Success)
             {
                 return "_" + match.Groups[1].Value;
+            } else if (MTRLPath.Contains("/obj/tail/t")) {
+                // Tails have their textures (but not materials) listed as _etc parts.
+                return "_etc";
             }
             return "";
         }
@@ -1211,7 +1235,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public static string GetCommonTextureDirectory()
         {
-            return "chara/common/texture/";
+            return "chara/common/texture";
         }
         
         /// <summary>
@@ -1253,7 +1277,7 @@ namespace xivModdingFramework.Materials.DataContainers
             // No path, assign it by default.
             if (path == "")
             {
-                path = rootPath + defaultFileName;
+                path = rootPath + "/" + defaultFileName;
                 return path;
             }
 
