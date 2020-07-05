@@ -45,7 +45,7 @@ CREATE TABLE "items" (
 	"primary_id_2"	INTEGER NOT NULL,
 	"secondary_id_2"	INTEGER NOT NULL,
 	"imc_variant_2"	INTEGER NOT NULL,
-	PRIMARY KEY("name")
+	PRIMARY KEY("name", "exd_id")
 );
 
 CREATE TABLE "ui" (
