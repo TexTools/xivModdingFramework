@@ -909,6 +909,12 @@ namespace xivModdingFramework.Cache
             /// <returns></returns>
             public string GetSql(bool includeWhere = true, bool skipJoin = true)
             {
+                // No clause if no valid value.
+                if((Inner == null || Inner.Count == 0) && (Column == null || Column == ""))
+                {
+                    return "";
+                }
+
                 var result = "";
                 if(includeWhere)
                 {
@@ -987,7 +993,10 @@ namespace xivModdingFramework.Cache
                 }
                 else
                 {
-                    cmd.Parameters.AddWithValue(Column, Value);
+                    if (Column != null && Column != "")
+                    {
+                        cmd.Parameters.AddWithValue(Column, Value);
+                    }
                 }
             }
         }
