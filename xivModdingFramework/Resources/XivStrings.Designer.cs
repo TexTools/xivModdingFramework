@@ -2149,6 +2149,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to UI.
+        /// </summary>
+        internal static string UI {
+            get {
+                return ResourceManager.GetString("UI", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to 060000.
         /// </summary>
         internal static string UIDat {

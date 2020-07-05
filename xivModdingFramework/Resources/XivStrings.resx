@@ -870,4 +870,7 @@
   <data name="LeftRing" xml:space="preserve">
     <value>Left Ring</value>
   </data>
+  <data name="UI" xml:space="preserve">
+    <value>UI</value>
+  </data>
 </root>

@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
@@ -42,6 +43,13 @@ namespace xivModdingFramework.Items.Categories
             _gameDirectory = gameDirectory;
             _xivLanguage = xivLanguage;
             _ex = new Ex(_gameDirectory, _xivLanguage);
+        }
+
+
+        public async Task<List<XivUi>> GetUIList()
+        {
+            var cache = new XivCache(_gameDirectory, _xivLanguage);
+            return await cache.GetCachedUiList();
         }
 
         /// <summary>

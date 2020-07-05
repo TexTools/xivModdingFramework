@@ -33,7 +33,8 @@ namespace xivModdingFramework.General.Enums
         [Description("de")] German,
         [Description("fr")] French,
         [Description("ko")] Korean,
-        [Description("chs")] Chinese
+        [Description("chs")] Chinese,
+        [Description("none")] None
     }
 
     /// <summary>

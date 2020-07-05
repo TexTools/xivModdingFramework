@@ -20,6 +20,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
@@ -50,6 +51,11 @@ namespace xivModdingFramework.Items.Categories
             _xivLanguage = xivLanguage;
             _ex = new Ex(_gameDirectory, _xivLanguage);
         }
+        public async Task<List<XivMinion>> GetMinionList(string substring = null)
+        {
+            var cache = new XivCache(_gameDirectory, _xivLanguage);
+            return await cache.GetCachedMinionsList(substring);
+        }
 
         /// <summary>
         /// Gets the list to be displayed in the Minion category
@@ -59,7 +65,7 @@ namespace xivModdingFramework.Items.Categories
         /// The data within companion_0 exd contains a reference to the index for lookup in modelchara
         /// </remarks>
         /// <returns>A list containing XivMinion data</returns>
-        public async Task<List<XivMinion>> GetMinionList()
+        public async Task<List<XivMinion>> GetUncachedMinionList()
         {
             var minionLock = new object();
             var minionList = new List<XivMinion>();
@@ -117,6 +123,12 @@ namespace xivModdingFramework.Items.Categories
             return minionList;
         }
 
+        public async Task<List<XivMount>> GetMountList(string substring = null, string category = null)
+        {
+            var cache = new XivCache(_gameDirectory, _xivLanguage);
+            return await cache.GetCachedMountList(substring, category);
+        }
+
         /// <summary>
         /// Gets the list to be displayed in the Mounts category
         /// </summary>
@@ -125,7 +137,7 @@ namespace xivModdingFramework.Items.Categories
         /// The data within mount_0 exd contains a reference to the index for lookup in modelchara
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public async Task<List<XivMount>> GetMountList()
+        public async Task<List<XivMount>> GetUncachedMountList()
         {
             var mountLock = new object();
             var mountList = new List<XivMount>();
@@ -192,7 +204,7 @@ namespace xivModdingFramework.Items.Categories
         /// The data format used by Ornaments is identical to mounts so XivMount can be used to store the data
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public async Task<List<XivMount>> GetOrnamentList()
+        public async Task<List<XivMount>> GetUncachedOrnamentList()
         {
             var mountLock = new object();
             var ornamentList = new List<XivMount>();
@@ -250,6 +262,14 @@ namespace xivModdingFramework.Items.Categories
             return ornamentList;
         }
 
+
+        public async Task<List<XivPet>> GetPetList(string substring = null)
+        {
+            var cache = new XivCache(_gameDirectory, _xivLanguage);
+            return await cache.GetCachedPetList(substring);
+
+        }
+
         /// <summary>
         /// Gets the list to be displayed in the Pets category
         /// </summary>
@@ -258,7 +278,7 @@ namespace xivModdingFramework.Items.Categories
         /// Because of this, the Pet data is hardcoded until a better way of obtaining it is found.
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public async Task<List<XivPet>> GetPetList()
+        public async Task<List<XivPet>> GetUncachedPetList()
         {
             var petLock = new object();
             var petList = new List<XivPet>();

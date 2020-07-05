@@ -23,6 +23,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
+using xivModdingFramework.Cache;
 
 namespace xivModdingFramework.Helpers
 {
@@ -157,7 +158,7 @@ namespace xivModdingFramework.Helpers
             });
         }
 
-        public Task PerformStartOver(DirectoryInfo backupsDirectory, IProgress<string> progress = null)
+        public Task PerformStartOver(DirectoryInfo backupsDirectory, IProgress<string> progress = null, XivLanguage language = XivLanguage.None)
         {
             return Task.Run(async () =>
             {
@@ -184,7 +185,7 @@ namespace xivModdingFramework.Helpers
                     {
                         throw new Exception("Start Over Failed: Index backups missing/outdated.");
                     }
-                }           
+                }
                 finally
                 {
                     // If no exception occured, restore the backups anyway just to be safe but don't throw an exception if it fails
@@ -200,7 +201,7 @@ namespace xivModdingFramework.Helpers
                             {
                                 await BackupIndexFiles(backupsDirectory);
                             }
-                            catch(Exception ex)
+                            catch (Exception ex)
                             {
                                 throw new Exception("Start Over Failed: Failed to update outdated backups.\n\n" + ex.Message);
                             }
@@ -235,6 +236,14 @@ namespace xivModdingFramework.Helpers
                     File.Delete(modListDirectory.FullName);
 
                     modding.CreateModlist();
+
+                    progress?.Report("Rebuilding Cache...");
+
+                    await Task.Run(async () =>
+                    {
+                        var _cache = new XivCache(_gameDirectory, language);
+                        _cache.RebuildCache();
+                    });
                 }
             });
         }
