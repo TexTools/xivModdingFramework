@@ -19,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
@@ -54,12 +55,18 @@ namespace xivModdingFramework.Items.Categories
             _xivLanguage = xivLanguage;
             _index = new Index(_gameDirectory);
         }
+        public async Task<List<XivGear>> GetGearList(string substring = null)
+        {
+            var cache = new XivCache(_gameDirectory, _xivLanguage);
+
+            return await cache.GetCachedGearList(substring);
+        }
 
         /// <summary>
         /// A getter for available gear in the Item exd files
         /// </summary>
         /// <returns>A list containing XivGear data</returns>
-        public async Task<List<XivGear>> GetGearList()
+        public async Task<List<XivGear>> GetUnCachedGearList()
         {
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
@@ -96,6 +103,7 @@ namespace xivModdingFramework.Items.Categories
 
                 var xivGear = new XivGear
                 {
+                    ExdID = item.Key,
                     PrimaryCategory = XivStrings.Gear,
                     ModelInfo = primaryMi,
                     SecondaryModelInfo = secondaryMi

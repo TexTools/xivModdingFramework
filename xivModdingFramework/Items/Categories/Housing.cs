@@ -20,6 +20,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.DataContainers;
@@ -47,7 +48,17 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of all Housing Items
         /// </summary>
         /// <returns>A list of XivFurniture objects containing housing items</returns>
-        public async Task<List<XivFurniture>> GetFurnitureList()
+        public async Task<List<XivFurniture>> GetFurnitureList(string substring = null)
+        {
+            var cache = new XivCache(_gameDirectory, _xivLanguage);
+            return await cache.GetCachedFurnitureList(substring);
+        }
+
+        /// <summary>
+        /// Gets the list of all Housing Items
+        /// </summary>
+        /// <returns>A list of XivFurniture objects containing housing items</returns>
+        public async Task<List<XivFurniture>> GetUncachedFurnitureList()
         {
             var furnitureList = new List<XivFurniture>();
 
