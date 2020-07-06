@@ -313,6 +313,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
             // Check the transparency bit.
             const ushort transparencyBit = 16;
+            const ushort backfaceBit = 1;
             var bit = (ushort)(ShaderNumber & transparencyBit);
 
             if(bit > 0)
@@ -321,6 +322,17 @@ namespace xivModdingFramework.Materials.DataContainers
             } else
             {
                 info.TransparencyEnabled = false;
+            }
+
+            bit = (ushort)(ShaderNumber & backfaceBit);
+
+            if (bit > 0)
+            {
+                info.RenderBackfaces = false;
+            }
+            else
+            {
+                info.RenderBackfaces = true;
             }
 
             info.Preset = MtrlShaderPreset.Default;
@@ -386,6 +398,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
             // Set transparency bit as needed.
             const ushort transparencyBit = 16;
+            const ushort backfaceBit = 1;
             var transparency = info.ForcedTransparency == null ? info.TransparencyEnabled : (bool)info.ForcedTransparency;
             if (transparency)
             {
@@ -394,6 +407,35 @@ namespace xivModdingFramework.Materials.DataContainers
             else
             {
                 ShaderNumber = (ushort)(ShaderNumber & (~transparencyBit));
+            }
+
+            // Set Backfaces bit.
+            var backfaces = info.RenderBackfaces;
+            if (!backfaces)
+            {
+                ShaderNumber = (ushort)(ShaderNumber | backfaceBit);
+            }
+            else
+            {
+                ShaderNumber = (ushort)(ShaderNumber & (~backfaceBit));
+            }
+
+            // Update us to DX11 material style if we're not already.
+            for (var idx = 0; idx < Unknown2.Length; idx++)
+            {
+                if (idx == 0)
+                {
+                    Unknown2[idx] = 12;
+                }
+                else
+                {
+                    Unknown2[idx] = 0;
+                }
+            }
+
+            for (var idx = 0; idx < TexturePathUnknownList.Count; idx++)
+            {
+                TexturePathUnknownList[idx] = 0;
             }
 
 
@@ -474,23 +516,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
             }
 
-            
-            // Clear out the unknown lists back to known default working values.
-            for(var idx = 0; idx < TexturePathUnknownList.Count; idx++)
-            {
-                TexturePathUnknownList[idx] = 0;
-            }
-
-            for (var idx = 0; idx < Unknown2.Length; idx++)
-            {
-                if(idx == 0)
-                {
-                    Unknown2[idx] = 12;
-                } else
-                {
-                    Unknown2[idx] = 0;
-                } 
-            }
         }
 
         /// <summary>
@@ -1444,6 +1469,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public MtrlShader Shader;
         public MtrlShaderPreset Preset;
         public bool TransparencyEnabled;
+        public bool RenderBackfaces = false;
         public bool HasColorset
         {
             get
