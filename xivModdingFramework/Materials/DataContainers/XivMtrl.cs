@@ -698,7 +698,7 @@ namespace xivModdingFramework.Materials.DataContainers
             } catch
             {
                 // Prefix the item's personal path onto it.
-                info.path = "{item_path}/" + info.path;
+                info.path = ItemPathToken + "/" + info.path;
                 info.path = DetokenizePath(info.path, info.Usage);
             }
 
