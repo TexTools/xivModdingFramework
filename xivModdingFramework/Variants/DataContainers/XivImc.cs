@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Variants.DataContainers
 {
@@ -54,12 +55,22 @@ namespace xivModdingFramework.Variants.DataContainers
         /// Returns the raw bytes that make up this IMC entry.
         /// </summary>
         /// <returns></returns>
-        public byte[] GetBytes()
+        public byte[] GetBytes(ImcType type)
         {
             var bytes = new List<byte>();
             bytes.AddRange(BitConverter.GetBytes(Variant));
             bytes.AddRange(BitConverter.GetBytes(Mask));
-            bytes.AddRange(BitConverter.GetBytes(Vfx));
+            if (type == ImcType.NonSet)
+            {
+                // Always 0 for non-set entries, their VFX number is the
+                // same as their Material Variant #.
+                bytes.AddRange(BitConverter.GetBytes(((ushort)0)));
+            }
+            else
+            {
+                // Actual VFX number.
+                bytes.AddRange(BitConverter.GetBytes(Vfx));
+            }
             return bytes.ToArray();
         }
 
