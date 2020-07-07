@@ -246,7 +246,7 @@ namespace xivModdingFramework.Variants.FileTypes
             var data = new List<byte>();
 
             // 4 Header bytes.
-            data.AddRange(BitConverter.GetBytes(info.SubsetCount));
+            data.AddRange(BitConverter.GetBytes((short) info.SubsetCount));
             data.AddRange(BitConverter.GetBytes((short) info.TypeIdentifier));
 
             // The rest of this is easy, it's literally just post all the sets in order.
