@@ -556,6 +556,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Dual Wield.
+        /// </summary>
+        internal static string Dual_Wield {
+            get {
+                return ResourceManager.GetString("Dual_Wield", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to DX11.
         /// </summary>
         internal static string DX11 {
@@ -1924,6 +1933,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Primary.
+        /// </summary>
+        internal static string Primary {
+            get {
+                return ResourceManager.GetString("Primary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Ramuh Egi.
         /// </summary>
         internal static string Ramuh_Egi {
@@ -2001,6 +2019,15 @@ namespace xivModdingFramework.Resources {
         internal static string SearchBox {
             get {
                 return ResourceManager.GetString("SearchBox", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Secondary.
+        /// </summary>
+        internal static string Secondary {
+            get {
+                return ResourceManager.GetString("Secondary", resourceCulture);
             }
         }
         

@@ -154,13 +154,13 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="part">The Mtrl part </param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion, string type = "Primary")
+        public async Task<XivMtrl> GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion)
         {
             var index = new Index(_gameDirectory);
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             // Get mtrl path
-            var mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, type);
+            var mtrlPath = await GetMtrlPath(itemModel, race, part, itemType);
             var mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
 
             // Get mtrl offset
@@ -181,50 +181,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (mtrlOffset == 0)
             {
-                // If secondary info does not give an offset, try setting body to 1
-                if (type.Equals("Secondary"))
-                {
-                    var xivGear = itemModel as XivGear;
-                    // Get mtrl path
-                    var originalBody = xivGear.SecondaryModelInfo.SecondaryID;
-                    xivGear.SecondaryModelInfo.SecondaryID = 1;
-
-                    if (xivGear.SecondaryModelInfo.PrimaryID > 8800 && xivGear.SecondaryModelInfo.PrimaryID < 8900)
-                    {
-                        itemType = XivItemType.equipment;
-                        race = XivRace.Hyur_Midlander_Male;
-                    }
-
-                    mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, type);
-                    mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
-
-                    // Get mtrl offset
-                    mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
-                        HashGenerator.GetHash(mtrlPath.File),
-                        DataFile);
-
-                    // If secondary info with body at 1 does not give an offset, go back to primary
-                    if (mtrlOffset == 0)
-                    {
-                        // Get mtrl path
-                        mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, "Primary");
-                        mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
-
-                        // Get mtrl offset
-                        mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
-                            HashGenerator.GetHash(mtrlPath.File),
-                            DataFile);
-
-                        if (mtrlOffset == 0)
-                        {
-                            throw new Exception($"Could not find offset for {mtrlStringPath}");
-                        }
-                    }
-                }
-                else
-                {
-                    throw new Exception($"Could not find offset for {mtrlStringPath}");
-                }
+                throw new Exception($"Could not find offset for {mtrlStringPath}");
             }
 
             var mtrlData = await GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
@@ -886,50 +843,29 @@ namespace xivModdingFramework.Materials.FileTypes
             return texTypePathList;
         }
 
-        public async Task<(string Folder, List<string> Files, bool hasVFX )> GetAllMtrlPaths(IItemModel item, XivItemType itemType, XivRace race = XivRace.Hyur_Midlander_Male, string type = "Primary")
+        public async Task<(string Folder, List<string> Files, bool hasVFX )> GetAllMtrlPaths(IItemModel item, XivItemType itemType, XivRace race = XivRace.Hyur_Midlander_Male)
         {
             // The default version number
             var variant = 1;
 
             var hasVfx = false;
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture && !type.Equals("Secondary"))
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(item);
                 variant = imcInfo.Variant;
-
                 if (imcInfo.Vfx > 0)
                 {
                     hasVfx = true;
                 }
+
             }
 
             var id = item.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = item.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = item.SecondaryCategory;
-
-            if (type.Equals("Secondary"))
-            {
-                var xivGear = item as XivGear;
-
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
-
-                var imc = new Imc(_gameDirectory, DataFile);
-
-                var imcInfo = await imc.GetImcInfo(item, true);
-                var imcChangedType = imc.ChangedType;
-                variant = imcInfo.Variant;
-
-                if (imcChangedType)
-                {
-                    itemCategory = XivStrings.Hands;
-                    itemType = XivItemType.equipment;
-                    race = XivRace.Hyur_Midlander_Male;
-                }
-            }
 
             if (itemCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
             {
@@ -941,7 +877,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             foreach(var letter in Constants.Alphabet)
             {
-                mtrlFiles.Add(GetMtrlFileName(item, itemType, race, letter, variant, type, itemCategory));
+                mtrlFiles.Add(GetMtrlFileName(item, itemType, race, letter, variant, itemCategory));
             }
 
             return (mtrlFolder, mtrlFiles, hasVfx);
@@ -956,14 +892,14 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="itemType">The type of the item</param>
         /// <param name="type">The item type whether Primary or Secondary</param>
         /// <returns>A tuple containing the mtrl folder and file, and whether it has a vfx</returns>
-        public async Task<(string Folder, string File, bool HasVfx)> GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType, string type)
+        public async Task<(string Folder, string File, bool HasVfx)> GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType)
         {
             // The default version number
             var variant = 1;
 
             var hasVfx = false;
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture && !type.Equals("Secondary"))
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
@@ -976,37 +912,15 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = itemModel.SecondaryCategory;
 
-            if (type.Equals("Secondary"))
-            {
-                var xivGear = itemModel as XivGear;
-
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
-
-                var imc = new Imc(_gameDirectory, DataFile);
-                // Use secondary model info instead.
-                var imcInfo = await imc.GetImcInfo(itemModel, true);
-                var imcChangedType = imc.ChangedType;
-                variant = imcInfo.Variant;
-
-                if (imcChangedType)
-                {
-                    itemCategory = XivStrings.Hands;
-                    itemType = XivItemType.equipment;
-                    xivRace = XivRace.Hyur_Midlander_Male;
-                }
-            }
 
             if (itemCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
             {
                 variant = 0;
             }
 
-            var mtrlFile = GetMtrlFileName(itemModel, itemType, xivRace, part, variant, type, itemCategory);
+            var mtrlFile = GetMtrlFileName(itemModel, itemType, xivRace, part, variant, itemCategory);
             var mtrlFolder = GetMtrlFolder(itemModel, itemType, xivRace, variant);
 
             return (mtrlFolder, mtrlFile, hasVfx);
@@ -1021,7 +935,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivRace">The race for the requested data</param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>The mtrl Folder</returns>
-        private async Task<string> GetMtrlFolder(IItemModel itemModel, XivRace xivRace, XivItemType itemType)
+        private async Task<string> GetMtrlFolder(IItemModel itemModel, XivRace xivRace, XivItemType itemType, bool useSecondary = false)
         {
             // The default version number
             var variant = 1;
@@ -1145,7 +1059,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="type"></param>
         /// <param name="itemCategory"></param>
         /// <returns></returns>
-        private string GetMtrlFileName(IItemModel itemModel, XivItemType itemType, XivRace xivRace = XivRace.Hyur_Midlander_Male, char materialIdenfitier = 'a',  int variant = 1, string type = "Primary", string itemCategory = "")
+        private string GetMtrlFileName(IItemModel itemModel, XivItemType itemType, XivRace xivRace = XivRace.Hyur_Midlander_Male, char materialIdenfitier = 'a',  int variant = 1, string itemCategory = "")
         {
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
@@ -1155,13 +1069,6 @@ namespace xivModdingFramework.Materials.FileTypes
             // This is so janky.
             if (itemCategory == "") {
                 itemCategory = itemModel.SecondaryCategory;
-            }
-
-            if (type.Equals("Secondary"))
-            {
-                var xivGear = itemModel as XivGear;
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             }
 
             if (itemModel.PrimaryCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
@@ -1177,10 +1084,10 @@ namespace xivModdingFramework.Materials.FileTypes
             switch (itemType)
             {
                 case XivItemType.equipment:
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}_{materialIdenfitier}{MtrlExtension}";
+                    mtrlFile = $"mt_c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}_{materialIdenfitier}{MtrlExtension}";
                     break;
                 case XivItemType.accessory:
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}_{materialIdenfitier}{MtrlExtension}";
+                    mtrlFile = $"mt_c{race}a{id}_{itemModel.GetItemSlotAbbreviation()}_{materialIdenfitier}{MtrlExtension}";
                     break;
                 case XivItemType.weapon:
                     mtrlFile = $"mt_w{id}b{bodyVer}_{materialIdenfitier}{MtrlExtension}";

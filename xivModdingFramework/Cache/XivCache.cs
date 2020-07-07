@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items;
@@ -20,7 +21,7 @@ namespace xivModdingFramework.Cache
     {
         private GameInfo _gameInfo;
         private DirectoryInfo _dbPath;
-        private static readonly Version CacheVersion = new Version("0.0.0.24");
+        private static readonly Version CacheVersion = new Version("0.0.0.25");
         private const string dbFileName = "mod_cache.db";
         private const string creationScript = "CreateDB.sql";
         private string _connectionString { get
@@ -134,10 +135,10 @@ namespace xivModdingFramework.Cache
                     throw new NotSupportedException("A valid language must be specified when rebuilding the Cache.");
                 }
 
-                CreateCache();
-
                 try
                 {
+                    CreateCache();
+
                     await RebuildItemsCache();
                     await RebuildMonstersCache();
                     await RebuildUiCache();
@@ -426,21 +427,19 @@ namespace xivModdingFramework.Cache
                 {
                     foreach (var item in items)
                     {
-                        var query = @"insert into items (exd_id, primary_id, secondary_id, imc_variant, slot, slot_full, name, icon_id, primary_id_2, secondary_id_2, imc_variant_2) 
-                            values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $primary_id_2, $secondary_id_2, $imc_variant_2)";
+                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id, is_weapon) 
+                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $is_weapon)";
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             cmd.Parameters.AddWithValue("exd_id", item.ExdID);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
                             cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
+                            cmd.Parameters.AddWithValue("is_weapon", ((XivGearModelInfo)item.ModelInfo).IsWeapon);
                             cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                             cmd.Parameters.AddWithValue("name", item.Name);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
-                            cmd.Parameters.AddWithValue("primary_id_2", item.SecondaryModelInfo == null ? 0 : (int?)item.SecondaryModelInfo.PrimaryID);
-                            cmd.Parameters.AddWithValue("secondary_id_2", item.SecondaryModelInfo == null ? 0 : (int?)item.SecondaryModelInfo.SecondaryID);
-                            cmd.Parameters.AddWithValue("imc_variant_2", item.SecondaryModelInfo == null ? 0 : (int?)item.SecondaryModelInfo.ImcSubsetID);
                             cmd.ExecuteScalar();
                         }
                     }
@@ -694,37 +693,49 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("items", where, async (reader) =>
+            List<XivGear> mainHands = new List<XivGear>();
+            List<XivGear> offHands = new List<XivGear>();
+            var list = await BuildListFromTable("items", where, async (reader) =>
             {
+                var primaryMi = new XivGearModelInfo();
+
                 var item = new XivGear
                 {
                     ExdID = reader.GetInt32("exd_id"),
                     PrimaryCategory = XivStrings.Gear,
                     SecondaryCategory = reader.GetString("slot_full"),
-                    ModelInfo = new XivModelInfo(),
-                    SecondaryModelInfo = new XivModelInfo()
+                    ModelInfo = primaryMi,
                 };
 
                 item.Name = reader.GetString("name");
                 item.IconNumber = (uint)reader.GetInt32("icon_id");
-                item.ModelInfo.PrimaryID = reader.GetInt32("primary_id");
-                item.ModelInfo.SecondaryID = reader.GetInt32("secondary_id");
-                item.ModelInfo.ImcSubsetID = reader.GetInt32("imc_variant");
+                primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
+                primaryMi.PrimaryID = reader.GetInt32("primary_id");
+                primaryMi.SecondaryID = reader.GetInt32("secondary_id");
+                primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");
 
-                if (reader.GetInt32("primary_id_2") > 0)
+                if(item.Name.Contains(XivStrings.Main_Hand))
                 {
-                    item.SecondaryModelInfo.PrimaryID = reader.GetInt32("primary_id_2");
-                    item.SecondaryModelInfo.SecondaryID = reader.GetInt32("secondary_id_2");
-                    item.SecondaryModelInfo.ImcSubsetID = reader.GetInt32("imc_variant_2");
-                }
-                else
+                    mainHands.Add(item);
+                } else if (item.Name.Contains(XivStrings.Off_Hand))
                 {
-                    item.SecondaryModelInfo = null;
+                    offHands.Add(item);
                 }
 
                 return item;
             });
 
+            // Assign pairs based on items that came out of the same EXD row.
+            foreach(var item in mainHands)
+            {
+                var pair = offHands.FirstOrDefault(x => x.ExdID == item.ExdID);
+                if(pair != null)
+                {
+                    pair.PairedItem = item;
+                    item.PairedItem = pair;
+                }
+            }
+            return list;
         }
 
         /// <summary>

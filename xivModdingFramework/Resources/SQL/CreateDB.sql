@@ -38,13 +38,11 @@ CREATE TABLE "items" (
 	"name"	TEXT NOT NULL,
 	"primary_id"	INTEGER NOT NULL,
 	"secondary_id"	INTEGER NOT NULL,
+	"is_weapon"	INTEGER NOT NULL,
 	"slot"		TEXT,
 	"slot_full"	TEXT NOT NULL,
 	"imc_variant"	INTEGER NOT NULL,
 	"icon_id"	INTEGER NOT NULL,
-	"primary_id_2"	INTEGER NOT NULL,
-	"secondary_id_2"	INTEGER NOT NULL,
-	"imc_variant_2"	INTEGER NOT NULL,
 	PRIMARY KEY("name", "exd_id")
 );
 
