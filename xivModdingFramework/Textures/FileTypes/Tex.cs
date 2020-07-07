@@ -185,7 +185,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="itemModel">An item that contains model data</param>
         /// <param name="xivRace">The race for the requested data</param>
         /// <returns>A list of part characters</returns>
-        public async Task<List<string>> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile, string type = "Primary")
+        public async Task<List<string>> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile)
         {
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
@@ -195,31 +195,11 @@ namespace xivModdingFramework.Textures.FileTypes
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = itemModel.SecondaryCategory;
 
-            if (type.Equals("Secondary"))
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
-                var xivGear = itemModel as XivGear;
-
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
-
-                var imc = new Imc(_gameDirectory, xivGear.DataFile);
-                version = (await imc.GetImcInfo(itemModel, true)).Variant.ToString().PadLeft(4, '0');
-
-                if (imc.ChangedType)
-                {
-                    itemType = XivItemType.equipment;
-                    xivRace = XivRace.Hyur_Midlander_Male;
-                    itemCategory = XivStrings.Hands;
-                }
-            }
-            else
-            {
-                if (itemType != XivItemType.human && itemType != XivItemType.furniture)
-                {
-                    // Get the mtrl version for the given item from the imc file
-                    var imc = new Imc(_gameDirectory, dataFile);
-                    version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
-                }
+                // Get the mtrl version for the given item from the imc file
+                var imc = new Imc(_gameDirectory, dataFile);
+                version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
             }
 
             var parts = Constants.Alphabet;
@@ -231,7 +211,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 case XivItemType.equipment:
                     mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}_";
+                    mtrlFile = $"mt_c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}_";
                     break;
                 case XivItemType.accessory:
                     mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";

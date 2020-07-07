@@ -5521,7 +5521,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 case XivItemType.equipment:
                     mdlFolder = $"chara/{itemType}/e{id}/model";
-                    mdlFile   = $"c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                    mdlFile   = $"c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
                     break;
                 case XivItemType.accessory:
                     mdlFolder = $"chara/{itemType}/a{id}/model";
@@ -5538,7 +5538,7 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     else
                     {
-                        mdlFile = $"c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                        mdlFile = $"c{race}a{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
                     }
                     break;
                 case XivItemType.weapon:

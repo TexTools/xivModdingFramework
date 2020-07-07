@@ -43,9 +43,26 @@ namespace xivModdingFramework.Items
             XivItemType itemType;
 
             if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) || 
-                item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Food))
+                item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Dual_Wield) || item.SecondaryCategory.Equals(XivStrings.Food))
             {
                 itemType = XivItemType.weapon;
+
+                try
+                {
+                    // Check to see if we're an equipment item masquerading as a weapon.
+                    var mi = (XivGearModelInfo)((IItemModel)item).ModelInfo;
+                    if (mi != null)
+                    {
+                        if (!mi.IsWeapon)
+                        {
+                            itemType = XivItemType.equipment;
+                        }
+                    }
+                }
+                catch
+                {
+                    //No-op.
+                }
             }
             else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Ears) || item.SecondaryCategory.Equals(XivStrings.Neck) || 
                      item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings)))
@@ -109,8 +126,8 @@ namespace xivModdingFramework.Items
             var itemType = XivItemType.none;
 
             // Weapons, Monsters of all kinds, and the character Body use the body type secondary identifier.
-            if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) ||
-                item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Food)
+            if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) || item.SecondaryCategory.Equals(XivStrings.Dual_Wield)
+                || item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Food)
                 || item.PrimaryCategory.Equals(XivStrings.Companions) || item.PrimaryCategory.Equals(XivStrings.Monster) || item.SecondaryCategory.Equals(XivStrings.Body))
             {
                 itemType = XivItemType.body;
@@ -145,6 +162,23 @@ namespace xivModdingFramework.Items
         /// <returns></returns>
         public static string GetItemSlotAbbreviation(this IItem item)
         {
+            // Test to make sure we're in the right category for these.
+            if (item.SecondaryCategory == XivStrings.Dual_Wield)
+            {
+                try
+                {
+                    var im = ((XivGearModelInfo)((XivGear)item).ModelInfo);
+                    if(!im.IsWeapon)
+                    {
+                        return Mdl.SlotAbbreviationDictionary[XivStrings.Hands];
+                    }
+                }
+                catch
+                {
+                    // Use the default logic if we failed the cast.
+                }
+            }
+
             // This is not actually correct currently for Demihuman models.
             // Demihuman models have their own Equipment slots, but that information is currently
             // Not pulled into textools, so they'll just end up with missing slot abbreviations.

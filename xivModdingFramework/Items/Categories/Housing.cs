@@ -241,11 +241,6 @@ namespace xivModdingFramework.Items.Categories
                 int itemDataLength = 168;
                 const int itemIconDataOffset = 136;
 
-                if (_xivLanguage == XivLanguage.Chinese)
-                {
-                    itemDataLength = 160;
-                }
-
                 var ex = new Ex(_gameDirectory, _xivLanguage);
                 var pictureDictionary = await ex.ReadExData(XivEx.picture);
                 var itemDictionary = await ex.ReadExData(XivEx.item);

@@ -106,47 +106,42 @@ namespace xivModdingFramework.Materials.FileTypes
             { XivTexType.Diffuse, new TextureUsageStruct() { TextureType = 3054951514, Unknown = 1611594207 } },
             { XivTexType.Specular, new TextureUsageStruct() { TextureType = 3367837167, Unknown = 2687453224 } },
             { XivTexType.Skin, new TextureUsageStruct() { TextureType = 940355280, Unknown = 735790577 } },
+            { XivTexType.Other, new TextureUsageStruct() { TextureType = 612525193, Unknown = 1851494160 } },
+        };  // Probably want to key this off a custom enum soon if we keep finding additional texture usage values.
+
+
+        // Shader Parameter defaults.  For most of them they seem to be used as multipliers.
+        public static Dictionary<MtrlShaderParameterId, List<float>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<float>>() {
+            { MtrlShaderParameterId.Common1, new List<float>(){ 0.5f } },
+            { MtrlShaderParameterId.Common2, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
+            { MtrlShaderParameterId.Reflection1, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.SkinOutline, new List<float>(){ 3f } },
+            { MtrlShaderParameterId.RacialSkin1, new List<float>(){ 0.02f, 0.02f, 0.02f } },
+            { MtrlShaderParameterId.SkinUnknown1, new List<float>(){ 0.4f, 0.4f, 0.4f } },
+            { MtrlShaderParameterId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
+            { MtrlShaderParameterId.RacialSkin2, new List<float>(){ 65f, 100f } },
+            { MtrlShaderParameterId.SkinUnknown3, new List<float>(){ 63f } },
+            { MtrlShaderParameterId.Equipment1, new List<float>(){ 0f } },
+            { MtrlShaderParameterId.Face1, new List<float>(){ 32f } },
+            { MtrlShaderParameterId.Hair1, new List<float>(){ 0.35f } },
+            { MtrlShaderParameterId.Hair2, new List<float>(){ 0.5f } },
+
+
+            { MtrlShaderParameterId.Furniture1, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderParameterId.Furniture2, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderParameterId.Furniture3, new List<float>(){ 0f, 0f, 0f } },
+            { MtrlShaderParameterId.Furniture4, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.Furniture5, new List<float>(){ 0.15f } },
+            { MtrlShaderParameterId.Furniture6, new List<float>(){ 0.15f } },
+            { MtrlShaderParameterId.Furniture7, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.Furniture8, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.Furniture9, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.Furniture10, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderParameterId.Furniture11, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderParameterId.Furniture12, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderParameterId.Furniture13, new List<float>(){ 0f, 0f, 0f } },
         };
-
-        
-        // References to the additional shader data at the end of MTRL files.
-        // Stored by ID, though unknown yet what the IDs correspond to.
-        // I suspect the IDs are used for piping additional maps/values to the shader, such as cube maps for reflection
-        // and skin/hair/iris color, etc. -Sel
-        // The actual byte array values do change a bit, but thus far I haven't been able to notice differences when they're changed.
-        public static Dictionary<MtrlShaderParameterId, List<byte>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<byte>>() {
-            { MtrlShaderParameterId.Common1, new List<byte>(){ 0,0,0,63 } },
-            { MtrlShaderParameterId.Common2, new List<byte>(){ 0,0,128,63 } },
-            { MtrlShaderParameterId.SkinColor, new List<byte>(){ 51, 51, 179, 63, 51, 51, 179, 63, 51, 51, 179, 63 } },
-            { MtrlShaderParameterId.Reflection1, new List<byte>(){ 0,0,128,63 } },
-            { MtrlShaderParameterId.SkinOutline, new List<byte>(){ 0,0,64,64 } },
-            { MtrlShaderParameterId.RacialSkin1, new List<byte>(){ 10, 215, 163, 60, 10, 215, 163, 60, 10, 215, 163, 60 } },
-            { MtrlShaderParameterId.SkinUnknown1, new List<byte>(){ 205, 204, 204, 62, 205, 204, 204, 62, 205, 204, 204, 62 } },
-            { MtrlShaderParameterId.SkinUnknown2, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { MtrlShaderParameterId.RacialSkin2, new List<byte>(){ 0, 0, 130, 66, 0, 0, 200, 66 } },
-            { MtrlShaderParameterId.SkinUnknown3, new List<byte>(){ 0, 0, 124, 66 } },
-            { MtrlShaderParameterId.Equipment1, new List<byte>(){ 0, 0, 0, 0 } },
-            { MtrlShaderParameterId.Face1, new List<byte>(){ 0, 0, 0, 66 } },
-            { MtrlShaderParameterId.Hair1, new List<byte>(){ 51, 51, 179, 62 } },
-            { MtrlShaderParameterId.Hair2, new List<byte>(){ 0, 0, 0, 63 } },
-
-
-            { MtrlShaderParameterId.Furniture1, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture2, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture3, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-            { MtrlShaderParameterId.Furniture4, new List<byte>(){ 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture5, new List<byte>(){ 143, 194, 117, 60 } },
-            { MtrlShaderParameterId.Furniture6, new List<byte>(){ 143, 194, 117, 60 } },
-            { MtrlShaderParameterId.Furniture7, new List<byte>(){ 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture8, new List<byte>(){ 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture9, new List<byte>(){ 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture10, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture11, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture12, new List<byte>(){ 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63, 0, 0, 128, 63 } },
-            { MtrlShaderParameterId.Furniture13, new List<byte>(){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63 } },
-        };
-
-
 
         /// <summary>
         /// Gets the MTRL data for the given item 
@@ -159,13 +154,13 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="part">The Mtrl part </param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion, string type = "Primary")
+        public async Task<XivMtrl> GetMtrlData(IItemModel itemModel, XivRace race, char part, int dxVersion)
         {
             var index = new Index(_gameDirectory);
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             // Get mtrl path
-            var mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, type);
+            var mtrlPath = await GetMtrlPath(itemModel, race, part, itemType);
             var mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
 
             // Get mtrl offset
@@ -186,50 +181,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (mtrlOffset == 0)
             {
-                // If secondary info does not give an offset, try setting body to 1
-                if (type.Equals("Secondary"))
-                {
-                    var xivGear = itemModel as XivGear;
-                    // Get mtrl path
-                    var originalBody = xivGear.SecondaryModelInfo.SecondaryID;
-                    xivGear.SecondaryModelInfo.SecondaryID = 1;
-
-                    if (xivGear.SecondaryModelInfo.PrimaryID > 8800 && xivGear.SecondaryModelInfo.PrimaryID < 8900)
-                    {
-                        itemType = XivItemType.equipment;
-                        race = XivRace.Hyur_Midlander_Male;
-                    }
-
-                    mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, type);
-                    mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
-
-                    // Get mtrl offset
-                    mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
-                        HashGenerator.GetHash(mtrlPath.File),
-                        DataFile);
-
-                    // If secondary info with body at 1 does not give an offset, go back to primary
-                    if (mtrlOffset == 0)
-                    {
-                        // Get mtrl path
-                        mtrlPath = await GetMtrlPath(itemModel, race, part, itemType, "Primary");
-                        mtrlStringPath = $"{mtrlPath.Folder}/{mtrlPath.File}";
-
-                        // Get mtrl offset
-                        mtrlOffset = await index.GetDataOffset(HashGenerator.GetHash(mtrlPath.Folder),
-                            HashGenerator.GetHash(mtrlPath.File),
-                            DataFile);
-
-                        if (mtrlOffset == 0)
-                        {
-                            throw new Exception($"Could not find offset for {mtrlStringPath}");
-                        }
-                    }
-                }
-                else
-                {
-                    throw new Exception($"Could not find offset for {mtrlStringPath}");
-                }
+                throw new Exception($"Could not find offset for {mtrlStringPath}");
             }
 
             var mtrlData = await GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
@@ -517,22 +469,19 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             var offset = shaderParam.Offset;
                             var size = shaderParam.Size;
-                            shaderParam.Bytes = new List<byte>();
-                            shaderParam.Args = new List<uint>();
+                            shaderParam.Args = new List<float>();
                             if (bytesRead + size <= originalShaderParameterDataSize)
                             {
                                 for (var idx = offset; idx < offset + size; idx+=4)
                                 {
-                                    var arg = br.ReadUInt32();
+                                    var arg = br.ReadSingle();
                                     shaderParam.Args.Add(arg);
                                     bytesRead += 4;
-                                    shaderParam.Bytes.AddRange(BitConverter.GetBytes(arg));
                                 }
                             } else
                             {
                                 // Just use a blank array if we have missing/invalid shader data.
-                                shaderParam.Bytes = new List<byte>(new byte[size]);
-                                shaderParam.Args = new List<uint>(new uint[size / 4]);
+                                shaderParam.Args = new List<float>(new float[size / 4]);
                             }
                         }
 
@@ -698,7 +647,15 @@ namespace xivModdingFramework.Materials.FileTypes
             foreach (var texPathString in xivMtrl.TexturePathList)
             {
                 xivMtrl.TexturePathOffsetList.Add(stringListBytes.Count);
-                stringListBytes.AddRange(Encoding.UTF8.GetBytes(texPathString.Replace("--", string.Empty)));
+                var path = texPathString;
+
+                // This is an old style DX9 Material still, make sure to fix it up.
+                if(xivMtrl.Unknown2[0] != 12)
+                {
+                    path = path.Replace("--", string.Empty);
+                }
+
+                stringListBytes.AddRange(Encoding.UTF8.GetBytes(path));
                 stringListBytes.Add(0);
             }
 
@@ -784,16 +741,17 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var offset = 0;
-            foreach (var dataStruct2 in xivMtrl.ShaderParameterList)
+            foreach (var parameter in xivMtrl.ShaderParameterList)
             {
                 // Ensure we're writing correctly calculated data.
-                dataStruct2.Offset = (short) offset;
-                dataStruct2.Size = (short) dataStruct2.Bytes.Count;
-                offset += dataStruct2.Size;
+                parameter.Offset = (short) offset;
+                parameter.Size = (short)parameter.Args.Count;
+                offset += parameter.Size * 4;
+                short byteSize = (short)(parameter.Size * 4);
 
-                mtrlBytes.AddRange(BitConverter.GetBytes((uint)dataStruct2.ParameterID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Offset));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct2.Size));
+                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ParameterID));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameter.Offset));
+                mtrlBytes.AddRange(BitConverter.GetBytes(byteSize));
             }
 
             foreach (var parameterStruct in xivMtrl.TextureDescriptorList)
@@ -809,9 +767,10 @@ namespace xivModdingFramework.Materials.FileTypes
             var shaderBytes = new List<byte>();
             foreach (var shaderParam in xivMtrl.ShaderParameterList)
             {
-                //shaderBytes.AddRange(Mtrl.ShaderParameterValues[shaderParam.ParameterID]);
-                //shaderBytes.AddRange(new byte[shaderParam.Bytes.Count]);
-                shaderBytes.AddRange(shaderParam.Bytes);
+                foreach (var f in shaderParam.Args)
+                {
+                    shaderBytes.AddRange(BitConverter.GetBytes(f));
+                }
             }
 
             // Pad out if we're missing anything.
@@ -821,7 +780,6 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             mtrlBytes.AddRange(shaderBytes);
 
-            //mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
 
             // Backfill the actual file size data.
@@ -885,50 +843,29 @@ namespace xivModdingFramework.Materials.FileTypes
             return texTypePathList;
         }
 
-        public async Task<(string Folder, List<string> Files, bool hasVFX )> GetAllMtrlPaths(IItemModel item, XivItemType itemType, XivRace race = XivRace.Hyur_Midlander_Male, string type = "Primary")
+        public async Task<(string Folder, List<string> Files, bool hasVFX )> GetAllMtrlPaths(IItemModel item, XivItemType itemType, XivRace race = XivRace.Hyur_Midlander_Male)
         {
             // The default version number
             var variant = 1;
 
             var hasVfx = false;
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture && !type.Equals("Secondary"))
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
                 var imcInfo = await imc.GetImcInfo(item);
                 variant = imcInfo.Variant;
-
                 if (imcInfo.Vfx > 0)
                 {
                     hasVfx = true;
                 }
+
             }
 
             var id = item.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = item.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = item.SecondaryCategory;
-
-            if (type.Equals("Secondary"))
-            {
-                var xivGear = item as XivGear;
-
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
-
-                var imc = new Imc(_gameDirectory, DataFile);
-
-                var imcInfo = await imc.GetImcInfo(item, true);
-                var imcChangedType = imc.ChangedType;
-                variant = imcInfo.Variant;
-
-                if (imcChangedType)
-                {
-                    itemCategory = XivStrings.Hands;
-                    itemType = XivItemType.equipment;
-                    race = XivRace.Hyur_Midlander_Male;
-                }
-            }
 
             if (itemCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
             {
@@ -940,7 +877,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             foreach(var letter in Constants.Alphabet)
             {
-                mtrlFiles.Add(GetMtrlFileName(item, itemType, race, letter, variant, type, itemCategory));
+                mtrlFiles.Add(GetMtrlFileName(item, itemType, race, letter, variant, itemCategory));
             }
 
             return (mtrlFolder, mtrlFiles, hasVfx);
@@ -955,14 +892,14 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="itemType">The type of the item</param>
         /// <param name="type">The item type whether Primary or Secondary</param>
         /// <returns>A tuple containing the mtrl folder and file, and whether it has a vfx</returns>
-        public async Task<(string Folder, string File, bool HasVfx)> GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType, string type)
+        public async Task<(string Folder, string File, bool HasVfx)> GetMtrlPath(IItemModel itemModel, XivRace xivRace, char part, XivItemType itemType)
         {
             // The default version number
             var variant = 1;
 
             var hasVfx = false;
 
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture && !type.Equals("Secondary"))
+            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
                 var imc = new Imc(_gameDirectory, DataFile);
@@ -975,37 +912,15 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = itemModel.SecondaryCategory;
 
-            if (type.Equals("Secondary"))
-            {
-                var xivGear = itemModel as XivGear;
-
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
-
-                var imc = new Imc(_gameDirectory, DataFile);
-                // Use secondary model info instead.
-                var imcInfo = await imc.GetImcInfo(itemModel, true);
-                var imcChangedType = imc.ChangedType;
-                variant = imcInfo.Variant;
-
-                if (imcChangedType)
-                {
-                    itemCategory = XivStrings.Hands;
-                    itemType = XivItemType.equipment;
-                    xivRace = XivRace.Hyur_Midlander_Male;
-                }
-            }
 
             if (itemCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
             {
                 variant = 0;
             }
 
-            var mtrlFile = GetMtrlFileName(itemModel, itemType, xivRace, part, variant, type, itemCategory);
+            var mtrlFile = GetMtrlFileName(itemModel, itemType, xivRace, part, variant, itemCategory);
             var mtrlFolder = GetMtrlFolder(itemModel, itemType, xivRace, variant);
 
             return (mtrlFolder, mtrlFile, hasVfx);
@@ -1020,7 +935,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivRace">The race for the requested data</param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>The mtrl Folder</returns>
-        private async Task<string> GetMtrlFolder(IItemModel itemModel, XivRace xivRace, XivItemType itemType)
+        private async Task<string> GetMtrlFolder(IItemModel itemModel, XivRace xivRace, XivItemType itemType, bool useSecondary = false)
         {
             // The default version number
             var variant = 1;
@@ -1144,7 +1059,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="type"></param>
         /// <param name="itemCategory"></param>
         /// <returns></returns>
-        private string GetMtrlFileName(IItemModel itemModel, XivItemType itemType, XivRace xivRace = XivRace.Hyur_Midlander_Male, char materialIdenfitier = 'a',  int variant = 1, string type = "Primary", string itemCategory = "")
+        private string GetMtrlFileName(IItemModel itemModel, XivItemType itemType, XivRace xivRace = XivRace.Hyur_Midlander_Male, char materialIdenfitier = 'a',  int variant = 1, string itemCategory = "")
         {
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
@@ -1154,13 +1069,6 @@ namespace xivModdingFramework.Materials.FileTypes
             // This is so janky.
             if (itemCategory == "") {
                 itemCategory = itemModel.SecondaryCategory;
-            }
-
-            if (type.Equals("Secondary"))
-            {
-                var xivGear = itemModel as XivGear;
-                id = xivGear.SecondaryModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                bodyVer = xivGear.SecondaryModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             }
 
             if (itemModel.PrimaryCategory.Equals(XivStrings.Character) && (itemCategory.Equals(XivStrings.Body) || itemCategory.Equals(XivStrings.Tail)))
@@ -1176,10 +1084,10 @@ namespace xivModdingFramework.Materials.FileTypes
             switch (itemType)
             {
                 case XivItemType.equipment:
-                    mtrlFile = $"mt_c{race}e{id}_{SlotAbbreviationDictionary[itemCategory]}_{materialIdenfitier}{MtrlExtension}";
+                    mtrlFile = $"mt_c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}_{materialIdenfitier}{MtrlExtension}";
                     break;
                 case XivItemType.accessory:
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}_{materialIdenfitier}{MtrlExtension}";
+                    mtrlFile = $"mt_c{race}a{id}_{itemModel.GetItemSlotAbbreviation()}_{materialIdenfitier}{MtrlExtension}";
                     break;
                 case XivItemType.weapon:
                     mtrlFile = $"mt_w{id}b{bodyVer}_{materialIdenfitier}{MtrlExtension}";
