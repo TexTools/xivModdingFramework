@@ -74,11 +74,6 @@ namespace xivModdingFramework.Items.DataContainers
         public XivModelInfo ModelInfo { get; set; }
 
         /// <summary>
-        /// The Secondary Model Information for the gear item
-        /// </summary>
-        public XivModelInfo SecondaryModelInfo { get; set; }
-
-        /// <summary>
         /// The Icon Number associated with the gear item
         /// </summary>
         public uint IconNumber { get; set; }
@@ -88,15 +83,15 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public int EquipSlotCategory { get; set; }
 
+        /// <summary>
+        /// The other item in this pair (main or offhand)
+        /// </summary>
+        public XivGear PairedItem { get; set; }
+
         public object Clone()
         {
             var copy = (XivGear)this.MemberwiseClone();
-            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
-
-            if (SecondaryModelInfo != null)
-            {
-                copy.SecondaryModelInfo = (XivModelInfo)SecondaryModelInfo.Clone();
-            }
+            copy.ModelInfo = (XivGearModelInfo)ModelInfo.Clone();
 
             return copy;
         }
@@ -107,5 +102,10 @@ namespace xivModdingFramework.Items.DataContainers
         }
 
         public override string ToString() => Name;
+    }
+
+    public class XivGearModelInfo : XivModelInfo
+    {
+        public bool IsWeapon = false;
     }
 }
