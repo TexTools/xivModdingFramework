@@ -14,6 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using xivModdingFramework.Helpers;
+
 namespace xivModdingFramework.Variants.DataContainers
 {
     /// <summary>
@@ -43,5 +49,62 @@ namespace xivModdingFramework.Variants.DataContainers
         /// Some examples would be any of the Lux weapons
         /// </remarks>
         public ushort Vfx { get; set; }
+
+        /// <summary>
+        /// Returns the raw bytes that make up this IMC entry.
+        /// </summary>
+        /// <returns></returns>
+        public byte[] GetBytes()
+        {
+            var bytes = new List<byte>();
+            bytes.AddRange(BitConverter.GetBytes(Variant));
+            bytes.AddRange(BitConverter.GetBytes(Mask));
+            bytes.AddRange(BitConverter.GetBytes(Vfx));
+            return bytes.ToArray();
+        }
+
+        /// <summary>
+        /// Shows a given attribute part
+        /// </summary>
+        /// <param name="part"></param>
+        public void ShowPart(char part)
+        {
+            var index = Helpers.Constants.Alphabet.ToList().IndexOf(part);
+            if(index < 0 || index > 9)
+            {
+                throw new NotSupportedException("Invalid IMC Part Letter.");
+            }
+
+            var bit = 1;
+            for(var i = 0; i < index; i++)
+            {
+                bit = bit << 1;
+            }
+
+            Mask = (ushort)(Mask | bit);
+        }
+
+        /// <summary>
+        /// Hides a given attribute part
+        /// </summary>
+        /// <param name="part"></param>
+        public void HidePart(char part)
+        {
+            var index = Helpers.Constants.Alphabet.ToList().IndexOf(part);
+            if (index < 0 || index > 9)
+            {
+                throw new NotSupportedException("Invalid IMC Part Letter.");
+            }
+
+            var bit = 1;
+            for (var i = 0; i < index; i++)
+            {
+                bit = bit << 1;
+            }
+
+            Mask = (ushort)(Mask & (~bit));
+
+        }
+
     }
 }

@@ -977,7 +977,7 @@ namespace xivModdingFramework.Cache
 
 
                     // [AND/OR] [COLUMN] [=/LIKE]
-                    if (Comparer == ComparisonType.Like)
+                    if (Comparer == ComparisonType.Equal)
                     {
                         result += " = ";
                     }

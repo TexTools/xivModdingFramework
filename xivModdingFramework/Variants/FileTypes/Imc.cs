@@ -64,7 +64,8 @@ namespace xivModdingFramework.Variants.FileTypes
             var info = await GetFullImcInfo(item);
             var slot = item.GetItemSlotAbbreviation();
 
-            return info.GetEntry(item.ModelInfo.ImcSubsetID, slot);
+            var result = info.GetEntry(item.ModelInfo.ImcSubsetID, slot);
+            return result;
         }
 
         public async Task<FullImcInfo> GetFullImcInfo(IItemModel item)
@@ -79,13 +80,18 @@ namespace xivModdingFramework.Variants.FileTypes
             {
                 // Some dual wield items don't have a second IMC, and just default to the first.
                 var gear = (XivGear)item;
-                if (gear != null && gear.PairedItem != null) {
-                    return await (GetFullImcInfo(gear.PairedItem));
+                if (gear != null && gear.PairedItem != null)
+                {
+                    var pair = gear.PairedItem;
+                    var imcPath = GetImcPath(pair);
+                    var path = imcPath.Folder + "/" + imcPath.File;
+                    return await (GetFullImcInfo(path));
                 }
             }
 
             return info;
         }
+
 
         /// <summary>
         /// Gets the full IMC information for a given item
@@ -183,6 +189,87 @@ namespace xivModdingFramework.Variants.FileTypes
                     return imcData;
                 }
             });
+        }
+
+        public async Task SaveImcInfo(XivImc info, IItemModel item)
+        {
+            var full = await GetFullImcInfo(item);
+            full.SetEntry(info, item.ModelInfo.ImcSubsetID, item.GetItemSlotAbbreviation());
+            await SaveFullImcInfo(full, item);
+        }
+
+        public async Task SaveImcInfo(XivImc info, string path, int subsetId = -1, string slot = "")
+        {
+            var full = await GetFullImcInfo(path);
+            full.SetEntry(info, subsetId, slot);
+            await SaveFullImcInfo(full, path);
+        }
+
+        public async Task SaveFullImcInfo(FullImcInfo info, IItemModel item)
+        {
+            try
+            {
+                var imcPath = GetImcPath(item);
+                var path = imcPath.Folder + "/" + imcPath.File;
+                await SaveFullImcInfo(info, path);
+            }
+            catch
+            {
+                // Some dual wield items don't have a second IMC, and just default to the first.
+                var gear = (XivGear)item;
+                if (gear != null && gear.PairedItem != null)
+                {
+                    var pair = gear.PairedItem;
+                    var imcPath = GetImcPath(pair);
+                    var path = imcPath.Folder + "/" + imcPath.File;
+                    await (SaveFullImcInfo(info, path));
+                }
+            }
+            return;
+
+        }
+
+        public async Task SaveFullImcInfo(FullImcInfo info, string path, string itemName = null, string category = null, string source = null)
+        {
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+
+
+            var imcOffset = await index.GetDataOffset(path);
+
+            // No writing new IMC files.
+            if (imcOffset == 0)
+            {
+                throw new InvalidDataException($"Could not find offset for {path}");
+            }
+
+            var data = new List<byte>();
+
+            // 4 Header bytes.
+            data.AddRange(BitConverter.GetBytes(info.SubsetCount));
+            data.AddRange(BitConverter.GetBytes((short) info.TypeIdentifier));
+
+            // The rest of this is easy, it's literally just post all the sets in order.
+            foreach(var entry in info.DefaultSubset)
+            {
+                data.AddRange(entry.GetBytes());
+            }
+
+            foreach(var set in info.SubsetList)
+            {
+                foreach (var entry in set)
+                {
+                    data.AddRange(entry.GetBytes());
+                }
+            }
+
+            // That's it.
+
+            itemName ??= Path.GetFileName(path);
+            category ??= "Meta";
+            source ??= "Internal";
+
+            await dat.ImportType2Data(data.ToArray(), itemName, path, category, source);
         }
 
         /// <summary>
@@ -320,12 +407,41 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if(_slotOffsetDictionary.ContainsKey(slot))
+                if(_slotOffsetDictionary.ContainsKey(slot) && _slotOffsetDictionary[slot] < subset.Count)
                 {
                     idx = _slotOffsetDictionary[slot];
                 }
 
                 return subset[idx];
+            }
+
+            public void SetEntry(XivImc info, int subsetID = -1, string slot = "")
+            {
+                // Variant IDs are 1 based, not 0 based.
+                var index = subsetID - 1;
+
+                // Invalid Index, return default.
+                if (index >= SubsetCount || index < 0)
+                {
+                    index = -1;
+                }
+
+                // Test for getting default set.
+                var subset = DefaultSubset;
+                if (index >= 0)
+                {
+                    subset = SubsetList[index];
+                }
+
+                // Get which offset the slot uses.
+                var idx = 0;
+                if (_slotOffsetDictionary.ContainsKey(slot) && _slotOffsetDictionary[slot] < subset.Count)
+                {
+                    idx = _slotOffsetDictionary[slot];
+                }
+
+                // Assign info.
+                subset[idx] = info;
             }
         }
 
