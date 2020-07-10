@@ -288,7 +288,7 @@ namespace xivModdingFramework.Items.Categories
             {
                 407, 408, 409, 410, 411, 412, 413,
                 414, 415, 416, 417, 418, 537, 618,
-                1027, 1028, 1430, 1930, 2023
+                1027, 1028, 1430, 1930, 2023, 2619
             };
 
             // A dictionary consisting of <model ID, Pet Name>
@@ -304,6 +304,7 @@ namespace xivModdingFramework.Items.Categories
                 {7007, XivStrings.Sephirot_Egi},
                 {7102, XivStrings.Bahamut_Egi},
                 {7103, XivStrings.Placeholder_Egi},
+                {7105, XivStrings.Seraph}
             };
 
             var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);

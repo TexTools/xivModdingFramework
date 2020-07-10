@@ -882,4 +882,7 @@
   <data name="Dual_Wield" xml:space="preserve">
     <value>Dual Wield</value>
   </data>
+  <data name="Seraph" xml:space="preserve">
+    <value>Seraph</value>
+  </data>
 </root>
