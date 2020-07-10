@@ -336,6 +336,9 @@
   <data name="Selene" xml:space="preserve">
     <value>フェアリー・セレネ</value>
   </data>
+  <data name="Seraph" xml:space="preserve">
+    <value>セラフィム</value>
+  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>ソウルクリスタル</value>
   </data>

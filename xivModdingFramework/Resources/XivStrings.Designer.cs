@@ -19,7 +19,7 @@ namespace xivModdingFramework.Resources {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class XivStrings {
@@ -2046,6 +2046,15 @@ namespace xivModdingFramework.Resources {
         internal static string Sephirot_Egi {
             get {
                 return ResourceManager.GetString("Sephirot_Egi", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Seraph.
+        /// </summary>
+        internal static string Seraph {
+            get {
+                return ResourceManager.GetString("Seraph", resourceCulture);
             }
         }
         
