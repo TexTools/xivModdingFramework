@@ -185,8 +185,11 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var mtrlData = await GetMtrlData(mtrlOffset, mtrlStringPath, dxVersion);
-            mtrlData.hasVfx = true;
 
+            if (mtrlPath.HasVfx)
+            {
+                mtrlData.hasVfx = true;
+            }          
 
             return mtrlData;
         }
