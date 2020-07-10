@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core.Model;
+using HelixToolkit.SharpDX.Core.Utilities.ImagePacker;
 using Newtonsoft.Json;
 using SharpDX;
 using System;
@@ -60,14 +62,6 @@ namespace xivModdingFramework.Models.FileTypes
             _pluginTarget = pluginTarget;
             _appVersion = appVersion;
         }
-
-        /// <summary>
-        /// This value represents the amount to multiply the model data
-        /// </summary>
-        /// <remarks>
-        /// It was determined that the values being used were too small so they are multiplied by 10 (default)
-        /// </remarks>
-        private const int ModelMultiplier = 10;
 
         /// <summary>
         /// Creates a Collada DAE file for a given model
@@ -247,7 +241,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="daeLocation">The location of the dae file</param>
         /// <param name="advImportSettings">The advanced Import settings</param>
         /// <returns>A dictionary containing (Mesh Number, (Mesh Part Number, Collada Data)</returns>
-        public Dictionary<int, Dictionary<int, ColladaData>> ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation, Dictionary<string, ModelImportSettings> advImportSettings = null)
+        public TTModel ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation, Dictionary<string, ModelImportSettings> advImportSettings = null)
         {
             var isHousingItem = xivMdl.MdlPath.Folder.Contains("bgcommon/hou/");
 
@@ -257,6 +251,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             // A dictionary containing <Mesh Number, <Mesh Part Number, Collada Data>
             var meshPartDataDictionary = new SortedDictionary<int, SortedDictionary<int, ColladaData>>();
+
+            TTModel ttModel = new TTModel();
 
             var meshCount = xivMdl.LoDList[0].MeshCount;
 
@@ -655,28 +651,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     // Indices
                                     if (reader.Name.Equals("p"))
                                     {
-                                        // This was done to reduce the memory footprint because 3ds exports can increase the number of vertex colors by a large amount.
-                                        // Disabled as of 2.0.9 since it seems to be causing issues.
-
-                                        /*
-                                        //If extra values were added, remove them to match the position or texture coordinates count, whichever is larger
-
-                                        var matchCount = cData.TextureCoordinates0.Count > cData.Positions.Count
-                                            ? cData.TextureCoordinates0.Count
-                                            : cData.Positions.Count;
-
-                                        if (cData.VertexColors.Count > matchCount)
-                                        {
-                                            var extraData = cData.VertexColors.Count - matchCount;
-                                            cData.VertexColors.RemoveRange(matchCount, extraData);
-                                        }
-
-                                        if (cData.VertexAlphas.Count > matchCount)
-                                        {
-                                            var extraData = cData.VertexAlphas.Count - matchCount;
-                                            cData.VertexAlphas.RemoveRange(matchCount, extraData);
-                                        }
-                                        */
 
                                         cData.Indices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
 
@@ -928,7 +902,156 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            return meshPartDataDictionary.ToDictionary(x => x.Key, x => x.Value.ToDictionary(y => y.Key, y => y.Value));
+            var dict = meshPartDataDictionary.ToDictionary(x => x.Key, x => x.Value.ToDictionary(y => y.Key, y => y.Value));
+
+            try
+            {
+                foreach (var kv in meshPartDataDictionary)
+                {
+                    var group = new TTMeshGroup();
+                    ttModel.MeshGroups.Add(group);
+                    var parts = group.Parts;
+
+                    var meshNum = kv.Key;
+                    foreach (var kv2 in kv.Value)
+                    {
+                        var partNum = kv2.Key;
+                        var part = new TTMeshPart();
+                        parts.Add(part);
+                        var cData = kv2.Value;
+
+                        // Here we need to rip through the old ColladaData format,
+                        // And rebuild the Vertex and Index lists into SE standard style.
+                        // That means each vertex is fully qualified with each datapoint.
+
+                        // The cleanest way to do this is to break down the list of triangle indicies
+                        // into their own completely qualified datapoints, then rebuild then vertex list
+                        // by effectively welding together identical indices.
+
+                        var numVerts = cData.Positions.Count / 3;
+                        var numIndices = cData.PositionIndices.Count;
+
+                        // Buuuut for now, just shatter the entire mesh and rebuild the list.
+                        // TODO - Weld the list down later.
+
+                        // Keep us from having to constantly resize this.
+                        part.Vertices.Capacity = numIndices;
+                        part.TriangleIndices.Capacity = numIndices;
+
+                        // Build the offset list for sanity to avoid expensive recalculations.
+                        var weightEntryOffsets = new List<int>();
+                        var offset = 0;
+                        for (int i = 0; i < numVerts; i++)
+                        {
+                            weightEntryOffsets.Add(offset);
+                            offset += (cData.Vcounts[i]) * 2;
+                        }
+                        
+
+                        // Build the vertex list.
+                        for (int i = 0; i < numIndices; i++)
+                        {
+
+                            TTVertex vert = new TTVertex();
+
+                            var start = (cData.PositionIndices[i]) * 3;
+                            vert.Position = new Vector3(cData.Positions[start], cData.Positions[start + 1], cData.Positions[start + 2]);
+
+                            // Make sure each data point actually exists, or use default.
+                            if (cData.NormalIndices.Count > i)
+                            {
+                                start = (cData.NormalIndices[i]) * 3;
+                                vert.Normal = new Vector3(cData.Normals[start], cData.Normals[start + 1], cData.Normals[start + 2]);
+                            }
+
+                            byte r = 255;
+                            byte g = 255;
+                            byte b = 255;
+                            byte a = 255;
+
+                            // Make sure each data point actually exists, or use default.
+                            if (cData.VertexColorIndices.Count > i)
+                            {
+                                start = (cData.VertexColorIndices[i]) * 3;
+                                r = (byte)(Math.Round(cData.VertexColors[start] * 255));
+                                g = (byte)(Math.Round(cData.VertexColors[start + 1] * 255));
+                                b = (byte)(Math.Round(cData.VertexColors[start + 2] * 255));
+                            }
+
+
+                            // Make sure each data point actually exists, or use default.
+                            if (cData.TextureCoordinate0Indices.Count > i)
+                            {
+                                start = (cData.TextureCoordinate0Indices[i]) * textureCoordinateStride;
+                                vert.UV1 = new Vector2(cData.TextureCoordinates0[start], cData.TextureCoordinates0[start + 1]);
+                            }
+
+                            // Make sure each data point actually exists, or use default.
+                            if (cData.TextureCoordinate1Indices.Count > i)
+                            {
+                                start = (cData.TextureCoordinate1Indices[i]) * textureCoordinateStride;
+                                vert.UV2 = new Vector2(cData.TextureCoordinates1[start], cData.TextureCoordinates1[start + 1]);
+                            }
+
+
+                            // Make sure each data point actually exists, or use default.
+                            if (cData.VertexAlphaIndices.Count > i)
+                            {
+                                start = (cData.VertexAlphaIndices[i]) * textureCoordinateStride;
+                                a = (byte)(Math.Round(cData.VertexAlphas[start] * 255));
+                            }
+                            vert.VertexColor = new byte[] { r, g, b, a };
+
+                            // Weights in DAE files are extremely annoying to manipulate, but here goes.
+                            var vertexId = cData.PositionIndices[i];
+                            var weightCount = cData.Vcounts[vertexId];
+                            for (var wi = 0; wi < weightCount; wi++)
+                            {
+                                if (wi > 3)
+                                {
+                                    // FFXIV only supports up to 4 bones per vertex.
+                                    break;
+                                }
+
+                                start = weightEntryOffsets[vertexId] + (wi * 2);
+
+                                // The Weight Indexes are listed as [JointId WeightId] in pairs.
+                                var jointId = cData.BoneIndices[start];
+                                var weightId = cData.BoneIndices[start + 1];
+
+                                // Get the original name and weight.
+                                var boneName = cData.BoneNumDictionary.First(x => x.Value == jointId).Key;
+                                var weight = cData.BoneWeights[weightId];
+
+                                if(ttModel.Bones.IndexOf(boneName) < 0)
+                                {
+                                    ttModel.Bones.Add(boneName);
+                                }
+
+                                // Convert them to the new id and byte format.
+                                byte newBoneId = (byte)ttModel.Bones.IndexOf(boneName);
+                                byte xivWeight = (byte)(Math.Round(weight * 255));
+
+                                // Save them.
+                                vert.BoneIds[wi] = newBoneId;
+                                vert.Weights[wi] = xivWeight;
+                            }
+                            // Save the new fully qualified vertex, and assign the tri index to point to it.
+                            part.Vertices.Add(vert);
+                            part.TriangleIndices.Add(part.Vertices.Count - 1);
+                        }
+                    }
+                }
+            } catch(Exception ex)
+            {
+                // Convenient throw to breakpoint on when debugging.
+                throw ex;
+            }
+
+            // Calculate the Tangents, since we don't pull them in from the DAE files.
+            TTModel.CalculateTangents(ttModel);
+
+            return ttModel;
         }
 
         /// <summary>
@@ -1653,7 +1776,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     foreach (var v in positions)
                     {
-                        xmlWriter.WriteString((v.X * ModelMultiplier).ToString() + " " + (v.Y * ModelMultiplier).ToString() + " " + (v.Z * ModelMultiplier).ToString() + " ");
+                        xmlWriter.WriteString((v.X * Constants.ModelMultiplier).ToString() + " " + (v.Y * Constants.ModelMultiplier).ToString() + " " + (v.Z * Constants.ModelMultiplier).ToString() + " ");
                     }
 
                     xmlWriter.WriteEndElement();
@@ -2913,10 +3036,10 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var matrix = new Matrix(skelDict[modelData.PathData.BoneList[m]].InversePoseMatrix);
 
-                            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * ModelMultiplier) + " ");
-                            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * ModelMultiplier) + " ");
-                            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * ModelMultiplier) + " ");
-                            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * ModelMultiplier) + " ");
+                            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Constants.ModelMultiplier) + " ");
+                            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Constants.ModelMultiplier) + " ");
+                            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * Constants.ModelMultiplier) + " ");
+                            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * Constants.ModelMultiplier) + " ");
                         }
                         catch
                         {
@@ -3516,10 +3639,10 @@ namespace xivModdingFramework.Models.FileTypes
 
             Matrix matrix = new Matrix(boneDictionary[skeleton.BoneName].PoseMatrix);
 
-            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * Constants.ModelMultiplier) + " ");
 
             xmlWriter.WriteEndElement();
             //</matrix>

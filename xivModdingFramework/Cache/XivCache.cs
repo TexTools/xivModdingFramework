@@ -23,7 +23,7 @@ namespace xivModdingFramework.Cache
         private DirectoryInfo _dbPath;
         private static readonly Version CacheVersion = new Version("0.0.0.25");
         private const string dbFileName = "mod_cache.db";
-        private const string creationScript = "CreateDB.sql";
+        private const string creationScript = "CreateCacheDB.sql";
         private string _connectionString { get
             {
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
@@ -814,6 +814,11 @@ namespace xivModdingFramework.Cache
             return val?.ToString();
         }
 
+        private async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
+        {
+            return await BuildListFromTable<T>(_connectionString, table, where, func);
+        }
+
         /// <summary>
         /// Creates a list from the data entries in a cache table, using the given where clause and predicate.
         /// </summary>
@@ -822,10 +827,10 @@ namespace xivModdingFramework.Cache
         /// <param name="where"></param>
         /// <param name="func"></param>
         /// <returns></returns>
-        private async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
+        public static async Task<List<T>> BuildListFromTable<T>(string connectionString, string table, WhereClause where, Func<CacheReader, Task<T>> func)
         {
             List<T> list = new List<T>();
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(connectionString))
             {
                 db.Open();
                 // Check how large the result set will be so we're not constantly
@@ -886,7 +891,7 @@ namespace xivModdingFramework.Cache
         /// A [WhereClause] with any [Inner] entries is considered
         /// a parenthetical group and has its own Column/Value/Comparer ignored.
         /// </summary>
-        private class WhereClause
+        public class WhereClause
         {
             public enum ComparisonType
             {
@@ -1018,7 +1023,7 @@ namespace xivModdingFramework.Cache
         /// ensures the underlying reader is properly closed and destroyed to help
         /// avoid lingering file handles.
         /// </summary>
-        private class CacheReader : IDisposable
+        public class CacheReader : IDisposable
         {
             private SQLiteDataReader _reader;
             private Dictionary<string, int> _headers;
@@ -1056,6 +1061,24 @@ namespace xivModdingFramework.Cache
                 {
                     _headers.Add(_reader.GetName(idx), idx);
                 }
+            }
+
+            public byte GetByte(string fieldName)
+            {
+                if (_reader[_headers[fieldName]].GetType() == NullType)
+                {
+                    return 0;
+                }
+                return _reader.GetByte(_headers[fieldName]);
+            }
+
+            public float GetFloat(string fieldName)
+            {
+                if (_reader[_headers[fieldName]].GetType() == NullType)
+                {
+                    return 0f;
+                }
+                return _reader.GetFloat(_headers[fieldName]);
             }
 
             public int GetInt32(string fieldName)

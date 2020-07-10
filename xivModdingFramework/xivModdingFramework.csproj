@@ -87,7 +87,7 @@
     <None Update="Resources\DefaultTextures\Specular.dds">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Resources\SQL\CreateDB.sql">
+    <None Update="Resources\SQL\CreateCacheDB.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
