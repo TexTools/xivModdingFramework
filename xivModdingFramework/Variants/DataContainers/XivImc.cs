@@ -31,7 +31,12 @@ namespace xivModdingFramework.Variants.DataContainers
         /// <summary>
         /// The Material Set / Variant #
         /// </summary>
-        public ushort Variant { get; set; }
+        public byte Variant { get; set; }
+
+        /// <summary>
+        /// Unknown byte next to the Variant
+        /// </summary>
+        public byte Unknown { get; set; }
 
         /// <summary>
         /// The IMC mask data

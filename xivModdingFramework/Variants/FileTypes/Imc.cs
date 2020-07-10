@@ -127,28 +127,32 @@ namespace xivModdingFramework.Variants.FileTypes
                     if (imcData.TypeIdentifier == ImcType.NonSet)
                     {
                         // This type uses the first short for both Variant and VFX.
-                        var variantAndVfx = br.ReadUInt16();
-                        var mask = br.ReadUInt16();
-                        var alwaysZero = br.ReadUInt16();
+                        byte variant = br.ReadByte();
+                        byte unknown = br.ReadByte();
+                        ushort mask = br.ReadUInt16();
+                        ushort alwaysZero = br.ReadUInt16();
 
                         imcData.DefaultSubset.Add(new XivImc
                         {
-                            Variant = variantAndVfx,
+                            Variant = variant,
+                            Unknown = unknown,
                             Mask = mask,
-                            Vfx = variantAndVfx
+                            Vfx = variant
                         });
 
                         for (var i = 0; i < subsetCount; i++)
                         {
-                            variantAndVfx = br.ReadUInt16();
+                            variant = br.ReadByte();
+                            unknown = br.ReadByte();
                             mask = br.ReadUInt16();
                             alwaysZero = br.ReadUInt16();
 
                             var newEntry = new XivImc
                             {
-                                Variant = variantAndVfx,
+                                Variant = variant,
+                                Unknown = unknown,
                                 Mask = mask,
-                                Vfx = variantAndVfx
+                                Vfx = variant
                             };
                             var subset = new List<XivImc>() { newEntry };
                         }
@@ -159,15 +163,15 @@ namespace xivModdingFramework.Variants.FileTypes
                         imcData.DefaultSubset = new List<XivImc>()
                         {
                             new XivImc
-                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             new XivImc
-                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             new XivImc
-                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             new XivImc
-                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             new XivImc
-                                {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                         };
 
                         for (var i = 0; i < subsetCount; i++)
@@ -176,17 +180,16 @@ namespace xivModdingFramework.Variants.FileTypes
                             var imcGear = new List<XivImc>()
                             {
                                 new XivImc
-                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 new XivImc
-                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 new XivImc
-                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 new XivImc
-                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                                 new XivImc
-                                    {Variant = br.ReadUInt16(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
                             };
-
                             imcData.SubsetList.Add(imcGear);
                         }
                     } else
