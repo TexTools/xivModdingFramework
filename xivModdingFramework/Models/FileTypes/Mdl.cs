@@ -38,6 +38,10 @@ using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
 using System.Diagnostics;
 using xivModdingFramework.Items.Categories;
 using HelixToolkit.SharpDX.Core.Core;
+using System.Transactions;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using SharpDX.Win32;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -1381,6 +1385,48 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
+        /// Event fired whenever the ImportModel function has non-critical updates.
+        /// </summary>
+        public event EventHandler<ModelImportUpdateEventArgs> OnImportUpdate;
+
+
+        /// <summary>
+        /// Basic container for update event notifications.
+        /// </summary>
+        public class ModelImportUpdateEventArgs : EventArgs
+        {
+            bool IsWarning = false;
+            public string Message = "";
+        };
+
+
+        /// <summary>
+        /// Retreieves the available list of file extensions the framework has importers available for.
+        /// </summary>
+        /// <returns></returns>
+        public List<string> GetAvailableImporters()
+        {
+            const string importerPath = "importers/";
+            var ret = new List<string>();
+            ret.Add("dae");
+
+            var directories = Directory.GetDirectories(importerPath);
+            foreach(var d in directories)
+            {
+                ret.Add((d.Replace(importerPath, "")).ToLower());
+            }
+            return ret;
+        }
+
+        // Just a default no-op function if we don't care about warning messages.
+        private void NoOp(bool isWarning, string message)
+        {
+            //No-Op.
+        }
+
+
+
+        /// <summary>
         /// Import a given model
         /// </summary>
         /// <param name="item">The current item being imported</param>
@@ -1388,70 +1434,125 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="fileLocation">The location of the dae file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
-        ///     Takes in the populated TTModel and any warnings generated in the process.
+        ///     Takes in the populated TTModel.
         ///     Should return a boolean indicating whether the process should continue or cancel (false to cancel)
+        /// </param>
+        /// <param name="loggingFuction">
+        /// Function to call when the importer receives a new log line.
+        /// Takes in [bool isWarning, string message].
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task<Dictionary<string, string>> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo fileLocation, string source = "Unknown", Func<TTModel, List<string>, Task<bool>> intermediaryFunction = null, bool rawDataOnly = false)
+        public async Task ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo fileLocation, string source = "Unknown", Func<TTModel, Task<bool>> intermediaryFunction = null, Action<bool, string> loggingFuction = null, bool rawDataOnly = false)
         {
-            if (!File.Exists(fileLocation.FullName))
+            // Wrapping this in an await ensures we're run asynchronously on a new thread.
+            await Task.Run(async () =>
             {
-                throw new IOException("The file provided for import does not exist");
-            }
-
-            if (!Path.GetExtension(fileLocation.FullName).ToLower().Equals(".dae"))
-            {
-                throw new FormatException("The file provided is not a collada .dae file");
-            }
-
-            var isHousingItem = item.PrimaryCategory.Equals(XivStrings.Housing);
-
-            var meshShapeDictionary = new Dictionary<int, int>();
-
-            // A dictionary containing any warnings raised by the import in the format <Warning Title, Warning Message>
-            var warningsDictionary = new Dictionary<string, string>();
-            var colorWarnings = new List<int>();
-            var alphaWarnings = new List<int>();
-
-            var dae = new Dae(_gameDirectory, _dataFile);
-
-            var ttModel = dae.ReadColladaFile(fileLocation);
-            List<string> warnings;
-            ttModel = TTModel.LoadFromFile("D:\\dev\\TT_FBX\\Debug\\result.db", out warnings);
-
-            // Copy in the original attribute/material data.
-            ttModel.MergeData(xivMdl);
-
-            // Call the user function, if one was provided.
-            if(intermediaryFunction != null)
-            {
-                bool cont = await intermediaryFunction(ttModel, warnings);
-                if(!cont)
+                if (!File.Exists(fileLocation.FullName))
                 {
-                    // This feels really dumb to cancel this via a throw, but we have no other method to do so...?
-                    throw new NotSupportedException("Intermediary Function Cancelled Import");
+                    throw new IOException("The file provided for import does not exist");
                 }
-            }
+
+                loggingFuction = loggingFuction == null ? NoOp : loggingFuction;
+                loggingFuction(false, "Starting Import of file: " + fileLocation.FullName);
+
+                var suffix = fileLocation.Extension.ToLower();
+                suffix = suffix.Substring(1);
+                loggingFuction(false, "Starting " + suffix + " importer...");
+                TTModel ttModel;
+
+                if (suffix != "dae") {
+                    var proc = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = Directory.GetCurrentDirectory() + "\\importers\\" + suffix + "\\importer.exe",
+                            Arguments = fileLocation.FullName,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            WorkingDirectory = Directory.GetCurrentDirectory() + "\\importers\\" + suffix + "\\",
+                            CreateNoWindow = true
+                        }
+                    };
+
+                    // Pipe the process output to our logging function.
+                    proc.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
+                    {
+                        loggingFuction(false, e.Data); ;
+                    };
+
+                    // Pipe the process output to our logging function.
+                    proc.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
+                    {
+                        loggingFuction(true, e.Data);
+                    };
+
+                    proc.Start();
+                    proc.BeginOutputReadLine();
+                    proc.BeginErrorReadLine();
+                    proc.WaitForExit();
+                    if (proc.ExitCode != 0)
+                    {
+                        loggingFuction(true, "Importer exited with error code: " + proc.ExitCode.ToString());
+                        throw (new Exception("Importer exited with error code: " + proc.ExitCode.ToString()));
+                    }
+                    loggingFuction(false, "Importer reported job successful.");
+                } else
+                {
+                    var dae = new Dae(_gameDirectory, _dataFile);
+                    // Dae handling is a special snowflake.
+                    loggingFuction(false, "Loading DAE file...");
+                    ttModel = dae.ReadColladaFile(fileLocation, loggingFuction);
+                    loggingFuction(false, "DAE File loaded successfully.");
+                }
 
 
-            var bytes = await MakeNewMdlFile(ttModel, xivMdl);
-            if(rawDataOnly)
-            {
-                _rawData = bytes;
-                return warningsDictionary;
-            }
+                List<string> warnings;
+                ttModel = TTModel.LoadFromFile("D:\\dev\\TT_FBX\\Debug\\result.db", loggingFuction);
 
-            var modding = new Modding(_gameDirectory);
-            var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
-            var modEntry = await modding.TryGetModEntry(mdlPath);
+                loggingFuction(false, "Merging in existing Attribute & Material Data...");
+                // Copy in the original attribute/material data.
+                ttModel.MergeData(xivMdl);
 
-            var dat = new Dat(_gameDirectory);
+                // Call the user function, if one was provided.
+                if (intermediaryFunction != null)
+                {
+                    loggingFuction(false, "Waiting on user...");
+                    bool cont = await intermediaryFunction(ttModel);
+                    if (!cont)
+                    {
+                        loggingFuction(false, "User cancelled import process.");
+                        // This feels really dumb to cancel this via a throw, but we have no other method to do so...?
+                        throw new Exception("cancel");
+                    }
+                }
 
-            var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
+                loggingFuction(false, "Creating MDL file from processed data...");
+                var bytes = await MakeNewMdlFile(ttModel, xivMdl);
+                if (rawDataOnly)
+                {
+                    _rawData = bytes;
+                    return;
+                }
 
-            await dat.WriteToDat(bytes.ToList(), modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
-            return warningsDictionary;
+                var modding = new Modding(_gameDirectory);
+                var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
+                var modEntry = await modding.TryGetModEntry(mdlPath);
+
+                var dat = new Dat(_gameDirectory);
+
+                var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
+
+                if (!rawDataOnly)
+                {
+                    loggingFuction(false, "Writing MDL File to FFXIV File System...");
+                    await dat.WriteToDat(bytes.ToList(), modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
+                }
+
+                loggingFuction(false, "Job done!");
+                return;
+            });
         }
 
 

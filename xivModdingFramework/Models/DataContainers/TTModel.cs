@@ -692,8 +692,8 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static TTModel LoadFromFile(string filePath, out List<string> warnings) {
-            warnings = new List<string>();
+        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFuction)
+        {
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             TTModel model = new TTModel();

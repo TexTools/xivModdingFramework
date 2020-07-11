@@ -240,7 +240,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivMdl">The XivMdl data</param>
         /// <param name="daeLocation">The location of the dae file</param>
         /// <returns>A dictionary containing (Mesh Number, (Mesh Part Number, Collada Data)</returns>
-        public TTModel ReadColladaFile(DirectoryInfo daeLocation)
+        public TTModel ReadColladaFile(DirectoryInfo daeLocation, Action<bool, string> loggingFuction)
         {
             var boneJointDict = new Dictionary<string, string>();
             var boneStringList = new List<string>();
@@ -665,6 +665,11 @@ namespace xivModdingFramework.Models.FileTypes
                             cData.TextureCoordinateStride = textureCoordinateStride;
                             cData.VertexColorStride = vertexColorStride;
 
+                            if(!meshPartDataDictionary.ContainsKey(meshNum))
+                            {
+                                meshPartDataDictionary.Add(meshNum, new SortedDictionary<int, ColladaData>());
+                            }
+
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
@@ -678,11 +683,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     throw new Exception($"Could not read mesh number of mesh: {atr}\n\n" +
                                                     $"Please make sure your mesh name ends with the mesh/part number.");
-                                }                                
-
-                                if (!meshPartDataDictionary.ContainsKey(meshNum))
-                                {
-                                    throw new Exception($"Extra meshes detected, please use Advanced Import.");
                                 }
 
                                 if (meshPartDataDictionary[meshNum].ContainsKey(meshPartNum))
@@ -694,10 +694,6 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
-                                if (!meshPartDataDictionary.ContainsKey(meshNum))
-                                {
-                                    throw new Exception($"Extra meshes detected, please use Advanced Import.");
-                                }
 
                                 if (meshPartDataDictionary[meshNum].ContainsKey(0))
                                 {

@@ -128,6 +128,47 @@ namespace xivModdingFramework.Helpers
             
             return path;
         }
+        public static XivRace GetRaceFromPath(string path)
+        {
+
+            var xivRace = XivRace.All_Races;
+
+            if (path.Contains("ui/") || path.Contains(".avfx"))
+            {
+                xivRace = XivRace.All_Races;
+            }
+            else if (path.Contains("monster"))
+            {
+                xivRace = XivRace.Monster;
+            }
+            else if (path.Contains(".tex") || path.Contains(".mdl") || path.Contains(".atex"))
+            {
+                if (path.Contains("accessory") || path.Contains("weapon") || path.Contains("/common/"))
+                {
+                    xivRace = XivRace.All_Races;
+                }
+                else
+                {
+                    if (path.Contains("demihuman"))
+                    {
+                        xivRace = XivRace.DemiHuman;
+                    }
+                    else if (path.Contains("/v"))
+                    {
+                        var raceCode = path.Substring(path.IndexOf("_c") + 2, 4);
+                        xivRace = XivRaces.GetXivRace(raceCode);
+                    }
+                    else
+                    {
+                        var raceCode = path.Substring(path.IndexOf("/c") + 2, 4);
+                        xivRace = XivRaces.GetXivRace(raceCode);
+                    }
+                }
+
+            }
+
+            return xivRace;
+        }
     
         /// <summary>
         /// Replaces the bytes in a given byte array with the bytes from another array, starting at the given index of the original array.
