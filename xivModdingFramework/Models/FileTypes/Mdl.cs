@@ -56,7 +56,18 @@ namespace xivModdingFramework.Models.FileTypes
             _dataFile = dataFile;
         }
 
-        public byte[] MDLRawData { get; set; }
+        private byte[] _rawData;
+
+        /// <summary>
+        /// Retrieves and clears the RawData value.
+        /// </summary>
+        /// <returns></returns>
+        public byte[] GetRawData()
+        {
+            var ret = _rawData;
+            _rawData = null;
+            return ret;
+        }
 
 
         /// <summary>
@@ -528,7 +539,7 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 IndexOffset     = br.ReadInt32(),
                                 IndexCount      = br.ReadInt32(),
-                                AttributeIndex  = br.ReadInt32(),
+                                AttributeBitmask  = br.ReadUInt32(),
                                 BoneStartOffset = br.ReadInt16(),
                                 BoneCount       = br.ReadInt16()
                             };
@@ -571,13 +582,13 @@ namespace xivModdingFramework.Models.FileTypes
                     boneDataBlock.BonePathOffsetList.Add(br.ReadInt32());
                 }
 
-                xivMdl.BonDataBlock = boneDataBlock;
+                xivMdl.BoneDataBlock = boneDataBlock;
 
                 // Bone Lists
-                xivMdl.BoneIndexMeshList = new List<BoneIndexMesh>();
+                xivMdl.MeshBoneSets = new List<BoneSet>();
                 for (var i = 0; i < xivMdl.ModelData.BoneListCount; i++)
                 {
-                    var boneIndexMesh = new BoneIndexMesh
+                    var boneIndexMesh = new BoneSet
                     {
                         BoneIndices = new List<short>(64)
                     };
@@ -589,7 +600,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     boneIndexMesh.BoneIndexCount = br.ReadInt32();
 
-                    xivMdl.BoneIndexMeshList.Add(boneIndexMesh);
+                    xivMdl.MeshBoneSets.Add(boneIndexMesh);
                 }
 
                 var shapeDataLists = new ShapeData
@@ -667,18 +678,18 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.HasShapeData = xivMdl.ModelData.ShapeCount > 0;
 
                 // Bone index for Parts
-                var boneIndexPart = new BoneIndexPart
+                var partBoneSet = new BoneSet
                 {
                     BoneIndexCount = br.ReadInt32(),
-                    BoneIndexList  = new List<short>()
+                    BoneIndices  = new List<short>()
                 };
 
-                for (var i = 0; i < boneIndexPart.BoneIndexCount / 2; i++)
+                for (var i = 0; i < partBoneSet.BoneIndexCount / 2; i++)
                 {
-                    boneIndexPart.BoneIndexList.Add(br.ReadInt16());
+                    partBoneSet.BoneIndices.Add(br.ReadInt16());
                 }
 
-                xivMdl.BoneIndexPart = boneIndexPart;
+                xivMdl.PartBoneSets = partBoneSet;
 
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
@@ -1374,19 +1385,22 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="item">The current item being imported</param>
         /// <param name="xivMdl">The model data for the given item</param>
-        /// <param name="daeLocation">The location of the dae file to import</param>
-        /// <param name="advImportSettings">The advanced import settings if any</param>
+        /// <param name="fileLocation">The location of the dae file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
+        /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
+        ///     Takes in the populated TTModel and any warnings generated in the process.
+        ///     Should return a boolean indicating whether the process should continue or cancel (false to cancel)
+        /// </param>
+        /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task<Dictionary<string, string>> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo daeLocation,
-            Dictionary<string, ModelImportSettings> advImportSettings, string source, string pluginTarget, bool rawDataOnly = false)
+        public async Task<Dictionary<string, string>> ImportModel(IItemModel item, XivMdl xivMdl, DirectoryInfo fileLocation, string source = "Unknown", Func<TTModel, List<string>, Task<bool>> intermediaryFunction = null, bool rawDataOnly = false)
         {
-            if (!File.Exists(daeLocation.FullName))
+            if (!File.Exists(fileLocation.FullName))
             {
                 throw new IOException("The file provided for import does not exist");
             }
 
-            if (!Path.GetExtension(daeLocation.FullName).ToLower().Equals(".dae"))
+            if (!Path.GetExtension(fileLocation.FullName).ToLower().Equals(".dae"))
             {
                 throw new FormatException("The file provided is not a collada .dae file");
             }
@@ -1400,17 +1414,43 @@ namespace xivModdingFramework.Models.FileTypes
             var colorWarnings = new List<int>();
             var alphaWarnings = new List<int>();
 
-            var dae = new Dae(_gameDirectory, _dataFile, pluginTarget);
+            var dae = new Dae(_gameDirectory, _dataFile);
 
-            // We only use the highest quality LoD for importing which is LoD 0
-            var lod0 = xivMdl.LoDList[0];
-
-            var ttModel = dae.ReadColladaFile(xivMdl, daeLocation, advImportSettings);
+            var ttModel = dae.ReadColladaFile(fileLocation);
             List<string> warnings;
-            //ttModel = TTModel.LoadFromFile("D:\\dev\\TT_FBX\\Debug\\result.db", out warnings);
+            ttModel = TTModel.LoadFromFile("D:\\dev\\TT_FBX\\Debug\\result.db", out warnings);
 
-            await MakeNewMdlFile(ttModel, item, xivMdl, advImportSettings, source, rawDataOnly);
-            
+            // Copy in the original attribute/material data.
+            ttModel.MergeData(xivMdl);
+
+            // Call the user function, if one was provided.
+            if(intermediaryFunction != null)
+            {
+                bool cont = await intermediaryFunction(ttModel, warnings);
+                if(!cont)
+                {
+                    // This feels really dumb to cancel this via a throw, but we have no other method to do so...?
+                    throw new NotSupportedException("Intermediary Function Cancelled Import");
+                }
+            }
+
+
+            var bytes = await MakeNewMdlFile(ttModel, xivMdl);
+            if(rawDataOnly)
+            {
+                _rawData = bytes;
+                return warningsDictionary;
+            }
+
+            var modding = new Modding(_gameDirectory);
+            var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
+            var modEntry = await modding.TryGetModEntry(mdlPath);
+
+            var dat = new Dat(_gameDirectory);
+
+            var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
+
+            await dat.WriteToDat(bytes.ToList(), modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
             return warningsDictionary;
         }
 
@@ -1418,29 +1458,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Creates a new Mdl file from the given data
         /// </summary>
-        /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
-        /// <param name="item">The item the model belongs to</param>
-        /// <param name="xivMdl">The original model data</param>
-        /// <param name="importSettings">The import settings if any</param>
-        /// <param name="source">The source/application that is writing to the dat.</param>
-        private async Task MakeNewMdlFile(TTModel ttModel, IItemModel item, XivMdl xivMdl, 
-            Dictionary<string, ModelImportSettings> importSettings, string source, bool rawDataOnly)
+        /// <param name="ttModel">The ttModel to import</param>
+        /// <param name="ogMdl">The original model data, imported automatically if NULL</param>
+        private async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl)
         {
             try
             {
                 // Prep the model with any last-step changes.
                 TTModel.MakeImportReady(ttModel);
 
-                var modding = new Modding(_gameDirectory);
 
                 var isAlreadyModified = false;
                 var isAlreadyModified2 = false;
 
-                var itemType = ItemType.GetPrimaryItemType(item);
-
-                var mdlPath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
-
-                var modEntry = await modding.TryGetModEntry(mdlPath);
 
                 // Vertex Info
                 #region Vertex Info Block
@@ -1449,16 +1479,41 @@ namespace xivModdingFramework.Models.FileTypes
                 var vertexInfoDict = new Dictionary<int, Dictionary<VertexUsageType, VertexDataType>>();
 
                 var lodNum = 0;
-                foreach (var lod in xivMdl.LoDList)
+                foreach (var lod in ogMdl.LoDList)
                 {
                     var vdsDictionary = new Dictionary<VertexUsageType, VertexDataType>();
-                    foreach (var meshData in lod.MeshDataList)
+                    var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
+
+                    for (int meshNum = 0; meshNum < meshMax; meshNum++)
                     {
-                        var dataSize = 0;
-                        foreach (var vds in meshData.VertexDataStructList)
+                        // Test if we have both old and new data or not.
+                        var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
+                        var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
+
+                        // Identify correct # of parts.
+                        var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : ogGroup.MeshPartList.Count;
+
+                        // Totals for each group
+                        var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
+                        var newPartCount = ttMeshGroup == null ? 0 : ttMeshGroup.Parts.Count;
+
+                        List<VertexDataStruct> source;
+                        if (ogGroup == null)
                         {
+                            // New Group, copy data over.
+                            source = lod.MeshDataList[0].VertexDataStructList;
+                        } else
+                        {
+                            source = ogGroup.VertexDataStructList;
+                        }
+
+                        var dataSize = 0;
+                        foreach (var vds in source)
+                        {
+
                             // Padding
                             vertexInfoBlock.AddRange(new byte[4]);
+
 
                             var dataBlock = vds.DataBlock;
                             var dataOffset = vds.DataOffset;
@@ -1537,7 +1592,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                             }
 
-                            vertexInfoBlock.Add(vds.DataBlock);
+                            vertexInfoBlock.Add((byte)dataBlock);
                             vertexInfoBlock.Add((byte)dataOffset);
                             vertexInfoBlock.Add((byte)dataType);
                             vertexInfoBlock.Add((byte)dataUsage);
@@ -1568,107 +1623,6 @@ namespace xivModdingFramework.Models.FileTypes
                         vertexInfoBlock.AddRange(new byte[72]);
                     }
 
-                    // If advanced import data exists, and a mesh has been added for LoD0
-                    if (lodNum == 0)
-                    {
-                        if (ttModel.MeshGroups.Count > lod.MeshDataList.Count)
-                        {
-                            var addedMeshCount = ttModel.MeshGroups.Count - lod.MeshDataList.Count;
-
-                            for (var i = 0; i < addedMeshCount; i++)
-                            {
-                                var dataSize = 0;
-                                // We will copy the vertex data structure of the first mesh in the LoD, as all mesh data structures for a given LoD are the same
-                                foreach (var vds in lod.MeshDataList[0].VertexDataStructList)
-                                {
-                                    // Padding
-                                    vertexInfoBlock.AddRange(new byte[4]);
-
-                                    var dataBlock = vds.DataBlock;
-                                    var dataOffset = vds.DataOffset;
-                                    var dataType = vds.DataType;
-                                    var dataUsage = vds.DataUsage;
-
-                                    if (lodNum == 0)
-                                    {
-                                        // Change Normals to Float from its default of Half for greater accuracy
-                                        // This increases the data from 8 bytes to 12 bytes
-                                        if (dataUsage == VertexUsageType.Normal)
-                                        {
-                                            // If the data type is already Float3 (in the case of an already modified model)
-                                            // we skip it.
-                                            if (dataType != VertexDataType.Float3)
-                                            {
-                                                dataType = VertexDataType.Float3;
-                                            }
-                                            else
-                                            {
-                                                isAlreadyModified = true;
-                                            }
-                                        }
-
-                                        // Change Texture Coordinates to Float from its default of Half for greater accuracy
-                                        // This increases the data from 8 bytes to 16 bytes, or from 4 bytes to 8 bytes if it is a housing item
-                                        if (dataUsage == VertexUsageType.TextureCoordinate)
-                                        {
-                                            if (dataType == VertexDataType.Half2 || dataType == VertexDataType.Half4)
-                                            {
-                                                if (dataType == VertexDataType.Half2)
-                                                {
-                                                    dataType = VertexDataType.Float2;
-                                                }
-                                                else
-                                                {
-                                                    dataType = VertexDataType.Float4;
-                                                }
-                                            }
-                                            else
-                                            {
-                                                isAlreadyModified = true;
-                                            }
-                                        }
-
-                                        // We have to adjust each offset after the Normal value because its size changed
-                                        // Normal is always in data block 1 and the first so its offset is 0
-                                        // Note: Texture Coordinates are always last so there is no need to adjust for it
-                                        if (dataBlock == 1 && dataOffset > 0 && !isAlreadyModified)
-                                        {
-                                            dataOffset += 4;
-                                        }
-                                    }
-
-                                    vertexInfoBlock.Add(vds.DataBlock);
-                                    vertexInfoBlock.Add((byte)dataOffset);
-                                    vertexInfoBlock.Add((byte)dataType);
-                                    vertexInfoBlock.Add((byte)dataUsage);
-
-                                    if (!vdsDictionary.ContainsKey(dataUsage))
-                                    {
-                                        vdsDictionary.Add(dataUsage, dataType);
-                                    }
-
-                                    dataSize += 8;
-                                }
-
-                                // End flag
-                                vertexInfoBlock.AddRange(new byte[4]);
-                                vertexInfoBlock.Add(0xFF);
-                                vertexInfoBlock.AddRange(new byte[3]);
-
-                                dataSize += 8;
-
-                                if (dataSize < 64)
-                                {
-                                    var remaining = 64 - dataSize;
-
-                                    vertexInfoBlock.AddRange(new byte[remaining]);
-                                }
-
-                                // Padding between data
-                                vertexInfoBlock.AddRange(new byte[72]);
-                            }
-                        }
-                    }
 
                     vertexInfoDict.Add(lodNum, vdsDictionary);
 
@@ -1700,7 +1654,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var attributeOffsetList = new List<int>();
 
                 // If doing an advanced import, and paths were added/removed, this List has already been changed directly in the XivMdl
-                foreach (var atr in xivMdl.PathData.AttributeList)
+                foreach (var atr in ogMdl.PathData.AttributeList)
                 {
                     // Attribute offset in path data block
                     attributeOffsetList.Add(pathInfoBlock.Count - 8);
@@ -1717,6 +1671,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var boneOffsetList = new List<int>();
                 var boneStrings = new List<string>();
 
+                // Write the full model level list of bones.
                 foreach (var bone in ttModel.Bones)
                 {
                     // Bone offset in path data block
@@ -1736,7 +1691,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var materialOffsetList = new List<int>();
 
                 // When doing an advanced import, and paths were added, this List has already been changed directly in the XivMdl
-                foreach (var material in xivMdl.PathData.MaterialList)
+                foreach (var material in ogMdl.PathData.MaterialList)
                 {
                     // Material offset in path data block
                     materialOffsetList.Add(pathInfoBlock.Count - 8);
@@ -1752,7 +1707,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Shape paths
                 var shapeOffsetList = new List<int>();
 
-                foreach (var shape in xivMdl.PathData.ShapeList)
+                foreach (var shape in ogMdl.PathData.ShapeList)
                 {
                     // Shape offset in path data block
                     shapeOffsetList.Add(pathInfoBlock.Count - 8);
@@ -1766,7 +1721,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 // Extra paths
-                foreach (var extra in xivMdl.PathData.ExtraPathList)
+                foreach (var extra in ogMdl.PathData.ExtraPathList)
                 {
                     // Path converted to bytes
                     pathInfoBlock.AddRange(Encoding.UTF8.GetBytes(extra));
@@ -1789,9 +1744,9 @@ namespace xivModdingFramework.Models.FileTypes
                 IOUtil.ReplaceBytesAt(pathInfoBlock, BitConverter.GetBytes(newPathBlockSize), 4);
 
                 // Adjust the vertex data block offset to account for the size changes;
-                var oldPathBlockSize = xivMdl.PathData.PathBlockSize;
+                var oldPathBlockSize = ogMdl.PathData.PathBlockSize;
                 var pathSizeDiff = newPathBlockSize - oldPathBlockSize;
-                xivMdl.LoDList[0].VertexDataOffset += pathSizeDiff;
+                ogMdl.LoDList[0].VertexDataOffset += pathSizeDiff;
 
 
                 #endregion
@@ -1801,86 +1756,77 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var modelDataBlock = new List<byte>();
 
-                var modelData = xivMdl.ModelData;
+                var ogModelData = ogMdl.ModelData;
 
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown0));
-
-                var meshCount = modelData.MeshCount;
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown0));
+                
+                short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].ExtraMeshCount);
+                short higherLodMeshCount = (short)(ogMdl.LoDList[2].MeshSum - ogMdl.LoDList[0].MeshSum);
+                meshCount += higherLodMeshCount;
                 // Update the total mesh count only if there are more meshes than the original
                 // We do not remove mesh if they are missing from the DAE, we just set the mesh metadata to 0
-                if (importSettings != null)
-                {
-                    if (importSettings.Count > xivMdl.LoDList[0].MeshDataList.Count)
-                    {
-                        var addedMeshCount = importSettings.Count - xivMdl.LoDList[0].MeshDataList.Count;
 
-                        meshCount += (short)addedMeshCount;
-                    }
-                }
-
-                modelData.MeshCount = meshCount;
+                ogModelData.MeshCount = meshCount;
                 modelDataBlock.AddRange(BitConverter.GetBytes(meshCount));
 
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.AttributeCount)); // This value has already been changed if doing an advanced import and attributes were added/removed
+                //TODO - FIXFIX - This needs to be recalculated
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.AttributeCount));
 
-                var meshPartCount = modelData.MeshPartCount;
+                var meshPartCount = ogModelData.MeshPartCount;
 
-                // Update the total mesh part count only if there are more parts than the original
-                // We do not remove parts if they are missing from the DAE, we just set their index count to 0
-                if (importSettings != null)
+                // Recalculate total number of parts.
+                short tParts = 0;
+                for (int lIdx = 0; lIdx < ogMdl.LoDList.Count; lIdx++)
                 {
-                    var addedPartSum = 0;
-
-                    foreach (var modelImportSettings in importSettings)
-                    {
-                        var importMeshPartCount = modelImportSettings.Value.PartList.Max() + 1;
-                        var meshNum = int.Parse(modelImportSettings.Key);
-
-                        var originalMeshPartCount = 0;
-                        if (xivMdl.LoDList[0].MeshDataList.Count > meshNum)
+                    if (lIdx == 0) {
+                        foreach (var m in ttModel.MeshGroups)
                         {
-                            originalMeshPartCount = xivMdl.LoDList[0].MeshDataList[meshNum].MeshPartList.Count;
+                            foreach (var p in m.Parts)
+                            {
+                                tParts++;
+                            }
                         }
-
-                        if (importMeshPartCount > originalMeshPartCount)
+                    } else
+                    {
+                        foreach (var m in ogMdl.LoDList[lIdx].MeshDataList)
                         {
-                            addedPartSum += (importMeshPartCount - originalMeshPartCount);
+                            foreach(var p in m.MeshPartList)
+                            {
+                                tParts++;
+                            }
                         }
                     }
-
-                    meshPartCount += (short)addedPartSum;
+                    tParts += ogMdl.LoDList[lIdx].ExtraMeshCount;
                 }
 
-                modelDataBlock.AddRange(BitConverter.GetBytes(meshPartCount));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.MaterialCount)); // This value has already been changed if doing an advanced import and materials were added/removed
+                modelDataBlock.AddRange(BitConverter.GetBytes(tParts));
 
-                // Add extra bone count if doing an advanced import
-                var boneStringCount = ttModel.Bones.Count;
-                modelDataBlock.AddRange(BitConverter.GetBytes((short)boneStringCount));
+                // TODO: Fixfix? Mtrl counts?
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.MaterialCount)); // This value has already been changed if doing an advanced import and materials were added/removed
 
-
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.BoneListCount));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeCount));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeDataCount));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.ShapeIndexCount));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown1));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown2));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown3));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown4));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown5));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown6)); // Unknown - Differential between gloves
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown7));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown8)); // Unknown - Differential between gloves
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown9));
-                modelDataBlock.Add(modelData.Unknown10a);
-                modelDataBlock.Add(modelData.Unknown10b);
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown11));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown12));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown13));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown14));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown15));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown16));
-                modelDataBlock.AddRange(BitConverter.GetBytes(modelData.Unknown17));
+                modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Bones.Count));
+                modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.ShapeCount));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.ShapeDataCount));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.ShapeIndexCount));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown4));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown5));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown6)); // Unknown - Differential between gloves
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown7));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown8)); // Unknown - Differential between gloves
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown9));
+                modelDataBlock.Add(ogModelData.Unknown10a);
+                modelDataBlock.Add(ogModelData.Unknown10b);
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown11));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown12));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown16));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown17));
 
 
 
@@ -1889,27 +1835,23 @@ namespace xivModdingFramework.Models.FileTypes
                 // Unknown Data 0
                 #region Unknown Data Block 0
 
-                var unknownDataBlock0 = xivMdl.UnkData0.Unknown;
+                var unknownDataBlock0 = ogMdl.UnkData0.Unknown;
 
 
 
                 #endregion
 
-                var flipAlpha = false;
-                if (importSettings != null)
-                {
-                    flipAlpha = importSettings.FirstOrDefault().Value.FlipAlpha;
-                }
+
                 // Get the imported data
-                var importDataDictionary = GetImportData(ttModel, itemType, vertexInfoDict, flipAlpha);
+                var importDataDictionary = GetImportData(ttModel, vertexInfoDict);
 
                 // Extra LoD Data
                 #region Extra Level Of Detail Block
                 var extraLodDataBlock = new List<byte>();
 
-                if (xivMdl.ExtraLoDList != null && xivMdl.ExtraLoDList.Count > 0)
+                if (ogMdl.ExtraLoDList != null && ogMdl.ExtraLoDList.Count > 0)
                 {
-                    foreach (var lod in xivMdl.ExtraLoDList)
+                    foreach (var lod in ogMdl.ExtraLoDList)
                     {
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshOffset));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshCount));
@@ -1946,7 +1888,7 @@ namespace xivModdingFramework.Models.FileTypes
                 int lastVertexCount = 0;
                 var previousIndexCount = 0;
                 short totalParts = 0;
-                foreach (var lod in xivMdl.LoDList)
+                foreach (var lod in ogMdl.LoDList)
                 {
                     var meshNum = 0;
                     var previousVertexDataOffset1 = 0;
@@ -1977,7 +1919,7 @@ namespace xivModdingFramework.Models.FileTypes
                         byte vertexDataEntrySize2 = addedMesh ? (byte) 0 : meshInfo.VertexDataEntrySize2;
                         short partCount = addedMesh ? (short)0 : meshInfo.MeshPartCount;
                         short materialIndex = addedMesh ? (short)0 : meshInfo.MaterialIndex;
-                        short boneListIndex = addedMesh ? (short)0 : meshInfo.BoneListIndex;
+                        short boneListIndex = addedMesh ? (short)0 : (short) 0;
                         byte vDataBlockCount = addedMesh ? (byte)0 : meshInfo.VertexDataBlockCount;
 
 
@@ -1987,8 +1929,8 @@ namespace xivModdingFramework.Models.FileTypes
                             vertexCount = (int) ttMeshGroup.VertexCount;
                             indexCount = (int) ttMeshGroup.IndexCount;
                             partCount = (short) ttMeshGroup.Parts.Count;
-                            boneListIndex = 0;
-                            //materialIndex = 0;      // TODO - FIXFIX - Set Material Index Correctly on Added Parts.
+                            boneListIndex = (short) meshNum;
+                            materialIndex = ttModel.GetMaterialIndex(meshNum);
                             vDataBlockCount = 2;
 
                             if (!addedMesh)
@@ -2016,7 +1958,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                             }
 
-                            if (xivMdl.HasShapeData && !addedMesh && lod.MeshDataList[meshNum].ShapePositionsDictionary != null && vertexCount != 0)
+                            if (ogMdl.HasShapeData && !addedMesh && lod.MeshDataList[meshNum].ShapePositionsDictionary != null && vertexCount != 0)
                             {
                                 // The shape positions count is added to the vertex count because it is not exported and therefore
                                 // missing from the imported data.
@@ -2099,13 +2041,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Unknown Attribute Data
                 #region Attribute Data Block
 
-                var attrPathOffsetList = xivMdl.AttrDataBlock.AttributePathOffsetList;
-
-                // If doing an advanced import, use the calculated attribute offsets in case attributes were added or removed
-                if (importSettings != null)
-                {
-                    attrPathOffsetList = attributeOffsetList;
-                }
+                var attrPathOffsetList = attributeOffsetList;
 
                 var attributePathDataBlock = new List<byte>();
                 foreach (var attributeOffset in attrPathOffsetList)
@@ -2118,7 +2054,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Unknown Data 1
                 #region Unknown Data Block 1
 
-                var unknownDataBlock1 = xivMdl.UnkData1.Unknown;
+                var unknownDataBlock1 = ogMdl.UnkData1.Unknown;
 
 
                 #endregion
@@ -2134,38 +2070,50 @@ namespace xivModdingFramework.Models.FileTypes
                 var previousIndexOffset = 0;
                 previousIndexCount = 0;
                 var indexOffset = 0;
-                foreach (var lod in xivMdl.LoDList)
+                foreach (var lod in ogMdl.LoDList)
                 {
-                    var meshNum = 0;
                     var partPadding = 0;
 
-                    foreach (var ttMeshGroup in ttModel.MeshGroups)
-                    {
-                        var partNum = 0;
-                        var addedMesh = meshNum >= lod.MeshCount;
+                    // Identify the correct # of meshes
+                    var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
 
-                        var ogPartCount = addedMesh ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
-                        var newPartCount = ttMeshGroup.Parts.Count;
+                    for(int meshNum = 0; meshNum < meshMax; meshNum++)
+                    {
+                        // Test if we have both old and new data or not.
+                        var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
+                        var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
+
+                        // Identify correct # of parts.
+                        var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : ogGroup.MeshPartList.Count;
+
+                        // Totals for each group
+                        var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
+                        var newPartCount = ttMeshGroup == null ? 0 : ttMeshGroup.Parts.Count;
 
                         // Skip higher LoD stuff for non-existent parts.
-                        if (lodNum > 0 && addedMesh)
+                        if (lodNum > 0 && ogGroup == null)
                         {
                             continue;
                         }
 
 
-                        foreach (var part in ttMeshGroup.Parts)
+                        // Loop all the parts we should write.
+                        for(var partNum = 0; partNum < partMax; partNum++)
                         {
+                            // Get old and new data.
+                            var ogPart = ogPartCount > partNum ? ogGroup.MeshPartList[partNum]: null;
+                            var ttPart = newPartCount > partNum ? ttMeshGroup.Parts[partNum] : null;
+
 
                             // Skip higher LoD stuff for non-existent parts.
-                            if(lodNum > 0 && partNum >= ogPartCount)
+                            if(lodNum > 0 && ogPart == null)
                             {
                                 continue;
                             }
 
                             var indexCount = 0;
                             short boneCount = 0;
-                            var attributeIndex = 0;
+                            uint attributeMask = 0;
 
                             if (lodNum == 0)
                             {
@@ -2197,10 +2145,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 }
 
-                                // TODO - FIXFIX - Attribute Handling.
-                                attributeIndex = 0;
+                                attributeMask = ttModel.GetAttributeBitmask(meshNum, partNum);
                                 indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
-                                boneCount = (short)ttModel.Bones.Count;
+
+                                // Count of bones for Mesh.  High LoD Meshes get 0... Not really ideal.
+                                // TODO: Fixfix - Need to save # of bones in higher lods.
+                                boneCount = (short) (lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
 
                                 // Calculate padding between meshes
                                 if (partNum == newPartCount - 1)
@@ -2217,29 +2167,18 @@ namespace xivModdingFramework.Models.FileTypes
                                     }
                                 }
 
-                                // Attribute index is changed directly to XivMdl from Advanced Import for existing meshes
-                                // This adds attributes if any for newly added meshes
-                                if (importSettings != null && importSettings.ContainsKey(meshNum.ToString()))
-                                {
-                                    if (importSettings[meshNum.ToString()].PartAttributeDictionary.ContainsKey(partNum))
-                                    {
-                                        attributeIndex = importSettings[meshNum.ToString()].PartAttributeDictionary[partNum];
-                                    }
-                                }
-
                             }
                             else
                             {
                                 // LoD non-zero
-                                var ogPart = lod.MeshDataList[meshNum].MeshPartList[partNum];
                                 indexCount = ogPart.IndexCount;
-                                boneCount = ogPart.BoneCount;
-                                attributeIndex = ogPart.AttributeIndex;
+                                boneCount = 0;
+                                attributeMask = ogPart.AttributeBitmask;
                             }
 
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeIndex));
+                            meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeMask));
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
 
@@ -2247,10 +2186,7 @@ namespace xivModdingFramework.Models.FileTypes
                             previousIndexOffset = indexOffset;
                             currentBoneOffset += boneCount;
 
-                            partNum++;
                         }
-
-                        meshNum++;
                     }
 
                     lodNum++;
@@ -2263,7 +2199,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Unknown Data 2
                 #region Unknown Data Block 2
 
-                var unknownDataBlock2 = xivMdl.UnkData2.Unknown;
+                var unknownDataBlock2 = ogMdl.UnkData2.Unknown;
 
 
 
@@ -2272,13 +2208,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Material Offset Data
                 #region Material Data Block
 
-                var matPathOffsetList = xivMdl.MatDataBlock.MaterialPathOffsetList;
-
-                // If doing an advanced import, use the calculated material offsets in case materials were added or removed
-                if (importSettings != null)
-                {
-                    matPathOffsetList = materialOffsetList;
-                }
+                var matPathOffsetList = materialOffsetList;
 
                 var matPathOffsetDataBlock = new List<byte>();
                 foreach (var materialOffset in matPathOffsetList)
@@ -2288,100 +2218,54 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
-                // Bone Offset Data
+                // Bone Strings Offset Data
                 #region Bone Data Block
 
-                var bonePathOffsetList = xivMdl.BonDataBlock.BonePathOffsetList;
-
-                // If doing an advanced import, use the calculated bone offsets in case bones were added
-                bonePathOffsetList = boneOffsetList;
+                var bonePathOffsetList = boneOffsetList;
 
                 var bonePathOffsetDataBlock = new List<byte>();
                 foreach (var boneOffset in bonePathOffsetList)
                 {
+
                     bonePathOffsetDataBlock.AddRange(BitConverter.GetBytes(boneOffset));
                 }
 
                 #endregion
 
                 // Bone Indices for meshes
-                #region Bone Index Mesh Block
+                #region Mesh Bone Sets
 
-                var boneIndexMeshBlock = new List<byte>();
+                var boneSetsBlock = new List<byte>();
 
-                lodNum = 0;
-                foreach (var boneIndexMesh in xivMdl.BoneIndexMeshList)
+                for(var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                 {
-                    if (lodNum == 0)
-                    {
-                        const int boneMaxEntries = 64;
-
-                        var count = boneStringCount;
-                        var remaining = boneMaxEntries - count;
-
-
-                        for (var i = 0; i < count; i++)
-                        {
-                            boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)i));
-                        }
-
-                        for (var i = 0; i < remaining; i++)
-                        {
-                            boneIndexMeshBlock.AddRange(BitConverter.GetBytes((short)0));
-                        }
-
-                        boneIndexMeshBlock.AddRange(BitConverter.GetBytes((int)count));
-                    }
-                    else
-                    {
-                        foreach (var boneIndex in boneIndexMesh.BoneIndices)
-                        {
-                            boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndex));
-                        }
-
-                        if (boneIndexMesh.BoneIndexCount != 65)
-                        {
-                            boneIndexMeshBlock.AddRange(BitConverter.GetBytes(boneIndexMesh.BoneIndexCount));
-                        }
-                    }
-
-                    lodNum++;
+                    boneSetsBlock.AddRange(ttModel.GetBoneSet(mi));
                 }
+                var boneIndexListSize = boneSetsBlock.Count;
+
+                // Higher LoD Bone sets are omitted.
 
                 #endregion
 
                 #region Shape Data Block
 
                 var FullShapeDataBlock = new List<byte>();
-                if (xivMdl.HasShapeData)
+                if (ogMdl.HasShapeData)
                 {
                     // Mesh Shape Info
                     #region Mesh Shape Info Data Block
 
                     var meshShapeInfoDataBlock = new List<byte>();
 
-                    var shapeInfoCount = xivMdl.MeshShapeData.ShapeInfoList.Count;
+                    var shapeInfoCount = ogMdl.MeshShapeData.ShapeInfoList.Count;
 
                     var infoNum = 0;
-                    foreach (var info in xivMdl.MeshShapeData.ShapeInfoList)
+                    foreach (var info in ogMdl.MeshShapeData.ShapeInfoList)
                     {
-                        if (importSettings != null)
-                        {
-                            meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeOffsetList[infoNum]));
-                        }
-                        else
-                        {
-                            meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(info.ShapePathOffset));
-                        }
+                        meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(info.ShapePathOffset));
 
-                        var disable = false;
-                        if (importSettings != null)
-                        {
-                            foreach (var value in importSettings.Values)
-                            {
-                                disable = disable || value.Disable;
-                            }
-                        }
+                        // TODO - FIXFIX - Re-enable shape parts.
+                        var disable = true;
                         foreach (var shapeInfoShapeIndexPart in info.ShapeIndexParts)
                         {
                             if (disable)
@@ -2418,7 +2302,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var meshShapeIndexInfoDataBlock = new List<byte>();
 
-                    foreach (var shapeIndexInfo in xivMdl.MeshShapeData.ShapeDataInfoList)
+                    foreach (var shapeIndexInfo in ogMdl.MeshShapeData.ShapeDataInfoList)
                     {
                         meshShapeIndexInfoDataBlock.AddRange(BitConverter.GetBytes(shapeIndexInfo.IndexDataOffset));
                         meshShapeIndexInfoDataBlock.AddRange(BitConverter.GetBytes(shapeIndexInfo.IndexCount));
@@ -2435,7 +2319,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var meshShapeDataBlock = new List<byte>();
 
                     var lodNumber = 0;
-                    foreach (var lod in xivMdl.LoDList)
+                    foreach (var lod in ogMdl.LoDList)
                     {
                         var indexMeshNum = new Dictionary<int, int>();
 
@@ -2448,10 +2332,10 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // Number of shape info in each mesh
-                        var perMeshCount = xivMdl.ModelData.ShapeCount;
+                        var perMeshCount = ogMdl.ModelData.ShapeCount;
 
                         // Shape info list
-                        var shapeInfoList = xivMdl.MeshShapeData.ShapeInfoList;
+                        var shapeInfoList = ogMdl.MeshShapeData.ShapeInfoList;
 
                         for (var j = 0; j < perMeshCount; j++)
                         {
@@ -2465,7 +2349,7 @@ namespace xivModdingFramework.Models.FileTypes
                             for (var k = 0; k < infoPartCount; k++)
                             {
                                 // Gets the data info for the part
-                                var shapeDataInfo = xivMdl.MeshShapeData.ShapeDataInfoList[indexPart.DataInfoIndex + k];
+                                var shapeDataInfo = ogMdl.MeshShapeData.ShapeDataInfoList[indexPart.DataInfoIndex + k];
 
                                 // The offset in the shape data 
                                 var indexDataOffset = shapeDataInfo.IndexDataOffset;
@@ -2477,42 +2361,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 var shapeData = mesh.ShapeIndexOffsetDictionary[shapeDataInfo.DataIndexOffset];
 
-                                if (importSettings != null && importSettings.ContainsKey(indexMeshLocation.ToString()))
-                                {
                                     var shapeCount = mesh.ShapeIndexOffsetDictionary.Count;
 
-                                    if (importSettings[indexMeshLocation.ToString()].Disable)
+                                if (!ttModel.EnableShapeData)
+                                {
+                                    foreach (var iOffset in shapeData)
                                     {
-                                        foreach (var iOffset in shapeData)
-                                        {
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
-                                        }
-                                    }
-                                    else if (importSettings[indexMeshLocation.ToString()].Fix)
-                                    {
-                                        throw new NotImplementedException();
-
-                                        //TODO Implement Fix
-                                        // Find the nearest to what the original was?
-                                    }
-                                    else
-                                    {
-                                        ushort previousEntry = 0;
-                                        foreach (var iOffset in shapeData)
-                                        {
-                                            if (iOffset.Key != ushort.MaxValue)
-                                            {
-                                                meshShapeDataBlock.AddRange(BitConverter.GetBytes(iOffset.Key));
-                                                previousEntry = iOffset.Key;
-                                            }
-                                            else
-                                            {
-                                                meshShapeDataBlock.AddRange(BitConverter.GetBytes(previousEntry));
-                                            }
-
-                                            meshShapeDataBlock.AddRange(BitConverter.GetBytes(iOffset.Value));
-                                        }
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                                        meshShapeDataBlock.AddRange(BitConverter.GetBytes((short)0));
                                     }
                                 }
                                 else
@@ -2547,49 +2403,27 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
 
                 // Bone Index Part
-                #region Bone Index Part Data Block
+                #region Part Bone Sets
 
-                var boneIndexPartDataBlock = new List<byte>();
-
+                // These are referential arrays to subsets of their parent mesh bone set.
+                // Their length is determined by the Part header's BoneCount field.
+                var partBoneSetsBlock = new List<byte>();
                 {
-                    var totalBonePartIndices = 0;
-                    var originalBonePartSum = 0;
                     var bones = ttModel.Bones;
 
-                    // Lod 0
-                    // Mesh
                     for (var j = 0; j < ttModel.MeshGroups.Count; j++)
                     {
-                        for (short i = 0; i < ttModel.Bones.Count; i++)
+                        for (short i = 0; i < ttModel.MeshGroups[j].Bones.Count; i++)
                         {
-                            boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(i));
-                            totalBonePartIndices += 1;
+                            // It's probably not perfectly performant in game, but we can just
+                            // write every bone from the parent set back in here.
+                            partBoneSetsBlock.AddRange(BitConverter.GetBytes(i));
                         }
                     }
 
-                    // Get total bone index count for original model
-                    foreach (var meshData in xivMdl.LoDList[0].MeshDataList)
-                    {
-                        foreach (var meshPart in meshData.MeshPartList)
-                        {
-                            originalBonePartSum += meshPart.BoneCount;
-                        }
-                    }
+                    // Higher LoDs omitted (they're given 0 bones)
 
-
-                    // Lod 1 - 2
-                    var boneIndexPart = xivMdl.BoneIndexPart;
-
-                    var remaining = boneIndexPart.BoneIndexList.Count - originalBonePartSum;
-
-                    for (var j = originalBonePartSum; j < boneIndexPart.BoneIndexList.Count; j++)
-                    {
-                        boneIndexPartDataBlock.AddRange(BitConverter.GetBytes(boneIndexPart.BoneIndexList[j]));
-                    }
-
-                    totalBonePartIndices += remaining;
-
-                    boneIndexPartDataBlock.InsertRange(0, BitConverter.GetBytes(totalBonePartIndices * 2));
+                    partBoneSetsBlock.InsertRange(0, BitConverter.GetBytes((int)(partBoneSetsBlock.Count)));
                 }
 
 
@@ -2601,8 +2435,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var paddingDataBlock = new List<byte>();
 
-                paddingDataBlock.Add(xivMdl.PaddingSize);
-                paddingDataBlock.AddRange(xivMdl.PaddedBytes);
+                paddingDataBlock.Add(ogMdl.PaddingSize);
+                paddingDataBlock.AddRange(ogMdl.PaddedBytes);
 
 
 
@@ -2613,7 +2447,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var boundingBoxDataBlock = new List<byte>();
                 
-                var boundingBox = xivMdl.BoundBox;
+                var boundingBox = ogMdl.BoundBox;
 
                 foreach (var point in boundingBox.PointList)
                 {
@@ -2651,9 +2485,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Combined Data Block Sizes
                 // This is the offset to the beginning of the vertex data
-                var combinedDataBlockSize = 68 + vertexInfoBlock.Count + pathInfoBlock.Count + modelDataBlock.Count + unknownDataBlock0.Length + (60 * xivMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
+                var combinedDataBlockSize = 68 + vertexInfoBlock.Count + pathInfoBlock.Count + modelDataBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
-                    boneIndexMeshBlock.Count + FullShapeDataBlock.Count + boneIndexPartDataBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneTransformDataBlock.Count;
+                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneTransformDataBlock.Count;
 
                 var lodDataBlock = new List<byte>();
 
@@ -2665,7 +2499,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var previousVertexDataOffset = 0;
                 short meshOffset = 0;
 
-                foreach (var lod in xivMdl.LoDList)
+                foreach (var lod in ogMdl.LoDList)
                 {
                     short mCount = 0;
                     // Index Data Size is recalculated for LoD 0, because of the imported data, but remains the same
@@ -2696,14 +2530,12 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             mCount++;
                             MeshData meshData;
-                            var skipShapeData = false;
 
                             // If meshes were added, no entry exists for it in the original data, so we grab the last available mesh
-                            if (importSettings != null && importData.Key >= lod.MeshDataList.Count)
+                            if (importData.Key >= lod.MeshDataList.Count)
                             {
                                 var diff = (importData.Key + 1) - lod.MeshDataList.Count;
                                 meshData = lod.MeshDataList[importData.Key - diff];
-                                skipShapeData = true;
                             }
                             else
                             {
@@ -2711,7 +2543,8 @@ namespace xivModdingFramework.Models.FileTypes
                             }
 
                             var shapeDataCount = 0;
-                            if (meshData.ShapePositionsDictionary != null && !skipShapeData && importData.Value.VertexCount != 0)
+                            // Write the shape data if it exists.
+                            if (meshData.ShapePositionsDictionary != null && importData.Value.VertexCount != 0)
                             {
                                 var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                                 if (!isAlreadyModified)
@@ -2815,9 +2648,9 @@ namespace xivModdingFramework.Models.FileTypes
                 fullModelDataBlock.AddRange(unknownDataBlock2);
                 fullModelDataBlock.AddRange(matPathOffsetDataBlock);
                 fullModelDataBlock.AddRange(bonePathOffsetDataBlock);
-                fullModelDataBlock.AddRange(boneIndexMeshBlock);
+                fullModelDataBlock.AddRange(boneSetsBlock);
                 fullModelDataBlock.AddRange(FullShapeDataBlock);
-                fullModelDataBlock.AddRange(boneIndexPartDataBlock);
+                fullModelDataBlock.AddRange(partBoneSetsBlock);
                 fullModelDataBlock.AddRange(paddingDataBlock);
                 fullModelDataBlock.AddRange(boundingBoxDataBlock);
                 fullModelDataBlock.AddRange(boneTransformDataBlock);
@@ -2887,20 +2720,20 @@ namespace xivModdingFramework.Models.FileTypes
                 var compressedIndexSizes = new List<int>();
 
                 lodNum = 0;
-                foreach (var lod in xivMdl.LoDList)
+                foreach (var lod in ogMdl.LoDList)
                 {
                     var vertexDataSection = new VertexDataSection();
                     var meshNum = 0;
 
                     if (lodNum == 0)
                     {
-                        var totalMeshes = importSettings != null ? importSettings.Count : lod.MeshCount;
+                        var totalMeshes = ttModel.MeshGroups.Count;
                         for (var i = 0; i < totalMeshes; i++)
                         {
                             var importData = importDataDictionary[meshNum];
 
                             // Because our imported data does not include mesh shape data, we must include it manually
-                            if (xivMdl.HasShapeData && meshNum < lod.MeshDataList.Count)
+                            if (ogMdl.HasShapeData && meshNum < lod.MeshDataList.Count)
                             {
                                 var meshData = lod.MeshDataList[meshNum];
 
@@ -2940,7 +2773,7 @@ namespace xivModdingFramework.Models.FileTypes
                                         }
 
                                         // Furniture does not have bone data
-                                        if (itemType != XivItemType.furniture)
+                                        if (ttModel.HasWeights)
                                         {
                                             foreach (var boneWeight in boneWeights)
                                             {
@@ -3059,7 +2892,7 @@ namespace xivModdingFramework.Models.FileTypes
                         foreach (var meshData in lod.MeshDataList)
                         {
                             var vertexInfo = vertexInfoDict[lodNum];
-                            var vertexData = GetVertexByteData(meshData.VertexData, itemType, vertexInfo);
+                            var vertexData = GetVertexByteData(meshData.VertexData, vertexInfo, ttModel.HasWeights);
 
                             vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
                             vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
@@ -3351,9 +3184,9 @@ namespace xivModdingFramework.Models.FileTypes
                 datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].IndexDataBlockPartCount));
 
                 // Mesh Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)modelData.MeshCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)ogModelData.MeshCount));
                 // Material Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)modelData.MaterialCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)ogModelData.MaterialCount));
                 // Unknown 1
                 datHeader.AddRange(BitConverter.GetBytes((short)259));
                 // Unknown 2
@@ -3411,18 +3244,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Add the header to the MDL data
                 compressedMDLData.InsertRange(0, datHeader);
 
-                var dat = new Dat(_gameDirectory);
-
-                var filePath = Path.Combine(xivMdl.MdlPath.Folder, xivMdl.MdlPath.File);
-
-                if (rawDataOnly)
-                {
-                    MDLRawData = compressedMDLData.ToArray();
-                }
-                else
-                {
-                    await dat.WriteToDat(compressedMDLData, modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
-                }
+                return compressedMDLData.ToArray();
 
                 #endregion
             }
@@ -3438,7 +3260,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A dictionary containing the vertex byte data per mesh</returns>
-        private Dictionary<int, VertexByteData> GetImportData(TTModel ttMesh, XivItemType itemType, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict, bool flipAlpha)
+        private Dictionary<int, VertexByteData> GetImportData(TTModel ttModel, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict)
         {
             var importDataDictionary = new Dictionary<int, VertexByteData>();
 
@@ -3447,7 +3269,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Add the first vertex data set to the ImportData list
             // This contains [ Position, Bone Weights, Bone Indices]
-            foreach(var m in ttMesh.MeshGroups)
+            foreach(var m in ttModel.MeshGroups)
             {
                 var importData = new VertexByteData()
                 {
@@ -3491,7 +3313,7 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // Furniture items do not have bone data
-                        if (itemType != XivItemType.furniture)
+                        if (ttModel.HasWeights)
                         {
                             // Bone Weights
                             importData.VertexData0.AddRange(v.Weights);
@@ -3527,17 +3349,10 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
 
-                        if (flipAlpha)
-                        {
-                            importData.VertexData1.Add(v.VertexColor[3]);
-                        }
-                        importData.VertexData1.Add(v.VertexColor[0]); // v.VertexColor is RGBA format.
+                        importData.VertexData1.Add(v.VertexColor[0]);
                         importData.VertexData1.Add(v.VertexColor[1]);
                         importData.VertexData1.Add(v.VertexColor[2]);
-                        if (!flipAlpha)
-                        {
-                            importData.VertexData1.Add(v.VertexColor[3]);
-                        }
+                        importData.VertexData1.Add(v.VertexColor[3]);
 
                         // Texture Coordinates
                         var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
@@ -3629,7 +3444,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="vertexData">The vertex data to convert</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A class containing the byte data for the given data</returns>
-        private static VertexByteData GetVertexByteData(VertexData vertexData, XivItemType itemType, Dictionary<VertexUsageType, VertexDataType> vertexInfoDict)
+        private static VertexByteData GetVertexByteData(VertexData vertexData, Dictionary<VertexUsageType, VertexDataType> vertexInfoDict, bool hasWeights)
         {
             var vertexByteData = new VertexByteData
             {
@@ -3662,8 +3477,7 @@ namespace xivModdingFramework.Models.FileTypes
                     vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(vertexData.Positions[i].Z));
                 }
 
-                // Furniture does not have bone data
-                if (itemType != XivItemType.furniture)
+                if (hasWeights)
                 {
                     // Bone Weights
                     foreach (var boneWeight in vertexData.BoneWeights[i])

@@ -7,6 +7,7 @@ using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using xivModdingFramework.Cache;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
 
@@ -54,10 +55,9 @@ namespace xivModdingFramework.Models.DataContainers
         // List of Vertex IDs that make up the triangles of the mesh.
         public List<int> TriangleIndices = new List<int>();
 
-        // List of textures used in by this part for rendering.
-        // Mostly semantic/for output models, not actually piped back into the
-        // FFXIV system.
-        public Dictionary<XivTexType, string> Materials = new Dictionary<XivTexType, string>();
+        // List of Attributes attached to this part.
+        public HashSet<string> Attributes = new HashSet<string>();
+
     }
 
     /// <summary>
@@ -69,6 +69,16 @@ namespace xivModdingFramework.Models.DataContainers
     {
         public List<TTMeshPart> Parts = new List<TTMeshPart>();
 
+        /// <summary>
+        /// Material used by this Mesh Group.
+        /// </summary>
+        public string Material;
+
+
+        /// <summary>
+        /// List of bones used by this mesh group's vertices.
+        /// </summary>
+        public List<string> Bones = new List<string>();
 
         /// <summary>
         /// Accessor for the full unified MeshGroup level Vertex list.
@@ -97,7 +107,6 @@ namespace xivModdingFramework.Models.DataContainers
             var realId = id - startingOffset;
             return part.Vertices[realId];
         }
-
 
         /// <summary>
         /// Accessor for the full unified MeshGroup level Index list
@@ -200,7 +209,11 @@ namespace xivModdingFramework.Models.DataContainers
 
     /// <summary>
     /// Class representing the base information for a 3D Model, unrelated to the 
-    /// item or anything else that it's associated with.
+    /// item or anything else that it's associated with.  This should be writeable
+    /// into the FFXIV file system with some calculation, but is primarly a class
+    /// for I/O with importers/exporters, and should not contain information like
+    /// padding bytes or unknown bytes unless this is data the end user can 
+    /// manipulate to some effect.
     /// </summary>
     public class TTModel
     {
@@ -210,11 +223,89 @@ namespace xivModdingFramework.Models.DataContainers
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
 
         /// <summary>
-        /// List of bones that are used in this mesh.
+        /// Readonly list of bones that are used in this model.
         /// </summary>
-        public List<string> Bones = new List<string>();
+        public List<string> Bones
+        {
+            get
+            {
+                var ret = new SortedSet<string>();
+                foreach (var m in MeshGroups)
+                {
+                    foreach(var b in m.Bones)
+                    {
+                        ret.Add(b);
+                    }
+                }
+                return ret.ToList();
+            }
+        }
+
+        /// <summary>
+        /// Readonly list of Materials used in this model.
+        /// </summary>
+        public List<string> Materials
+        {
+            get
+            {
+                var ret = new SortedSet<string>();
+                foreach(var m in MeshGroups)
+                {
+                    ret.Add(m.Material);
+                }
+                return ret.ToList();
+            }
+        }
+
+        /// <summary>
+        /// Readonly list of attributes used by this model.
+        /// </summary>
+        public List<string> Attributes
+        {
+            get
+            {
+                var ret = new SortedSet<string>();
+                foreach( var m in MeshGroups)
+                {
+                    foreach(var p in m.Parts)
+                    {
+                        foreach(var a in p.Attributes)
+                        {
+                            ret.Add(a);
+                        }
+                    }
+                }
+                return ret.ToList();
+            }
+        }
 
 
+        /// <summary>
+        /// Whether or not to write Shape data to the resulting MDL.
+        /// </summary>
+        public bool EnableShapeData = false;
+
+        /// <summary>
+        /// Whether or not this Model actually has animation/weight data.
+        /// </summary>
+        public bool HasWeights
+        {
+            get
+            {
+                foreach (var m in MeshGroups)
+                {
+                    if (m.Bones.Count > 0)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sum count of Vertices in this model.
+        /// </summary>
         public uint VertexCount
         {
             get
@@ -227,6 +318,10 @@ namespace xivModdingFramework.Models.DataContainers
                 return count;
             }
         }
+
+        /// <summary>
+        /// Sum count of Indices in this model.
+        /// </summary>
         public uint IndexCount
         {
             get
@@ -237,6 +332,149 @@ namespace xivModdingFramework.Models.DataContainers
                     count += (uint)m.IndexCount;
                 }
                 return count;
+            }
+        }
+
+
+        /// <summary>
+        /// Creates a bone set from the model and group information.
+        /// </summary>
+        /// <param name="PartNumber"></param>
+        public List<byte> GetBoneSet(int groupNumber)
+        {
+            var fullList = Bones;
+            var partial = MeshGroups[groupNumber].Bones;
+
+            var result = new List<byte>(new byte[128]);
+
+            if(partial.Count > 64)
+            {
+                throw new InvalidDataException("Individual Mesh groups cannot reference more than 64 bones.");
+            }
+
+            // This is essential a translation table of [mesh group bone index] => [full model bone index]
+            for (int i = 0; i < partial.Count; i++)
+            {
+                var b = BitConverter.GetBytes(((short) fullList.IndexOf(partial[i])));
+                IOUtil.ReplaceBytesAt(result, b, i * 2);
+            }
+
+            result.AddRange(BitConverter.GetBytes(partial.Count));
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets the material index for a given group, based on model and group information.
+        /// </summary>
+        /// <param name="groupNumber"></param>
+        /// <returns></returns>
+        public short GetMaterialIndex(int groupNumber) {
+            
+            // Sanity check
+            if (MeshGroups.Count <= groupNumber) return 0;
+
+            var m = MeshGroups[groupNumber];
+
+            // By definition the Materials object must contain the mesh material, so no need to check for -1 here.
+            return (short) Materials.IndexOf(m.Material); 
+        }
+
+        /// <summary>
+        /// Retrieves the bitmask value for a part's attributes, based on part and model settings.
+        /// </summary>
+        /// <param name="groupNumber"></param>
+        /// <returns></returns>
+        public uint GetAttributeBitmask(int groupNumber, int partNumber)
+        {
+            var allAttributes = Attributes;
+            if(allAttributes.Count > 32)
+            {
+                throw new InvalidDataException("Models cannot have more than 32 total attributes.");
+            }
+            uint mask = 0;
+
+            var partAttributes = MeshGroups[groupNumber].Parts[partNumber].Attributes;
+
+            uint bit = 1;
+            for(int i = 0; i < allAttributes.Count; i++)
+            {
+                var a = allAttributes[i];
+                bit = (uint)1 << i;
+
+                if(partAttributes.Contains(a))
+                {
+                    mask = (uint)(mask | bit);
+                }
+                
+            }
+
+            return mask;
+        }
+
+
+
+        /// <summary>
+        /// Merges in the side data elements from a Mdl file that we 
+        /// wouldn't normally get from one of the importers, ex. material names
+        /// attribute names, etc.
+        /// 
+        /// Users may manipulate this data further via Advanced Import after it
+        /// has been merged over.
+        /// 
+        /// Raw Geometry data/data that may have come from the external importers
+        /// should *NOT* be overwritten/modified.
+        /// </summary>
+        /// <param name="rawMdl"></param>
+        public void MergeData(XivMdl rawMdl)
+        {
+            // Only need to loop the data we're merging in, other elements are naturally
+            // left blank/default.
+
+            var attributes = rawMdl.PathData.AttributeList;
+            for(var mIdx = 0; mIdx < rawMdl.LoDList[0].MeshDataList.Count; mIdx++)
+            {
+                // Can only carry in data to meshes that exist
+                if (mIdx >= MeshGroups.Count) continue;
+
+                var md = rawMdl.LoDList[0].MeshDataList[mIdx];
+                var localMesh = MeshGroups[mIdx];
+
+                // Copy over Material
+                var matIdx = md.MeshInfo.MaterialIndex;
+                if (matIdx < rawMdl.PathData.MaterialList.Count)
+                {
+                    localMesh.Material = rawMdl.PathData.MaterialList[matIdx];
+                }
+                
+
+                for(var pIdx = 0; pIdx < md.MeshPartList.Count; pIdx++)
+                {
+                    // Can only carry in data to parts that exist
+                    if (pIdx >= localMesh.Parts.Count) continue;
+
+
+                    var p = md.MeshPartList[pIdx];
+                    var localPart = localMesh.Parts[pIdx];
+
+                    // Copy over attributes. (Convert from bitmask to full string values)
+                    var mask = p.AttributeBitmask;
+                    uint bit = 1;
+                    for(int i = 0; i < 32; i++)
+                        {
+                        bit = (uint)1 << i;
+
+                        if( (mask & bit) > 0)
+                        {
+                            // Can't add attributes that don't exist (should never be hit, but sanity).
+                            if (i >= attributes.Count) continue;
+
+                            localPart.Attributes.Add(attributes[i]);
+                        }
+                    }
+                }
+            
+            
             }
         }
 
@@ -266,54 +504,54 @@ namespace xivModdingFramework.Models.DataContainers
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
 
-
-                        int boneSum = 0;
-                        // Weight corrections.
-                        while (boneSum != 255)
+                        if (model.HasWeights)
                         {
-                            boneSum = 0;
-                            var mostMajor = -1;
-                            var most = -1;
-                            // Loop them to sum them up.
-                            // and snag the least/most major influences while we're at it.
-                            for (var i = 0; i < v.Weights.Length; i++)
+                            int boneSum = 0;
+                            // Weight corrections.
+                            while (boneSum != 255)
                             {
-                                var value = v.Weights[i];
-
-                                // Don't care about 0 weight entries.
-                                if (value == 0) continue;
-
-                                boneSum += value;
-                                if (value > most)
+                                boneSum = 0;
+                                var mostMajor = -1;
+                                var most = -1;
+                                // Loop them to sum them up.
+                                // and snag the least/most major influences while we're at it.
+                                for (var i = 0; i < v.Weights.Length; i++)
                                 {
-                                    mostMajor = i;
-                                    most = value;
+                                    var value = v.Weights[i];
+
+                                    // Don't care about 0 weight entries.
+                                    if (value == 0) continue;
+
+                                    boneSum += value;
+                                    if (value > most)
+                                    {
+                                        mostMajor = i;
+                                        most = value;
+                                    }
                                 }
+
+                                var alteration = 255 - boneSum;
+                                if (Math.Abs(alteration) > 1)
+                                {
+                                    totalMajorCorrections++;
+                                }
+
+                                if (Math.Abs(alteration) > 255)
+                                {
+                                    // Just No.
+                                    v.Weights[0] = 255;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                    break;
+
+                                }
+
+                                // Take or Add to the most major bone.
+                                v.Weights[mostMajor] += (byte)alteration;
+                                boneSum += alteration;
                             }
-
-                            var alteration = 255 - boneSum;
-                            if(Math.Abs(alteration) > 1)
-                            {
-                                totalMajorCorrections++;
-                            }
-
-                            if(Math.Abs(alteration) > 255)
-                            {
-                                // Just No.
-                                v.Weights[0] = 255;
-                                v.Weights[1] = 0;
-                                v.Weights[1] = 0;
-                                v.Weights[1] = 0;
-                                break;
-
-                            }
-
-                            // Take or Add to the most major bone.
-                            v.Weights[mostMajor] += (byte)alteration;
-                            boneSum += alteration;
                         }
-
-                        var z = "z";
                     }
                 }
             }
@@ -496,14 +734,15 @@ namespace xivModdingFramework.Models.DataContainers
                 }
 
                 // Load Bones
-                query = "select * from bones order by bone_id asc;";
+                query = "select * from bones order by mesh asc, bone_id asc;";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(cmd.ExecuteReader()))
                     {
                         while (reader.NextRow())
                         {
-                            model.Bones.Add(reader.GetString("name"));
+                            var meshId = reader.GetInt32("mesh");
+                            model.MeshGroups[meshId].Bones.Add(reader.GetString("name"));
                         }
                     }
                 }

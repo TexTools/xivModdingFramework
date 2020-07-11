@@ -73,12 +73,12 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The data block containing bone information
         /// </summary>
-        public BoneDataBlock BonDataBlock { get; set; }
+        public BoneDataBlock BoneDataBlock { get; set; }
 
         /// <summary>
         /// The list continaing each of the Bone Index Lists for each LoD
         /// </summary>
-        public List<BoneIndexMesh> BoneIndexMeshList { get; set; }
+        public List<BoneSet> MeshBoneSets { get; set; }
 
         /// <summary>
         /// The data containing the information for mesh shapes
@@ -88,7 +88,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The data containing the information for the bone indices used by mesh parts
         /// </summary>
-        public BoneIndexPart BoneIndexPart { get; set; }
+        public BoneSet PartBoneSets { get; set; }
 
         /// <summary>
         /// The size of the padded bytes immediately following 

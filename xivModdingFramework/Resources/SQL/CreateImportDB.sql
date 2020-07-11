@@ -75,12 +75,13 @@ CREATE TABLE "parts" (
 
 -- Bones
 CREATE TABLE "bones" (
+	"mesh"		INTEGER NOT NULL,
 	"bone_id"	INTEGER NOT NULL,
 	"name"  TEXT NOT NULL,
 	
 	-- Format for storing bone matrices tbd.
 
-	Primary KEY("bone_id")
+	Primary KEY("mesh","bone_id")
 );
 
 -- Materials

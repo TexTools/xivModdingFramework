@@ -55,7 +55,7 @@ namespace xivModdingFramework.Models.FileTypes
             Blender,
 		}
 
-        public Dae(DirectoryInfo gameDirectory, XivDataFile dataFile, string pluginTarget, string appVersion = "1.0.0")
+        public Dae(DirectoryInfo gameDirectory, XivDataFile dataFile, string pluginTarget = "OpenCollada", string appVersion = "1.0.0")
         {
             _gameDirectory = gameDirectory;
             _dataFile = dataFile;
@@ -239,32 +239,17 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="xivMdl">The XivMdl data</param>
         /// <param name="daeLocation">The location of the dae file</param>
-        /// <param name="advImportSettings">The advanced Import settings</param>
         /// <returns>A dictionary containing (Mesh Number, (Mesh Part Number, Collada Data)</returns>
-        public TTModel ReadColladaFile(XivMdl xivMdl, DirectoryInfo daeLocation, Dictionary<string, ModelImportSettings> advImportSettings = null)
+        public TTModel ReadColladaFile(DirectoryInfo daeLocation)
         {
-            var isHousingItem = xivMdl.MdlPath.Folder.Contains("bgcommon/hou/");
-
             var boneJointDict = new Dictionary<string, string>();
             var boneStringList = new List<string>();
-            var uniqueBoneNames = new HashSet<string>(xivMdl.PathData.BoneList);
+            var uniqueBoneNames = new HashSet<string>();
 
             // A dictionary containing <Mesh Number, <Mesh Part Number, Collada Data>
             var meshPartDataDictionary = new SortedDictionary<int, SortedDictionary<int, ColladaData>>();
 
             TTModel ttModel = new TTModel();
-
-            var meshCount = xivMdl.LoDList[0].MeshCount;
-
-            if (advImportSettings != null && advImportSettings.Count > meshCount)
-            {
-                meshCount = (short)advImportSettings.Count;
-            }
-
-            for (var i = 0; i < meshCount; i++)
-            {
-                meshPartDataDictionary.Add(i, new SortedDictionary<int, ColladaData>());
-            }
 
             // Reading Control Data to get bones that are used in model
             using (var reader = XmlReader.Create(daeLocation.FullName))
@@ -380,21 +365,8 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 }
             }
-
-            // Throw an exception if no bones were found in the dae file, and it is not a housing item
-            if (boneJointDict.Count < 1 && !isHousingItem)
-            {
-                throw new Exception("No bones were found in the dae file.");
-            }
-
             var boneDict = new Dictionary<string, int>();
             var meshNameDict = new Dictionary<string, string>();
-
-            // Create a dictionary of the original bone data with <Bone Name, Bone Index>
-            for (var i = 0; i < xivMdl.PathData.BoneList.Count; i++)
-            {
-                boneDict.Add(xivMdl.PathData.BoneList[i], i);
-            }
 
             // Default values for element names
             var texc   = "-map0-array";
@@ -718,11 +690,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     throw new Exception($"There cannot be any duplicate meshes.  Duplicate: {atr}");
                                 }
 
-                                if (advImportSettings == null && (meshPartNum + 1 > xivMdl.LoDList[0].MeshDataList[meshNum].MeshPartList.Count))
-                                {
-                                    throw new Exception($"Extra mesh parts detected, please use Advanced Import.");
-                                }
-
                                 meshPartDataDictionary[meshNum].Add(meshPartNum, cData);
                             }
                             else
@@ -823,11 +790,6 @@ namespace xivModdingFramework.Models.FileTypes
                                                 boneNum++;
                                             }
                                         }
-
-                                        if (advImportSettings == null && (boneNum > boneDict.Count))
-                                        {
-                                            throw new Exception("Extra bones detected, please use Advanced Import.");
-                                        }
                                     }
 
                                     if (reader.Name.Contains("float_array"))
@@ -879,29 +841,6 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            // Check for vertex limit and missing weights
-            foreach (var mesh in meshPartDataDictionary)
-            {
-                var meshPartData = mesh.Value;
-                var totalVerts = 0;
-
-                foreach (var part in meshPartData)
-                {
-                    if (part.Value.Vcounts.Count < (part.Value.Positions.Count / 3) && !isHousingItem)
-                    {
-                        throw new Exception($"Vertices with missing weights detected in mesh {mesh.Key}.{part.Key}");
-                    }
-                    totalVerts += part.Value.Vcounts.Count;
-                }
-
-                if (totalVerts >= ushort.MaxValue)
-                {
-                    throw new Exception($"Maximum amount of 65535 vertices per mesh group exceeded.\n\n" +
-                        $"Vertex count for group {mesh.Key}: {totalVerts}");
-
-                }
-            }
-
             var dict = meshPartDataDictionary.ToDictionary(x => x.Key, x => x.Value.ToDictionary(y => y.Key, y => y.Value));
 
             try
@@ -941,10 +880,13 @@ namespace xivModdingFramework.Models.FileTypes
                         // Build the offset list for sanity to avoid expensive recalculations.
                         var weightEntryOffsets = new List<int>();
                         var offset = 0;
-                        for (int i = 0; i < numVerts; i++)
+                        if (cData.Vcounts.Count != 0)
                         {
-                            weightEntryOffsets.Add(offset);
-                            offset += (cData.Vcounts[i]) * 2;
+                            for (int i = 0; i < numVerts; i++)
+                            {
+                                weightEntryOffsets.Add(offset);
+                                offset += (cData.Vcounts[i]) * 2;
+                            }
                         }
                         
 
@@ -1002,39 +944,43 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             vert.VertexColor = new byte[] { r, g, b, a };
 
-                            // Weights in DAE files are extremely annoying to manipulate, but here goes.
-                            var vertexId = cData.PositionIndices[i];
-                            var weightCount = cData.Vcounts[vertexId];
-                            for (var wi = 0; wi < weightCount; wi++)
+                            if (cData.Vcounts.Count != 0)
                             {
-                                if (wi > 3)
+                                // Weights in DAE files are extremely annoying to manipulate, but here goes.
+                                var vertexId = cData.PositionIndices[i];
+                                var weightCount = cData.Vcounts[vertexId];
+                                for (var wi = 0; wi < weightCount; wi++)
                                 {
-                                    // FFXIV only supports up to 4 bones per vertex.
-                                    break;
+                                    if (wi > 3)
+                                    {
+                                        // FFXIV only supports up to 4 bones per vertex.
+                                        break;
+                                    }
+
+                                    start = weightEntryOffsets[vertexId] + (wi * 2);
+
+                                    // The Weight Indexes are listed as [JointId WeightId] in pairs.
+                                    var jointId = cData.BoneIndices[start];
+                                    var weightId = cData.BoneIndices[start + 1];
+
+                                    // Get the original name and weight.
+                                    var boneName = cData.BoneNumDictionary.First(x => x.Value == jointId).Key;
+                                    var weight = cData.BoneWeights[weightId];
+
+                                    // Add the bones to the group bone set at needed.
+                                    if (!group.Bones.Contains(boneName))
+                                    {
+                                        group.Bones.Add(boneName);
+                                    }
+
+                                    // Convert them to the new id and byte format.
+                                    byte newBoneId = (byte)group.Bones.IndexOf(boneName);
+                                    byte xivWeight = (byte)(Math.Round(weight * 255));
+
+                                    // Save them.
+                                    vert.BoneIds[wi] = newBoneId;
+                                    vert.Weights[wi] = xivWeight;
                                 }
-
-                                start = weightEntryOffsets[vertexId] + (wi * 2);
-
-                                // The Weight Indexes are listed as [JointId WeightId] in pairs.
-                                var jointId = cData.BoneIndices[start];
-                                var weightId = cData.BoneIndices[start + 1];
-
-                                // Get the original name and weight.
-                                var boneName = cData.BoneNumDictionary.First(x => x.Value == jointId).Key;
-                                var weight = cData.BoneWeights[weightId];
-
-                                if(ttModel.Bones.IndexOf(boneName) < 0)
-                                {
-                                    ttModel.Bones.Add(boneName);
-                                }
-
-                                // Convert them to the new id and byte format.
-                                byte newBoneId = (byte)ttModel.Bones.IndexOf(boneName);
-                                byte xivWeight = (byte)(Math.Round(weight * 255));
-
-                                // Save them.
-                                vert.BoneIds[wi] = newBoneId;
-                                vert.Weights[wi] = xivWeight;
                             }
                             // Save the new fully qualified vertex, and assign the tri index to point to it.
                             part.Vertices.Add(vert);
@@ -3155,7 +3101,7 @@ namespace xivModdingFramework.Models.FileTypes
                     //</vcount>
 
                     var bs = meshDataList[i].MeshInfo.BoneListIndex;
-                    var boneSet = modelData.BoneIndexMeshList[bs].BoneIndices;
+                    var boneSet = modelData.MeshBoneSets[bs].BoneIndices;
 
                     //<v>
                     xmlWriter.WriteStartElement("v");
