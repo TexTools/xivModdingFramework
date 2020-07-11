@@ -444,7 +444,8 @@ namespace xivModdingFramework.Models.DataContainers
                 var matIdx = md.MeshInfo.MaterialIndex;
                 if (matIdx < rawMdl.PathData.MaterialList.Count)
                 {
-                    localMesh.Material = rawMdl.PathData.MaterialList[matIdx];
+                    var oldMtrl = rawMdl.PathData.MaterialList[matIdx];
+                    localMesh.Material = oldMtrl;
                 }
                 
 
