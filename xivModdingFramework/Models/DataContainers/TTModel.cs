@@ -32,7 +32,7 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector2 UV2 = new Vector2(0, 0);
 
         // RGBA
-        public byte[] VertexColor = new byte[4];
+        public byte[] VertexColor = new byte[] { 255, 255, 255, 255 };
 
         // BoneIds and Weights.  FFXIV Vertices can only be affected by a maximum of 4 bones.
         public byte[] BoneIds = new byte[4];
@@ -771,7 +771,7 @@ namespace xivModdingFramework.Models.DataContainers
                         if (mIdx >= ogMdl.LoDList[lIdx].MeshDataList.Count) return;
 
                         // Get all the parts for this mesh.
-                        var parts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).ToList();
+                        var parts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).OrderBy(x => x.ShapeName).ToList();
 
                         // If we have any, we need to create entries for them.
                         if (parts.Count > 0)
@@ -792,7 +792,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 // This matches old vertex ID(old MeshGroup level) to new vertex ID(new shape part level).
                                 var vertexDictionary = new Dictionary<int, int>();
 
-                                var uniqueVertexIds = new HashSet<int>();
+                                var uniqueVertexIds = new SortedSet<int>();
                                 foreach (var d in data)
                                 {
                                     uniqueVertexIds.Add(d.ShapeVertex);
@@ -801,9 +801,9 @@ namespace xivModdingFramework.Models.DataContainers
                                 // Now we need to use these to reference the original vertex list for the mesh
                                 // to create our new TTVertexes.
                                 var oldVertexIds = uniqueVertexIds.ToList();
-                                var vert = new TTVertex();
                                 foreach (var vId in oldVertexIds)
                                 {
+                                    var vert = new TTVertex();
                                     vert.Position = ogGroup.VertexData.Positions.Count > vId ? ogGroup.VertexData.Positions[vId] : new Vector3();
                                     vert.Normal = ogGroup.VertexData.Normals.Count > vId ? ogGroup.VertexData.Normals[vId] : new Vector3();
                                     vert.Tangent = ogGroup.VertexData.Tangents.Count > vId ? ogGroup.VertexData.Tangents[vId] : new Vector3();
@@ -811,6 +811,12 @@ namespace xivModdingFramework.Models.DataContainers
                                     vert.Handedness = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormalHandedness[vId] == 0 ? true : false : false; // TODO - FIXFIX ? Might havethis backwards?
                                     vert.UV1 = ogGroup.VertexData.TextureCoordinates0.Count > vId ? ogGroup.VertexData.TextureCoordinates0[vId] : new Vector2();
                                     vert.UV2 = ogGroup.VertexData.TextureCoordinates1.Count > vId ? ogGroup.VertexData.TextureCoordinates1[vId] : new Vector2();
+                                    var color = ogGroup.VertexData.Colors.Count > vId ? ogGroup.VertexData.Colors[vId]: new Color();
+
+                                    vert.VertexColor[0] = color.R;
+                                    vert.VertexColor[1] = color.G;
+                                    vert.VertexColor[2] = color.B;
+                                    vert.VertexColor[3] = color.A;
 
                                     for (int i = 0; i < 4 && i < ogGroup.VertexData.BoneWeights[vId].Length; i++)
                                     {
@@ -852,6 +858,12 @@ namespace xivModdingFramework.Models.DataContainers
                         }
                     }
                 }
+
+                foreach(var m in MeshGroups)
+                {
+                    m.ShapeParts = m.ShapeParts.OrderBy(x => x.Name).ToList();
+                }
+
             } catch (Exception ex)
             {
                 throw ex;

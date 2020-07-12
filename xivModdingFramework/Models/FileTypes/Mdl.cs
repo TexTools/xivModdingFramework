@@ -2378,11 +2378,11 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
 
                 #region Shape Stuff
-                #region Shape Data Block
 
                 var FullShapeDataBlock = new List<byte>();
                 if (ttModel.EnableShapeData)
                 {
+                    #region Shape Part Counts
 
                     var meshShapeInfoDataBlock = new List<byte>();
 
@@ -2452,7 +2452,7 @@ namespace xivModdingFramework.Models.FileTypes
                     #endregion
 
                     // Mesh Shape Data
-                    #region Mesh Shape Data Block
+                    #region Raw Shape Data Data Block
 
                     var meshShapeDataBlock = new List<byte>();
 
@@ -2482,7 +2482,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 var baseVertexCount = ttModel.MeshGroups[meshNum].VertexCount + newVertsSoFar[meshNum];
                                 foreach (var r in p.Part.Replacements)
                                 {
-                                    // TODO FIXFIX - Are these ints or shorts?
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort) r.Key));
 
                                     // Shift these forward to be relative to the full mesh group, rather than
@@ -2588,6 +2587,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
+                #region LoD Block
                 // Combined Data Block Sizes
                 // This is the offset to the beginning of the vertex data
                 var combinedDataBlockSize = 68 + vertexInfoBlock.Count + pathInfoBlock.Count + modelDataBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
@@ -2747,6 +2747,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     lodNum++;
                 }
+                #endregion
 
                 // Combine All DataBlocks
                 fullModelDataBlock.AddRange(pathInfoBlock);
@@ -2835,6 +2836,104 @@ namespace xivModdingFramework.Models.FileTypes
                 var compressedMeshSizes = new List<int>();
                 var compressedIndexSizes = new List<int>();
 
+                if (ttModel.EnableShapeData)
+                {
+                    // Shape parts need to be rewitten in specific order.
+                    var parts = ttModel.ShapeParts;
+                    foreach ( var p in parts)
+                    {
+                        // Because our imported data does not include mesh shape data, we must include it manually
+                        var group = ttModel.MeshGroups[p.MeshId];
+                        var importData = importDataDictionary[p.MeshId];
+                        foreach (var v in p.Part.Vertices)
+                        {
+                            // Positions for Weapon and Monster item types are half precision floating points
+                            var posDataType = vertexInfoDict[0][VertexUsageType.Position];
+
+
+                            Half hx, hy, hz;
+                            if (posDataType == VertexDataType.Half4)
+                            {
+                                hx = new Half(v.Position[0]);
+                                hy = new Half(v.Position[1]);
+                                hz = new Half(v.Position[2]);
+
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(hx.RawValue));
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(hy.RawValue));
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(hz.RawValue));
+
+                                // Half float positions have a W coordinate but it is never used and is defaulted to 1.
+                                var w = new Half(1);
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
+
+                            }
+                            // Everything else has positions as singles 
+                            else
+                            {
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[0]));
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[1]));
+                                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[2]));
+                            }
+
+                            // Furniture items do not have bone data
+                            if (ttModel.HasWeights)
+                            {
+                                // Bone Weights
+                                importData.VertexData0.AddRange(v.Weights);
+
+                                // Bone Indices
+                                importData.VertexData0.AddRange(v.BoneIds);
+                            }
+
+                            // Normals
+                            hx = v.Normal[0];
+                            hy = v.Normal[1];
+                            hz = v.Normal[2];
+
+                            importData.VertexData1.AddRange(BitConverter.GetBytes(hx));
+                            importData.VertexData1.AddRange(BitConverter.GetBytes(hy));
+                            importData.VertexData1.AddRange(BitConverter.GetBytes(hz));
+
+                            // BiNormals
+                            // Change the BiNormals based on Handedness
+                            var biNormal = v.Binormal;
+                            int handedness = v.Handedness ? 1 : -1;
+
+                            // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
+                            // But the data gets written into the game, too, so why do we need to pre-flip it?
+
+                            importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
+
+
+                            if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
+                            {
+                                // 99% sure this code path is never actually used.
+                                importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(v.Tangent, handedness * -1));
+                            }
+
+
+                            importData.VertexData1.Add(v.VertexColor[0]);
+                            importData.VertexData1.Add(v.VertexColor[1]);
+                            importData.VertexData1.Add(v.VertexColor[2]);
+                            importData.VertexData1.Add(v.VertexColor[3]);
+
+                            // Texture Coordinates
+                            var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
+
+
+                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[0]));
+                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[1]));
+
+                            if (texCoordDataType == VertexDataType.Float4)
+                            {
+                                importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[0]));
+                                importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[1]));
+                            }
+                        }
+                    }
+                }
+
+
                 lodNum = 0;
                 foreach (var lod in ogMdl.LoDList)
                 {
@@ -2844,103 +2943,10 @@ namespace xivModdingFramework.Models.FileTypes
                     if (lodNum == 0)
                     {
                         var totalMeshes = ttModel.MeshGroups.Count;
+
                         for (var i = 0; i < totalMeshes; i++)
                         {
                             var importData = importDataDictionary[meshNum];
-
-                            // Because our imported data does not include mesh shape data, we must include it manually
-                            if (ttModel.EnableShapeData && meshNum < lod.MeshDataList.Count && lodNum == 0)
-                            {
-                                var group = ttModel.MeshGroups[meshNum];
-                                foreach(var shapePart in group.ShapeParts)
-                                {
-                                    foreach (var v in shapePart.Vertices)
-                                    {
-                                        // Positions for Weapon and Monster item types are half precision floating points
-                                        var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
-
-                                        Half hx, hy, hz;
-                                        if (posDataType == VertexDataType.Half4)
-                                        {
-                                            hx = new Half(v.Position[0]);
-                                            hy = new Half(v.Position[1]);
-                                            hz = new Half(v.Position[2]);
-
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(hx.RawValue));
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(hy.RawValue));
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(hz.RawValue));
-
-                                            // Half float positions have a W coordinate but it is never used and is defaulted to 1.
-                                            var w = new Half(1);
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
-
-                                        }
-                                        // Everything else has positions as singles 
-                                        else
-                                        {
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[0]));
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[1]));
-                                            importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[2]));
-                                        }
-
-                                        // Furniture items do not have bone data
-                                        if (ttModel.HasWeights)
-                                        {
-                                            // Bone Weights
-                                            importData.VertexData0.AddRange(v.Weights);
-
-                                            // Bone Indices
-                                            importData.VertexData0.AddRange(v.BoneIds);
-                                        }
-
-                                        // Normals
-                                        hx = v.Normal[0];
-                                        hy = v.Normal[1];
-                                        hz = v.Normal[2];
-
-                                        importData.VertexData1.AddRange(BitConverter.GetBytes(hx));
-                                        importData.VertexData1.AddRange(BitConverter.GetBytes(hy));
-                                        importData.VertexData1.AddRange(BitConverter.GetBytes(hz));
-
-                                        // BiNormals
-                                        // Change the BiNormals based on Handedness
-                                        var biNormal = v.Binormal;
-                                        int handedness = v.Handedness ? 1 : -1;
-
-                                        // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
-                                        // But the data gets written into the game, too, so why do we need to pre-flip it?
-
-                                        importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
-
-
-                                        if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
-                                        {
-                                            // 99% sure this code path is never actually used.
-                                            importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(v.Tangent, handedness * -1));
-                                        }
-
-
-                                        importData.VertexData1.Add(v.VertexColor[0]);
-                                        importData.VertexData1.Add(v.VertexColor[1]);
-                                        importData.VertexData1.Add(v.VertexColor[2]);
-                                        importData.VertexData1.Add(v.VertexColor[3]);
-
-                                        // Texture Coordinates
-                                        var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
-
-
-                                        importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[0]));
-                                        importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[1]));
-
-                                        if (texCoordDataType == VertexDataType.Float4)
-                                        {
-                                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[0]));
-                                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[1]));
-                                        }
-                                    }
-                                }
-                            }
 
                             vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
                             vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
