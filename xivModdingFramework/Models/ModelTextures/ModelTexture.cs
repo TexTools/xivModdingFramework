@@ -222,13 +222,25 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     if (multiPixels != null)
                     {
-                        diffR = multiPixels[i - 3];
-                        diffG = multiPixels[i - 3];
-                        diffB = multiPixels[i - 3];
+                        if (materialType.Equals("hair"))
+                        {
+                            if (multiPixels.Length > i)
+                            {
+                                specR = multiPixels[i - 3];
+                                specG = multiPixels[i - 2];
+                                specB = multiPixels[i - 1];
+                            }
+                        }
+                        else
+                        {
+                            diffR = multiPixels[i - 3];
+                            diffG = multiPixels[i - 3];
+                            diffB = multiPixels[i - 3];
 
-                        specR = multiPixels[i - 1];
-                        specG = multiPixels[i - 1];
-                        specB = multiPixels[i - 1];
+                            specR = multiPixels[i - 1];
+                            specG = multiPixels[i - 1];
+                            specB = multiPixels[i - 1];
+                        }
                     }
                     else
                     {
