@@ -130,7 +130,7 @@ namespace xivModdingFramework.Variants.FileTypes
                         byte variant = br.ReadByte();
                         byte unknown = br.ReadByte();
                         ushort mask = br.ReadUInt16();
-                        ushort alwaysZero = br.ReadUInt16();
+                        ushort vfx = br.ReadUInt16();
 
                         imcData.DefaultSubset.Add(new XivImc
                         {
@@ -145,16 +145,17 @@ namespace xivModdingFramework.Variants.FileTypes
                             variant = br.ReadByte();
                             unknown = br.ReadByte();
                             mask = br.ReadUInt16();
-                            alwaysZero = br.ReadUInt16();
+                            vfx = br.ReadUInt16();
 
                             var newEntry = new XivImc
                             {
                                 Variant = variant,
                                 Unknown = unknown,
                                 Mask = mask,
-                                Vfx = variant
+                                Vfx = vfx
                             };
                             var subset = new List<XivImc>() { newEntry };
+                            imcData.SubsetList.Add(subset);
                         }
                     }
                     else if(imcData.TypeIdentifier == ImcType.Set)
