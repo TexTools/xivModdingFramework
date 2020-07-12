@@ -61,7 +61,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model">The model we are getting the skeleton for</param>
         public async Task CreateSkelFromSklb(IItem item, XivMdl model)
         {
-            var hasAssetcc = File.Exists(Directory.GetCurrentDirectory() + "\\AssetCc2.exe");
+            var hasAssetcc = File.Exists(Directory.GetCurrentDirectory() + "\\NotAssetCc.exe");
             
             if (hasAssetcc)
             {
@@ -104,8 +104,8 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         StartInfo = new ProcessStartInfo
                         {
-                            FileName = Directory.GetCurrentDirectory() + "/AssetCc2.exe",
-                            Arguments = "-s \"" + skelLoc + sklbName + ".sklb\" \"" + skelLoc + sklbName + ".xml\"",
+                            FileName = Directory.GetCurrentDirectory() + "/NotAssetCc.exe",
+                            Arguments = "\"" + skelLoc + sklbName + ".sklb\" \"" + skelLoc + sklbName + ".xml\"",
                             RedirectStandardOutput = true,
                             UseShellExecute = false,
                             CreateNoWindow = true
@@ -120,7 +120,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else
             {
-                throw new FileNotFoundException("AssetCc2 could not be found.");
+                throw new FileNotFoundException("NotAssetCc could not be found.");
             }
         }
 
