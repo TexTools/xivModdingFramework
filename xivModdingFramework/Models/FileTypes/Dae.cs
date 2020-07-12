@@ -884,103 +884,149 @@ namespace xivModdingFramework.Models.FileTypes
                                 offset += (cData.Vcounts[i]) * 2;
                             }
                         }
-                        
 
-                        // Build the vertex list.
+                        // list of [vertex Id] => All the triangle indexes that reference it.
+                        var verticesToIndexes = new List<List<int>>(new List<int>[numVerts]);
+                        for (int i = 0; i < numVerts; i++)
+                        {
+                            // There's probably a better way to do the constructor to make this handled automatically, but whatever.
+                            verticesToIndexes[i] = new List<int>();
+                        }
+
+                        // Collect all the tri indexes by vertex.
                         for (int i = 0; i < numIndices; i++)
                         {
+                            var vertexId = cData.PositionIndices[i];
+                            verticesToIndexes[vertexId].Add(i);
+                        }
 
-                            TTVertex vert = new TTVertex();
+                        // Pre-fill the array so we can reference it by index.
+                        part.TriangleIndices = new List<int>(new int[numIndices]);
 
-                            var start = (cData.PositionIndices[i]) * 3;
-                            vert.Position = new Vector3(cData.Positions[start], cData.Positions[start + 1], cData.Positions[start + 2]);
+                        // For every vert
+                        for (int vi = 0; vi < numVerts; vi++)
+                        {
+                            var sharedVerts = new List<TTVertex>();
 
-                            // Make sure each data point actually exists, or use default.
-                            if (cData.NormalIndices.Count > i)
+                            // And every Triangle Index used by that vert.
+                            for (int ti = 0; ti < verticesToIndexes[vi].Count; ti++)
                             {
-                                start = (cData.NormalIndices[i]) * 3;
-                                vert.Normal = new Vector3(cData.Normals[start], cData.Normals[start + 1], cData.Normals[start + 2]);
-                            }
+                                // Build a vertex using the data at this index.
+                                var i = verticesToIndexes[vi][ti];
+                                TTVertex vert = new TTVertex();
 
-                            byte r = 255;
-                            byte g = 255;
-                            byte b = 255;
-                            byte a = 255;
+                                var start = (cData.PositionIndices[i]) * 3;
+                                vert.Position = new Vector3(cData.Positions[start], cData.Positions[start + 1], cData.Positions[start + 2]);
 
-                            // Make sure each data point actually exists, or use default.
-                            if (cData.VertexColorIndices.Count > i)
-                            {
-                                start = (cData.VertexColorIndices[i]) * 3;
-                                r = (byte)(Math.Round(cData.VertexColors[start] * 255));
-                                g = (byte)(Math.Round(cData.VertexColors[start + 1] * 255));
-                                b = (byte)(Math.Round(cData.VertexColors[start + 2] * 255));
-                            }
-
-
-                            // Make sure each data point actually exists, or use default.
-                            if (cData.TextureCoordinate0Indices.Count > i)
-                            {
-                                start = (cData.TextureCoordinate0Indices[i]) * textureCoordinateStride;
-                                vert.UV1 = new Vector2(cData.TextureCoordinates0[start], cData.TextureCoordinates0[start + 1]);
-                            }
-
-                            // Make sure each data point actually exists, or use default.
-                            if (cData.TextureCoordinate1Indices.Count > i)
-                            {
-                                start = (cData.TextureCoordinate1Indices[i]) * textureCoordinateStride;
-                                vert.UV2 = new Vector2(cData.TextureCoordinates1[start], cData.TextureCoordinates1[start + 1]);
-                            }
-
-
-                            // Make sure each data point actually exists, or use default.
-                            if (cData.VertexAlphaIndices.Count > i)
-                            {
-                                start = (cData.VertexAlphaIndices[i]) * textureCoordinateStride;
-                                a = (byte)(Math.Round(cData.VertexAlphas[start] * 255));
-                            }
-                            vert.VertexColor = new byte[] { r, g, b, a };
-
-                            if (cData.Vcounts.Count != 0)
-                            {
-                                // Weights in DAE files are extremely annoying to manipulate, but here goes.
-                                var vertexId = cData.PositionIndices[i];
-                                var weightCount = cData.Vcounts[vertexId];
-                                for (var wi = 0; wi < weightCount; wi++)
+                                // Make sure each data point actually exists, or use default.
+                                if (cData.NormalIndices.Count > i)
                                 {
-                                    if (wi > 3)
+                                    start = (cData.NormalIndices[i]) * 3;
+                                    vert.Normal = new Vector3(cData.Normals[start], cData.Normals[start + 1], cData.Normals[start + 2]);
+                                }
+
+                                byte r = 255;
+                                byte g = 255;
+                                byte b = 255;
+                                byte a = 255;
+
+                                // Make sure each data point actually exists, or use default.
+                                if (cData.VertexColorIndices.Count > i)
+                                {
+                                    start = (cData.VertexColorIndices[i]) * 3;
+                                    r = (byte)(Math.Round(cData.VertexColors[start] * 255));
+                                    g = (byte)(Math.Round(cData.VertexColors[start + 1] * 255));
+                                    b = (byte)(Math.Round(cData.VertexColors[start + 2] * 255));
+                                }
+
+
+                                // Make sure each data point actually exists, or use default.
+                                if (cData.TextureCoordinate0Indices.Count > i)
+                                {
+                                    start = (cData.TextureCoordinate0Indices[i]) * textureCoordinateStride;
+                                    vert.UV1 = new Vector2(cData.TextureCoordinates0[start], cData.TextureCoordinates0[start + 1]);
+                                }
+
+                                // Make sure each data point actually exists, or use default.
+                                if (cData.TextureCoordinate1Indices.Count > i)
+                                {
+                                    start = (cData.TextureCoordinate1Indices[i]) * textureCoordinateStride;
+                                    vert.UV2 = new Vector2(cData.TextureCoordinates1[start], cData.TextureCoordinates1[start + 1]);
+                                }
+
+
+                                // Make sure each data point actually exists, or use default.
+                                if (cData.VertexAlphaIndices.Count > i)
+                                {
+                                    start = (cData.VertexAlphaIndices[i]) * textureCoordinateStride;
+                                    a = (byte)(Math.Round(cData.VertexAlphas[start] * 255));
+                                }
+                                vert.VertexColor = new byte[] { r, g, b, a };
+
+                                if (cData.Vcounts.Count != 0)
+                                {
+                                    // Weights in DAE files are extremely annoying to manipulate, but here goes.
+                                    var vertexId = cData.PositionIndices[i];
+                                    var weightCount = cData.Vcounts[vertexId];
+                                    for (var wi = 0; wi < weightCount; wi++)
                                     {
-                                        // FFXIV only supports up to 4 bones per vertex.
+                                        if (wi > 3)
+                                        {
+                                            // FFXIV only supports up to 4 bones per vertex.
+                                            break;
+                                        }
+
+                                        start = weightEntryOffsets[vertexId] + (wi * 2);
+
+                                        // The Weight Indexes are listed as [JointId WeightId] in pairs.
+                                        var jointId = cData.BoneIndices[start];
+                                        var weightId = cData.BoneIndices[start + 1];
+
+                                        // Get the original name and weight.
+                                        var boneName = cData.BoneNumDictionary.First(x => x.Value == jointId).Key;
+                                        var weight = cData.BoneWeights[weightId];
+
+                                        // Add the bones to the group bone set at needed.
+                                        if (!group.Bones.Contains(boneName))
+                                        {
+                                            group.Bones.Add(boneName);
+                                        }
+
+                                        // Convert them to the new id and byte format.
+                                        byte newBoneId = (byte)group.Bones.IndexOf(boneName);
+                                        byte xivWeight = (byte)(Math.Round(weight * 255));
+
+                                        // Save them.
+                                        vert.BoneIds[wi] = newBoneId;
+                                        vert.Weights[wi] = xivWeight;
+                                    }
+                                }
+
+                                // Now test to see if this vert is unique, or needs to be added.
+                                var vertToUse = -1;
+                                for(int si = 0; si < sharedVerts.Count; si++)
+                                {
+                                    if(sharedVerts[si] == vert)
+                                    {
+                                        vertToUse = si;
                                         break;
                                     }
+                                }
 
-                                    start = weightEntryOffsets[vertexId] + (wi * 2);
-
-                                    // The Weight Indexes are listed as [JointId WeightId] in pairs.
-                                    var jointId = cData.BoneIndices[start];
-                                    var weightId = cData.BoneIndices[start + 1];
-
-                                    // Get the original name and weight.
-                                    var boneName = cData.BoneNumDictionary.First(x => x.Value == jointId).Key;
-                                    var weight = cData.BoneWeights[weightId];
-
-                                    // Add the bones to the group bone set at needed.
-                                    if (!group.Bones.Contains(boneName))
-                                    {
-                                        group.Bones.Add(boneName);
-                                    }
-
-                                    // Convert them to the new id and byte format.
-                                    byte newBoneId = (byte)group.Bones.IndexOf(boneName);
-                                    byte xivWeight = (byte)(Math.Round(weight * 255));
-
-                                    // Save them.
-                                    vert.BoneIds[wi] = newBoneId;
-                                    vert.Weights[wi] = xivWeight;
+                                if(vertToUse == -1)
+                                {
+                                    // This vertex is unique, and needs to be added to the array.
+                                    sharedVerts.Add(vert);
+                                    var lastIndex = sharedVerts.Count - 1;
+                                    part.TriangleIndices[i] = (part.Vertices.Count + lastIndex);
+                                } else
+                                {
+                                    // Vert already exists, just use the reference one.
+                                    part.TriangleIndices[i] = (part.Vertices.Count + vertToUse);
                                 }
                             }
-                            // Save the new fully qualified vertex, and assign the tri index to point to it.
-                            part.Vertices.Add(vert);
-                            part.TriangleIndices.Add(part.Vertices.Count - 1);
+
+                            part.Vertices.AddRange(sharedVerts);
                         }
                     }
                 }
@@ -2382,467 +2428,6 @@ namespace xivModdingFramework.Models.FileTypes
                     totalVertices += totalCount;
                 }
 
-                #region testing
-                //if (modelData.ExtraData.totalExtraCounts.ContainsKey(i))
-                //{
-                //    var extraVerts = modelData.ExtraData.totalExtraCounts[i];
-                //    var extraStart = meshList[i].Indices.Max() + 1;
-
-                //    //<geometry>
-                //    xmlWriter.WriteStartElement("geometry");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i);
-                //    xmlWriter.WriteAttributeString("name", "extra_" + modelName + "_" + i);
-                //    //<mesh>
-                //    xmlWriter.WriteStartElement("mesh");
-
-                //    /*
-                //     * --------------------
-                //     * Verticies
-                //     * --------------------
-                //     */
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-positions");
-                //    //<float_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-positions-array");
-                //    xmlWriter.WriteAttributeString("count", (extraVerts * 3).ToString());
-
-                //    var ExPositions = meshList[i].Vertices.GetRange(extraStart, extraVerts);
-
-                //    foreach (var v in ExPositions)
-                //    {
-                //        xmlWriter.WriteString((v.X * Info.modelMultiplier).ToString() + " " + (v.Y * Info.modelMultiplier).ToString() + " " + (v.Z * Info.modelMultiplier).ToString() + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</float_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-positions-array");
-                //    xmlWriter.WriteAttributeString("count", extraVerts.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "3");
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "X");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Y");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Z");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-
-                //    /*
-                //     * --------------------
-                //     * Normals
-                //     * --------------------
-                //     */
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-normals");
-                //    //<float_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-normals-array");
-                //    xmlWriter.WriteAttributeString("count", (extraVerts * 3).ToString());
-
-                //    var ExNormals = meshList[i].Normals.GetRange(extraStart, extraVerts);
-
-                //    foreach (var n in ExNormals)
-                //    {
-                //        xmlWriter.WriteString(n.X.ToString() + " " + n.Y.ToString() + " " + n.Z.ToString() + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</float_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-normals-array");
-                //    xmlWriter.WriteAttributeString("count", extraVerts.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "3");
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "X");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Y");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Z");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-                //    /*
-                //     * --------------------
-                //     * Texture Coordinates
-                //     * --------------------
-                //     */
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map0");
-                //    //<float_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map0-array");
-                //    xmlWriter.WriteAttributeString("count", (extraVerts * 2).ToString());
-
-                //    //var texCoords = meshList[i].TextureCoordinates.GetRange(totalVertices, totalCount);
-                //    var ExTexCoords = meshList[i].TextureCoordinates.GetRange(extraStart, extraVerts);
-
-                //    foreach (var tc in ExTexCoords)
-                //    {
-                //        xmlWriter.WriteString(tc.X.ToString() + " " + (tc.Y * -1).ToString() + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</float_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map0-array");
-                //    xmlWriter.WriteAttributeString("count", extraVerts.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "2");
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "S");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "T");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-                //    /*
-                //     * --------------------
-                //     * Seconadry Texture Coordinates
-                //     * --------------------
-                //     */
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map1");
-                //    //<float_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map1-array");
-                //    xmlWriter.WriteAttributeString("count", (extraVerts * 2).ToString());
-
-                //    //var texCoords = meshList[i].TextureCoordinates.GetRange(totalVertices, totalCount);
-                //    var ExTexCoords2 = meshList[i].TextureCoordinates2.GetRange(extraStart, extraVerts);
-
-                //    foreach (var tc in ExTexCoords2)
-                //    {
-                //        xmlWriter.WriteString(tc.X.ToString() + " " + (tc.Y * -1).ToString() + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</float_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map1-array");
-                //    xmlWriter.WriteAttributeString("count", extraVerts.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "2");
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "S");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "T");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-                //    /*
-                //     * --------------------
-                //     * Tangents
-                //     * --------------------
-                //     */
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map0-textangents");
-                //    //<float_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map0-textangents-array");
-                //    xmlWriter.WriteAttributeString("count", (extraVerts * 3).ToString());
-
-                //    var ExTangents = meshList[i].Tangents.GetRange(extraStart, extraVerts);
-
-                //    foreach (var tan in ExTangents)
-                //    {
-                //        xmlWriter.WriteString(tan.X.ToString() + " " + tan.Y.ToString() + " " + tan.Z.ToString() + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</float_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map0-textangents-array");
-                //    xmlWriter.WriteAttributeString("count", extraVerts.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "3");
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "X");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Y");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Z");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-
-                //    /*
-                //     * --------------------
-                //     * Binormals
-                //     * --------------------
-                //     */
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map0-texbinormals");
-                //    //<float_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-map0-texbinormals-array");
-                //    xmlWriter.WriteAttributeString("count", (extraVerts * 3).ToString());
-
-                //    var ExBiNormals = meshList[i].BiTangents.GetRange(extraStart, extraVerts);
-
-                //    foreach (var bn in ExBiNormals)
-                //    {
-                //        xmlWriter.WriteString(bn.X.ToString() + " " + bn.Y.ToString() + " " + bn.Z.ToString() + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</float_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map0-texbinormals-array");
-                //    xmlWriter.WriteAttributeString("count", extraVerts.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "3");
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "X");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Y");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "Z");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-
-                //    //<vertices>
-                //    xmlWriter.WriteStartElement("vertices");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-vertices");
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "POSITION");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-positions");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-                //    xmlWriter.WriteEndElement();
-                //    //</vertices>
-
-                //    var extraIndexCount = 0;
-                //    foreach (var ic in modelData.ExtraData.indexCounts)
-                //    {
-                //        extraIndexCount += ic.IndexCount;
-                //    }
-
-                //    //<triangles>
-                //    xmlWriter.WriteStartElement("triangles");
-                //    xmlWriter.WriteAttributeString("material", modelName + "_" + i);
-                //    xmlWriter.WriteAttributeString("count", (modelData.ExtraData.extraIndices[i].Count / 3).ToString());
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "VERTEX");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-vertices");
-                //    xmlWriter.WriteAttributeString("offset", "0");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "NORMAL");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-normals");
-                //    xmlWriter.WriteAttributeString("offset", "1");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map0");
-                //    xmlWriter.WriteAttributeString("offset", "2");
-                //    xmlWriter.WriteAttributeString("set", "0");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "TEXCOORD");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map1");
-                //    xmlWriter.WriteAttributeString("offset", "2");
-                //    xmlWriter.WriteAttributeString("set", "1");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "TEXTANGENT");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map0-textangents");
-                //    xmlWriter.WriteAttributeString("offset", "3");
-                //    xmlWriter.WriteAttributeString("set", "1");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "TEXBINORMAL");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-map0-texbinormals");
-                //    xmlWriter.WriteAttributeString("offset", "3");
-                //    xmlWriter.WriteAttributeString("set", "1");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<p>
-                //    xmlWriter.WriteStartElement("p");
-                //    var minIndex = modelData.ExtraData.extraIndices[i].Min();
-                //    foreach (var ind in modelData.ExtraData.extraIndices[i])
-                //    {
-                //        int p = ind - minIndex;
-
-                //        if (p >= 0)
-                //        {
-                //            xmlWriter.WriteString(p + " " + p + " " + p + " " + p + " ");
-                //        }
-                //    }
-                //    xmlWriter.WriteEndElement();
-                //    //</p>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</triangles>
-                //    xmlWriter.WriteEndElement();
-                //    //</mesh>
-                //    xmlWriter.WriteEndElement();
-                //    //</geometry>
-                //}
-                #endregion testing
             }
 
             xmlWriter.WriteEndElement();
@@ -3122,225 +2707,6 @@ namespace xivModdingFramework.Models.FileTypes
                     prevIndexCount += indexCount;
                 }
 
-                #region testing
-                //if (modelData.ExtraData.totalExtraCounts.ContainsKey(i))
-                //{
-                //    //< controller >
-                //    xmlWriter.WriteStartElement("controller");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1");
-                //    //<skin>
-                //    xmlWriter.WriteStartElement("skin");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i);
-                //    //<bind_shape_matrix>
-                //    xmlWriter.WriteStartElement("bind_shape_matrix");
-                //    xmlWriter.WriteString("1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1");
-                //    xmlWriter.WriteEndElement();
-                //    //</bind_shape_matrix>
-
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1-joints");
-                //    //<Name_array>
-                //    xmlWriter.WriteStartElement("Name_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1-joints-array");
-                //    xmlWriter.WriteAttributeString("count", meshDataList[i].BoneStrings.Count.ToString());
-                //    foreach (var b in meshDataList[i].BoneStrings)
-                //    {
-                //        xmlWriter.WriteString(b + " ");
-                //    }
-                //    xmlWriter.WriteEndElement();
-                //    //</Name_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-joints-array");
-                //    xmlWriter.WriteAttributeString("count", meshDataList[i].BoneStrings.Count.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "1");
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "JOINT");
-                //    xmlWriter.WriteAttributeString("type", "name");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1-bind_poses");
-                //    //<Name_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1-bind_poses-array");
-                //    xmlWriter.WriteAttributeString("count", (16 * meshDataList[i].BoneStrings.Count).ToString());
-
-                //    for (int m = 0; m < meshDataList[i].BoneStrings.Count; m++)
-                //    {
-                //        try
-                //        {
-                //            Matrix matrix = new Matrix(skelDict[meshDataList[i].BoneStrings[m]].InversePoseMatrix);
-
-                //            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Info.modelMultiplier) + " ");
-                //            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Info.modelMultiplier) + " ");
-                //            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * Info.modelMultiplier) + " ");
-                //            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * Info.modelMultiplier) + " ");
-                //        }
-                //        catch
-                //        {
-                //            Debug.WriteLine("Error at " + meshDataList[i].BoneStrings[m]);
-                //        }
-
-                //    }
-                //    xmlWriter.WriteEndElement();
-                //    //</Name_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-bind_poses-array");
-                //    xmlWriter.WriteAttributeString("count", meshDataList[i].BoneStrings.Count.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "16");
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "TRANSFORM");
-                //    xmlWriter.WriteAttributeString("type", "float4x4");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-                //    var extraVerts = modelData.ExtraData.totalExtraCounts[i];
-                //    //var extraStart = meshDataList[i].Indices.Max() + 1;
-                //    var extraStart = modelData.ExtraData.indexMin[i];
-                //    var ExWeightCounts = meshDataList[i].WeightCounts.GetRange(extraStart, extraVerts);
-                //    var totalExWeights = 0;
-
-                //    foreach (var bwc in ExWeightCounts)
-                //    {
-                //        totalExWeights += bwc;
-                //    }
-
-                //    //<source>
-                //    xmlWriter.WriteStartElement("source");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1-weights");
-                //    //<Name_array>
-                //    xmlWriter.WriteStartElement("float_array");
-                //    xmlWriter.WriteAttributeString("id", "geom-extra_" + modelName + "_" + i + "-skin1-weights-array");
-                //    xmlWriter.WriteAttributeString("count", totalExWeights.ToString());
-
-                //    var ExWeightlist = meshDataList[i].BlendWeights.GetRange(extraStart, totalExWeights);
-
-                //    foreach (var bw in ExWeightlist)
-                //    {
-                //        xmlWriter.WriteString(bw + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</Name_array>
-
-                //    //<technique_common>
-                //    xmlWriter.WriteStartElement("technique_common");
-                //    //<accessor>
-                //    xmlWriter.WriteStartElement("accessor");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-weights-array");
-                //    xmlWriter.WriteAttributeString("count", totalExWeights.ToString());
-                //    xmlWriter.WriteAttributeString("stride", "1");
-                //    //<param>
-                //    xmlWriter.WriteStartElement("param");
-                //    xmlWriter.WriteAttributeString("name", "WEIGHT");
-                //    xmlWriter.WriteAttributeString("type", "float");
-                //    xmlWriter.WriteEndElement();
-                //    //</param>
-                //    xmlWriter.WriteEndElement();
-                //    //</accessor>
-                //    xmlWriter.WriteEndElement();
-                //    //</technique_common>
-                //    xmlWriter.WriteEndElement();
-                //    //</source>
-
-                //    //<joints>
-                //    xmlWriter.WriteStartElement("joints");
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "JOINT");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-joints");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "INV_BIND_MATRIX");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-bind_poses");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-                //    xmlWriter.WriteEndElement();
-                //    //</joints>
-
-                //    //<vertex_weights>
-                //    xmlWriter.WriteStartElement("vertex_weights");
-                //    xmlWriter.WriteAttributeString("count", ExWeightlist.Count.ToString());
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "JOINT");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-joints");
-                //    xmlWriter.WriteAttributeString("offset", "0");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-                //    //<input>
-                //    xmlWriter.WriteStartElement("input");
-                //    xmlWriter.WriteAttributeString("semantic", "WEIGHT");
-                //    xmlWriter.WriteAttributeString("source", "#geom-extra_" + modelName + "_" + i + "-skin1-weights");
-                //    xmlWriter.WriteAttributeString("offset", "1");
-                //    xmlWriter.WriteEndElement();
-                //    //</input>
-
-                //    //<vcount>
-                //    xmlWriter.WriteStartElement("vcount");
-
-                //    //var ExWeightlist = meshDataList[i].WeightCounts.GetRange(extraStart, totalExWeights);
-
-                //    foreach (var bwc in ExWeightCounts)
-                //    {
-                //        xmlWriter.WriteString(bwc + " ");
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</vcount>
-                //    //<v>
-                //    xmlWriter.WriteStartElement("v");
-                //    int blin2 = 0;
-
-                //    var ExBlendind = meshDataList[i].BlendIndices.GetRange(extraStart, totalExWeights);
-
-                //    foreach (var bi in ExBlendind)
-                //    {
-                //        xmlWriter.WriteString(bi + " " + blin2 + " ");
-                //        blin2++;
-                //    }
-
-                //    xmlWriter.WriteEndElement();
-                //    //</v>
-                //    xmlWriter.WriteEndElement();
-                //    //</vertex_weights>
-
-                //    xmlWriter.WriteEndElement();
-                //    //</skin>
-                //    xmlWriter.WriteEndElement();
-                //    //</controller>
-                //}
-                #endregion testing
             }
 
             xmlWriter.WriteEndElement();

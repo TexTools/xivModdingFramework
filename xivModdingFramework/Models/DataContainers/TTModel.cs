@@ -37,6 +37,32 @@ namespace xivModdingFramework.Models.DataContainers
         // BoneIds and Weights.  FFXIV Vertices can only be affected by a maximum of 4 bones.
         public byte[] BoneIds = new byte[4];
         public byte[] Weights = new byte[4];
+
+        public static bool operator ==(TTVertex a, TTVertex b)
+        {
+            // Memberwise equality.
+            if (a.Position != b.Position) return false;
+            if (a.Normal != b.Normal) return false;
+            if (a.Binormal != b.Binormal) return false;
+            if (a.Handedness != b.Handedness) return false;
+            if (a.UV1 != b.UV1) return false;
+            if (a.UV2 != b.UV2) return false;
+
+            for(var ci = 0; ci < 4; ci++)
+            {
+                if (a.VertexColor[ci] != b.VertexColor[ci]) return false;
+                if (a.BoneIds[ci] != b.BoneIds[ci]) return false;
+                if (a.Weights[ci] != b.Weights[ci]) return false;
+
+            }
+
+            return true;
+        }
+
+        public static bool operator !=(TTVertex a, TTVertex b)
+        {
+            return !(a == b);
+        }
     }
 
 
