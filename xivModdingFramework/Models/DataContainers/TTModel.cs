@@ -61,6 +61,29 @@ namespace xivModdingFramework.Models.DataContainers
     }
 
     /// <summary>
+    /// Class representing a shape data part.
+    /// A MeshGroup may have any amount of these, including
+    /// multiple that have the same shape name.
+    /// </summary>
+    public class TTShapePart
+    {
+        /// <summary>
+        /// The raw shp_ identifier.
+        /// </summary>
+        public string Name;
+
+        /// <summary>
+        /// The list of vertices this Shape introduces.
+        /// </summary>
+        public List<TTVertex> Vertices = new List<TTVertex>();
+
+        /// <summary>
+        /// Dictionary of [Mesh Level Index #] => [Shape Part Vertex # to replace that Index's Value with] 
+        /// </summary>
+        public Dictionary<int, int> Replacements = new Dictionary<int, int>();
+    }
+
+    /// <summary>
     /// Class representing a mesh group in TexTools
     /// At the FFXIV level, all the parts are crushed down together into one
     /// Singular 'Mesh'.
@@ -79,6 +102,9 @@ namespace xivModdingFramework.Models.DataContainers
         /// List of bones used by this mesh group's vertices.
         /// </summary>
         public List<string> Bones = new List<string>();
+
+
+        public List<TTShapePart> ShapeParts = new List<TTShapePart>();
 
         /// <summary>
         /// Accessor for the full unified MeshGroup level Vertex list.
@@ -284,6 +310,116 @@ namespace xivModdingFramework.Models.DataContainers
         /// Whether or not to write Shape data to the resulting MDL.
         /// </summary>
         public bool EnableShapeData = false;
+        
+        /// <summary>
+        /// List of all shape names used in the model.
+        /// </summary>
+        public List<string> ShapeNames
+        {
+            get
+            {
+                var shapes = new SortedSet<string>();
+                foreach(var m in MeshGroups)
+                {
+                    foreach(var p in m.ShapeParts)
+                    {
+                        shapes.Add(p.Name);
+                    }
+                }
+                return shapes.ToList();
+            }
+        }
+        
+        /// <summary>
+        /// Total # of Shape Parts
+        /// </summary>
+        public short ShapePartCount
+        {
+            get
+            {
+                short sum = 0;
+                foreach(var m in MeshGroups)
+                {
+                    sum += (short) m.ShapeParts.Count;
+                }
+                return sum;
+            }
+        }
+
+        /// <summary>
+        /// Total Shape Data (Index) Entries
+        /// </summary>
+        public short ShapeDataCount
+        {
+            get
+            {
+                short sum = 0;
+                foreach (var m in MeshGroups)
+                {
+                    foreach(var p in m.ShapeParts)
+                    {
+                        sum += (short)p.Replacements.Count;
+                    }
+                }
+                return sum;
+            }
+        }
+
+
+        /// <summary>
+        /// Per-Shape sum of parts; matches up by index to ShapeNames.
+        /// </summary>
+        /// <returns></returns>
+        public List<short> ShapePartCounts
+        {
+            get
+            {
+                var counts = new List<short>(new short[ShapeNames.Count]);
+
+                foreach (var m in MeshGroups)
+                {
+                    foreach (var p in m.ShapeParts)
+                    {
+                        var idx = ShapeNames.IndexOf(p.Name);
+                        counts[idx]++;
+                    }
+                }
+                return counts;
+            }
+        }
+
+        /// <summary>
+        /// List of all the Shape Parts in the mesh, grouped by Shape Name order.
+        /// (Matches up with ShapePartCounts)
+        /// </summary>
+        public List<(TTShapePart Part, int MeshId)> ShapeParts
+        {
+            get
+            {
+                var byShape = new Dictionary<string, List<(TTShapePart Part, int MeshId)>>();
+
+                var mIdx = 0;
+                foreach (var m in MeshGroups)
+                {
+                    foreach (var p in m.ShapeParts)
+                    {
+                        if(!byShape.ContainsKey(p.Name))
+                        {
+                            byShape.Add(p.Name, new List<(TTShapePart Part, int MeshId)>());
+                        }
+                        byShape[p.Name].Add((p, mIdx));
+                    }
+                    mIdx++;
+                }
+
+                var ret = new List<(TTShapePart Part, int MeshId)>();
+                foreach(var name in ShapeNames)
+                {
+                    ret.AddRange(byShape[name]);
+                }
+                return ret;
+            }
+        }
 
         /// <summary>
         /// Whether or not this Model actually has animation/weight data.
@@ -479,6 +615,7 @@ namespace xivModdingFramework.Models.DataContainers
             }
         }
 
+
         /// <summary>
         /// This function does all the minor adjustments to a Model that makes it
         /// ready for injection into the SE filesystem.  Such as flipping the 
@@ -488,7 +625,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// Returns a list of warnings we might want to inform the user about,
         /// if there were any oddities in the data.
         /// </summary>
-        public static List<string> MakeImportReady(TTModel model)
+        public static void MakeImportReady(TTModel model)
         {
             var totalMajorCorrections = 0;
             var warnings = new List<string>();
@@ -559,16 +696,16 @@ namespace xivModdingFramework.Models.DataContainers
 
             if(totalMajorCorrections > 0)
             {
+                // TODO - FIXFIX - Use proper logging method.
                 warnings.Add(totalMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
             }
-            return warnings;
+            //return warnings;
         }
 
         /// <summary>
-        /// This function does all the minor adjustments to a Model that makes it
-        /// ready for injection into the SE filesystem.  Such as flipping the 
-        /// UVs, and applying the global level size multiplier.
-        /// Likewise, MakeImport() undoes this process.
+        /// This process undoes all the strange minor adjustments to a model
+        /// that FFXIV expects in the SE filesystem, such as flipping the UVs,
+        /// and having tiny ass models.
         /// 
         /// This process is expected to be warning-free, so it has no return value.
         /// </summary>
@@ -588,6 +725,136 @@ namespace xivModdingFramework.Models.DataContainers
                         v.UV2[1] *= -1;
                     }
                 }
+            }
+        }
+
+
+        /// <summary>
+        /// This is the last pre-import step.  Merges raw shaped data from
+        /// a low-level xivMdl object.
+        /// </summary>
+        /// <param name="rawMdl"></param>
+        public void MergeShapeData(XivMdl ogMdl)
+        {
+            try
+            {
+                // Sanity checks.
+                if (!ogMdl.HasShapeData || !EnableShapeData)
+                {
+                    return;
+                }
+
+                // Just use LoD 0 only.
+                var lIdx = 0;
+
+                var baseShapeData = ogMdl.MeshShapeData;
+                // For every Shape
+                foreach (var shape in baseShapeData.ShapeInfoList)
+                {
+                    var name = shape.Name;
+                    // For every Mesh Group
+                    for (var mIdx = 0; mIdx < MeshGroups.Count; mIdx++)
+                    {
+                        var ogGroup = ogMdl.LoDList[lIdx].MeshDataList[mIdx];
+                        var newGroup = MeshGroups[mIdx];
+                        var newBoneSet = newGroup.Bones;
+
+                        // Have to convert the raw bone set to a useable format...
+                        var oldBoneSetRaw = ogMdl.MeshBoneSets[ogGroup.MeshInfo.BoneListIndex];
+                        var oldBoneSet = new List<string>();
+                        for (int bi = 0; bi < oldBoneSetRaw.BoneIndexCount; bi++)
+                        {
+                            oldBoneSet.Add(ogMdl.PathData.BoneList[bi]);
+                        }
+
+                        // No shape data for groups that don't exist in the old model.
+                        if (mIdx >= ogMdl.LoDList[lIdx].MeshDataList.Count) return;
+
+                        // Get all the parts for this mesh.
+                        var parts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).ToList();
+
+                        // If we have any, we need to create entries for them.
+                        if (parts.Count > 0)
+                        {
+                            foreach (var p in parts)
+                            {
+                                var ttPart = new TTShapePart();
+                                ttPart.Name = name;
+
+                                var data = baseShapeData.GetShapeData(p);
+
+
+                                // That's the easy part...
+
+                                // Now we have to build the Vertex List for this part.
+                                // First we need a set of all the unique vertex IDs in the the data.
+
+                                // This matches old vertex ID(old MeshGroup level) to new vertex ID(new shape part level).
+                                var vertexDictionary = new Dictionary<int, int>();
+
+                                var uniqueVertexIds = new HashSet<int>();
+                                foreach (var d in data)
+                                {
+                                    uniqueVertexIds.Add(d.ShapeVertex);
+                                }
+
+                                // Now we need to use these to reference the original vertex list for the mesh
+                                // to create our new TTVertexes.
+                                var oldVertexIds = uniqueVertexIds.ToList();
+                                var vert = new TTVertex();
+                                foreach (var vId in oldVertexIds)
+                                {
+                                    vert.Position = ogGroup.VertexData.Positions.Count > vId ? ogGroup.VertexData.Positions[vId] : new Vector3();
+                                    vert.Normal = ogGroup.VertexData.Normals.Count > vId ? ogGroup.VertexData.Normals[vId] : new Vector3();
+                                    vert.Tangent = ogGroup.VertexData.Tangents.Count > vId ? ogGroup.VertexData.Tangents[vId] : new Vector3();
+                                    vert.Binormal = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormals[vId] : new Vector3();
+                                    vert.Handedness = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormalHandedness[vId] == 0 ? true : false : false; // TODO - FIXFIX ? Might havethis backwards?
+                                    vert.UV1 = ogGroup.VertexData.TextureCoordinates0.Count > vId ? ogGroup.VertexData.TextureCoordinates0[vId] : new Vector2();
+                                    vert.UV2 = ogGroup.VertexData.TextureCoordinates1.Count > vId ? ogGroup.VertexData.TextureCoordinates1[vId] : new Vector2();
+
+                                    for (int i = 0; i < 4 && i < ogGroup.VertexData.BoneWeights[vId].Length; i++)
+                                    {
+                                        // Copy Weights over.
+                                        vert.Weights[i] = (byte)(Math.Round(ogGroup.VertexData.BoneWeights[vId][i] * 255));
+
+                                        // We have to convert the bone ID to match the new bone IDs used in this TTModel.
+                                        var oldBoneId = ogGroup.VertexData.BoneIndices[vId][i];
+                                        var boneName = oldBoneSet[oldBoneId];
+                                        int newBoneId = newBoneSet.IndexOf(boneName);
+                                        if (newBoneId < 0)
+                                        {
+                                            throw new Exception("New model is missing bone used in Shape Data: " + boneName);
+                                        }
+
+                                        vert.BoneIds[i] = (byte)newBoneId;
+                                    }
+
+                                    // We can now add our new fully qualified vertex.
+                                    ttPart.Vertices.Add(vert);
+                                    vertexDictionary.Add(vId, ttPart.Vertices.Count - 1);
+                                }
+
+                                // Okay, we now have fully qualified vertex data, but we need to carry over the index
+                                // edits, and modify the vertex #'s to point to the new vertex list.
+                                //   ( That way this part's vertex offsets aren't dependent on the rest of the model maintaining the same structure )
+                                foreach (var d in data)
+                                {
+                                    var vertexId = vertexDictionary[d.ShapeVertex];
+
+                                    // This line is where shape data gets F*cked by changes to the base model.
+                                    // Because we're using the index offset that's relative to the original model's mesh group index list.
+                                    var indexId = d.BaseIndex;
+
+                                    ttPart.Replacements.Add(indexId, vertexId);
+                                }
+                                newGroup.ShapeParts.Add(ttPart);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ex)
+            {
+                throw ex;
             }
         }
 
