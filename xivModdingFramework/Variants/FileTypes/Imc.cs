@@ -276,14 +276,9 @@ namespace xivModdingFramework.Variants.FileTypes
 
             // That's it.
 
-            // Get outta here with your fancy operators
-            //itemName ??= Path.GetFileName(path);
-            //category ??= "Meta";
-            //source ??= "Internal";
-
-            itemName = itemName ?? Path.GetFileName(path);
-            category = category ?? "Meta";
-            source = source ?? "Internal";
+            itemName ??= Path.GetFileName(path);
+            category ??= "Meta";
+            source ??= "Internal";
 
             await dat.ImportType2Data(data.ToArray(), itemName, path, category, source);
         }
