@@ -42,6 +42,7 @@ using System.Transactions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using SharpDX.Win32;
+using xivModdingFramework.Models.Helpers;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -1387,7 +1388,8 @@ namespace xivModdingFramework.Models.FileTypes
         {
             const string importerPath = "importers/";
             var ret = new List<string>();
-            ret.Add("dae");
+            ret.Add("dae"); // DAE handler is internal.
+            ret.Add("db");  // Raw already-parsed DB files are fine.
 
             var directories = Directory.GetDirectories(importerPath);
             foreach(var d in directories)
@@ -1404,22 +1406,66 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
-        /// <summary>
-        /// Just an extra overload for ImportModel that automatically resolves a string path to directory info.
-        /// </summary>
-        public async Task ImportModel(IItemModel item, XivRace race, string path, string source = "Unknown", Func<TTModel, Task<bool>> intermediaryFunction = null, Action<bool, string> loggingFuction = null, bool rawDataOnly = false)
+        private async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
         {
-            var d = new DirectoryInfo(path);
-            await ImportModel(item, race, d, source, intermediaryFunction, loggingFuction, rawDataOnly);
-        }
 
-        /// <summary>
-        /// Just an extra overload for ImportModel that automatically resolves the XivMdl.
-        /// </summary>
-        public async Task ImportModel(IItemModel item, XivRace race, DirectoryInfo fileLocation, string source = "Unknown", Func<TTModel, Task<bool>> intermediaryFunction = null, Action<bool, string> loggingFuction = null, bool rawDataOnly = false)
-        {
-            var currentMdl = await this.GetMdlData(item, race);
-            await ImportModel(item, currentMdl, fileLocation, source, intermediaryFunction, loggingFuction, rawDataOnly);
+            var importerFolder = Directory.GetCurrentDirectory() + "\\importers\\" + importerName;
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = importerFolder + "\\importer.exe",
+                    Arguments = "\"" + filePath + "\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    WorkingDirectory = "" + importerFolder + "",
+                    CreateNoWindow = true
+                }
+            };
+
+            // Pipe the process output to our logging function.
+            proc.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
+            {
+                loggingFunction(false, e.Data);
+            };
+
+            // Pipe the process output to our logging function.
+            proc.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
+            {
+                loggingFunction(true, e.Data);
+            };
+
+            proc.EnableRaisingEvents = true;
+
+            loggingFunction(false, "Starting " + importerName.ToUpper() + " Importer...");
+            proc.Start();
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+            int? code = null;
+            proc.Exited += (object sender, EventArgs e) =>
+            {
+                code = proc.ExitCode;
+            };
+
+            return await Task.Run(async () =>
+            {
+                while(code == null)
+                {
+                    Thread.Sleep(100);
+                }
+
+                if (code != 0)
+                {
+                    throw (new Exception("Importer exited with error code: " + proc.ExitCode.ToString()));
+                }
+                return importerFolder + "\\result.db";
+            });
         }
 
         /// <summary>
@@ -1433,120 +1479,145 @@ namespace xivModdingFramework.Models.FileTypes
         ///     Takes in the populated TTModel.
         ///     Should return a boolean indicating whether the process should continue or cancel (false to cancel)
         /// </param>
-        /// <param name="loggingFuction">
+        /// <param name="loggingFunction">
         /// Function to call when the importer receives a new log line.
         /// Takes in [bool isWarning, string message].
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task ImportModel(IItemModel item, XivMdl currentMdl, DirectoryInfo fileLocation, string source = "Unknown", Func<TTModel, Task<bool>> intermediaryFunction = null, Action<bool, string> loggingFuction = null, bool rawDataOnly = false)
+        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func <TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", bool rawDataOnly = false)
         {
+
+            #region Setup and Validation
+            if (options == null)
+            {
+                options = new ModelModifierOptions();
+            }
+
+            if(loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            // Test the Path.
+            DirectoryInfo fileLocation = null;
+            try
+            {
+                fileLocation = new DirectoryInfo(path);
+            }
+            catch (Exception ex)
+            {
+                throw new IOException("Invalid file path.");
+            }
+
+            if (!File.Exists(fileLocation.FullName))
+            {
+                throw new IOException("The file provided for import does not exist");
+            }
+
+            var modding = new Modding(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+
+            // Resolve the current (possibly modded) Mdl.
+            XivMdl currentMdl = null;
+            try
+            {
+                 currentMdl = await this.GetMdlData(item, race);
+            } catch(Exception ex)
+            {
+                // If we failed to load the MDL, see if we can get the unmodded MDL.
+                var mdlPath = GetMdlPath(item, race, item.GetPrimaryItemType(), null, null, null);
+                var mod = await modding.TryGetModEntry(mdlPath.Folder + "/" + mdlPath.File);
+                if (mod != null)
+                {
+                    loggingFunction(true, "Unable to load current MDL file.  Attempting to use original MDL file...");
+
+                    var ogOffset = mod.data.originalOffset;
+                    currentMdl = await this.GetMdlData(item, IOUtil.GetRaceFromPath(path), null, mdlPath.Folder + "/" + mdlPath.File, ogOffset);
+                } else
+                {
+                    throw new Exception("Unable to load base MDL file.");
+                }
+            }
+            #endregion
+
             // Wrapping this in an await ensures we're run asynchronously on a new thread.
             await Task.Run(async () =>
             {
-                if (!File.Exists(fileLocation.FullName))
-                {
-                    throw new IOException("The file provided for import does not exist");
-                }
 
-                var modding = new Modding(_gameDirectory);
+                #region TTModel Loading
+                // Probably could stand to push this out to its own function later.
                 var mdlPath = Path.Combine(currentMdl.MdlPath.Folder, currentMdl.MdlPath.File);
                 
-                loggingFuction = loggingFuction == null ? NoOp : loggingFuction;
-                loggingFuction(false, "Starting Import of file: " + fileLocation.FullName);
+                loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
+                loggingFunction(false, "Starting Import of file: " + fileLocation.FullName);
 
                 var suffix = fileLocation.Extension.ToLower();
                 suffix = suffix.Substring(1);
-                loggingFuction(false, "Starting " + suffix + " importer...");
-                TTModel ttModel;
+                TTModel ttModel = null;
 
-                var importerFolder = Directory.GetCurrentDirectory() + "\\importers\\" + suffix;
-                if (suffix != "dae") {
-                    var proc = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = importerFolder + "\\importer.exe",
-                            Arguments = "\"" + fileLocation.FullName + "\"",
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            UseShellExecute = false,
-                            WorkingDirectory = "" + importerFolder + "",
-                            CreateNoWindow = true
-                        }
-                    };
+                // Loading and Running the actual Importers.
+                if (suffix != "dae" && suffix != "db") {
+                    var dbFile = await RunExternalImporter(suffix, path, loggingFunction);
+                    loggingFunction(false, "Loading intermediate file...");
+                    ttModel = TTModel.LoadFromFile(dbFile, loggingFunction);
 
-                    // Pipe the process output to our logging function.
-                    proc.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
-                    {
-                        loggingFuction(false, e.Data); ;
-                    };
-
-                    // Pipe the process output to our logging function.
-                    proc.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
-                    {
-                        loggingFuction(true, e.Data);
-                    };
-
-                    proc.Start();
-                    proc.BeginOutputReadLine();
-                    proc.BeginErrorReadLine();
-                    proc.WaitForExit();
-                    if (proc.ExitCode != 0)
-                    {
-                        loggingFuction(true, "Importer exited with error code: " + proc.ExitCode.ToString());
-                        throw (new Exception("Importer exited with error code: " + proc.ExitCode.ToString()));
-                    }
-                    loggingFuction(false, "Importer reported job successful.");
-
-                    loggingFuction(false, "Loading intermediate file...");
-                    ttModel = TTModel.LoadFromFile(importerFolder + "\\result.db", loggingFuction);
-
-                } else
+                } else if (suffix == "dae")
                 {
-                    var dae = new Dae(_gameDirectory, _dataFile);
                     // Dae handling is a special snowflake.
-                    loggingFuction(false, "Loading DAE file...");
-                    ttModel = dae.ReadColladaFile(fileLocation, loggingFuction);
-                    loggingFuction(false, "DAE File loaded successfully.");
+                    var dae = new Dae(_gameDirectory, _dataFile);
+                    loggingFunction(false, "Loading DAE file...");
+                    ttModel = dae.ReadColladaFile(fileLocation, loggingFunction);
+                    loggingFunction(false, "DAE File loaded successfully.");
+                } else if (suffix == "db")
+                {
+                    loggingFunction(false, "Loading intermediate file...");
+                    // Raw already converted DB file, just load it.
+                    ttModel = TTModel.LoadFromFile(fileLocation.FullName, loggingFunction);
+                }
+                #endregion
+
+                // At this point we now have a fully populated TTModel entry.
+                // Time to pull in the Model Modifier for any extra steps before we pass
+                // it to the raw MDL creation function.
+
+                loggingFunction(false, "Merging in existing Attribute & Material Data...");
+
+                XivMdl ogMdl = null;
+                if (options.EnableShapeData && !ttModel.HasShapeData)
+                {
+                    // Load the original model if we're actually going to need it.
+                    var mod = await modding.TryGetModEntry(mdlPath);
+                    if (mod != null)
+                    {
+                        loggingFunction(false, "Loading original SE model to retrieve Shape Data...");
+                        var ogOffset = mod.data.originalOffset;
+                        ogMdl = await GetMdlData(item, IOUtil.GetRaceFromPath(mdlPath), null, mdlPath, ogOffset);
+                    }
                 }
 
+                // Apply our Model Modifier options to the model.
+                options.Apply(ttModel, currentMdl, ogMdl, loggingFunction);
 
-
-                loggingFuction(false, "Merging in existing Attribute & Material Data...");
-                // Copy in the original attribute/material data.
-                ttModel.MergeData(currentMdl);
 
                 // Call the user function, if one was provided.
                 if (intermediaryFunction != null)
                 {
-                    loggingFuction(false, "Waiting on user...");
+                    loggingFunction(false, "Waiting on user...");
+
+                    // Bool says whether or not we should continue.
                     bool cont = await intermediaryFunction(ttModel);
                     if (!cont)
                     {
-                        loggingFuction(false, "User cancelled import process.");
+                        loggingFunction(false, "User cancelled import process.");
                         // This feels really dumb to cancel this via a throw, but we have no other method to do so...?
                         throw new Exception("cancel");
                     }
                 }
 
-                // We need to load the original unmodified model to get the shape data.
-                if(ttModel.EnableShapeData)
-                {
-
-                    var mod = await modding.TryGetModEntry(mdlPath);
-                    if (mod != null)
-                    {
-                        loggingFuction(false, "Loading original SE model to retrieve Shape Data...");
-                        var ogOffset = mod.data.originalOffset;
-                        currentMdl = await this.GetMdlData(item, IOUtil.GetRaceFromPath(mdlPath), null, mdlPath, ogOffset);
-                    }
-
-
-                }
-
-                loggingFuction(false, "Creating MDL file from processed data...");
-                var bytes = await MakeNewMdlFile(ttModel, currentMdl);
+                // Time to create the raw MDL.
+                loggingFunction(false, "Creating MDL file from processed data...");
+                var bytes = await MakeNewMdlFile(ttModel, currentMdl, loggingFunction);
                 if (rawDataOnly)
                 {
                     _rawData = bytes;
@@ -1555,17 +1626,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var modEntry = await modding.TryGetModEntry(mdlPath);
 
-                var dat = new Dat(_gameDirectory);
 
                 var filePath = Path.Combine(currentMdl.MdlPath.Folder, currentMdl.MdlPath.File);
 
                 if (!rawDataOnly)
                 {
-                    loggingFuction(false, "Writing MDL File to FFXIV File System...");
+                    loggingFunction(false, "Writing MDL File to FFXIV File System...");
                     await dat.WriteToDat(bytes.ToList(), modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
                 }
 
-                loggingFuction(false, "Job done!");
+                loggingFunction(false, "Job done!");
                 return;
             });
         }
@@ -1576,28 +1646,20 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        private async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl)
+        private async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
             try
             {
-                // Prep the model with any last-step changes.
-                TTModel.MakeImportReady(ttModel);
-
-                // Can't enable shape data that doesn't exist.
-                if(!ogMdl.HasShapeData)
-                {
-                    ttModel.EnableShapeData = false;
-                }
-
-                if(ttModel.EnableShapeData)
-                {
-                    ttModel.MergeShapeData(ogMdl);
-                }
-
-
                 var isAlreadyModified = false;
                 var isAlreadyModified2 = false;
 
+                // Final step modifications to the TTModel
+                ModelModifiers.MakeImportReady(ttModel, loggingFunction);
 
                 // Vertex Info
                 #region Vertex Info Block
@@ -1832,7 +1894,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Shape paths
                 var shapeOffsetList = new List<int>();
 
-                if (ttModel.EnableShapeData)
+                if (ttModel.HasShapeData)
                 {
                     foreach (var shape in ttModel.ShapeNames)
                     {
@@ -1936,9 +1998,9 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Materials.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Bones.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.EnableShapeData ? (short) ttModel.ShapeNames.Count : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.EnableShapeData ? (short) ttModel.ShapePartCount : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.EnableShapeData ? (short) ttModel.ShapeDataCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short) ttModel.ShapeNames.Count : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short) ttModel.ShapePartCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short) ttModel.ShapeDataCount : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
@@ -2091,7 +2153,7 @@ namespace xivModdingFramework.Models.FileTypes
                             }
 
                             // Add in any shape vertices.
-                            if (ttModel.EnableShapeData)
+                            if (ttModel.HasShapeData)
                             {
                                 // These are effectively orphaned vertices until the shape
                                 // data kicks in and rewrites the triangle index list.
@@ -2380,7 +2442,7 @@ namespace xivModdingFramework.Models.FileTypes
                 #region Shape Stuff
 
                 var FullShapeDataBlock = new List<byte>();
-                if (ttModel.EnableShapeData)
+                if (ttModel.HasShapeData)
                 {
                     #region Shape Part Counts
 
@@ -2651,7 +2713,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             var shapeDataCount = 0;
                             // Write the shape data if it exists.
-                            if (ttModel.EnableShapeData && !addedMesh && lodNum == 0)
+                            if (ttModel.HasShapeData && !addedMesh && lodNum == 0)
                             {
                                 var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                                 if (!isAlreadyModified)
@@ -2836,7 +2898,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var compressedMeshSizes = new List<int>();
                 var compressedIndexSizes = new List<int>();
 
-                if (ttModel.EnableShapeData)
+                if (ttModel.HasShapeData)
                 {
                     // Shape parts need to be rewitten in specific order.
                     var parts = ttModel.ShapeParts;
@@ -3830,7 +3892,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="itemType">The items type</param>
         /// <param name="secondaryModel">The secondary model if any</param>
         /// <returns>A Tuple containing the Folder and File string paths</returns>
-        private (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel, string mdlStringPath, string ringSide)
+        public (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel, string mdlStringPath, string ringSide)
         {
             if (mdlStringPath != null)
             {

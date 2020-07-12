@@ -31,6 +31,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Models.FileTypes
@@ -240,7 +241,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivMdl">The XivMdl data</param>
         /// <param name="daeLocation">The location of the dae file</param>
         /// <returns>A dictionary containing (Mesh Number, (Mesh Part Number, Collada Data)</returns>
-        public TTModel ReadColladaFile(DirectoryInfo daeLocation, Action<bool, string> loggingFuction)
+        public TTModel ReadColladaFile(DirectoryInfo daeLocation, Action<bool, string> loggingFunction)
         {
             var boneJointDict = new Dictionary<string, string>();
             var boneStringList = new List<string>();
@@ -1022,7 +1023,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 } else
                                 {
                                     // Vert already exists, just use the reference one.
-                                    part.TriangleIndices[i] = (part.Vertices.Count + vertToUse);
+                                    part.TriangleIndices[i] =(part.Vertices.Count + vertToUse);
                                 }
                             }
 
@@ -1035,9 +1036,6 @@ namespace xivModdingFramework.Models.FileTypes
                 // Convenient throw to breakpoint on when debugging.
                 throw ex;
             }
-
-            // Calculate the Tangents, since we don't pull them in from the DAE files.
-            TTModel.CalculateTangents(ttModel);
 
             return ttModel;
         }
