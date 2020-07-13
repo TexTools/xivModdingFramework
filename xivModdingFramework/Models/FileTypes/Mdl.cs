@@ -2959,7 +2959,7 @@ namespace xivModdingFramework.Models.FileTypes
                             // BiNormals
                             // Change the BiNormals based on Handedness
                             var biNormal = v.Binormal;
-                            int handedness = v.Handedness ? 1 : -1;
+                            int handedness = v.Handedness ? -1 : 1;
 
                             // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
                             // But the data gets written into the game, too, so why do we need to pre-flip it?
@@ -3471,7 +3471,7 @@ namespace xivModdingFramework.Models.FileTypes
                         // BiNormals
                         // Change the BiNormals based on Handedness
                         var biNormal = v.Binormal;
-                        int handedness = v.Handedness ? 1 : -1;
+                        int handedness = v.Handedness ? -1 : 1;
 
                         // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
                         // But the data gets written into the game, too, so why do we need to pre-flip it?
@@ -3564,7 +3564,7 @@ namespace xivModdingFramework.Models.FileTypes
             bytes.Add(z);
 
             // Add handedness bit
-            if (handedness < 0)
+            if (handedness > 0)
             {
                 bytes.Add(0);
             } else
@@ -3759,129 +3759,6 @@ namespace xivModdingFramework.Models.FileTypes
             var tangent = Vector3.Cross(normal, binormal);
             tangent *= (handedness == 0 ? 1 : -1);
             return tangent;
-        }
-
-        /// <summary>
-        /// Calculates the tangent data for given mesh.
-        /// </summary>
-        /// <param name="triangleIndices">The list of indexes to serve when generating triangles from the other fields</param>
-        /// <param name="positions"></param>
-        /// <param name="normals"></param>
-        /// <param name="uvCoordinates"></param>
-        /// <param name="outTangents"></param>
-        /// <param name="outBitangents"></param>
-        /// <param name="outHandedness"></param>
-        public static void CalculateTangentData(List<int> triangleIndices, List<Vector3> positions, List<Vector3> normals, List<Vector2> uvCoordinates, out List<Vector3> outTangents, out List<Vector3> outBitangents, out List<int> outHandedness)
-        {
-            // Sanity checks on argument structure.
-            if (positions.Count != normals.Count || positions.Count != uvCoordinates.Count || triangleIndices.Count % 3 != 0)
-            {
-                throw (new Exception("Invalid arguments for tangent calculation."));
-            }
-
-            // Set up arrays.
-            outTangents = new List<Vector3>(positions.Count);
-            outTangents.AddRange(Enumerable.Repeat(Vector3.Zero, positions.Count));
-
-            outBitangents = new List<Vector3>(positions.Count);
-            outBitangents.AddRange(Enumerable.Repeat(Vector3.Zero, positions.Count));
-
-            outHandedness = new List<int>(positions.Count);
-            outHandedness.AddRange(Enumerable.Repeat(0, positions.Count));
-
-            // Interim arrays for calculations
-            var tangents = new List<Vector3>(positions.Count);
-            tangents.AddRange(Enumerable.Repeat(Vector3.Zero, positions.Count));
-            var bitangents = new List<Vector3>(positions.Count);
-            bitangents.AddRange(Enumerable.Repeat(Vector3.Zero, positions.Count));
-
-            // Make sure there's actually data to use...
-            if (positions.Count == 0 || triangleIndices.Count == 0)
-            {
-                return;
-            }
-
-            var maxIndex = triangleIndices.Max();
-            if (maxIndex >= positions.Count || maxIndex >= normals.Count || maxIndex > uvCoordinates.Count)
-            {
-                // Some unknown amount of indexes are invalid, just fail the whole thing.
-                return;
-            }
-
-
-            // Calculate Tangent, Bitangent/Binormal and Handedness.
-
-            // This loops for each TRI, building up the sum
-            // tangent/bitangent angles at each VERTEX.
-            for (var a = 0; a < triangleIndices.Count; a += 3)
-            {
-                var vertex1 = triangleIndices[a];
-                var vertex2 = triangleIndices[a + 1];
-                var vertex3 = triangleIndices[a + 2];
-
-                    var position1 = positions[vertex1];
-                var position2 = positions[vertex2];
-                var position3 = positions[vertex3];
-                var uv1 = uvCoordinates[vertex1];
-                var uv2 = uvCoordinates[vertex2];
-                var uv3 = uvCoordinates[vertex3];
-                var deltaX1 = position2.X - position1.X;
-                var deltaX2 = position3.X - position1.X;
-                var deltaY1 = position2.Y - position1.Y;
-                var deltaY2 = position3.Y - position1.Y;
-                var deltaZ1 = position2.Z - position1.Z;
-                var deltaZ2 = position3.Z - position1.Z;
-                var deltaU1 = uv2.X - uv1.X;
-                var deltaU2 = uv3.X - uv1.X;
-                var deltaV1 = uv2.Y - uv1.Y;
-                var deltaV2 = uv3.Y - uv1.Y;
-                var r = 1.0f / (deltaU1 * deltaV2 - deltaU2 * deltaV1);
-                var sdir = new Vector3((deltaV2 * deltaX1 - deltaV1 * deltaX2) * r, (deltaV2 * deltaY1 - deltaV1 * deltaY2) * r, (deltaV2 * deltaZ1 - deltaV1 * deltaZ2) * r);
-                var tdir = new Vector3((deltaU1 * deltaX2 - deltaU2 * deltaX1) * r, (deltaU1 * deltaY2 - deltaU2 * deltaY1) * r, (deltaU1 * deltaZ2 - deltaU2 * deltaZ1) * r);
-
-                tangents[vertex1] += sdir;
-                tangents[vertex2] += sdir;
-                tangents[vertex3] += sdir;
-
-                bitangents[vertex1] += tdir;
-                bitangents[vertex2] += tdir;
-                bitangents[vertex3] += tdir;
-            }
-
-            // Loop the VERTEXES now to calculate the end tangent/bitangents based on the summed data for each VERTEX
-            for (var a = 0; a < positions.Count; ++a)
-            {
-                // Reference: https://marti.works/posts/post-calculating-tangents-for-your-mesh/post/
-                // We were already doing these calculations to establish handedness, but we weren't actually
-                // using the other results before.  Better to kill the previous computations and use these numbers
-                // for everything to avoid minor differences causing errors.
-
-                //var posIdx = vDict[a];
-
-                var n = normals[a];
-
-                var t = tangents[a];
-                var b = bitangents[a];
-
-                // Calculate tangent vector
-                var tangent = t - (n * Vector3.Dot(n, t));
-                tangent = Vector3.Normalize(tangent);
-
-                // Compute binormal
-                var binormal = Vector3.Cross(n, tangent);
-                binormal.Normalize();
-
-                // Compute handedness
-                int handedness = Vector3.Dot(Vector3.Cross(t, b), n) > 0 ? 1 : -1;
-
-                // Apply handedness
-                binormal *= handedness;
-
-                outTangents[a] = tangent;
-                outBitangents[a] = binormal;
-                outHandedness[a] = handedness;
-            }
-
         }
 
         /// <summary>

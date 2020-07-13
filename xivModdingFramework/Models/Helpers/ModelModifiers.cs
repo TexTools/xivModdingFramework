@@ -300,7 +300,7 @@ namespace xivModdingFramework.Models.Helpers
                                     vert.Normal = ogGroup.VertexData.Normals.Count > vId ? ogGroup.VertexData.Normals[vId] : new Vector3();
                                     vert.Tangent = ogGroup.VertexData.Tangents.Count > vId ? ogGroup.VertexData.Tangents[vId] : new Vector3();
                                     vert.Binormal = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormals[vId] : new Vector3();
-                                    vert.Handedness = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormalHandedness[vId] == 0 ? true : false : false; // TODO - FIXFIX ? Might havethis backwards?
+                                    vert.Handedness = ogGroup.VertexData.BiNormalHandedness.Count > vId ? ogGroup.VertexData.BiNormalHandedness[vId] == 0 ? false : true : false;
                                     vert.UV1 = ogGroup.VertexData.TextureCoordinates0.Count > vId ? ogGroup.VertexData.TextureCoordinates0[vId] : new Vector2();
                                     vert.UV2 = ogGroup.VertexData.TextureCoordinates1.Count > vId ? ogGroup.VertexData.TextureCoordinates1[vId] : new Vector2();
                                     var color = ogGroup.VertexData.Colors.Count > vId ? ogGroup.VertexData.Colors[vId] : new Color();
@@ -508,6 +508,14 @@ namespace xivModdingFramework.Models.Helpers
             {
                 loggingFunction = NoOp;
             }
+            
+            // Calculate Tangents if needed - BEFORE flipping UVs.
+            var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
+            if (!hasTangents)
+            {
+                loggingFunction(false, "Calculating Tangent Data...");
+                CalculateTangents(model);
+            }
 
             var totalMajorCorrections = 0;
             var warnings = new List<string>();
@@ -581,13 +589,6 @@ namespace xivModdingFramework.Models.Helpers
                 loggingFunction(true, totalMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
             }
 
-            // Calculate Tangents if needed.
-            var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
-            if (!hasTangents)
-            {
-                loggingFunction(false, "Calculating Tangent Data...");
-                CalculateTangents(model);
-            }
         }
 
         /// <summary>
@@ -657,35 +658,44 @@ namespace xivModdingFramework.Models.Helpers
                     // tangent/bitangent angles at each VERTEX.
                     for (var a = 0; a < p.TriangleIndices.Count; a += 3)
                     {
-                        var vertex1 = p.Vertices[p.TriangleIndices[a]];
-                        var vertex2 = p.Vertices[p.TriangleIndices[a + 1]];
-                        var vertex3 = p.Vertices[p.TriangleIndices[a + 2]];
+                        var vertexId1 = p.TriangleIndices[a];
+                        var vertexId2 = p.TriangleIndices[a + 1];
+                        var vertexId3 = p.TriangleIndices[a + 2];
+
+                        var vertex1 = p.Vertices[vertexId1];
+                        var vertex2 = p.Vertices[vertexId2];
+                        var vertex3 = p.Vertices[vertexId3];
 
                         var deltaX1 = vertex2.Position.X - vertex1.Position.X;
                         var deltaX2 = vertex3.Position.X - vertex1.Position.X;
+
                         var deltaY1 = vertex2.Position.Y - vertex1.Position.Y;
                         var deltaY2 = vertex3.Position.Y - vertex1.Position.Y;
+
                         var deltaZ1 = vertex2.Position.Z - vertex1.Position.Z;
                         var deltaZ2 = vertex3.Position.Z - vertex1.Position.Z;
+
                         var deltaU1 = vertex2.UV1.X - vertex1.UV1.X;
                         var deltaU2 = vertex3.UV1.X - vertex1.UV1.X;
+
                         var deltaV1 = vertex2.UV1.Y - vertex1.UV1.Y;
                         var deltaV2 = vertex3.UV1.Y - vertex1.UV1.Y;
+
                         var r = 1.0f / (deltaU1 * deltaV2 - deltaU2 * deltaV1);
                         var sdir = new Vector3((deltaV2 * deltaX1 - deltaV1 * deltaX2) * r, (deltaV2 * deltaY1 - deltaV1 * deltaY2) * r, (deltaV2 * deltaZ1 - deltaV1 * deltaZ2) * r);
                         var tdir = new Vector3((deltaU1 * deltaX2 - deltaU2 * deltaX1) * r, (deltaU1 * deltaY2 - deltaU2 * deltaY1) * r, (deltaU1 * deltaZ2 - deltaU2 * deltaZ1) * r);
 
-                        tangents[p.TriangleIndices[a]] += sdir;
-                        tangents[p.TriangleIndices[a + 1]] += sdir;
-                        tangents[p.TriangleIndices[a + 2]] += sdir;
+                        tangents[vertexId1] += sdir;
+                        tangents[vertexId2] += sdir;
+                        tangents[vertexId3] += sdir;
 
-                        bitangents[p.TriangleIndices[a]] += tdir;
-                        bitangents[p.TriangleIndices[a + 1]] += tdir;
-                        bitangents[p.TriangleIndices[a + 2]] += tdir;
+                        bitangents[vertexId1] += tdir;
+                        bitangents[vertexId2] += tdir;
+                        bitangents[vertexId3] += tdir;
                     }
 
                     // Loop the VERTEXES now to calculate the end tangent/bitangents based on the summed data for each VERTEX
-                    for (var a = 0; a < p.Vertices.Count; ++a)
+                    for (var vertexId = 0; vertexId < p.Vertices.Count; ++vertexId)
                     {
                         // Reference: https://marti.works/posts/post-calculating-tangents-for-your-mesh/post/
                         // We were already doing these calculations to establish handedness, but we weren't actually
@@ -693,12 +703,12 @@ namespace xivModdingFramework.Models.Helpers
                         // for everything to avoid minor differences causing errors.
 
                         //var posIdx = vDict[a];
-                        var vertex = p.Vertices[a];
+                        var vertex = p.Vertices[vertexId];
 
                         var n = vertex.Normal;
 
-                        var t = tangents[a];
-                        var b = bitangents[a];
+                        var t = tangents[vertexId];
+                        var b = bitangents[vertexId];
 
                         // Calculate tangent vector
                         var tangent = t - (n * Vector3.Dot(n, t));
@@ -716,7 +726,10 @@ namespace xivModdingFramework.Models.Helpers
 
                         vertex.Tangent = tangent;
                         vertex.Binormal = binormal;
-                        vertex.Handedness = handedness > 0 ? true : false;
+                        vertex.Handedness = handedness < 0 ? true : false;
+
+                        // FFXIV actually tracks BINORMAL handedness, not TANGENT handeness, so we have to reverse this.
+                        vertex.Handedness = !vertex.Handedness;
                     }
                 }
             }

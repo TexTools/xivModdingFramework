@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
 
@@ -24,9 +25,12 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector3 Position = new Vector3(0,0,0);
 
         public Vector3 Normal = new Vector3(0, 0, 0);
-        public Vector3 Tangent = new Vector3(0, 0, 0);
         public Vector3 Binormal = new Vector3(0, 0, 0);
-        public bool Handedness = true;
+        public Vector3 Tangent = new Vector3(0, 0, 0);
+
+        // This is Technically BINORMAL handedness in FFXIV.
+        // A values of TRUE indicates we need to flip the Tangent when generated. (-1)
+        public bool Handedness = false;
 
         public Vector2 UV1 = new Vector2(0, 0);
         public Vector2 UV2 = new Vector2(0, 0);
@@ -62,6 +66,13 @@ namespace xivModdingFramework.Models.DataContainers
         public static bool operator !=(TTVertex a, TTVertex b)
         {
             return !(a == b);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj.GetType() != typeof(TTVertex)) return false;
+            var b = (TTVertex)obj;
+            return b == this;
         }
     }
 
