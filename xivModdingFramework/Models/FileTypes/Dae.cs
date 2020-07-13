@@ -247,6 +247,9 @@ namespace xivModdingFramework.Models.FileTypes
             var boneStringList = new List<string>();
             var uniqueBoneNames = new HashSet<string>();
 
+            // List of mesh names by Mesh Num -> Part Num
+            var meshNames = new List<List<string>>();
+
             // A dictionary containing <Mesh Number, <Mesh Part Number, Collada Data>
             var meshPartDataDictionary = new SortedDictionary<int, SortedDictionary<int, ColladaData>>();
 
@@ -671,6 +674,11 @@ namespace xivModdingFramework.Models.FileTypes
                                 meshPartDataDictionary.Add(meshNum, new SortedDictionary<int, ColladaData>());
                             }
 
+                            while(meshNames.Count <= meshNum)
+                            {
+                                meshNames.Add(new List<string>());
+                            }
+
                             // If the current attribute is a mesh part
                             if (atr.Contains("."))
                             {
@@ -679,6 +687,13 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     // Get part number
                                     meshPartNum = int.Parse(atr.Substring(atr.LastIndexOf(".") + 1));
+
+                                    while(meshNames[meshNum].Count <= meshPartNum)
+                                    {
+                                        meshNames[meshNum].Add("Unknown");
+                                    }
+
+                                    meshNames[meshNum][meshPartNum] = atr;
                                 }
                                 catch
                                 {
@@ -695,6 +710,13 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
+                                if(meshNames[meshNum].Count == 0)
+                                {
+                                    meshNames[meshNum].Add(atr);
+                                } else
+                                {
+                                    meshNames[meshNum][0] = atr;
+                                }
 
                                 if (meshPartDataDictionary[meshNum].ContainsKey(0))
                                 {
@@ -856,6 +878,8 @@ namespace xivModdingFramework.Models.FileTypes
                         parts.Add(part);
                         var cData = kv2.Value;
 
+                        part.Name = meshNames[meshNum][partNum];
+
                         // Here we need to rip through the old ColladaData format,
                         // And rebuild the Vertex and Index lists into SE standard style.
                         // That means each vertex is fully qualified with each datapoint.
@@ -866,9 +890,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                         var numVerts = cData.Positions.Count / 3;
                         var numIndices = cData.PositionIndices.Count;
-
-                        // Buuuut for now, just shatter the entire mesh and rebuild the list.
-                        // TODO - Weld the list down later.
 
                         // Keep us from having to constantly resize this.
                         part.Vertices.Capacity = numIndices;
