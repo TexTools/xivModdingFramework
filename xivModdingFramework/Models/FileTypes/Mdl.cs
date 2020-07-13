@@ -2090,8 +2090,11 @@ namespace xivModdingFramework.Models.FileTypes
                     var lod0VertexDataEntrySize0 = 0;
                     var lod0VertexDataEntrySize1 = 0;
 
-                    foreach (var ttMeshGroup in ttModel.MeshGroups)
+                    var max = lodNum == 0 ? ttModel.MeshGroups.Count : Math.Max(ttModel.MeshGroups.Count, lod.MeshDataList.Count);
+
+                    for(int mi = 0; mi < max; mi++)
                     {
+
                         bool addedMesh = meshNum >= lod.MeshCount;
 
                         // Skip higher LoDs for any additional stuff.
@@ -2120,6 +2123,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (lodNum == 0)
                         {
+                            var ttMeshGroup = ttModel.MeshGroups[mi];
                             vertexCount = (int)ttMeshGroup.VertexCount;
                             indexCount = (int)ttMeshGroup.IndexCount;
                             partCount = (short)ttMeshGroup.Parts.Count;
