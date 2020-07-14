@@ -330,22 +330,49 @@ namespace xivModdingFramework.General.Enums
 
         /// <summary>
         /// Determines if this race is a child of another given race or not.
+        /// If the values are the same, it is considered TRUE by default.
         /// </summary>
         /// <param name="possibleChild"></param>
         /// <param name="possibleParent"></param>
         /// <returns></returns>
-        public static bool IsChildOf(this XivRace possibleChild, XivRace possibleParent)
+        public static bool IsChildOf(this XivRace possibleChild, XivRace possibleParent, bool allowSame = true)
         {
             CheckTree();
-            var node = dict[possibleChild];
-            while (node.Parent != null) {
-                if(node.Race == possibleParent)
+            if(possibleChild == possibleParent && allowSame)
+            {
+                return true;
+            }
+            return !IsParentOf(possibleParent, possibleChild, allowSame);
+        }
+
+        /// <summary>
+        /// Determines if this race is a parent of a nother given race or not.
+        /// If the values are the same, it is considered TRUE by default.
+        /// </summary>
+        /// <param name="possibleParent"></param>
+        /// <param name="possibleChild"></param>
+        /// <returns></returns>
+        public static bool IsParentOf(this XivRace possibleParent, XivRace possibleChild, bool allowSame = true)
+        {
+            CheckTree();
+            if(possibleChild == possibleParent && allowSame)
+            {
+                return true;
+            }
+
+            var node = GetNode(possibleChild);
+            if (node == null) return false;
+
+            while (node.Parent != null)
+            {
+                node = node.Parent;
+                if (node.Race == possibleParent)
                 {
                     return true;
                 }
-                node = node.Parent;
             }
             return false;
+
         }
 
         /// <summary>
@@ -415,6 +442,24 @@ namespace xivModdingFramework.General.Enums
             }
 
             return XivRace.Hyur_Midlander_Male;
+        }
+
+        /// <summary>
+        /// Gets the internal FFXIV MTRL path for a given race's skin, using the tree as needed to find the appropriate ancestor skin.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <returns></returns>
+        public static string GetSkinPath(this XivRace startingRace, int body = 1, string materialId = "a")
+        {
+            var race = GetSkinRace(startingRace);
+            if(race != startingRace)
+            {
+                body = 1;
+            }
+
+            var bodyCode = body.ToString().PadLeft(4, '0');
+            var path = "/chara/human/c" + race.GetRaceCode() + "/obj/body/b" + bodyCode + "/material/v0001/mt_c" + race.GetRaceCode() + "b" + bodyCode + "_" + materialId + ".mtrl";
+            return path;
         }
     }
 
