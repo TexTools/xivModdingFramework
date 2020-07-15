@@ -65,9 +65,14 @@ namespace xivModdingFramework.Helpers
 
             using (var ms = new MemoryStream(compressedBytes))
             {
-                using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
+                using (var ds = new DeflateStream(ms, CompressionMode.Decompress, true))
                 {
-                    await ds.ReadAsync(decompressedBytes, 0, uncompressedSize);
+                    int offset = 0; // offset for writing into buffer
+                    int bytesRead; // number of bytes read from Read operation
+                    while ((bytesRead = await ds.ReadAsync(decompressedBytes, offset, uncompressedSize - offset)) > 0)
+                    {
+                        offset += bytesRead;  // offset in buffer for results of next reading
+                    }
                 }
             }
 
