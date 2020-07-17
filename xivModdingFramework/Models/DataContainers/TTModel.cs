@@ -781,6 +781,11 @@ namespace xivModdingFramework.Models.DataContainers
         }
 
 
+        /// <summary>
+        /// Saves the TTModel to a .DB file for use with external importers/exporters.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="loggingFunction"></param>
         public void SaveToFile(string filePath, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
@@ -948,11 +953,11 @@ namespace xivModdingFramework.Models.DataContainers
             }
         }
 
-            /// <summary>
-            /// Creates and populates a TTModel object from a raw XivMdl
-            /// </summary>
-            /// <param name="rawMdl"></param>
-            /// <returns></returns>
+        /// <summary>
+        /// Creates and populates a TTModel object from a raw XivMdl
+        /// </summary>
+        /// <param name="rawMdl"></param>
+        /// <returns></returns>
         public static TTModel FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
@@ -965,7 +970,7 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MergeAttributeData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeMaterialData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
-
+            ModelModifiers.MakeExportReady(ttModel, loggingFunction);
             ttModel.Source = rawMdl.MdlPath;
 
             return ttModel;
@@ -1001,6 +1006,11 @@ namespace xivModdingFramework.Models.DataContainers
                 if (b == "") continue;
                 var j = JsonConvert.DeserializeObject<SkeletonData>(b);
                 j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+
+                j.PoseMatrix[3] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
+                j.PoseMatrix[7] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
+                j.PoseMatrix[11] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
+                j.PoseMatrix[15] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
 
                 fullSkel.Add(j.BoneName, j);
             }

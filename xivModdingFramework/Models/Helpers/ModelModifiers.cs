@@ -743,9 +743,6 @@ namespace xivModdingFramework.Models.Helpers
         /// ready for injection into the SE filesystem.  Such as flipping the 
         /// UVs, and applying the global level size multiplier.
         /// Likewise, MakeExportReady() undoes this process.
-        /// 
-        /// Returns a list of warnings we might want to inform the user about,
-        /// if there were any oddities in the data.
         /// </summary>
         public static void MakeImportReady(TTModel model, Action<bool, string> loggingFunction = null)
         {
@@ -777,6 +774,7 @@ namespace xivModdingFramework.Models.Helpers
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
 
+                        // Weight Validation
                         if (model.HasWeights)
                         {
                             int boneSum = 0;
@@ -840,8 +838,6 @@ namespace xivModdingFramework.Models.Helpers
         /// This process undoes all the strange minor adjustments to a model
         /// that FFXIV expects in the SE filesystem, such as flipping the UVs,
         /// and having tiny ass models.
-        /// 
-        /// This process is expected to be warning-free, so it has no return value.
         /// </summary>
         public static void MakeExportReady(TTModel model, Action<bool, string> loggingFunction = null)
         {
@@ -856,7 +852,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     foreach (var v in p.Vertices)
                     {
-                        // Model Size Multitplier.
+                        // Model Size Multiplier.
                         v.Position *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
 
                         // UV Flipping
