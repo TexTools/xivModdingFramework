@@ -77,9 +77,26 @@ CREATE TABLE "parts" (
 CREATE TABLE "bones" (
 	"mesh"		INTEGER NOT NULL,
 	"bone_id"	INTEGER NOT NULL,
+	"parent_id" INTEGER,
 	"name"  TEXT NOT NULL,
 	
-	-- Format for storing bone matrices tbd.
+	-- Bone matricies are only copied in once as Mesh -1.
+	"matrix_0"	REAL,
+	"matrix_1"	REAL,
+	"matrix_2"	REAL,
+	"matrix_3"	REAL,
+	"matrix_4"	REAL,
+	"matrix_5"	REAL,
+	"matrix_6"	REAL,
+	"matrix_7"	REAL,
+	"matrix_8"	REAL,
+	"matrix_9"	REAL,
+	"matrix_10"	REAL,
+	"matrix_11"	REAL,
+	"matrix_12"	REAL,
+	"matrix_13"	REAL,
+	"matrix_14"	REAL,
+	"matrix_15"	REAL,
 
 	Primary KEY("mesh","bone_id")
 );

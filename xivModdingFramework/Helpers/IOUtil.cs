@@ -174,7 +174,40 @@ namespace xivModdingFramework.Helpers
 
             return xivRace;
         }
-    
+
+        /// <summary>
+        /// Creates a row-by-row Matrix from a column order float set.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static float[] RowsFromColumns(float[] data)
+        {
+            var formatted = new float[16];
+
+            formatted[0] = data[0];
+            formatted[1] = data[4];
+            formatted[2] = data[8];
+            formatted[3] = data[12];
+
+
+            formatted[4] = data[1];
+            formatted[5] = data[5];
+            formatted[6] = data[9];
+            formatted[7] = data[13];
+
+            formatted[8] = data[2];
+            formatted[9] = data[6];
+            formatted[10] = data[10];
+            formatted[11] = data[14];
+
+            formatted[12] = data[3];
+            formatted[13] = data[7];
+            formatted[14] = data[11];
+            formatted[15] = data[15];
+
+            return formatted;
+        }
+
         /// <summary>
         /// Replaces the bytes in a given byte array with the bytes from another array, starting at the given index of the original array.
         /// </summary>

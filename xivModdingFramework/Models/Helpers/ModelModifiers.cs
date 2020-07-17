@@ -8,6 +8,12 @@ using xivModdingFramework.Mods;
 using xivModdingFramework.Models.FileTypes;
 using System.Threading.Tasks;
 using SharpDX;
+using xivModdingFramework.General.Enums;
+using System.Threading;
+using System.IO;
+using Newtonsoft.Json;
+using System.Text.RegularExpressions;
+using HelixToolkit.SharpDX.Core;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -132,6 +138,140 @@ namespace xivModdingFramework.Models.Helpers
     /// </summary>
     public static class ModelModifiers
     {
+        // Merges the full geometry data from a raw xivMdl
+        // This will destroy any existing mesh groups in the TTModel.
+        public static void MergeGeometryData(TTModel ttModel, XivMdl rawMdl, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            ttModel.MeshGroups.Clear();
+
+            var meshIdx = 0;
+            var totalPartIdx = 0;
+            foreach(var baseMesh in rawMdl.LoDList[0].MeshDataList)
+            {
+                var ttMesh = new TTMeshGroup();
+                ttModel.MeshGroups.Add(ttMesh);
+
+                // Build the bone set for our mesh.
+                if (rawMdl.MeshBoneSets != null && rawMdl.MeshBoneSets.Count > 0)
+                {
+                    var meshBoneSet = rawMdl.MeshBoneSets[baseMesh.MeshInfo.BoneSetIndex];
+                    for (var bi = 0; bi < meshBoneSet.BoneIndexCount; bi++)
+                    {
+                        // This is an index into the main bone paths list.
+                        var boneIndex = meshBoneSet.BoneIndices[bi];
+                        var boneName = rawMdl.PathData.BoneList[boneIndex];
+                        ttMesh.Bones.Add(boneName);
+                    }
+                }
+
+                var partIdx = 0;
+                foreach(var basePart in baseMesh.MeshPartList)
+                {
+                    var ttPart = new TTMeshPart();
+                    ttMesh.Parts.Add(ttPart);
+
+                    // Get the Indicies uniuqe to this part.
+                    var indices = baseMesh.VertexData.Indices.GetRange(basePart.IndexOffset - baseMesh.MeshInfo.IndexDataOffset, basePart.IndexCount);
+
+                    // Get the Vertices unique to this part.
+                    var uniqueVertexIdSet = new SortedSet<int>(indices); // Maximum possible amount is # of indices, though likely it is less.
+
+                    foreach(var ind in indices)
+                    {
+                        uniqueVertexIdSet.Add(ind);
+                    }
+
+                    // Need it as a list to have index access to it.
+                    var uniqueVertexIds = uniqueVertexIdSet.ToList();
+
+                    // Maps old vertex ID to new vertex ID.
+                    var vertDict = new Dictionary<int, int>(uniqueVertexIds.Count);
+
+                    // Now we need to loop through, copy over the vertex data, keeping track of the new vertex IDs.
+                    for(var i = 0; i < uniqueVertexIds.Count; i++)
+                    {
+                        var oldVertexId = uniqueVertexIds[i];
+                        var ttVert = new TTVertex();
+
+                        // Copy in the datapoints if they exist.
+                        if (baseMesh.VertexData.Positions.Count > oldVertexId)
+                        {
+                            ttVert.Position = baseMesh.VertexData.Positions[oldVertexId];
+                        }
+                        if (baseMesh.VertexData.Normals.Count > oldVertexId)
+                        {
+                            ttVert.Normal = baseMesh.VertexData.Normals[oldVertexId];
+                        }
+                        if (baseMesh.VertexData.BiNormals.Count > oldVertexId)
+                        {
+                            ttVert.Binormal = baseMesh.VertexData.BiNormals[oldVertexId];
+                        }
+                        if (baseMesh.VertexData.BiNormalHandedness.Count > oldVertexId)
+                        {
+                            ttVert.Handedness = baseMesh.VertexData.BiNormalHandedness[oldVertexId] == 0 ? false : true;
+                        }
+                        if (baseMesh.VertexData.Tangents.Count > oldVertexId)
+                        {
+                            ttVert.Tangent = baseMesh.VertexData.Tangents[oldVertexId];
+                        }
+                        if (baseMesh.VertexData.TextureCoordinates0.Count > oldVertexId)
+                        {
+                            ttVert.UV1 = baseMesh.VertexData.TextureCoordinates0[oldVertexId];
+                        }
+                        if (baseMesh.VertexData.TextureCoordinates1.Count > oldVertexId)
+                        {
+                            ttVert.UV2 = baseMesh.VertexData.TextureCoordinates1[oldVertexId];
+                        }
+
+
+                        // Now for the fun part, establishing bones.
+                        for(var bIdx = 0; bIdx < 4; bIdx++)
+                        {
+                            // Vertex doesn't have weights.
+                            if (baseMesh.VertexData.BoneWeights.Count <= oldVertexId) break;
+                            
+                            // No more weights for this vertex.
+                            if (baseMesh.VertexData.BoneIndices[oldVertexId].Length <= bIdx) break;
+
+                            // Null weight for this bone.
+                            if (baseMesh.VertexData.BoneWeights[oldVertexId][bIdx] == 0) continue;
+
+                            var boneId = baseMesh.VertexData.BoneIndices[oldVertexId][bIdx];
+                            var weight = baseMesh.VertexData.BoneWeights[oldVertexId][bIdx];
+                            //var boneName = 
+
+                            // These seem to actually be irrelevant, and the bone ID is just routed directly to the mesh level identifier.
+                            // var partBoneSet = rawMdl.PartBoneSets.BoneIndices.GetRange(basePart.BoneStartOffset, basePart.BoneCount);
+
+                            ttVert.BoneIds[bIdx] = (byte) boneId;
+                            ttVert.Weights[bIdx] = (byte) Math.Round(weight * 255);
+                        }
+
+                        ttPart.Vertices.Add(ttVert);
+                        vertDict.Add(oldVertexId, ttPart.Vertices.Count - 1);
+                    }
+
+                    // Now we need to copy in the triangle indices, pointing to the new, part-level vertex IDs.
+                    foreach(var oldVertexId in indices)
+                    {
+                        ttPart.TriangleIndices.Add(vertDict[oldVertexId]);
+                    }
+
+                    // Ok, gucci now.
+
+                    partIdx++;
+                    totalPartIdx++;
+                }
+
+                meshIdx++;
+            }
+
+        }
         // Merges attribute data from the given raw XivMdl.
         public static void MergeAttributeData(TTModel ttModel, XivMdl rawMdl, Action<bool, string> loggingFunction = null)
         {
@@ -252,7 +392,7 @@ namespace xivModdingFramework.Models.Helpers
                         var newBoneSet = newGroup.Bones;
 
                         // Have to convert the raw bone set to a useable format...
-                        var oldBoneSetRaw = ogMdl.MeshBoneSets[ogGroup.MeshInfo.BoneListIndex];
+                        var oldBoneSetRaw = ogMdl.MeshBoneSets[ogGroup.MeshInfo.BoneSetIndex];
                         var oldBoneSet = new List<string>();
                         for (int bi = 0; bi < oldBoneSetRaw.BoneIndexCount; bi++)
                         {
@@ -393,8 +533,8 @@ namespace xivModdingFramework.Models.Helpers
                     foreach(var v in p.Vertices)
                     {
 
-                        v.Position.X = Math.Abs((v.Position.X % 1));
-                        v.Position.Y = Math.Abs((v.Position.X % 1)) * -1;
+                        v.UV1.X = Math.Abs((v.UV1.X % 1));
+                        v.UV1.Y = Math.Abs((v.UV1.Y % 1)) * -1;
                     }
                 }
             }
@@ -491,6 +631,111 @@ namespace xivModdingFramework.Models.Helpers
         }
 
 
+        
+        private static Vector4 Transform(Vector3 input, Matrix m)
+        {
+            Vector4 v = new Vector4(input, 1f);
+            Vector4 result = Vector4.Zero;
+            Vector3 final = Vector3.Zero;
+            for (int i = 0; i < 4; ++i)
+                result[i] = (v[i] * m.Column1[i]) + (v[i] * m.Column2[i]) + (v[i] * m.Column3[i]) + (v[i] * m.Column4[i]);
+
+            final[0] = result[0];
+            final[1] = result[1];
+            final[2] = result[2];
+            return result;
+        }
+
+        /// <summary>
+        /// Attempts to deform a model from its original race to the given target race.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="targetRace"></param>
+        /// <param name="loggingFunction"></param>
+        public static void ApplyRacialDeform(TTModel model, XivRace targetRace, Action<bool, string> loggingFunction = null)
+        {
+            try
+            {
+                if (loggingFunction == null)
+                {
+                    loggingFunction = NoOp;
+                }
+
+                if (!model.IsInternal)
+                {
+                    loggingFunction(true, "Racial deforms can only be implied to internal models.");
+                    return;
+                }
+                loggingFunction(false, "Attempting to deform model...");
+
+
+                Dictionary<string, Matrix> deformations, decomposed, recalculated;
+                Mdl.GetDeformationMatrices(XivRace.Miqote_Female, out deformations, out decomposed, out recalculated);
+
+                // Now we're ready to animate...
+
+                // For each mesh
+                foreach (var m in model.MeshGroups)
+                {
+                    //And each part in that mesh...
+                    foreach (var p in m.Parts)
+                    {
+                        // And each vertex in that part...
+                        foreach (var v in p.Vertices)
+                        {
+                            Vector3 position = Vector3.Zero;
+                            Vector3 normal = Vector3.Zero;
+                            Vector3 binormal = Vector3.Zero;
+                            Vector3 tangent = Vector3.Zero;
+
+                            float wsum = 0;
+                            // And each bone in that vertex.
+                            for (var b = 0; b < 4; b++)
+                            {
+                                if (v.Weights[b] == 0) continue;
+                                var boneName = m.Bones[v.BoneIds[b]];
+                                var boneWeight = (v.Weights[b]) / 255f;
+                                wsum += boneWeight;
+
+                                var matrix = Matrix.Identity;
+                                if (recalculated.ContainsKey(boneName)) {
+                                    matrix = deformations[boneName];
+                                } else
+                                {
+                                    throw new Exception("Invalid bone");
+                                }
+
+                                if(matrix[15] != 1.0f || matrix[14] != 0 || matrix[13] != 0 || matrix[12] != 0)
+                                {
+                                    //throw new Exception("eh?");
+                                }
+
+                                //var vec = new Vector4(v.Position[0],v.Position[1],v.Position[2], 1);
+                                //vec = Vector4.Transform(vec, matrix);
+                                //Vector3.Transform(ref v.Position, ref matrix, out result);
+                                Vector3 r;
+                                Vector3.TransformCoordinate(ref v.Position, ref matrix, out r);
+                                position += r * boneWeight;//(Transform(v.Position, matrix) * boneWeight);
+
+                                var asdf = "sadf";
+                                //position += (matrix.TranslationVector)
+
+                            }
+                            if(wsum != 1)
+                            {
+                                var z = "d";
+                                //throw new Exception("Sum Failure.");
+                            }
+                            v.Position = new Vector3(position.X, position.Y, position.Z);
+                        }
+                    }
+                }
+            }catch(Exception ex)
+            {
+                var z = "d";
+            }
+
+        }
 
 
         /// <summary>
@@ -735,6 +980,34 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
+        /// <summary>
+        /// Calculates the tangent data, assuming we already have the binormal data available.
+        /// </summary>
+        /// <param name="normals"></param>
+        /// <param name="binormals"></param>
+        /// <param name="handedness"></param>
+        /// <returns></returns>
+        public static void CalculateTangentsFromBinormals(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            foreach( var m in model.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    foreach(var v in p.Vertices)
+                    {
+
+                        var tangent = Vector3.Cross(v.Normal, v.Binormal);
+                        tangent *= (v.Handedness == true ? -1 : 1);
+                        v.Tangent = tangent;
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// /dev/null function used when no logging parameter is supplied, 

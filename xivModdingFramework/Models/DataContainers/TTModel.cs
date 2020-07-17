@@ -1,14 +1,19 @@
 ﻿using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
+using Newtonsoft.Json;
 using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
 
@@ -281,9 +286,30 @@ namespace xivModdingFramework.Models.DataContainers
     public class TTModel
     {
         /// <summary>
+        /// The internal or external file path where this TTModel originated from.
+        /// </summary>
+        public string Source = "";
+
+        /// <summary>
         /// The Mesh groups and parts of this mesh.
         /// </summary>
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
+
+
+        #region Calculated Properties
+
+        /// <summary>
+        /// Is this TTModel populated from an internal file, or external?
+        /// </summary>
+        public bool IsInternal
+        {
+            get
+            {
+                var regex = new Regex("\\.mdl$");
+                var match = regex.Match(Source);
+                return match.Success;
+            }
+        }
 
         /// <summary>
         /// Readonly list of bones that are used in this model.
@@ -410,7 +436,6 @@ namespace xivModdingFramework.Models.DataContainers
                 return sum;
             }
         }
-
 
         /// <summary>
         /// Per-Shape sum of parts; matches up by index to ShapeNames.
@@ -596,16 +621,35 @@ namespace xivModdingFramework.Models.DataContainers
             return mask;
         }
 
+
+        /// <summary>
+        /// Retreives the raw XivMdl entry that was used to populate this TTModel, if it exists.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<XivMdl> GetRawMdl(Mdl _mdl)
+        {
+            if (!IsInternal) return null;
+            return await _mdl.GetRawMdlData(Source);
+        }
+        #endregion
+
+        #region Major Public Functions
+
         /// <summary>
         /// Loads a TTModel file from a given SQLite3 DB filepath.
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFunction)
+        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFunction = null)
         {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             TTModel model = new TTModel();
+            model.Source = filePath;
 
             // Spawn a DB connection to do the raw queries.
             using (var db = new SQLiteConnection(connectionString))
@@ -735,5 +779,268 @@ namespace xivModdingFramework.Models.DataContainers
 
             return model;
         }
+
+
+        public void SaveToFile(string filePath, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+            File.Delete(filePath);
+
+            var boneDict = ResolveBoneHeirarchy();
+
+            var connectionString = "Data Source=" + filePath + ";Pooling=False;";
+            try
+            {
+                const string creationScript = "CreateImportDB.sql";
+                // Spawn a DB connection to do the raw queries.
+                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+                using (var db = new SQLiteConnection(connectionString))
+                {
+                    db.Open();
+
+                    // Create the DB
+                    var lines = File.ReadAllLines("Resources\\SQL\\" + creationScript);
+                    var sqlCmd = String.Join("\n", lines);
+
+                    using (var cmd = new SQLiteCommand(sqlCmd, db))
+                    {
+                        cmd.ExecuteScalar();
+                    }
+
+                    // Write the Data.
+                    using (var transaction = db.BeginTransaction())
+                    {
+
+                        // Bones mesh -1 -- Full Skeleton the file needs, using the raw bone Ids.
+                        var query = @"insert into bones (mesh, bone_id, parent_id, name, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
+                                             values ($mesh, $bone_id, $parent_id, $name, $matrix_0, $matrix_1, $matrix_2, $matrix_3, $matrix_4, $matrix_5, $matrix_6, $matrix_7, $matrix_8, $matrix_9, $matrix_10, $matrix_11, $matrix_12, $matrix_13, $matrix_14, $matrix_15);";
+                        foreach (var b in boneDict)
+                        {
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("name", b.Value.BoneName);
+                                cmd.Parameters.AddWithValue("bone_id", b.Value.BoneNumber);
+                                cmd.Parameters.AddWithValue("parent_id", b.Value.BoneParent);
+                                cmd.Parameters.AddWithValue("mesh", -1);
+
+                                for (int i = 0; i < 16; i++)
+                                {
+                                    cmd.Parameters.AddWithValue("matrix_" + i.ToString(), b.Value.PoseMatrix[i]);
+                                }
+                                cmd.ExecuteScalar();
+                            }
+                        }
+
+
+                        var meshIdx = 0;
+                        foreach (var m in MeshGroups)
+                        {
+                            // Bones
+                            query = @"insert into bones (mesh, bone_id, name) values ($mesh, $bone_id, $name);";
+                            var bIdx = 0;
+                            foreach (var b in m.Bones)
+                            {
+                                using (var cmd = new SQLiteCommand(query, db))
+                                {
+                                    cmd.Parameters.AddWithValue("name", b);
+                                    cmd.Parameters.AddWithValue("bone_id", bIdx);
+                                    cmd.Parameters.AddWithValue("parent_id", null);
+                                    cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                    cmd.ExecuteScalar();
+                                }
+                                bIdx++;
+                            }
+
+
+                            // Parts
+                            var partIdx = 0;
+                            foreach (var p in m.Parts)
+                            {
+                                // Parts
+                                query = @"insert into parts (mesh, part, name) values ($mesh, $part, $name);";
+                                using (var cmd = new SQLiteCommand(query, db))
+                                {
+                                    cmd.Parameters.AddWithValue("name", Path.GetFileNameWithoutExtension(Source) + "_" + meshIdx + "." + partIdx);
+                                    cmd.Parameters.AddWithValue("part", partIdx);
+                                    cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                    cmd.ExecuteScalar();
+                                }
+                                bIdx++;
+
+                                // Vertices
+                                var vIdx = 0;
+                                foreach (var v in p.Vertices)
+                                {
+                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
+                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        cmd.Parameters.AddWithValue("part", partIdx);
+                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                        cmd.Parameters.AddWithValue("vertex_id", vIdx);
+
+                                        cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                        cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                        cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+                                        cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
+                                        cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
+                                        cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
+
+                                        cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
+                                        cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
+                                        cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
+                                        cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
+
+                                        cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
+                                        cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
+                                        cmd.Parameters.AddWithValue("uv_2_u", v.UV2.X);
+                                        cmd.Parameters.AddWithValue("uv_2_v", v.UV2.Y);
+
+
+                                        cmd.Parameters.AddWithValue("bone_1_id", v.BoneIds[0]);
+                                        cmd.Parameters.AddWithValue("bone_1_weight", v.Weights[0] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_2_id", v.BoneIds[1]);
+                                        cmd.Parameters.AddWithValue("bone_2_weight", v.Weights[1] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_3_id", v.BoneIds[2]);
+                                        cmd.Parameters.AddWithValue("bone_3_weight", v.Weights[2] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
+                                        cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
+
+                                        cmd.ExecuteScalar();
+                                        vIdx++;
+                                    }
+                                }
+
+                                // Indices
+                                for (var i = 0; i < p.TriangleIndices.Count; i++)
+                                {
+                                    query = @"insert into indices (mesh, part, index_id, vertex_id) values ($mesh, $part, $index_id, $vertex_id);";
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        cmd.Parameters.AddWithValue("part", partIdx);
+                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                        cmd.Parameters.AddWithValue("index_id", i);
+                                        cmd.Parameters.AddWithValue("vertex_id", p.TriangleIndices[i]);
+                                        cmd.ExecuteScalar();
+                                    }
+                                }
+
+                                partIdx++;
+                            }
+
+                            meshIdx++;
+
+
+                        }
+                        transaction.Commit();
+                    }
+                }
+            } catch(Exception Ex)
+            {
+                throw Ex;
+            }
+        }
+
+            /// <summary>
+            /// Creates and populates a TTModel object from a raw XivMdl
+            /// </summary>
+            /// <param name="rawMdl"></param>
+            /// <returns></returns>
+        public static TTModel FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
+            var ttModel = new TTModel();
+            ModelModifiers.MergeGeometryData(ttModel, rawMdl, loggingFunction);
+            ModelModifiers.MergeAttributeData(ttModel, rawMdl, loggingFunction);
+            ModelModifiers.MergeMaterialData(ttModel, rawMdl, loggingFunction);
+            ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+
+            ttModel.Source = rawMdl.MdlPath;
+
+            return ttModel;
+        }
+
+        #endregion
+
+        #region  Internal Helper Functions
+
+        /// <summary>
+        /// Resolves the full bone heirarchy necessary to animate this TTModel.
+        /// Used when saving the file to DB.  (Or potentially animating it)
+        /// </summary>
+        /// <returns></returns>
+        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy()
+        {
+            var race = IOUtil.GetRaceFromPath(Source);
+            var fullSkel = new Dictionary<string, SkeletonData>();
+            var skelDict = new Dictionary<string, SkeletonData>();
+
+            // Gets the first 5 characters of the file string
+            // These are usually the race ID or model ID of an item
+            // This would be the same name given to the skeleton file
+            var skelName = "c" + race.GetRaceCode();
+
+
+            var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
+            var skeletonData = File.ReadAllLines(skeletonFile);
+
+            // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
+            foreach (var b in skeletonData)
+            {
+                if (b == "") continue;
+                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+
+                fullSkel.Add(j.BoneName, j);
+            }
+
+            foreach (var s in Bones)
+            {
+                var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);
+
+                if (fullSkel.ContainsKey(fixedBone))
+                {
+                    var skel = fullSkel[fixedBone];
+
+                    if (skel.BoneParent == -1 && !skelDict.ContainsKey(skel.BoneName))
+                    {
+                        skelDict.Add(skel.BoneName, skel);
+                    }
+
+                    while (skel.BoneParent != -1)
+                    {
+                        if (!skelDict.ContainsKey(skel.BoneName))
+                        {
+                            skelDict.Add(skel.BoneName, skel);
+                        }
+                        skel = fullSkel.First(x => x.Value.BoneNumber == skel.BoneParent).Value;
+
+                        if (skel.BoneParent == -1 && !skelDict.ContainsKey(skel.BoneName))
+                        {
+                            skelDict.Add(skel.BoneName, skel);
+                        }
+                    }
+                }
+                else
+                {
+                    throw new Exception($"The skeleton file {skeletonFile} did not contain bone {s}. Consider updating the skeleton file.");
+                }
+            }
+
+            return skelDict;
+        }
+
+        #endregion
     }
 }

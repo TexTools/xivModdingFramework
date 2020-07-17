@@ -69,20 +69,18 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="xivModel">The model to create a dae file for</param>
         /// <param name="saveLocation">The location to save the dae file</param>
-        public async Task MakeDaeFileFromModel(IItemModel item, XivMdl xivModel, DirectoryInfo saveLocation, XivRace race)
+        public async Task MakeDaeFileFromModel(XivMdl xivModel, string path, string skelName)
         {
             FullSkel.Clear();
             FullSkelNum.Clear();
 
             var hasBones = true;
 
-            var modelName = Path.GetFileNameWithoutExtension(xivModel.MdlPath.File);
+            var modelName = Path.GetFileNameWithoutExtension(xivModel.MdlPath);
 
-            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation, race)}\\3D";
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
 
-            Directory.CreateDirectory(path);
-
-            var savePath = Path.Combine(path, modelName) + ".dae";
+            var savePath = path;
 
             // We will only use the LoD with the highest quality, that being LoD 0
             var lod0 = xivModel.LoDList[0];
@@ -96,44 +94,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (hasBones)
             {
-                // Gets the first 5 characters of the file string
-                // These are usually the race ID or model ID of an item
-                // This would be the same name given to the skeleton file
-                var skelName = modelName.Substring(0, 5);
-
-                if (item.SecondaryCategory.Equals(XivStrings.Head) || item.SecondaryCategory.Equals(XivStrings.Hair) || item.SecondaryCategory.Equals(XivStrings.Face))
-                {
-                    skelName = modelName.Substring(5, 5);
-                }
-
-                // Checks to see if the skeleton file exists, and throws an exception if it does not
-                if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
-                {
-                    try
-                    {
-                        var sklb = new Sklb(_gameDirectory, _dataFile);
-                        await sklb.CreateSkelFromSklb(item, xivModel);
-
-                        if (item.SecondaryCategory.Equals(XivStrings.Head) || item.SecondaryCategory.Equals(XivStrings.Hair) || item.SecondaryCategory.Equals(XivStrings.Face))
-                        {
-                            skelName = modelName.Substring(0, 5);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        if (e.GetType() == typeof(FileNotFoundException))
-                        {
-                            throw e;
-                        }
-
-                        skelName = modelName.Substring(0, 5);
-                        if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
-                        {
-                            throw new IOException("Skeleton File Not Found!");
-                        }
-                    }
-                }
-
                 var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
                 var skeletonData = File.ReadAllLines(skeletonFile);
 
@@ -254,6 +214,7 @@ namespace xivModdingFramework.Models.FileTypes
             var meshPartDataDictionary = new SortedDictionary<int, SortedDictionary<int, ColladaData>>();
 
             TTModel ttModel = new TTModel();
+            ttModel.Source = daeLocation.FullName;
 
             // Reading Control Data to get bones that are used in model
             using (var reader = XmlReader.Create(daeLocation.FullName))
@@ -2581,6 +2542,7 @@ namespace xivModdingFramework.Models.FileTypes
                         try
                         {
                             var matrix = new Matrix(skelDict[modelData.PathData.BoneList[m]].InversePoseMatrix);
+                            //matrix = Matrix.Identity;
 
                             xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Constants.ModelMultiplier) + " ");
                             xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Constants.ModelMultiplier) + " ");
@@ -2700,7 +2662,7 @@ namespace xivModdingFramework.Models.FileTypes
                     xmlWriter.WriteEndElement();
                     //</vcount>
 
-                    var bs = meshDataList[i].MeshInfo.BoneListIndex;
+                    var bs = meshDataList[i].MeshInfo.BoneSetIndex;
                     var boneSet = modelData.MeshBoneSets[bs].BoneIndices;
 
                     //<v>
@@ -2966,6 +2928,17 @@ namespace xivModdingFramework.Models.FileTypes
 
             Matrix matrix = new Matrix(boneDictionary[skeleton.BoneName].PoseMatrix);
 
+            /*
+            Dictionary<string, Matrix> deformations, decomposed, recalculated;
+            Mdl.GetDeformationMatrices(XivRace.Miqote_Female, out deformations, out decomposed, out recalculated);
+            
+            matrix = decomposed[skeleton.BoneName];
+
+            xmlWriter.WriteString(matrix.Row1.X + " " + matrix.Row1.Y + " " + matrix.Row1.Z + " " + (matrix.Row1.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Row2.X + " " + matrix.Row2.Y + " " + matrix.Row2.Z + " " + (matrix.Row2.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Row3.X + " " + matrix.Row3.Y + " " + matrix.Row3.Z + " " + (matrix.Row3.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Row4.X + " " + matrix.Row4.Y + " " + matrix.Row4.Z + " " + (matrix.Row4.W * Constants.ModelMultiplier) + " ");*/
+            
             xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Constants.ModelMultiplier) + " ");
             xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Constants.ModelMultiplier) + " ");
             xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * Constants.ModelMultiplier) + " ");

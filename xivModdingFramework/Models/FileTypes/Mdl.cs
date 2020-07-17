@@ -43,6 +43,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using SharpDX.Win32;
 using xivModdingFramework.Models.Helpers;
+using Newtonsoft.Json;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -72,6 +73,163 @@ namespace xivModdingFramework.Models.FileTypes
             var ret = _rawData;
             _rawData = null;
             return ret;
+        }
+
+
+        /// <summary>
+        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
+        /// to match the target file extention.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="race"></param>
+        /// <param name="submeshId"></param>
+        /// <returns></returns>
+        public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool getOriginal = false)
+        {
+            var mdlPath = GetMdlPath(item, race, submeshId);
+            await ExportMdlToFile(mdlPath, outputFilePath, getOriginal);
+        }
+
+
+        /// <summary>
+        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
+        /// to match the target file extention.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="outputFilePath"></param>
+        /// <param name="getOriginal"></param>
+        /// <returns></returns>
+        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, bool getOriginal = false)
+        {
+            // Importers and exporters currently use the same criteria.
+            // Any available exporter is assumed to be able to import and vice versa.
+            // This may change at a later date.
+            var exporters = GetAvailableExporters();
+            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
+            fileFormat = fileFormat.ToLower();
+            if(!exporters.Contains(fileFormat))
+            {
+                throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
+            }
+
+
+            if (fileFormat == "dae")
+            {
+                // Validate the skeleton.
+                var mdlName = Path.GetFileName(mdlPath);
+                var sklb = new Sklb(_gameDirectory, _dataFile);
+                await sklb.CreateSkelForMdl(mdlPath);
+                var skel = await sklb.GetParsedSkelFilename(mdlPath);
+
+                // Special DAE snowflake.
+                var mdl = await GetRawMdlData(mdlPath, getOriginal);
+                var _dae = new Dae(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
+                await _dae.MakeDaeFileFromModel(mdl, outputFilePath, skel);
+
+            } 
+            else 
+            {
+                var model = await GetModel(mdlPath);
+                await ExportModel(model, outputFilePath);
+            }
+        }
+
+
+        /// <summary>
+        /// Exports a TTModel file to the given output path.
+        /// DOES NOT SUPPORT DAE EXPORT.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="outputFilePath"></param>
+        /// <returns></returns>
+        public async Task ExportModel(TTModel model, string outputFilePath)
+        {
+            var exporters = GetAvailableExporters();
+            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
+            fileFormat = fileFormat.ToLower();
+            if (!exporters.Contains(fileFormat))
+            {
+                throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
+            }
+
+            outputFilePath = outputFilePath.Replace("/", "\\");
+
+            // Obj's a bit of a special case, as it doesn't have any skeleton data, and is
+            // also an internal function.  (Mostly) Doesn't hurt to keep it available though.
+            // ( Some users still seem to expect it to be a fully fledged format, so there is some
+            // argument to removing it to reduce confusion. )
+            if (fileFormat == "obj")
+            {
+                var obj = new Obj(_gameDirectory);
+                obj.ExportObj(model, outputFilePath);
+                return;
+            }
+
+            if (!model.IsInternal)
+            {
+                throw new NotSupportedException("Cannot export non-internal model - Skel data unidentifiable.");
+            }
+
+            // Validate the skeleton.
+            var mdlName = Path.GetFileName(model.Source);
+            var sklb = new Sklb(_gameDirectory, _dataFile);
+            await sklb.CreateSkelForMdl(model.Source);
+            var skel = await sklb.GetParsedSkelFilename(model.Source);
+
+
+            // Save the DB file.
+            var dbPath = Path.GetDirectoryName(outputFilePath) + "\\" + Path.GetFileNameWithoutExtension(model.Source) + ".db";
+            model.SaveToFile(dbPath);
+
+            var importerFolder = Directory.GetCurrentDirectory() + "\\importers\\" + fileFormat;
+
+            if (fileFormat == "db")
+            {
+                // Just want the intermediate file? Just see if we need to move it.
+                if (!Path.Equals(outputFilePath,dbPath))
+                {
+                    File.Delete(outputFilePath);
+                    File.Move(dbPath, outputFilePath);
+                }
+            }
+            else
+            {
+                // We actually have an external importer to use.
+
+                // We don't really care that much about showing the user a log
+                // during exports, so we can just do this the simple way.
+                var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = importerFolder + "\\importer.exe",
+                        Arguments = "\"" + dbPath + "\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        WorkingDirectory = "" + importerFolder + "",
+                        CreateNoWindow = true
+                    }
+                };
+
+                proc.Start();
+                proc.WaitForExit();
+                var code = proc.ExitCode;
+
+                if(code != 0)
+                {
+                    throw new Exception("Exporter threw error code: " + proc.ExitCode);
+                }
+
+                var outputFile = importerFolder + "\\result." + fileFormat;
+
+                // Just move the result file if we need to.
+                if (!Path.Equals(outputFilePath, outputFile))
+                { 
+                    File.Delete(outputFilePath);
+                    File.Move(outputFile, outputFilePath);
+                }
+            }
         }
 
 
@@ -113,40 +271,61 @@ namespace xivModdingFramework.Models.FileTypes
 
 
         /// <summary>
-        /// Gets the MDL Data given a model and race
+        /// Retreives the high level TTModel representation of an underlying MDL file.
         /// </summary>
-        /// <param name="itemModel">The Item model</param>
-        /// <param name="xivRace">The race for which to get the data</param>
-        /// <param name="secondaryModel">The secondary model info if needed</param>
-        /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetMdlData(IItemModel itemModel, XivRace xivRace, XivModelInfo secondaryModel = null, string mdlStringPath = null, int originalOffset = 0, string ringSide = null)
+        /// <param name="item"></param>
+        /// <param name="race"></param>
+        /// <param name="submeshId"></param>
+        /// <param name="getOriginal"></param>
+        /// <returns></returns>
+        public async Task<TTModel> GetModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false)
+        {
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+            var modding = new Modding(_gameDirectory);
+            var mdl = await GetRawMdlData(item, race, submeshId, getOriginal);
+            var ttModel = TTModel.FromRaw(mdl);
+            return ttModel;
+        }
+        public async Task<TTModel> GetModel(string mdlPath, bool getOriginal = false)
+        {
+            var mdl = await GetRawMdlData(mdlPath, getOriginal);
+            var ttModel = TTModel.FromRaw(mdl);
+            return ttModel;
+        }
+
+        public async Task<XivMdl> GetRawMdlData(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false)
+        {
+            var mdlPath = GetMdlPath(item, race, submeshId);
+            return await GetRawMdlData(mdlPath, getOriginal);
+        }
+
+            /// <summary>
+            /// Retrieves the raw XivMdl file at a given internal file path.
+            /// </summary>
+            /// <returns>An XivMdl structure containing all mdl data.</returns>
+        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
             var getShapeData = true;
 
-            var itemType = ItemType.GetPrimaryItemType(itemModel);
 
-            var mdlPath = GetMdlPath(itemModel, xivRace, itemType, secondaryModel, mdlStringPath, ringSide);
+            var offset = await index.GetDataOffset(mdlPath);
 
-            var offset = await index.GetDataOffset(HashGenerator.GetHash(mdlPath.Folder), HashGenerator.GetHash(mdlPath.File),
-                _dataFile);
-
-            if (await modding.IsModEnabled($"{mdlPath.Folder}/{mdlPath.File}", false) == XivModStatus.Enabled &&
-                originalOffset == 0)
+            if(getOriginal)
             {
-                //getShapeData = false;
-            }
-
-            if (originalOffset != 0)
-            {
-                offset = originalOffset;
+                var mod = await modding.TryGetModEntry(mdlPath);
+                if (mod != null && mod.enabled)
+                {
+                    offset = mod.data.originalOffset;
+                }
             }
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offset for {mdlPath.Folder}/{mdlPath.File}");
+                throw new Exception($"Could not find offset for {mdlPath}");
             }
 
             var mdlData = await dat.GetType3Data(offset, _dataFile);
@@ -470,7 +649,7 @@ namespace xivModdingFramework.Models.FileTypes
                             MaterialIndex        = br.ReadInt16(),
                             MeshPartIndex        = br.ReadInt16(),
                             MeshPartCount        = br.ReadInt16(),
-                            BoneListIndex        = br.ReadInt16(),
+                            BoneSetIndex        = br.ReadInt16(),
                             IndexDataOffset      = br.ReadInt32(),
                             VertexDataOffset0    = br.ReadInt32(),
                             VertexDataOffset1    = br.ReadInt32(),
@@ -736,7 +915,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var transformCount = xivMdl.ModelData.BoneCount;
 
-                if (itemType == XivItemType.furniture)
+                if (transformCount == 0)
                 {
                     transformCount = xivMdl.ModelData.Unknown8;
                 }
@@ -1399,6 +1578,26 @@ namespace xivModdingFramework.Models.FileTypes
             return ret;
         }
 
+        /// <summary>
+        /// Retreieves the available list of file extensions the framework has exporters available for.
+        /// </summary>
+        /// <returns></returns>
+        public List<string> GetAvailableExporters()
+        {
+            const string importerPath = "importers/";
+            var ret = new List<string>();
+            ret.Add("dae"); // DAE handler is internal.
+            ret.Add("obj"); // OBJ handler is internal.
+            ret.Add("db");  // Raw already-parsed DB files are fine.
+
+            var directories = Directory.GetDirectories(importerPath);
+            foreach (var d in directories)
+            {
+                ret.Add((d.Replace(importerPath, "")).ToLower());
+            }
+            return ret;
+        }
+
         // Just a default no-op function if we don't care about warning messages.
         private void NoOp(bool isWarning, string message)
         {
@@ -1485,7 +1684,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func <TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", bool rawDataOnly = false)
+        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func <TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
         {
 
             #region Setup and Validation
@@ -1522,18 +1721,16 @@ namespace xivModdingFramework.Models.FileTypes
             XivMdl currentMdl = null;
             try
             {
-                 currentMdl = await this.GetMdlData(item, race);
+                 currentMdl = await this.GetRawMdlData(item, race, submeshId);
             } catch(Exception ex)
             {
                 // If we failed to load the MDL, see if we can get the unmodded MDL.
-                var mdlPath = GetMdlPath(item, race, item.GetPrimaryItemType(), null, null, null);
-                var mod = await modding.TryGetModEntry(mdlPath.Folder + "/" + mdlPath.File);
+                var mdlPath = GetMdlPath(item, race);
+                var mod = await modding.TryGetModEntry(mdlPath);
                 if (mod != null)
                 {
                     loggingFunction(true, "Unable to load current MDL file.  Attempting to use original MDL file...");
-
-                    var ogOffset = mod.data.originalOffset;
-                    currentMdl = await this.GetMdlData(item, IOUtil.GetRaceFromPath(path), null, mdlPath.Folder + "/" + mdlPath.File, ogOffset);
+                    currentMdl = await this.GetRawMdlData(item, IOUtil.GetRaceFromPath(path), submeshId, true);
                 } else
                 {
                     throw new Exception("Unable to load base MDL file.");
@@ -1547,7 +1744,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #region TTModel Loading
                 // Probably could stand to push this out to its own function later.
-                var mdlPath = Path.Combine(currentMdl.MdlPath.Folder, currentMdl.MdlPath.File);
+                var mdlPath = currentMdl.MdlPath;
                 
                 loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
                 loggingFunction(false, "Starting Import of file: " + fileLocation.FullName);
@@ -1592,7 +1789,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         loggingFunction(false, "Loading original SE model to retrieve Shape Data...");
                         var ogOffset = mod.data.originalOffset;
-                        ogMdl = await GetMdlData(item, IOUtil.GetRaceFromPath(mdlPath), null, mdlPath, ogOffset);
+                        ogMdl = await GetRawMdlData(item, IOUtil.GetRaceFromPath(mdlPath), submeshId, true);
                     }
                 }
 
@@ -1627,7 +1824,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var modEntry = await modding.TryGetModEntry(mdlPath);
 
 
-                var filePath = Path.Combine(currentMdl.MdlPath.Folder, currentMdl.MdlPath.File);
+                var filePath = currentMdl.MdlPath;
 
                 if (!rawDataOnly)
                 {
@@ -2035,7 +2232,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 // Get the imported data
-                var importDataDictionary = GetImportData(ttModel, vertexInfoDict);
+                var importDataDictionary = GetGeometryData(ttModel, vertexInfoDict);
 
                 // Extra LoD Data
                 #region Extra Level Of Detail Block
@@ -3396,12 +3593,12 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
-        /// Gets the import data in byte format
+        /// Converts the TTTModel Geometry into the raw byte blocks FFXIV expects.
         /// </summary>
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A dictionary containing the vertex byte data per mesh</returns>
-        private Dictionary<int, VertexByteData> GetImportData(TTModel ttModel, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict)
+        private Dictionary<int, VertexByteData> GetGeometryData(TTModel ttModel, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict)
         {
             var importDataDictionary = new Dictionary<int, VertexByteData>();
 
@@ -3729,40 +3926,112 @@ namespace xivModdingFramework.Models.FileTypes
             return vertexByteData;
         }
 
+
         /// <summary>
-        /// Calculate the missing Tangent data from a model based on the existent Normal and Binormal data.
+        /// Classes used in reading bone deformation data.
         /// </summary>
-        /// <param name="normals"></param>
-        /// <param name="binormals"></param>
-        /// <param name="handedness"></param>
-        /// <returns></returns>
-        public static Vector3Collection CalculateTangentsFromBinormals(Vector3Collection normals, Vector3Collection binormals, List<byte> handedness)
+        private class DeformationBoneSet
         {
-            var tangents = new Vector3Collection(binormals.Count);
-            if (normals.Count != binormals.Count || normals.Count != handedness.Count)
-            {
-                return tangents;
-            }
-            for(var idx = 0; idx < normals.Count; idx++)
-            {
-                var tangent = Vector3.Cross(normals[idx], binormals[idx]);
-                tangent*= (handedness[idx] == 0 ? 1 : -1 );
-                tangents.Add(tangent);
-            }
-            return tangents;
+            public List<DeformationBoneData> Data = new List<DeformationBoneData>();
         }
-        /// <summary>
-        /// Calculate the missing Tangent data from a model based on a single point of existent Normal and Binormal data.
-        /// </summary>
-        /// <param name="normals"></param>
-        /// <param name="binormals"></param>
-        /// <param name="handedness"></param>
-        /// <returns></returns>
-        public static Vector3 CalculateTangentFromBinormal(Vector3 normal, Vector3 binormal, byte handedness)
+        private class DeformationBoneData
         {
-            var tangent = Vector3.Cross(normal, binormal);
-            tangent *= (handedness == 0 ? 1 : -1);
-            return tangent;
+            public string Name;
+            public float[] Matrix = new float[16];
+        }
+
+        private static Dictionary<string, Matrix> baseDeformationMatrix;
+        private static Dictionary<string, Matrix> recalculatedDeformationMatrix;
+        private static Dictionary<string, Matrix> decomposedDeformationMatrix;
+
+        /// <summary>
+        /// Loads the deformation files for attempting racial deformation
+        /// Currently in debugging phase.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <param name="deformations"></param>
+        /// <param name="decomposed"></param>
+        /// <param name="recalculated"></param>
+        public static void GetDeformationMatrices(XivRace race, out Dictionary<string, Matrix> deformations, out Dictionary<string, Matrix> decomposed, out Dictionary<string, Matrix> recalculated)
+        {
+            baseDeformationMatrix = new Dictionary<string, Matrix>();
+            recalculatedDeformationMatrix = new Dictionary<string, Matrix>();
+            decomposedDeformationMatrix = new Dictionary<string, Matrix>();
+
+
+            var deformFile = "Skeletons/c" + race.GetRaceCode() + "_deform.json";
+            var deformationLines = File.ReadAllLines(deformFile);
+            string deformationJson = deformationLines[0];
+            var deformationData = JsonConvert.DeserializeObject<DeformationBoneSet>(deformationJson);
+            foreach (var set in deformationData.Data)
+            {
+                baseDeformationMatrix.Add(set.Name, new Matrix(set.Matrix));
+            }
+
+            var skelDict = new Dictionary<string, SkeletonData>();
+
+            var skelName = "c" + race.GetRaceCode();
+            var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
+            var skeletonData = File.ReadAllLines(skeletonFile);
+            var FullSkel = new Dictionary<string, SkeletonData>();
+            var FullSkelNum = new Dictionary<int, SkeletonData>();
+
+            // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
+            foreach (var b in skeletonData)
+            {
+                if (b == "") continue;
+                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+
+                FullSkel.Add(j.BoneName, j);
+                FullSkelNum.Add(j.BoneNumber, j);
+            }
+
+            var root = FullSkel["n_root"];
+
+            BuildNewTransfromMatrices(root, FullSkel);
+
+
+            deformations = baseDeformationMatrix;
+            decomposed = decomposedDeformationMatrix;
+            recalculated = recalculatedDeformationMatrix;
+        }
+        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData)
+        {
+            if (node.BoneParent == -1)
+            {
+                recalculatedDeformationMatrix.Add(node.BoneName, baseDeformationMatrix[node.BoneName]);
+                decomposedDeformationMatrix.Add(node.BoneName, baseDeformationMatrix[node.BoneName]);
+                //decomposedDeformationMatrix.Add(node.BoneName, Matrix.Scaling(3.0f,1.0f,1.0f));
+                //recalculatedDeformationMatrix.Add(node.BoneName, Matrix.Scaling(3.0f, 1.0f, 1.0f));
+            }
+            else
+            {
+                try
+                {
+                    if (baseDeformationMatrix.ContainsKey(node.BoneName))
+                    {
+                        var parent = skeletonData.First(x => x.Value.BoneNumber == node.BoneParent);
+                        var decomposed = baseDeformationMatrix[parent.Value.BoneName].Inverted() * baseDeformationMatrix[node.BoneName];
+                        //decomposed = Matrix.Identity;
+                        var recomposed = recalculatedDeformationMatrix[parent.Value.BoneName] * decomposed;
+                        decomposedDeformationMatrix.Add(node.BoneName, decomposed);
+                        recalculatedDeformationMatrix.Add(node.BoneName, recomposed);
+                    }
+                    else
+                    {
+                        recalculatedDeformationMatrix.Add(node.BoneName, Matrix.Identity);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var b = "d";
+                }
+            }
+            var children = skeletonData.Where(x => x.Value.BoneParent == node.BoneNumber);
+            foreach (var c in children)
+            {
+                BuildNewTransfromMatrices(c.Value, skeletonData);
+            }
         }
 
         /// <summary>
@@ -3770,38 +4039,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="itemModel">The item model</param>
         /// <param name="xivRace">The selected race for the given item</param>
-        /// <param name="itemType">The items type</param>
-        /// <param name="secondaryModel">The secondary model if any</param>
-        /// <returns>A Tuple containing the Folder and File string paths</returns>
-        public (string Folder, string File) GetMdlPath(IItemModel itemModel, XivRace xivRace, XivItemType itemType, XivModelInfo secondaryModel, string mdlStringPath, string ringSide)
+        /// <param name="submeshId">The submesh ID - Only used for furniture items which contain multiple meshes, like the Ahriman Clock.</param>
+        /// <returns>The path in string format.  Not a fucking tuple.</returns>
+        public string GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null)
         {
-            if (mdlStringPath != null)
-            {
-                var folder = Path.GetDirectoryName(mdlStringPath).Replace("\\", "/");
-                var file = Path.GetFileName(mdlStringPath);
-
-                return (folder, file);
-            }
-
             string mdlFolder = "", mdlFile = "";
 
-            var mdlInfo = secondaryModel ?? itemModel.ModelInfo;
+            var mdlInfo =  itemModel.ModelInfo;
             var id = mdlInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = mdlInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = itemModel.SecondaryCategory;
 
-            if (secondaryModel != null)
-            {
-                // Secondary model is gear if between 8800 and 8900 instead of weapon
-                if (secondaryModel.PrimaryID > 8800 && secondaryModel.PrimaryID < 8900)
-                {
-                    itemType = XivItemType.equipment;
-                    xivRace = XivRace.Hyur_Midlander_Male;
-                    itemCategory = XivStrings.Hands;
-                }
-            }
-          
             var race = xivRace.GetRaceCode();
+            var itemType = itemModel.GetPrimaryItemType();
 
             switch (itemType)
             {
@@ -3811,21 +4061,7 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case XivItemType.accessory:
                     mdlFolder = $"chara/{itemType}/a{id}/model";
-                    if (ringSide != null)
-                    {
-                        if (ringSide.Equals("Right"))
-                        {
-                            mdlFile = $"c{race}a{id}_rir{MdlExtension}";
-                        }
-                        else
-                        {
-                            mdlFile = $"c{race}a{id}_ril{MdlExtension}";
-                        }
-                    }
-                    else
-                    {
-                        mdlFile = $"c{race}a{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
-                    }
+                    mdlFile = $"c{race}a{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
                     break;
                 case XivItemType.weapon:
                     mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
@@ -3867,21 +4103,20 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     break;
                 case XivItemType.furniture:
-                    var part = "";
-                    if (itemModel.TertiaryCategory != "base")
+                    if (submeshId == null || submeshId == "base")
                     {
-                        part = itemModel.TertiaryCategory;
+                        submeshId = "";
                     }
 
                     if (itemCategory.Equals(XivStrings.Furniture_Indoor))
                     {
                         mdlFolder = $"bgcommon/hou/indoor/general/{id}/bgparts";
-                        mdlFile = $"fun_b0_m{id}{part}{MdlExtension}";
+                        mdlFile = $"fun_b0_m{id}{submeshId}{MdlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
                     {
                         mdlFolder = $"bgcommon/hou/outdoor/general/{id}/bgparts";
-                        mdlFile = $"gar_b0_m{id}{part}{MdlExtension}";
+                        mdlFile = $"gar_b0_m{id}{submeshId}{MdlExtension}";
                     }
 
                     break;
@@ -3891,7 +4126,7 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
             }
 
-            return (mdlFolder, mdlFile);
+            return mdlFolder + "/" + mdlFile;
         }
 
         public static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>

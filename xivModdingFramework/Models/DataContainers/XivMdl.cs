@@ -27,7 +27,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The path to this mdl file
         /// </summary>
-        public (string Folder, string File) MdlPath { get; set; }
+        public string MdlPath { get; set; }
 
 
         /// <summary>
