@@ -112,13 +112,19 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
 
+            var dir = Path.GetDirectoryName(outputFilePath);
+            if (!Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+
 
             if (fileFormat == "dae")
             {
                 // Validate the skeleton.
                 var mdlName = Path.GetFileName(mdlPath);
                 var sklb = new Sklb(_gameDirectory, _dataFile);
-                await sklb.CreateSkelForMdl(mdlPath);
+                await sklb.CreateSkelFileForMdl(mdlPath);
                 var skel = await sklb.GetParsedSkelFilename(mdlPath);
 
                 // Special DAE snowflake.
@@ -152,6 +158,12 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
 
+            var dir = Path.GetDirectoryName(outputFilePath);
+            if (!Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+
             outputFilePath = outputFilePath.Replace("/", "\\");
 
             // Obj's a bit of a special case, as it doesn't have any skeleton data, and is
@@ -173,7 +185,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Validate the skeleton.
             var mdlName = Path.GetFileName(model.Source);
             var sklb = new Sklb(_gameDirectory, _dataFile);
-            await sklb.CreateSkelForMdl(model.Source);
+            await sklb.CreateSkelFileForMdl(model.Source);
             var skel = await sklb.GetParsedSkelFilename(model.Source);
 
 
@@ -181,7 +193,7 @@ namespace xivModdingFramework.Models.FileTypes
             var dbPath = Path.GetDirectoryName(outputFilePath) + "\\" + Path.GetFileNameWithoutExtension(model.Source) + ".db";
             model.SaveToFile(dbPath);
 
-            var importerFolder = Directory.GetCurrentDirectory() + "\\importers\\" + fileFormat;
+            var importerFolder = Directory.GetCurrentDirectory() + "\\converters\\" + fileFormat;
 
             if (fileFormat == "db")
             {
@@ -202,7 +214,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = importerFolder + "\\importer.exe",
+                        FileName = importerFolder + "\\converter.exe",
                         Arguments = "\"" + dbPath + "\"",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -1565,7 +1577,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public List<string> GetAvailableImporters()
         {
-            const string importerPath = "importers/";
+            const string importerPath = "converters/";
             var ret = new List<string>();
             ret.Add("dae"); // DAE handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
@@ -1584,7 +1596,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public List<string> GetAvailableExporters()
         {
-            const string importerPath = "importers/";
+            const string importerPath = "converters/";
             var ret = new List<string>();
             ret.Add("dae"); // DAE handler is internal.
             ret.Add("obj"); // OBJ handler is internal.
@@ -1608,7 +1620,7 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
         {
 
-            var importerFolder = Directory.GetCurrentDirectory() + "\\importers\\" + importerName;
+            var importerFolder = Directory.GetCurrentDirectory() + "\\converters\\" + importerName;
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
@@ -1618,7 +1630,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = importerFolder + "\\importer.exe",
+                    FileName = importerFolder + "\\converter.exe",
                     Arguments = "\"" + filePath + "\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -1854,9 +1866,6 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var isAlreadyModified = false;
                 var isAlreadyModified2 = false;
-
-                // Final step modifications to the TTModel
-                ModelModifiers.MakeImportReady(ttModel, loggingFunction);
 
                 // Vertex Info
                 #region Vertex Info Block

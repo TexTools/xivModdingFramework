@@ -21,7 +21,7 @@ namespace xivModdingFramework.Cache
     {
         private GameInfo _gameInfo;
         private DirectoryInfo _dbPath;
-        private static readonly Version CacheVersion = new Version("0.0.0.25");
+        public static readonly Version CacheVersion = new Version("0.0.0.25");
         private const string dbFileName = "mod_cache.db";
         private const string creationScript = "CreateCacheDB.sql";
         private string _connectionString { get

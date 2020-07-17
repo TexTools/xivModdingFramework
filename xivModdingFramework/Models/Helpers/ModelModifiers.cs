@@ -630,22 +630,6 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
-
-        
-        private static Vector4 Transform(Vector3 input, Matrix m)
-        {
-            Vector4 v = new Vector4(input, 1f);
-            Vector4 result = Vector4.Zero;
-            Vector3 final = Vector3.Zero;
-            for (int i = 0; i < 4; ++i)
-                result[i] = (v[i] * m.Column1[i]) + (v[i] * m.Column2[i]) + (v[i] * m.Column3[i]) + (v[i] * m.Column4[i]);
-
-            final[0] = result[0];
-            final[1] = result[1];
-            final[2] = result[2];
-            return result;
-        }
-
         /// <summary>
         /// Attempts to deform a model from its original race to the given target race.
         /// </summary>
@@ -654,7 +638,6 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="loggingFunction"></param>
         public static void ApplyRacialDeform(TTModel model, XivRace targetRace, Action<bool, string> loggingFunction = null)
         {
-            MakeImportReady(model);
             try
             {
                 if (loggingFunction == null)
@@ -704,10 +687,10 @@ namespace xivModdingFramework.Models.Helpers
                                 }
 
 
-                                position += tf(v.Position, matrix) * boneWeight;
-                                normal += tf(v.Normal, matrix) * boneWeight;
-                                binormal += tf(v.Binormal, matrix) * boneWeight;
-                                tangent += tf(v.Tangent, matrix) * boneWeight;
+                                position += MatrixTransform(v.Position, matrix) * boneWeight;
+                                normal += MatrixTransform(v.Normal, matrix) * boneWeight;
+                                binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
+                                tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
                             }
 
                             v.Position = position;
@@ -722,49 +705,61 @@ namespace xivModdingFramework.Models.Helpers
             {
                 throw (ex);
             }
-
-            MakeExportReady(model);
-
         }
 
 
         /// <summary>
-        /// So this is is included because apparently SharpDX's Matrix implementation (At least in the version we're on)
-        /// is wrong, or based on some strange, non-standard assumptions on how the affine matrices should be set up.
+        /// This takes a standard Affine Transformation matrix [0,0,0,1 on bottom], and a vector, and applies the transformation to it.
+        /// Treating the vector as a [1x4] Column, with [1] in the last entry.  This function is necessary because SharpDX implementation
+        /// of transforms assumes your affine matrices are set up with translation on the bottom(and vectors as rows), not the right(and vectors as columns).
         /// </summary>
         /// <param name="vector"></param>
         /// <param name="transform"></param>
         /// <param name="result"></param>
-        private static Vector3 tf(Vector3 vector, Matrix transform)
+        private static Vector3 MatrixTransform(Vector3 vector, Matrix transform)
         {
-            var result = new Vector4(
+            var result = new Vector3(
                 (vector.X * transform[0]) +  (vector.Y * transform[1])  + (vector.Z * transform[2])  + (1.0f * transform[3]),
                 (vector.X * transform[4]) +  (vector.Y * transform[5])  + (vector.Z * transform[6])  + (1.0f * transform[7]),
-                (vector.X * transform[8]) +  (vector.Y * transform[9])  + (vector.Z * transform[10]) + (1.0f * transform[11]),
-                (vector.X * transform[12]) + (vector.Y * transform[13]) + (vector.Z * transform[14]) + (1.0f * transform[15]));
+                (vector.X * transform[8]) +  (vector.Y * transform[9])  + (vector.Z * transform[10]) + (1.0f * transform[11]));
 
-            return new Vector3(result.X, result.Y, result.Z);
+            return result;
         }
 
         /// <summary>
         /// This function does all the minor adjustments to a Model that makes it
         /// ready for injection into the SE filesystem.  Such as flipping the 
-        /// UVs, and applying the global level size multiplier.
+        /// UVs, calculating tangents, and applying the global level size multiplier.
         /// Likewise, MakeExportReady() undoes this process.
+        /// 
+        /// Weight check skip lets us avoid some calculation in cases where we already know they're fine.
         /// </summary>
-        public static void MakeImportReady(TTModel model, Action<bool, string> loggingFunction = null)
+        public static void MakeImportReady(TTModel model, Action<bool, string> loggingFunction = null, bool reconvert = false)
         {
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
-            
+
             // Calculate Tangents if needed - BEFORE flipping UVs.
-            var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
-            if (!hasTangents)
+            // Skip this is we're just reconverting back, to avoid any potential issues and save time.
+            if (!reconvert)
             {
-                loggingFunction(false, "Calculating Tangent Data...");
-                CalculateTangents(model);
+                var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
+                if (!hasTangents)
+                {
+                    var hasBinormals = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Binormal != Vector3.Zero)));
+
+                    // If we already have binormal data, we can just use the cheaper function.
+                    if (hasBinormals)
+                    {
+                        CalculateTangentsFromBinormals(model, loggingFunction);
+                    }
+                    else
+                    {
+                        CalculateTangents(model, loggingFunction);
+                    }
+                }
             }
 
             var totalMajorCorrections = 0;
@@ -775,60 +770,60 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     foreach (var v in p.Vertices)
                     {
-                        // Model Size Multiplier.
-                        v.Position /= xivModdingFramework.Helpers.Constants.ModelMultiplier;
-
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
 
-                        // Weight Validation
-                        if (model.HasWeights)
+                        if (!reconvert)
                         {
-                            int boneSum = 0;
-                            // Weight corrections.
-                            while (boneSum != 255)
+                            // Weight Validation
+                            if (model.HasWeights)
                             {
-                                boneSum = 0;
-                                var mostMajor = -1;
-                                var most = -1;
-                                // Loop them to sum them up.
-                                // and snag the least/most major influences while we're at it.
-                                for (var i = 0; i < v.Weights.Length; i++)
+                                int boneSum = 0;
+                                // Weight corrections.
+                                while (boneSum != 255)
                                 {
-                                    var value = v.Weights[i];
-
-                                    // Don't care about 0 weight entries.
-                                    if (value == 0) continue;
-
-                                    boneSum += value;
-                                    if (value > most)
+                                    boneSum = 0;
+                                    var mostMajor = -1;
+                                    var most = -1;
+                                    // Loop them to sum them up.
+                                    // and snag the least/most major influences while we're at it.
+                                    for (var i = 0; i < v.Weights.Length; i++)
                                     {
-                                        mostMajor = i;
-                                        most = value;
+                                        var value = v.Weights[i];
+
+                                        // Don't care about 0 weight entries.
+                                        if (value == 0) continue;
+
+                                        boneSum += value;
+                                        if (value > most)
+                                        {
+                                            mostMajor = i;
+                                            most = value;
+                                        }
                                     }
+
+                                    var alteration = 255 - boneSum;
+                                    if (Math.Abs(alteration) > 1)
+                                    {
+                                        totalMajorCorrections++;
+                                    }
+
+                                    if (Math.Abs(alteration) > 255)
+                                    {
+                                        // Just No.
+                                        v.Weights[0] = 255;
+                                        v.Weights[1] = 0;
+                                        v.Weights[1] = 0;
+                                        v.Weights[1] = 0;
+                                        break;
+
+                                    }
+
+                                    // Take or Add to the most major bone.
+                                    v.Weights[mostMajor] += (byte)alteration;
+                                    boneSum += alteration;
                                 }
-
-                                var alteration = 255 - boneSum;
-                                if (Math.Abs(alteration) > 1)
-                                {
-                                    totalMajorCorrections++;
-                                }
-
-                                if (Math.Abs(alteration) > 255)
-                                {
-                                    // Just No.
-                                    v.Weights[0] = 255;
-                                    v.Weights[1] = 0;
-                                    v.Weights[1] = 0;
-                                    v.Weights[1] = 0;
-                                    break;
-
-                                }
-
-                                // Take or Add to the most major bone.
-                                v.Weights[mostMajor] += (byte)alteration;
-                                boneSum += alteration;
                             }
                         }
                     }
@@ -860,9 +855,6 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     foreach (var v in p.Vertices)
                     {
-                        // Model Size Multiplier.
-                        v.Position *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
-
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
@@ -873,8 +865,6 @@ namespace xivModdingFramework.Models.Helpers
 
         /// <summary>
         /// Convenience function for calculating tangent data for a TTModel.
-        /// This is significantly more performant than creating Position/Normal lists
-        /// and passing them to the Mdl.cs version, but the calculations are the same.
         /// </summary>
         /// <param name="model"></param>
         public static void CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null)
@@ -884,7 +874,12 @@ namespace xivModdingFramework.Models.Helpers
                 loggingFunction = NoOp;
             }
 
-            // Set up arrays.
+            loggingFunction(false, "Calculating Tangents...");
+
+            // So, in order to properly calculate tangents, we have to flip the UV back into normal human space.
+            MakeExportReady(model, loggingFunction);
+
+
             foreach (var m in model.MeshGroups)
             {
                 foreach (var p in m.Parts)
@@ -982,6 +977,9 @@ namespace xivModdingFramework.Models.Helpers
                     }
                 }
             }
+
+            // And now reconvert the model.
+            MakeImportReady(model, loggingFunction, true);
         }
 
         /// <summary>
@@ -997,8 +995,9 @@ namespace xivModdingFramework.Models.Helpers
             {
                 loggingFunction = NoOp;
             }
+            loggingFunction(false, "Calculating Tangents from Binormal Data...");
 
-            foreach( var m in model.MeshGroups)
+            foreach ( var m in model.MeshGroups)
             {
                 foreach(var p in m.Parts)
                 {

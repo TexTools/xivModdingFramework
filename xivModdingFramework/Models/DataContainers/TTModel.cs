@@ -777,6 +777,8 @@ namespace xivModdingFramework.Models.DataContainers
             }
 
 
+            // Convert the model to FFXIV's internal weirdness.
+            ModelModifiers.MakeImportReady(model, loggingFunction);
             return model;
         }
 
@@ -794,11 +796,13 @@ namespace xivModdingFramework.Models.DataContainers
             }
             File.Delete(filePath);
 
-            var boneDict = ResolveBoneHeirarchy();
+            ModelModifiers.MakeExportReady(this, loggingFunction);
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
+                var boneDict = ResolveBoneHeirarchy();
+
                 const string creationScript = "CreateImportDB.sql";
                 // Spawn a DB connection to do the raw queries.
                 // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
@@ -819,8 +823,48 @@ namespace xivModdingFramework.Models.DataContainers
                     using (var transaction = db.BeginTransaction())
                     {
 
+                        // Metadata.
+                        var query = @"insert into meta (key, value) values ($key, $value)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            // FFXIV stores stuff in Meters.
+                            cmd.Parameters.AddWithValue("key", "unit");
+                            cmd.Parameters.AddWithValue("value", "meter");
+                            cmd.ExecuteScalar();
+
+                            // Application that created the db.
+                            cmd.Parameters.AddWithValue("key", "application");
+                            cmd.Parameters.AddWithValue("value", "ffxiv_tt");
+                            cmd.ExecuteScalar();
+
+                            // Does the framework NOT have a version identifier?  I couldn't find one, so the Cache version works.
+                            cmd.Parameters.AddWithValue("key", "version");
+                            cmd.Parameters.AddWithValue("value", XivCache.CacheVersion);
+                            cmd.ExecuteScalar();
+
+                            // Axis information
+                            cmd.Parameters.AddWithValue("key", "up");
+                            cmd.Parameters.AddWithValue("value", "y");
+                            cmd.ExecuteScalar();
+
+                            cmd.Parameters.AddWithValue("key", "front");
+                            cmd.Parameters.AddWithValue("value", "z");
+                            cmd.ExecuteScalar();
+
+                            cmd.Parameters.AddWithValue("key", "handedness");
+                            cmd.Parameters.AddWithValue("value", "r");
+                            cmd.ExecuteScalar();
+
+
+                            // FFXIV stores stuff in Meters.
+                            cmd.Parameters.AddWithValue("key", "name");
+                            cmd.Parameters.AddWithValue("value", Path.GetFileNameWithoutExtension(Source));
+                            cmd.ExecuteScalar();
+
+                        }
+
                         // Bones mesh -1 -- Full Skeleton the file needs, using the raw bone Ids.
-                        var query = @"insert into bones (mesh, bone_id, parent_id, name, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
+                        query = @"insert into bones (mesh, bone_id, parent_id, name, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
                                              values ($mesh, $bone_id, $parent_id, $name, $matrix_0, $matrix_1, $matrix_2, $matrix_3, $matrix_4, $matrix_5, $matrix_6, $matrix_7, $matrix_8, $matrix_9, $matrix_10, $matrix_11, $matrix_12, $matrix_13, $matrix_14, $matrix_15);";
                         foreach (var b in boneDict)
                         {
@@ -949,8 +993,12 @@ namespace xivModdingFramework.Models.DataContainers
                 }
             } catch(Exception Ex)
             {
+                ModelModifiers.MakeImportReady(this, loggingFunction);
                 throw Ex;
             }
+
+            // Undo the export ready at the start.
+            ModelModifiers.MakeImportReady(this, loggingFunction);
         }
 
         /// <summary>
@@ -970,7 +1018,6 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MergeAttributeData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeMaterialData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
-            ModelModifiers.MakeExportReady(ttModel, loggingFunction);
             ttModel.Source = rawMdl.MdlPath;
 
             return ttModel;
@@ -1006,12 +1053,6 @@ namespace xivModdingFramework.Models.DataContainers
                 if (b == "") continue;
                 var j = JsonConvert.DeserializeObject<SkeletonData>(b);
                 j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-
-                j.PoseMatrix[3] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
-                j.PoseMatrix[7] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
-                j.PoseMatrix[11] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
-                j.PoseMatrix[15] *= xivModdingFramework.Helpers.Constants.ModelMultiplier;
-
                 fullSkel.Add(j.BoneName, j);
             }
 

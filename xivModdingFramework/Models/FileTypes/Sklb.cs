@@ -113,47 +113,47 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
-        /// Creates a Skel file for the given Mdl.
-        /// NoOp if the file already exists.
+        /// Creates a .Skel file for the given Mdl.
         /// </summary>
         /// <remarks>
         /// The skel file is the Sklb havok data parsed into json objects
         /// </remarks>
         /// <param name="item">The item we are getting the skeleton for</param>
         /// <param name="model">The model we are getting the skeleton for</param>
-        public async Task CreateSkelForMdl(string fullMdlPath)
+        public async Task CreateSkelFileForMdl(string fullMdlPath)
         {
             var skelName = await GetSkelNameFromPath(fullMdlPath);
-            /* 
-
-            // Checks to see if the skeleton file exists, and throws an exception if it does not
-            if (!File.Exists(Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel"))
-            {
-            } */
 
             var skelLoc = ".\\Skeletons\\";
 
             Directory.CreateDirectory(skelLoc);
 
+            // If we don't have an XML already...
             if (!File.Exists(skelLoc + skelName + ".xml"))
             {
-                await GetSkeleton(fullMdlPath);
-
-                var proc = new Process
+                // Generate a raw .sklb file, if one exists for it.
+                await ExtractSkelb(fullMdlPath);
+                if (File.Exists(skelLoc + skelName + ".sklb"))
                 {
-                    StartInfo = new ProcessStartInfo
+                    // And pass it to the converter.
+                    var proc = new Process
                     {
-                        FileName = Directory.GetCurrentDirectory() + "/NotAssetCc.exe",
-                        Arguments = "\"" + skelLoc + skelName + ".sklb\" \"" + skelLoc + skelName + ".xml\"",
-                        RedirectStandardOutput = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = Directory.GetCurrentDirectory() + "/NotAssetCc.exe",
+                            Arguments = "\"" + skelLoc + skelName + ".sklb\" \"" + skelLoc + skelName + ".xml\"",
+                            RedirectStandardOutput = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        }
+                    };
 
-                proc.Start();
-                proc.WaitForExit();
+                    proc.Start();
+                    proc.WaitForExit();
+                }
             }
+
+            // Pass the XML file onto the parser, if it exists.
             if(File.Exists(skelLoc + skelName + ".xml"))
                 ParseSkeleton(skelLoc + skelName + ".xml", fullMdlPath);
         }
@@ -163,7 +163,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="modelName">The name of the model</param>
         /// <param name="category">The items category</param>
-        private async Task GetSkeleton(string fullMdlPath)
+        private async Task ExtractSkelb(string fullMdlPath)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
@@ -201,6 +201,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (IsHair(fullMdlPath))
                 {
+                    //TODO - FIXFIX - HAIR SKELLS
                     //id = _hairSklbName.Substring(1);
                 }
 
