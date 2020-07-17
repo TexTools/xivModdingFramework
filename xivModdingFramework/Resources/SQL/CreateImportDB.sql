@@ -16,7 +16,7 @@ CREATE TABLE "indices" (
 	"mesh"	INTEGER NOT NULL,
 	"part"   INTEGER NOT NULL,
 	"index_id"	INTEGER NOT NULL,
-	"vertex_id"		TEXT NOT NULL,
+	"vertex_id"	  INTEGER NOT NULL,
 	
 
 	PRIMARY KEY("mesh","part","index_id")

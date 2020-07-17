@@ -654,6 +654,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="loggingFunction"></param>
         public static void ApplyRacialDeform(TTModel model, XivRace targetRace, Action<bool, string> loggingFunction = null)
         {
+            MakeImportReady(model);
             try
             {
                 if (loggingFunction == null)
@@ -705,38 +706,47 @@ namespace xivModdingFramework.Models.Helpers
                                     throw new Exception("Invalid bone");
                                 }
 
-                                if(matrix[15] != 1.0f || matrix[14] != 0 || matrix[13] != 0 || matrix[12] != 0)
-                                {
-                                    //throw new Exception("eh?");
-                                }
 
-                                //var vec = new Vector4(v.Position[0],v.Position[1],v.Position[2], 1);
-                                //vec = Vector4.Transform(vec, matrix);
-                                //Vector3.Transform(ref v.Position, ref matrix, out result);
-                                Vector3 r;
-                                Vector3.TransformCoordinate(ref v.Position, ref matrix, out r);
-                                position += r * boneWeight;//(Transform(v.Position, matrix) * boneWeight);
-
-                                var asdf = "sadf";
-                                //position += (matrix.TranslationVector)
-
+                                position += tf(v.Position, matrix) * boneWeight;
+                                normal += tf(v.Normal, matrix) * boneWeight;
+                                binormal += tf(v.Binormal, matrix) * boneWeight;
+                                tangent += tf(v.Tangent, matrix) * boneWeight;
                             }
-                            if(wsum != 1)
-                            {
-                                var z = "d";
-                                //throw new Exception("Sum Failure.");
-                            }
-                            v.Position = new Vector3(position.X, position.Y, position.Z);
+
+                            v.Position = position;
+                            v.Normal = normal;
+                            v.Binormal = binormal;
+                            v.Tangent = tangent;
                         }
                     }
                 }
             }catch(Exception ex)
             {
-                var z = "d";
+                throw (ex);
             }
+
+            MakeExportReady(model);
 
         }
 
+
+        /// <summary>
+        /// So this is is included because apparently SharpDX's Matrix implementation (At least in the version we're on)
+        /// is wrong, or based on some strange, non-standard assumptions on how the affine matrices should be set up.
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <param name="transform"></param>
+        /// <param name="result"></param>
+        private static Vector3 tf(Vector3 vector, Matrix transform)
+        {
+            var result = new Vector4(
+                (vector.X * transform[0]) +  (vector.Y * transform[1])  + (vector.Z * transform[2])  + (1.0f * transform[3]),
+                (vector.X * transform[4]) +  (vector.Y * transform[5])  + (vector.Z * transform[6])  + (1.0f * transform[7]),
+                (vector.X * transform[8]) +  (vector.Y * transform[9])  + (vector.Z * transform[10]) + (1.0f * transform[11]),
+                (vector.X * transform[12]) + (vector.Y * transform[13]) + (vector.Z * transform[14]) + (1.0f * transform[15]));
+
+            return new Vector3(result.X, result.Y, result.Z);
+        }
 
         /// <summary>
         /// This function does all the minor adjustments to a Model that makes it

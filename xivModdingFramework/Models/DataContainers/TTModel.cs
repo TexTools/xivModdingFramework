@@ -687,7 +687,7 @@ namespace xivModdingFramework.Models.DataContainers
                 }
 
                 // Load Bones
-                query = "select * from bones order by mesh asc, bone_id asc;";
+                query = "select * from bones where mesh >= 0 order by mesh asc, bone_id asc;";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(cmd.ExecuteReader()))
