@@ -689,20 +689,17 @@ namespace xivModdingFramework.Models.Helpers
                             Vector3 binormal = Vector3.Zero;
                             Vector3 tangent = Vector3.Zero;
 
-                            float wsum = 0;
                             // And each bone in that vertex.
                             for (var b = 0; b < 4; b++)
                             {
                                 if (v.Weights[b] == 0) continue;
                                 var boneName = m.Bones[v.BoneIds[b]];
                                 var boneWeight = (v.Weights[b]) / 255f;
-                                wsum += boneWeight;
 
                                 var matrix = Matrix.Identity;
-                                if (recalculated.ContainsKey(boneName)) {
+                                if (deformations.ContainsKey(boneName)) {
                                     matrix = deformations[boneName];
-                                } else
-                                {
+                                } else {
                                     throw new Exception("Invalid bone");
                                 }
 
@@ -720,7 +717,8 @@ namespace xivModdingFramework.Models.Helpers
                         }
                     }
                 }
-            }catch(Exception ex)
+            }
+            catch(Exception ex)
             {
                 throw (ex);
             }
