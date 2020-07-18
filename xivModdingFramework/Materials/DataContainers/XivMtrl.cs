@@ -809,7 +809,13 @@ namespace xivModdingFramework.Materials.DataContainers
                 if (info.HasMulti || info.HasSpec)
                 {
                     SetTextureUsage(XivTexType.Multi);
-                    SetTextureUsage(XivTexType.Specular);
+                }
+                if(info.HasSpec)
+                {
+                    // What does this do?  It's only found on extremely rare items with specular maps,
+                    // and if when we add it/touch it, it either totally breaks the specularity, or crashes.
+                    // And on the items it is involved in, adding/removing it seems to do nothing.
+                    // SetTextureUsage(XivTexType.Specular);  
                 }
             }
             else
@@ -852,6 +858,12 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 args.Add(MtrlShaderParameterId.Equipment1, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
+
+                // This seems to be some kind of shinyness thing?
+                if(info.Preset == MtrlShaderPreset.DiffuseSpecular)
+                {
+                    args[MtrlShaderParameterId.Common2] = new List<float>() { 0.25f };
+                }
             }
             else if (info.Shader == MtrlShader.Iris)
             {
@@ -906,8 +918,6 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <param name="data"></param>
         private void SetShaderParameter(MtrlShaderParameterId parameterId, List<float> data = null)
         {
-
-
             try
             {
                 var value = ShaderParameterList.First(x => x.ParameterID == parameterId);

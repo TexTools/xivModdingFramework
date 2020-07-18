@@ -19,6 +19,7 @@ using Newtonsoft.Json;
 using SharpDX;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -40,12 +41,10 @@ namespace xivModdingFramework.Models.FileTypes
     public class Sklb
     {
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
-
-        public Sklb(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        private const string SkeletonsFolder = ".\\Skeletons\\";
+        public Sklb(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
         }
 
         /// <summary>
@@ -55,58 +54,58 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="fullMdlPath"></param>
         /// <returns></returns>
-        public async Task<string> GetParsedSkelFilename(string fullMdlPath)
+        public static string GetParsedSkelFilename(string fullMdlPath)
         {
+            if (IsFurnishing(fullMdlPath))
+            {
+                return null;
+            }
 
             var mdlPath = fullMdlPath;
             var mdlName = Path.GetFileName(fullMdlPath);
             var skelName = mdlName.Substring(0, 5);
 
-            if (IsHair(mdlPath))
-            {
-                // TODO - FIXFIX - HAIR SKELS.
-                throw new NotImplementedException("Investigate this before release.");
-                /*var hBones = (from bone in model.Bones where bone.Contains("x_h") select bone).ToList();
-
-                if (hBones.Count > 0)
-                {
-                    skelName = hBones[0].Substring(hBones[0].IndexOf("x_h") + 2, 5);
-                }
-                else
-                {
-                    skelName = mdlName.Substring(5, 5);
-                }*/
-            }
-
+            // We compile all the exceptions down into the base skel, so this is easy and quick.
             return skelName;
         }
 
-        private async Task<string> GetSkelNameFromPath(string fullMdlPath)
+        private async Task<string> GetInternalSkelName(string fullMdlPath)
         {
+            if (IsFurnishing(fullMdlPath))
+            {
+                return null;
+            }
 
             var mdlPath = fullMdlPath;
             var mdlName = Path.GetFileName(fullMdlPath);
             var skelName = mdlName.Substring(0, 5);
 
-            if (IsHairHatFace(fullMdlPath))
+            if (IsHat(fullMdlPath) || IsFace(fullMdlPath))
             {
                 skelName = mdlName.Substring(5, 5);
             }
-
             else if (IsHair(mdlPath))
             {
-                // TODO - FIXFIX - HAIR SKELS.
-                throw new NotImplementedException("Investigate this before release.");
-                /*var hBones = (from bone in model.Bones where bone.Contains("x_h") select bone).ToList();
+                // This part sucks, gotta load the MDL and scrape the bone list
+                // to look for hair EX bones.
+                // No real getting around it until we find out how skeletons are set in game.
 
-                if (hBones.Count > 0)
+                var _mdl = new Mdl(_gameDirectory, IOUtil.GetDataFileFromPath(fullMdlPath));
+                var model = await _mdl.GetModel(fullMdlPath, true);   // Get the OG skel for the hair, don't trick users into thinking they can add EX bones.
+
+                // This process technically should also be done for other gear slots that might have EX Bones.
+                // But that's both rare, and this process is expensive, so we don't, and instead just package EX bone sets
+                // in with the TexTools distributable.
+
+                if (model.Bones.Any(x => x.Contains("x_h")))
                 {
-                    skelName = hBones[0].Substring(hBones[0].IndexOf("x_h") + 2, 5);
+                    var bone = model.Bones.First(x => x.Contains("x_h"));
+                    skelName = bone.Substring(bone.IndexOf("x_h") + 2, 5);
                 }
                 else
                 {
                     skelName = mdlName.Substring(5, 5);
-                }*/
+                }
             }
 
             return skelName;
@@ -120,78 +119,117 @@ namespace xivModdingFramework.Models.FileTypes
         /// </remarks>
         /// <param name="item">The item we are getting the skeleton for</param>
         /// <param name="model">The model we are getting the skeleton for</param>
-        public async Task CreateSkelFileForMdl(string fullMdlPath)
+        public async Task<string> CreateParsedSkelFile(string fullMdlPath)
         {
-            var skelName = await GetSkelNameFromPath(fullMdlPath);
+            var internalSkelName = await GetInternalSkelName(fullMdlPath);
+            if (internalSkelName == null) {
+                return null;
+            }
 
-            var skelLoc = ".\\Skeletons\\";
+            var externalSkelName = GetParsedSkelFilename(fullMdlPath);
+            var resultPath = SkeletonsFolder + externalSkelName + ".skel";
 
-            Directory.CreateDirectory(skelLoc);
-
-            // If we don't have an XML already...
-            if (!File.Exists(skelLoc + skelName + ".xml"))
+            // If we already have a file, and it's not one of the special types we merge in, just return that.
+            if (File.Exists(resultPath) && !IsHairHatFace(fullMdlPath))
             {
-                // Generate a raw .sklb file, if one exists for it.
-                await ExtractSkelb(fullMdlPath);
-                if (File.Exists(skelLoc + skelName + ".sklb"))
-                {
-                    // And pass it to the converter.
-                    var proc = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = Directory.GetCurrentDirectory() + "/NotAssetCc.exe",
-                            Arguments = "\"" + skelLoc + skelName + ".sklb\" \"" + skelLoc + skelName + ".xml\"",
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        }
-                    };
+                return resultPath;
+            }
 
-                    proc.Start();
-                    proc.WaitForExit();
+
+
+            Directory.CreateDirectory(SkeletonsFolder);
+
+
+            // Generate a raw .sklb file, if one exists for it.
+            var skelbFile = await ExtractSkelb(fullMdlPath, internalSkelName);
+            if (skelbFile != null)
+            {
+
+                var xmlFile = SkeletonsFolder + internalSkelName + ".xml";
+                File.Delete(xmlFile);
+
+                // And convert that extracted raw .sklb file to XML...
+                
+                var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = Directory.GetCurrentDirectory() + "/NotAssetCc.exe",
+                        Arguments = "\"" + skelbFile + "\" \"" + xmlFile + "\"",
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                proc.Start();
+                proc.WaitForExit();
+
+                // And then if the XML was generated successfully, create the JSON file.
+                // Seriously, why aren't these suffixed .json after we're done?
+                if (File.Exists(xmlFile))
+                {
+                    ParseSkeleton(xmlFile, fullMdlPath);
+                }
+                else
+                {
+                    return null;
                 }
             }
 
-            // Pass the XML file onto the parser, if it exists.
-            if(File.Exists(skelLoc + skelName + ".xml"))
-                ParseSkeleton(skelLoc + skelName + ".xml", fullMdlPath);
+            return resultPath;
         }
 
         /// <summary>
         /// Resolves the original skeleton path in the FFXIV file system and raw extracts it.
         /// </summary>
-        /// <param name="modelName">The name of the model</param>
-        /// <param name="category">The items category</param>
-        private async Task ExtractSkelb(string fullMdlPath)
+        /// <param name="fullMdlPath">Full path to the MDL.</param>
+        /// <param name="internalSkelName">Internal skeleton name (for hair).  This can be resolved if missing, though it is slightly expensive to do so.</param>
+        private async Task<string> ExtractSkelb(string fullMdlPath, string internalSkelName = null)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
+            var dataFile = IOUtil.GetDataFileFromPath(fullMdlPath);
 
-            var fileName = Path.GetFileName(fullMdlPath);
+            var fileName = Path.GetFileNameWithoutExtension(fullMdlPath);
             var skelFolder = "";
             var skelFile = "";
             var slotAbr = "";
 
-            if (fileName[0].Equals('w'))
+            if (IsNonhuman(fullMdlPath))
             {
-                skelFolder = string.Format(XivStrings.WeapSkelFolder, fileName.Substring(1, 4), "0001");
-                skelFile = string.Format(XivStrings.WeapSkelFile, fileName.Substring(1, 4), "0001");
+                // Weapons / Monsters / Demihumans are simple enough cases, we just have to use different formatting strings.
+                if (IsWeapon(fullMdlPath))
+                {
+                    skelFolder = string.Format(XivStrings.WeapSkelFolder, fileName.Substring(1, 4), "0001");
+                    skelFile = string.Format(XivStrings.WeapSkelFile, fileName.Substring(1, 4), "0001");
+                } else if(IsMonster(fullMdlPath))
+                {
+                    skelFolder = string.Format(XivStrings.MonsterSkelFolder, fileName.Substring(1, 4), "0001");
+                    skelFile = string.Format(XivStrings.MonsterSkelFile, fileName.Substring(1, 4), "0001");
+                } else if(IsDemihuman(fullMdlPath))
+                {
+                    skelFolder = string.Format(XivStrings.DemiSkelFolder, fileName.Substring(1, 4), "0001");
+                    skelFile = string.Format(XivStrings.DemiSkelFile, fileName.Substring(1, 4), "0001");
+                }
             }
-            else if (fileName[0].Equals('m'))
+            else if (IsHair(fullMdlPath))
             {
-                skelFolder = string.Format(XivStrings.MonsterSkelFolder, fileName.Substring(1, 4), "0001");
-                skelFile = string.Format(XivStrings.MonsterSkelFile, fileName.Substring(1, 4), "0001");
-            }
-            else if (fileName[0].Equals('d'))
-            {
-                skelFolder = string.Format(XivStrings.DemiSkelFolder, fileName.Substring(1, 4), "0001");
-                skelFile = string.Format(XivStrings.DemiSkelFile, fileName.Substring(1, 4), "0001");
+                // Hair we have to potentially scrape the MDL file to check for EX bones to scrape those EX bones for their skeleton name.
+                // Pretty ugly, but you do what you gotta do.
+                if (internalSkelName == null)
+                {
+                    internalSkelName = await GetInternalSkelName(fullMdlPath);
+                }
+
+                // First arg is the constant string to format based on.  Second arg is Race #.
+                skelFolder = string.Format(XivStrings.EquipSkelFolder, fileName.Substring(1, 4), "hair", internalSkelName, "");
+                skelFile = string.Format(XivStrings.EquipSkelFile, fileName.Substring(1, 4), internalSkelName, "");
             }
             else
             {
-                // This is some jank.
-                var slotRegex = new Regex("_([a-z]{3}).mdl");
+                // This is some jank in order to determine what id/slotAbr to use.
+                var slotRegex = new Regex("_([a-z]{3})$");
                 var match = slotRegex.Match(fileName);
                 var normalSlotAbr = match.Groups[1].Value;
                 var category = Mdl.SlotAbbreviationDictionary.First(x => x.Value == normalSlotAbr).Key;
@@ -199,23 +237,18 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var id = fileName.Substring(6, 4);
 
-                if (IsHair(fullMdlPath))
-                {
-                    //TODO - FIXFIX - HAIR SKELLS
-                    //id = _hairSklbName.Substring(1);
-                }
-
+                // Most subtypes just use body 0001 always, but not *all* of them.
+                // This weird construct is to check for those exceptions.
                 if (slotAbr.Equals("base"))
                 {
                     id = "0001";
                 }
-
                 skelFolder = string.Format(XivStrings.EquipSkelFolder, fileName.Substring(1, 4), slotAbr, slotAbr[0], id);
                 skelFile = string.Format(XivStrings.EquipSkelFile, fileName.Substring(1, 4), slotAbr[0], id);
             }
 
             // Continue only if the skeleton file exists
-            if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), _dataFile))
+            if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder), dataFile))
             {
                 // Sometimes for face skeletons id 0001 does not exist but 0002 does
                 if (IsFace(fullMdlPath))
@@ -225,25 +258,25 @@ namespace xivModdingFramework.Models.FileTypes
                     skelFile = string.Format(XivStrings.EquipSkelFile, fileName.Substring(1, 4), slotAbr[0], "0002");
 
                     if (!await index.FileExists(HashGenerator.GetHash(skelFile), HashGenerator.GetHash(skelFolder),
-                        _dataFile))
+                        dataFile))
                     {
-                        return;
+                        return null;
                     }
                 }
                 else
                 {
-                    return;
+                    return null;
                 }
             }
 
-            var offset = await index.GetDataOffset(HashGenerator.GetHash(skelFolder), HashGenerator.GetHash(skelFile), _dataFile);
+            var offset = await index.GetDataOffset(HashGenerator.GetHash(skelFolder), HashGenerator.GetHash(skelFile), dataFile);
 
             if (offset == 0)
             {
                 throw new Exception($"Could not find offset for {skelFolder}/{skelFile}");
             }
 
-            var sklbData = await dat.GetType2Data(offset, _dataFile);
+            var sklbData = await dat.GetType2Data(offset, dataFile);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))
             {
@@ -279,19 +312,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var havokData = br.ReadBytes(sklbData.Length - dataOffset);
 
-                var mName = fileName.Substring(0, 5);
-
-                if (IsHat(fullMdlPath))
-                {
-                    mName = fileName.Substring(5, 5);
-                }
-                else if (IsHair(fullMdlPath))
-                {
-                    throw new NotImplementedException("FIXFIX");
-                    //mName = _hairSklbName;
-                }
-
-                File.WriteAllBytes(Directory.GetCurrentDirectory() + "/Skeletons/" + mName + ".sklb", havokData);
+                var outputPath = Directory.GetCurrentDirectory() + "/Skeletons/" + internalSkelName + ".sklb";
+                File.WriteAllBytes(outputPath, havokData);
+                return outputPath;
             }
         }
 
@@ -308,6 +331,7 @@ namespace xivModdingFramework.Models.FileTypes
             var boneNames = new List<string>();
             var matrix = new List<Matrix>();
             var boneCount = 0;
+            //var rawSkelName = Path.GetFileNameWithoutExtension(skelLoc);
 
             using (var reader = XmlReader.Create(skelLoc))
             {
@@ -464,21 +488,46 @@ namespace xivModdingFramework.Models.FileTypes
             File.Delete(Path.ChangeExtension(skelLoc, ".xml"));
         }
 
-        private bool IsFace(string fullMdlPath)
+        private static bool IsFace(string fullMdlPath)
         {
             return fullMdlPath.Contains("/face/f");
         }
-        private bool IsHair(string fullMdlPath)
+        private static bool IsHair(string fullMdlPath)
         {
             return fullMdlPath.Contains("/hair/h");
         }
-        private bool IsHat(string fullMdlPath)
+        private static bool IsHat(string fullMdlPath)
         {
+            // Might be a little oddness here because Demihumans can also have hats...
+            // But demihuman codepaths exit much earlier on regardless, and just have their own static skels.
+            // Also demihuman support is shit as is anyways.
             return fullMdlPath.Contains("_met.mdl");
         }
-        private bool IsHairHatFace(string fullMdlPath)
+        private static bool IsHairHatFace(string fullMdlPath)
         {
             return IsHair(fullMdlPath) || IsHat(fullMdlPath) || IsFace(fullMdlPath);
+        }
+        private static bool IsWeapon(string fullMdlPath)
+        {
+            return fullMdlPath.Contains("chara/weapon/");
+        }
+        private static bool IsMonster(string fullMdlPath)
+        {
+            return fullMdlPath.Contains("chara/monster");
+        }
+        private static bool IsDemihuman(string fullMdlPath)
+        {
+            return fullMdlPath.Contains("chara/demihuman");
+        }
+        
+        private static bool IsNonhuman(string fullMdlPath)
+        {
+            return IsWeapon(fullMdlPath) || IsMonster(fullMdlPath) || IsDemihuman(fullMdlPath);
+        }
+
+        private static bool IsFurnishing(string fullMdlPath)
+        {
+            return fullMdlPath.Contains("bgcommon/");
         }
 
         private void AddToRaceSkeleton(List<string> jsonBones, string fullMdlPath)
@@ -493,7 +542,7 @@ namespace xivModdingFramework.Models.FileTypes
                 race = Path.GetFileNameWithoutExtension(fullMdlPath).Substring(0, 5);
             }
 
-            var skelLoc = Directory.GetCurrentDirectory() + "\\Skeletons\\";
+            var skelLoc = Directory.GetCurrentDirectory() + SkeletonsFolder;
 
             if (File.Exists(skelLoc + race + ".skel"))
             {

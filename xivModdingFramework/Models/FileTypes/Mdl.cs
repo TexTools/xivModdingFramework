@@ -140,15 +140,19 @@ namespace xivModdingFramework.Models.FileTypes
             if (fileFormat == "dae")
             {
                 // Validate the skeleton.
-                var mdlName = Path.GetFileName(mdlPath);
-                var sklb = new Sklb(_gameDirectory, _dataFile);
-                await sklb.CreateSkelFileForMdl(mdlPath);
-                var skel = await sklb.GetParsedSkelFilename(mdlPath);
+                var sklb = new Sklb(_gameDirectory);
+                var skel = await sklb.CreateParsedSkelFile(mdlPath);
+
+                // If we have weights, but can't find a skel, bad times.
+                if (skel == null)
+                {
+                    throw new InvalidDataException("Unable to resolve model skeleton.");
+                }
 
                 // Special DAE snowflake.
                 var mdl = await GetRawMdlData(mdlPath, getOriginal);
                 var _dae = new Dae(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
-                await _dae.MakeDaeFileFromModel(mdl, outputFilePath, skel);
+                await _dae.MakeDaeFileFromModel(mdl, outputFilePath, Path.GetFileNameWithoutExtension(skel));
 
             } 
             else 
@@ -185,13 +189,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             outputFilePath = outputFilePath.Replace("/", "\\");
 
-            // Pop the textures out so the exporters can reference them.
-            await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
-
-            // Obj's a bit of a special case, as it doesn't have any skeleton data, and is
-            // also an internal function.  (Mostly) Doesn't hurt to keep it available though.
-            // ( Some users still seem to expect it to be a fully fledged format, so there is some
-            // argument to removing it to reduce confusion. )
+            // OBJ is a bit of a special, speedy case.  The format both has no textures, and no weights,
+            // So we don't need to do any heavy lifting for that stuff.
             if (fileFormat == "obj")
             {
                 var obj = new Obj(_gameDirectory);
@@ -201,17 +200,33 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (!model.IsInternal)
             {
+                // This isn't *really* true, but there's no case where we are re-exporting TTModel objects
+                // right now without them at least having an internal XIV path associated, so I don't see a need to fuss over this,
+                // since it would be complicated.
                 throw new NotSupportedException("Cannot export non-internal model - Skel data unidentifiable.");
             }
+
+            // The export process could really be sped up by forking threads to do
+            // both the bone and material exports at the same time.
+
+            // Pop the textures out so the exporters can reference them.
+            await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
 
             // Validate the skeleton.
             if (model.HasWeights)
             {
-                // TODO - FIXFIX - This needs validation for both HAIR and WEAPONS
-                var mdlName = Path.GetFileName(model.Source);
-                var sklb = new Sklb(_gameDirectory, _dataFile);
-                await sklb.CreateSkelFileForMdl(model.Source);
-                var skel = await sklb.GetParsedSkelFilename(model.Source);
+                // The TTModel.SaveToFile function will re-resolve this var using a more
+                // speedy, synchronous function, so we don't need to hang onto it.
+                // We just need to call this here to ensure the .skel file is
+                // created, if needed.
+                var sklb = new Sklb(_gameDirectory);
+                var skel = await sklb.CreateParsedSkelFile(model.Source);
+
+                // If we have weights, but can't find a skel, bad times.
+                if(skel == null)
+                {
+                    throw new InvalidDataException("Unable to resolve model skeleton.");
+                }
             }
 
 
@@ -2660,7 +2675,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
 
                                 // Count of bones for Mesh.  High LoD Meshes get 0... Not really ideal.
-                                // TODO: Fixfix - Need to save # of bones in higher lods.
                                 boneCount = (short) (lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
 
                                 // Calculate padding between meshes

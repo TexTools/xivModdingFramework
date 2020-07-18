@@ -1049,14 +1049,14 @@ namespace xivModdingFramework.Models.DataContainers
         /// <returns></returns>
         private Dictionary<string, SkeletonData> ResolveBoneHeirarchy()
         {
-            var race = IOUtil.GetRaceFromPath(Source);
             var fullSkel = new Dictionary<string, SkeletonData>();
             var skelDict = new Dictionary<string, SkeletonData>();
 
-            // Gets the first 5 characters of the file string
-            // These are usually the race ID or model ID of an item
-            // This would be the same name given to the skeleton file
-            var skelName = "c" + race.GetRaceCode();
+            var skelName = Sklb.GetParsedSkelFilename(Source);
+            if(skelName == null)
+            {
+                return skelDict;
+            }
 
 
             var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
