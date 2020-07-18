@@ -44,6 +44,14 @@ using System.Threading;
 using SharpDX.Win32;
 using xivModdingFramework.Models.Helpers;
 using Newtonsoft.Json;
+using xivModdingFramework.Materials.FileTypes;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using xivModdingFramework.Textures.FileTypes;
+using xivModdingFramework.Models.ModelTextures;
+using SixLabors.ImageSharp.Formats.Bmp;
+using xivModdingFramework.Variants.FileTypes;
+using SixLabors.ImageSharp.Formats.Png;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -87,7 +95,17 @@ namespace xivModdingFramework.Models.FileTypes
         public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool getOriginal = false)
         {
             var mdlPath = GetMdlPath(item, race, submeshId);
-            await ExportMdlToFile(mdlPath, outputFilePath, getOriginal);
+            var mtrlVariant = 1;
+            try
+            {
+                var _imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
+                mtrlVariant = (await _imc.GetImcInfo(item)).Variant;
+            } catch(Exception ex)
+            {
+                // No-op, defaulted to 1.
+            }
+
+            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, getOriginal);
         }
 
 
@@ -99,7 +117,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="outputFilePath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, bool getOriginal = false)
+        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool getOriginal = false)
         {
             // Importers and exporters currently use the same criteria.
             // Any available exporter is assumed to be able to import and vice versa.
@@ -135,8 +153,9 @@ namespace xivModdingFramework.Models.FileTypes
             } 
             else 
             {
+                var imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
                 var model = await GetModel(mdlPath);
-                await ExportModel(model, outputFilePath);
+                await ExportModel(model, outputFilePath, mtrlVariant);
             }
         }
 
@@ -148,7 +167,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
         /// <returns></returns>
-        public async Task ExportModel(TTModel model, string outputFilePath)
+        public async Task ExportModel(TTModel model, string outputFilePath, int mtrlVariant = 1)
         {
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
@@ -165,6 +184,9 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             outputFilePath = outputFilePath.Replace("/", "\\");
+
+            // Pop the textures out so the exporters can reference them.
+            await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
 
             // Obj's a bit of a special case, as it doesn't have any skeleton data, and is
             // also an internal function.  (Mostly) Doesn't hurt to keep it available though.
@@ -183,10 +205,14 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Validate the skeleton.
-            var mdlName = Path.GetFileName(model.Source);
-            var sklb = new Sklb(_gameDirectory, _dataFile);
-            await sklb.CreateSkelFileForMdl(model.Source);
-            var skel = await sklb.GetParsedSkelFilename(model.Source);
+            if (model.HasWeights)
+            {
+                // TODO - FIXFIX - This needs validation for both HAIR and WEAPONS
+                var mdlName = Path.GetFileName(model.Source);
+                var sklb = new Sklb(_gameDirectory, _dataFile);
+                await sklb.CreateSkelFileForMdl(model.Source);
+                var skel = await sklb.GetParsedSkelFilename(model.Source);
+            }
 
 
             // Save the DB file.
@@ -244,6 +270,85 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
+        /// <summary>
+        /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
+        /// </summary>
+        private async Task ExportMaterialsForModel(TTModel model, string outputFilePath, int mtrlVariant = 1)
+        {
+            try
+            {
+                var modelName = Path.GetFileNameWithoutExtension(model.Source);
+                var directory = Path.GetDirectoryName(outputFilePath);
+
+                // Language doesn't actually matter here.
+                var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
+                var _tex = new Tex(_gameDirectory);
+                var _index = new Index(_gameDirectory);
+                var materialIdx = 0;
+
+
+                foreach (var materialName in model.Materials)
+                {
+                    // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
+                    var mtrlPath = _mtrl.GetMtrlPath(model.Source, materialName, mtrlVariant);
+                    var mtrlOffset = await _index.GetDataOffset(mtrlPath);
+                    var mtrl = await _mtrl.GetMtrlData(mtrlOffset, mtrlPath, 11);
+                    var _modelMaps = new ModelTexture(_gameDirectory, mtrl);
+                    var modelMaps = await _modelMaps.GetModelMaps();
+
+                    // Outgoing file names.
+                    var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
+                    var mtrl_suffix = ".png";
+
+                    if (modelMaps.Diffuse != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Diffuse, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "d" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Normal != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Normal, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "n" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Specular != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Specular, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "s" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Alpha != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Alpha, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "o" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Emissive != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Emissive, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "e" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    materialIdx++;
+                }
+            }
+            catch (Exception exc)
+            {
+                var z = "d";
+                //throw exc;
+            }
+        }
 
         /// <summary>
         /// Retrieves all items that share the same model.
@@ -967,7 +1072,7 @@ namespace xivModdingFramework.Models.FileTypes
                             BiNormals = new Vector3Collection(),
                             BiNormalHandedness = new List<byte>(),
                             Tangents = new Vector3Collection(),
-                            Colors = new List<Color>(),
+                            Colors = new List<SharpDX.Color>(),
                             Colors4 = new Color4Collection(),
                             TextureCoordinates0 = new Vector2Collection(),
                             TextureCoordinates1 = new Vector2Collection(),
@@ -1330,7 +1435,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 var b = br.ReadByte();
                                 var a = br.ReadByte();
 
-                                vertexData.Colors.Add(new Color(r, g, b, a));
+                                vertexData.Colors.Add(new SharpDX.Color(r, g, b, a));
                                 vertexData.Colors4.Add(new Color4((r / 255f), (g / 255f), (b / 255f), (a / 255f)));
                             }
                         }

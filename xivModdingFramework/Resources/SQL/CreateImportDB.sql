@@ -68,6 +68,7 @@ CREATE TABLE "vertices" (
 CREATE TABLE "parts" (
 	"mesh"	INTEGER NOT NULL,
 	"part"   INTEGER NOT NULL,
+	"material_id" INTEGER,
 	"name"   TEXT,
 
 	Primary KEY("mesh", "part")
@@ -103,10 +104,12 @@ CREATE TABLE "bones" (
 
 -- Materials
 CREATE TABLE "materials" (
-	"mesh"			INTEGER NOT NULL,
-	"part"			INTEGER NOT NULL,
-	"usage"			TEXT NOT NULL,
-	"path"			TEXT NOT NULL,
+	"material_id"	INTEGER NOT NULL,
+	"diffuse"		TEXT,
+	"normal"		TEXT,
+	"specular"		TEXT,
+	"opacity"		TEXT,
+	"emissive"		TEXT,
 
-	Primary KEY("mesh","part","usage")
+	Primary KEY("material_id")
 );

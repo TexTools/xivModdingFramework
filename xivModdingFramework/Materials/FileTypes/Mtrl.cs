@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -29,6 +30,7 @@ using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -927,6 +929,47 @@ namespace xivModdingFramework.Materials.FileTypes
             var mtrlFolder = GetMtrlFolder(itemModel, itemType, xivRace, variant);
 
             return (mtrlFolder, mtrlFile, hasVfx);
+        }
+
+        /// <summary>
+        /// Resolves the MTRL path for a given MDL path.
+        /// Only needed because of the rare exception case of skin materials.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="mtrlVariant">Which material variant folder.  Defaulted to 1.</param>
+        /// <returns></returns>
+        public string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
+        {
+            var skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+            var match = skinRegex.Match(mtrlName);
+            
+
+            var mtrlFolder = "";
+
+            // Skin is the only known exception case.  Skin materials are auto resolved out of their item root path
+            // and into the character base directory.
+            if (match.Success)
+            {
+                var race = match.Groups[1].Value;
+                var body = match.Groups[2].Value;
+
+                mtrlFolder = "chara/human/c" + race + "/obj/body/b" + body + "/material/v0001";
+
+            }
+            else if(mtrlName.LastIndexOf("/") > 0)
+            {
+                // This a furniture item or something else that specifies an explicit full material path.
+                // We can just return that.
+                return mtrlName;
+            }
+            else
+            {
+                var mdlFolder = Path.GetDirectoryName(mdlPath);
+                mdlFolder = mdlFolder.Replace("\\", "/");
+                var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
+                mtrlFolder = baseFolder + "/material/v" + mtrlVariant.ToString().PadLeft(4, '0');
+            }
+            return mtrlFolder + mtrlName;
         }
 
 
