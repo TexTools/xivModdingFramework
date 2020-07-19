@@ -135,6 +135,10 @@ namespace xivModdingFramework.Helpers
         }
         public static XivRace GetRaceFromPath(string path)
         {
+            if(path == null)
+            {
+                return XivRace.All_Races;
+            }
 
             var xivRace = XivRace.All_Races;
 

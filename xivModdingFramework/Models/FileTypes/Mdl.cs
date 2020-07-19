@@ -52,6 +52,7 @@ using xivModdingFramework.Models.ModelTextures;
 using SixLabors.ImageSharp.Formats.Bmp;
 using xivModdingFramework.Variants.FileTypes;
 using SixLabors.ImageSharp.Formats.Png;
+using System.Data;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -100,7 +101,8 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var _imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
                 mtrlVariant = (await _imc.GetImcInfo(item)).Variant;
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
                 // No-op, defaulted to 1.
             }
@@ -125,7 +127,7 @@ namespace xivModdingFramework.Models.FileTypes
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
             fileFormat = fileFormat.ToLower();
-            if(!exporters.Contains(fileFormat))
+            if (!exporters.Contains(fileFormat))
             {
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
@@ -154,8 +156,8 @@ namespace xivModdingFramework.Models.FileTypes
                 var _dae = new Dae(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
                 await _dae.MakeDaeFileFromModel(mdl, outputFilePath, Path.GetFileNameWithoutExtension(skel));
 
-            } 
-            else 
+            }
+            else
             {
                 var imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
                 var model = await GetModel(mdlPath);
@@ -223,7 +225,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var skel = await sklb.CreateParsedSkelFile(model.Source);
 
                 // If we have weights, but can't find a skel, bad times.
-                if(skel == null)
+                if (skel == null)
                 {
                     throw new InvalidDataException("Unable to resolve model skeleton.");
                 }
@@ -239,7 +241,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (fileFormat == "db")
             {
                 // Just want the intermediate file? Just see if we need to move it.
-                if (!Path.Equals(outputFilePath,dbPath))
+                if (!Path.Equals(outputFilePath, dbPath))
                 {
                     File.Delete(outputFilePath);
                     File.Move(dbPath, outputFilePath);
@@ -269,7 +271,7 @@ namespace xivModdingFramework.Models.FileTypes
                 proc.WaitForExit();
                 var code = proc.ExitCode;
 
-                if(code != 0)
+                if (code != 0)
                 {
                     throw new Exception("Exporter threw error code: " + proc.ExitCode);
                 }
@@ -278,7 +280,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Just move the result file if we need to.
                 if (!Path.Equals(outputFilePath, outputFile))
-                { 
+                {
                     File.Delete(outputFilePath);
                     File.Move(outputFile, outputFilePath);
                 }
@@ -290,19 +292,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         private async Task ExportMaterialsForModel(TTModel model, string outputFilePath, int mtrlVariant = 1)
         {
-            try
+            var modelName = Path.GetFileNameWithoutExtension(model.Source);
+            var directory = Path.GetDirectoryName(outputFilePath);
+
+            // Language doesn't actually matter here.
+            var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
+            var _tex = new Tex(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+            var materialIdx = 0;
+
+
+            foreach (var materialName in model.Materials)
             {
-                var modelName = Path.GetFileNameWithoutExtension(model.Source);
-                var directory = Path.GetDirectoryName(outputFilePath);
-
-                // Language doesn't actually matter here.
-                var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
-                var _tex = new Tex(_gameDirectory);
-                var _index = new Index(_gameDirectory);
-                var materialIdx = 0;
-
-
-                foreach (var materialName in model.Materials)
+                try
                 {
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
                     var mtrlPath = _mtrl.GetMtrlPath(model.Source, materialName, mtrlVariant);
@@ -355,13 +357,14 @@ namespace xivModdingFramework.Models.FileTypes
                         }
                     }
 
-                    materialIdx++;
                 }
-            }
-            catch (Exception exc)
-            {
-                var z = "d";
-                //throw exc;
+                catch (Exception exc)
+                {
+                    // Failing to resolve a material is considered a non-critical error.
+                    // Continue attempting to resolve the rest of the materials in the model.
+                    //throw exc;
+                }
+                materialIdx++;
             }
         }
 
@@ -396,7 +399,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Character models are assumed to have no shared models,
                 // So return a copy of the original item.
-                sameModelItems.Add((IItemModel) item.Clone());
+                sameModelItems.Add((IItemModel)item.Clone());
             }
             return sameModelItems;
         }
@@ -432,10 +435,10 @@ namespace xivModdingFramework.Models.FileTypes
             return await GetRawMdlData(mdlPath, getOriginal);
         }
 
-            /// <summary>
-            /// Retrieves the raw XivMdl file at a given internal file path.
-            /// </summary>
-            /// <returns>An XivMdl structure containing all mdl data.</returns>
+        /// <summary>
+        /// Retrieves the raw XivMdl file at a given internal file path.
+        /// </summary>
+        /// <returns>An XivMdl structure containing all mdl data.</returns>
         public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
         {
             var index = new Index(_gameDirectory);
@@ -446,7 +449,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var offset = await index.GetDataOffset(mdlPath);
 
-            if(getOriginal)
+            if (getOriginal)
             {
                 var mod = await modding.TryGetModEntry(mdlPath);
                 if (mod != null && mod.enabled)
@@ -462,7 +465,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var mdlData = await dat.GetType3Data(offset, _dataFile);
 
-            var xivMdl = new XivMdl {MdlPath = mdlPath};
+            var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
@@ -473,12 +476,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var mdlPathData = new MdlPathData()
                 {
-                    PathCount     = br.ReadInt32(),
+                    PathCount = br.ReadInt32(),
                     PathBlockSize = br.ReadInt32(),
                     AttributeList = new List<string>(),
-                    BoneList      = new List<string>(),
-                    MaterialList  = new List<string>(),
-                    ShapeList     = new List<string>(),
+                    BoneList = new List<string>(),
+                    MaterialList = new List<string>(),
+                    ShapeList = new List<string>(),
                     ExtraPathList = new List<string>()
                 };
 
@@ -488,34 +491,34 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var mdlModelData = new MdlModelData
                 {
-                    Unknown0            = br.ReadInt32(),
-                    MeshCount           = br.ReadInt16(),
-                    AttributeCount      = br.ReadInt16(),
-                    MeshPartCount       = br.ReadInt16(),
-                    MaterialCount       = br.ReadInt16(),
-                    BoneCount           = br.ReadInt16(),
-                    BoneListCount       = br.ReadInt16(),
-                    ShapeCount          = br.ReadInt16(),
-                    ShapePartCount      = br.ReadInt16(),
-                    ShapeDataCount     = br.ReadInt16(),
-                    Unknown1            = br.ReadInt16(),
-                    Unknown2            = br.ReadInt16(),
-                    Unknown3            = br.ReadInt16(),
-                    Unknown4            = br.ReadInt16(),
-                    Unknown5            = br.ReadInt16(),
-                    Unknown6            = br.ReadInt16(),
-                    Unknown7            = br.ReadInt16(),
-                    Unknown8            = br.ReadInt16(), // Used for transform count with furniture
-                    Unknown9            = br.ReadInt16(),
-                    Unknown10a          = br.ReadByte(),
-                    Unknown10b          = br.ReadByte(),
-                    Unknown11           = br.ReadInt16(),
-                    Unknown12           = br.ReadInt16(),
-                    Unknown13           = br.ReadInt16(),
-                    Unknown14           = br.ReadInt16(),
-                    Unknown15           = br.ReadInt16(),
-                    Unknown16           = br.ReadInt16(),
-                    Unknown17           = br.ReadInt16()
+                    Unknown0 = br.ReadInt32(),
+                    MeshCount = br.ReadInt16(),
+                    AttributeCount = br.ReadInt16(),
+                    MeshPartCount = br.ReadInt16(),
+                    MaterialCount = br.ReadInt16(),
+                    BoneCount = br.ReadInt16(),
+                    BoneListCount = br.ReadInt16(),
+                    ShapeCount = br.ReadInt16(),
+                    ShapePartCount = br.ReadInt16(),
+                    ShapeDataCount = br.ReadInt16(),
+                    Unknown1 = br.ReadInt16(),
+                    Unknown2 = br.ReadInt16(),
+                    Unknown3 = br.ReadInt16(),
+                    Unknown4 = br.ReadInt16(),
+                    Unknown5 = br.ReadInt16(),
+                    Unknown6 = br.ReadInt16(),
+                    Unknown7 = br.ReadInt16(),
+                    Unknown8 = br.ReadInt16(), // Used for transform count with furniture
+                    Unknown9 = br.ReadInt16(),
+                    Unknown10a = br.ReadByte(),
+                    Unknown10b = br.ReadByte(),
+                    Unknown11 = br.ReadInt16(),
+                    Unknown12 = br.ReadInt16(),
+                    Unknown13 = br.ReadInt16(),
+                    Unknown14 = br.ReadInt16(),
+                    Unknown15 = br.ReadInt16(),
+                    Unknown16 = br.ReadInt16(),
+                    Unknown17 = br.ReadInt16()
                 };
 
                 // Finished reading all MdlModelData
@@ -570,11 +573,12 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         var mat = Encoding.ASCII.GetString(materialName.ToArray()).Replace("\0", "");
-                        if(mat.StartsWith("shp_"))
+                        if (mat.StartsWith("shp_"))
                         {
                             // Catch case for situation where there's null values at the end of the materials list.
                             mdlPathData.ShapeList.Add(mat);
-                        } else
+                        }
+                        else
                         {
                             totalNonNullMaterials++;
                             mdlPathData.MaterialList.Add(mat);
@@ -646,25 +650,25 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var lod = new LevelOfDetail
                     {
-                        MeshOffset       = br.ReadUInt16(),
-                        MeshCount        = br.ReadInt16(),
-                        Unknown0         = br.ReadInt32(),
-                        Unknown1         = br.ReadInt32(),
-                        MeshEnd          = br.ReadInt16(),
-                        ExtraMeshCount   = br.ReadInt16(),
-                        MeshSum          = br.ReadInt16(),
-                        Unknown2         = br.ReadInt16(),
-                        Unknown3         = br.ReadInt32(),
-                        Unknown4         = br.ReadInt32(),
-                        Unknown5         = br.ReadInt32(),
-                        IndexDataStart   = br.ReadInt32(),
-                        Unknown6         = br.ReadInt32(),
-                        Unknown7         = br.ReadInt32(),
-                        VertexDataSize   = br.ReadInt32(),
-                        IndexDataSize    = br.ReadInt32(),
+                        MeshOffset = br.ReadUInt16(),
+                        MeshCount = br.ReadInt16(),
+                        Unknown0 = br.ReadInt32(),
+                        Unknown1 = br.ReadInt32(),
+                        MeshEnd = br.ReadInt16(),
+                        ExtraMeshCount = br.ReadInt16(),
+                        MeshSum = br.ReadInt16(),
+                        Unknown2 = br.ReadInt16(),
+                        Unknown3 = br.ReadInt32(),
+                        Unknown4 = br.ReadInt32(),
+                        Unknown5 = br.ReadInt32(),
+                        IndexDataStart = br.ReadInt32(),
+                        Unknown6 = br.ReadInt32(),
+                        Unknown7 = br.ReadInt32(),
+                        VertexDataSize = br.ReadInt32(),
+                        IndexDataSize = br.ReadInt32(),
                         VertexDataOffset = br.ReadInt32(),
-                        IndexDataOffset  = br.ReadInt32(),
-                        MeshDataList     = new List<MeshData>()
+                        IndexDataOffset = br.ReadInt32(),
+                        MeshDataList = new List<MeshData>()
                     };
                     // Finished reading LoD
 
@@ -686,7 +690,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     isEmpty = br.PeekChar() == 0;
                 }
-                catch{}
+                catch { }
 
                 if (isEmpty && totalLoDMeshes < mdlModelData.MeshCount)
                 {
@@ -696,25 +700,25 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var lod = new LevelOfDetail
                         {
-                            MeshOffset       = br.ReadUInt16(),
-                            MeshCount        = br.ReadInt16(),
-                            Unknown0         = br.ReadInt32(),
-                            Unknown1         = br.ReadInt32(),
-                            MeshEnd          = br.ReadInt16(),
-                            ExtraMeshCount   = br.ReadInt16(),
-                            MeshSum          = br.ReadInt16(),
-                            Unknown2         = br.ReadInt16(),
-                            Unknown3         = br.ReadInt32(),
-                            Unknown4         = br.ReadInt32(),
-                            Unknown5         = br.ReadInt32(),
-                            IndexDataStart   = br.ReadInt32(),
-                            Unknown6         = br.ReadInt32(),
-                            Unknown7         = br.ReadInt32(),
-                            VertexDataSize   = br.ReadInt32(),
-                            IndexDataSize    = br.ReadInt32(),
+                            MeshOffset = br.ReadUInt16(),
+                            MeshCount = br.ReadInt16(),
+                            Unknown0 = br.ReadInt32(),
+                            Unknown1 = br.ReadInt32(),
+                            MeshEnd = br.ReadInt16(),
+                            ExtraMeshCount = br.ReadInt16(),
+                            MeshSum = br.ReadInt16(),
+                            Unknown2 = br.ReadInt16(),
+                            Unknown3 = br.ReadInt32(),
+                            Unknown4 = br.ReadInt32(),
+                            Unknown5 = br.ReadInt32(),
+                            IndexDataStart = br.ReadInt32(),
+                            Unknown6 = br.ReadInt32(),
+                            Unknown7 = br.ReadInt32(),
+                            VertexDataSize = br.ReadInt32(),
+                            IndexDataSize = br.ReadInt32(),
                             VertexDataOffset = br.ReadInt32(),
-                            IndexDataOffset  = br.ReadInt32(),
-                            MeshDataList     = new List<MeshData>()
+                            IndexDataOffset = br.ReadInt32(),
+                            MeshDataList = new List<MeshData>()
                         };
 
                         xivMdl.ExtraLoDList.Add(lod);
@@ -736,7 +740,7 @@ namespace xivModdingFramework.Models.FileTypes
                         xivMdl.LoDList[i].MeshDataList[j].VertexDataStructList = new List<VertexDataStruct>();
 
                         // LoD Index * Vertex Data Structure size + Header
-                        
+
                         br.BaseStream.Seek(j * 136 + loDStructPos, SeekOrigin.Begin);
 
                         // If the first byte is 255, we reached the end of the Vertex Data Structs
@@ -745,10 +749,10 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var vertexDataStruct = new VertexDataStruct
                             {
-                                DataBlock  = dataBlockNum,
+                                DataBlock = dataBlockNum,
                                 DataOffset = br.ReadByte(),
-                                DataType   = VertexTypeDictionary[br.ReadByte()],
-                                DataUsage  = VertexUsageDictionary[br.ReadByte()]
+                                DataType = VertexTypeDictionary[br.ReadByte()],
+                                DataUsage = VertexUsageDictionary[br.ReadByte()]
                             };
 
                             xivMdl.LoDList[i].MeshDataList[j].VertexDataStructList.Add(vertexDataStruct);
@@ -776,16 +780,16 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var meshDataInfo = new MeshDataInfo
                         {
-                            VertexCount          = br.ReadInt32(),
-                            IndexCount           = br.ReadInt32(),
-                            MaterialIndex        = br.ReadInt16(),
-                            MeshPartIndex        = br.ReadInt16(),
-                            MeshPartCount        = br.ReadInt16(),
-                            BoneSetIndex        = br.ReadInt16(),
-                            IndexDataOffset      = br.ReadInt32(),
-                            VertexDataOffset0    = br.ReadInt32(),
-                            VertexDataOffset1    = br.ReadInt32(),
-                            VertexDataOffset2    = br.ReadInt32(),
+                            VertexCount = br.ReadInt32(),
+                            IndexCount = br.ReadInt32(),
+                            MaterialIndex = br.ReadInt16(),
+                            MeshPartIndex = br.ReadInt16(),
+                            MeshPartCount = br.ReadInt16(),
+                            BoneSetIndex = br.ReadInt16(),
+                            IndexDataOffset = br.ReadInt32(),
+                            VertexDataOffset0 = br.ReadInt32(),
+                            VertexDataOffset1 = br.ReadInt32(),
+                            VertexDataOffset2 = br.ReadInt32(),
                             VertexDataEntrySize0 = br.ReadByte(),
                             VertexDataEntrySize1 = br.ReadByte(),
                             VertexDataEntrySize2 = br.ReadByte(),
@@ -795,7 +799,7 @@ namespace xivModdingFramework.Models.FileTypes
                         lod.MeshDataList[i].MeshInfo = meshDataInfo;
 
                         // In the event we have a null material reference, set it to material 0 to be safe.
-                        if(meshDataInfo.MaterialIndex >= totalNonNullMaterials)
+                        if (meshDataInfo.MaterialIndex >= totalNonNullMaterials)
                         {
                             meshDataInfo.MaterialIndex = 0;
                         }
@@ -811,7 +815,8 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 lod.MeshDataList[i].IsBody = true;
                             }
-                        } catch(Exception e)
+                        }
+                        catch (Exception e)
                         {
 
                         }
@@ -853,11 +858,11 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             var meshPart = new MeshPart
                             {
-                                IndexOffset     = br.ReadInt32(),
-                                IndexCount      = br.ReadInt32(),
-                                AttributeBitmask  = br.ReadUInt32(),
+                                IndexOffset = br.ReadInt32(),
+                                IndexCount = br.ReadInt32(),
+                                AttributeBitmask = br.ReadUInt32(),
                                 BoneStartOffset = br.ReadInt16(),
-                                BoneCount       = br.ReadInt16()
+                                BoneCount = br.ReadInt16()
                             };
 
                             meshData.MeshPartList.Add(meshPart);
@@ -921,9 +926,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var shapeDataLists = new ShapeData
                 {
-                    ShapeInfoList     = new List<ShapeData.ShapeInfo>(),
+                    ShapeInfoList = new List<ShapeData.ShapeInfo>(),
                     ShapeParts = new List<ShapeData.ShapePart>(),
-                    ShapeDataList     = new List<ShapeData.ShapeDataEntry>()
+                    ShapeDataList = new List<ShapeData.ShapeDataEntry>()
                 };
 
                 var totalPartCount = 0;
@@ -975,7 +980,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var shapeIndexInfo = new ShapeData.ShapePart
                     {
                         MeshIndexOffset = br.ReadInt32(),  // The offset to the index block this Shape Data should be replacing in. -- This is how Shape Data is tied to each mesh.
-                        IndexCount      = br.ReadInt32(),  // # of triangle indices to replace.
+                        IndexCount = br.ReadInt32(),  // # of triangle indices to replace.
                         ShapeDataOffset = br.ReadInt32()   // The offset where this part should start reading in the Shape Data list.
                     };
 
@@ -987,8 +992,8 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var shapeData = new ShapeData.ShapeDataEntry
                     {
-                        BaseIndex   = br.ReadUInt16(),  // Base Triangle Index we're replacing
-                        ShapeVertex  = br.ReadUInt16()  // The Vertex that Triangle Index should now point to instead.
+                        BaseIndex = br.ReadUInt16(),  // Base Triangle Index we're replacing
+                        ShapeVertex = br.ReadUInt16()  // The Vertex that Triangle Index should now point to instead.
                     };
                     shapeDataLists.ShapeDataList.Add(shapeData);
                 }
@@ -997,10 +1002,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Build the list of offsets so we can match it for shape data.
                 var indexOffsets = new List<List<int>>();
-                for(int l = 0; l < xivMdl.LoDList.Count; l++)
+                for (int l = 0; l < xivMdl.LoDList.Count; l++)
                 {
                     indexOffsets.Add(new List<int>());
-                    for(int m = 0; m < xivMdl.LoDList[l].MeshDataList.Count; m++)
+                    for (int m = 0; m < xivMdl.LoDList[l].MeshDataList.Count; m++)
                     {
                         indexOffsets[l].Add(xivMdl.LoDList[l].MeshDataList[m].MeshInfo.IndexDataOffset);
                     }
@@ -1015,7 +1020,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var partBoneSet = new BoneSet
                 {
                     BoneIndexCount = br.ReadInt32(),
-                    BoneIndices  = new List<short>()
+                    BoneIndices = new List<short>()
                 };
 
                 for (var i = 0; i < partBoneSet.BoneIndexCount / 2; i++)
@@ -1067,7 +1072,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var totalMeshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
-                    if(lod.MeshCount == 0) continue;
+                    if (lod.MeshCount == 0) continue;
 
                     var meshDataList = lod.MeshDataList;
 
@@ -1162,8 +1167,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for bone weights
                         var bwDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                            where vertexDataStruct.DataUsage == VertexUsageType.BoneWeight
-                            select vertexDataStruct).FirstOrDefault();
+                                            where vertexDataStruct.DataUsage == VertexUsageType.BoneWeight
+                                            select vertexDataStruct).FirstOrDefault();
 
                         if (bwDataStruct != null)
                         {
@@ -1210,8 +1215,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for bone indices
                         var biDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                            where vertexDataStruct.DataUsage == VertexUsageType.BoneIndex
-                            select vertexDataStruct).FirstOrDefault();
+                                            where vertexDataStruct.DataUsage == VertexUsageType.BoneIndex
+                                            select vertexDataStruct).FirstOrDefault();
 
                         if (biDataStruct != null)
                         {
@@ -1257,8 +1262,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for Normals
                         var normDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                            where vertexDataStruct.DataUsage == VertexUsageType.Normal
-                            select vertexDataStruct).FirstOrDefault();
+                                              where vertexDataStruct.DataUsage == VertexUsageType.Normal
+                                              select vertexDataStruct).FirstOrDefault();
 
                         if (normDataStruct != null)
                         {
@@ -1319,8 +1324,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for BiNormals
                         var biNormDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                            where vertexDataStruct.DataUsage == VertexUsageType.Binormal
-                            select vertexDataStruct).FirstOrDefault();
+                                                where vertexDataStruct.DataUsage == VertexUsageType.Binormal
+                                                select vertexDataStruct).FirstOrDefault();
 
                         if (biNormDataStruct != null)
                         {
@@ -1366,8 +1371,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for Tangents
                         var tangentDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                                                where vertexDataStruct.DataUsage == VertexUsageType.Tangent
-                                                select vertexDataStruct).FirstOrDefault();
+                                                 where vertexDataStruct.DataUsage == VertexUsageType.Tangent
+                                                 select vertexDataStruct).FirstOrDefault();
 
                         if (tangentDataStruct != null)
                         {
@@ -1414,8 +1419,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for colors
                         var colorDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                            where vertexDataStruct.DataUsage == VertexUsageType.Color
-                            select vertexDataStruct).FirstOrDefault();
+                                               where vertexDataStruct.DataUsage == VertexUsageType.Color
+                                               select vertexDataStruct).FirstOrDefault();
 
                         if (colorDataStruct != null)
                         {
@@ -1462,8 +1467,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Get the Vertex Data Structure for texture coordinates
                         var tcDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                            where vertexDataStruct.DataUsage == VertexUsageType.TextureCoordinate
-                            select vertexDataStruct).FirstOrDefault();
+                                            where vertexDataStruct.DataUsage == VertexUsageType.TextureCoordinate
+                                            select vertexDataStruct).FirstOrDefault();
 
                         if (tcDataStruct != null)
                         {
@@ -1526,7 +1531,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     tcVector1 = new Vector2(x, y);
                                     vertexData.TextureCoordinates0.Add(tcVector1);
                                 }
-                                else if(tcDataStruct.DataType == VertexDataType.Float4)
+                                else if (tcDataStruct.DataType == VertexDataType.Float4)
                                 {
                                     var x = br.ReadSingle();
                                     var y = br.ReadSingle();
@@ -1674,7 +1679,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     }
                                     else
                                     {
-                                        mesh.ShapePathList = new List<string>{shapeInfo.Name};
+                                        mesh.ShapePathList = new List<string> { shapeInfo.Name };
                                     }
                                 }
                             }
@@ -1703,7 +1708,7 @@ namespace xivModdingFramework.Models.FileTypes
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
             var directories = Directory.GetDirectories(importerPath);
-            foreach(var d in directories)
+            foreach (var d in directories)
             {
                 ret.Add((d.Replace(importerPath, "")).ToLower());
             }
@@ -1786,7 +1791,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             return await Task.Run(async () =>
             {
-                while(code == null)
+                while (code == null)
                 {
                     Thread.Sleep(100);
                 }
@@ -1816,7 +1821,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func <TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
+        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
         {
 
             #region Setup and Validation
@@ -1825,25 +1830,28 @@ namespace xivModdingFramework.Models.FileTypes
                 options = new ModelModifierOptions();
             }
 
-            if(loggingFunction == null)
+            if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
 
             // Test the Path.
-            DirectoryInfo fileLocation = null;
-            try
+            if (path != null && path != "")
             {
-                fileLocation = new DirectoryInfo(path);
-            }
-            catch (Exception ex)
-            {
-                throw new IOException("Invalid file path.");
-            }
+                DirectoryInfo fileLocation = null;
+                try
+                {
+                    fileLocation = new DirectoryInfo(path);
+                }
+                catch (Exception ex)
+                {
+                    throw new IOException("Invalid file path.");
+                }
 
-            if (!File.Exists(fileLocation.FullName))
-            {
-                throw new IOException("The file provided for import does not exist");
+                if (!File.Exists(fileLocation.FullName))
+                {
+                    throw new IOException("The file provided for import does not exist");
+                }
             }
 
             var modding = new Modding(_gameDirectory);
@@ -1853,8 +1861,9 @@ namespace xivModdingFramework.Models.FileTypes
             XivMdl currentMdl = null;
             try
             {
-                 currentMdl = await this.GetRawMdlData(item, race, submeshId);
-            } catch(Exception ex)
+                currentMdl = await this.GetRawMdlData(item, race, submeshId);
+            }
+            catch (Exception ex)
             {
                 // If we failed to load the MDL, see if we can get the unmodded MDL.
                 var mdlPath = GetMdlPath(item, race);
@@ -1862,8 +1871,9 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mod != null)
                 {
                     loggingFunction(true, "Unable to load current MDL file.  Attempting to use original MDL file...");
-                    currentMdl = await this.GetRawMdlData(item, IOUtil.GetRaceFromPath(path), submeshId, true);
-                } else
+                    currentMdl = await this.GetRawMdlData(item, race, submeshId, true);
+                }
+                else
                 {
                     throw new Exception("Unable to load base MDL file.");
                 }
@@ -1877,35 +1887,47 @@ namespace xivModdingFramework.Models.FileTypes
                 #region TTModel Loading
                 // Probably could stand to push this out to its own function later.
                 var mdlPath = currentMdl.MdlPath;
-                
-                loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
-                loggingFunction(false, "Starting Import of file: " + fileLocation.FullName);
 
-                var suffix = fileLocation.Extension.ToLower();
-                suffix = suffix.Substring(1);
+                loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
+                loggingFunction(false, "Starting Import of file: " + path);
+
+                var suffix = path == null || path == "" ? null : Path.GetExtension(path).ToLower().Substring(1);
                 TTModel ttModel = null;
 
-                // Loading and Running the actual Importers.
-                if (suffix != "dae" && suffix != "db") {
-                    var dbFile = await RunExternalImporter(suffix, path, loggingFunction);
-                    loggingFunction(false, "Loading intermediate file...");
-                    ttModel = TTModel.LoadFromFile(dbFile, loggingFunction);
 
-                } else if (suffix == "dae")
+                // Loading and Running the actual Importers.
+                if (path == null || path == "")
+                {
+                    // If we were given no path, load the current model.
+                    ttModel = await GetModel(item, race, submeshId);
+                }
+                else if (suffix == "dae")
                 {
                     // Dae handling is a special snowflake.
                     var dae = new Dae(_gameDirectory, _dataFile);
                     loggingFunction(false, "Loading DAE file...");
+                    var fileLocation = new DirectoryInfo(path);
                     ttModel = dae.ReadColladaFile(fileLocation, loggingFunction);
                     loggingFunction(false, "DAE File loaded successfully.");
-                } else if (suffix == "db")
+                }
+                else if (suffix == "db")
                 {
                     loggingFunction(false, "Loading intermediate file...");
                     // Raw already converted DB file, just load it.
-                    ttModel = TTModel.LoadFromFile(fileLocation.FullName, loggingFunction);
+                    ttModel = TTModel.LoadFromFile(path, loggingFunction);
+                }
+                else
+                {
+                    var dbFile = await RunExternalImporter(suffix, path, loggingFunction);
+                    loggingFunction(false, "Loading intermediate file...");
+                    ttModel = TTModel.LoadFromFile(dbFile, loggingFunction);
                 }
                 #endregion
 
+                if (ttModel.MeshGroups.Count == 0)
+                {
+                    throw new InvalidDataException("The imported model has no data.");
+                }
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
@@ -2017,7 +2039,8 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             // New Group, copy data over.
                             source = lod.MeshDataList[0].VertexDataStructList;
-                        } else
+                        }
+                        else
                         {
                             source = ogGroup.VertexDataStructList;
                         }
@@ -2275,7 +2298,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var ogModelData = ogMdl.ModelData;
 
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown0));
-                
+
                 short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].ExtraMeshCount);
                 short higherLodMeshCount = (short)(ogMdl.LoDList[2].MeshSum - ogMdl.LoDList[0].MeshSum);
                 meshCount += higherLodMeshCount;
@@ -2293,7 +2316,8 @@ namespace xivModdingFramework.Models.FileTypes
                 short tParts = 0;
                 for (int lIdx = 0; lIdx < ogMdl.LoDList.Count; lIdx++)
                 {
-                    if (lIdx == 0) {
+                    if (lIdx == 0)
+                    {
                         foreach (var m in ttModel.MeshGroups)
                         {
                             foreach (var p in m.Parts)
@@ -2307,11 +2331,12 @@ namespace xivModdingFramework.Models.FileTypes
                                 tParts++;
                             }*/
                         }
-                    } else
+                    }
+                    else
                     {
                         foreach (var m in ogMdl.LoDList[lIdx].MeshDataList)
                         {
-                            foreach(var p in m.MeshPartList)
+                            foreach (var p in m.MeshPartList)
                             {
                                 tParts++;
                             }
@@ -2324,9 +2349,9 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Materials.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Bones.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short) ttModel.ShapeNames.Count : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short) ttModel.ShapePartCount : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short) ttModel.ShapeDataCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeDataCount : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
@@ -2418,7 +2443,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var max = lodNum == 0 ? ttModel.MeshGroups.Count : Math.Max(ttModel.MeshGroups.Count, lod.MeshDataList.Count);
 
-                    for(int mi = 0; mi < max; mi++)
+                    for (int mi = 0; mi < max; mi++)
                     {
 
                         bool addedMesh = meshNum >= lod.MeshCount;
@@ -2439,10 +2464,10 @@ namespace xivModdingFramework.Models.FileTypes
                         var vertexDataOffset2 = addedMesh ? 0 : meshInfo.VertexDataOffset2;
                         byte vertexDataEntrySize0 = addedMesh ? (byte)lod0VertexDataEntrySize0 : meshInfo.VertexDataEntrySize0;
                         byte vertexDataEntrySize1 = addedMesh ? (byte)lod0VertexDataEntrySize1 : meshInfo.VertexDataEntrySize1;
-                        byte vertexDataEntrySize2 = addedMesh ? (byte) 0 : meshInfo.VertexDataEntrySize2;
+                        byte vertexDataEntrySize2 = addedMesh ? (byte)0 : meshInfo.VertexDataEntrySize2;
                         short partCount = addedMesh ? (short)0 : meshInfo.MeshPartCount;
                         short materialIndex = addedMesh ? (short)0 : meshInfo.MaterialIndex;
-                        short boneSetIndex = addedMesh ? (short)0 : (short) 0;
+                        short boneSetIndex = addedMesh ? (short)0 : (short)0;
                         byte vDataBlockCount = addedMesh ? (byte)0 : meshInfo.VertexDataBlockCount;
 
 
@@ -2521,7 +2546,7 @@ namespace xivModdingFramework.Models.FileTypes
                             vertexDataOffset1 = vertexCount * vertexDataEntrySize0;
                         }
 
-                            
+
                         lastVertexCount = vertexCount;
 
                         if (lod0VertexDataEntrySize0 == 0)
@@ -2603,7 +2628,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // Identify the correct # of meshes
                     var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
 
-                    for(int meshNum = 0; meshNum < meshMax; meshNum++)
+                    for (int meshNum = 0; meshNum < meshMax; meshNum++)
                     {
                         // Test if we have both old and new data or not.
                         var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
@@ -2624,15 +2649,15 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                         // Loop all the parts we should write.
-                        for(var partNum = 0; partNum < partMax; partNum++)
+                        for (var partNum = 0; partNum < partMax; partNum++)
                         {
                             // Get old and new data.
-                            var ogPart = ogPartCount > partNum ? ogGroup.MeshPartList[partNum]: null;
+                            var ogPart = ogPartCount > partNum ? ogGroup.MeshPartList[partNum] : null;
                             var ttPart = newPartCount > partNum ? ttMeshGroup.Parts[partNum] : null;
 
 
                             // Skip higher LoD stuff for non-existent parts.
-                            if(lodNum > 0 && ogPart == null)
+                            if (lodNum > 0 && ogPart == null)
                             {
                                 continue;
                             }
@@ -2675,7 +2700,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
 
                                 // Count of bones for Mesh.  High LoD Meshes get 0... Not really ideal.
-                                boneCount = (short) (lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
+                                boneCount = (short)(lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
 
                                 // Calculate padding between meshes
                                 if (partNum == newPartCount - 1)
@@ -2758,7 +2783,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var boneSetsBlock = new List<byte>();
 
-                for(var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                 {
                     boneSetsBlock.AddRange(ttModel.GetBoneSet(mi));
                 }
@@ -2781,7 +2806,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var shapePartCounts = ttModel.ShapePartCounts;
 
                     short runningSum = 0;
-                    for(var sIdx = 0; sIdx < ttModel.ShapeNames.Count; sIdx++)
+                    for (var sIdx = 0; sIdx < ttModel.ShapeNames.Count; sIdx++)
                     {
 
                         meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes(shapeOffsetList[sIdx]));
@@ -2789,13 +2814,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                         for (var l = 0; l < ogMdl.LoDList.Count; l++)
                         {
-                            if(l == 0)
+                            if (l == 0)
                             {
                                 // LOD 0
                                 meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes((short)runningSum));
                                 runningSum += count;
 
-                            } else
+                            }
+                            else
                             {
                                 // LOD 1+
                                 meshShapeInfoDataBlock.AddRange(BitConverter.GetBytes((short)0));
@@ -2873,17 +2899,17 @@ namespace xivModdingFramework.Models.FileTypes
                                 var baseVertexCount = ttModel.MeshGroups[meshNum].VertexCount + newVertsSoFar[meshNum];
                                 foreach (var r in p.Part.Replacements)
                                 {
-                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort) r.Key));
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
 
                                     // Shift these forward to be relative to the full mesh group, rather than
                                     // just the shape part.
-                                    var vertexId = (uint) r.Value;
+                                    var vertexId = (uint)r.Value;
                                     vertexId += baseVertexCount;
 
-                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort) vertexId));
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)vertexId));
                                 }
 
-                                newVertsSoFar[meshNum] += (uint) p.Part.Vertices.Count;
+                                newVertsSoFar[meshNum] += (uint)p.Part.Vertices.Count;
                             }
                         }
 
@@ -2941,7 +2967,7 @@ namespace xivModdingFramework.Models.FileTypes
                 #region Bounding Box Data Block
 
                 var boundingBoxDataBlock = new List<byte>();
-                
+
                 var boundingBox = ogMdl.BoundBox;
 
                 foreach (var point in boundingBox.PointList)
@@ -3231,7 +3257,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     // Shape parts need to be rewitten in specific order.
                     var parts = ttModel.ShapeParts;
-                    foreach ( var p in parts)
+                    foreach (var p in parts)
                     {
                         // Because our imported data does not include mesh shape data, we must include it manually
                         var group = ttModel.MeshGroups[p.MeshId];
@@ -3714,7 +3740,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 throw ex;
             }
@@ -3735,7 +3761,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Add the first vertex data set to the ImportData list
             // This contains [ Position, Bone Weights, Bone Indices]
-            foreach(var m in ttModel.MeshGroups)
+            foreach (var m in ttModel.MeshGroups)
             {
                 var importData = new VertexByteData()
                 {
@@ -3837,7 +3863,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 var count = m.IndexCount;
-                for (var i = 0; i < count; i++) 
+                for (var i = 0; i < count; i++)
                 {
                     var index = m.GetIndexAt(i);
                     importData.IndexData.AddRange(BitConverter.GetBytes(((ushort)index)));
@@ -3883,9 +3909,9 @@ namespace xivModdingFramework.Models.FileTypes
 
             // And then multiply the resulting value times (255 / 2), and round off the result.
             // This helps minimize errors that arise from quirks in floating point arithmetic.
-            var x = (byte) Math.Round(vec.X * (255f / 2f));
-            var y = (byte) Math.Round(vec.Y * (255f / 2f));
-            var z = (byte) Math.Round(vec.Z * (255f / 2f));
+            var x = (byte)Math.Round(vec.X * (255f / 2f));
+            var y = (byte)Math.Round(vec.Y * (255f / 2f));
+            var z = (byte)Math.Round(vec.Z * (255f / 2f));
 
 
             bytes.Add(x);
@@ -3896,7 +3922,8 @@ namespace xivModdingFramework.Models.FileTypes
             if (handedness > 0)
             {
                 bytes.Add(0);
-            } else
+            }
+            else
             {
                 bytes.Add(255);
             }
@@ -4173,7 +4200,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             string mdlFolder = "", mdlFile = "";
 
-            var mdlInfo =  itemModel.ModelInfo;
+            var mdlInfo = itemModel.ModelInfo;
             var id = mdlInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = mdlInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemCategory = itemModel.SecondaryCategory;
@@ -4185,7 +4212,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 case XivItemType.equipment:
                     mdlFolder = $"chara/{itemType}/e{id}/model";
-                    mdlFile   = $"c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
+                    mdlFile = $"c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
                     break;
                 case XivItemType.accessory:
                     mdlFolder = $"chara/{itemType}/a{id}/model";
@@ -4193,36 +4220,36 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case XivItemType.weapon:
                     mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
-                    mdlFile   = $"w{id}b{bodyVer}{MdlExtension}";
+                    mdlFile = $"w{id}b{bodyVer}{MdlExtension}";
                     break;
                 case XivItemType.monster:
                     mdlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/model";
-                    mdlFile   = $"m{id}b{bodyVer}{MdlExtension}";
+                    mdlFile = $"m{id}b{bodyVer}{MdlExtension}";
                     break;
                 case XivItemType.demihuman:
                     mdlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/model";
-                    mdlFile   = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
+                    mdlFile = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
                     break;
                 case XivItemType.human:
                     if (itemCategory.Equals(XivStrings.Body))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/model";
-                        mdlFile   = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
+                        mdlFile = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Hair))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/model";
-                        mdlFile   = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                        mdlFile = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Face))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/model";
-                        mdlFile   = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                        mdlFile = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Tail))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
-                        mdlFile   = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                        mdlFile = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
                     else if (itemCategory.Equals(XivStrings.Ears))
                     {

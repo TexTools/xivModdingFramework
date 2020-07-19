@@ -931,6 +931,10 @@ namespace xivModdingFramework.Materials.FileTypes
             return (mtrlFolder, mtrlFile, hasVfx);
         }
 
+        // Helper regexes for GetMtrlPath.
+        private readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
+        private readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
+        private readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
         /// Only needed because of the rare exception case of skin materials.
@@ -940,8 +944,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns></returns>
         public string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
         {
-            var skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
-            var match = skinRegex.Match(mtrlName);
+            var match = _skinRegex.Match(mtrlName);
             
 
             var mtrlFolder = "";
@@ -956,19 +959,50 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlFolder = "chara/human/c" + race + "/obj/body/b" + body + "/material/v0001";
 
             }
-            else if(mtrlName.LastIndexOf("/") > 0)
+            else if (mtrlName.LastIndexOf("/") > 0)
             {
                 // This a furniture item or something else that specifies an explicit full material path.
                 // We can just return that.
                 return mtrlName;
-            }
-            else
-            {
+            } else if (mdlPath.Contains("/face/f") || mdlPath.Contains("/zear/z")) {
+
+                // Faces and ears don't use material variants.
                 var mdlFolder = Path.GetDirectoryName(mdlPath);
                 mdlFolder = mdlFolder.Replace("\\", "/");
                 var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
+                mtrlFolder = baseFolder + "/material";
+            }
+            else {
+
+                var mdlMatch = _raceRegex.Match(mdlPath);
+                var mtrlMatch = _raceRegex.Match(mtrlName);
+
+                // Both items have racaial information in their path, and the races DON'T match.
+                if(mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // In this case, we need to replace the MDL path's racial string with the racial string from the MTRL.
+                    // This only really happens in hair items, that have unique racial model paths, but often share materials still.
+                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
+                }
+
+                mdlMatch = _weaponMatch.Match(mdlPath);
+                mtrlMatch = _weaponMatch.Match(mtrlName);
+
+                // Both items have weapon model information in their path, and the weapons DON'T match.
+                if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // In this case, we need to replace the MDL path's weapon string with the weapon string from the MTRL.
+                    // This really only seems to happen with dual wield weapons and the Gauss Barrel.
+                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
+                }
+
+                var mdlFolder = Path.GetDirectoryName(mdlPath);
+                mdlFolder = mdlFolder.Replace("\\", "/");
+
+                var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
                 mtrlFolder = baseFolder + "/material/v" + mtrlVariant.ToString().PadLeft(4, '0');
             }
+
             return mtrlFolder + mtrlName;
         }
 

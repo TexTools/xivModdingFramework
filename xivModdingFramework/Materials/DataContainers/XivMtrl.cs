@@ -815,11 +815,13 @@ namespace xivModdingFramework.Materials.DataContainers
                     // What does this do?  It's only found on extremely rare items with specular maps,
                     // and if when we add it/touch it, it either totally breaks the specularity, or crashes.
                     // And on the items it is involved in, adding/removing it seems to do nothing.
+                    // Might be a glass shader only value?
                     // SetTextureUsage(XivTexType.Specular);  
                 }
             }
             else
             {
+                // This is uh... Glass shader?  I think is the only fall through here.
                 SetTextureUsage(XivTexType.Normal);
                 SetTextureUsage(XivTexType.Diffuse);
                 SetTextureUsage(XivTexType.Multi);
@@ -858,12 +860,6 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 args.Add(MtrlShaderParameterId.Equipment1, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
-
-                // This seems to be some kind of shinyness thing?
-                if(info.Preset == MtrlShaderPreset.DiffuseSpecular)
-                {
-                    args[MtrlShaderParameterId.Common2] = new List<float>() { 0.25f };
-                }
             }
             else if (info.Shader == MtrlShader.Iris)
             {
