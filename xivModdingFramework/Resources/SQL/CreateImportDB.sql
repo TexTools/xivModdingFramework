@@ -64,11 +64,20 @@ CREATE TABLE "vertices" (
 	PRIMARY KEY("mesh","part","vertex_id")
 );
 
+-- Meshes
+CREATE TABLE "meshes" (
+	"mesh"	INTEGER NOT NULL,
+	"material_id" INTEGER,
+	"name"   TEXT,
+
+	Primary KEY("mesh")
+);
+
+
 -- Parts
 CREATE TABLE "parts" (
 	"mesh"	INTEGER NOT NULL,
 	"part"   INTEGER NOT NULL,
-	"material_id" INTEGER,
 	"name"   TEXT,
 
 	Primary KEY("mesh", "part")
@@ -78,10 +87,16 @@ CREATE TABLE "parts" (
 CREATE TABLE "bones" (
 	"mesh"		INTEGER NOT NULL,
 	"bone_id"	INTEGER NOT NULL,
-	"parent_id" INTEGER,
 	"name"  TEXT NOT NULL,
+
+	Primary KEY("mesh","bone_id")
+);
+
+-- The actual skeleton/bind pose.
+CREATE TABLE "skeleton" (
+	"name"  TEXT NOT NULL,
+	"parent" TEXT,
 	
-	-- Bone matricies are only copied in once as Mesh -1.
 	"matrix_0"	REAL,
 	"matrix_1"	REAL,
 	"matrix_2"	REAL,
@@ -99,7 +114,7 @@ CREATE TABLE "bones" (
 	"matrix_14"	REAL,
 	"matrix_15"	REAL,
 
-	Primary KEY("mesh","bone_id")
+	Primary KEY("name")
 );
 
 -- Materials

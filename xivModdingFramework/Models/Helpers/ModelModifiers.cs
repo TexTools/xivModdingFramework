@@ -155,6 +155,7 @@ namespace xivModdingFramework.Models.Helpers
             {
                 var ttMesh = new TTMeshGroup();
                 ttModel.MeshGroups.Add(ttMesh);
+                ttMesh.Name = "Group " + meshIdx;
 
                 // Build the bone set for our mesh.
                 if (rawMdl.MeshBoneSets != null && rawMdl.MeshBoneSets.Count > 0)
@@ -174,6 +175,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     var ttPart = new TTMeshPart();
                     ttMesh.Parts.Add(ttPart);
+                    ttPart.Name = "Part " + partIdx;
 
                     // Get the Indicies uniuqe to this part.
                     var indices = baseMesh.VertexData.Indices.GetRange(basePart.IndexOffset - baseMesh.MeshInfo.IndexDataOffset, basePart.IndexCount);

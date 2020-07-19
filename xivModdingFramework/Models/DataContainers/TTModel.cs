@@ -139,6 +139,12 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public string Material;
 
+        
+        /// <summary>
+        /// Purely semantic.
+        /// </summary>
+        public string Name;
+
 
         /// <summary>
         /// List of bones used by this mesh group's vertices.
@@ -657,8 +663,30 @@ namespace xivModdingFramework.Models.DataContainers
                 db.Open();
                 // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
 
+                // Load Mesh Groups
+                var query = "select * from meshes order by mesh asc;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    using (var reader = new CacheReader(cmd.ExecuteReader()))
+                    {
+                        while (reader.NextRow())
+                        {
+                            var meshNum = reader.GetInt32("mesh");
+
+                            // Spawn mesh groups as needed.
+                            while (model.MeshGroups.Count <= meshNum)
+                            {
+                                model.MeshGroups.Add(new TTMeshGroup());
+                            }
+
+                            model.MeshGroups[meshNum].Name = reader.GetString("name");
+                        }
+                    }
+                }
+
+
                 // Load Mesh Parts
-                var query = "select * from parts order by mesh asc, part asc;";
+                query = "select * from parts order by mesh asc, part asc;";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(cmd.ExecuteReader()))
@@ -668,7 +696,7 @@ namespace xivModdingFramework.Models.DataContainers
                             var meshNum = reader.GetInt32("mesh");
                             var partNum = reader.GetInt32("part");
 
-                            // Spawn mesh groups as needed.
+                            // Spawn mesh groups if needed.
                             while(model.MeshGroups.Count <= meshNum)
                             {
                                 model.MeshGroups.Add(new TTMeshGroup());
@@ -864,32 +892,34 @@ namespace xivModdingFramework.Models.DataContainers
 
                         }
 
-                        // Bones mesh -1 -- Full Skeleton the file needs, using the raw bone Ids.
-                        query = @"insert into bones (mesh, bone_id, parent_id, name, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
-                                             values ($mesh, $bone_id, $parent_id, $name, $matrix_0, $matrix_1, $matrix_2, $matrix_3, $matrix_4, $matrix_5, $matrix_6, $matrix_7, $matrix_8, $matrix_9, $matrix_10, $matrix_11, $matrix_12, $matrix_13, $matrix_14, $matrix_15);";
-                        foreach (var b in boneDict)
+                        // Skeleton
+                        query = @"insert into skeleton (name, parent, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
+                                             values ($name, $parent, $matrix_0, $matrix_1, $matrix_2, $matrix_3, $matrix_4, $matrix_5, $matrix_6, $matrix_7, $matrix_8, $matrix_9, $matrix_10, $matrix_11, $matrix_12, $matrix_13, $matrix_14, $matrix_15);";
+
+                        using (var cmd = new SQLiteCommand(query, db))
                         {
-                            using (var cmd = new SQLiteCommand(query, db))
+                            foreach (var b in boneDict)
                             {
+                                var parent = boneDict.FirstOrDefault(x => x.Value.BoneNumber == b.Value.BoneParent);
+                                var parentName = parent.Key == null ? null : parent.Key;
                                 cmd.Parameters.AddWithValue("name", b.Value.BoneName);
-                                cmd.Parameters.AddWithValue("bone_id", b.Value.BoneNumber);
-                                cmd.Parameters.AddWithValue("parent_id", b.Value.BoneParent);
-                                cmd.Parameters.AddWithValue("mesh", -1);
+                                cmd.Parameters.AddWithValue("parent", parentName);
 
                                 for (int i = 0; i < 16; i++)
                                 {
                                     cmd.Parameters.AddWithValue("matrix_" + i.ToString(), b.Value.PoseMatrix[i]);
                                 }
+
                                 cmd.ExecuteScalar();
                             }
                         }
 
 
-                        var meshIdx = 0;
+                            var meshIdx = 0;
                         foreach (var m in MeshGroups)
                         {
                             // Bones
-                            query = @"insert into bones (mesh, bone_id, name, parent_id) values ($mesh, $bone_id, $name, $parent_id);";
+                            query = @"insert into bones (mesh, bone_id, name) values ($mesh, $bone_id, $name);";
                             var bIdx = 0;
                             foreach (var b in m.Bones)
                             {
@@ -919,18 +949,27 @@ namespace xivModdingFramework.Models.DataContainers
                                 cmd.ExecuteScalar();
                             }
 
+                            query = @"insert into meshes (mesh, name, material_id) values ($mesh, $name, $material_id);";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("name", m.Name);
+                                cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                cmd.Parameters.AddWithValue("material_id", GetMaterialIndex(meshIdx));
+                                cmd.ExecuteScalar();
+                            }
+
+
                             // Parts
                             var partIdx = 0;
                             foreach (var p in m.Parts)
                             {
                                 // Parts
-                                query = @"insert into parts (mesh, part, name, material_id) values ($mesh, $part, $name, $material_id);";
+                                query = @"insert into parts (mesh, part, name) values ($mesh, $part, $name);";
                                 using (var cmd = new SQLiteCommand(query, db))
                                 {
-                                    cmd.Parameters.AddWithValue("name", Path.GetFileNameWithoutExtension(Source) + "_" + meshIdx + "." + partIdx);
+                                    cmd.Parameters.AddWithValue("name", p.Name);
                                     cmd.Parameters.AddWithValue("part", partIdx);
                                     cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                    cmd.Parameters.AddWithValue("material_id", GetMaterialIndex(meshIdx));
                                     cmd.ExecuteScalar();
                                 }
 

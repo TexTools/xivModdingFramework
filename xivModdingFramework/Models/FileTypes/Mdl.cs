@@ -233,10 +233,12 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             // Save the DB file.
-            var dbPath = Path.GetDirectoryName(outputFilePath) + "\\" + Path.GetFileNameWithoutExtension(model.Source) + ".db";
+
+            var converterFolder = Directory.GetCurrentDirectory() + "\\converters\\" + fileFormat;
+            Directory.CreateDirectory(converterFolder);
+            var dbPath = converterFolder + "\\input.db";
             model.SaveToFile(dbPath);
 
-            var importerFolder = Directory.GetCurrentDirectory() + "\\converters\\" + fileFormat;
 
             if (fileFormat == "db")
             {
@@ -257,12 +259,12 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = importerFolder + "\\converter.exe",
+                        FileName = converterFolder + "\\converter.exe",
                         Arguments = "\"" + dbPath + "\"",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
-                        WorkingDirectory = "" + importerFolder + "",
+                        WorkingDirectory = "" + converterFolder + "",
                         CreateNoWindow = true
                     }
                 };
@@ -276,7 +278,7 @@ namespace xivModdingFramework.Models.FileTypes
                     throw new Exception("Exporter threw error code: " + proc.ExitCode);
                 }
 
-                var outputFile = importerFolder + "\\result." + fileFormat;
+                var outputFile = converterFolder + "\\result." + fileFormat;
 
                 // Just move the result file if we need to.
                 if (!Path.Equals(outputFilePath, outputFile))
@@ -1710,7 +1712,11 @@ namespace xivModdingFramework.Models.FileTypes
             var directories = Directory.GetDirectories(importerPath);
             foreach (var d in directories)
             {
-                ret.Add((d.Replace(importerPath, "")).ToLower());
+                var suffix = (d.Replace(importerPath, "")).ToLower();
+                if (ret.IndexOf(suffix) < 0)
+                {
+                    ret.Add(suffix);
+                }
             }
             return ret;
         }
@@ -1730,7 +1736,11 @@ namespace xivModdingFramework.Models.FileTypes
             var directories = Directory.GetDirectories(importerPath);
             foreach (var d in directories)
             {
-                ret.Add((d.Replace(importerPath, "")).ToLower());
+                var suffix = (d.Replace(importerPath, "")).ToLower();
+                if (ret.IndexOf(suffix) < 0)
+                {
+                    ret.Add(suffix);
+                }
             }
             return ret;
         }
