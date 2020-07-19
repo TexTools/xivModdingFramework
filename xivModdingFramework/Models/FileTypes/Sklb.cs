@@ -126,6 +126,7 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
+
             var externalSkelName = GetParsedSkelFilename(fullMdlPath);
             var resultPath = SkeletonsFolder + externalSkelName + ".skel";
 
