@@ -32,6 +32,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool ClearVColor { get; set; }
         public bool ClearVAlpha { get; set; }
 
+
         /// <summary>
         /// Default constructor explicitly establishes option defaults.
         /// </summary>
@@ -138,6 +139,26 @@ namespace xivModdingFramework.Models.Helpers
     /// </summary>
     public static class ModelModifiers
     {
+        public static void ScaleModel(TTModel ttModel, float scale, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+            loggingFunction(false, "Scaling model by: " + scale.ToString("0.00"));
+
+            foreach (var m in ttModel.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    foreach (var v in p.Vertices)
+                    {
+                        v.Position *= scale;
+                    }
+                }
+            }
+        }
+
         // Merges the full geometry data from a raw xivMdl
         // This will destroy any existing mesh groups in the TTModel.
         public static void MergeGeometryData(TTModel ttModel, XivMdl rawMdl, Action<bool, string> loggingFunction = null)
@@ -389,6 +410,10 @@ namespace xivModdingFramework.Models.Helpers
                     // For every Mesh Group
                     for (var mIdx = 0; mIdx < ttModel.MeshGroups.Count; mIdx++)
                     {
+                        if (mIdx >= ogMdl.LoDList[lIdx].MeshDataList.Count)
+                        {
+                            break;
+                        }
                         var ogGroup = ogMdl.LoDList[lIdx].MeshDataList[mIdx];
                         var newGroup = ttModel.MeshGroups[mIdx];
                         var newBoneSet = newGroup.Bones;
@@ -463,7 +488,9 @@ namespace xivModdingFramework.Models.Helpers
                                         int newBoneId = newBoneSet.IndexOf(boneName);
                                         if (newBoneId < 0)
                                         {
-                                            throw new Exception("New model is missing bone used in Shape Data: " + boneName);
+                                            // Add the missing bone in at the end of the list.
+                                            newGroup.Bones.Add(boneName);
+                                            newBoneId = newGroup.Bones.Count - 1;
                                         }
 
                                         vert.BoneIds[i] = (byte)newBoneId;
@@ -878,9 +905,6 @@ namespace xivModdingFramework.Models.Helpers
 
             loggingFunction(false, "Calculating Tangents...");
 
-            // So, in order to properly calculate tangents, we have to flip the UV back into normal human space.
-            MakeExportReady(model, loggingFunction);
-
 
             foreach (var m in model.MeshGroups)
             {
@@ -979,9 +1003,6 @@ namespace xivModdingFramework.Models.Helpers
                     }
                 }
             }
-
-            // And now reconvert the model.
-            MakeImportReady(model, loggingFunction, true);
         }
 
         /// <summary>

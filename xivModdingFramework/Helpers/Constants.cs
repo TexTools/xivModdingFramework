@@ -13,6 +13,5 @@ namespace xivModdingFramework.Helpers
         /// The alphabet.  Now in character array form.
         /// </summary>
         public static readonly char[] Alphabet = { 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' };
-        public static float ModelMultiplier = 10.0f;
     }
 }

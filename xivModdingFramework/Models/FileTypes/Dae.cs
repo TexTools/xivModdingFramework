@@ -1297,8 +1297,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             //<unit>
             xmlWriter.WriteStartElement("unit");
-            xmlWriter.WriteAttributeString("name", "inch");
-            xmlWriter.WriteAttributeString("meter", "0.0254");
+            xmlWriter.WriteAttributeString("name", "meter");
+            xmlWriter.WriteAttributeString("meter", "1"); // FFXIV uses Meters as the internal measure.
             xmlWriter.WriteEndElement();
             //</unit>
 
@@ -1744,7 +1744,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     foreach (var v in positions)
                     {
-                        xmlWriter.WriteString((v.X * Constants.ModelMultiplier).ToString() + " " + (v.Y * Constants.ModelMultiplier).ToString() + " " + (v.Z * Constants.ModelMultiplier).ToString() + " ");
+                        xmlWriter.WriteString((v.X).ToString() + " " + (v.Y).ToString() + " " + (v.Z).ToString() + " ");
                     }
 
                     xmlWriter.WriteEndElement();
@@ -2544,10 +2544,10 @@ namespace xivModdingFramework.Models.FileTypes
                             var matrix = new Matrix(skelDict[modelData.PathData.BoneList[m]].InversePoseMatrix);
                             //matrix = Matrix.Identity;
 
-                            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Constants.ModelMultiplier) + " ");
-                            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Constants.ModelMultiplier) + " ");
-                            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * Constants.ModelMultiplier) + " ");
-                            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * Constants.ModelMultiplier) + " ");
+                            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W) + " ");
+                            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W) + " ");
+                            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W) + " ");
+                            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W) + " ");
                         }
                         catch
                         {
@@ -2934,15 +2934,15 @@ namespace xivModdingFramework.Models.FileTypes
             
             matrix = decomposed[skeleton.BoneName];
 
-            xmlWriter.WriteString(matrix.Row1.X + " " + matrix.Row1.Y + " " + matrix.Row1.Z + " " + (matrix.Row1.W * Constants.ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Row2.X + " " + matrix.Row2.Y + " " + matrix.Row2.Z + " " + (matrix.Row2.W * Constants.ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Row3.X + " " + matrix.Row3.Y + " " + matrix.Row3.Z + " " + (matrix.Row3.W * Constants.ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Row4.X + " " + matrix.Row4.Y + " " + matrix.Row4.Z + " " + (matrix.Row4.W * Constants.ModelMultiplier) + " ");*/
+            xmlWriter.WriteString(matrix.Row1.X + " " + matrix.Row1.Y + " " + matrix.Row1.Z + " " + (matrix.Row1.W ) + " ");
+            xmlWriter.WriteString(matrix.Row2.X + " " + matrix.Row2.Y + " " + matrix.Row2.Z + " " + (matrix.Row2.W ) + " ");
+            xmlWriter.WriteString(matrix.Row3.X + " " + matrix.Row3.Y + " " + matrix.Row3.Z + " " + (matrix.Row3.W ) + " ");
+            xmlWriter.WriteString(matrix.Row4.X + " " + matrix.Row4.Y + " " + matrix.Row4.Z + " " + (matrix.Row4.W ) + " ");*/
             
-            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W * Constants.ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W * Constants.ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W * Constants.ModelMultiplier) + " ");
-            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W * Constants.ModelMultiplier) + " ");
+            xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W ) + " ");
+            xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W ) + " ");
+            xmlWriter.WriteString(matrix.Column3.X + " " + matrix.Column3.Y + " " + matrix.Column3.Z + " " + (matrix.Column3.W ) + " ");
+            xmlWriter.WriteString(matrix.Column4.X + " " + matrix.Column4.Y + " " + matrix.Column4.Z + " " + (matrix.Column4.W ) + " ");
 
             xmlWriter.WriteEndElement();
             //</matrix>

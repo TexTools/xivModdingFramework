@@ -914,8 +914,27 @@ namespace xivModdingFramework.Models.DataContainers
                             }
                         }
 
+                        var matIdx = 0;
+                        foreach(var material in Materials)
+                        {
+                            // Materials
+                            query = @"insert into materials (material_id, diffuse, normal, specular, opacity) values ($material_id, $diffuse, $normal, $specular, $opacity);";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
+                                var mtrl_suffix = ".png";
+                                cmd.Parameters.AddWithValue("material_id", matIdx);
+                                cmd.Parameters.AddWithValue("diffuse", mtrl_prefix + "d" + mtrl_suffix);
+                                cmd.Parameters.AddWithValue("normal", mtrl_prefix + "n" + mtrl_suffix);
+                                cmd.Parameters.AddWithValue("specular", mtrl_prefix + "s" + mtrl_suffix);
+                                cmd.Parameters.AddWithValue("emissive", mtrl_prefix + "e" + mtrl_suffix);
+                                cmd.Parameters.AddWithValue("opacity", mtrl_prefix + "o" + mtrl_suffix);
+                                cmd.ExecuteScalar();
+                            }
+                            matIdx++;
+                        }
 
-                            var meshIdx = 0;
+                        var meshIdx = 0;
                         foreach (var m in MeshGroups)
                         {
                             // Bones
@@ -934,20 +953,6 @@ namespace xivModdingFramework.Models.DataContainers
                                 bIdx++;
                             }
 
-                            // Materials
-                            query = @"insert into materials (material_id, diffuse, normal, specular, opacity) values ($material_id, $diffuse, $normal, $specular, $opacity);";
-                            using (var cmd = new SQLiteCommand(query, db))
-                            {
-                                var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(m.Material.Substring(1)) + "_";
-                                var mtrl_suffix = ".png";
-                                cmd.Parameters.AddWithValue("material_id", GetMaterialIndex(meshIdx));
-                                cmd.Parameters.AddWithValue("diffuse", mtrl_prefix + "d" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("normal", mtrl_prefix + "n" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("specular", mtrl_prefix + "s" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("emissive", mtrl_prefix + "e" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("opacity", mtrl_prefix + "o" + mtrl_suffix);
-                                cmd.ExecuteScalar();
-                            }
 
                             query = @"insert into meshes (mesh, name, material_id) values ($mesh, $name, $material_id);";
                             using (var cmd = new SQLiteCommand(query, db))
