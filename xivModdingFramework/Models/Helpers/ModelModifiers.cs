@@ -192,14 +192,29 @@ namespace xivModdingFramework.Models.Helpers
                 }
 
                 var partIdx = 0;
-                foreach(var basePart in baseMesh.MeshPartList)
+                bool fakePart = false;
+                var totalParts = baseMesh.MeshPartList.Count;
+
+                // This is a furniture or other mesh that doesn't use the part system.
+                if (rawMdl.Partless)
                 {
+                    fakePart = true;
+                    totalParts = 1;
+                }
+
+                for(var pi = 0; pi < totalParts; pi++)
+                {
+
                     var ttPart = new TTMeshPart();
                     ttMesh.Parts.Add(ttPart);
                     ttPart.Name = "Part " + partIdx;
 
                     // Get the Indicies uniuqe to this part.
-                    var indices = baseMesh.VertexData.Indices.GetRange(basePart.IndexOffset - baseMesh.MeshInfo.IndexDataOffset, basePart.IndexCount);
+                    var basePart = fakePart == false ? baseMesh.MeshPartList[pi] : null;
+                    var indexStart = fakePart == false ? basePart.IndexOffset - baseMesh.MeshInfo.IndexDataOffset : 0;
+                    var indexCount = fakePart == false ? basePart.IndexCount : baseMesh.MeshInfo.IndexCount;
+
+                    var indices = baseMesh.VertexData.Indices.GetRange(indexStart, indexCount);
 
                     // Get the Vertices unique to this part.
                     var uniqueVertexIdSet = new SortedSet<int>(indices); // Maximum possible amount is # of indices, though likely it is less.

@@ -95,7 +95,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool getOriginal = false)
         {
-            var mdlPath = GetMdlPath(item, race, submeshId);
+            var mdlPath = await GetMdlPath(item, race, submeshId);
             var mtrlVariant = 1;
             try
             {
@@ -433,7 +433,7 @@ namespace xivModdingFramework.Models.FileTypes
 
         public async Task<XivMdl> GetRawMdlData(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false)
         {
-            var mdlPath = GetMdlPath(item, race, submeshId);
+            var mdlPath = await GetMdlPath(item, race, submeshId);
             return await GetRawMdlData(mdlPath, getOriginal);
         }
 
@@ -1876,7 +1876,7 @@ namespace xivModdingFramework.Models.FileTypes
             catch (Exception ex)
             {
                 // If we failed to load the MDL, see if we can get the unmodded MDL.
-                var mdlPath = GetMdlPath(item, race);
+                var mdlPath = await GetMdlPath(item, race);
                 var mod = await modding.TryGetModEntry(mdlPath);
                 if (mod != null)
                 {
@@ -2018,6 +2018,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var isAlreadyModified = false;
                 var isAlreadyModified2 = false;
+                var totalMeshCount = 0;
 
                 // Vertex Info
                 #region Vertex Info Block
@@ -2037,12 +2038,6 @@ namespace xivModdingFramework.Models.FileTypes
                         var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
                         var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
 
-                        // Identify correct # of parts.
-                        var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : ogGroup.MeshPartList.Count;
-
-                        // Totals for each group
-                        var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
-                        var newPartCount = ttMeshGroup == null ? 0 : ttMeshGroup.Parts.Count;
 
                         List<VertexDataStruct> source;
                         if (ogGroup == null)
@@ -2565,6 +2560,12 @@ namespace xivModdingFramework.Models.FileTypes
                             lod0VertexDataEntrySize1 = vertexDataEntrySize1;
                         }
 
+                        // Partless models strictly cannot have parts divisions.
+                        if(ogMdl.Partless)
+                        {
+                            partCount = 0;
+                        }
+
                         meshDataBlock.AddRange(BitConverter.GetBytes(vertexCount));
                         meshDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                         meshDataBlock.AddRange(BitConverter.GetBytes((short)materialIndex));
@@ -2626,130 +2627,133 @@ namespace xivModdingFramework.Models.FileTypes
                 var meshPartDataBlock = new List<byte>();
 
                 lodNum = 0;
-
-                short currentBoneOffset = 0;
-                var previousIndexOffset = 0;
-                previousIndexCount = 0;
-                var indexOffset = 0;
-                foreach (var lod in ogMdl.LoDList)
+                if (!ogMdl.Partless)
                 {
-                    var partPadding = 0;
 
-                    // Identify the correct # of meshes
-                    var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
-
-                    for (int meshNum = 0; meshNum < meshMax; meshNum++)
+                    short currentBoneOffset = 0;
+                    var previousIndexOffset = 0;
+                    previousIndexCount = 0;
+                    var indexOffset = 0;
+                    foreach (var lod in ogMdl.LoDList)
                     {
-                        // Test if we have both old and new data or not.
-                        var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
-                        var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
+                        var partPadding = 0;
 
-                        // Identify correct # of parts.
-                        var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : ogGroup.MeshPartList.Count;
+                        // Identify the correct # of meshes
+                        var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
 
-                        // Totals for each group
-                        var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
-                        var newPartCount = ttMeshGroup == null ? 0 : ttMeshGroup.Parts.Count;
-
-                        // Skip higher LoD stuff for non-existent parts.
-                        if (lodNum > 0 && ogGroup == null)
+                        for (int meshNum = 0; meshNum < meshMax; meshNum++)
                         {
-                            continue;
-                        }
+                            // Test if we have both old and new data or not.
+                            var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
+                            var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
 
+                            // Identify correct # of parts.
+                            var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : ogGroup.MeshPartList.Count;
 
-                        // Loop all the parts we should write.
-                        for (var partNum = 0; partNum < partMax; partNum++)
-                        {
-                            // Get old and new data.
-                            var ogPart = ogPartCount > partNum ? ogGroup.MeshPartList[partNum] : null;
-                            var ttPart = newPartCount > partNum ? ttMeshGroup.Parts[partNum] : null;
-
+                            // Totals for each group
+                            var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
+                            var newPartCount = ttMeshGroup == null ? 0 : ttMeshGroup.Parts.Count;
 
                             // Skip higher LoD stuff for non-existent parts.
-                            if (lodNum > 0 && ogPart == null)
+                            if (lodNum > 0 && ogGroup == null)
                             {
                                 continue;
                             }
 
-                            var indexCount = 0;
-                            short boneCount = 0;
-                            uint attributeMask = 0;
 
-                            if (lodNum == 0)
+                            // Loop all the parts we should write.
+                            for (var partNum = 0; partNum < partMax; partNum++)
                             {
-                                // At LoD Zero we're not importing old FFXIV data, we're importing
-                                // the new stuff.
+                                // Get old and new data.
+                                var ogPart = ogPartCount > partNum ? ogGroup.MeshPartList[partNum] : null;
+                                var ttPart = newPartCount > partNum ? ttMeshGroup.Parts[partNum] : null;
 
-                                // Recalculate Index Offset
-                                if (meshNum == 0)
+
+                                // Skip higher LoD stuff for non-existent parts.
+                                if (lodNum > 0 && ogPart == null)
                                 {
-                                    if (partNum == 0)
+                                    continue;
+                                }
+
+                                var indexCount = 0;
+                                short boneCount = 0;
+                                uint attributeMask = 0;
+
+                                if (lodNum == 0)
+                                {
+                                    // At LoD Zero we're not importing old FFXIV data, we're importing
+                                    // the new stuff.
+
+                                    // Recalculate Index Offset
+                                    if (meshNum == 0)
                                     {
-                                        indexOffset = 0;
+                                        if (partNum == 0)
+                                        {
+                                            indexOffset = 0;
+                                        }
+                                        else
+                                        {
+                                            indexOffset = previousIndexOffset + previousIndexCount;
+                                        }
                                     }
                                     else
                                     {
-                                        indexOffset = previousIndexOffset + previousIndexCount;
+                                        if (partNum == 0)
+                                        {
+                                            indexOffset = previousIndexOffset + previousIndexCount + partPadding;
+                                        }
+                                        else
+                                        {
+                                            indexOffset = previousIndexOffset + previousIndexCount;
+                                        }
+
                                     }
+
+                                    attributeMask = ttModel.GetAttributeBitmask(meshNum, partNum);
+                                    indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
+
+                                    // Count of bones for Mesh.  High LoD Meshes get 0... Not really ideal.
+                                    boneCount = (short)(lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
+
+                                    // Calculate padding between meshes
+                                    if (partNum == newPartCount - 1)
+                                    {
+                                        var padd = (indexOffset + indexCount) % 8;
+
+                                        if (padd != 0)
+                                        {
+                                            partPadding = 8 - padd;
+                                        }
+                                        else
+                                        {
+                                            partPadding = 0;
+                                        }
+                                    }
+
                                 }
                                 else
                                 {
-                                    if (partNum == 0)
-                                    {
-                                        indexOffset = previousIndexOffset + previousIndexCount + partPadding;
-                                    }
-                                    else
-                                    {
-                                        indexOffset = previousIndexOffset + previousIndexCount;
-                                    }
-
+                                    // LoD non-zero
+                                    indexCount = ogPart.IndexCount;
+                                    boneCount = 0;
+                                    attributeMask = 0;
                                 }
 
-                                attributeMask = ttModel.GetAttributeBitmask(meshNum, partNum);
-                                indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeMask));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
+                                meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
 
-                                // Count of bones for Mesh.  High LoD Meshes get 0... Not really ideal.
-                                boneCount = (short)(lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
-
-                                // Calculate padding between meshes
-                                if (partNum == newPartCount - 1)
-                                {
-                                    var padd = (indexOffset + indexCount) % 8;
-
-                                    if (padd != 0)
-                                    {
-                                        partPadding = 8 - padd;
-                                    }
-                                    else
-                                    {
-                                        partPadding = 0;
-                                    }
-                                }
+                                previousIndexCount = indexCount;
+                                previousIndexOffset = indexOffset;
+                                currentBoneOffset += boneCount;
 
                             }
-                            else
-                            {
-                                // LoD non-zero
-                                indexCount = ogPart.IndexCount;
-                                boneCount = 0;
-                                attributeMask = 0;
-                            }
-
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeMask));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
-
-                            previousIndexCount = indexCount;
-                            previousIndexOffset = indexOffset;
-                            currentBoneOffset += boneCount;
-
                         }
-                    }
 
-                    lodNum++;
+                        lodNum++;
+                    }
                 }
 
 
@@ -2939,22 +2943,25 @@ namespace xivModdingFramework.Models.FileTypes
                 // These are referential arrays to subsets of their parent mesh bone set.
                 // Their length is determined by the Part header's BoneCount field.
                 var partBoneSetsBlock = new List<byte>();
+                if (!ogMdl.Partless)
                 {
-                    var bones = ttModel.Bones;
-
-                    for (var j = 0; j < ttModel.MeshGroups.Count; j++)
                     {
-                        for (short i = 0; i < ttModel.MeshGroups[j].Bones.Count; i++)
+                        var bones = ttModel.Bones;
+
+                        for (var j = 0; j < ttModel.MeshGroups.Count; j++)
                         {
-                            // It's probably not perfectly performant in game, but we can just
-                            // write every bone from the parent set back in here.
-                            partBoneSetsBlock.AddRange(BitConverter.GetBytes(i));
+                            for (short i = 0; i < ttModel.MeshGroups[j].Bones.Count; i++)
+                            {
+                                // It's probably not perfectly performant in game, but we can just
+                                // write every bone from the parent set back in here.
+                                partBoneSetsBlock.AddRange(BitConverter.GetBytes(i));
+                            }
                         }
+
+                        // Higher LoDs omitted (they're given 0 bones)
+
+                        partBoneSetsBlock.InsertRange(0, BitConverter.GetBytes((int)(partBoneSetsBlock.Count)));
                     }
-
-                    // Higher LoDs omitted (they're given 0 bones)
-
-                    partBoneSetsBlock.InsertRange(0, BitConverter.GetBytes((int)(partBoneSetsBlock.Count)));
                 }
 
 
@@ -3149,8 +3156,11 @@ namespace xivModdingFramework.Models.FileTypes
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)(meshOffset + mCount)));
                     lodDataBlock.AddRange(BitConverter.GetBytes(shapeMeshCount));
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)(meshOffset + mCount + shapeMeshCount)));
-                    meshOffset += (short)(mCount + shapeMeshCount);
 
+                    // Might as well keep this updated for later.
+                    totalMeshCount = meshOffset + mCount + shapeMeshCount;
+
+                    meshOffset += (short)(mCount + shapeMeshCount);
 
                     lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
 
@@ -3274,88 +3284,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var importData = importDataDictionary[p.MeshId];
                         foreach (var v in p.Part.Vertices)
                         {
-                            // Positions for Weapon and Monster item types are half precision floating points
-                            var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
-
-                            Half hx, hy, hz;
-                            if (posDataType == VertexDataType.Half4)
-                            {
-                                hx = new Half(v.Position[0]);
-                                hy = new Half(v.Position[1]);
-                                hz = new Half(v.Position[2]);
-
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(hx.RawValue));
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(hy.RawValue));
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(hz.RawValue));
-
-                                // Half float positions have a W coordinate but it is never used and is defaulted to 1.
-                                var w = new Half(1);
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
-
-                            }
-                            // Everything else has positions as singles 
-                            else
-                            {
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[0]));
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[1]));
-                                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[2]));
-                            }
-
-                            // Furniture items do not have bone data
-                            if (ttModel.HasWeights)
-                            {
-                                // Bone Weights
-                                importData.VertexData0.AddRange(v.Weights);
-
-                                // Bone Indices
-                                importData.VertexData0.AddRange(v.BoneIds);
-                            }
-
-                            // Normals
-                            hx = v.Normal[0];
-                            hy = v.Normal[1];
-                            hz = v.Normal[2];
-
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(hx));
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(hy));
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(hz));
-
-                            // BiNormals
-                            // Change the BiNormals based on Handedness
-                            var biNormal = v.Binormal;
-                            int handedness = v.Handedness ? -1 : 1;
-
-                            // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
-                            // But the data gets written into the game, too, so why do we need to pre-flip it?
-
-                            importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
-
-
-                            if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
-                            {
-                                // 99% sure this code path is never actually used.
-                                importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(v.Tangent, handedness * -1));
-                            }
-
-
-                            importData.VertexData1.Add(v.VertexColor[0]);
-                            importData.VertexData1.Add(v.VertexColor[1]);
-                            importData.VertexData1.Add(v.VertexColor[2]);
-                            importData.VertexData1.Add(v.VertexColor[3]);
-
-                            // Texture Coordinates
-                            var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
-
-
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[0]));
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[1]));
-
-                            if (texCoordDataType == VertexDataType.Float4)
-                            {
-                                importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[0]));
-                                importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[1]));
-                            }
+                            WriteVertex(importData, vertexInfoDict, ttModel, v);
                         }
                     }
                 }
@@ -3686,9 +3615,9 @@ namespace xivModdingFramework.Models.FileTypes
                 datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].IndexDataBlockPartCount));
 
                 // Mesh Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)ogModelData.MeshCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)totalMeshCount));
                 // Material Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)ogModelData.MaterialCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)ttModel.Materials.Count));
                 // Unknown 1
                 datHeader.AddRange(BitConverter.GetBytes((short)259));
                 // Unknown 2
@@ -3786,88 +3715,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     foreach (var v in p.Vertices)
                     {
-                        // Positions for Weapon and Monster item types are half precision floating points
-                        var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
-
-                        Half hx, hy, hz;
-                        if (posDataType == VertexDataType.Half4)
-                        {
-                            hx = new Half(v.Position[0]);
-                            hy = new Half(v.Position[1]);
-                            hz = new Half(v.Position[2]);
-
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(hx.RawValue));
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(hy.RawValue));
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(hz.RawValue));
-
-                            // Half float positions have a W coordinate but it is never used and is defaulted to 1.
-                            var w = new Half(1);
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
-
-                        }
-                        // Everything else has positions as singles 
-                        else
-                        {
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[0]));
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[1]));
-                            importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[2]));
-                        }
-
-                        // Furniture items do not have bone data
-                        if (ttModel.HasWeights)
-                        {
-                            // Bone Weights
-                            importData.VertexData0.AddRange(v.Weights);
-
-                            // Bone Indices
-                            importData.VertexData0.AddRange(v.BoneIds);
-                        }
-
-                        // Normals
-                        hx = v.Normal[0];
-                        hy = v.Normal[1];
-                        hz = v.Normal[2];
-
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(hx));
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(hy));
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(hz));
-
-                        // BiNormals
-                        // Change the BiNormals based on Handedness
-                        var biNormal = v.Binormal;
-                        int handedness = v.Handedness ? -1 : 1;
-
-                        // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
-                        // But the data gets written into the game, too, so why do we need to pre-flip it?
-
-                        importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
-
-
-                        if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
-                        {
-                            // 99% sure this code path is never actually used.
-                            importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(v.Tangent, handedness * -1));
-                        }
-
-
-                        importData.VertexData1.Add(v.VertexColor[0]);
-                        importData.VertexData1.Add(v.VertexColor[1]);
-                        importData.VertexData1.Add(v.VertexColor[2]);
-                        importData.VertexData1.Add(v.VertexColor[3]);
-
-                        // Texture Coordinates
-                        var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
-
-
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[0]));
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[1]));
-
-                        if (texCoordDataType == VertexDataType.Float4)
-                        {
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[0]));
-                            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[1]));
-                        }
+                        WriteVertex(importData, vertexInfoDict, ttModel, v);
                     }
 
                 }
@@ -4091,6 +3939,95 @@ namespace xivModdingFramework.Models.FileTypes
             return vertexByteData;
         }
 
+        private void WriteVertex(VertexByteData importData, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict, TTModel model, TTVertex v)
+        {
+            // Positions for Weapon and Monster item types are half precision floating points
+            var posDataType = vertexInfoDict[0][VertexUsageType.Position];
+
+
+            Half hx, hy, hz;
+            if (posDataType == VertexDataType.Half4)
+            {
+                hx = new Half(v.Position[0]);
+                hy = new Half(v.Position[1]);
+                hz = new Half(v.Position[2]);
+
+                importData.VertexData0.AddRange(BitConverter.GetBytes(hx.RawValue));
+                importData.VertexData0.AddRange(BitConverter.GetBytes(hy.RawValue));
+                importData.VertexData0.AddRange(BitConverter.GetBytes(hz.RawValue));
+
+                // Half float positions have a W coordinate but it is never used and is defaulted to 1.
+                var w = new Half(1);
+                importData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
+
+            }
+            // Everything else has positions as singles 
+            else
+            {
+                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[0]));
+                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[1]));
+                importData.VertexData0.AddRange(BitConverter.GetBytes(v.Position[2]));
+            }
+
+            // Furniture items do not have bone data
+            if (model.HasWeights)
+            {
+                // Bone Weights
+                importData.VertexData0.AddRange(v.Weights);
+
+                // Bone Indices
+                importData.VertexData0.AddRange(v.BoneIds);
+            }
+
+            // Normals
+            hx = v.Normal[0];
+            hy = v.Normal[1];
+            hz = v.Normal[2];
+
+            importData.VertexData1.AddRange(BitConverter.GetBytes(hx));
+            importData.VertexData1.AddRange(BitConverter.GetBytes(hy));
+            importData.VertexData1.AddRange(BitConverter.GetBytes(hz));
+
+            // BiNormals
+            // Change the BiNormals based on Handedness
+            var biNormal = v.Binormal;
+            int handedness = v.Handedness ? -1 : 1;
+
+            // This part makes sense - Handedness defines when you need to flip the tangent/binormal...
+            // But the data gets written into the game, too, so why do we need to pre-flip it?
+
+            importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
+
+
+            if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
+            {
+                // 99% sure this code path is never actually used.
+                importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(v.Tangent, handedness * -1));
+            }
+
+
+            if (vertexInfoDict[0].ContainsKey(VertexUsageType.Color))
+            {
+                importData.VertexData1.Add(v.VertexColor[0]);
+                importData.VertexData1.Add(v.VertexColor[1]);
+                importData.VertexData1.Add(v.VertexColor[2]);
+                importData.VertexData1.Add(v.VertexColor[3]);
+            }
+
+            // Texture Coordinates
+            var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
+
+
+            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[0]));
+            importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[1]));
+
+            if (texCoordDataType == VertexDataType.Float4)
+            {
+                importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[0]));
+                importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[1]));
+            }
+        }
+
 
         /// <summary>
         /// Classes used in reading bone deformation data.
@@ -4206,7 +4143,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivRace">The selected race for the given item</param>
         /// <param name="submeshId">The submesh ID - Only used for furniture items which contain multiple meshes, like the Ahriman Clock.</param>
         /// <returns>The path in string format.  Not a fucking tuple.</returns>
-        public string GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null)
+        public async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null)
         {
             string mdlFolder = "", mdlFile = "";
 
@@ -4268,22 +4205,20 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     break;
                 case XivItemType.furniture:
+                    // Language doesn't matter for this call.
+                    var housing = new Housing(_gameDirectory, XivLanguage.None);
+                    var mdlPath = "";
+                    // Housing assets use a different function to scrub the .sgd files for
+                    // their direct absolute model references.
+                    var assetDict = await housing.GetFurnitureModelParts(itemModel);
+
                     if (submeshId == null || submeshId == "base")
                     {
-                        submeshId = "";
+                        submeshId = "b0";
                     }
 
-                    if (itemCategory.Equals(XivStrings.Furniture_Indoor))
-                    {
-                        mdlFolder = $"bgcommon/hou/indoor/general/{id}/bgparts";
-                        mdlFile = $"fun_b0_m{id}{submeshId}{MdlExtension}";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
-                    {
-                        mdlFolder = $"bgcommon/hou/outdoor/general/{id}/bgparts";
-                        mdlFile = $"gar_b0_m{id}{submeshId}{MdlExtension}";
-                    }
-
+                    mdlPath = assetDict["b0"];
+                    return mdlPath;
                     break;
                 default:
                     mdlFolder = "";

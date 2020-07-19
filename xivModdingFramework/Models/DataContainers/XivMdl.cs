@@ -29,6 +29,29 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public string MdlPath { get; set; }
 
+        /// <summary>
+        /// Special indicator that says the mesh does not use parts at all.
+        /// This is the case for some furniture/background models.
+        /// </summary>
+        public bool Partless
+        {
+            get
+            {
+                var anyParts = false;
+                var anyIndices = false;
+                foreach(var m in LoDList[0].MeshDataList)
+                {
+                    anyParts = anyParts || m.MeshPartList.Count > 0;
+                    if(m.MeshInfo.IndexCount > 0)
+                    {
+                        anyIndices = true;
+                    }
+                }
+                var noParts = !anyParts;
+                return noParts && (!HasShapeData) && anyIndices;
+            }
+        }
+
 
         /// <summary>
         /// The path data contained in the mdl file
