@@ -2029,6 +2029,9 @@ namespace xivModdingFramework.Models.FileTypes
                 var lodNum = 0;
                 foreach (var lod in ogMdl.LoDList)
                 {
+                    // Higher LoDs are skipped.
+                    if (lodNum > 0) continue;
+
                     var vdsDictionary = new Dictionary<VertexUsageType, VertexDataType>();
                     var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
 
@@ -2302,55 +2305,25 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var ogModelData = ogMdl.ModelData;
 
-                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown0));
-
                 short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].ExtraMeshCount);
-                short higherLodMeshCount = (short)(ogMdl.LoDList[2].MeshSum - ogMdl.LoDList[0].MeshSum);
+                short higherLodMeshCount = 0;
                 meshCount += higherLodMeshCount;
                 // Update the total mesh count only if there are more meshes than the original
                 // We do not remove mesh if they are missing from the DAE, we just set the mesh metadata to 0
 
                 ogModelData.MeshCount = meshCount;
-                modelDataBlock.AddRange(BitConverter.GetBytes(meshCount));
-
-                modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Attributes.Count));
-
-                var meshPartCount = ogModelData.MeshPartCount;
-
                 // Recalculate total number of parts.
-                short tParts = 0;
-                for (int lIdx = 0; lIdx < ogMdl.LoDList.Count; lIdx++)
+                short partCOunt  = 0;
+                foreach (var m in ttModel.MeshGroups)
                 {
-                    if (lIdx == 0)
-                    {
-                        foreach (var m in ttModel.MeshGroups)
-                        {
-                            foreach (var p in m.Parts)
-                            {
-                                tParts++;
-                            }
-                            /*
-                             //Not sure when if ever the shape parts count here, but it seems like never.
-                            foreach(var p in m.ShapeParts)
-                            {
-                                tParts++;
-                            }*/
-                        }
-                    }
-                    else
-                    {
-                        foreach (var m in ogMdl.LoDList[lIdx].MeshDataList)
-                        {
-                            foreach (var p in m.MeshPartList)
-                            {
-                                tParts++;
-                            }
-                        }
-                    }
+                    partCOunt += (short)m.Parts.Count;
                 }
 
-                modelDataBlock.AddRange(BitConverter.GetBytes(tParts));
 
+                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(meshCount));
+                modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Attributes.Count));
+                modelDataBlock.AddRange(BitConverter.GetBytes(partCOunt));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Materials.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.Bones.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
@@ -2440,25 +2413,23 @@ namespace xivModdingFramework.Models.FileTypes
                 var meshIndexOffsets = new List<int>();
                 foreach (var lod in ogMdl.LoDList)
                 {
+                    if(lodNum > 0)
+                    {
+                        continue;
+                    }
+
                     var meshNum = 0;
                     var previousVertexDataOffset1 = 0;
                     var previousIndexDataOffset = 0;
                     var lod0VertexDataEntrySize0 = 0;
                     var lod0VertexDataEntrySize1 = 0;
 
-                    var max = lodNum == 0 ? ttModel.MeshGroups.Count : Math.Max(ttModel.MeshGroups.Count, lod.MeshDataList.Count);
+                    var max = lodNum == 0 ? ttModel.MeshGroups.Count : 0;
 
                     for (int mi = 0; mi < max; mi++)
                     {
 
                         bool addedMesh = meshNum >= lod.MeshCount;
-
-                        // Skip higher LoDs for any additional stuff.
-                        if (lodNum > 0 && addedMesh)
-                        {
-                            continue;
-                        }
-
                         var meshInfo = addedMesh ? null : lod.MeshDataList[meshNum].MeshInfo;
 
                         var vertexCount = addedMesh ? 0 : meshInfo.VertexCount;
@@ -2475,52 +2446,47 @@ namespace xivModdingFramework.Models.FileTypes
                         short boneSetIndex = addedMesh ? (short)0 : (short)0;
                         byte vDataBlockCount = addedMesh ? (byte)0 : meshInfo.VertexDataBlockCount;
 
+                        var ttMeshGroup = ttModel.MeshGroups[mi];
+                        vertexCount = (int)ttMeshGroup.VertexCount;
+                        indexCount = (int)ttMeshGroup.IndexCount;
+                        partCount = (short)ttMeshGroup.Parts.Count;
+                        boneSetIndex = (short)meshNum;
+                        materialIndex = ttModel.GetMaterialIndex(meshNum);
+                        vDataBlockCount = 2;
 
-
-                        if (lodNum == 0)
+                        if (!addedMesh)
                         {
-                            var ttMeshGroup = ttModel.MeshGroups[mi];
-                            vertexCount = (int)ttMeshGroup.VertexCount;
-                            indexCount = (int)ttMeshGroup.IndexCount;
-                            partCount = (short)ttMeshGroup.Parts.Count;
-                            boneSetIndex = (short)meshNum;
-                            materialIndex = ttModel.GetMaterialIndex(meshNum);
-                            vDataBlockCount = 2;
-
-                            if (!addedMesh)
+                            // Since we changed Normals and Texture coordinates from half to floats, we need
+                            // to adjust the vertex data entry size for that data block from 24 to 36, or from 16 to 24 if its a housing item
+                            // we skip this adjustment if the model is already modified
+                            if (!isAlreadyModified)
                             {
-                                // Since we changed Normals and Texture coordinates from half to floats, we need
-                                // to adjust the vertex data entry size for that data block from 24 to 36, or from 16 to 24 if its a housing item
-                                // we skip this adjustment if the model is already modified
-                                if (!isAlreadyModified)
-                                {
-                                    var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
+                                var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
 
-                                    if (texCoordDataType == VertexDataType.Float2)
-                                    {
-                                        vertexDataEntrySize1 += 8;
-                                    }
-                                    else
-                                    {
-                                        vertexDataEntrySize1 += 12;
-                                    }
+                                if (texCoordDataType == VertexDataType.Float2)
+                                {
+                                    vertexDataEntrySize1 += 8;
                                 }
-                                if (!isAlreadyModified2)
+                                else
                                 {
-                                    vertexDataEntrySize0 += 4;
-
+                                    vertexDataEntrySize1 += 12;
                                 }
                             }
-
-                            // Add in any shape vertices.
-                            if (ttModel.HasShapeData)
+                            if (!isAlreadyModified2)
                             {
-                                // These are effectively orphaned vertices until the shape
-                                // data kicks in and rewrites the triangle index list.
-                                foreach (var shapePart in ttMeshGroup.ShapeParts)
-                                {
-                                    vertexCount += shapePart.Vertices.Count;
-                                }
+                                vertexDataEntrySize0 += 4;
+
+                            }
+                        }
+
+                        // Add in any shape vertices.
+                        if (ttModel.HasShapeData)
+                        {
+                            // These are effectively orphaned vertices until the shape
+                            // data kicks in and rewrites the triangle index list.
+                            foreach (var shapePart in ttMeshGroup.ShapeParts)
+                            {
+                                vertexCount += shapePart.Vertices.Count;
                             }
                         }
 
@@ -2639,7 +2605,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var partPadding = 0;
 
                         // Identify the correct # of meshes
-                        var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
+                        var meshMax = lodNum > 0 ? 0 : ttModel.MeshGroups.Count;
 
                         for (int meshNum = 0; meshNum < meshMax; meshNum++)
                         {
@@ -2648,17 +2614,11 @@ namespace xivModdingFramework.Models.FileTypes
                             var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
 
                             // Identify correct # of parts.
-                            var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : ogGroup.MeshPartList.Count;
+                            var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : 0;
 
                             // Totals for each group
                             var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
                             var newPartCount = ttMeshGroup == null ? 0 : ttMeshGroup.Parts.Count;
-
-                            // Skip higher LoD stuff for non-existent parts.
-                            if (lodNum > 0 && ogGroup == null)
-                            {
-                                continue;
-                            }
 
 
                             // Loop all the parts we should write.
@@ -2667,13 +2627,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 // Get old and new data.
                                 var ogPart = ogPartCount > partNum ? ogGroup.MeshPartList[partNum] : null;
                                 var ttPart = newPartCount > partNum ? ttMeshGroup.Parts[partNum] : null;
-
-
-                                // Skip higher LoD stuff for non-existent parts.
-                                if (lodNum > 0 && ogPart == null)
-                                {
-                                    continue;
-                                }
 
                                 var indexCount = 0;
                                 short boneCount = 0;
@@ -3043,22 +2996,22 @@ namespace xivModdingFramework.Models.FileTypes
                     short mCount = 0;
                     // Index Data Size is recalculated for LoD 0, because of the imported data, but remains the same
                     // for every other LoD.
-                    var indexDataSize = lod.IndexDataSize;
+                    var indexDataSize = 0;
 
                     // Both of these index values are always the same.
                     // Because index data starts after the vertex data, these values need to be recalculated because
                     // the imported data can add/remove vertex data
-                    var indexDataStart = lod.IndexDataStart;
-                    var indexDataOffset = lod.IndexDataOffset;
+                    var indexDataStart = 0;
+                    var indexDataOffset = 0;
 
 
                     // This value is modified for LoD0 when import settings are present
                     // This value is recalculated for every other LoD because of the imported data can add/remove vertex data.
-                    var vertexDataOffset = lod.VertexDataOffset;
+                    var vertexDataOffset = 0;
 
                     // Vertex Data Size is recalculated for LoD 0, because of the imported data, but remains the same
                     // for every other LoD.
-                    var vertexDataSize = lod.VertexDataSize;
+                    var vertexDataSize = 0;
 
                     // Calculate the new values based on imported data
                     // Note: Only the highest quality LoD is used which is LoD 0
@@ -3132,13 +3085,12 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     else
                     {
-                        mCount = lod.MeshCount;
                         // The (vertex offset + vertex data size + index data size) of the previous LoD give you the vertex offset of the current LoD
                         vertexDataOffset = previousVertexDataOffset + previousVertexDataSize + previousindexDataSize;
 
                         // The (vertex data offset + vertex data size) of the current LoD give you the index offset
                         // In this case it uses the newly calculated vertex data offset to get the correct index offset
-                        indexDataOffset = vertexDataOffset + vertexDataSize;
+                        indexDataOffset = vertexDataOffset + 0;
                         indexDataStart = indexDataOffset;
                     }
 
@@ -3315,26 +3267,6 @@ namespace xivModdingFramework.Models.FileTypes
                             }
 
                             meshNum++;
-                        }
-                    }
-
-                    if (lodNum > 0)
-                    {
-                        foreach (var meshData in lod.MeshDataList)
-                        {
-                            var vertexInfo = vertexInfoDict[lodNum];
-                            var vertexData = GetVertexByteData(meshData.VertexData, vertexInfo, ttModel.HasWeights);
-
-                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData0);
-                            vertexDataSection.VertexDataBlock.AddRange(vertexData.VertexData1);
-                            vertexDataSection.IndexDataBlock.AddRange(vertexData.IndexData);
-
-                            var indexPadding = (vertexData.IndexCount * 2) % 16;
-
-                            if (indexPadding != 0)
-                            {
-                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
-                            }
                         }
                     }
 
