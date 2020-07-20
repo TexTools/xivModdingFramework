@@ -133,7 +133,8 @@ namespace xivModdingFramework.General.Enums
             {
                 Parent = dict[XivRace.Hyur_Highlander_Male],
                 Race = XivRace.Roegadyn_Male,
-                Children = new List<XivRaceNode>()
+                Children = new List<XivRaceNode>(),
+                HasSkin = true
             });
             dict.Add(XivRace.Hrothgar, new XivRaceNode()
             {
@@ -342,7 +343,8 @@ namespace xivModdingFramework.General.Enums
             {
                 return true;
             }
-            return !IsParentOf(possibleParent, possibleChild, allowSame);
+            var isParent = IsParentOf(possibleParent, possibleChild, allowSame);
+            return isParent;
         }
 
         /// <summary>
