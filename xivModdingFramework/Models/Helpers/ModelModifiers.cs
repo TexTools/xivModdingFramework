@@ -791,21 +791,7 @@ namespace xivModdingFramework.Models.Helpers
             // Skip this is we're just reconverting back, to avoid any potential issues and save time.
             if (!reconvert)
             {
-                var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
-                if (!hasTangents)
-                {
-                    var hasBinormals = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Binormal != Vector3.Zero)));
-
-                    // If we already have binormal data, we can just use the cheaper function.
-                    if (hasBinormals)
-                    {
-                        CalculateTangentsFromBinormals(model, loggingFunction);
-                    }
-                    else
-                    {
-                        CalculateTangents(model, loggingFunction);
-                    }
-                }
+                CalculateTangents(model, loggingFunction);
             }
 
             var totalMajorCorrections = 0;
@@ -921,6 +907,25 @@ namespace xivModdingFramework.Models.Helpers
             }
 
             loggingFunction(false, "Calculating Tangents...");
+            var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
+            var hasBinormals = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Binormal != Vector3.Zero)));
+
+            if(hasTangents && hasBinormals)
+            {
+                // Why are we here?  Go away.
+                return;
+            }
+
+            // If we already have binormal data, we can just use the cheaper function.
+            if (hasBinormals)
+            {
+                CalculateTangentsFromBinormals(model, loggingFunction);
+                return;
+            }
+
+            // Technically we could have another shortcut case here if we have tangent but not binormal data.
+            // But that never happens in ffxiv.
+
 
 
             foreach (var m in model.MeshGroups)
