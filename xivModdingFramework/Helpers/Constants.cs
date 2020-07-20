@@ -1,4 +1,6 @@
-﻿using System;
+﻿using HelixToolkit.SharpDX.Core;
+using HelixToolkit.SharpDX.Core.Model.Scene2D;
+using System;
 using System.Collections.Generic;
 using System.Text;
 

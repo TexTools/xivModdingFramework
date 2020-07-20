@@ -37,7 +37,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// This is the index to the value in MdlPathData.AttributeList
         /// </remarks>
-        public int AttributeIndex { get; set; }
+        public uint AttributeBitmask { get; set; }
 
         /// <summary>
         /// The offset to the starting bone in the BoneList

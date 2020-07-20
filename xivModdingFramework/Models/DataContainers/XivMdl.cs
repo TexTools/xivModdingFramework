@@ -27,7 +27,30 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The path to this mdl file
         /// </summary>
-        public (string Folder, string File) MdlPath { get; set; }
+        public string MdlPath { get; set; }
+
+        /// <summary>
+        /// Special indicator that says the mesh does not use parts at all.
+        /// This is the case for some furniture/background models.
+        /// </summary>
+        public bool Partless
+        {
+            get
+            {
+                var anyParts = false;
+                var anyIndices = false;
+                foreach(var m in LoDList[0].MeshDataList)
+                {
+                    anyParts = anyParts || m.MeshPartList.Count > 0;
+                    if(m.MeshInfo.IndexCount > 0)
+                    {
+                        anyIndices = true;
+                    }
+                }
+                var noParts = !anyParts;
+                return noParts && (!HasShapeData) && anyIndices;
+            }
+        }
 
 
         /// <summary>
@@ -73,12 +96,12 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The data block containing bone information
         /// </summary>
-        public BoneDataBlock BonDataBlock { get; set; }
+        public BoneDataBlock BoneDataBlock { get; set; }
 
         /// <summary>
         /// The list continaing each of the Bone Index Lists for each LoD
         /// </summary>
-        public List<BoneIndexMesh> BoneIndexMeshList { get; set; }
+        public List<BoneSet> MeshBoneSets { get; set; }
 
         /// <summary>
         /// The data containing the information for mesh shapes
@@ -88,7 +111,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The data containing the information for the bone indices used by mesh parts
         /// </summary>
-        public BoneIndexPart BoneIndexPart { get; set; }
+        public BoneSet PartBoneSets { get; set; }
 
         /// <summary>
         /// The size of the padded bytes immediately following 

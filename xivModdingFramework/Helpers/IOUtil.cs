@@ -65,9 +65,14 @@ namespace xivModdingFramework.Helpers
 
             using (var ms = new MemoryStream(compressedBytes))
             {
-                using (var ds = new DeflateStream(ms, CompressionMode.Decompress))
+                using (var ds = new DeflateStream(ms, CompressionMode.Decompress, true))
                 {
-                    await ds.ReadAsync(decompressedBytes, 0, uncompressedSize);
+                    int offset = 0; // offset for writing into buffer
+                    int bytesRead; // number of bytes read from Read operation
+                    while ((bytesRead = await ds.ReadAsync(decompressedBytes, offset, uncompressedSize - offset)) > 0)
+                    {
+                        offset += bytesRead;  // offset in buffer for results of next reading
+                    }
                 }
             }
 
@@ -128,7 +133,85 @@ namespace xivModdingFramework.Helpers
             
             return path;
         }
-    
+        public static XivRace GetRaceFromPath(string path)
+        {
+            if(path == null)
+            {
+                return XivRace.All_Races;
+            }
+
+            var xivRace = XivRace.All_Races;
+
+            if (path.Contains("ui/") || path.Contains(".avfx"))
+            {
+                xivRace = XivRace.All_Races;
+            }
+            else if (path.Contains("monster"))
+            {
+                xivRace = XivRace.Monster;
+            }
+            else if (path.Contains(".tex") || path.Contains(".mdl") || path.Contains(".atex"))
+            {
+                if (path.Contains("accessory") || path.Contains("weapon") || path.Contains("/common/"))
+                {
+                    xivRace = XivRace.All_Races;
+                }
+                else
+                {
+                    if (path.Contains("demihuman"))
+                    {
+                        xivRace = XivRace.DemiHuman;
+                    }
+                    else if (path.Contains("/v"))
+                    {
+                        var raceCode = path.Substring(path.IndexOf("_c") + 2, 4);
+                        xivRace = XivRaces.GetXivRace(raceCode);
+                    }
+                    else
+                    {
+                        var raceCode = path.Substring(path.IndexOf("/c") + 2, 4);
+                        xivRace = XivRaces.GetXivRace(raceCode);
+                    }
+                }
+
+            }
+
+            return xivRace;
+        }
+
+        /// <summary>
+        /// Creates a row-by-row Matrix from a column order float set.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static float[] RowsFromColumns(float[] data)
+        {
+            var formatted = new float[16];
+
+            formatted[0] = data[0];
+            formatted[1] = data[4];
+            formatted[2] = data[8];
+            formatted[3] = data[12];
+
+
+            formatted[4] = data[1];
+            formatted[5] = data[5];
+            formatted[6] = data[9];
+            formatted[7] = data[13];
+
+            formatted[8] = data[2];
+            formatted[9] = data[6];
+            formatted[10] = data[10];
+            formatted[11] = data[14];
+
+            formatted[12] = data[3];
+            formatted[13] = data[7];
+            formatted[14] = data[11];
+            formatted[15] = data[15];
+
+            return formatted;
+        }
+
         /// <summary>
         /// Replaces the bytes in a given byte array with the bytes from another array, starting at the given index of the original array.
         /// </summary>

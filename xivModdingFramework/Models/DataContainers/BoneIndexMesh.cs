@@ -24,7 +24,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// <remarks>
     /// This references the specific bones that are used by the mesh by their index in the bone string list 
     /// </remarks>
-    public class BoneIndexMesh
+    public class BoneSet
     {
         /// <summary>
         /// The list of Bone Indices

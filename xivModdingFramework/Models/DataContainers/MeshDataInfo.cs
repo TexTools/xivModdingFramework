@@ -55,7 +55,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// This is the index of the bone list in the BoneDataList
         /// </remarks>
-        public short BoneListIndex { get; set; }
+        public short BoneSetIndex { get; set; }
 
         /// <summary>
         /// The offset to the Index Data Block

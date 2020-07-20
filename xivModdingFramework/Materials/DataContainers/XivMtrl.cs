@@ -809,11 +809,19 @@ namespace xivModdingFramework.Materials.DataContainers
                 if (info.HasMulti || info.HasSpec)
                 {
                     SetTextureUsage(XivTexType.Multi);
-                    SetTextureUsage(XivTexType.Specular);
+                }
+                if(info.HasSpec)
+                {
+                    // What does this do?  It's only found on extremely rare items with specular maps,
+                    // and if when we add it/touch it, it either totally breaks the specularity, or crashes.
+                    // And on the items it is involved in, adding/removing it seems to do nothing.
+                    // Might be a glass shader only value?
+                    // SetTextureUsage(XivTexType.Specular);  
                 }
             }
             else
             {
+                // This is uh... Glass shader?  I think is the only fall through here.
                 SetTextureUsage(XivTexType.Normal);
                 SetTextureUsage(XivTexType.Diffuse);
                 SetTextureUsage(XivTexType.Multi);
@@ -906,8 +914,6 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <param name="data"></param>
         private void SetShaderParameter(MtrlShaderParameterId parameterId, List<float> data = null)
         {
-
-
             try
             {
                 var value = ShaderParameterList.First(x => x.ParameterID == parameterId);

@@ -201,15 +201,14 @@ namespace xivModdingFramework.Mods
                 return;
             }
 
+
             if (enable)
             {
-                await index.UpdateIndex(modEntry.data.modOffset, internalFilePath, XivDataFiles.GetXivDataFile(modEntry.datFile));
-                await index.UpdateIndex2(modEntry.data.modOffset, internalFilePath, XivDataFiles.GetXivDataFile(modEntry.datFile));
+                await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath);
             }
             else
             {
-                await index.UpdateIndex(modEntry.data.originalOffset, internalFilePath, XivDataFiles.GetXivDataFile(modEntry.datFile));
-                await index.UpdateIndex2(modEntry.data.originalOffset, internalFilePath, XivDataFiles.GetXivDataFile(modEntry.datFile));
+                await index.UpdateDataOffset(modEntry.data.originalOffset, internalFilePath);
             }
 
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
@@ -265,14 +264,12 @@ namespace xivModdingFramework.Mods
 
                 if (enable)
                 {
-                    await index.UpdateIndex(modEntry.data.modOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
-                    await index.UpdateIndex2(modEntry.data.modOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
+                    await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
                     modEntry.enabled = true;
                 }
                 else
                 {
-                    await index.UpdateIndex(modEntry.data.originalOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
-                    await index.UpdateIndex2(modEntry.data.originalOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
+                    await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
                     modEntry.enabled = false;
                 }
             }
@@ -302,14 +299,12 @@ namespace xivModdingFramework.Mods
 
                 if (enable && !modEntry.enabled)
                 {
-                    await index.UpdateIndex(modEntry.data.modOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
-                    await index.UpdateIndex2(modEntry.data.modOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
+                    await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
                     modEntry.enabled = true;
                 }
                 else if (!enable && modEntry.enabled)
                 {
-                    await index.UpdateIndex(modEntry.data.originalOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
-                    await index.UpdateIndex2(modEntry.data.originalOffset, modEntry.fullPath, XivDataFiles.GetXivDataFile(modEntry.datFile));
+                    await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
                     modEntry.enabled = false;
                 }
 
@@ -342,10 +337,7 @@ namespace xivModdingFramework.Mods
                     {
                         try
                         {
-                            await index.UpdateIndex(modEntry.originalOffset, modEntry.fullPath,
-                                XivDataFiles.GetXivDataFile(modEntry.datFile));
-                            await index.UpdateIndex2(modEntry.originalOffset, modEntry.fullPath,
-                                XivDataFiles.GetXivDataFile(modEntry.datFile));
+                            await index.UpdateDataOffset(modEntry.originalOffset, modEntry.fullPath);
                         }
                         catch (Exception ex)
                         {
