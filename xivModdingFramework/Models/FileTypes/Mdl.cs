@@ -1822,7 +1822,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="fileLocation">The location of the dae file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
-        ///     Takes in the populated TTModel.
+        ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
         ///     Should return a boolean indicating whether the process should continue or cancel (false to cancel)
         /// </param>
         /// <param name="loggingFunction">
@@ -1831,7 +1831,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
+        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
         {
 
             #region Setup and Validation
@@ -1967,7 +1967,8 @@ namespace xivModdingFramework.Models.FileTypes
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
-                    bool cont = await intermediaryFunction(ttModel);
+                    var oldModel = TTModel.FromRaw(currentMdl);
+                    bool cont = await intermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
                         loggingFunction(false, "User cancelled import process.");

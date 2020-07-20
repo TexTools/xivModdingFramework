@@ -139,7 +139,7 @@ namespace xivModdingFramework.Models.Helpers
     /// </summary>
     public static class ModelModifiers
     {
-        public static void ScaleModel(TTModel ttModel, float scale, Action<bool, string> loggingFunction = null)
+        public static void ScaleModel(TTModel ttModel, double scale, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -153,7 +153,9 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     foreach (var v in p.Vertices)
                     {
-                        v.Position *= scale;
+                        v.Position.X = (float)(v.Position.X * scale);
+                        v.Position.Y = (float)(v.Position.Y * scale);
+                        v.Position.Z = (float)(v.Position.Z * scale);
                     }
                 }
             }
