@@ -208,6 +208,54 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetDataOffset(pathHash, fileHash, dataFile);
 
         }
+        public async Task<int> GetDataOffsetIndex2(string fullPath)
+        {
+            var fullPathHash = HashGenerator.GetHash(fullPath);
+            var uFullPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(fullPathHash), 0);
+            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
+            var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+
+            var SegmentHeaders = new int[4];
+            var SegmentOffsets = new int[4];
+            var SegmentSizes = new int[4];
+
+            // Segment header offsets
+            SegmentHeaders[0] = 1028;                   // Files
+            SegmentHeaders[1] = 1028 + (72 * 1) + 4;    // Unknown
+            SegmentHeaders[2] = 1028 + (72 * 2) + 4;    // Unknown
+            SegmentHeaders[3] = 1028 + (72 * 3) + 4;    // Folders
+
+
+            await _semaphoreSlim.WaitAsync();
+
+            // Dump the index into memory, since we're going to have to inject data.
+            byte[] originalIndex = File.ReadAllBytes(index2Path);
+
+            // Get all the segment header data
+            for (int i = 0; i < SegmentHeaders.Length; i++)
+            {
+                SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+            }
+
+            int fileCount = SegmentSizes[0] / 8;
+
+            for (int i = 0; i < fileCount; i++)
+            {
+                int position = SegmentOffsets[0] + (i * 8);
+                uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
+                uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
+
+                // Index 2 is just in hash order, so find the spot where we fit in.
+                if (iFullPathHash == uFullPathHash)
+                {
+                    int signedOffset= BitConverter.ToInt32(originalIndex, position + 4);
+                    return signedOffset * 8;
+                }
+            }
+            _semaphoreSlim.Release();
+            return 0;
+        }
         /// <summary>
         /// Gets the offset for the data in the .dat file
         /// </summary>
@@ -1190,6 +1238,65 @@ namespace xivModdingFramework.SqPack.FileTypes
             return true;
         }
 
+
+        /// <summary>
+        /// Handles updating both indexes in a safe way.
+        /// </summary>
+        /// <param name="offset"></param>
+        /// <param name="fullPath"></param>
+        /// <returns></returns>
+        public async Task<int> UpdateDataOffset(long offset, string fullPath)
+        {
+            await _semaphoreSlim.WaitAsync();
+            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
+
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+            var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+
+            // Test both index files for write access.
+            try
+            {
+                using (var fs = new FileStream(indexPath, FileMode.Open))
+                {
+                    var canRead = fs.CanRead;
+                    var canWrite = fs.CanWrite;
+                    if (!canRead || !canWrite)
+                    {
+                        throw new Exception();
+                    }
+                }
+                using (var fs = new FileStream(index2Path, FileMode.Open))
+                {
+                    var canRead = fs.CanRead;
+                    var canWrite = fs.CanWrite;
+                    if (!canRead || !canWrite)
+                    {
+                        throw new Exception();
+                    }
+                }
+            } catch
+            {
+                _semaphoreSlim.Release();
+                throw new Exception("Unable to update Index files.  File(s) are currently in use.");
+            }
+
+            var oldOffset = 0;
+            try
+            {
+                // Now attempt to write.
+                oldOffset = await UpdateIndex(offset, fullPath, dataFile);
+                await UpdateIndex2(offset, fullPath, dataFile);
+            } catch
+            {
+                _semaphoreSlim.Release();
+                throw;
+            }
+
+            _semaphoreSlim.Release();
+
+            return oldOffset;
+        }
+
         /// <summary>
         /// Updates the .index files offset for a given item.
         /// </summary>
@@ -1197,7 +1304,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="fullPath">The internal path of the file whos offset is to be updated.</param>
         /// <param name="dataFile">The data file to update the index for</param>
         /// <returns>The offset which was replaced.</returns>
-        public async Task<int> UpdateIndex(long offset, string fullPath, XivDataFile dataFile)
+        private async Task<int> UpdateIndex(long offset, string fullPath, XivDataFile dataFile)
         {
             fullPath = fullPath.Replace("\\", "/");
             var folderHash =
@@ -1261,7 +1368,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="fullPath">The internal path of the file whos offset is to be updated.</param>
         /// <param name="dataFile">The data file to update the index for</param>
         /// <returns>The offset which was replaced.</returns>
-        public async Task UpdateIndex2(long offset, string fullPath, XivDataFile dataFile)
+        private async Task UpdateIndex2(long offset, string fullPath, XivDataFile dataFile)
         {
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath);

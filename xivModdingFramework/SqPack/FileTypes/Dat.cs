@@ -1193,8 +1193,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         bw.Write(new byte[sizeDiff]);
                     }
 
-                    await index.UpdateIndex(modEntry.data.modOffset, internalFilePath, dataFile);
-                    await index.UpdateIndex2(modEntry.data.modOffset, internalFilePath, dataFile);
+                    await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath);
 
                     offset = modEntry.data.modOffset;
 
@@ -1262,8 +1261,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     throw new Exception("Failed to create file descriptor.");
                                 }
                             }
-                            var originalOffset = await index.UpdateIndex(mod.data.modOffset, internalFilePath, dataFile) * 8;
-                            await index.UpdateIndex2(mod.data.modOffset, internalFilePath, dataFile);
+                            var originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath) * 8;
 
                             // The imported data was larger than the original existing mod,
                             // and an empty slot large enough for the data was available,
@@ -1389,8 +1387,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             throw new Exception("Failed to create file descriptor.");
                         }
                     }
-                    var oldOffset = await index.UpdateIndex(offset, internalFilePath, dataFile) * 8;
-                    await index.UpdateIndex2(offset, internalFilePath, dataFile);
+                    var oldOffset = await index.UpdateDataOffset(offset, internalFilePath) * 8;
 
                     /*
                      * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
