@@ -2424,9 +2424,9 @@ namespace xivModdingFramework.Models.FileTypes
                     var lod0VertexDataEntrySize0 = 0;
                     var lod0VertexDataEntrySize1 = 0;
 
-                    var max = lodNum == 0 ? ttModel.MeshGroups.Count : 0;
+                    var lodMax = lodNum == 0 ? ttModel.MeshGroups.Count : 0;
 
-                    for (int mi = 0; mi < max; mi++)
+                    for (int mi = 0; mi < lodMax; mi++)
                     {
 
                         bool addedMesh = meshNum >= lod.MeshCount;
@@ -2913,10 +2913,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Higher LoDs omitted (they're given 0 bones)
 
-                        partBoneSetsBlock.InsertRange(0, BitConverter.GetBytes((int)(partBoneSetsBlock.Count)));
                     }
                 }
 
+                partBoneSetsBlock.InsertRange(0, BitConverter.GetBytes((int)(partBoneSetsBlock.Count)));
 
 
                 #endregion
@@ -2938,9 +2938,42 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var boundingBoxDataBlock = new List<byte>();
 
-                var boundingBox = ogMdl.BoundBox;
+                // All right, time to tough it out and just recalculate the bounding box.
+                // These are used for occlusion culling.  Primarily editing these mostly matters
+                // for furniture, but helps for everything.
+                float minX = 9999.0f, minY = 9999.0f, minZ = 9999.0f;
+                float maxX = -9999.0f, maxY = -9999.0f, maxZ = -9999.0f;
+                foreach (var m in ttModel.MeshGroups)
+                {
+                    foreach (var p in m.Parts)
+                    {
+                        foreach (var v in p.Vertices)
+                        {
+                            minX = minX < v.Position.X ? minX : v.Position.X;
+                            minY = minY < v.Position.Y ? minY : v.Position.Y;
+                            minZ = minZ < v.Position.Z ? minZ : v.Position.Z;
 
-                foreach (var point in boundingBox.PointList)
+                            maxX = maxX > v.Position.X ? maxX : v.Position.X;
+                            maxY = maxY > v.Position.Y ? maxY : v.Position.Y;
+                            maxZ = maxZ > v.Position.Z ? maxZ : v.Position.Z;
+                        }
+                    }
+                }
+                var oldBb = ogMdl.BoundBox;
+                var bb = new List<Vector4>(8);
+                bb.Add(new Vector4(minX, minY, minZ, 1.0f));
+                bb.Add(new Vector4(maxX, maxY, maxZ, 1.0f));
+                bb.Add(new Vector4(minX, minY, minZ, 1.0f));
+                bb.Add(new Vector4(maxX, maxY, maxZ, 1.0f));
+                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));  // Is this padding?
+                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));  // Is it some kind of magical second bounding box?
+                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));  // The world may never know...
+                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+
+
+
+
+                foreach (var point in bb)
                 {
                     boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.X));
                     boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.Y));
