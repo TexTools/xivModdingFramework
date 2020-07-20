@@ -106,26 +106,11 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (charaItem.SecondaryCategory == XivStrings.Body)
             {
-                if (_language != XivLanguage.Korean )
-                {
-                    folder = XivStrings.BodyMtrlFolder;
-                }
-                else
-                {
-                    folder = XivStrings.BodyMtrlFolderOld;
-                }
-
+                folder = XivStrings.BodyMtrlFolder;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
-                if (_language != XivLanguage.Korean )
-                {
-                    folder = XivStrings.TailMtrlFolder;
-                }
-                else
-                {
-                    folder = XivStrings.TailMtrlFolderOld;
-                }
+                folder = XivStrings.TailMtrlFolder;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Ears)
             {
@@ -303,26 +288,12 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.SecondaryCategory == XivStrings.Body)
             {
-                if (_language != XivLanguage.Korean )
-                {
-                    folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), variant.ToString().PadLeft(4, '0'));
-                }
-                else
-                {
-                    folder = string.Format(XivStrings.BodyMtrlFolderOld, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-                }
+                folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), variant.ToString().PadLeft(4, '0'));
                 file = XivStrings.BodyMtrlFile;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
-                if (_language != XivLanguage.Korean )
-                {
-                    folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-                }
-                else
-                {
-                    folder = string.Format(XivStrings.TailMtrlFolderOld, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-                }
+                folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
                 file = XivStrings.TailMtrlFile;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Ears)
@@ -346,43 +317,29 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.SecondaryCategory == XivStrings.Body)
             {
-                if (_language != XivLanguage.Korean )
-                {
-                    var testDictionary = new Dictionary<int, int>();
+                var testDictionary = new Dictionary<int, int>();
 
-                    for (var i = 0; i < 50; i++)
-                    {
-                        var folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
-                        testDictionary.Add(HashGenerator.GetHash(folder), i);
-
-                        variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                        variantList.Sort();
-                    }
-                }
-                else
+                for (var i = 0; i < 50; i++)
                 {
-                    variantList.Add(1);
+                    var folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
+                    testDictionary.Add(HashGenerator.GetHash(folder), i);
+
+                    variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                    variantList.Sort();
                 }
             }
 
             if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
-                if (_language != XivLanguage.Korean )
-                {
-                    var testDictionary = new Dictionary<int, int>();
+                var testDictionary = new Dictionary<int, int>();
 
-                    for (var i = 0; i < 50; i++)
-                    {
-                        var folder = string.Format(XivStrings.TailMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
-                        testDictionary.Add(HashGenerator.GetHash(folder), i);
-
-                        variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                        variantList.Sort();
-                    }
-                }
-                else
+                for (var i = 0; i < 50; i++)
                 {
-                    variantList.Add(1);
+                    var folder = string.Format(XivStrings.TailMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
+                    testDictionary.Add(HashGenerator.GetHash(folder), i);
+
+                    variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                    variantList.Sort();
                 }
             }
 

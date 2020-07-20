@@ -834,12 +834,6 @@
   <data name="Viera_NPC" xml:space="preserve">
     <value>Viera NPC</value>
   </data>
-  <data name="BodyMtrlFolderOld" xml:space="preserve">
-    <value>chara/human/c{0}/obj/body/b{1}/material</value>
-  </data>
-  <data name="TailMtrlFolderOld" xml:space="preserve">
-    <value>chara/human/c{0}/obj/tail/t{1}/material</value>
-  </data>
   <data name="EarsMDLFile" xml:space="preserve">
     <value>c{0}z{1}_{2}.mdl</value>
   </data>

@@ -77,7 +77,7 @@ namespace xivModdingFramework.Items.Categories
             const int modelDataOffset = 24;
             const int iconDataOffset = 136;
             int slotDataOffset = 156;
-            if(_xivLanguage == XivLanguage.Chinese)
+            if(_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
             {
                 dataLength = 160;
                 slotDataOffset = 154;

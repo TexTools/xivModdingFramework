@@ -1075,14 +1075,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.SecondaryCategory.Equals(XivStrings.Body))
                     {
-                        if (_language != XivLanguage.Korean)
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
-                        }
-                        else
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
-                        }
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
                     }
                     else if (itemModel.SecondaryCategory.Equals(XivStrings.Hair))
                     {
@@ -1095,14 +1088,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemModel.SecondaryCategory.Equals(XivStrings.Tail))
                     {
-                        if (_language != XivLanguage.Korean)
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
-                        }
-                        else
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
-                        }
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                     }
                     else if (itemModel.SecondaryCategory.Equals(XivStrings.Ears))
                     {
