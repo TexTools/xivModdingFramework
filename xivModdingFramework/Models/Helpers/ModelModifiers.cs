@@ -251,6 +251,13 @@ namespace xivModdingFramework.Models.Helpers
                         {
                             ttVert.Binormal = baseMesh.VertexData.BiNormals[oldVertexId];
                         }
+                        if (baseMesh.VertexData.Colors.Count > oldVertexId)
+                        {
+                            ttVert.VertexColor[0] = baseMesh.VertexData.Colors[oldVertexId].R;
+                            ttVert.VertexColor[1] = baseMesh.VertexData.Colors[oldVertexId].G;
+                            ttVert.VertexColor[2] = baseMesh.VertexData.Colors[oldVertexId].B;
+                            ttVert.VertexColor[3] = baseMesh.VertexData.Colors[oldVertexId].A;
+                        }
                         if (baseMesh.VertexData.BiNormalHandedness.Count > oldVertexId)
                         {
                             ttVert.Handedness = baseMesh.VertexData.BiNormalHandedness[oldVertexId] == 0 ? false : true;
