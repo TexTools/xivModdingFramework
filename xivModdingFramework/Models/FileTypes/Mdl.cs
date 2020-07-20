@@ -4183,7 +4183,7 @@ namespace xivModdingFramework.Models.FileTypes
                         submeshId = "b0";
                     }
 
-                    mdlPath = assetDict["b0"];
+                    mdlPath = assetDict[submeshId];
                     return mdlPath;
                     break;
                 default:
