@@ -30,31 +30,114 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 using Color = SharpDX.Color;
+using xivModdingFramework.Materials.FileTypes;
+using HelixToolkit.SharpDX.Core.Model.Scene2D;
+using HelixToolkit.SharpDX.Core;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
-    public class ModelTexture
-    {
-        private readonly XivMtrl _mtrlData;
-        private readonly DirectoryInfo _gameDirectory;
 
-        public ModelTexture(DirectoryInfo gameDirectory, XivMtrl mtrlData)
+    /// <summary>
+    /// Data holder for the entire set of custom colors needed to render everything that supports custom colors.
+    /// </summary>
+    public class CustomModelColors
+    {
+        public Color SkinColor;
+        public Color EyeColor;      // Off eye color customization isn't really sanely doable since it's managed by Vertex Color.
+        public Color LipColor;
+        public Color HairColor;
+
+        // Also known as Limbal Color or Etc. Color.  Just depends on race.
+        // Most have tattoo color, so that's the default name.
+        public Color TattooColor;
+
+        public Color FurnitureColor;
+
+        // Optional values.
+        public Color? HairHighlightColor;
+
+
+
+        // One for each colorset row.  Null for undyed.
+        public List<Color?> DyeColors;
+
+        public CustomModelColors()
         {
-            _mtrlData = mtrlData;
-            _gameDirectory = gameDirectory;
+            // These match with the Hex Colors in TexTools Settings.Settings file.
+            // They don't really *have* to, but it probably makes sense to use the 
+            // Same defaults.
+
+            SkinColor = new Color(204, 149, 120, 255);
+            EyeColor = new Color(21, 176, 172, 255);
+            LipColor = new Color(173, 105, 105, 255);
+            HairColor = new Color(130, 64, 13, 255);
+            TattooColor = new Color(0, 255, 66, 255);
+            FurnitureColor = new Color(141, 60, 204, 255);
+
+            HairHighlightColor = new Color(77, 126, 240, 255);
+
+            DyeColors = new List<Color?>(16);
+            for(int i = 0; i < 16; i++)
+            {
+                DyeColors.Add(null);
+            }
+        }
+    }
+
+    public static class ModelTexture
+    {
+        // Static level default value accessor.
+        // This is effectively the user's color settings as far as the 
+        // framework lib is concerned.
+        private static CustomModelColors _defaultColors;
+        public static void SetCustomColors(CustomModelColors c)
+        {
+            _defaultColors = c;
+        }
+        public static CustomModelColors GetCustomColors()
+        {
+            if (_defaultColors == null)
+            {
+                // Make a default entry if none was ever set.
+                _defaultColors = new CustomModelColors();
+            }
+            return _defaultColors;
+        }
+
+
+        /// <summary>
+        /// Gets the customized texture map data for a model.
+        /// Null custom model colors uses the defaults at ModelTexture.GetCustomColors().
+        /// </summary>
+        /// <param name="gameDirectory"></param>
+        /// <param name="mtrl"></param>
+        /// <param name="colors"></param>
+        /// <returns></returns>
+        public static async Task<ModelTextureData> GetModelMaps(DirectoryInfo gameDirectory, XivMtrl mtrl, CustomModelColors colors = null)
+        {
+            var tex = new Tex(gameDirectory);
+            return await GetModelMaps(tex, mtrl);
         }
 
         /// <summary>
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public async Task<ModelTextureData> GetModelMaps(Color? customColor = null, bool colorChangeShader = false)
+        public static async Task<ModelTextureData> GetModelMaps(Tex tex, XivMtrl mtrl, CustomModelColors colors = null)
         {
-            var texMapData = await GetTexMapData();
+
+            // Use static values as needed.
+            if(colors == null)
+            {
+                colors = GetCustomColors();
+            }
+
+            var shaderInfo = mtrl.GetShaderInfo();
+            var mtrlMaps = mtrl.GetAllMapInfos();
+
+            var texMapData = await GetTexMapData(tex, mtrl);
 
             var dimensions = await EqualizeTextureSizes(texMapData);
-
-            var materialType = GetMaterialType(_mtrlData.MTRLPath);
 
             var diffuseMap = new List<byte>();
             var normalMap = new List<byte>();
@@ -66,70 +149,7 @@ namespace xivModdingFramework.Models.ModelTextures
             var specularColorList = new List<Color>();
             var emissiveColorList = new List<Color>();
 
-            await Task.Run(() =>
-            {
-                if (texMapData.ColorSet != null)
-                {
-                    var colorPixels = texMapData.ColorSet.Data;
-
-                    for (var i = 0; i < texMapData.ColorSet.Data.Length; i += 16)
-                    {
-                        int red = colorPixels[i];
-                        int green = colorPixels[i + 1];
-                        int blue = colorPixels[i + 2];
-                        int alpha = colorPixels[i + 3];
-
-                        diffuseColorList.Add(new Color(red, green, blue));
-
-                        red = colorPixels[i + 4];
-                        green = colorPixels[i + 5];
-                        blue = colorPixels[i + 6];
-                        alpha = colorPixels[i + 7];
-
-                        specularColorList.Add(new Color(red, green, blue));
-
-                        red = colorPixels[i + 8];
-                        green = colorPixels[i + 9];
-                        blue = colorPixels[i + 10];
-                        alpha = colorPixels[i + 11];
-
-                        emissiveColorList.Add(new Color(red, green, blue));
-                    }
-                }
-                else
-                {
-                    for (var i = 0; i < 1024; i += 16)
-                    {
-                        if (!materialType.Equals("other") && !materialType.Equals("housing"))
-                        {
-                            if (customColor != null)
-                            {
-                                diffuseColorList.Add(customColor.GetValueOrDefault());
-                            }
-                            else
-                            {
-                                if (!materialType.Equals("body"))
-                                {
-                                    diffuseColorList.Add(new Color(96, 57, 19));
-                                }
-                                else
-                                {
-                                    diffuseColorList.Add(new Color(255, 255, 255));
-                                }
-                            }
-                        }
-                        else
-                        {
-                            diffuseColorList.Add(new Color(255, 255, 255));
-                        }
-
-                        specularColorList.Add(new Color(25, 25, 25));
-                        emissiveColorList.Add(new Color(0, 0, 0));
-                    }
-                }
-            });
-
-            byte[] diffusePixels = null, specularPixels = null, multiPixels = null, skinPixels = null, normalPixels = null;
+            byte[] diffusePixels = null, specularPixels = null, normalPixels = null;
 
             if (texMapData.Normal != null)
             {
@@ -146,228 +166,63 @@ namespace xivModdingFramework.Models.ModelTextures
                 specularPixels = texMapData.Specular.Data;
             }
 
-            if (texMapData.Multi != null)
-            {
-                multiPixels = texMapData.Multi.Data;
-            }
-
-            if (texMapData.Skin != null)
-            {
-                skinPixels = texMapData.Skin.Data;
-            }
-
-            byte diffR = 255, diffG = 255, diffB = 255;
-            byte specR = 255, specG = 255, specB = 255;
-            byte normR = 255, normG = 255, normB = 255;
-
-            var dataLength = 0;
-
-            if (normalPixels != null)
-            {
-                dataLength = normalPixels.Length;
-            }
-            else if (diffusePixels != null)
-            {
-                dataLength = diffusePixels.Length;
-            }
+            var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
 
             await Task.Run(() =>
             {
                 for (var i = 3; i < dataLength; i += 4)
                 {
-                    var alpha = 255;
+                // Load the individual pixels into memory.
+                    Color baseNormalColor = new Color(127, 127, 255, 255);
+                    Color baseDiffuseColor = new Color(255, 255, 255, 255);
+                    Color baseSpecularColor = new Color(255, 255, 255, 255);
+
 
                     if (normalPixels != null)
                     {
-                        normR = normalPixels[i - 3];
-                        normG = normalPixels[i - 2];
-                        alpha = normalPixels[i - 1]; // This is the normal maps blue channel, and usually acts as the alpha channel
-
-
-                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail") || materialType.Equals("ears"))
-                        {
-                            normR = normalPixels[i - 3];
-                            normG = normalPixels[i - 2];
-                            normB = normalPixels[i - 1];
-                            alpha = normalPixels[i];
-                        }
+                        baseNormalColor = new Color(normalPixels[i - 3], normalPixels[i - 2], normalPixels[i - 1], normalPixels[i]);
                     }
-                    else if (diffusePixels != null)
+
+                    if (diffusePixels != null)
                     {
-                        alpha = diffusePixels[i];
+                        baseDiffuseColor = new Color(diffusePixels[i - 3], diffusePixels[i - 2], diffusePixels[i - 1], diffusePixels[i]);
                     }
 
-                    if (materialType.Equals("housing"))
+                    if(specularPixels != null)
+                    { 
+                        baseSpecularColor = new Color(specularPixels[i - 3], specularPixels[i - 2], specularPixels[i - 1], specularPixels[i]);
+                    }
+
+                    byte colorsetValue = baseNormalColor.A;
+
+                    // Calculate real colors from the inputs and shader.
+                    Color normalColor, diffuseColor, specularColor;
+                    byte opacity;
+                    ComputeShaderColors(colors, shaderInfo, baseNormalColor, baseDiffuseColor, baseSpecularColor, out normalColor, out diffuseColor, out specularColor, out opacity);
+                    Color alphaColor = new Color(opacity, opacity, opacity, opacity);
+
+                    // Apply colorset if needed.  (This could really be baked into ComputeShaderColors)
+                    Color emissiveColor = new Color(0, 0, 0, 0);
+                    if(mtrl.ColorSetData.Count > 0)
                     {
-                        if (colorChangeShader && normalPixels != null)
-                        {
-                            alpha = normalPixels[i];
-                        }
-                        else
-                        {
-                            if (diffusePixels != null)
-                            {
-                                alpha = diffusePixels[i];
-                            }
-                            else if (normalPixels != null)
-                            {
-                                alpha = normalPixels[i];
-                            }
-                            else
-                            {
-                                alpha = 255;
-                            }
-                        }
+                        var cs = texMapData.ColorSet.Data;
+                        Color finalDiffuseColor, finalSpecularColor;
+                        ComputeColorsetBlending(mtrl, colorsetValue, cs, diffuseColor, specularColor, out finalDiffuseColor, out finalSpecularColor, out emissiveColor);
+                        diffuseColor = finalDiffuseColor;
+                        specularColor = finalSpecularColor;
                     }
 
-                    if (multiPixels != null)
-                    {
-                        if (materialType.Equals("hair"))
-                        {
-                            if (multiPixels.Length > i)
-                            {
-                                specR = multiPixels[i - 3];
-                                specG = multiPixels[i - 2];
-                                specB = multiPixels[i - 1];
-                            }
-                        }
-                        else
-                        {
-                            diffR = multiPixels[i - 3];
-                            diffG = multiPixels[i - 3];
-                            diffB = multiPixels[i - 3];
+                    // White out the opacity channels where appropriate.
+                    diffuseColor.A = opacity;
+                    specularColor.A = 255;
+                    normalColor.A = 255;
 
-                            specR = multiPixels[i - 1];
-                            specG = multiPixels[i - 1];
-                            specB = multiPixels[i - 1];
-                        }
-                    }
-                    else
-                    {
-                        if (diffusePixels != null)
-                        {
-                            diffR = diffusePixels[i - 3];
-                            diffG = diffusePixels[i - 2];
-                            diffB = diffusePixels[i - 1];
-                        }
-
-                        if (specularPixels != null)
-                        {
-                            if (specularPixels.Length > i)
-                            {
-                                specR = specularPixels[i - 3];
-                                specG = specularPixels[i - 2];
-                                specB = specularPixels[i - 1];
-                            }
-                        }
-
-                        if (skinPixels != null)
-                        {
-                            specR = skinPixels[i - 3];
-                            specG = skinPixels[i - 2];
-                            specB = skinPixels[i - 1];
-                        }
-                    }
-
-                    Color diffuseColor, specularColor, emissiveColor, alphaColor;
-
-                    var pixel = 0f;
-                    var blendPercent = 0f;
-
-                    if (normalPixels != null)
-                    {
-                        pixel = (normalPixels[i] / 255f) * 15f;
-                        blendPercent = (float) (pixel - Math.Truncate(pixel));
-                    }
-
-                    if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail") || materialType.Equals("ears"))
-                    {
-                        pixel = 0;
-                        blendPercent = 0;
-                    }
-
-                    if (blendPercent != 0)
-                    {
-                        var firstColorLocation = (int) Math.Truncate(pixel);
-                        var secondColorLocation = firstColorLocation + 1;
-
-                        var diffColor1 = diffuseColorList[secondColorLocation];
-                        var diffColor2 = diffuseColorList[firstColorLocation];
-
-                        var firstColor = new Color(diffColor1.R, diffColor1.G, diffColor1.B, alpha);
-                        var secondColor = new Color(diffColor2.R, diffColor2.G, diffColor2.B, alpha);
-
-                        var diffuseBlend = Blend(firstColor, secondColor, blendPercent);
-
-                        var specColor1 = specularColorList[secondColorLocation];
-                        var specColor2 = specularColorList[firstColorLocation];
-
-                        firstColor = new Color(specColor1.R, specColor1.G, specColor1.B, (byte) 255);
-                        secondColor = new Color(specColor2.R, specColor2.G, specColor2.B, (byte) 255);
-
-                        var specBlend = Blend(firstColor, secondColor, blendPercent);
-
-                        var emisColor1 = emissiveColorList[secondColorLocation];
-                        var emisColor2 = emissiveColorList[firstColorLocation];
-
-                        firstColor = new Color(emisColor1.R, emisColor1.G, emisColor1.B, (byte) 255);
-                        secondColor = new Color(emisColor2.R, emisColor2.G, emisColor2.B, (byte) 255);
-
-                        var emisBlend = Blend(firstColor, secondColor, blendPercent);
-
-                        diffuseColor = new Color((int) ((diffuseBlend.R / 255f) * diffR),
-                            (int) ((diffuseBlend.G / 255f) * diffG), (int) ((diffuseBlend.B / 255f) * diffB), alpha);
-                        specularColor = new Color((int) ((specBlend.R / 255f) * specR),
-                            (int) ((specBlend.G / 255f) * specG), (int) ((specBlend.B / 255f) * specB), 255);
-                        emissiveColor = new Color((int) emisBlend.R, (int) emisBlend.G, (int) emisBlend.B, (int) 255);
-                    }
-                    else
-                    {
-                        var colorLoc = (int) Math.Floor(pixel + 0.5f);
-
-                        var diffColor = diffuseColorList[colorLoc];
-                        var specColor = specularColorList[colorLoc];
-                        var emisColor = emissiveColorList[colorLoc];
-
-                        if (materialType.Equals("hair") || materialType.Equals("etc") || materialType.Equals("tail") || materialType.Equals("ears"))
-                        {
-                            diffuseColor = new Color((int) ((diffColor.R / 255f) * specR),
-                                (int) ((diffColor.G / 255f) * specR), (int) ((diffColor.B / 255f) * specR), alpha);
-                            specularColor = new Color((int) ((specColor.R / 255f) * specG),
-                                (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
-                        }
-                        else
-                        {
-                            diffuseColor = new Color((int) ((diffColor.R / 255f) * diffR),
-                                (int) ((diffColor.G / 255f) * diffG), (int) ((diffColor.B / 255f) * diffB), alpha);
-
-                            if (materialType.Equals("body"))
-                            {
-                                specularColor = new Color((int) ((specColor.R / 255f) * specG),
-                                    (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
-                            }
-                            else if (materialType.Equals("housing"))
-                            {
-                                specularColor = new Color((int) ((specColor.R / 255f) * specG),
-                                    (int) ((specColor.G / 255f) * specG), (int) ((specColor.B / 255f) * specG), 255);
-                            }
-                            else
-                            {
-                                specularColor = new Color((int) ((specColor.R / 255f) * specB),
-                                    (int) ((specColor.G / 255f) * specB), (int) ((specColor.B / 255f) * specB), 255);
-                            }
-                        }
-
-                        emissiveColor = new Color((int) emisColor.R, (int) emisColor.G, (int) emisColor.B, (int) 255);
-                    }
-
-                    alphaColor = new Color((int) alpha, (int) alpha, (int) alpha, (int) alpha);
 
                     diffuseMap.AddRange(BitConverter.GetBytes(diffuseColor.ToRgba()));
                     specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
                     emissiveMap.AddRange(BitConverter.GetBytes(emissiveColor.ToRgba()));
                     alphaMap.AddRange(BitConverter.GetBytes(alphaColor.ToRgba()));
-                    normalMap.AddRange(BitConverter.GetBytes(new Color(normR, normG, normB, (byte) 255).ToRgba()));
+                    normalMap.AddRange(BitConverter.GetBytes(normalColor.ToRgba()));
                 }
             });
 
@@ -386,39 +241,35 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 
         /// <summary>
-        /// Gets the data for the texture map
+        /// Retreives the raw pixel data for each texture, collated into a class to hold them.
         /// </summary>
         /// <returns>The texure map data</returns>
-        private async Task<TexMapData> GetTexMapData()
+        private static async Task<TexMapData> GetTexMapData(Tex tex, XivMtrl mtrl)
         {
-            var tex = new Tex(_gameDirectory);
-
             var texMapData = new TexMapData();
 
-            foreach (var texTypePath in _mtrlData.TextureTypePathList)
-            {
-                if (texTypePath.Type != XivTexType.ColorSet)
-                {
-                    var texData = await tex.GetTexData(texTypePath);
+            // Use the function that returns proper sane reuslts.
+            var ttps = mtrl.GetTextureTypePathList();
 
+            foreach (var ttp in ttps)
+            {
+                if (ttp.Type != XivTexType.ColorSet)
+                {
+                    var texData = await tex.GetTexData(ttp);
                     var imageData = await tex.GetImageData(texData);
 
-                    switch (texTypePath.Type)
-                    { 
+                    switch (ttp.Type)
+                    {
                         case XivTexType.Diffuse:
                             texMapData.Diffuse = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                             break;
                         case XivTexType.Specular:
+                        case XivTexType.Multi:
+                        case XivTexType.Skin:
                             texMapData.Specular = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
                             break;
                         case XivTexType.Normal:
                             texMapData.Normal = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
-                            break;
-                        case XivTexType.Multi:
-                            texMapData.Multi = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
-                            break;
-                        case XivTexType.Skin:
-                            texMapData.Skin = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
                             break;
                         default:
                             // Do not render textures that we do not know how to use
@@ -427,19 +278,10 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            foreach (var texPath in _mtrlData.TexturePathList)
-            {
-                if (texPath.Contains("dummy"))
-                {
-                    texMapData.HasDummyTextures = true;
-                    break;
-                }
-            }
-
-            if (_mtrlData.ColorSetDataSize > 0)
+            if (mtrl.ColorSetDataSize > 0)
             {
                 var colorSetData = new List<byte>();
-                foreach (var half in _mtrlData.ColorSetData)
+                foreach (var half in mtrl.ColorSetData)
                 {
 
                     var colorByte = (byte) (half * 255);
@@ -463,7 +305,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// </summary>
         /// <param name="texMapData">The texture map data containing the texture bytes</param>
         /// <returns>The width and height that the textures were equalized to.</returns>
-        private async Task<(int Width, int Height)> EqualizeTextureSizes(TexMapData texMapData)
+        private static async Task<(int Width, int Height)> EqualizeTextureSizes(TexMapData texMapData)
         {
             // Normal map is chosen because almost every item has a normal map, diffuse is chosen otherwise
             var width = 0;
@@ -518,30 +360,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     largestSize = size;
                     width = texMapData.Specular.Width;
                     height = texMapData.Specular.Height;
-                }
-            }
-
-            if (texMapData.Multi != null)
-            {
-                var size = texMapData.Multi.Width * texMapData.Multi.Height;
-
-                if (size > largestSize)
-                {
-                    largestSize = size;
-                    width = texMapData.Multi.Width;
-                    height = texMapData.Multi.Height;
-                }
-            }
-
-            if (texMapData.Skin != null)
-            {
-                var size = texMapData.Skin.Width * texMapData.Skin.Height;
-
-                if (size > largestSize)
-                {
-                    largestSize = size;
-                    width = texMapData.Skin.Width;
-                    height = texMapData.Skin.Height;
                 }
             }
 
@@ -606,100 +424,329 @@ namespace xivModdingFramework.Models.ModelTextures
                         texMapData.Specular.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
                     }
                 }
-
-                if (texMapData.Multi != null &&
-                    (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Multi.Data, texMapData.Multi.Width,
-                        texMapData.Multi.Height))
-                    {
-                        img.Mutate(x => x.Resize(width, height));
-
-                        texMapData.Multi.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
-                    }
-                }
-
-                if (texMapData.Skin != null &&
-                    (largestSize > texMapData.Skin.Width * texMapData.Skin.Height || scaleDown))
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Skin.Data, texMapData.Skin.Width,
-                        texMapData.Skin.Height))
-                    {
-                        img.Mutate(x => x.Resize(width, height));
-
-                        texMapData.Skin.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
-                    }
-                }
             });
 
             return (width, height);
         }
 
+        private static void ComputeShaderColors(ShaderInfo info, Color baseNormal, Color baseDiffuse, Color baseSpecular, out Color newNormal, out Color newDiffuse, out Color newSpecular, out byte opacity)
+        {
+            ComputeShaderColors(GetCustomColors(), info, baseNormal, baseDiffuse, baseSpecular, out newNormal, out newDiffuse, out newSpecular, out opacity);
+        }
+
+        private static void ComputeShaderColors(CustomModelColors colors,  ShaderInfo info, Color baseNormal, Color baseDiffuse, Color baseSpecular, out Color newNormal, out Color newDiffuse, out Color newSpecular, out byte opacity)
+        {
+            // This is basically codifying this document: https://docs.google.com/spreadsheets/d/1kIKvVsW3fOnVeTi9iZlBDqJo6GWVn6K6BCUIRldEjhw/edit#gid=2112506802
+            opacity = 255;
+            newNormal = baseNormal;
+            newDiffuse = baseDiffuse;
+            newSpecular = baseSpecular;
+
+            // This var is technically defined in the Shaders parameters.
+            // But we can use a constant copy of it for now, since it's largely non-changeable.
+            const float PlayerColorMultiplier = 1.4f;
+            const float BrightPlayerColorMultiplier = 3.0f;
+
+            if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
+            {
+                // Common
+                // Base color here is diffuse if we have one...
+                if(info.Preset == MtrlShaderPreset.DiffuseSpecular)
+                {
+                    // Has a raw diffuse.
+                    newDiffuse = baseDiffuse;
+
+                    // But we also have to modulate that diffuse color by the multi red channel.
+                    newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
+
+                    // Has a raw specular.
+                    newSpecular = baseSpecular;
+
+                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti)
+                {
+                    // Has a raw diffuse.
+                    newDiffuse = baseDiffuse;
+                    newDiffuse.A = baseNormal.B;
+
+                    // Uses multi green/blue in some fashion.
+                    // We'll just show green for now.
+                    newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
+
+                } else
+                {
+                    // Uses multi channel Red as a base/ao map.
+                    newDiffuse = new Color(baseSpecular.R, baseSpecular.R, baseSpecular.R, (byte)255);
+                    newDiffuse.A = baseNormal.B;
+
+                    // Uses multi green/blue in some fashion.
+                    // We'll just show green for now.
+                    newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
+
+                }
+
+                // Normal is the same for all of them.
+                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
+                opacity = baseNormal.B;
+
+
+
+            } else if(info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture)
+            {
+                // Furniture
+                newDiffuse = new Color(baseDiffuse.R, baseDiffuse.G, baseDiffuse.B, (byte)255);
+
+                if(info.Shader == MtrlShader.DyeableFurniture)
+                {
+                    float colorInfluence = ByteToFloat(baseDiffuse.A);
+                    Color furnitureColor = MultiplyColor(colors.FurnitureColor, 1.0f);
+
+                    newDiffuse = Blend(baseDiffuse, furnitureColor, colorInfluence);
+
+                }
+
+                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
+                newNormal = new Color(baseNormal.R, baseNormal.G, baseNormal.B, (byte)255);
+
+                // This needs some more research all around
+
+            } else if(info.Shader == MtrlShader.Skin)
+            {
+
+                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
+                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G,(byte) 255);
+                opacity = 255;
+
+                // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                // tones down the specularity here, but without it the skin is hyper reflective.
+                newSpecular = MultiplyColor(newSpecular, 0.25f);
+
+                // New diffuse starts from regular diffuse file.
+                // Then factors in the player's skin color multiplied by the shader value.
+                float skinInfluence = ByteToFloat(baseSpecular.R) * 0.5f;
+                Color skinColor = MultiplyColor(colors.SkinColor, 1.0f);
+
+                newDiffuse = Blend(baseDiffuse, skinColor, skinInfluence);
+
+                if (info.Preset == MtrlShaderPreset.Face)
+                {
+                    // Face shaders also allow for lip color.
+                    Color lipColor = MultiplyColor(colors.LipColor, 1.0f);
+                    float lipInfluence = ByteToFloat(baseSpecular.B);
+                    newDiffuse = Blend(newDiffuse, lipColor, lipInfluence);
+                    
+                }
+
+
+            } else if(info.Shader == MtrlShader.Hair)
+            {
+
+                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
+                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
+                opacity = baseNormal.A;
+
+                // The influence here determines which base color we use.
+                float influenceStrength = ByteToFloat(baseSpecular.A);
+
+                // Starting from the original hair color...
+                var baseColor = MultiplyColor(colors.HairColor, 1.0f);
+
+                // Hair highlight color if available.
+                var targetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
+
+                // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
+                if (info.Preset == MtrlShaderPreset.Face)
+                {
+                    targetColor = MultiplyColor(colors.TattooColor, 1.0f);
+                } else if(info.Preset == MtrlShaderPreset.FaceBright)
+                {
+                    // Multiplier here is 3.0 instead of 1.4
+                    targetColor = MultiplyColor(colors.TattooColor, BrightPlayerColorMultiplier / PlayerColorMultiplier);
+
+                }
+
+                // This gets us our actual base color.
+                baseColor = Blend(baseColor, targetColor, influenceStrength);
+
+                // Now this needs to be straight multiplied with the multi channel red.
+                newDiffuse = MultiplyColor(baseColor, baseSpecular.R);
+
+            } else if(info.Shader == MtrlShader.Iris)
+            {
+                // Eyes
+                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
+                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
+                opacity = baseNormal.A;
+
+
+                // Base color is the selected eye color.
+                var baseColor = colors.EyeColor;
+
+                // Pretty sure some data is missing in here.
+                // Catchlight is also not factored in atm.
+
+                // Now this needs to be straight multiplied with the multi channel red.
+                newDiffuse = MultiplyColor(baseColor, baseSpecular.R);
+
+
+            } else
+            {
+                // Fall through just shows stuff as is.
+                newNormal = baseNormal;
+                newDiffuse = baseDiffuse;
+                newSpecular = baseSpecular;
+            }
+
+            // Transparency filtering.
+            if (!info.TransparencyEnabled)
+            {
+                opacity = (byte)(opacity < 128 ? 0 : 255);
+            }
+        }
+
+        private static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color baseDiffuse, Color baseSpecular, out Color newDiffuse, out Color newSpecular, out Color emissiveColor)
+        {
+            int rowNumber = colorsetByte / 17;
+            int nextRow = rowNumber >= 15 ? 15 : rowNumber + 1;
+            int blendAmount = (colorsetByte % 17);
+            float fBlendAmount = blendAmount / 17.0f;
+
+            Color diffuse1, diffuse2;
+            Color spec1, spec2;
+            Color emiss1, emiss2;
+
+            // Byte offset to rows
+            var row1Offset = Clamp(rowNumber * 16);
+            var row2Offset = Clamp(nextRow * 16);
+
+            diffuse1 = new Color(colorSetData[row1Offset + 0], colorSetData[row1Offset + 1], colorSetData[row1Offset + 2], (byte)255);
+            diffuse2 = new Color(colorSetData[row2Offset + 0], colorSetData[row2Offset + 1], colorSetData[row2Offset + 2], (byte)255);
+
+            spec1 = new Color(colorSetData[row1Offset + 4], colorSetData[row1Offset + 5], colorSetData[row1Offset + 6], (byte)255);
+            spec2 = new Color(colorSetData[row2Offset + 4], colorSetData[row2Offset + 5], colorSetData[row2Offset + 6], (byte)255);
+
+            emiss1 = new Color(colorSetData[row1Offset + 8], colorSetData[row1Offset + 9], colorSetData[row1Offset + 10], (byte)255);
+            emiss2 = new Color(colorSetData[row2Offset + 8], colorSetData[row2Offset + 9], colorSetData[row2Offset + 10], (byte)255);
+
+
+            // These are now our base values to multiply the base values by.
+            Color diffuse = Blend(diffuse1, diffuse2, fBlendAmount);
+            Color specular = Blend(spec1, spec2, fBlendAmount);
+            Color emissive = Blend(emiss1, emiss2, fBlendAmount);
+
+            newDiffuse = MultiplyColor(baseDiffuse, diffuse);
+            newSpecular = MultiplyColor(baseSpecular, specular);
+            emissiveColor = emissive;  // Nothing to multiply by here.
+
+        }
+
+
+        #region Math Helpers
         /// <summary>Blends the specified colors together.</summary>
-        /// <param name="color">Color to blend onto the background color.</param>
         /// <param name="backColor">Color to blend the other color onto.</param>
+        /// <param name="color">Color to blend onto the background color.</param>
         /// <param name="amount">How much of <paramref name="color"/> to keep,
         /// “on top of” <paramref name="backColor"/>.</param>
         /// <returns>The blended colors.</returns>
-        private static Color Blend(Color color, Color backColor, double amount)
+        private static Color Blend(Color backColor, Color color, float amount)
         {
-            var r = (byte)((color.R * amount) + backColor.R * (1 - amount));
-            var g = (byte)((color.G * amount) + backColor.G * (1 - amount));
-            var b = (byte)((color.B * amount) + backColor.B * (1 - amount));
+            var r = (byte)Clamp(Math.Round((color.R * amount) + backColor.R * (1 - amount)));
+            var g = (byte)Clamp(Math.Round((color.G * amount) + backColor.G * (1 - amount)));
+            var b = (byte)Clamp(Math.Round((color.B * amount) + backColor.B * (1 - amount)));
             return new Color(r, g, b);
         }
 
-        private string GetMaterialType(string mtrlPath)
+        private static int Clamp(int i)
         {
-            if (mtrlPath.Contains("bgcommon/"))
+            if (i > 255)
             {
-                return "housing";
+                return 255;
             }
-
-            if (mtrlPath.Contains("/hair/h"))
+            else if (i < 0)
             {
-                return "hair";
+                return 0;
             }
-
-            if (mtrlPath.Contains("/body/b"))
+            else
             {
-                return "body";
+                return i;
             }
-
-            if (mtrlPath.Contains("/face/f"))
+        }
+        private static float Clamp(double f)
+        {
+            if (f > 255)
             {
-                if (mtrlPath.Contains("_etc_"))
-                {
-                    return "etc";
-                }
-
-                if (mtrlPath.Contains("_iri"))
-                {
-                    return "iris";
-                }
-
-                return "fac";
+                return 255;
             }
-
-            if (mtrlPath.Contains("/tail/t"))
+            else if (f < 0)
             {
-                if (mtrlPath.Contains("1301") || mtrlPath.Contains("1304") || mtrlPath.Contains("1401") ||
-                    mtrlPath.Contains("1404"))
-                {
-                    return "other";
-                }
-
-                return "tail";
+                return 0;
             }
-
-            if (mtrlPath.Contains("/zear/z") && !mtrlPath.Contains("_fac_"))
+            else
             {
-                return "ears";
+                return (float)f;
             }
-
-            return "other";
+        }
+        /// <summary>
+        /// Performs a basic alpha blending of two colors.
+        /// </summary>
+        /// <param name="bg"></param>
+        /// <param name="fg"></param>
+        /// <returns></returns>
+        private static float ByteToFloat(byte b)
+        {
+            float f = b / 255f;
+            return f;
         }
 
+        private static byte FloatToByte(float f)
+        {
+            byte b;
+
+            if (f > 1)
+            {
+                b = 255;
+            }
+            else if (f < 0)
+            {
+                b = 0;
+            }
+            else
+            {
+                b = (byte)Math.Round(f * 255f);
+            }
+
+            return b;
+        }
+
+        private static Color MultiplyColor(Color c1, byte b)
+        {
+            var ret = new Color();
+            ret.R = FloatToByte(ByteToFloat(c1.R) * ByteToFloat(b));
+            ret.G = FloatToByte(ByteToFloat(c1.G) * ByteToFloat(b));
+            ret.B = FloatToByte(ByteToFloat(c1.B) * ByteToFloat(b));
+            ret.A = FloatToByte(ByteToFloat(c1.A) * ByteToFloat(b));
+            return ret;
+
+        }
+        private static Color MultiplyColor(Color c1, float f)
+        {
+            var ret = new Color();
+            ret.R = FloatToByte(ByteToFloat(c1.R) * f);
+            ret.G = FloatToByte(ByteToFloat(c1.G) * f);
+            ret.B = FloatToByte(ByteToFloat(c1.B) * f);
+            ret.A = FloatToByte(ByteToFloat(c1.A) * f);
+            return ret;
+
+        }
+        private static Color MultiplyColor(Color c1, Color c2)
+        {
+            var ret = new Color();
+            ret.R = FloatToByte(ByteToFloat(c1.R) * ByteToFloat(c2.R));
+            ret.G = FloatToByte(ByteToFloat(c1.G) * ByteToFloat(c2.G));
+            ret.B = FloatToByte(ByteToFloat(c1.B) * ByteToFloat(c2.B));
+            ret.A = FloatToByte(ByteToFloat(c1.A) * ByteToFloat(c2.A));
+            return ret;
+        }
+        #endregion
         public class TexMapData
         {
             public TexInfo Diffuse { get; set; }
@@ -708,13 +755,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
             public TexInfo Normal { get; set; }
 
-            public TexInfo Multi { get; set; }
-
             public TexInfo ColorSet { get; set; }
-
-            public TexInfo Skin { get; set; }
-
-            public bool HasDummyTextures { get; set; }
         }
 
         public class TexInfo

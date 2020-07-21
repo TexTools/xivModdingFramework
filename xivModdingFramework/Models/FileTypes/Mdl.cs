@@ -93,7 +93,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="race"></param>
         /// <param name="submeshId"></param>
         /// <returns></returns>
-        public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool getOriginal = false)
+        public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false)
         {
             var mdlPath = await GetMdlPath(item, race, submeshId);
             var mtrlVariant = 1;
@@ -107,7 +107,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // No-op, defaulted to 1.
             }
 
-            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, getOriginal);
+            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, includeTextures, getOriginal);
         }
 
 
@@ -119,7 +119,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="outputFilePath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool getOriginal = false)
+        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool getOriginal = false)
         {
             // Importers and exporters currently use the same criteria.
             // Any available exporter is assumed to be able to import and vice versa.
@@ -161,7 +161,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
                 var model = await GetModel(mdlPath);
-                await ExportModel(model, outputFilePath, mtrlVariant);
+                await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
             }
         }
 
@@ -173,7 +173,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
         /// <returns></returns>
-        public async Task ExportModel(TTModel model, string outputFilePath, int mtrlVariant = 1)
+        public async Task ExportModel(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true)
         {
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
@@ -212,7 +212,10 @@ namespace xivModdingFramework.Models.FileTypes
             // both the bone and material exports at the same time.
 
             // Pop the textures out so the exporters can reference them.
-            await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
+            if (includeTextures)
+            {
+                await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
+            }
 
             // Validate the skeleton.
             if (model.HasWeights)
@@ -312,8 +315,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var mtrlPath = _mtrl.GetMtrlPath(model.Source, materialName, mtrlVariant);
                     var mtrlOffset = await _index.GetDataOffset(mtrlPath);
                     var mtrl = await _mtrl.GetMtrlData(mtrlOffset, mtrlPath, 11);
-                    var _modelMaps = new ModelTexture(_gameDirectory, mtrl);
-                    var modelMaps = await _modelMaps.GetModelMaps();
+                    var modelMaps = await ModelTexture.GetModelMaps(_gameDirectory, mtrl);
 
                     // Outgoing file names.
                     var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
@@ -365,6 +367,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // Failing to resolve a material is considered a non-critical error.
                     // Continue attempting to resolve the rest of the materials in the model.
                     //throw exc;
+                    var z = "d";
                 }
                 materialIdx++;
             }
