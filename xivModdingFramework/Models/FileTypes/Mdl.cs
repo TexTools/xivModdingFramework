@@ -367,7 +367,6 @@ namespace xivModdingFramework.Models.FileTypes
                     // Failing to resolve a material is considered a non-critical error.
                     // Continue attempting to resolve the rest of the materials in the model.
                     //throw exc;
-                    var z = "d";
                 }
                 materialIdx++;
             }
