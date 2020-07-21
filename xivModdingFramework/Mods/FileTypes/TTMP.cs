@@ -218,6 +218,12 @@ namespace xivModdingFramework.Mods.FileTypes
                                 ModSize = simpleModData.ModSize,
                                 DatFile = simpleModData.DatFile,
                                 ModOffset = binaryWriter.BaseStream.Position,
+                                ModPackEntry = new ModPack
+                                {
+                                    name =  modPackData.Name,
+                                    author = modPackData.Author,
+                                    version = modPackData.Version.ToString()
+                                }
                             };
 
                             var rawData = dat.GetRawData((int) simpleModData.ModOffset,
