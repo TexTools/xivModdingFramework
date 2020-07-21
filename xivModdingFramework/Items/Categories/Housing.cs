@@ -92,7 +92,7 @@ namespace xivModdingFramework.Items.Categories
             int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if (_xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 160;
             }
@@ -165,7 +165,7 @@ namespace xivModdingFramework.Items.Categories
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
         private async Task<List<XivFurniture>> GetPaintings()
         {
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if (_xivLanguage == XivLanguage.Korean)
             {
                 var paintingsLock = new object();
                 // These are the offsets to relevant data
@@ -314,7 +314,7 @@ namespace xivModdingFramework.Items.Categories
             int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if (_xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 160;
             }
