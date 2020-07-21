@@ -1593,11 +1593,17 @@ namespace xivModdingFramework.Materials.DataContainers
         }
     }
 
-    public class MapInfo
+    public class MapInfo : ICloneable
     {
         public XivTexType Usage;
         public MtrlTextureDescriptorFormat Format;
         public string path;
+
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
     }
 
 
