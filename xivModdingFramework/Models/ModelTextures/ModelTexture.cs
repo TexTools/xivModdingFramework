@@ -455,9 +455,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 {
                     // Has a raw diffuse.
                     newDiffuse = baseDiffuse;
-
-                    // But we also have to modulate that diffuse color by the multi red channel.
-                    newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
+                    newDiffuse.A = baseNormal.B;
 
                     // Has a raw specular.
                     newSpecular = baseSpecular;
@@ -466,6 +464,10 @@ namespace xivModdingFramework.Models.ModelTextures
                 {
                     // Has a raw diffuse.
                     newDiffuse = baseDiffuse;
+
+                    // But we also have to modulate that diffuse color by the multi red channel.
+                    newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
+
                     newDiffuse.A = baseNormal.B;
 
                     // Uses multi green/blue in some fashion.
