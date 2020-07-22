@@ -148,7 +148,7 @@ namespace xivModdingFramework.Helpers
                     new DirectoryInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
 
                 // Since the material addition directly adds to section 1 we can no longer check for outdated using that section header
-                // so instead compare the hahes of sections 2 and 3
+                // so instead compare the hashes of sections 2 and 3
                 var backupHashSection2 =  _index.GetIndexSection2Hash(backupDataFile);
                 var currentHashSection2 = _index.GetIndexSection2Hash(currentDataFile);
                 var backupHashSection3 = _index.GetIndexSection3Hash(backupDataFile);
