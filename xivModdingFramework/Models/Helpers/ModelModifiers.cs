@@ -587,7 +587,7 @@ namespace xivModdingFramework.Models.Helpers
                     {
 
                         v.UV1.X = Math.Abs((v.UV1.X % 1));
-                        v.UV1.Y = Math.Abs((v.UV1.Y % 1)) * -1;
+                        v.UV1.Y = Math.Abs((v.UV1.Y % 1));
                     }
                 }
             }
