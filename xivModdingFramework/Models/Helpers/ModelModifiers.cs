@@ -570,13 +570,15 @@ namespace xivModdingFramework.Models.Helpers
             ttModel.MeshGroups.ForEach(x => x.ShapeParts.Clear());
         }
 
-        // Forces all UV Coordinates in UV1 Layer to [1,-1] Quadrant.
+        // Forces all UV Coordinates in UV1 Layer to [1,1] (pre-flip) Quadrant.
         public static void ForceUVQuadrant(TTModel model, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
+
+            MakeExportReady(model, loggingFunction);
 
             loggingFunction(false, "Forcing UV1 to [1,-1]...");
             foreach(var m in model.MeshGroups)
@@ -586,11 +588,37 @@ namespace xivModdingFramework.Models.Helpers
                     foreach(var v in p.Vertices)
                     {
 
-                        v.UV1.X = Math.Abs((v.UV1.X % 1));
-                        v.UV1.Y = Math.Abs((v.UV1.Y % 1));
+                        v.UV1.X = (v.UV1.X % 1);
+                        v.UV1.Y = (v.UV1.Y % 1);
+
+                        if (v.UV1.X < 0)
+                        {
+                            v.UV1.X += 1;
+                        }
+
+                        if (v.UV1.Y > 0)
+                        {
+                            v.UV1.Y -= 1;
+                        }
                     }
                 }
             }
+
+            // Tangents have to be recalculated because we moved the UVs.
+            foreach (var m in model.MeshGroups)
+            {
+                foreach (var p in m.Parts)
+                {
+                    foreach (var v in p.Vertices)
+                    {
+                        v.Tangent = Vector3.Zero;
+                        v.Binormal = Vector3.Zero;
+                        v.Handedness = false;
+                    }
+                }
+            }
+            MakeImportReady(model, loggingFunction);
+
         }
 
         // Resets UV2 to [0,0]
