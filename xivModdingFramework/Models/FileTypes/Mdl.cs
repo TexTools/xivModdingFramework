@@ -4131,7 +4131,13 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case XivItemType.accessory:
                     mdlFolder = $"chara/{itemType}/a{id}/model";
-                    mdlFile = $"c{race}a{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
+                    var abrv = itemModel.GetItemSlotAbbreviation();
+                    // Just left ring things.
+                    if (submeshId == "ril")
+                    {
+                        abrv = "ril";
+                    }
+                    mdlFile = $"c{race}a{id}_{abrv}{MdlExtension}";
                     break;
                 case XivItemType.weapon:
                     mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
