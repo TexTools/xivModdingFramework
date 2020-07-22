@@ -166,6 +166,23 @@ namespace xivModdingFramework.Models.ModelTextures
                 specularPixels = texMapData.Specular.Data;
             }
 
+            if(normalPixels == null && diffusePixels == null)
+            {
+                // This material doesn't actually have any readable data.
+
+                var empty = new ModelTextureData
+                {
+                    Width = 0,
+                    Height = 0,
+                    Normal = new byte[0],
+                    Diffuse = new byte[0],
+                    Specular = new byte[0],
+                    Emissive = new byte[0],
+                    Alpha = new byte[0]
+                };
+                return empty;
+            }
+
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
 
             await Task.Run(() =>
