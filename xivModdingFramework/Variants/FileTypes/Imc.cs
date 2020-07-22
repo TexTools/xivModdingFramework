@@ -392,6 +392,16 @@ namespace xivModdingFramework.Variants.FileTypes
             /// </summary>
             public List<XivImc> DefaultSubset { get; set; }
 
+            // Gets all (non-default) IMC entries for a given slot.
+            public List<XivImc> GetAllEntries(string slot = "")
+            {
+                var ret = new List<XivImc>(SubsetList.Count);
+                for(int i = 0; i < SubsetList.Count; i++)
+                {
+                    ret.Add(GetEntry(i, slot));
+                }
+                return ret;
+            }
 
             /// <summary>
             /// Retrieve a given IMC info. Negative values retrieve the default set.

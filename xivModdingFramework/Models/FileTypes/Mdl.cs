@@ -372,42 +372,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
-        /// <summary>
-        /// Retrieves all items that share the same model.
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="language"></param>
-        /// <returns></returns>
-        public async Task<List<IItemModel>> GetSameModelList(IItemModel item, XivLanguage language = XivLanguage.English)
-        {
-            var sameModelItems = new List<IItemModel>();
-            var gear = new Gear(_gameDirectory, language);
-            var character = new Character(_gameDirectory, language);
-            var companions = new Companions(_gameDirectory, language);
-            var ui = new UI(_gameDirectory, language);
-            var housing = new Housing(_gameDirectory, language);
-
-            if (item.PrimaryCategory.Equals(XivStrings.Gear))
-            {
-
-                // Scan the gear list for anything using the same model ID and slot.
-                sameModelItems.AddRange(
-                    (await gear.GetGearList())
-                    .Where(it =>
-                    it.ModelInfo.PrimaryID == item.ModelInfo.PrimaryID
-                    && it.SecondaryCategory == item.SecondaryCategory).Select(it => it as IItemModel).ToList()
-                );
-            }
-            else if (item.PrimaryCategory.Equals(XivStrings.Character))
-            {
-
-                // Character models are assumed to have no shared models,
-                // So return a copy of the original item.
-                sameModelItems.Add((IItemModel)item.Clone());
-            }
-            return sameModelItems;
-        }
-
 
         /// <summary>
         /// Retreives the high level TTModel representation of an underlying MDL file.

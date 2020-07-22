@@ -736,6 +736,46 @@ namespace xivModdingFramework.Items.Categories
                     && it.ModelInfo.SecondaryID == item.ModelInfo.SecondaryID
                     && it.SecondaryCategory == item.SecondaryCategory).Select(it => it as IItemModel).ToList()
                 );
+
+                // We don't really care which sub-model gets returned here, we just need a path to pull the data file off of.
+                var imc = new Imc(_gameDirectory, item.DataFile);
+
+                // Language doesn't actually matter for the tests we're doing here.
+                var info = await imc.GetFullImcInfo(item);
+                var slot = item.GetItemSlotAbbreviation();
+                var imcEntries = info.GetAllEntries(slot);
+
+                // Need to verify all of our IMC sets are properly represented in the item list.
+                for (int i = 0; i < imcEntries.Count; i++)
+                {
+                    // Already in it.  All set.
+                    if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
+
+                    // Need to create a new item for it.
+                    var npcItem = new XivGear()
+                    {
+                        Name = "NPC Equipment e" + item.ModelInfo.PrimaryID + " " + slot + " IMC Variant " + i,
+                        ModelInfo = new XivGearModelInfo(),
+                        PrimaryCategory = item.PrimaryCategory,
+                        SecondaryCategory = item.SecondaryCategory,
+                        TertiaryCategory = item.TertiaryCategory,
+                        DataFile = item.DataFile,
+                    };
+                    npcItem.ModelInfo.PrimaryID = item.ModelInfo.PrimaryID;
+                    npcItem.ModelInfo.SecondaryID = item.ModelInfo.SecondaryID;
+                    npcItem.ModelInfo.ImcSubsetID = i;
+                    try
+                    {
+                        ((XivGearModelInfo)npcItem.ModelInfo).IsWeapon = ((XivGearModelInfo)item.ModelInfo).IsWeapon;
+                    }
+                    catch
+                    {
+                        // No-op.  Should never actually get here, but safety check on the cast.
+                    }
+
+                    sameModelItems.Add(npcItem);
+                }
+
             }
             else
             {
