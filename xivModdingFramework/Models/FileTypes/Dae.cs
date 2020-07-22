@@ -1019,6 +1019,8 @@ namespace xivModdingFramework.Models.FileTypes
                 throw ex;
             }
 
+            ModelModifiers.MakeImportReady(ttModel);
+
             return ttModel;
         }
 
