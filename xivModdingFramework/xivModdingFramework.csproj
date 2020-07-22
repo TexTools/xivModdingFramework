@@ -9,6 +9,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Models\Interfaces\**" />
+    <Compile Remove="Models\NewFolder1\**" />
+    <Compile Remove="Models\NewFolder2\**" />
+    <EmbeddedResource Remove="Models\Interfaces\**" />
+    <EmbeddedResource Remove="Models\NewFolder1\**" />
+    <EmbeddedResource Remove="Models\NewFolder2\**" />
+    <None Remove="Models\Interfaces\**" />
+    <None Remove="Models\NewFolder1\**" />
+    <None Remove="Models\NewFolder2\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="HelixToolkit" Version="2.9.0" />
     <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.9.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
@@ -50,10 +62,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\Interfaces\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="Resources\DefaultTextures\8888.dds">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -87,7 +95,10 @@
     <None Update="Resources\DefaultTextures\Specular.dds">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Resources\SQL\CreateDB.sql">
+    <None Update="Resources\SQL\CreateCacheDB.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\SQL\CreateImportDB.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

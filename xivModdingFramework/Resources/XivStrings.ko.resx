@@ -153,6 +153,9 @@
   <data name="ColorSet" xml:space="preserve">
     <value>ColorSet</value>
   </data>
+  <data name="Companions" xml:space="preserve">
+    <value>버디</value>
+  </data>
   <data name="Diffuse" xml:space="preserve">
     <value>Diffuse</value>
   </data>
@@ -166,7 +169,7 @@
     <value>Eos</value>
   </data>
   <data name="Equipment_Decals" xml:space="preserve">
-    <value>Equipment Decals</value>
+    <value>장비 문장</value>
   </data>
   <data name="Error_DirectoryError" xml:space="preserve">
     <value>Directory Error</value>
@@ -194,6 +197,9 @@
   </data>
   <data name="Garuda_Egi" xml:space="preserve">
     <value>Garuda-Egi</value>
+  </data>
+  <data name="Gear" xml:space="preserve">
+    <value>장비</value>
   </data>
   <data name="Hair" xml:space="preserve">
     <value>머리 모양</value>

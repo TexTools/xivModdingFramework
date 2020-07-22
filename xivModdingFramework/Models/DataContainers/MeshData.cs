@@ -46,20 +46,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public bool IsBody { get; set; }
 
-        /// <summary>
-        /// A dictionary containing the reference index and position data for mesh hiding
-        /// </summary>
-        public Dictionary<int, Vector3> ReferencePositionsDictionary { get; set; }
-
-        /// <summary>
-        /// A dictionary containing the shape offset and position data for mesh hiding
-        /// </summary>
-        public Dictionary<int, Vector3> ShapePositionsDictionary { get; set; }
-
-        /// <summary>
-        /// A dictionary containing the reference index and shape offset for mesh hiding
-        /// </summary>
-        public Dictionary<int, Dictionary<ushort, ushort>> ShapeIndexOffsetDictionary { get; set; }
 
         /// <summary>
         /// A list of the shape paths associated with this mesh

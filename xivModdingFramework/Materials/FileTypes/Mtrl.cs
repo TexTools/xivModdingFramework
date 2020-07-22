@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -29,6 +30,7 @@ using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -929,6 +931,81 @@ namespace xivModdingFramework.Materials.FileTypes
             return (mtrlFolder, mtrlFile, hasVfx);
         }
 
+        // Helper regexes for GetMtrlPath.
+        private readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
+        private readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
+        private readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+        /// <summary>
+        /// Resolves the MTRL path for a given MDL path.
+        /// Only needed because of the rare exception case of skin materials.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="mtrlVariant">Which material variant folder.  Defaulted to 1.</param>
+        /// <returns></returns>
+        public string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
+        {
+            var match = _skinRegex.Match(mtrlName);
+            
+
+            var mtrlFolder = "";
+
+            // Skin is the only known exception case.  Skin materials are auto resolved out of their item root path
+            // and into the character base directory.
+            if (match.Success)
+            {
+                var race = match.Groups[1].Value;
+                var body = match.Groups[2].Value;
+
+                mtrlFolder = "chara/human/c" + race + "/obj/body/b" + body + "/material/v0001";
+
+            }
+            else if (mtrlName.LastIndexOf("/") > 0)
+            {
+                // This a furniture item or something else that specifies an explicit full material path.
+                // We can just return that.
+                return mtrlName;
+            } else if (mdlPath.Contains("/face/f") || mdlPath.Contains("/zear/z")) {
+
+                // Faces and ears don't use material variants.
+                var mdlFolder = Path.GetDirectoryName(mdlPath);
+                mdlFolder = mdlFolder.Replace("\\", "/");
+                var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
+                mtrlFolder = baseFolder + "/material";
+            }
+            else {
+
+                var mdlMatch = _raceRegex.Match(mdlPath);
+                var mtrlMatch = _raceRegex.Match(mtrlName);
+
+                // Both items have racaial information in their path, and the races DON'T match.
+                if(mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // In this case, we need to replace the MDL path's racial string with the racial string from the MTRL.
+                    // This only really happens in hair items, that have unique racial model paths, but often share materials still.
+                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
+                }
+
+                mdlMatch = _weaponMatch.Match(mdlPath);
+                mtrlMatch = _weaponMatch.Match(mtrlName);
+
+                // Both items have weapon model information in their path, and the weapons DON'T match.
+                if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // In this case, we need to replace the MDL path's weapon string with the weapon string from the MTRL.
+                    // This really only seems to happen with dual wield weapons and the Gauss Barrel.
+                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
+                }
+
+                var mdlFolder = Path.GetDirectoryName(mdlPath);
+                mdlFolder = mdlFolder.Replace("\\", "/");
+
+                var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
+                mtrlFolder = baseFolder + "/material/v" + mtrlVariant.ToString().PadLeft(4, '0');
+            }
+
+            return mtrlFolder + mtrlName;
+        }
+
 
 
         /// <summary>
@@ -998,14 +1075,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 case XivItemType.human:
                     if (itemModel.SecondaryCategory.Equals(XivStrings.Body))
                     {
-                        if (_language != XivLanguage.Korean)
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
-                        }
-                        else
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material";
-                        }
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/material/v{version}";
                     }
                     else if (itemModel.SecondaryCategory.Equals(XivStrings.Hair))
                     {
@@ -1018,14 +1088,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (itemModel.SecondaryCategory.Equals(XivStrings.Tail))
                     {
-                        if (_language != XivLanguage.Korean)
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
-                        }
-                        else
-                        {
-                            mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material";
-                        }
+                        mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                     }
                     else if (itemModel.SecondaryCategory.Equals(XivStrings.Ears))
                     {

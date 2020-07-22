@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using xivModdingFramework.General.Enums;
@@ -39,59 +40,72 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Exports each mesh as an obj file
         /// </summary>
-        /// <param name="item">The item to be exported</param>
-        /// <param name="xivMdl">The XivMdl model data</param>
-        /// <param name="saveLocation">The location in which to save the obj file</param>
-        public void ExportObj(IItemModel item, XivMdl xivMdl, DirectoryInfo saveLocation, XivRace race)
+        public void ExportObj(TTModel model, string path)
         {
-            var meshes = xivMdl.LoDList[0].MeshDataList;
+            var meshGroups = model.MeshGroups;
 
-            var path = $"{IOUtil.MakeItemSavePath(item, saveLocation, race)}\\3D";
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
 
-            Directory.CreateDirectory(path);
-
-            var meshNum = 0;
-            foreach (var meshData in meshes)
+            try
             {
-                var modelName = $"{Path.GetFileNameWithoutExtension(xivMdl.MdlPath.File)}_{meshNum}";
-                var savePath = Path.Combine(path, modelName) + ".obj";
+                var meshNum = 0;
+                foreach (var mesh in meshGroups)
+                {
+                    var modelName = $"{Path.GetFileNameWithoutExtension(path)}_{meshNum}.obj";
+                    var savePath = Path.GetDirectoryName(path) + "\\" + modelName;
 
-                meshNum++;
-
-                File.WriteAllText(savePath, ExportObj(meshData));
+                    meshNum++;
+                    File.WriteAllText(savePath, ExportObj(mesh));
+                }
+            } catch(Exception ex)
+            {
+                throw ex;
             }
         }
 
-        public string ExportObj(MeshData meshData)
+        public string ExportObj(TTMeshGroup mesh)
         {
             var sb = new StringBuilder();
 
-            var vertexData = meshData.VertexData;
 
-            foreach (var vertexDataPosition in vertexData.Positions)
+            // Merge the index and vertex lists.
+            var vertices = new List<TTVertex>((int)mesh.VertexCount);
+            var indices = new List<int>((int)mesh.IndexCount);
+            foreach (var p in mesh.Parts)
             {
-                sb.AppendLine($"v {vertexDataPosition.X:N5} {vertexDataPosition.Y:N5} {vertexDataPosition.Z:N5}");
+                var preVertexCount = vertices.Count;
+                vertices.AddRange(p.Vertices);
+                foreach (var i in p.TriangleIndices)
+                {
+                    indices.Add(i + preVertexCount);
+                }
             }
 
-            foreach (var texCoord in vertexData.TextureCoordinates0)
+            foreach (var v in vertices)
             {
-                var ox = texCoord.X - Math.Truncate(texCoord.X);
-                var oy = texCoord.Y - Math.Truncate(texCoord.Y);
+                sb.AppendLine($"v {v.Position.X:N5} {v.Position.Y:N5} {v.Position.Z:N5}");
+            }
+
+            foreach (var v in vertices)
+            {
+                var ox = v.UV1.X - Math.Truncate(v.UV1.X);
+                var oy = v.UV1.Y - Math.Truncate(v.UV1.Y);
                 sb.AppendLine($"vt {ox:N5} {(1 - oy):N5}");
             }
 
-            foreach (var vertexDataNormal in vertexData.Normals)
+            foreach (var v in vertices)
             {
-                sb.AppendLine($"vn {vertexDataNormal.X:N5} {vertexDataNormal.Y:N5} {vertexDataNormal.Z:N5}");
+                sb.AppendLine($"vn {v.Normal.X:N5} {v.Normal.Y:N5} {v.Normal.Z:N5}");
             }
 
-            for (var i = 0; i < vertexData.Indices.Count; i += 3)
+            for (var i = 0; i < indices.Count; i += 3)
             {
-                var index1 = vertexData.Indices[i] + 1;
-                var index2 = vertexData.Indices[i + 1] + 1;
-                var index3 = vertexData.Indices[i + 2] + 1;
+                var index1 = indices[i] + 1;
+                var index2 = indices[i + 1] + 1;
+                var index3 = indices[i + 2] + 1;
                 sb.AppendLine($"f {index1}/{index1}/{index1} {index2}/{index2}/{index2} {index3}/{index3}/{index3}");
             }
+
 
             return sb.ToString();
         }

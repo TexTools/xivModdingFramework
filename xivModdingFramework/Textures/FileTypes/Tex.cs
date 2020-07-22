@@ -86,6 +86,19 @@ namespace xivModdingFramework.Textures.FileTypes
             _dataFile = dataFile;
         }
 
+        public async Task<XivTex> GetTexData(MapInfo map)
+        {
+
+            var dataFile = IOUtil.GetDataFileFromPath(map.path);
+            var ttp = new TexTypePath()
+            {
+                DataFile = dataFile,
+                Path = map.path,
+                Type = map.Usage
+            };
+            return await GetTexData(ttp);
+        }
+
         public async Task<XivTex> GetTexData(TexTypePath ttp)
         {
             var folder = Path.GetDirectoryName(ttp.Path);
@@ -692,7 +705,8 @@ namespace xivModdingFramework.Textures.FileTypes
 
                     using (var compressor = new Compressor())
                     {
-                        compressor.Input.SetMipmapGeneration(xivTex.MipMapCount > 0, xivTex.MipMapCount);
+                        // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
+                        compressor.Input.SetMipmapGeneration(true, xivTex.MipMapCount > 1 ? -1: 1);
                         compressor.Input.SetData(surface);
                         compressor.Compression.Format = compressionFormat;
                         compressor.Compression.SetBGRAPixelFormat();

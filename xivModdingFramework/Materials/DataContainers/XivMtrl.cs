@@ -311,6 +311,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     break;
             }
 
+            info.HasColorset = ColorSetData.Count > 0;
             // Check the transparency bit.
             const ushort transparencyBit = 16;
             const ushort backfaceBit = 1;
@@ -445,6 +446,15 @@ namespace xivModdingFramework.Materials.DataContainers
                 // Returning here ensures shader information
                 // is not bashed unless edited.
                 return;
+            }
+
+            if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass || info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture)
+            {
+                info.HasColorset = true;
+            }
+            else
+            {
+                info.HasColorset = false;
             }
 
             RegenerateTextureUsageList(info);
@@ -809,11 +819,19 @@ namespace xivModdingFramework.Materials.DataContainers
                 if (info.HasMulti || info.HasSpec)
                 {
                     SetTextureUsage(XivTexType.Multi);
-                    SetTextureUsage(XivTexType.Specular);
+                }
+                if(info.HasSpec)
+                {
+                    // What does this do?  It's only found on extremely rare items with specular maps,
+                    // and if when we add it/touch it, it either totally breaks the specularity, or crashes.
+                    // And on the items it is involved in, adding/removing it seems to do nothing.
+                    // Might be a glass shader only value?
+                    // SetTextureUsage(XivTexType.Specular);  
                 }
             }
             else
             {
+                // This is uh... Glass shader?  I think is the only fall through here.
                 SetTextureUsage(XivTexType.Normal);
                 SetTextureUsage(XivTexType.Diffuse);
                 SetTextureUsage(XivTexType.Multi);
@@ -906,8 +924,6 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <param name="data"></param>
         private void SetShaderParameter(MtrlShaderParameterId parameterId, List<float> data = null)
         {
-
-
             try
             {
                 var value = ShaderParameterList.First(x => x.ParameterID == parameterId);
@@ -1470,17 +1486,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public MtrlShaderPreset Preset;
         public bool TransparencyEnabled;
         public bool RenderBackfaces = false;
-        public bool HasColorset
-        {
-            get
-            {
-                if(Shader == MtrlShader.Standard || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
-                {
-                    return true;
-                }
-                return false;
-            }
-        }
+        public bool HasColorset = false;
         public bool HasDiffuse
         {
             get
@@ -1587,11 +1593,17 @@ namespace xivModdingFramework.Materials.DataContainers
         }
     }
 
-    public class MapInfo
+    public class MapInfo : ICloneable
     {
         public XivTexType Usage;
         public MtrlTextureDescriptorFormat Format;
         public string path;
+
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
     }
 
 

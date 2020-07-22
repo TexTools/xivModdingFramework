@@ -70,7 +70,7 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector3Collection Tangents { get; set; }
 
         /// <summary>
-        /// The vertex color data in Byte4 format (A, R, G, B)
+        /// The vertex color data in Byte4 format (R, G, B, A)
         /// </summary>
         public List<Color> Colors { get; set; }
 
