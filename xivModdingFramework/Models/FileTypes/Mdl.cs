@@ -448,6 +448,8 @@ namespace xivModdingFramework.Models.FileTypes
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
+            var mod = await modding.TryGetModEntry(mdlPath);
+            var modded = mod != null && mod.enabled;
             var getShapeData = true;
 
 
@@ -455,8 +457,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (getOriginal)
             {
-                var mod = await modding.TryGetModEntry(mdlPath);
-                if (mod != null && mod.enabled)
+                if (modded)
                 {
                     offset = mod.data.originalOffset;
                 }
@@ -684,6 +685,13 @@ namespace xivModdingFramework.Models.FileTypes
                         lod.MeshCount = 1;
                     }
 
+                    // This is a simple check to identify old mods that may have broken shape data.
+                    // Old mods still have LoD 1+ data.
+                    if (modded  && i > 0 && lod.MeshCount > 0)
+                    {
+                        getShapeData = false;
+                    }
+
                     //Adding to xivMdl
                     xivMdl.LoDList.Add(lod);
                 }
@@ -728,6 +736,7 @@ namespace xivModdingFramework.Models.FileTypes
                         xivMdl.ExtraLoDList.Add(lod);
                     }
                 }
+
 
                 // Now that we have the LoD data, we can go back and read the Vertex Data Structures
                 // First we save our current position
