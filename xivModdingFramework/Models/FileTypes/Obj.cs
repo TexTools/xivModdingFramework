@@ -77,7 +77,7 @@ namespace xivModdingFramework.Models.FileTypes
                 vertices.AddRange(p.Vertices);
                 foreach (var i in p.TriangleIndices)
                 {
-                    indices.Add(p.TriangleIndices[i] + preVertexCount);
+                    indices.Add(i + preVertexCount);
                 }
             }
 
