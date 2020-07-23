@@ -923,7 +923,16 @@ namespace xivModdingFramework.Models.DataContainers
                             {
                                 var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
                                 var mtrl_suffix = ".png";
+                                var name = material;
+                                try
+                                {
+                                    name = Path.GetFileName(material);
+                                } catch
+                                {
+
+                                }
                                 cmd.Parameters.AddWithValue("material_id", matIdx);
+                                cmd.Parameters.AddWithValue("name", name);
                                 cmd.Parameters.AddWithValue("diffuse", mtrl_prefix + "d" + mtrl_suffix);
                                 cmd.Parameters.AddWithValue("normal", mtrl_prefix + "n" + mtrl_suffix);
                                 cmd.Parameters.AddWithValue("specular", mtrl_prefix + "s" + mtrl_suffix);

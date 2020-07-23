@@ -120,6 +120,7 @@ CREATE TABLE "skeleton" (
 -- Materials
 CREATE TABLE "materials" (
 	"material_id"	INTEGER NOT NULL,
+	"name"			TEXT,
 	"diffuse"		TEXT,
 	"normal"		TEXT,
 	"specular"		TEXT,
