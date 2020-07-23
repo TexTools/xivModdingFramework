@@ -745,8 +745,36 @@ namespace xivModdingFramework.Items.Categories
                 var slot = item.GetItemSlotAbbreviation();
                 var imcEntries = info.GetAllEntries(slot);
 
+                if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID != 0))
+                {
+                    // Need to list default IMC set.
+                    // Need to create a new item for it.
+                    var npcItem = new XivGear()
+                    {
+                        Name = "NPC Equipment e" + item.ModelInfo.PrimaryID + " " + slot + " Default Variant",
+                        ModelInfo = new XivGearModelInfo(),
+                        PrimaryCategory = item.PrimaryCategory,
+                        SecondaryCategory = item.SecondaryCategory,
+                        TertiaryCategory = item.TertiaryCategory,
+                        DataFile = item.DataFile,
+                    };
+                    npcItem.ModelInfo.PrimaryID = item.ModelInfo.PrimaryID;
+                    npcItem.ModelInfo.SecondaryID = item.ModelInfo.SecondaryID;
+                    npcItem.ModelInfo.ImcSubsetID = 0;
+                    try
+                    {
+                        ((XivGearModelInfo)npcItem.ModelInfo).IsWeapon = ((XivGearModelInfo)item.ModelInfo).IsWeapon;
+                    }
+                    catch
+                    {
+                        // No-op.  Should never actually get here, but safety check on the cast.
+                    }
+
+                    sameModelItems.Add(npcItem);
+                }
+
                 // Need to verify all of our IMC sets are properly represented in the item list.
-                for (int i = 0; i < imcEntries.Count; i++)
+                for (int i = 1; i <= imcEntries.Count; i++)
                 {
                     // Already in it.  All set.
                     if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;

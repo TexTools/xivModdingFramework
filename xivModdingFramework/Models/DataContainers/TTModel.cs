@@ -918,12 +918,21 @@ namespace xivModdingFramework.Models.DataContainers
                         foreach(var material in Materials)
                         {
                             // Materials
-                            query = @"insert into materials (material_id, diffuse, normal, specular, opacity) values ($material_id, $diffuse, $normal, $specular, $opacity);";
+                            query = @"insert into materials (material_id, name, diffuse, normal, specular, opacity, emissive) values ($material_id, $name, $diffuse, $normal, $specular, $opacity, $emissive);";
                             using (var cmd = new SQLiteCommand(query, db))
                             {
                                 var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
                                 var mtrl_suffix = ".png";
+                                var name = material;
+                                try
+                                {
+                                    name = Path.GetFileNameWithoutExtension(material);
+                                } catch
+                                {
+
+                                }
                                 cmd.Parameters.AddWithValue("material_id", matIdx);
+                                cmd.Parameters.AddWithValue("name", name);
                                 cmd.Parameters.AddWithValue("diffuse", mtrl_prefix + "d" + mtrl_suffix);
                                 cmd.Parameters.AddWithValue("normal", mtrl_prefix + "n" + mtrl_suffix);
                                 cmd.Parameters.AddWithValue("specular", mtrl_prefix + "s" + mtrl_suffix);

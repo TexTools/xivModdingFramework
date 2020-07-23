@@ -697,7 +697,7 @@ namespace xivModdingFramework.Models.Helpers
                 loggingFunction = NoOp;
             }
 
-            loggingFunction(false, "Clearing UV2...");
+            loggingFunction(false, "Cloning UV1 to UV2...");
             foreach (var m in model.MeshGroups)
             {
                 foreach (var p in m.Parts)

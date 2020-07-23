@@ -934,6 +934,7 @@ namespace xivModdingFramework.Materials.FileTypes
         // Helper regexes for GetMtrlPath.
         private readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
         private readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
+        private readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
         private readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
@@ -993,6 +994,17 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     // In this case, we need to replace the MDL path's weapon string with the weapon string from the MTRL.
                     // This really only seems to happen with dual wield weapons and the Gauss Barrel.
+                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
+                }
+
+                mdlMatch = _tailMatch.Match(mdlPath);
+                mtrlMatch = _tailMatch.Match(mtrlName);
+
+                // Both items have tail model information in their path, and the weapons DON'T match.
+                if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // Replacing the tail reference in the main path with the one from the MTRL.
+                    // Needless to say, this only happens with tail items.
                     mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
                 }
 
