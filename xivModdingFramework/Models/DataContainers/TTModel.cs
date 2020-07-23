@@ -926,7 +926,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 var name = material;
                                 try
                                 {
-                                    name = Path.GetFileName(material);
+                                    name = Path.GetFileNameWithoutExtension(material);
                                 } catch
                                 {
 
