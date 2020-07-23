@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
@@ -221,6 +222,87 @@ namespace xivModdingFramework.Items
             }
             return '-';
         }
+
+        // Zero(th) group is the full file path.
+        // First group is the item root path.
+        // Second group is the imc file name.
+        private static readonly Regex _equipmentRegex = new Regex("^(chara/equipment/(e[0-9]{4})/).*");
+        private static readonly Regex _accessoryRegex = new Regex("^(chara/accessory/(a[0-9]{4})/).*");
+        private static readonly Regex _weaponRegex = new Regex("^(chara/weapon/w[0-9]{4}/obj/body/(b[0-9]{4})/).*");
+        private static readonly Regex _monsterRegex = new Regex("^(chara/monster/m[0-9]{4}/obj/body/(b[0-9]{4})/).*");
+        private static readonly Regex _demihumanRegex = new Regex("^(chara/demihuman/d[0-9]{4}/obj/equipment/(e[0-9]{4})/).*");
+        public static XivItemType GetItemTypeFromPath(string path)
+        {
+
+            if (_equipmentRegex.IsMatch(path)) return XivItemType.equipment;
+            if (_accessoryRegex.IsMatch(path)) return XivItemType.accessory;
+            if (_weaponRegex.IsMatch(path)) return XivItemType.weapon;
+            if (_monsterRegex.IsMatch(path)) return XivItemType.monster;
+            if (_demihumanRegex.IsMatch(path)) return XivItemType.demihuman;
+
+            return XivItemType.unknown;
+        }
+
+        /// <summary>
+        /// Finds the root folder for an item, from any child path.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static string GetRootFolderFromPath(string path)
+        {
+            var match = _equipmentRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _accessoryRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _weaponRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _monsterRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _demihumanRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Finds suffix-less -name- of the IMC File for a given child path..
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        private static string GetIMCNameFromChildPath(string path)
+        {
+            var match = _equipmentRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _accessoryRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _weaponRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _monsterRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _demihumanRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the IMC path for a given child path.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static string GetIMCPathFromChildPath(string path)
+        {
+
+            var imcName = GetIMCNameFromChildPath(path);
+            var rootFolder = GetRootFolderFromPath(path);
+            if (imcName == null || rootFolder == null)
+            {
+                return null;
+            }
+
+            return rootFolder + imcName + ".imc";
+        }
+
 
         /// <summary>
         /// Get this item's root folder in the FFXIV internal directory structure.

@@ -261,6 +261,45 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         /// <summary>
+        /// Retrieves the list of texture paths used by the given mtrl path (significantly faster than loading the entire material and scanning it).
+        /// </summary>
+        /// <param name="mtrlPath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool forceOriginal = false)
+        {
+            var dat = new Dat(_gameDirectory);
+            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal);
+            var uniqueTextures = new HashSet<string>();
+            var texRegex = new Regex(".*\\.tex$");
+
+            using (var br = new BinaryReader(new MemoryStream(mtrlData)))
+            {
+                br.BaseStream.Seek(12, SeekOrigin.Begin);
+                var TextureCount = br.ReadByte();
+                br.BaseStream.Seek(36, SeekOrigin.Begin);
+                for(int i = 0; i < TextureCount; i++)
+                {
+
+                    // TODO - FIXFIX - Need to actually pull offsets for this it seems.
+                    byte a;
+                    List<byte> bytes = new List<byte>(); ;
+                    while ((a = br.ReadByte()) != 0)
+                    {
+                        bytes.Add(a);
+                    }
+
+                    var st = Encoding.ASCII.GetString(bytes.ToArray()).Replace("\0", "");
+
+                    if (texRegex.IsMatch(st))
+                    {
+                        uniqueTextures.Add(st);
+                    }
+                }
+            }
+            return uniqueTextures.ToList();
+        }
+
+        /// <summary>
         /// Gets the MTRL data for the given offset and path
         /// </summary>
         /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
@@ -268,6 +307,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>XivMtrl containing all the mtrl data</returns>
         public async Task<XivMtrl> GetMtrlData(int mtrlOffset, string mtrlPath, int dxVersion)
         {
+            await GetTexturePathsFromMtrlPath(mtrlPath);
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
 
@@ -276,6 +316,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             XivMtrl xivMtrl = null;
 
+            // Why is there a semaphore here to read an in memory byte block?
             await _semaphoreSlim.WaitAsync();
 
             try
@@ -932,10 +973,10 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         // Helper regexes for GetMtrlPath.
-        private readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
-        private readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
-        private readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
-        private readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+        private static readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
+        private static readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
+        private static readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
+        private static readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
         /// Only needed because of the rare exception case of skin materials.

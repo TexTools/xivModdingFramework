@@ -53,6 +53,8 @@ using SixLabors.ImageSharp.Formats.Bmp;
 using xivModdingFramework.Variants.FileTypes;
 using SixLabors.ImageSharp.Formats.Png;
 using System.Data;
+using System.Text.RegularExpressions;
+using xivModdingFramework.Materials.DataContainers;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -409,6 +411,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns>An XivMdl structure containing all mdl data.</returns>
         public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
         {
+            await GetReferencedMaterialPaths(mdlPath, -1, getOriginal);
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
@@ -1670,6 +1673,159 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             return xivMdl;
+        }
+
+
+        /// <summary>
+        /// Extracts and calculates the full MTRL paths from a given MDL file.
+        /// A material variant of -1 gets the materials for ALL variants,
+        /// effectively generating the 'child files' list for an Mdl file.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="getOriginal"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false)
+        {
+            // Language is irrelevant here.
+            var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
+            var _mtrl = new Mtrl(_gameDirectory, dataFile, XivLanguage.None);
+            var _imc = new Imc(_gameDirectory, dataFile);
+            var _index = new Index(_gameDirectory);
+
+            var materials = new List<string>();
+
+            // Read the raw Material names from the file.
+            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal);
+            if(materialNames.Count == 0)
+            {
+                return materials;
+            }
+
+            var materialVariants = new HashSet<int>();
+            if (materialVariant >= 0)
+            {
+                // If we had a specific variant to get, just use that.
+                materialVariants.Add(materialVariant);
+
+            } else { 
+
+                // Otherwise, we have to resolve all possible variants.
+                var imcPath = ItemType.GetIMCPathFromChildPath(mdlPath);
+                if (imcPath == null)
+                {
+                    // No IMC file means this Mdl doesn't use variants/only has a single variant.
+                    materialVariants.Add(1);
+                }
+                else
+                {
+
+                    // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
+                    var info = await _imc.GetFullImcInfo(imcPath);
+                    var slotRegex = new Regex("_([a-z]{3}).mdl$");
+                    var slot = "";
+                    var m = slotRegex.Match(mdlPath);
+                    if (m.Success)
+                    {
+                        slot = m.Groups[1].Value;
+                    }
+
+                    // We have to get all of the material variants used for this item now.
+                    var imcInfos = info.GetAllEntries(slot);
+                    foreach (var i in imcInfos)
+                    {
+                        materialVariants.Add(i.Variant);
+                    }
+                }
+            }
+
+            // We have to get every material file that this MDL references.
+            // That means every variant of every material referenced.
+            var uniqueMaterialPaths = new HashSet<string>();
+            foreach (var mVariant in materialVariants)
+            {
+                foreach (var mName in materialNames)
+                {
+                    var path = _mtrl.GetMtrlPath(mdlPath, mName, mVariant);
+                    if (!uniqueMaterialPaths.Contains(path))
+                    {
+                        // Validate the MTRL actually exists. (Sometimes unused IMC sets refer to nonexistent materials)
+                        // (This seems to only really be the case when the Material Variant is 0)
+                        if (await _index.FileExists(path))
+                        {
+                            uniqueMaterialPaths.Add(path);
+                        }
+                    }
+                }
+            }
+
+            return uniqueMaterialPaths.ToList();
+        }
+
+
+
+        /// <summary>
+        /// Extracts just the MTRL names from a mdl file.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="getOriginal"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false)
+        {
+            var materials = new List<string>();
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+            var modding = new Modding(_gameDirectory);
+            var mod = await modding.TryGetModEntry(mdlPath);
+            var offset = await index.GetDataOffset(mdlPath);
+
+            var modded = mod != null && mod.enabled;
+            if (getOriginal)
+            {
+                if (modded)
+                {
+                    offset = mod.data.originalOffset;
+                }
+            }
+
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offset for {mdlPath}");
+            }
+
+            var mdlData = await dat.GetType3Data(offset, _dataFile);
+
+
+            using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
+            {
+                // We skip the Vertex Data Structures for now
+                // This is done so that we can get the correct number of meshes per LoD first
+                br.BaseStream.Seek(64 + 136 * mdlData.MeshCount + 4, SeekOrigin.Begin);
+
+                var PathCount = br.ReadInt32();
+                var PathBlockSize = br.ReadInt32();
+
+
+                Regex materialRegex = new Regex(".*\\.mtrl$");
+
+                for (var i = 0; i < PathCount; i++)
+                {
+                    byte a;
+                    List<byte> bytes = new List<byte>(); ;
+                    while ((a = br.ReadByte()) != 0)
+                    {
+                        bytes.Add(a);
+                    }
+
+                    var st = Encoding.ASCII.GetString(bytes.ToArray()).Replace("\0", "");
+
+                    if (materialRegex.IsMatch(st))
+                    {
+                        materials.Add(st);
+                    }
+                }
+
+            }
+            return materials;
         }
 
 
