@@ -918,7 +918,7 @@ namespace xivModdingFramework.Models.DataContainers
                         foreach(var material in Materials)
                         {
                             // Materials
-                            query = @"insert into materials (material_id, diffuse, normal, specular, opacity) values ($material_id, $diffuse, $normal, $specular, $opacity);";
+                            query = @"insert into materials (material_id, name, diffuse, normal, specular, opacity, emissive) values ($material_id, $name, $diffuse, $normal, $specular, $opacity, $emissive);";
                             using (var cmd = new SQLiteCommand(query, db))
                             {
                                 var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
