@@ -131,7 +131,7 @@ namespace xivModdingFramework.General.Enums
             });
             dict.Add(XivRace.Roegadyn_Male, new XivRaceNode()
             {
-                Parent = dict[XivRace.Hyur_Highlander_Male],
+                Parent = dict[XivRace.Hyur_Midlander_Male],
                 Race = XivRace.Roegadyn_Male,
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
@@ -191,7 +191,7 @@ namespace xivModdingFramework.General.Enums
             });
             dict.Add(XivRace.Roegadyn_Female, new XivRaceNode()
             {
-                Parent = dict[XivRace.Hyur_Highlander_Female],
+                Parent = dict[XivRace.Hyur_Midlander_Female],
                 Race = XivRace.Roegadyn_Female,
                 Children = new List<XivRaceNode>()
             });
