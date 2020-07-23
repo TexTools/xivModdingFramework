@@ -991,7 +991,7 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.MeshShapeData.AssignMeshAndLodNumbers(indexOffsets);
 
                 // Sets the boolean flag if the model has shape data
-                xivMdl.HasShapeData = xivMdl.ModelData.ShapeCount > 0;
+                xivMdl.HasShapeData = xivMdl.ModelData.ShapeCount > 0 && getShapeData;
 
                 // Bone index for Parts
                 var partBoneSet = new BoneSet
