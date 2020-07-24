@@ -412,16 +412,6 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns>An XivMdl structure containing all mdl data.</returns>
         public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
         {
-            /*
-            var _cache = new XivCache(_gameDirectory);
-            var roots = await _cache.Dependencies.GetDependencyRoots(mdlPath);
-            if (roots != null)
-            {
-                var mdlChildren = await _cache.Dependencies.GetChildFiles(mdlPath);
-                var mtrlChildren = await _cache.Dependencies.GetChildFiles(mdlChildren[0]);
-                var rootChildren = await _cache.Dependencies.GetChildFiles(roots[0].ToString());
-                var metaChildren = await _cache.Dependencies.GetChildFiles(rootChildren[0]);
-            }*/
 
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);

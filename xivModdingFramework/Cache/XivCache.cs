@@ -10,6 +10,8 @@ using xivModdingFramework.Items;
 using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Mods;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Cache
@@ -22,7 +24,7 @@ namespace xivModdingFramework.Cache
     {
         private GameInfo _gameInfo;
         private DirectoryInfo _dbPath;
-        public static readonly Version CacheVersion = new Version("0.0.0.25");
+        public static readonly Version CacheVersion = new Version("0.0.1.0");
         private const string dbFileName = "mod_cache.db";
         private const string creationScript = "CreateCacheDB.sql";
         private string _connectionString { get
@@ -33,6 +35,10 @@ namespace xivModdingFramework.Cache
 
         public readonly XivDependencyGraph Dependencies;
 
+        // Safety check to make sure we don't redundantly attempt to rebuild the cache.
+        private static bool _REBUILDING = false;
+
+        private ModList _cachedModList;
         public GameInfo GameInfo
         {
             get
@@ -57,16 +63,18 @@ namespace xivModdingFramework.Cache
             _gameInfo = gameInfo;
             _dbPath = new DirectoryInfo(Path.Combine(_gameInfo.GameDirectory.Parent.Parent.FullName, dbFileName));
 
-            if (validateCache)
+            Dependencies = new XivDependencyGraph(gameInfo, this);
+            if (validateCache && !_REBUILDING)
             {
 
-                if (CacheNeedsRebuild())
+                if (CacheNeedsRebuild() && !_REBUILDING)
                 {
+                    _REBUILDING = true;
                     RebuildCache();
+                    _REBUILDING = false;
                 }
             }
 
-            Dependencies = new XivDependencyGraph(gameInfo, this);
         }
 
         /// <summary>
@@ -81,7 +89,7 @@ namespace xivModdingFramework.Cache
                     // Cache structure updated?
                     var val = GetMetaValue("cache_version");
                     var version = new Version(val);
-                    if (version < CacheVersion)
+                    if (version != CacheVersion)
                     {
                         return true;
                     }
@@ -89,7 +97,7 @@ namespace xivModdingFramework.Cache
                     // FFXIV Updated?
                     val = GetMetaValue("ffxiv_version");
                     version = new Version(val);
-                    if (version < _gameInfo.GameVersion)
+                    if (version != _gameInfo.GameVersion)
                     {
                         return true;
                     }
@@ -120,7 +128,7 @@ namespace xivModdingFramework.Cache
             };
 
             var result = checkValidation();
-            if(result)
+            if (result)
             {
                 // Ensure we cleaned up after ourselves
                 // in preprartion for calling rebuild.
@@ -156,15 +164,20 @@ namespace xivModdingFramework.Cache
                     await RebuildMonstersCache();
                     await RebuildUiCache();
                     await RebuildFurnitureCache();
+                    var pre = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                    await BuildModdedItemDependencies();
+                    var post = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+
+                    var result = post - pre;
 
                     SetMetaValue("cache_version", CacheVersion.ToString());
                     SetMetaValue("ffxiv_version", _gameInfo.GameVersion.ToString());
                     SetMetaValue("language", _gameInfo.GameLanguage.ToString());
 
-                } catch(Exception Ex)
+                } catch (Exception Ex)
                 {
                     SetMetaValue("needs_rebuild", "1");
-                    throw Ex;
+                    throw;
                 }
             }).Wait();
         }
@@ -259,13 +272,13 @@ namespace xivModdingFramework.Cache
 
                 var _housing = new Housing(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
                 var list = await _housing.GetUncachedFurnitureList();
-            
+
                 db.Open();
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
                     {
-                        
+
                         var query = @"
                             insert into housing ( name,  category,  subcategory,  primary_id,  icon_id) 
                                           values($name, $category, $subcategory, $primary_id, $icon_id)";
@@ -300,7 +313,7 @@ namespace xivModdingFramework.Cache
                 if (_gameInfo.GameLanguage != XivLanguage.Chinese && _gameInfo.GameLanguage != XivLanguage.Korean)
                 {
                     list.AddRange(await _companions.GetUncachedOrnamentList());
-                }                
+                }
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -326,7 +339,7 @@ namespace xivModdingFramework.Cache
                             }
                             catch (Exception ex)
                             {
-                                throw ex;
+                                throw;
                             }
                         }
                     }
@@ -370,7 +383,7 @@ namespace xivModdingFramework.Cache
                             }
                             catch (Exception ex)
                             {
-                                throw ex;
+                                throw;
                             }
                         }
                     }
@@ -403,7 +416,7 @@ namespace xivModdingFramework.Cache
                             on conflict do nothing";
                         using (var cmd = new SQLiteCommand(query, db))
                         {
-                            try { 
+                            try {
                                 cmd.Parameters.AddWithValue("name", item.Name);
                                 cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
                                 cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
@@ -413,7 +426,7 @@ namespace xivModdingFramework.Cache
                                 cmd.ExecuteScalar();
                             }
                             catch (Exception ex) {
-                                throw ex;
+                                throw;
                             }
                         }
                     }
@@ -459,6 +472,102 @@ namespace xivModdingFramework.Cache
                     transaction.Commit();
                 }
             }
+        }
+
+
+        private async Task BuildModdedItemDependencies()
+        {
+            var _modding = new Modding(GameInfo.GameDirectory);
+            _cachedModList = _modding.GetModList();
+
+            foreach(var m in _cachedModList.Mods)
+            {
+                try
+                {
+                    await UpdateFileChildren(m.fullPath);
+                } catch(Exception ex)
+                {
+                    throw;
+                }
+            }
+            _cachedModList = null;
+        }
+
+
+        /// <summary>
+        /// Retreives the child files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetChildFiles(string internalFilePath)
+        {
+            var wc = new WhereClause() { Column = "parent", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
+            var list = await BuildListFromTable("dependencies", wc, async (reader) =>
+            {
+                return reader.GetString("child");
+            });
+
+            if(list.Count == 0)
+            {
+                // Need to pull the raw data to verify a 0 count entry.
+                list = await Dependencies.GetChildFiles(internalFilePath);
+                if (list != null && list.Count > 0)
+                {
+                    await UpdateFileChildren(internalFilePath, list);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Retreives the child files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetCachedParentFiles(string internalFilePath)
+        {
+            var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
+            var list = await BuildListFromTable("dependencies", wc, async (reader) =>
+            {
+                return reader.GetString("parent");
+            });
+            return list;
+        }
+
+        /// <summary>
+        /// Retreives the parent files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetParentFiles(string internalFilePath)
+        {
+            return await Dependencies.GetParentFiles(internalFilePath);
+        }
+
+        /// <summary>
+        /// Retreives the sibling files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetSiblingFiles(string internalFilePath)
+        {
+            return await Dependencies.GetSiblingFiles(internalFilePath);
+        }
+
+
+        /// <summary>
+        /// Retrieves the dependency roots for the given file.
+        /// 
+        /// For everything other than texture files, this will always be,
+        /// A list of length 1 (valid), 0 (orphaned), or null (invalid/not in the scope of the dependency graph)
+        /// For textures this can be 0 (orphaned) or any amount 1+.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
+        {
+            var roots = await Dependencies.GetDependencyRoots(internalFilePath);
+            return roots;
         }
 
         /// <summary>
@@ -575,7 +684,7 @@ namespace xivModdingFramework.Cache
                 });
             } catch(Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 
@@ -629,7 +738,7 @@ namespace xivModdingFramework.Cache
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 
@@ -686,7 +795,7 @@ namespace xivModdingFramework.Cache
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 
@@ -751,25 +860,6 @@ namespace xivModdingFramework.Cache
             return list;
         }
 
-        /// <summary>
-        /// Retrieve the path list of the children for this file.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        public List<string> GetFileChildren(string path)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <summary>
-        /// Retreive the path list of the parents for this file.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        public List<string> GetFileParents(string path)
-        {
-            throw new NotImplementedException();
-        }
 
         /// <summary>
         /// Sets a meta value to the cache.
@@ -818,13 +908,116 @@ namespace xivModdingFramework.Cache
                     }
                     catch (Exception Ex)
                     {
-                        throw Ex;
+                        throw;
                         // Meta Table doesn't exist.
                     }
                 }
             }
 
             return val?.ToString();
+        }
+
+        /// <summary>
+        /// Updates the file children in the dependencies cache.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        public async Task UpdateFileChildren(string internalFilePath, List<string> children = null)
+        {
+            var level = Dependencies.GetDependencyLevel(internalFilePath);
+            if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Texture)
+            {
+                return;
+            }
+
+            var wc = new WhereClause() { Column = "child", Value = internalFilePath, Comparer = WhereClause.ComparisonType.Equal };
+            var oldChildren = await BuildListFromTable("dependencies", wc, async (reader) =>
+            {
+                return reader.GetString("child");
+            });
+
+            if (level == XivDependencyLevel.Meta)
+            {
+                var allMetas = await (await Dependencies.GetDependencyRoots(internalFilePath))[0].GetMetaFiles();
+
+                // Meta files should be updated as a group.
+                // Written this way to be more efficient/speedy.
+                using (var db = new SQLiteConnection(_connectionString))
+                {
+                    db.Open();
+                    using (var transaction = db.BeginTransaction())
+                    {
+                        var delQuery = "delete from dependencies where parent = $parent";
+                        using (var delCmd= new SQLiteCommand(delQuery, db))
+                        {
+                            var insertQuery = "insert into dependencies (parent, child) values ($parent, $child)";
+                            using (var insertCmd = new SQLiteCommand(insertQuery, db))
+                            {
+
+                                // For each meta entry
+                                foreach (var meta in allMetas)
+                                {
+                                    // Clear the old children
+                                    delCmd.Parameters.AddWithValue("parent", meta);
+                                    delCmd.ExecuteScalar();
+
+                                    foreach (var child in children)
+                                    {
+
+                                        // And write the new ones.
+                                        insertCmd.Parameters.AddWithValue("parent", meta);
+                                        insertCmd.Parameters.AddWithValue("child", child);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Just updating a single file.
+                if (children == null)
+                {
+                    children = await Dependencies.GetChildFiles(internalFilePath);
+                }
+
+                using (var db = new SQLiteConnection(_connectionString))
+                {
+                    db.Open();
+                    using (var transaction = db.BeginTransaction())
+                    {
+                        var query = "delete from dependencies where parent = $parent";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            cmd.Parameters.AddWithValue("parent", internalFilePath);
+                            cmd.ExecuteScalar();
+                        }
+
+                        if (children == null) return;
+
+
+                        query = "insert into dependencies (parent, child) values ($parent, $child)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var child in children)
+                            {
+                                cmd.Parameters.AddWithValue("parent", internalFilePath);
+                                cmd.Parameters.AddWithValue("child", child);
+                                try
+                                {
+                                    cmd.ExecuteScalar();
+                                }
+                                catch (Exception ex)
+                                {
+                                    throw;
+                                }
+                            }
+                        }
+                        transaction.Commit();
+                    }
+                }
+            }
+
         }
 
         private async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
@@ -842,6 +1035,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static async Task<List<T>> BuildListFromTable<T>(string connectionString, string table, WhereClause where, Func<CacheReader, Task<T>> func)
         {
+
             List<T> list = new List<T>();
             using (var db = new SQLiteConnection(connectionString))
             {
@@ -889,7 +1083,7 @@ namespace xivModdingFramework.Cache
                             }
                             catch (Exception ex)
                             {
-                                throw ex;
+                                throw;
                             }
                         }
                     }

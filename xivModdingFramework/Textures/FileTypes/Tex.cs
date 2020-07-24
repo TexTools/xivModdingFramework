@@ -23,6 +23,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using TeximpNet.Compression;
 using TeximpNet.DDS;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -104,6 +105,9 @@ namespace xivModdingFramework.Textures.FileTypes
             var folder = Path.GetDirectoryName(ttp.Path);
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(ttp.Path);
+
+
+
             var offset = 0;
 
             var hashedfolder = 0;
@@ -146,10 +150,6 @@ namespace xivModdingFramework.Textures.FileTypes
             return xivTex;
         }
 
-        public async Task GetIndexFileDictionary()
-        {
-            _indexFileDictionary = await _index.GetFileDictionary(_dataFile);
-        }
 
         public async Task<XivTex> GetTexDataPreFetchedIndex(TexTypePath ttp)
         {

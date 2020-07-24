@@ -21,6 +21,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 
@@ -256,6 +257,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
             return 0;
         }
+
         /// <summary>
         /// Gets the offset for the data in the .dat file
         /// </summary>
@@ -715,8 +717,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="fullPath">Full internal file path to the file that should be deleted.</param>
         /// <param name="dataFile">Which data file to use</param>
         /// <returns></returns>
-        public bool DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
+        public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
         {
+            _semaphoreSlim.WaitAsync();
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
@@ -962,19 +965,27 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
 
+
+            _semaphoreSlim.Release();
+
+            // Update Dependency Cache.
+            var cache = new XivCache(_gameDirectory);
+            await cache.UpdateFileChildren(fullPath);
+
             return true;
         }
 
 
-                /// <summary>
-                /// Adds a new file descriptor/stub into the Index files.
-                /// </summary>
-                /// <param name="fullPath">Full path to the new file.</param>
-                /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
-                /// <param name="dataFile">Which data file set to use.</param>
-                /// <returns></returns>
-        public bool AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
+        /// <summary>
+        /// Adds a new file descriptor/stub into the Index files.
+        /// </summary>
+        /// <param name="fullPath">Full path to the new file.</param>
+        /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
+        /// <param name="dataFile">Which data file set to use.</param>
+        /// <returns></returns>
+        public async Task<bool> AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
         {
+            await _semaphoreSlim.WaitAsync();
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
@@ -1235,6 +1246,14 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             }
 
+
+            _semaphoreSlim.Release();
+
+            // Update Dependency Cache.
+            var cache = new XivCache(_gameDirectory);
+            await cache.UpdateFileChildren(fullPath);
+
+
             return true;
         }
 
@@ -1293,6 +1312,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             _semaphoreSlim.Release();
+
+            // Update Dependency Cache.
+            var cache = new XivCache(_gameDirectory);
+            await cache.UpdateFileChildren(fullPath);
+
+
 
             return oldOffset;
         }

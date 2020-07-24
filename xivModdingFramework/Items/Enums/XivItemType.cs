@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.ComponentModel;
+
 namespace xivModdingFramework.Items.Enums
 {
     /// <summary>
@@ -22,21 +24,38 @@ namespace xivModdingFramework.Items.Enums
     /// </summary>
     public enum XivItemType
     {
-        unknown,
-        none,
-        weapon,
-        equipment,
-        accessory,
-        monster,
-        demihuman,
-        body,
-        hair,
-        tail,
-        ear,
-        face,
-        human,
-        decal,
-        ui,
-        furniture // This one's a little vague and encompasses really all of /bgcommon/
+        [Description("")] unknown,
+        [Description("")] none,
+        [Description("w")] weapon,
+        [Description("e")] equipment,
+        [Description("a")] accessory,
+        [Description("m")] monster,
+        [Description("d")] demihuman,
+        [Description("b")] body,
+        [Description("h")] hair,
+        [Description("t")] tail,
+        [Description("z")] ear,
+        [Description("f")] face,
+        [Description("c")] human,
+        [Description("")] decal,
+        [Description("")] ui,
+        [Description("")] furniture, // This one's a little vague and encompasses really all of /bgcommon/
+        [Description("")] indoor,     // These are the clearer versions, but only used by the dependency graph.
+        [Description("")] outdoor
+    }
+
+    public static class XivItemTypes {
+
+        /// <summary>
+        /// Gets the file type prefix for the enum value from its description.
+        /// </summary>
+        /// <param name="value">The enum value</param>
+        /// <returns>The race code</returns>
+        public static string GetFilePrefix(this XivItemType value)
+        {
+            var field = value.GetType().GetField(value.ToString());
+            var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
+            return attribute.Length > 0 ? attribute[0].Description : value.ToString();
+        }
     }
 }

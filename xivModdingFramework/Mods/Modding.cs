@@ -51,6 +51,11 @@ namespace xivModdingFramework.Mods
             ModListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
         }
+
+        public ModList GetModList()
+        {
+            return JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+        }
         public async Task DeleteAllFilesAddedByTexTools()
         {
             var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
@@ -362,12 +367,12 @@ namespace xivModdingFramework.Mods
             if (modToRemove.source == "FilesAddedByTexTools")
             {
                 var index = new Index(_gameDirectory);
-                var success = index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                var success = await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
                 if(!success)
                 {
                     throw new Exception("Failed to delete file descriptor.");
                 }
-                success = index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                success = await index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
                 if (!success)
                 {
                     throw new Exception("Failed to delete file descriptor.");
@@ -419,12 +424,12 @@ namespace xivModdingFramework.Mods
                 if (modToRemove.source == "FilesAddedByTexTools")
                 {
                     var index = new Index(_gameDirectory);
-                    var success = index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                    var success = await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
                     if (!success)
                     {
                         throw new Exception("Failed to delete file descriptor.");
                     }
-                    success = index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                    success = await index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
                     if (!success)
                     {
                         throw new Exception("Failed to delete file descriptor.");
