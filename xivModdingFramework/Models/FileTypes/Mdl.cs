@@ -1920,16 +1920,17 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 XivMdl ogMdl = null;
-                if (options.EnableShapeData && !ttModel.HasShapeData)
+
+                // Load the original model if we're actually going to need it.
+                var mod = await modding.TryGetModEntry(mdlPath);
+                if (mod != null)
                 {
-                    // Load the original model if we're actually going to need it.
-                    var mod = await modding.TryGetModEntry(mdlPath);
-                    if (mod != null)
-                    {
-                        loggingFunction(false, "Loading original SE model to retrieve Shape Data...");
-                        var ogOffset = mod.data.originalOffset;
-                        ogMdl = await GetRawMdlData(item, IOUtil.GetRaceFromPath(mdlPath), submeshId, true);
-                    }
+                    loggingFunction(false, "Loading original SE model...");
+                    var ogOffset = mod.data.originalOffset;
+                    ogMdl = await GetRawMdlData(item, IOUtil.GetRaceFromPath(mdlPath), submeshId, true);
+                } else
+                {
+                    ogMdl = currentMdl;
                 }
 
                 // Apply our Model Modifier options to the model.
@@ -1942,7 +1943,7 @@ namespace xivModdingFramework.Models.FileTypes
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
-                    var oldModel = TTModel.FromRaw(currentMdl);
+                    var oldModel = TTModel.FromRaw(ogMdl);
                     bool cont = await intermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
