@@ -541,18 +541,22 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 // New diffuse starts from regular diffuse file.
                 // Then factors in the player's skin color multiplied by the shader value.
-                float skinInfluence = ByteToFloat(baseSpecular.R) * 0.5f;
-                Color skinColor = MultiplyColor(colors.SkinColor, 1.0f);
+                float skinInfluence = ByteToFloat(baseSpecular.R);
+                var coloredSkin = MultiplyColor(baseDiffuse, colors.SkinColor);
 
-                newDiffuse = Blend(baseDiffuse, skinColor, skinInfluence);
+                newDiffuse = Blend(baseDiffuse, coloredSkin, skinInfluence);
 
                 if (info.Preset == MtrlShaderPreset.Face)
                 {
                     // Face shaders also allow for lip color.
-                    Color lipColor = MultiplyColor(colors.LipColor, 1.0f);
+                    var coloredLip = MultiplyColor(baseDiffuse, colors.LipColor);
                     float lipInfluence = ByteToFloat(baseSpecular.B);
-                    newDiffuse = Blend(newDiffuse, lipColor, lipInfluence);
-                    
+                    newDiffuse = Blend(newDiffuse, coloredLip, lipInfluence);
+
+                    // For lipstick, increase the specular value slightly.
+                    float specAmp = 1.0f + (lipInfluence * 0.25f);
+                    newSpecular = MultiplyColor(newSpecular, specAmp);
+
                 }
 
 
