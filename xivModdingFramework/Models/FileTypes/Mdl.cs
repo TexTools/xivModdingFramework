@@ -55,6 +55,7 @@ using SixLabors.ImageSharp.Formats.Png;
 using System.Data;
 using System.Text.RegularExpressions;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Cache;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -101,7 +102,7 @@ namespace xivModdingFramework.Models.FileTypes
             var mtrlVariant = 1;
             try
             {
-                var _imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
+                var _imc = new Imc(_gameDirectory);
                 mtrlVariant = (await _imc.GetImcInfo(item)).Variant;
             }
             catch (Exception ex)
@@ -161,7 +162,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else
             {
-                var imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
+                var imc = new Imc(_gameDirectory);
                 var model = await GetModel(mdlPath);
                 await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
             }
@@ -411,7 +412,17 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns>An XivMdl structure containing all mdl data.</returns>
         public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
         {
-            await GetReferencedMaterialPaths(mdlPath, -1, getOriginal);
+            /*
+            var _cache = new XivCache(_gameDirectory);
+            var roots = await _cache.Dependencies.GetDependencyRoots(mdlPath);
+            if (roots != null)
+            {
+                var mdlChildren = await _cache.Dependencies.GetChildFiles(mdlPath);
+                var mtrlChildren = await _cache.Dependencies.GetChildFiles(mdlChildren[0]);
+                var rootChildren = await _cache.Dependencies.GetChildFiles(roots[0].ToString());
+                var metaChildren = await _cache.Dependencies.GetChildFiles(rootChildren[0]);
+            }*/
+
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
@@ -1684,12 +1695,12 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false)
+        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true)
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(_gameDirectory, dataFile, XivLanguage.None);
-            var _imc = new Imc(_gameDirectory, dataFile);
+            var _imc = new Imc(_gameDirectory);
             var _index = new Index(_gameDirectory);
 
             var materials = new List<string>();
@@ -1720,20 +1731,29 @@ namespace xivModdingFramework.Models.FileTypes
                 {
 
                     // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
-                    var info = await _imc.GetFullImcInfo(imcPath);
-                    var slotRegex = new Regex("_([a-z]{3}).mdl$");
-                    var slot = "";
-                    var m = slotRegex.Match(mdlPath);
-                    if (m.Success)
+                    try
                     {
-                        slot = m.Groups[1].Value;
-                    }
+                        var info = await _imc.GetFullImcInfo(imcPath);
+                        var slotRegex = new Regex("_([a-z]{3}).mdl$");
+                        var slot = "";
+                        var m = slotRegex.Match(mdlPath);
+                        if (m.Success)
+                        {
+                            slot = m.Groups[1].Value;
+                        }
 
-                    // We have to get all of the material variants used for this item now.
-                    var imcInfos = info.GetAllEntries(slot);
-                    foreach (var i in imcInfos)
+                        // We have to get all of the material variants used for this item now.
+                        var imcInfos = info.GetAllEntries(slot);
+                        foreach (var i in imcInfos)
+                        {
+                            materialVariants.Add(i.Variant);
+                        }
+                    }
+                    catch
                     {
-                        materialVariants.Add(i.Variant);
+                        // Some Dual Wield weapons don't have any IMC entry at all.
+                        // In these cases they just use Material Variant 1 (Which is usually a simple dummy material)
+                        materialVariants.Add(1);
                     }
                 }
             }
@@ -1755,6 +1775,24 @@ namespace xivModdingFramework.Models.FileTypes
                             uniqueMaterialPaths.Add(path);
                         }
                     }
+                }
+            }
+
+            if(!includeSkin)
+            {
+                var skinRegex = new Regex("chara/human/c[0-9]{4}/obj/body/b[0-9]{4}/material/v[0-9]{4}/.+\\.mtrl");
+                var toRemove = new List<string>();
+                foreach(var mtrl in uniqueMaterialPaths)
+                {
+                    if(skinRegex.IsMatch(mtrl))
+                    {
+                        toRemove.Add(mtrl);
+                    }
+                }
+
+                foreach(var mtrl in toRemove)
+                {
+                    uniqueMaterialPaths.Remove(mtrl);
                 }
             }
 

@@ -274,13 +274,27 @@ namespace xivModdingFramework.Materials.FileTypes
 
             using (var br = new BinaryReader(new MemoryStream(mtrlData)))
             {
+                // Texture count position.
                 br.BaseStream.Seek(12, SeekOrigin.Begin);
-                var TextureCount = br.ReadByte();
-                br.BaseStream.Seek(36, SeekOrigin.Begin);
-                for(int i = 0; i < TextureCount; i++)
-                {
+                var textureCount = br.ReadByte();
+                var mapCount = br.ReadByte();
+                var cSetCount = br.ReadByte();
 
-                    // TODO - FIXFIX - Need to actually pull offsets for this it seems.
+                var offset = 0;
+
+                var dataOffsetBase = 16 + (mapCount * 4) + (cSetCount * 4) + (textureCount * 4);
+
+
+                for(int i = 0; i < textureCount; i++)
+                {
+                    // Jump to the texture name offset.
+                    br.BaseStream.Seek(16 + offset, SeekOrigin.Begin);
+                    var textureNameOffset = br.ReadInt16();
+
+                    // Jump to the texture name.
+                    br.BaseStream.Seek(dataOffsetBase + textureNameOffset, SeekOrigin.Begin);
+
+                    // Read the texture name.
                     byte a;
                     List<byte> bytes = new List<byte>(); ;
                     while ((a = br.ReadByte()) != 0)
@@ -294,6 +308,9 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         uniqueTextures.Add(st);
                     }
+
+                    // Bump to next texture name offset.
+                    offset += 4;
                 }
             }
             return uniqueTextures.ToList();
@@ -899,7 +916,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, DataFile);
+                var imc = new Imc(_gameDirectory);
                 var imcInfo = await imc.GetImcInfo(item);
                 variant = imcInfo.Variant;
                 if (imcInfo.Vfx > 0)
@@ -948,7 +965,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, DataFile);
+                var imc = new Imc(_gameDirectory);
                 var imcInfo = await imc.GetImcInfo(itemModel);
                 variant = imcInfo.Variant;
 
@@ -1076,7 +1093,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, DataFile);
+                var imc = new Imc(_gameDirectory);
                 var imcInfo = await imc.GetImcInfo(itemModel);
                 variant = imcInfo.Variant;
             }

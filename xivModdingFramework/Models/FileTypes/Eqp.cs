@@ -22,10 +22,12 @@ namespace xivModdingFramework.Models.FileTypes
         private readonly DirectoryInfo _gameDirectory;
         private readonly DirectoryInfo _modListDirectory;
 
-        private const int EquipmentParameterEntrySize = 8;
+        // Full EQP entries are 8 bytes long.
+        public const int EquipmentParameterEntrySize = 8;
 
-        private const int EquipmentDeformerParameterEntrySize = 2;
-        private const int EquipmentDeformerParameterHeaderLength = 320;
+        // Full EQDP entries are 2 bytes long.
+        public const int EquipmentDeformerParameterEntrySize = 2;
+        public const int EquipmentDeformerParameterHeaderLength = 320;
 
 
         // The subset list of races that actually have deformation files.
@@ -129,9 +131,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<List<XivRace>> GetAvailableRacialModels(int equipmentId, string slot)
         {
-            var accessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+            var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
 
-            if(!accessory)
+            if(!isAccessory)
             {
                 var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
                 if(!slotOk)
@@ -140,7 +142,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            var sets = await GetAllEquipmentDeformationSets(equipmentId, accessory);
+            var sets = await GetAllEquipmentDeformationSets(equipmentId, isAccessory);
             var races = new List<XivRace>();
 
             foreach(var kv in sets)

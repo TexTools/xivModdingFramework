@@ -211,7 +211,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // Get the mtrl version for the given item from the imc file
-                var imc = new Imc(_gameDirectory, dataFile);
+                var imc = new Imc(_gameDirectory);
                 version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
             }
 

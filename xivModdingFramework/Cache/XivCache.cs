@@ -4,6 +4,7 @@ using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.Categories;
@@ -27,6 +28,16 @@ namespace xivModdingFramework.Cache
         private string _connectionString { get
             {
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
+            }
+        }
+
+        public readonly XivDependencyGraph Dependencies;
+
+        public GameInfo GameInfo
+        {
+            get
+            {
+                return _gameInfo;
             }
         }
 
@@ -54,6 +65,8 @@ namespace xivModdingFramework.Cache
                     RebuildCache();
                 }
             }
+
+            Dependencies = new XivDependencyGraph(gameInfo, this);
         }
 
         /// <summary>

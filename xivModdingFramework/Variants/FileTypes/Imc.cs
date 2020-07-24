@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
@@ -41,12 +42,10 @@ namespace xivModdingFramework.Variants.FileTypes
     {
         private const string ImcExtension = ".imc";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
 
-        public Imc(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        public Imc(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
         }
 
         /// <summary>
@@ -108,7 +107,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 throw new InvalidDataException($"Could not find offset for {path}");
             }
 
-            var imcByteData = await dat.GetType2Data(imcOffset, _dataFile);
+            var imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(path));
 
             return await Task.Run(() =>
             {
@@ -328,7 +327,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <summary>
         /// A dictionary containing slot offset data in format [Slot Abbreviation, Offset within variant set]
         /// </summary>
-        private static readonly Dictionary<string, int> _slotOffsetDictionary = new Dictionary<string, int>
+        public static readonly Dictionary<string, int> SlotOffsetDictionary = new Dictionary<string, int>
         {
             {"met", 0},
             {"top", 1},
@@ -429,9 +428,9 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if(_slotOffsetDictionary.ContainsKey(slot) && _slotOffsetDictionary[slot] < subset.Count)
+                if(SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
-                    idx = _slotOffsetDictionary[slot];
+                    idx = SlotOffsetDictionary[slot];
                 }
 
                 return subset[idx];
@@ -457,9 +456,9 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if (_slotOffsetDictionary.ContainsKey(slot) && _slotOffsetDictionary[slot] < subset.Count)
+                if (SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
-                    idx = _slotOffsetDictionary[slot];
+                    idx = SlotOffsetDictionary[slot];
                 }
 
                 // Assign info.

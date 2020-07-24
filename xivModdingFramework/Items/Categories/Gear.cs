@@ -357,7 +357,7 @@ namespace xivModdingFramework.Items.Categories
         public async Task<List<XivRace>> GetRacesForTextures(XivGear xivGear, XivDataFile dataFile)
         {
             // Get the material version for the item from the imc file
-            var imc = new Imc(_gameDirectory, dataFile);
+            var imc = new Imc(_gameDirectory);
             var gearVersion = (await imc.GetImcInfo(xivGear)).Variant.ToString().PadLeft(4, '0');
 
             var modelID = xivGear.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
@@ -706,7 +706,7 @@ namespace xivModdingFramework.Items.Categories
             }
             sameModelItems = await GetSameModelList(item);
 
-            var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
+            var imc = new Imc(_gameDirectory);
             var originalInfo = await imc.GetImcInfo(item);
 
             var sameMaterialItems = new List<IItemModel>();
@@ -738,7 +738,7 @@ namespace xivModdingFramework.Items.Categories
                 );
 
                 // We don't really care which sub-model gets returned here, we just need a path to pull the data file off of.
-                var imc = new Imc(_gameDirectory, item.DataFile);
+                var imc = new Imc(_gameDirectory);
 
                 // Language doesn't actually matter for the tests we're doing here.
                 var info = await imc.GetFullImcInfo(item);
