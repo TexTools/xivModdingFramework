@@ -424,6 +424,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (modded)
                 {
                     offset = mod.data.originalOffset;
+                    modded = false;
                 }
             }
 
