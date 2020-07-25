@@ -1910,10 +1910,12 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-                if (ttModel.MeshGroups.Count == 0)
+                var sane = TTModel.SanityCheck(ttModel, loggingFunction);
+                if(!sane)
                 {
-                    throw new InvalidDataException("The imported model has no data.");
+                    throw new InvalidDataException("Model was deemed invalid.");
                 }
+
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
