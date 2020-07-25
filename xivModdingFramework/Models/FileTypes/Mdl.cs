@@ -53,6 +53,7 @@ using SixLabors.ImageSharp.Formats.Bmp;
 using xivModdingFramework.Variants.FileTypes;
 using SixLabors.ImageSharp.Formats.Png;
 using System.Data;
+using System.Text.RegularExpressions;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -1869,6 +1870,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Wrapping this in an await ensures we're run asynchronously on a new thread.
             await Task.Run(async () =>
             {
+                var filePath = currentMdl.MdlPath;
 
                 #region TTModel Loading
                 // Probably could stand to push this out to its own function later.
@@ -1910,11 +1912,14 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+
                 var sane = TTModel.SanityCheck(ttModel, loggingFunction);
-                if(!sane)
+                if (!sane)
                 {
                     throw new InvalidDataException("Model was deemed invalid.");
                 }
+
+
 
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
@@ -1956,6 +1961,10 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
+                // Fix up the skin references, just because we can/it helps user expectation.
+                // Doesn't really matter as these get auto-resolved in game no matter what race they point to.
+                ModelModifiers.FixUpSkinReferences(ttModel, filePath, loggingFunction);
+
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");
                 var bytes = await MakeNewMdlFile(ttModel, currentMdl, loggingFunction);
@@ -1968,7 +1977,6 @@ namespace xivModdingFramework.Models.FileTypes
                 var modEntry = await modding.TryGetModEntry(mdlPath);
 
 
-                var filePath = currentMdl.MdlPath;
 
                 if (!rawDataOnly)
                 {
