@@ -594,7 +594,7 @@ namespace xivModdingFramework.Cache
         private static readonly Regex _extensionRegex = new Regex(".*\\.([a-z]+)(" + Constants.BinaryOffsetMarker + "[0-9]+)?$");
 
         // Captures the slot of a file (even if it has a binary extension)
-        private static readonly Regex _slotRegex = new Regex("[a-z][0-9]{4}[a-z][0-9]{4}_([a-z]{3})?(?:_[a-z]+)?\\.[a-z]+(?:" + Constants.BinaryOffsetMarker + "[0-9]+)?$");
+        private static readonly Regex _slotRegex = new Regex("[a-z][0-9]{4}[a-z][0-9]{4}_([a-z]{3})(?:_.+\\.|\\.)[a-z]+(?:" + Constants.BinaryOffsetMarker + "[0-9]+)?$");
 
         // Regex for identifying internal references to an item's root node.
         private static readonly Regex RootLevelRegex = new Regex("^%([a-z]+)-([0-9]+)%(?:([a-z]+)-([0-9]+)%)?(?:([a-z]+)%)?$");
@@ -932,6 +932,21 @@ namespace xivModdingFramework.Cache
                 return null;
             }
             var root = new XivDependencyRoot(this, type, primaryId, secondaryType, secondaryId, slot);
+
+            if (slot == null)
+            {
+                // Safety checks.  Custom-name textures can often end up with set being resolvable
+                // but slot non-resolvable.  Either way it's irrelevant, as 
+                // they'll have their root resolved via modlist, if one exists for them.
+                if (root.PrimaryType == XivItemType.equipment
+                    || root.PrimaryType == XivItemType.accessory
+                    || (root.PrimaryType == XivItemType.human && root.SecondaryType != XivItemType.body)
+                    || root.PrimaryType == XivItemType.demihuman)
+                {
+                        return null;
+                }
+            }
+
             return root;
 
         }
@@ -967,14 +982,16 @@ namespace xivModdingFramework.Cache
             var root = CreateDependencyRoot(type, pId, secondaryType, sId, slot);
             return root;
         }
+
+
         /// <summary>
-        /// So this is by far the shittiest case for resolution of file dependency info.
-        /// Because custom textures both can have any name they want, and exist in any folder they want,
-        /// We have to crawl the cache to find what custom MTRL refers to them, if any.
+        /// This crawls the cache to find what files refer to the file in question.
+        /// The cache is not guaranteed to be exhaustive with regards to default files, so essentially
+        /// this covers cross-root-referential files.
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        private async Task<List<XivDependencyRoot>> GetCustomTextureDependencyRoots(string internalFilePath)
+        private async Task<List<XivDependencyRoot>> GetModdedRoots(string internalFilePath)
         {
 
             var parents = new List<string>();
@@ -985,6 +1002,10 @@ namespace xivModdingFramework.Cache
             foreach (var file in cachedParents)
             {
                 var matRoots = await _cache.GetDependencyRoots(file);
+                foreach(var mat in matRoots)
+                {
+                    uniqueRoots.Add(mat);
+                }
             }
 
             return uniqueRoots.ToList();
@@ -992,15 +1013,20 @@ namespace xivModdingFramework.Cache
 
         /// <summary>
         /// Resolves the dependency roots for a given child file of any file type.
-        /// For Non-Texture files this will always be exactly one root (or null).
-        /// For textures this can be be multiple (valid), zero (orphaned), or null (not in dependency graph).
+        /// For Model, Meta, and Material files this will always be exactly one root (or 0).
+        /// For Textures this can be more than one.
         /// 
-        /// A null return indicates the item does not fall within the domain of the dependency graph.
-        /// A return of Length 0 indicates this custom texture file does not have any parents remaining.
-        ///   - This can still change due to mods beind re-enabled.  A secondary check function should 
-        ///   - be written to validate if an orphaned file can be safely deleted or if it still has
-        ///   - lingering disabled references in the Modlist.
-        ///   
+        ///     - TECHNICALLY some Materials can be cross-root referenced in some item categories.
+        ///     - Specifically in the Human group and Furniture group.
+        ///     - These cases are just not supported in the graph because trying to identify them all is
+        ///     - *Exceptionally* costly or effectively impossible.  As such, upward tree traversals
+        ///     - for materials in those categories may be incomplete.
+        /// 
+        /// A return value of 0 length indicates that this file is orphaned,
+        /// and has no calculatable dependency information.
+        /// 
+        /// NOTE - Dependency Roots for TEXTURES and MATERIALS cannot be 100% correctly established
+        /// without a fully populated cache of mod file children.
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
@@ -1013,19 +1039,21 @@ namespace xivModdingFramework.Cache
             {
                 // This is a root placeholder item, just reconstruct it and ship it back.
                 var root = CreateDependencyRoot(internalFilePath);
-                if(root == null)
+                if(root != null)
                 {
-                    return null;
+                    roots.Add(root);
                 }
-                return new List<XivDependencyRoot>() { root };
+                return roots.ToList();
             }
 
-            // Tex files require special handling.
+
+            // Tex files require special handling, because they can be referenced by modded items
+            // outside of their own dependency chain potentially.
             match = _extensionRegex.Match(internalFilePath);
-            if(match.Success && match.Groups[1].Value == "tex")
+            if(match.Success && (match.Groups[1].Value == "tex"))
             {
-                // Oh boy.  Here we have to scrape the modlist to find any custom modded roots(plural) we may have.
-                var customRoots = await GetCustomTextureDependencyRoots(internalFilePath);
+                // Oh boy.  Here we have to scrape the cache to find any custom modded roots(plural) we may have.
+                var customRoots = await GetModdedRoots(internalFilePath);
                 foreach(var r in customRoots)
                 {
                     roots.Add(r);
@@ -1040,7 +1068,6 @@ namespace xivModdingFramework.Cache
                 match = PrimaryExtractionRegex.Match(internalFilePath);
                 if (match.Success)
                 {
-                    // Ok, at this point we can generate our root.  First extract all the data from the root path.
                     var type = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[1].Value);
                     int pId = Int32.Parse(match.Groups[2].Value);
                     XivItemType? secondaryType = null;
@@ -1061,12 +1088,13 @@ namespace xivModdingFramework.Cache
                         slot = match.Groups[1].Value;
                     }
 
+                    // This can return null if we're an unsupported type, or some of our data
+                    // extracted was incomplete/invalid (ex. Custom named textures).
                     var root = CreateDependencyRoot(type, pId, secondaryType, sId, slot);
-                    if (root == null)
+                    if (root != null)
                     {
-                        return null;
+                        roots.Add(root);
                     }
-                    roots.Add(root);
                 }
             }
 
@@ -1112,9 +1140,6 @@ namespace xivModdingFramework.Cache
                     return new List<XivDependencyRoot>() { CreateDependencyRoot(type, setId, null, null, slot) };
                     
                 }
-
-                // At this point, the only conclusion is that the file is not something in the dependency tree.
-                return null;
             }
 
             return roots.ToList();

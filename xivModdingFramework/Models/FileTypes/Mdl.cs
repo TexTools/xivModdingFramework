@@ -1755,15 +1755,11 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 foreach (var mName in materialNames)
                 {
-                    var path = _mtrl.GetMtrlPath(mdlPath, mName, mVariant);
-                    if (!uniqueMaterialPaths.Contains(path))
+                    // Material ID 0 is SE's way of saying it doesn't exist.
+                    if (mVariant != 0)
                     {
-                        // Validate the MTRL actually exists. (Sometimes unused IMC sets refer to nonexistent materials)
-                        // (This seems to only really be the case when the Material Variant is 0)
-                        if (await _index.FileExists(path))
-                        {
-                            uniqueMaterialPaths.Add(path);
-                        }
+                        var path = _mtrl.GetMtrlPath(mdlPath, mName, mVariant);
+                        uniqueMaterialPaths.Add(path);
                     }
                 }
             }
