@@ -145,17 +145,45 @@ namespace xivModdingFramework.Models.FileTypes
             var sets = await GetAllEquipmentDeformationSets(equipmentId, isAccessory);
             var races = new List<XivRace>();
 
-            foreach(var kv in sets)
+            if (sets != null)
             {
-                var race = kv.Key;
-                var set = kv.Value;
-                var entry = set.Parameters[slot];
-
-                // Bit0 has unknown purpose currently.
-                if(entry.bit1)
+                foreach (var kv in sets)
                 {
-                    races.Add(race);
+                    var race = kv.Key;
+                    var set = kv.Value;
+                    var entry = set.Parameters[slot];
+
+                    // Bit0 has unknown purpose currently.
+                    if (entry.bit1)
+                    {
+                        races.Add(race);
+                    }
                 }
+            } else
+            {
+                var _index = new Index(_gameDirectory);
+
+                // Ok, at this point we're in a somewhat unusual item; it's an item that is effectively non-set.
+                // It has an item set ID in the multiple thousands (ex. 5000/9000), so it does not use the EQDP table.
+                // In these cases, there's nothing to do but hard check the model paths, until such a time as we know
+                // how these are resolved.
+                foreach (var race in DeformationAvailableRaces)
+                {
+                    var path = "";
+                    if (!isAccessory)
+                    {
+                        path = String.Format(_EquipmentModelPathFormat, equipmentId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
+                    }
+                    else
+                    {
+                        path = String.Format(_AccessoryModelPathFormat, equipmentId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
+                    }
+                    if(await _index.FileExists(path))
+                    {
+                        races.Add(race);
+                    }
+                }
+
             }
 
             return races;
@@ -167,7 +195,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="accessory"></param>
         /// <returns></returns>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameterSet>> GetAllEquipmentDeformationSets(int equipmentId, bool accessory)
+        private async Task<Dictionary<XivRace, EquipmentDeformationParameterSet>> GetAllEquipmentDeformationSets(int equipmentId, bool accessory)
         {
             var sets = new Dictionary<XivRace, EquipmentDeformationParameterSet>();
 
@@ -176,11 +204,15 @@ namespace xivModdingFramework.Models.FileTypes
                 var result = await GetEquipmentDeformationSet(equipmentId, race, accessory);
                 if (result != null) {
                     sets.Add(race, result);
+                } else
+                {
+                    return null;
                 }
             }
 
             return sets;
         }
+
 
         /// <summary>
         /// Get the equipment or accessory deformation set for a given item and race.
@@ -190,7 +222,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="race"></param>
         /// <param name="accessory"></param>
         /// <returns></returns>
-        public async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false)
+        private async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false)
         {
             var raw = await GetRawEquipmentDeformationParameters(equipmentId, race, accessory);
             if(raw == null)
@@ -221,6 +253,8 @@ namespace xivModdingFramework.Models.FileTypes
             return set;
         }
 
+        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
+        private string _AccessoryModelPathFormat = "chara/equipment/a{0}/model/c{1}a{0}_{2}.mdl";
         /// <summary>
         /// Get the raw bytes for the equipment or accessory deformation parameters for a given equipment set and race.
         /// </summary>
@@ -235,6 +269,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if(start >= data.Count)
             {
+
                 return null;
             }
 

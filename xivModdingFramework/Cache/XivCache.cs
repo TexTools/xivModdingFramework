@@ -24,10 +24,10 @@ namespace xivModdingFramework.Cache
     {
         private GameInfo _gameInfo;
         private DirectoryInfo _dbPath;
-        public static readonly Version CacheVersion = new Version("0.0.1.0");
+        public static readonly Version CacheVersion = new Version("0.0.1.1");
         private const string dbFileName = "mod_cache.db";
         private const string creationScript = "CreateCacheDB.sql";
-        private string _connectionString { get
+        public string CacheConnectionString { get
             {
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
             }
@@ -192,7 +192,7 @@ namespace xivModdingFramework.Cache
             GC.WaitForPendingFinalizers();
             File.Delete(_dbPath.FullName);
 
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
                 var lines = File.ReadAllLines("Resources\\SQL\\" + creationScript);
@@ -225,7 +225,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private async Task RebuildUiCache()
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 var _ui = new UI(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
                 var list = await _ui.GetActionList();
@@ -267,7 +267,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private async Task RebuildFurnitureCache()
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _housing = new Housing(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
@@ -303,7 +303,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private async Task RebuildMountsCache()
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
@@ -353,7 +353,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private async Task RebuildPetsCache()
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
@@ -398,7 +398,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private async Task RebuildMinionsCache()
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
@@ -442,7 +442,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private async Task RebuildItemsCache()
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 Gear gear = null;
                 gear = new Gear(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
@@ -474,101 +474,6 @@ namespace xivModdingFramework.Cache
             }
         }
 
-
-        private async Task BuildModdedItemDependencies()
-        {
-            var _modding = new Modding(GameInfo.GameDirectory);
-            _cachedModList = _modding.GetModList();
-
-            foreach(var m in _cachedModList.Mods)
-            {
-                try
-                {
-                    await UpdateFileChildren(m.fullPath);
-                } catch(Exception ex)
-                {
-                    throw;
-                }
-            }
-            _cachedModList = null;
-        }
-
-
-        /// <summary>
-        /// Retreives the child files in the dependency graph for this file.
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <returns></returns>
-        public async Task<List<string>> GetChildFiles(string internalFilePath)
-        {
-            var wc = new WhereClause() { Column = "parent", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies", wc, async (reader) =>
-            {
-                return reader.GetString("child");
-            });
-
-            if(list.Count == 0)
-            {
-                // Need to pull the raw data to verify a 0 count entry.
-                list = await Dependencies.GetChildFiles(internalFilePath);
-                if (list != null && list.Count > 0)
-                {
-                    await UpdateFileChildren(internalFilePath, list);
-                }
-            }
-            return list;
-        }
-
-        /// <summary>
-        /// Retreives the child files in the dependency graph for this file.
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <returns></returns>
-        public async Task<List<string>> GetCachedParentFiles(string internalFilePath)
-        {
-            var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies", wc, async (reader) =>
-            {
-                return reader.GetString("parent");
-            });
-            return list;
-        }
-
-        /// <summary>
-        /// Retreives the parent files in the dependency graph for this file.
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <returns></returns>
-        public async Task<List<string>> GetParentFiles(string internalFilePath)
-        {
-            return await Dependencies.GetParentFiles(internalFilePath);
-        }
-
-        /// <summary>
-        /// Retreives the sibling files in the dependency graph for this file.
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <returns></returns>
-        public async Task<List<string>> GetSiblingFiles(string internalFilePath)
-        {
-            return await Dependencies.GetSiblingFiles(internalFilePath);
-        }
-
-
-        /// <summary>
-        /// Retrieves the dependency roots for the given file.
-        /// 
-        /// For everything other than texture files, this will always be,
-        /// A list of length 1 (valid), 0 (orphaned), or null (invalid/not in the scope of the dependency graph)
-        /// For textures this can be 0 (orphaned) or any amount 1+.
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <returns></returns>
-        public async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
-        {
-            var roots = await Dependencies.GetDependencyRoots(internalFilePath);
-            return roots;
-        }
 
         /// <summary>
         /// Get the ui entries list, optionally with a substring filter.
@@ -868,7 +773,7 @@ namespace xivModdingFramework.Cache
         /// <param name="value"></param>
         private void SetMetaValue(string key, string value = null)
         {
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
                 var query = "insert into meta(key, value) values($key,$value) on conflict(key) do update set value = excluded.value";
@@ -889,7 +794,7 @@ namespace xivModdingFramework.Cache
         private string GetMetaValue(string key)
         {
             string val = null;
-            using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
                 var query = "select value from meta where key = $key";
@@ -918,10 +823,128 @@ namespace xivModdingFramework.Cache
         }
 
         /// <summary>
+        /// Builds the initial base/required dependency list, aka
+        /// all the file children of the modded files in the modlist.
+        /// </summary>
+        /// <returns></returns>
+        private async Task BuildModdedItemDependencies()
+        {
+            var _modding = new Modding(GameInfo.GameDirectory);
+            _cachedModList = _modding.GetModList();
+
+            foreach (var m in _cachedModList.Mods)
+            {
+                try
+                {
+                    await UpdateChildFiles(m.fullPath);
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+            }
+            _cachedModList = null;
+        }
+
+
+        /// <summary>
+        /// Retreives the child files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetChildFiles(string internalFilePath, bool cachedOnly = false)
+        {
+            var wc = new WhereClause() { Column = "parent", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
+            var list = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+            {
+                return reader.GetString("child");
+            });
+
+            if (cachedOnly)
+            {
+                return list;
+            }
+
+            if (list.Count == 0)
+            {
+                // Need to pull the raw data to verify a 0 count entry.
+                list = await Dependencies.GetChildFiles(internalFilePath);
+                if (list != null && list.Count > 0)
+                {
+                    await UpdateChildFiles(internalFilePath, list);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Retreives the parent files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetParentFiles(string internalFilePath, bool cachedOnly = false)
+        {
+            var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
+            var list = await BuildListFromTable("dependencies_parents", wc, async (reader) =>
+            {
+                return reader.GetString("parent");
+            });
+
+            if (cachedOnly)
+            {
+                return list;
+            }
+
+            if (list.Count == 0)
+            {
+                try
+                {
+                    // Need to pull the raw data to verify a 0 count entry.
+                    list = await Dependencies.GetParentFiles(internalFilePath);
+                    if (list != null && list.Count > 0)
+                    {
+                        await UpdateParentFiles(internalFilePath, list);
+                    }
+                } catch(Exception ex)
+                {
+                    list = await Dependencies.GetParentFiles(internalFilePath);
+                    throw;
+                }
+            }
+            return list;
+        }
+        /// <summary>
+        /// Retreives the sibling files in the dependency graph for this file.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetSiblingFiles(string internalFilePath)
+        {
+            return await Dependencies.GetSiblingFiles(internalFilePath);
+        }
+
+
+        /// <summary>
+        /// Retrieves the dependency roots for the given file.
+        /// 
+        /// For everything other than texture files, this will always be,
+        /// A list of length 1 (valid), 0 (orphaned), or null (invalid/not in the scope of the dependency graph)
+        /// For textures this can be 0 (orphaned) or any amount 1+.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
+        {
+            var roots = await Dependencies.GetDependencyRoots(internalFilePath);
+            return roots;
+        }
+
+
+        /// <summary>
         /// Updates the file children in the dependencies cache.
         /// </summary>
         /// <param name="internalFilePath"></param>
-        public async Task UpdateFileChildren(string internalFilePath, List<string> children = null)
+        public async Task UpdateChildFiles(string internalFilePath, List<string> children = null)
         {
             var level = Dependencies.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Texture)
@@ -929,100 +952,109 @@ namespace xivModdingFramework.Cache
                 return;
             }
 
-            var wc = new WhereClause() { Column = "child", Value = internalFilePath, Comparer = WhereClause.ComparisonType.Equal };
-            var oldChildren = await BuildListFromTable("dependencies", wc, async (reader) =>
+            // Just updating a single file.
+            if (children == null)
             {
-                return reader.GetString("child");
-            });
-
-            if (level == XivDependencyLevel.Meta)
-            {
-                var allMetas = await (await Dependencies.GetDependencyRoots(internalFilePath))[0].GetMetaFiles();
-
-                // Meta files should be updated as a group.
-                // Written this way to be more efficient/speedy.
-                using (var db = new SQLiteConnection(_connectionString))
-                {
-                    db.Open();
-                    using (var transaction = db.BeginTransaction())
-                    {
-                        var delQuery = "delete from dependencies where parent = $parent";
-                        using (var delCmd= new SQLiteCommand(delQuery, db))
-                        {
-                            var insertQuery = "insert into dependencies (parent, child) values ($parent, $child)";
-                            using (var insertCmd = new SQLiteCommand(insertQuery, db))
-                            {
-
-                                // For each meta entry
-                                foreach (var meta in allMetas)
-                                {
-                                    // Clear the old children
-                                    delCmd.Parameters.AddWithValue("parent", meta);
-                                    delCmd.ExecuteScalar();
-
-                                    foreach (var child in children)
-                                    {
-
-                                        // And write the new ones.
-                                        insertCmd.Parameters.AddWithValue("parent", meta);
-                                        insertCmd.Parameters.AddWithValue("child", child);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                children = await Dependencies.GetChildFiles(internalFilePath);
             }
-            else
-            {
-                // Just updating a single file.
-                if (children == null)
-                {
-                    children = await Dependencies.GetChildFiles(internalFilePath);
-                }
 
-                using (var db = new SQLiteConnection(_connectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+                using (var transaction = db.BeginTransaction())
                 {
-                    db.Open();
-                    using (var transaction = db.BeginTransaction())
+                    var query = "delete from dependencies_children where parent = $parent";
+                    using (var cmd = new SQLiteCommand(query, db))
                     {
-                        var query = "delete from dependencies where parent = $parent";
-                        using (var cmd = new SQLiteCommand(query, db))
+                        cmd.Parameters.AddWithValue("parent", internalFilePath);
+                        cmd.ExecuteScalar();
+                    }
+
+                    if (children == null) return;
+
+
+                    query = "insert into dependencies_children (parent, child) values ($parent, $child)";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        foreach (var child in children)
                         {
                             cmd.Parameters.AddWithValue("parent", internalFilePath);
-                            cmd.ExecuteScalar();
-                        }
-
-                        if (children == null) return;
-
-
-                        query = "insert into dependencies (parent, child) values ($parent, $child)";
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            foreach (var child in children)
+                            cmd.Parameters.AddWithValue("child", child);
+                            try
                             {
-                                cmd.Parameters.AddWithValue("parent", internalFilePath);
-                                cmd.Parameters.AddWithValue("child", child);
-                                try
-                                {
-                                    cmd.ExecuteScalar();
-                                }
-                                catch (Exception ex)
-                                {
-                                    throw;
-                                }
+                                cmd.ExecuteScalar();
+                            }
+                            catch (Exception ex)
+                            {
+                                throw;
                             }
                         }
-                        transaction.Commit();
                     }
+                    transaction.Commit();
                 }
             }
 
         }
 
+        /// <summary>
+        /// Updates the file parents in the dependencies cache.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        private async Task UpdateParentFiles(string internalFilePath, List<string> parents = null)
+        {
+            var level = Dependencies.GetDependencyLevel(internalFilePath);
+            if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root)
+            {
+                return;
+            }
+
+            // Just updating a single file.
+            if (parents == null)
+            {
+                parents = await Dependencies.GetParentFiles(internalFilePath);
+            }
+
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+                using (var transaction = db.BeginTransaction())
+                {
+                    // Clear out all old parents
+                    var query = "delete from dependencies_parents where parent = $child";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("child", internalFilePath);
+                        cmd.ExecuteScalar();
+                    }
+
+                    if (parents == null) return;
+
+
+                    query = "insert into dependencies_parents (parent, child) values ($parent, $child)";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        foreach (var parent in parents)
+                        {
+                            cmd.Parameters.AddWithValue("parent", parent);
+                            cmd.Parameters.AddWithValue("child", internalFilePath);
+                            try
+                            {
+                                cmd.ExecuteScalar();
+                            }
+                            catch (Exception ex)
+                            {
+                                throw;
+                            }
+                        }
+                    }
+                    transaction.Commit();
+                }
+            }
+
+        }
         private async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
         {
-            return await BuildListFromTable<T>(_connectionString, table, where, func);
+            return await BuildListFromTable<T>(CacheConnectionString, table, where, func);
         }
 
         /// <summary>

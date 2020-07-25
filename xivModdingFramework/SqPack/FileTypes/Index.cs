@@ -970,7 +970,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Update Dependency Cache.
             var cache = new XivCache(_gameDirectory);
-            await cache.UpdateFileChildren(fullPath);
+            await cache.UpdateChildFiles(fullPath);
 
             return true;
         }
@@ -1251,7 +1251,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Update Dependency Cache.
             var cache = new XivCache(_gameDirectory);
-            await cache.UpdateFileChildren(fullPath);
+            await cache.UpdateChildFiles(fullPath);
 
 
             return true;
@@ -1315,7 +1315,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Update Dependency Cache.
             var cache = new XivCache(_gameDirectory);
-            await cache.UpdateFileChildren(fullPath);
+            await cache.UpdateChildFiles(fullPath);
 
 
 

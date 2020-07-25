@@ -340,6 +340,28 @@ namespace xivModdingFramework.Variants.FileTypes
             {"rir", 3},
             {"ril", 4}
         };
+        /// <summary>
+        /// A dictionary containing slot offset data in format [Slot Abbreviation, Offset within variant set]
+        /// </summary>
+        public static readonly Dictionary<string, int> EquipmentSlotOffsetDictionary = new Dictionary<string, int>
+        {
+            {"met", 0},
+            {"top", 1},
+            {"glv", 2},
+            {"dwn", 3},
+            {"sho", 4},
+        };
+        /// <summary>
+        /// A dictionary containing slot offset data in format [Slot Abbreviation, Offset within variant set]
+        /// </summary>
+        public static readonly Dictionary<string, int> AccessorySlotOffsetDictionary = new Dictionary<string, int>
+        {
+            {"ear", 0},
+            {"nek", 1},
+            {"wrs", 2},
+            {"rir", 3},
+            {"ril", 4}
+        };
 
         /// <summary>
         /// Class containing the information for and IMC file

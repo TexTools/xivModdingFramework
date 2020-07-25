@@ -78,9 +78,16 @@ CREATE TABLE "monsters" (
 	PRIMARY KEY("category", "name", "primary_id", "secondary_id", "imc_variant")
 );
 
-CREATE TABLE "dependencies" (
+CREATE TABLE "dependencies_children" (
 	"parent" TEXT NOT NULL,
 	"child" TEXT NOT NULL,
 
 	PRIMARY KEY("parent", "child")
+);
+
+CREATE TABLE "dependencies_parents" (
+	"child" TEXT NOT NULL,
+	"parent" TEXT NOT NULL,
+
+	PRIMARY KEY("child", "parent")
 );
