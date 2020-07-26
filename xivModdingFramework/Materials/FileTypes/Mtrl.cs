@@ -935,6 +935,7 @@ namespace xivModdingFramework.Materials.FileTypes
         private readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
         private readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
         private readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
+        private readonly Regex _raceMatch = new Regex("(c[0-9]{4})");
         private readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
@@ -945,13 +946,24 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns></returns>
         public string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
         {
-            var match = _skinRegex.Match(mtrlName);
-            
+
+
+            // So we have to do this step first.
+            var mdlMatch = _raceMatch.Match(mdlPath);
+            var mtrlMatch = _raceMatch.Match(mtrlName);
+
+            // Both Items have racial model information in their path, and the races DON'T match.
+            if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+            {
+                // In this case, we actually replace the race in the Material the race from the MODEL, which has priority.
+                mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, mdlMatch.Groups[1].Value);
+            }
+
 
             var mtrlFolder = "";
 
-            // Skin is the only known exception case.  Skin materials are auto resolved out of their item root path
-            // and into the character base directory.
+            // Now then, skin materials resolve to their racial path, always.
+            var match = _skinRegex.Match(mtrlName);
             if (match.Success)
             {
                 var race = match.Groups[1].Value;
@@ -965,6 +977,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 // This a furniture item or something else that specifies an explicit full material path.
                 // We can just return that.
                 return mtrlName;
+
             } else if (mdlPath.Contains("/face/f") || mdlPath.Contains("/zear/z")) {
 
                 // Faces and ears don't use material variants.
@@ -973,10 +986,11 @@ namespace xivModdingFramework.Materials.FileTypes
                 var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
                 mtrlFolder = baseFolder + "/material";
             }
+
             else {
 
-                var mdlMatch = _raceRegex.Match(mdlPath);
-                var mtrlMatch = _raceRegex.Match(mtrlName);
+                mdlMatch = _raceRegex.Match(mdlPath);
+                mtrlMatch = _raceRegex.Match(mtrlName);
 
                 // Both items have racaial information in their path, and the races DON'T match.
                 if(mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
@@ -1007,6 +1021,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     // Needless to say, this only happens with tail items.
                     mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
                 }
+
 
                 var mdlFolder = Path.GetDirectoryName(mdlPath);
                 mdlFolder = mdlFolder.Replace("\\", "/");
