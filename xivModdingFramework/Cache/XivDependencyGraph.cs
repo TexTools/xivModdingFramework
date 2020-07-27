@@ -1210,7 +1210,7 @@ namespace xivModdingFramework.Cache
 
         private async Task TestAllIds(Dictionary<string, XivDependencyRootInfo?> combinedHashes, XivItemType primary, XivItemType? secondary) {
 
-            await Task.Run(async () => {
+            await Task.Run(() => {
                 var root = new XivDependencyRootInfo();
                 root.PrimaryType = primary;
                 root.SecondaryType = secondary;
@@ -1332,7 +1332,7 @@ namespace xivModdingFramework.Cache
                     tasks.Add(TestAllIds(mergedDict, primary, secondary));
                 }
             }
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks.ToArray());
 
         }
 
