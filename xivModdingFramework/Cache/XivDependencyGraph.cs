@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
@@ -1208,81 +1209,91 @@ namespace xivModdingFramework.Cache
         }
 
 
-        private async Task TestAllIds(Dictionary<string, XivDependencyRootInfo?> combinedHashes, XivItemType primary, XivItemType? secondary) {
+        private async Task TestAllRoots(Dictionary<string, XivDependencyRootInfo?> combinedHashes, XivItemType primary, XivItemType? secondary) {
+
 
             await Task.Run(() => {
-                var root = new XivDependencyRootInfo();
-                root.PrimaryType = primary;
-                root.SecondaryType = secondary;
-                var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-                var races = XivRaces.PlayableRaces;
-
-                for (int p = 0; p < 10000; p++)
+                try
                 {
-                    root.PrimaryId = p;
+                    var root = new XivDependencyRootInfo();
+                    root.PrimaryType = primary;
+                    root.SecondaryType = secondary;
+                    var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                    var races = XivRaces.PlayableRaces;
 
-                    if (secondary == null)
+                    for (int p = 0; p < 10000; p++)
                     {
-                        var folder = root.GetRootFolder() + "model";
-                        var folderHash = HashGenerator.GetHash(folder);
-                        var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
-                        // For these, just let the EDP module verify if there are any races availble for the item?
-                        foreach(var slot in slots)
-                        {
-                            root.Slot = slot;
-                            foreach (var race in races) {
-                                var modelName = root.GetRacialModelName(race);
-                                var fileHash = HashGenerator.GetHash(modelName);
-                                var key = fileHash.ToString() + folderHash.ToString();
-                                if (combinedHashes.ContainsKey(key))
-                                {
-                                    XivCache.CacheRoot(root);
+                        root.PrimaryId = p;
 
-                                    // We don't care how many models there are, just that there *are* any models.
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        for (int s = 0; s < 10000; s++)
+                        if (secondary == null)
                         {
-                            root.SecondaryId = s;
                             var folder = root.GetRootFolder() + "model";
                             var folderHash = HashGenerator.GetHash(folder);
-                            var slots = XivItemTypes.GetAvailableSlots((XivItemType)root.SecondaryType);
+                            var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
                             // For these, just let the EDP module verify if there are any races availble for the item?
-
-                            if (root.PrimaryId == 201 && root.SecondaryId == 56 && root.PrimaryType == XivItemType.weapon) {
-                                var z = "d";
-                            }
-
-                            if(slots.Count == 0)
-                            {
-                                slots.Add("");
-                            }
                             foreach (var slot in slots)
                             {
-                                if (slot == "")
+                                root.Slot = slot;
+                                foreach (var race in races)
                                 {
-                                    root.Slot = null;
+                                    var modelName = root.GetRacialModelName(race);
+                                    var fileHash = HashGenerator.GetHash(modelName);
+                                    var key = fileHash.ToString() + folderHash.ToString();
+                                    if (combinedHashes.ContainsKey(key))
+                                    {
+                                        XivCache.CacheRoot(root);
+
+                                        // We don't care how many models there are, just that there *are* any models.
+                                        break;
+                                    }
                                 }
-                                else
+                            }
+                        }
+                        else
+                        {
+                            for (int s = 0; s < 10000; s++)
+                            {
+                                root.SecondaryId = s;
+                                var folder = root.GetRootFolder() + "model";
+                                var folderHash = HashGenerator.GetHash(folder);
+                                var slots = XivItemTypes.GetAvailableSlots((XivItemType)root.SecondaryType);
+                                // For these, just let the EDP module verify if there are any races availble for the item?
+
+                                if (root.PrimaryId == 201 && root.SecondaryId == 56 && root.PrimaryType == XivItemType.weapon)
                                 {
-                                    root.Slot = slot;
+                                    var z = "d";
                                 }
-                                var modelName = root.GetSimpleModelName();
-                                var fileHash = HashGenerator.GetHash(modelName);
-                                var key = fileHash.ToString() + folderHash.ToString();
-                                if (combinedHashes.ContainsKey(key))
+
+                                if (slots.Count == 0)
                                 {
-                                    XivCache.CacheRoot(root);
+                                    slots.Add("");
+                                }
+                                foreach (var slot in slots)
+                                {
+                                    if (slot == "")
+                                    {
+                                        root.Slot = null;
+                                    }
+                                    else
+                                    {
+                                        root.Slot = slot;
+                                    }
+                                    var modelName = root.GetSimpleModelName();
+                                    var fileHash = HashGenerator.GetHash(modelName);
+                                    var key = fileHash.ToString() + folderHash.ToString();
+                                    if (combinedHashes.ContainsKey(key))
+                                    {
+                                        XivCache.CacheRoot(root);
+                                    }
                                 }
                             }
                         }
                     }
+                } catch(Exception Ex) {
+                    Console.WriteLine(Ex.Message);
+                    throw;
                 }
+
             });
         }
 
@@ -1295,6 +1306,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public async Task CacheAllRealRoots()
         {
+            ResetRootCache();
             var index = new Index(XivCache.GameInfo.GameDirectory);
             var mergedHashes = await index.GetFileDictionary(XivDataFile._04_Chara);
 
@@ -1327,12 +1339,19 @@ namespace xivModdingFramework.Cache
             foreach (var kv in types)
             {
                 var primary = kv.Key;
-                foreach(var secondary in kv.Value)
+                foreach (var secondary in kv.Value)
                 {
-                    tasks.Add(TestAllIds(mergedDict, primary, secondary));
+                    tasks.Add(TestAllRoots(mergedDict, primary, secondary));
                 }
             }
-            await Task.WhenAll(tasks.ToArray());
+            try
+            {
+                await Task.WhenAll(tasks.ToArray());
+            } catch(Exception ex)
+            {
+                Console.WriteLine(ex);
+                throw;
+            }
 
         }
 
