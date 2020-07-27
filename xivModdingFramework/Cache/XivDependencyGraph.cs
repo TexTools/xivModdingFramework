@@ -10,7 +10,9 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
@@ -56,9 +58,10 @@ namespace xivModdingFramework.Cache
     }
 
 
-    // The information needed to construct a Dependency Root.
-    // A struct may not be fully qualified with information to generate
-    // a full root if it did not come from an actual XivDependencyRoot object.
+    // A naive representation of a dependency root/root folder in FFXIV's
+    // File System.  Provides basic calculated fields, however, more extensive
+    // calculations expect this item to be fully qualified and properly contained
+    // in an actual dependency root object.
     public struct XivDependencyRootInfo
     {
         // Only types with actual dependency structures are supported.
@@ -82,34 +85,14 @@ namespace xivModdingFramework.Cache
         // Slot may not exist for all types.
         public string? Slot;
 
-    }
-
-    /// <summary>
-    /// A class representing a top level dependency root.  This is in effect, a collection of
-    /// five simple values [Type, Primary Id, Secondary Type, Secondary ID, Slot]
-    /// All Entries have at least Primary Type and Id.
-    /// From these five populated values, we can effectively generate the entire dependency tree downwards,
-    /// and these five values can be generated from any child file via XivDependencyGraph::GetDependencyRoot(internalFilePath)
-    /// 
-    /// These five values can also be used to collect the entire subset of FFXIV "Items" that live within this
-    /// dependency root.
-    /// 
-    /// This class also overrides ToString() with an arbitrary string based representation of these five values,
-    /// which can be used in the various functions which take path strings.
-    /// </summary>
-    public class XivDependencyRoot
-    {
         /// <summary>
-        /// The actual relevant datapoints.
+        /// Converts this dependency root into a raw string entry.
         /// </summary>
-        public readonly XivDependencyRootInfo Info;
-
-        // Internal dependency graph reference so we can leach data and functions from it as needed.
-        private readonly XivDependencyGraph _graph;
-
-
-        // {0} = BaseFileFormat
-        private static readonly string ModelNameFormat = "model/{0}.mdl";
+        /// <returns></returns>
+        public override string ToString()
+        {
+            return GetRootFile();
+        }
 
         // Type -> Typecode -> Id
         private static readonly string RootFolderFormatPrimary = "chara/{0}/{1}{2}/";
@@ -121,11 +104,165 @@ namespace xivModdingFramework.Cache
         private static readonly string BaseFileFormatWithSlot = "{0}{1}{2}{3}_{4}";
         private static readonly string BaseFileFormatNoSlot = "{0}{1}{2}{3}";
 
+        // {0} = BaseFileFormat
+        private static readonly string ModelNameFormat = "{0}.mdl";
+
+
+        /// <summary>
+        /// Gets the file name base for this root.
+        /// Ex c0101f0001_fac
+        /// </summary>
+        /// <returns></returns>
+        public string GetBaseFileName()
+        {
+            var pId = PrimaryId.ToString().PadLeft(4, '0');
+            var pPrefix = XivItemTypes.GetSystemPrefix(PrimaryType);
+            var sId = "";
+            var sPrefix = "";
+            if (SecondaryType != null)
+            {
+                sId = SecondaryId.ToString().PadLeft(4, '0');
+                sPrefix = XivItemTypes.GetSystemPrefix((XivItemType)SecondaryType);
+            }
+
+            if (Slot != null)
+            {
+                return String.Format(BaseFileFormatWithSlot, new string[] { pPrefix, pId, sPrefix, sId, Slot });
+            }
+            else
+            {
+                return String.Format(BaseFileFormatNoSlot, new string[] { pPrefix, pId, sPrefix, sId });
+            }
+        }
+
+        public string GetRootFile()
+        {
+            return GetRootFolder() + GetBaseFileName() + ".root";
+        }
+
+        public string GetMetaFile()
+        {
+            return GetRootFolder() + GetBaseFileName() + ".meta";
+        }
+
+        /// <summary>
+        /// Gets the root folder for this depenedency root.
+        /// </summary>
+        /// <returns></returns>
+        public string GetRootFolder()
+        {
+            var pId = PrimaryId.ToString().PadLeft(4, '0');
+            var primary = String.Format(RootFolderFormatPrimary, new string[] { XivItemTypes.GetSystemName(PrimaryType), XivItemTypes.GetSystemPrefix(PrimaryType), pId });
+
+            var secondary = "";
+            if (SecondaryType != null)
+            {
+                var sId = SecondaryId.ToString().PadLeft(4, '0');
+                var sType = (XivItemType)SecondaryType;
+                secondary = String.Format(RootFolderFormatSecondary, new string[] { XivItemTypes.GetSystemName(sType), XivItemTypes.GetSystemPrefix(sType), sId });
+            }
+
+            return primary + secondary;
+        }
+
+        public string GetSimpleModelName()
+        {
+            if (SecondaryType == null)
+            {
+                throw new NotSupportedException("Cannot generate simple model name for this type. EQDP file must Be used.");
+            }
+
+            return String.Format(ModelNameFormat, new string[] { GetBaseFileName() });
+        }
+
+        public string GetRacialModelName(XivRace race)
+        {
+            if (SecondaryType != null)
+            {
+                throw new NotSupportedException("Cannot generate Racial Model name - Item Type does not use Racial Models.");
+            }
+
+            // Racial models essentially treat the item as if it had a primary type of 
+            // Human to start, of the appropriate human type.
+            var pId = race.GetRaceCode();
+            var pPrefix = XivItemTypes.GetSystemPrefix(XivItemType.human);
+
+            var sId = PrimaryId.ToString().PadLeft(4, '0');
+            var sPrefix = XivItemTypes.GetSystemPrefix(PrimaryType);
+
+            var baseName = "";
+            if (Slot != null)
+            {
+                baseName = String.Format(BaseFileFormatWithSlot, new string[] { pPrefix, pId, sPrefix, sId, Slot });
+            }
+            else
+            {
+                baseName = String.Format(BaseFileFormatNoSlot, new string[] { pPrefix, pId, sPrefix, sId });
+            }
+
+            return String.Format(ModelNameFormat, new string[] { baseName });
+        }
+
+        public static bool operator ==(XivDependencyRootInfo obj1, XivDependencyRootInfo obj2)
+        {
+
+            if (object.ReferenceEquals(obj1, null) && object.ReferenceEquals(obj2, null)) return true;
+            if (object.ReferenceEquals(obj1, null) || object.ReferenceEquals(obj2, null)) return false;
+
+            return obj1.ToString() == obj2.ToString();
+        }
+
+        public static bool operator !=(XivDependencyRootInfo obj1, XivDependencyRootInfo obj2)
+        {
+            if (object.ReferenceEquals(obj1, null) && object.ReferenceEquals(obj2, null)) return false;
+            if (object.ReferenceEquals(obj1, null) || object.ReferenceEquals(obj2, null)) return true;
+
+            return obj1.ToString() != obj2.ToString();
+        }
+
+        public override bool Equals(object obj)
+        {
+            try
+            {
+                XivDependencyRootInfo other = (XivDependencyRootInfo)obj;
+                return this == other;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        public override int GetHashCode()
+        {
+            return this.ToString().GetHashCode();
+        }
+
+    }
+
+    /// <summary>
+    /// A class representing a top level dependency root.  This is in effect, a collection of
+    /// five simple values [Type, Primary Id, Secondary Type, Secondary ID, Slot]
+    /// All Entries have at least Primary Type and Id.
+    /// From these five populated values, we can effectively generate the entire dependency tree downwards,
+    /// and these five values can be generated from any child file via XivDependencyGraph::GetDependencyRoot(internalFilePath)
+    /// 
+    /// This class wraps the child Info class with some additional sanity checks, via creation through the cache/dependency graph.
+    /// A successful creation through those functions should always guarantee a valid DependencyRoot object, which can
+    /// fully resolve all of its constituent parts.
+    /// 
+    /// Likewise, this class can be turned into an IItem with a generic name via the ToItem() function.
+    /// </summary>
+    public class XivDependencyRoot
+    {
+        /// <summary>
+        /// The actual relevant datapoints.
+        /// </summary>
+        public readonly XivDependencyRootInfo Info;
+
         // sPrefix => sId (or Primary if Secondary not available)
         private static readonly string ImcFileFormat = "{0}{1}.imc";
 
-
-        public XivDependencyRoot(XivDependencyGraph graph, XivItemType type, int pid, XivItemType? secondaryType = null, int? sid = null, string slot = null) : this(graph, new XivDependencyRootInfo()
+        public XivDependencyRoot(XivItemType type, int pid, XivItemType? secondaryType = null, int? sid = null, string slot = null) : this(new XivDependencyRootInfo()
         {
             PrimaryType = type,
             Slot = slot,
@@ -135,10 +272,9 @@ namespace xivModdingFramework.Cache
         })
         {
         }
-        public XivDependencyRoot(XivDependencyGraph graph, XivDependencyRootInfo info)
+        public XivDependencyRoot(XivDependencyRootInfo info)
         {
             Info = info;
-            _graph = graph;
 
 
             // Exception handling time!
@@ -175,7 +311,6 @@ namespace xivModdingFramework.Cache
             }
         }
 
-
         public static bool operator ==(XivDependencyRoot obj1, XivDependencyRoot obj2)
         {
             
@@ -204,96 +339,15 @@ namespace xivModdingFramework.Cache
                 return false;
             }
         }
-        public override int GetHashCode()
-        {
-            return this.ToString().GetHashCode();
-        }
-
-        public string GetBaseFileName()
-        {
-            var pId = Info.PrimaryId.ToString().PadLeft(4, '0');
-            var pPrefix = XivItemTypes.GetFilePrefix(Info.PrimaryType);
-            var sId = "";
-            var sPrefix = "";
-            if (Info.SecondaryType != null)
-            {
-                sId = Info.SecondaryId.ToString().PadLeft(4, '0');
-                sPrefix = XivItemTypes.GetFilePrefix((XivItemType)Info.SecondaryType);
-            }
-
-            if (Info.Slot != null)
-            {
-                return String.Format(BaseFileFormatWithSlot, new string[] { pId, pPrefix, sId, sPrefix, Info.Slot });
-            }
-            else
-            {
-                return String.Format(BaseFileFormatNoSlot, new string[] { pId, pPrefix, sId, sPrefix });
-            }
-        }
-
-        /// <summary>
-        /// Converts this dependency root into a raw string entry.
-        /// </summary>
-        /// <returns></returns>
         public override string ToString()
         {
-            var path = GetRootFolder() + GetBaseFileName() + ".root";
-            return path;
+            return Info.ToString();
         }
-
-        public string GetRootFolder()
+        public override int GetHashCode()
         {
-            var pId = Info.PrimaryId.ToString().PadLeft(4, '0');
-            var primary =  String.Format(RootFolderFormatPrimary, new string[]{ Info.PrimaryType.ToString(), XivItemTypes.GetFilePrefix(Info.PrimaryType), pId });
-
-            var secondary = "";
-            if (Info.SecondaryType != null)
-            {
-                var sId = Info.SecondaryId.ToString().PadLeft(4, '0');
-                var sType = (XivItemType)Info.SecondaryType;
-                secondary = String.Format(RootFolderFormatSecondary, new string[] { sType.ToString(), XivItemTypes.GetFilePrefix(sType), sId });
-            }
-
-            return primary + secondary;
+            return Info.ToString().GetHashCode();
         }
 
-        private string GetSimpleModelName()
-        {
-            if(Info.SecondaryType == null)
-            {
-                throw new NotSupportedException("Cannot generate simple model name for this type. EQDP file must Be used.");
-            }
-
-            return String.Format(ModelNameFormat, new string[] { GetBaseFileName() });
-        }
-
-        private string GetRacialModelName(XivRace race)
-        {
-            if (Info.SecondaryType != null)
-            {
-                throw new NotSupportedException("Cannot generate Racial Model name - Item Type does not use Racial Models.");
-            }
-
-            // Racial models essentially treat the item as if it had a primary type of 
-            // Human to start, of the appropriate human type.
-            var pId = race.GetRaceCode();
-            var pPrefix = "c";
-
-            var sId = Info.PrimaryId.ToString().PadLeft(4, '0');
-            var sPrefix = XivItemTypes.GetFilePrefix(Info.PrimaryType);
-
-            var baseName = "";
-            if (Info.Slot != null)
-            {
-                baseName = String.Format(BaseFileFormatWithSlot, new string[] { pPrefix, pId, sPrefix, sId, Info.Slot });
-            }
-            else
-            {
-                baseName = String.Format(BaseFileFormatNoSlot, new string[] { pPrefix, pId, sPrefix, sId });
-            }
-
-            return String.Format(ModelNameFormat, new string[] { baseName });
-        }
 
         /// <summary>
         /// Gets all the binary-offset meta entries associated with this root.
@@ -322,18 +376,18 @@ namespace xivModdingFramework.Cache
             // Try to resolve Meta files first.
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
-                var _eqp = new Eqp(_graph.GameInfo.GameDirectory);
+                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
                 var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot);
                 var models = new List<string>();
                 foreach(var race in races)
                 {
-                    models.Add(GetRootFolder() + GetRacialModelName(race));
+                    models.Add(Info.GetRootFolder() + "model/" + Info.GetRacialModelName(race));
                 }
                 return models;
             } else {
                 // The rest of the types just have a single, calculateable model path.
-                var folder = GetRootFolder();
-                var modelPath = folder + GetSimpleModelName();
+                var folder = Info.GetRootFolder();
+                var modelPath = folder + "model/" + Info.GetSimpleModelName();
                 return new List<string>() { modelPath };
             }
 
@@ -352,7 +406,7 @@ namespace xivModdingFramework.Cache
             {
                 foreach(var model in models)
                 {
-                    var mdlMats = await _graph.Cache.GetChildFiles(model);
+                    var mdlMats = await XivCache.GetChildFiles(model);
                     foreach(var mat in mdlMats)
                     {
                         materials.Add(mat);
@@ -375,7 +429,7 @@ namespace xivModdingFramework.Cache
             {
                 foreach (var mat in materials)
                 {
-                    var mtrlTexs = await _graph.Cache.GetChildFiles(mat);
+                    var mtrlTexs = await XivCache.GetChildFiles(mat);
                     foreach (var tex in mtrlTexs)
                     {
                         textures.Add(tex);
@@ -401,19 +455,19 @@ namespace xivModdingFramework.Cache
             var imcPath = "";
             if (Info.SecondaryType == null)
             {
-                var iPrefix = XivItemTypes.GetFilePrefix(Info.PrimaryType);
+                var iPrefix = XivItemTypes.GetSystemPrefix(Info.PrimaryType);
                 var iId = Info.PrimaryId.ToString().PadLeft(4, '0');
-                imcPath = GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
+                imcPath = Info.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
             }
             else
             {
-                var iPrefix = XivItemTypes.GetFilePrefix((XivItemType)Info.SecondaryType);
+                var iPrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
                 var iId = Info.SecondaryId.ToString().PadLeft(4, '0');
-                imcPath = GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
+                imcPath = Info.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
             }
 
 
-            var _gameDirectory = _graph.GameInfo.GameDirectory;
+            var _gameDirectory = XivCache.GameInfo.GameDirectory;
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var imcOffset = await index.GetDataOffset(imcPath);
@@ -523,6 +577,32 @@ namespace xivModdingFramework.Cache
             return entries;
         }
 
+
+        /// <summary>
+        /// Creates and returns an IIteModel instance based on this root's information.
+        /// uses the appropriate subtypes.
+        /// </summary>
+        /// <returns></returns>
+        public IItemModel ToItem()
+        {
+            switch(Info.PrimaryType)
+            {
+                case XivItemType.equipment:
+                case XivItemType.accessory:
+                case XivItemType.weapon:
+                    return XivGear.FromDependencyRoot(this);
+                case XivItemType.demihuman:
+                case XivItemType.monster:
+                    return XivMount.FromDependencyRoot(this);
+                case XivItemType.indoor:
+                case XivItemType.outdoor:
+                    return XivFurniture.FromDependencyRoot(this);
+                case XivItemType.human:
+                    return XivCharacter.FromDependencyRoot(this);
+            }
+            return XivGenericItemModel.FromDependencyRoot(this);
+        }
+
     }
 
     /// <summary>
@@ -566,10 +646,6 @@ namespace xivModdingFramework.Cache
         */
 
 
-
-        private GameInfo _gameInfo;
-        private XivCache _cache;
-
         /// <summary>
         /// The groupings of the files in the dependency tree based on their level.
         /// </summary>
@@ -607,7 +683,7 @@ namespace xivModdingFramework.Cache
         private static readonly Regex _extensionRegex = new Regex(".*\\.([a-z]+)(" + Constants.BinaryOffsetMarker + "[0-9]+)?$");
 
         // Captures the slot of a file (even if it has a binary extension)
-        private static readonly Regex _slotRegex = new Regex("[a-z][0-9]{4}[a-z][0-9]{4}_([a-z]{3})(?:_.+\\.|\\.)[a-z]+(?:" + Constants.BinaryOffsetMarker + "[0-9]+)?$");
+        private static readonly Regex _slotRegex = new Regex("[a-z][0-9]{4}(?:[a-z][0-9]{4})?_([a-z]{3})(?:_.+\\.|\\.)[a-z]+(?:" + Constants.BinaryOffsetMarker + "[0-9]+)?$");
 
         // Captures the binary offset of a file.
         private static readonly Regex _binaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
@@ -625,28 +701,10 @@ namespace xivModdingFramework.Cache
         // Group 2 == PrimaryId
         // Group 3 == SecondaryId (if it exists)
 
-        private static readonly Regex PrimaryExtractionRegex = new Regex("^chara\\/([a-z]+)\\/[a-z]([0-9]{4})\\/(?:obj\\/([a-z]+)\\/[a-z]([0-9]{4})\\/)?.*$");
+        private static readonly Regex PrimaryExtractionRegex = new Regex("^chara\\/([a-z]+)\\/[a-z]([0-9]{4})(?:\\/obj\\/([a-z]+)\\/[a-z]([0-9]{4})\\/)?.*$");
 
-
-        public GameInfo GameInfo
+        public XivDependencyGraph()
         {
-            get
-            {
-                return _gameInfo;
-            }
-        }
-        public XivCache Cache
-        {
-            get
-            {
-                return _cache;
-            }
-        }
-
-        public XivDependencyGraph(GameInfo gameInfo, XivCache cache)
-        {
-            _gameInfo = gameInfo;
-            _cache = cache;
         }
 
         /// <summary>
@@ -672,12 +730,12 @@ namespace xivModdingFramework.Cache
                 return new List<string>();
             }
 
-            var _modding = new Modding(GameInfo.GameDirectory);
-            var _index = new Index(GameInfo.GameDirectory);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
             var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
             var mod = await _modding.TryGetModEntry(internalFilePath);
 
-            var roots = (await _cache.GetDependencyRoots(internalFilePath));
+            var roots = (await XivCache.GetDependencyRoots(internalFilePath));
 
             if(roots.Count == 0)
             {
@@ -704,8 +762,8 @@ namespace xivModdingFramework.Cache
                 foreach (var model in models)
                 {
                     // And check which materials they use.
-                    var materials = await _cache.GetChildFiles(model);
-                    if(materials.Contains(internalFilePath))
+                    var materials = await XivCache.GetChildFiles(model);
+                    if (materials.Contains(internalFilePath))
                     {
                         // If we're used in the model, it's one of our parents.
                         parents.Add(model);
@@ -726,7 +784,7 @@ namespace xivModdingFramework.Cache
                     foreach(var mat in materials)
                     {
                         // Get all the textures they use.
-                        var textures = await _cache.GetChildFiles(mat);
+                        var textures = await XivCache.GetChildFiles(mat);
                         if(textures.Contains(internalFilePath))
                         {
                             parents.Add(mat);
@@ -753,7 +811,7 @@ namespace xivModdingFramework.Cache
             var siblings = new HashSet<string>();
             foreach(var p in parents)
             {
-                var children = await _cache.GetChildFiles(p);
+                var children = await XivCache.GetChildFiles(p);
                 foreach(var c in children)
                 {
                     siblings.Add(c);
@@ -779,28 +837,38 @@ namespace xivModdingFramework.Cache
 
             if (level == XivDependencyLevel.Root)
             {
-                var root = (await _cache.GetDependencyRoots(internalFilePath))[0];
+                var root = (await XivCache.GetDependencyRoots(internalFilePath))[0];
                 return await root.GetModelFiles();
             }
 
             if (level == XivDependencyLevel.Model)
             {
-                // Model children should only include skin Materials if they're in the actual character structure.
-                var roots = (await _cache.GetDependencyRoots(internalFilePath));
-                var includeSkin = roots.Any(x => x.Info.PrimaryType == XivItemType.human && x.Info.SecondaryType == XivItemType.body);
-
                 var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
-                var _mdl = new Mdl(GameInfo.GameDirectory, dataFile);
-                var mdlChildren = await _mdl.GetReferencedMaterialPaths(internalFilePath, -1, false, includeSkin);
+                try
+                {
+                    var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
+                    var mdlChildren = await _mdl.GetReferencedMaterialPaths(internalFilePath, -1, false, false);
+                    return mdlChildren;
+                } catch
+                {
+                    // It's possible this model doesn't actually exist, in which case, return empty.
+                    return new List<string>();
+                }
 
-                return mdlChildren;
             } else if (level == XivDependencyLevel.Material)
             {
-                var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
-                var _mtrl = new Mtrl(GameInfo.GameDirectory, dataFile, GameInfo.GameLanguage);
-                var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false);
+                try
+                {
+                    var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
+                    var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
+                    var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false);
+                    return mtrlChildren;
+                } catch
+                {
+                    // It's possible this material doesn't actually exist, in which case, return empty.
+                    return new List<string>();
+                }
 
-                return mtrlChildren;
             } else
             {
                 // Textures have no child files.
@@ -900,6 +968,13 @@ namespace xivModdingFramework.Cache
                 return null;
             }
 
+            // Human - Body is an absolute mess of exceptions and weird cross-references.
+            // Just don't support it for now.
+            if(info.PrimaryType == XivItemType.human && info.SecondaryType == XivItemType.body)
+            {
+                return null;
+            }
+
             if (info.Slot == null)
             {
                 // Safety checks.  Custom-name textures can often end up with set being resolvable
@@ -907,7 +982,7 @@ namespace xivModdingFramework.Cache
                 // they'll have their root resolved via modlist, if one exists for them.
                 if (info.PrimaryType == XivItemType.equipment
                     || info.PrimaryType == XivItemType.accessory
-                    || (info.PrimaryType == XivItemType.human && info.SecondaryType != XivItemType.body)
+                    || info.PrimaryType == XivItemType.human
                     || info.PrimaryType == XivItemType.demihuman)
                 {
                         return null;
@@ -921,7 +996,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            return new XivDependencyRoot(this, info);
+            return new XivDependencyRoot(info);
 
         }
 
@@ -943,14 +1018,14 @@ namespace xivModdingFramework.Cache
             // We specifically just want to know what cached files have us listed as childern; not what we have in the 
             // parents dependencies cache.
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var cachedParents = await XivCache.BuildListFromTable(_cache.CacheConnectionString, "dependencies_children", wc, async (reader) =>
+            var cachedParents = await XivCache.BuildListFromTable(XivCache.CacheConnectionString, "dependencies_children", wc, async (reader) =>
             {
                 return reader.GetString("parent");
             });
 
             foreach (var file in cachedParents)
             {
-                var matRoots = await _cache.GetDependencyRoots(file);
+                var matRoots = await XivCache.GetDependencyRoots(file);
                 foreach(var mat in matRoots)
                 {
                     uniqueRoots.Add(mat);
@@ -973,7 +1048,7 @@ namespace xivModdingFramework.Cache
         /// <param name="SecondaryId"></param>
         /// <param name="Slot"></param>
         /// <returns></returns>
-        private XivDependencyRootInfo ExtractRootInfo(string internalFilePath)
+        public XivDependencyRootInfo ExtractRootInfo(string internalFilePath)
         {
 
             XivDependencyRootInfo info = new XivDependencyRootInfo();
@@ -985,24 +1060,19 @@ namespace xivModdingFramework.Cache
             var match = PrimaryExtractionRegex.Match(internalFilePath);
             if (match.Success)
             {
-                // Ok, at this point, we have a normal file path.  That means we can extract everything out of it.
-                match = PrimaryExtractionRegex.Match(internalFilePath);
+                info.PrimaryType = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[1].Value);
+                info.PrimaryId = Int32.Parse(match.Groups[2].Value);
+                if (match.Groups[3].Success)
+                {
+                    info.SecondaryType = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[3].Value);
+                    info.SecondaryId = Int32.Parse(match.Groups[4].Value);
+                }
+
+                // Then get the slot if we have one.
+                match = _slotRegex.Match(internalFilePath);
                 if (match.Success)
                 {
-                    info.PrimaryType = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[1].Value);
-                    info.PrimaryId = Int32.Parse(match.Groups[2].Value);
-                    if (match.Groups[3].Success)
-                    {
-                        info.SecondaryType = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[3].Value);
-                        info.SecondaryId = Int32.Parse(match.Groups[4].Value);
-                    }
-
-                    // Then get the slot if we have one.
-                    match = _slotRegex.Match(internalFilePath);
-                    if (match.Success)
-                    {
-                        info.Slot = match.Groups[1].Value;
-                    }
+                    info.Slot = match.Groups[1].Value;
                 }
             }
 
@@ -1135,6 +1205,135 @@ namespace xivModdingFramework.Cache
             }
 
             return roots.ToList();
+        }
+
+
+        private async Task TestAllIds(Dictionary<string, XivDependencyRootInfo?> combinedHashes, XivItemType primary, XivItemType? secondary) {
+
+            await Task.Run(async () => {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = primary;
+                root.SecondaryType = secondary;
+                var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                var races = XivRaces.PlayableRaces;
+
+                for (int p = 0; p < 10000; p++)
+                {
+                    root.PrimaryId = p;
+
+                    if (secondary == null)
+                    {
+                        var folder = root.GetRootFolder() + "model";
+                        var folderHash = HashGenerator.GetHash(folder);
+                        var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
+                        // For these, just let the EDP module verify if there are any races availble for the item?
+                        foreach(var slot in slots)
+                        {
+                            root.Slot = slot;
+                            foreach (var race in races) {
+                                var modelName = root.GetRacialModelName(race);
+                                var fileHash = HashGenerator.GetHash(modelName);
+                                var key = fileHash.ToString() + folderHash.ToString();
+                                if (combinedHashes.ContainsKey(key))
+                                {
+                                    XivCache.CacheRoot(root);
+
+                                    // We don't care how many models there are, just that there *are* any models.
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (int s = 0; s < 10000; s++)
+                        {
+                            root.SecondaryId = s;
+                            var folder = root.GetRootFolder() + "model";
+                            var folderHash = HashGenerator.GetHash(folder);
+                            var slots = XivItemTypes.GetAvailableSlots((XivItemType)root.SecondaryType);
+                            // For these, just let the EDP module verify if there are any races availble for the item?
+
+                            if (root.PrimaryId == 201 && root.SecondaryId == 56 && root.PrimaryType == XivItemType.weapon) {
+                                var z = "d";
+                            }
+
+                            if(slots.Count == 0)
+                            {
+                                slots.Add("");
+                            }
+                            foreach (var slot in slots)
+                            {
+                                if (slot == "")
+                                {
+                                    root.Slot = null;
+                                }
+                                else
+                                {
+                                    root.Slot = slot;
+                                }
+                                var modelName = root.GetSimpleModelName();
+                                var fileHash = HashGenerator.GetHash(modelName);
+                                var key = fileHash.ToString() + folderHash.ToString();
+                                if (combinedHashes.ContainsKey(key))
+                                {
+                                    XivCache.CacheRoot(root);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        /// <summary>
+        /// This is a simple function that rips through the entire index file, for all 9,999 possible
+        /// primary and secondary IDs for each possible category, and verifies they have a root path
+        /// alive.
+        /// </summary>
+        /// <returns></returns>
+        public async Task CacheAllRealRoots()
+        {
+            var index = new Index(XivCache.GameInfo.GameDirectory);
+            var mergedHashes = await index.GetFileDictionary(XivDataFile._04_Chara);
+
+            var mergedDict = new Dictionary<string, XivDependencyRootInfo?>();
+            foreach(var kv in mergedHashes)
+            {
+                mergedDict.Add(kv.Key, null);
+            }
+
+
+            var types = new Dictionary<XivItemType, List<XivItemType?>>();
+            foreach(var type in DependencySupportedTypes)
+            {
+                types.Add(type, new List<XivItemType?>());
+            }
+
+            types[XivItemType.monster].Add(XivItemType.body);
+            types[XivItemType.weapon].Add(XivItemType.body);
+            types[XivItemType.human].Add(XivItemType.body);
+            types[XivItemType.human].Add(XivItemType.face);
+            types[XivItemType.human].Add(XivItemType.hair);
+            types[XivItemType.human].Add(XivItemType.tail);
+            types[XivItemType.human].Add(XivItemType.ear);
+            types[XivItemType.demihuman].Add(XivItemType.equipment);
+            types[XivItemType.equipment].Add(null);
+            types[XivItemType.accessory].Add(null);
+
+
+            var tasks = new List<Task>();
+            foreach (var kv in types)
+            {
+                var primary = kv.Key;
+                foreach(var secondary in kv.Value)
+                {
+                    tasks.Add(TestAllIds(mergedDict, primary, secondary));
+                }
+            }
+            Task.WaitAll(tasks.ToArray());
+
         }
 
     }
