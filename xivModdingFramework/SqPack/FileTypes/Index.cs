@@ -719,7 +719,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
         {
-            _semaphoreSlim.WaitAsync();
+            await _semaphoreSlim.WaitAsync();
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
@@ -969,8 +969,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
 
             // Update Dependency Cache.
-            var cache = new XivCache(_gameDirectory);
-            await cache.UpdateChildFiles(fullPath);
+            await XivCache.UpdateChildFiles(fullPath);
 
             return true;
         }
@@ -1250,8 +1249,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
 
             // Update Dependency Cache.
-            var cache = new XivCache(_gameDirectory);
-            await cache.UpdateChildFiles(fullPath);
+            await XivCache.UpdateChildFiles(fullPath);
 
 
             return true;
@@ -1314,8 +1312,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
 
             // Update Dependency Cache.
-            var cache = new XivCache(_gameDirectory);
-            await cache.UpdateChildFiles(fullPath);
+            await XivCache.UpdateChildFiles(fullPath);
 
 
 

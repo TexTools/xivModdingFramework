@@ -419,7 +419,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 var ret = new List<XivImc>(SubsetList.Count);
                 for(int i = 0; i < SubsetList.Count; i++)
                 {
-                    ret.Add(GetEntry(i, slot));
+                    ret.Add(GetEntry(i+1, slot));
                 }
                 return ret;
             }
