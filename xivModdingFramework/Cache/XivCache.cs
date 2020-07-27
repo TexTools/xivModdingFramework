@@ -283,6 +283,10 @@ namespace xivModdingFramework.Cache
                 }
             }
 
+            // We intentionally don't delete the root cache here.
+            // That data is considere inviolate, and should never be changed
+            // unless the user specifically requests to rebuild it, or
+            // manually replaces the roots DB.  (It takes an hour or more to build)
             SQLiteConnection.ClearAllPools();
             GC.WaitForPendingFinalizers();
             File.Delete(_dbPath.FullName);
@@ -1149,6 +1153,27 @@ namespace xivModdingFramework.Cache
             return Dependencies.CreateDependencyRoot(GetItemRootInfo(item));
         }
 
+
+        public static void ResetRootCache()
+        {
+
+            SQLiteConnection.ClearAllPools();
+            GC.WaitForPendingFinalizers();
+            File.Delete(_rootCachePath.FullName);
+
+            using (var db = new SQLiteConnection(RootsCacheConnectionString))
+            {
+                db.Open();
+                var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
+                var sqlCmd = String.Join("\n", lines);
+
+                using (var cmd = new SQLiteCommand(sqlCmd, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+            }
+        }
+
         /// <summary>
         /// Saves a dependency root to the DB, for item list crawling.
         /// </summary>
@@ -1481,6 +1506,7 @@ namespace xivModdingFramework.Cache
             return file;
         }
 
+
         /// <summary>
         /// This function is a long-running thread function which operates alongside the main
         /// system.  It pops items off the dependency queue to process and identify what file parents
@@ -1494,7 +1520,6 @@ namespace xivModdingFramework.Cache
             BackgroundWorker worker = (BackgroundWorker)sender;
             while (!worker.CancellationPending)
             {
-                //Dependencies.CacheAllRealRoots().Wait();
                 var file = "";
                 XivDependencyLevel level;
                 try
