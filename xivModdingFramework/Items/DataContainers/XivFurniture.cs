@@ -15,8 +15,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -65,6 +67,26 @@ namespace xivModdingFramework.Items.DataContainers
         /// The Icon Number associated with the furniture item
         /// </summary>
         public uint IconNumber { get; set; }
+
+        public static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        {
+            var item = new XivFurniture();
+            item.ModelInfo = new XivModelInfo();
+            item.ModelInfo.PrimaryID = root.Info.PrimaryId;
+            item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
+            item.Name = root.Info.GetBaseFileName();
+            item.PrimaryCategory = XivStrings.Housing;
+            if (root.Info.PrimaryType == Enums.XivItemType.indoor)
+            {
+                item.SecondaryCategory = XivStrings.Furniture_Indoor;
+
+            } else
+            {
+                item.SecondaryCategory = XivStrings.Furniture_Outdoor;
+            }
+
+            return item;
+        }
 
         public int CompareTo(object obj)
         {

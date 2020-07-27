@@ -15,8 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Linq;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -87,6 +91,33 @@ namespace xivModdingFramework.Items.DataContainers
         /// The other item in this pair (main or offhand)
         /// </summary>
         public XivGear PairedItem { get; set; }
+
+        public static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        {
+            var item = new XivGear();
+            item.ModelInfo = new XivGearModelInfo();
+            item.ModelInfo.PrimaryID = root.Info.PrimaryId;
+            if (root.Info.SecondaryId != null)
+            {
+                item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
+            }
+
+            item.Name = root.Info.GetBaseFileName();
+            item.PrimaryCategory = XivStrings.Gear;
+
+            if (root.Info.PrimaryType == Enums.XivItemType.weapon)
+            {
+                ((XivGearModelInfo)item.ModelInfo).IsWeapon = true;
+                item.SecondaryCategory = XivStrings.Main_Hand;
+            }
+            else
+            {
+                item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.First(x => x.Value == root.Info.Slot).Key;
+            }
+
+
+            return item;
+        }
 
         public object Clone()
         {
