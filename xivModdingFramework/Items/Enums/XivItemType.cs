@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
 using System.ComponentModel;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.Enums
 {
@@ -26,17 +28,17 @@ namespace xivModdingFramework.Items.Enums
     {
         [Description("")] unknown,
         [Description("")] none,
-        [Description("w")] weapon,
-        [Description("e")] equipment,
-        [Description("a")] accessory,
-        [Description("m")] monster,
-        [Description("d")] demihuman,
-        [Description("b")] body,
-        [Description("h")] hair,
-        [Description("t")] tail,
-        [Description("z")] ear,
-        [Description("f")] face,
-        [Description("c")] human,
+        [Description("weapon")] weapon,
+        [Description("equipment")] equipment,
+        [Description("accessory")] accessory,
+        [Description("monster")] monster,
+        [Description("demihuman")] demihuman,
+        [Description("body")] body,
+        [Description("hair")] hair,
+        [Description("tail")] tail,
+        [Description("zear")] ear,
+        [Description("face")] face,
+        [Description("human")] human,
         [Description("")] decal,
         [Description("")] ui,
         [Description("")] furniture, // This one's a little vague and encompasses really all of /bgcommon/
@@ -46,16 +48,99 @@ namespace xivModdingFramework.Items.Enums
 
     public static class XivItemTypes {
 
+        public static Dictionary<XivItemType, string> NiceNames = new Dictionary<XivItemType, string>
+        {
+            { XivItemType.unknown, "Unknown" },
+            { XivItemType.none, XivStrings.None },
+            { XivItemType.weapon, XivStrings.Weapon },
+            { XivItemType.equipment, XivStrings.Equipment },
+            { XivItemType.accessory, XivStrings.Accessory },
+            { XivItemType.monster, XivStrings.Monster },
+            { XivItemType.demihuman, XivStrings.DemiHuman },
+            { XivItemType.body, XivStrings.Body },
+            { XivItemType.hair, XivStrings.Hair },
+            { XivItemType.tail, XivStrings.Tail },
+            { XivItemType.ear, XivStrings.Ears },
+            { XivItemType.face, XivStrings.Face },
+            { XivItemType.human, "Human" },
+            { XivItemType.decal, "Decal" },
+            { XivItemType.ui, XivStrings.UI },
+            { XivItemType.furniture, XivStrings.Housing },
+            { XivItemType.indoor, XivStrings.Furniture_Indoor },
+            { XivItemType.outdoor, XivStrings.Furniture_Outdoor }
+        };
+
         /// <summary>
         /// Gets the file type prefix for the enum value from its description.
         /// </summary>
         /// <param name="value">The enum value</param>
         /// <returns>The race code</returns>
-        public static string GetFilePrefix(this XivItemType value)
+        public static string GetSystemPrefix(this XivItemType value)
+        {
+            if(value == XivItemType.human)
+            {
+                // this one's weird.
+                return "c";
+            }
+
+
+            var name = GetSystemName(value);
+            var letter = "";
+            if(name.Length > 0)
+            {
+                letter = name[0].ToString();
+            }
+            return letter;
+        }
+
+        /// <summary>
+        /// Gets the file type prefix for the enum value from its description.
+        /// </summary>
+        /// <param name="value">The enum value</param>
+        /// <returns>The race code</returns>
+        public static string GetSystemName(this XivItemType value)
         {
             var field = value.GetType().GetField(value.ToString());
             var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].Description : value.ToString();
+        }
+
+        /// <summary>
+        /// The available slots for a given type.
+        /// Note - This doesn't accurately reflect HUMAN-BODY specifically, as that is a 
+        /// wild, extremely messy exception case.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public static List<string> GetAvailableSlots(this XivItemType type)
+        {
+            if(type == XivItemType.equipment)
+            {
+                return new List<string> { "met", "top", "glv", "dwn", "sho" };
+            } else if(type == XivItemType.accessory)
+            {
+                return new List<string> { "ear", "nek", "wrs", "rir", "ril" };
+            }
+            else if (type == XivItemType.face)
+            {
+                return new List<string> { "fac" };
+            }
+            else if (type == XivItemType.tail)
+            {
+                return new List<string> { "til" };
+            }
+            else if (type == XivItemType.hair)
+            {
+                return new List<string> { "hir" };
+            }
+            else if (type == XivItemType.ear)
+            {
+                return new List<string> { "ear" };
+            }
+            else
+            {
+                return new List<string>();
+            }
         }
     }
 }
