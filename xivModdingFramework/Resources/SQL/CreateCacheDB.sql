@@ -80,14 +80,19 @@ CREATE TABLE "monsters" (
 
 CREATE TABLE "dependencies_children" (
 	"parent" TEXT NOT NULL,
-	"child" TEXT NOT NULL,
+	"child" TEXT,
 
 	PRIMARY KEY("parent", "child")
 );
 
 CREATE TABLE "dependencies_parents" (
 	"child" TEXT NOT NULL,
-	"parent" TEXT NOT NULL,
+	"parent" TEXT,
 
 	PRIMARY KEY("child", "parent")
+);
+
+CREATE TABLE "dependencies_update_queue" (
+	"position" INTEGER PRIMARY KEY AUTOINCREMENT,
+	"file" TEXT NOT NULL
 );

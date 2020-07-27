@@ -48,8 +48,7 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<List<XivUi>> GetUIList()
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedUiList();
+            return await XivCache.GetCachedUiList();
         }
 
         /// <summary>

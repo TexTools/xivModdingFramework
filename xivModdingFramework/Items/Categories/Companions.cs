@@ -53,8 +53,7 @@ namespace xivModdingFramework.Items.Categories
         }
         public async Task<List<XivMinion>> GetMinionList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedMinionsList(substring);
+            return await XivCache.GetCachedMinionsList(substring);
         }
 
         /// <summary>
@@ -125,8 +124,7 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<List<XivMount>> GetMountList(string substring = null, string category = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedMountList(substring, category);
+            return await XivCache.GetCachedMountList(substring, category);
         }
 
         /// <summary>
@@ -265,8 +263,7 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<List<XivPet>> GetPetList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedPetList(substring);
+            return await XivCache.GetCachedPetList(substring);
 
         }
 

@@ -58,9 +58,7 @@ namespace xivModdingFramework.Items.Categories
         }
         public async Task<List<XivGear>> GetGearList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-
-            return await cache.GetCachedGearList(substring);
+            return await XivCache.GetCachedGearList(substring);
         }
 
         /// <summary>

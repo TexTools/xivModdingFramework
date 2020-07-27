@@ -241,8 +241,7 @@ namespace xivModdingFramework.Helpers
 
                     await Task.Run(async () =>
                     {
-                        var _cache = new XivCache(_gameDirectory, language);
-                        _cache.RebuildCache();
+                        XivCache.RebuildCache();
                     });
                 }
             });
