@@ -22,6 +22,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods;
@@ -1095,7 +1096,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             var offset = 0;
             var dataOverwritten = false;
 
+
             internalFilePath = internalFilePath.Replace("\\", "/");
+
+            // Store this for later.
+            var oldChildren = await XivCache.GetChildFiles(internalFilePath);
 
             var index = new Index(_gameDirectory);
 
@@ -1439,6 +1444,34 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
                 }
+            }
+
+
+            // Update the file children in the cache.
+            var newChildren = await XivCache.UpdateChildFiles(internalFilePath);
+
+            var modifiedChildren = new List<string>();
+            for (var i = 0; i < newChildren.Count; i++) {
+                if(!oldChildren.Contains(newChildren[i]))
+                {
+                    // Added a file reference.
+                    modifiedChildren.Add(newChildren[i]);
+                }
+            }
+
+            for (var i = 0; i < oldChildren.Count; i++)
+            {
+                if (!newChildren.Contains(oldChildren[i]))
+                {
+                    // Deleted a file reference.
+                    modifiedChildren.Add(oldChildren[i]);
+                }
+            }
+
+            // If we changed any references, push them onto the cache queue.
+            foreach(var child in modifiedChildren)
+            {
+                XivCache.QueueParentFilesUpdate(child);
             }
 
             return offset;

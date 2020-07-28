@@ -968,9 +968,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             _semaphoreSlim.Release();
 
-            // Update Dependency Cache.
-            await XivCache.UpdateChildFiles(fullPath);
-
             return true;
         }
 
@@ -1248,9 +1245,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             _semaphoreSlim.Release();
 
-            // Update Dependency Cache.
-            await XivCache.UpdateChildFiles(fullPath);
-
 
             return true;
         }
@@ -1310,9 +1304,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             _semaphoreSlim.Release();
-
-            // Update Dependency Cache.
-            await XivCache.UpdateChildFiles(fullPath);
 
 
 
