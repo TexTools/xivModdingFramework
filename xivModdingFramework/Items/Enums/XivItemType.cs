@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using xivModdingFramework.Resources;
@@ -50,7 +51,7 @@ namespace xivModdingFramework.Items.Enums
 
         public static Dictionary<XivItemType, string> NiceNames = new Dictionary<XivItemType, string>
         {
-            { XivItemType.unknown, "Unknown" },
+            { XivItemType.unknown, XivStrings.Unknown },
             { XivItemType.none, XivStrings.None },
             { XivItemType.weapon, XivStrings.Weapon },
             { XivItemType.equipment, XivStrings.Equipment },
@@ -60,10 +61,10 @@ namespace xivModdingFramework.Items.Enums
             { XivItemType.body, XivStrings.Body },
             { XivItemType.hair, XivStrings.Hair },
             { XivItemType.tail, XivStrings.Tail },
-            { XivItemType.ear, XivStrings.Ears },
+            { XivItemType.ear, XivStrings.Earring },
             { XivItemType.face, XivStrings.Face },
-            { XivItemType.human, "Human" },
-            { XivItemType.decal, "Decal" },
+            { XivItemType.human, XivStrings.Human },
+            { XivItemType.decal, XivStrings.Decal },
             { XivItemType.ui, XivStrings.UI },
             { XivItemType.furniture, XivStrings.Housing },
             { XivItemType.indoor, XivStrings.Furniture_Indoor },
@@ -94,6 +95,23 @@ namespace xivModdingFramework.Items.Enums
         }
 
         /// <summary>
+        /// Retrieves an XivItemType from a system name.
+        /// </summary>
+        /// <param name="value">The enum value</param>
+        /// <returns>The race code</returns>
+        public static XivItemType FromSystemPrefix(char value)
+        {
+            foreach (XivItemType type in (XivItemType[])Enum.GetValues(typeof(XivItemType)))
+            {
+                if (type.GetSystemPrefix()[0] == value)
+                {
+                    return type;
+                }
+            }
+            return XivItemType.unknown;
+        }
+
+        /// <summary>
         /// Gets the file type prefix for the enum value from its description.
         /// </summary>
         /// <param name="value">The enum value</param>
@@ -103,6 +121,23 @@ namespace xivModdingFramework.Items.Enums
             var field = value.GetType().GetField(value.ToString());
             var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].Description : value.ToString();
+        }
+
+        /// <summary>
+        /// Retrieves an XivItemType from a system name.
+        /// </summary>
+        /// <param name="value">The enum value</param>
+        /// <returns>The race code</returns>
+        public static XivItemType FromSystemName(string value)
+        {
+            foreach (XivItemType type in (XivItemType[])Enum.GetValues(typeof(XivItemType)))
+            {
+                if(type.GetSystemName() == value)
+                {
+                    return type;
+                }
+            }
+            return XivItemType.unknown;
         }
 
         /// <summary>
@@ -135,7 +170,7 @@ namespace xivModdingFramework.Items.Enums
             }
             else if (type == XivItemType.ear)
             {
-                return new List<string> { "ear" };
+                return new List<string> { "zer" };
             }
             else
             {
