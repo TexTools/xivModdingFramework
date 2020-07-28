@@ -133,6 +133,8 @@ namespace xivModdingFramework.Helpers
             
             return path;
         }
+
+
         public static XivRace GetRaceFromPath(string path)
         {
             if(path == null)
@@ -152,7 +154,7 @@ namespace xivModdingFramework.Helpers
             }
             else if (path.Contains(".tex") || path.Contains(".mdl") || path.Contains(".atex"))
             {
-                if (path.Contains("accessory") || path.Contains("weapon") || path.Contains("/common/"))
+                if (path.Contains("weapon") || path.Contains("/common/"))
                 {
                     xivRace = XivRace.All_Races;
                 }
