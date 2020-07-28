@@ -519,6 +519,11 @@ namespace xivModdingFramework.Textures.FileTypes
             return convertedBytes.ToArray();
         }
 
+        public async Task GetIndexFileDictionary()
+        {
+            _indexFileDictionary = await _index.GetFileDictionary(_dataFile);
+        }
+
         /// <summary>
         /// Creates bitmap from decompressed Linear texture data.
         /// </summary>
