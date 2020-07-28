@@ -1092,6 +1092,42 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
+
+
+        /// <summary>
+        /// Fixes up the racial skin references in the model's materials.
+        /// this isn't actually necessary as the game will auto-resolve these regardless, but it's nice to do.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="newInternalPath"></param>
+        public static void FixUpSkinReferences(TTModel model, string newInternalPath, Action<bool, string> loggingFunction = null)
+        {
+
+            // Here we should to go in and correct any Skin Material references to point to the skin material for this race.
+            // It's not actually -NEEDED-, as the game will dynamically resolve them anyways to the player's skin material, but it's good for user expectation and sanity.
+
+            var raceRegex = new Regex("(c[0-9]{4})");
+            // So we have to do this step first.
+            var newRaceMatch = raceRegex.Match(newInternalPath);
+
+            if(!newRaceMatch.Success)
+            {
+                return;
+            }
+
+            loggingFunction(false, "Fixing up racial skin references...");
+
+            foreach (var m in model.MeshGroups)
+            {
+                var mtrlMatch = raceRegex.Match(m.Material);
+                if(mtrlMatch.Success)
+                {
+                    m.Material.Replace(mtrlMatch.Groups[1].Value, newRaceMatch.Groups[1].Value);
+                }
+            }
+
+        }
+
         /// <summary>
         /// /dev/null function used when no logging parameter is supplied, 
         /// just to make sure we don't have to constantly null-check the logging functions.

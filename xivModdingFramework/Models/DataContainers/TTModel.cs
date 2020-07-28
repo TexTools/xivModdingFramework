@@ -1160,6 +1160,39 @@ namespace xivModdingFramework.Models.DataContainers
             return skelDict;
         }
 
+
+        /// <summary>
+        /// Performs a basic sanity check on an incoming TTModel
+        /// Returns true if there were no errors or errors that were resolvable.
+        /// Returns false if the model was deemed insane.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="loggingFunction"></param>
+        /// <returns></returns>
+        public static bool SanityCheck(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
+            if(model.MeshGroups.Count == 0)
+            {
+                loggingFunction(true, "Model has no data. - Model must have at least one valid Mesh Group.");
+                return false;
+            }
+
+
+            var Group0Valid = model.MeshGroups[0].Parts.Any(x => x.Vertices.Count > 0);
+            if(!Group0Valid)
+            {
+                loggingFunction(true, "Mesh Group 0 has no valid parts - Model must have at least one vertex in Mesh Group 0.");
+                return false;
+            }
+
+            return true;
+        }
+
         #endregion
     }
 }

@@ -428,6 +428,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (modded)
                 {
                     offset = mod.data.originalOffset;
+                    modded = false;
                 }
             }
 
@@ -2048,6 +2049,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Wrapping this in an await ensures we're run asynchronously on a new thread.
             await Task.Run(async () =>
             {
+                var filePath = currentMdl.MdlPath;
 
                 #region TTModel Loading
                 // Probably could stand to push this out to its own function later.
@@ -2089,10 +2091,15 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-                if (ttModel.MeshGroups.Count == 0)
+
+                var sane = TTModel.SanityCheck(ttModel, loggingFunction);
+                if (!sane)
                 {
-                    throw new InvalidDataException("The imported model has no data.");
+                    throw new InvalidDataException("Model was deemed invalid.");
                 }
+
+
+
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
@@ -2100,16 +2107,17 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 XivMdl ogMdl = null;
-                if (options.EnableShapeData && !ttModel.HasShapeData)
+
+                // Load the original model if we're actually going to need it.
+                var mod = await modding.TryGetModEntry(mdlPath);
+                if (mod != null)
                 {
-                    // Load the original model if we're actually going to need it.
-                    var mod = await modding.TryGetModEntry(mdlPath);
-                    if (mod != null)
-                    {
-                        loggingFunction(false, "Loading original SE model to retrieve Shape Data...");
-                        var ogOffset = mod.data.originalOffset;
-                        ogMdl = await GetRawMdlData(item, IOUtil.GetRaceFromPath(mdlPath), submeshId, true);
-                    }
+                    loggingFunction(false, "Loading original SE model...");
+                    var ogOffset = mod.data.originalOffset;
+                    ogMdl = await GetRawMdlData(item, IOUtil.GetRaceFromPath(mdlPath), submeshId, true);
+                } else
+                {
+                    ogMdl = currentMdl;
                 }
 
                 // Apply our Model Modifier options to the model.
@@ -2122,7 +2130,7 @@ namespace xivModdingFramework.Models.FileTypes
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
-                    var oldModel = TTModel.FromRaw(currentMdl);
+                    var oldModel = TTModel.FromRaw(ogMdl);
                     bool cont = await intermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
@@ -2131,6 +2139,10 @@ namespace xivModdingFramework.Models.FileTypes
                         throw new Exception("cancel");
                     }
                 }
+
+                // Fix up the skin references, just because we can/it helps user expectation.
+                // Doesn't really matter as these get auto-resolved in game no matter what race they point to.
+                ModelModifiers.FixUpSkinReferences(ttModel, filePath, loggingFunction);
 
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");
@@ -2144,7 +2156,6 @@ namespace xivModdingFramework.Models.FileTypes
                 var modEntry = await modding.TryGetModEntry(mdlPath);
 
 
-                var filePath = currentMdl.MdlPath;
 
                 if (!rawDataOnly)
                 {
