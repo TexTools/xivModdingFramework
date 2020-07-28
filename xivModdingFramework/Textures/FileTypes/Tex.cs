@@ -1235,6 +1235,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
+            {XivStrings.LeftRing, "ril"},
             {XivStrings.Wrists, "wrs"},
             {XivStrings.Head_Body, "top"},
             {XivStrings.Body_Hands, "top"},
