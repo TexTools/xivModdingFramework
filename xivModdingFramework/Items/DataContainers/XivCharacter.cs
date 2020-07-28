@@ -81,7 +81,7 @@ namespace xivModdingFramework.Items.DataContainers
 
             if (root.Info.Slot != null)
             {
-                item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.First(x => x.Value == root.Info.Slot).Key;
+                item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.FirstOrDefault(x => x.Value == root.Info.Slot).Key;
             } else
             {
                 item.SecondaryCategory = XivStrings.Body;
