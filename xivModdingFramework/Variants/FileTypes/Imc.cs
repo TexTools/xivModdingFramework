@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -85,6 +86,68 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             return info;
+        }
+
+
+        private static readonly Regex _pathOnlyRegex = new Regex("^(.*)" + Constants.BinaryOffsetMarker + ".*$");
+        private static readonly Regex _binaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
+
+        /// <summary>
+        /// Retrieves an arbitrary selection of IMC entries based on their path::binaryoffset.
+        /// </summary>
+        /// <param name="pathsWithOffsets"></param>
+        /// <returns></returns>
+        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets)
+        {
+            var entries = new List<XivImc>();
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+
+            var lastPath = "";
+            int imcOffset = 0;
+            byte[] imcByteData = new byte[0];
+
+            foreach (var combinedPath in pathsWithOffsets)
+            {
+                var binaryMatch = _binaryOffsetRegex.Match(combinedPath);
+                var pathMatch = _pathOnlyRegex.Match(combinedPath);
+
+                // Invalid format.
+                if (!pathMatch.Success || !binaryMatch.Success) continue;
+
+                long offset = Int64.Parse(binaryMatch.Groups[1].Value) / 8;
+                string path = pathMatch.Groups[1].Value;
+
+                // Only reload this data if we need to.
+                if (path != lastPath)
+                {
+                    imcOffset = await index.GetDataOffset(path);
+                    imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(path));
+                }
+                lastPath = path;
+
+                // Offset would run us past the end of the file.
+                const int entrySize = 6;
+                if (offset > imcByteData.Length - entrySize) continue;
+
+
+                using (var br = new BinaryReader(new MemoryStream(imcByteData)))
+                {
+                    var subsetCount = br.ReadInt16();
+                    var identifier = (ImcType)br.ReadInt16();
+
+                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                    entries.Add(new XivImc
+                    {
+                        Variant = br.ReadByte(),
+                        Unknown = br.ReadByte(),
+                        Mask = br.ReadUInt16(),
+                        Vfx = br.ReadUInt16()
+                    });
+                }
+
+            }
+            return entries;
         }
 
 

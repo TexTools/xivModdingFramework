@@ -35,12 +35,12 @@ namespace xivModdingFramework.Cache
         private const string rootCacheFileName = "roots_cache.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
-        public static string CacheConnectionString { get
+        internal static string CacheConnectionString { get
             {
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
             }
         }
-        public static string RootsCacheConnectionString
+        internal static string RootsCacheConnectionString
         {
             get
             {
@@ -48,10 +48,16 @@ namespace xivModdingFramework.Cache
             }
         }
 
-        private static XivDependencyGraph Dependencies;
 
         // Safety check to make sure we don't redundantly attempt to rebuild the cache.
         private static bool _REBUILDING = false;
+        public static bool IsRebuilding
+        {
+            get
+            {
+                return _REBUILDING;
+            }
+        }
         public static GameInfo GameInfo
         {
             get
@@ -100,6 +106,7 @@ namespace xivModdingFramework.Cache
 
         private static BackgroundWorker _cacheWorker;
 
+
         /// <summary>
         /// Language is not actually required for Cache -reading-, only for cache generation, so it is 
         /// technically an optional parameter if you know you're just reading cache data.
@@ -142,15 +149,12 @@ namespace xivModdingFramework.Cache
             _dbPath = new DirectoryInfo(Path.Combine(_gameInfo.GameDirectory.Parent.Parent.FullName, dbFileName));
             _rootCachePath = new DirectoryInfo(Path.Combine(_gameInfo.GameDirectory.Parent.Parent.FullName, rootCacheFileName));
 
-            Dependencies = new XivDependencyGraph();
             if (!_REBUILDING)
             {
 
                 if (CacheNeedsRebuild() && !_REBUILDING)
                 {
-                    _REBUILDING = true;
                     RebuildCache();
-                    _REBUILDING = false;
                 }
             }
 
@@ -232,7 +236,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         public static void RebuildCache()
         {
-
+            _REBUILDING = true;
             Task.Run(async () =>
             {
                 if (_gameInfo.GameLanguage == XivLanguage.None)
@@ -244,28 +248,37 @@ namespace xivModdingFramework.Cache
                 {
                     CreateCache();
 
-                    await RebuildItemsCache();
-                    await RebuildMonstersCache();
-                    await RebuildUiCache();
-                    await RebuildFurnitureCache();
-                    var pre = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-                    await BuildModdedItemDependencies();
-                    var post = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                    var tasks = new List<Task>();
+
+                    var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                    tasks.Add(RebuildItemsCache());
+                    tasks.Add(RebuildMonstersCache());
+                    tasks.Add(RebuildUiCache());
+                    tasks.Add(RebuildFurnitureCache());
+                    tasks.Add(BuildModdedItemDependencies());
+
+                    await Task.WhenAll(tasks);
+
+                    var post = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
 
                     var result = post - pre;
 
                     SetMetaValue("cache_version", CacheVersion.ToString());
                     SetMetaValue("ffxiv_version", _gameInfo.GameVersion.ToString());
                     SetMetaValue("language", _gameInfo.GameLanguage.ToString());
+                    SetMetaValue("build_time", result.ToString());
 
                 } catch (Exception Ex)
                 {
                     SetMetaValue("needs_rebuild", "1");
+                    _REBUILDING = false;
                     throw;
                 }
             }).Wait();
+            _REBUILDING = false;
         }
 
+        #region Cache Rebuilding
 
         /// <summary>
         /// Destroys and recreates the base SQL Database.
@@ -320,18 +333,6 @@ namespace xivModdingFramework.Cache
         }
 
 
-        /// <summary>
-        /// Populate the monsters table.
-        /// </summary>
-        /// <returns></returns>
-        private static async Task RebuildMonstersCache()
-        {
-            // Mounts, Minions, etc. are really just monsters.
-            await RebuildMinionsCache();
-            await RebuildMountsCache();
-            await RebuildPetsCache();
-        }
-
 
         /// <summary>
         /// Populate the ui table.
@@ -357,7 +358,8 @@ namespace xivModdingFramework.Cache
                     foreach (var item in list)
                     {
                         var query = @"
-                            insert into ui (name, category, subcategory, path, icon_id) values ($name, $category, $subcategory, $path, $icon_id)
+                            insert into ui ( name,  category,  subcategory,  path,  icon_id,  root) 
+                                    values ($name, $category, $subcategory, $path, $icon_id, $root)
                                 on conflict do nothing";
                         using (var cmd = new SQLiteCommand(query, db))
                         {
@@ -366,6 +368,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
                             cmd.Parameters.AddWithValue("path", item.UiPath);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("root", null);  // Unsupported for UI elements for now.
                             cmd.ExecuteScalar();
                         }
                     }
@@ -374,6 +377,18 @@ namespace xivModdingFramework.Cache
             }
         }
 
+
+        /// <summary>
+        /// Populate the monsters table.
+        /// </summary>
+        /// <returns></returns>
+        private static async Task RebuildMonstersCache()
+        {
+            // Mounts, Minions, etc. are really just monsters.
+            await RebuildMinionsCache();
+            await RebuildMountsCache();
+            await RebuildPetsCache();
+        }
 
         /// <summary>
         /// Populate the housing table.
@@ -394,8 +409,10 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into housing ( name,  category,  subcategory,  primary_id,  icon_id) 
-                                          values($name, $category, $subcategory, $primary_id, $icon_id)";
+                            insert into housing ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
+                                          values($name, $category, $subcategory, $primary_id, $icon_id, $root)";
+
+                        var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             cmd.Parameters.AddWithValue("name", item.Name);
@@ -403,6 +420,13 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                            if(root.IsValid())
+                            {
+                                cmd.Parameters.AddWithValue("root", root.ToString());
+                            } else
+                            {
+                                cmd.Parameters.AddWithValue("root", null);
+                            }
                             cmd.ExecuteScalar();
                         }
                     }
@@ -436,9 +460,10 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into monsters ( name, category,  primary_id,  secondary_id,  imc_variant,  model_type) 
-                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type)
+                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root) 
+                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root)
                             on conflict do nothing";
+                        var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             try
@@ -449,6 +474,14 @@ namespace xivModdingFramework.Cache
                                 cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                                 cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                                 cmd.Parameters.AddWithValue("model_type", ((XivMonsterModelInfo)item.ModelInfo).ModelType.ToString());
+                                if (root.IsValid())
+                                {
+                                    cmd.Parameters.AddWithValue("root", root.ToString());
+                                }
+                                else
+                                {
+                                    cmd.Parameters.AddWithValue("root", null);
+                                }
                                 cmd.ExecuteScalar();
                             }
                             catch (Exception ex)
@@ -480,9 +513,10 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into monsters ( name, category,  primary_id,  secondary_id,  imc_variant,  model_type) 
-                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type)
+                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root) 
+                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root)
                             on conflict do nothing";
+                        var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             try
@@ -493,6 +527,14 @@ namespace xivModdingFramework.Cache
                                 cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                                 cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                                 cmd.Parameters.AddWithValue("model_type", ((XivMonsterModelInfo)item.ModelInfo).ModelType.ToString());
+                                if (root.IsValid())
+                                {
+                                    cmd.Parameters.AddWithValue("root", root.ToString());
+                                }
+                                else
+                                {
+                                    cmd.Parameters.AddWithValue("root", null);
+                                }
                                 cmd.ExecuteScalar();
                             }
                             catch (Exception ex)
@@ -525,9 +567,10 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into monsters ( name, category,  primary_id,  secondary_id,  imc_variant,  model_type) 
-                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type)
+                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root) 
+                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root)
                             on conflict do nothing";
+                        var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             try {
@@ -537,6 +580,14 @@ namespace xivModdingFramework.Cache
                                 cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                                 cmd.Parameters.AddWithValue("category", item.SecondaryCategory);
                                 cmd.Parameters.AddWithValue("model_type", ((XivMonsterModelInfo)item.ModelInfo).ModelType.ToString());
+                                if (root.IsValid())
+                                {
+                                    cmd.Parameters.AddWithValue("root", root.ToString());
+                                }
+                                else
+                                {
+                                    cmd.Parameters.AddWithValue("root", null);
+                                }
                                 cmd.ExecuteScalar();
                             }
                             catch (Exception ex) {
@@ -567,8 +618,9 @@ namespace xivModdingFramework.Cache
                 {
                     foreach (var item in items)
                     {
-                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id, is_weapon) 
-                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $is_weapon)";
+                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id,  is_weapon,  root) 
+                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $is_weapon, $root)";
+                        var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             cmd.Parameters.AddWithValue("exd_id", item.ExdID);
@@ -580,360 +632,20 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                             cmd.Parameters.AddWithValue("name", item.Name);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            if(root.IsValid())
+                            {
+                                cmd.Parameters.AddWithValue("root", root.ToString());
+                            }
+                            else
+                            {
+                                cmd.Parameters.AddWithValue("root", null);
+                            }
                             cmd.ExecuteScalar();
                         }
                     }
                     transaction.Commit();
                 }
             }
-        }
-
-
-        /// <summary>
-        /// Get the ui entries list, optionally with a substring filter.
-        /// </summary>
-        /// <param name="substring"></param>
-        /// <returns></returns>
-        public static async Task<List<XivFurniture>> GetCachedFurnitureList(string substring = null)
-        {
-            WhereClause where = null;
-            if (substring != null)
-            {
-                where = new WhereClause();
-                where.Comparer = WhereClause.ComparisonType.Like;
-                where.Column = "name";
-                where.Value = "%" + substring + "%";
-            }
-
-            return await BuildListFromTable("housing", where, async (reader) =>
-            {
-                var item = new XivFurniture
-                {
-                    PrimaryCategory = XivStrings.Housing,
-                    SecondaryCategory = reader.GetString("category"),
-                    TertiaryCategory = reader.GetString("subcategory"),
-                    Name = reader.GetString("name"),
-                    IconNumber = (uint)reader.GetInt32("icon_id"),
-                    ModelInfo = new XivModelInfo()
-                    {
-                        PrimaryID = reader.GetInt32("primary_id")
-                    }
-                };
-                return item;
-            });
-        }
-
-        /// <summary>
-        /// Get the ui entries list, optionally with a substring filter.
-        /// </summary>
-        /// <param name="substring"></param>
-        /// <returns></returns>
-        public static async Task<List<XivUi>> GetCachedUiList(string substring = null)
-        {
-            WhereClause where = null;
-            if (substring != null)
-            {
-                where = new WhereClause();
-                where.Comparer = WhereClause.ComparisonType.Like;
-                where.Column = "name";
-                where.Value = "%" + substring + "%";
-            }
-
-            return await BuildListFromTable("ui", where, async (reader) =>
-            {
-                var item = new XivUi
-                {
-                    PrimaryCategory = XivStrings.UI,
-                    SecondaryCategory = reader.GetString("category"),
-                    TertiaryCategory = reader.GetString("subcategory"),
-                    Name = reader.GetString("name"),
-                    IconNumber = reader.GetInt32("icon_id"),
-                    UiPath = reader.GetString("path"),
-                };
-                return item;
-            });
-        }
-
-        /// <summary>
-        /// Get the minions entries list, optionally with a substring filter.
-        /// </summary>
-        /// <param name="substring"></param>
-        /// <returns></returns>
-        public static async Task<List<XivMinion>> GetCachedMinionsList(string substring = null)
-        {
-            var where = new WhereClause();
-
-            var minionClause = new WhereClause();
-            minionClause.Column = "category";
-            minionClause.Value = XivStrings.Minions;
-            minionClause.Join = WhereClause.JoinType.And;
-            minionClause.Comparer = WhereClause.ComparisonType.Equal;
-            where.Inner.Add(minionClause);
-
-            if (substring != null)
-            {
-                var w = new WhereClause();
-                w.Comparer = WhereClause.ComparisonType.Like;
-                w.Join = WhereClause.JoinType.And;
-                w.Column = "name";
-                w.Value = "%" + substring + "%";
-                where.Inner.Add(w);
-            }
-
-            try
-            {
-                return await BuildListFromTable("monsters", where, async (reader) =>
-                {
-                    var item = new XivMinion
-                    {
-                        PrimaryCategory = XivStrings.Companions,
-                        SecondaryCategory = reader.GetString("category"),
-                        Name = reader.GetString("name"),
-                        ModelInfo = new XivMonsterModelInfo
-                        {
-                            ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
-                            PrimaryID = reader.GetInt32("primary_id"),
-                            SecondaryID = reader.GetInt32("secondary_id"),
-                            ImcSubsetID = reader.GetInt32("imc_variant"),
-                        }
-
-
-                    };
-                    return item;
-                });
-            } catch(Exception ex)
-            {
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Get the pets entries list, optionally with a substring filter.
-        /// </summary>
-        /// <param name="substring"></param>
-        /// <returns></returns>
-        public static async Task<List<XivPet>> GetCachedPetList(string substring = null)
-        {
-            var where = new WhereClause();
-
-            var petClause = new WhereClause();
-            petClause.Column = "category";
-            petClause.Value = XivStrings.Pets;
-            petClause.Join = WhereClause.JoinType.And;
-            petClause.Comparer = WhereClause.ComparisonType.Equal;
-            where.Inner.Add(petClause);
-
-            if (substring != null)
-            {
-                var w = new WhereClause();
-                w.Comparer = WhereClause.ComparisonType.Like;
-                w.Join = WhereClause.JoinType.And;
-                w.Column = "name";
-                w.Value = "%" + substring + "%";
-                where.Inner.Add(w);
-            }
-
-            try
-            {
-                return await BuildListFromTable("monsters", where, async (reader) =>
-                {
-                    var item = new XivPet
-                    {
-                        PrimaryCategory = XivStrings.Companions,
-                        SecondaryCategory = reader.GetString("category"),
-                        Name = reader.GetString("name"),
-                        ModelInfo = new XivMonsterModelInfo
-                        {
-                            ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
-                            PrimaryID = reader.GetInt32("primary_id"),
-                            SecondaryID = reader.GetInt32("secondary_id"),
-                            ImcSubsetID = reader.GetInt32("imc_variant"),
-                        }
-
-
-                    };
-                    return item;
-                });
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Get the mounts entries list, optionally with a substring filter.
-        /// </summary>
-        /// <param name="substring"></param>
-        /// <returns></returns>
-        public static async Task<List<XivMount>> GetCachedMountList(string substring = null, string category = null)
-        {
-            var where = new WhereClause();
-
-            if (category != null)
-            {
-                var categoryClause = new WhereClause();
-                categoryClause.Column = "category";
-                categoryClause.Value = category;
-                categoryClause.Join = WhereClause.JoinType.And;
-                categoryClause.Comparer = WhereClause.ComparisonType.Equal;
-                where.Inner.Add(categoryClause);
-            }
-
-            if (substring != null)
-            {
-                var w = new WhereClause();
-                w.Comparer = WhereClause.ComparisonType.Like;
-                w.Join = WhereClause.JoinType.And;
-                w.Column = "name";
-                w.Value = "%" + substring + "%";
-                where.Inner.Add(w);
-            }
-
-            try
-            {
-                return await BuildListFromTable("monsters", where, async (reader) =>
-                {
-                    var item = new XivMount
-                    {
-                        PrimaryCategory = XivStrings.Companions,
-                        SecondaryCategory = reader.GetString("category"),
-                        Name = reader.GetString("name"),
-                        ModelInfo = new XivMonsterModelInfo
-                        {
-                            ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
-                            PrimaryID = reader.GetInt32("primary_id"),
-                            SecondaryID = reader.GetInt32("secondary_id"),
-                            ImcSubsetID = reader.GetInt32("imc_variant"),
-                        }
-
-
-                    };
-                    return item;
-                });
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Get the gear entries list, optionally with a substring filter.
-        /// </summary>
-        /// <param name="substring"></param>
-        /// <returns></returns>
-        public static async Task<List<XivGear>> GetCachedGearList(string substring = null)
-        {
-            WhereClause where = null;
-            if (substring != null)
-            {
-                where = new WhereClause();
-                where.Comparer = WhereClause.ComparisonType.Like;
-                where.Column = "name";
-                where.Value = "%" + substring + "%";
-            }
-
-            List<XivGear> mainHands = new List<XivGear>();
-            List<XivGear> offHands = new List<XivGear>();
-            var list = await BuildListFromTable("items", where, async (reader) =>
-            {
-                var primaryMi = new XivGearModelInfo();
-
-                var item = new XivGear
-                {
-                    ExdID = reader.GetInt32("exd_id"),
-                    PrimaryCategory = XivStrings.Gear,
-                    SecondaryCategory = reader.GetString("slot_full"),
-                    ModelInfo = primaryMi,
-                };
-
-                item.Name = reader.GetString("name");
-                item.IconNumber = (uint)reader.GetInt32("icon_id");
-                primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
-                primaryMi.PrimaryID = reader.GetInt32("primary_id");
-                primaryMi.SecondaryID = reader.GetInt32("secondary_id");
-                primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");
-
-                if(item.Name.Contains(XivStrings.Main_Hand))
-                {
-                    mainHands.Add(item);
-                } else if (item.Name.Contains(XivStrings.Off_Hand))
-                {
-                    offHands.Add(item);
-                }
-
-                return item;
-            });
-
-            // Assign pairs based on items that came out of the same EXD row.
-            foreach(var item in mainHands)
-            {
-                var pair = offHands.FirstOrDefault(x => x.ExdID == item.ExdID);
-                if(pair != null)
-                {
-                    pair.PairedItem = item;
-                    item.PairedItem = pair;
-                }
-            }
-            return list;
-        }
-
-
-        /// <summary>
-        /// Sets a meta value to the cache.
-        /// </summary>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        private static void SetMetaValue(string key, string value = null)
-        {
-            using (var db = new SQLiteConnection(CacheConnectionString))
-            {
-                db.Open();
-                var query = "insert into meta(key, value) values($key,$value) on conflict(key) do update set value = excluded.value";
-                using (var cmd = new SQLiteCommand(query, db))
-                {
-                    cmd.Parameters.AddWithValue("key", key);
-                    cmd.Parameters.AddWithValue("value", value);
-                    cmd.ExecuteScalar();
-                }
-            }
-        }
-
-        /// <summary>
-        /// Retrieves a meta value from the cache.
-        /// </summary>
-        /// <param name="key"></param>
-        /// <returns></returns>
-        private static string GetMetaValue(string key)
-        {
-            string val = null;
-            using (var db = new SQLiteConnection(CacheConnectionString))
-            {
-                db.Open();
-                var query = "select value from meta where key = $key";
-
-                // Double Using statements are important here to ensure
-                // that the SQLiteCommand and SQLiteConnection can be 
-                // immediately GC'd, and not keep the file handle
-                // open in case we want to destroy the DB File.
-                using (var cmd = new SQLiteCommand(query, db))
-                {
-                    cmd.Parameters.AddWithValue("key", key);
-                    try
-                    {
-                        val = (string)cmd.ExecuteScalar();
-
-                    }
-                    catch (Exception Ex)
-                    {
-                        throw;
-                        // Meta Table doesn't exist.
-                    }
-                }
-            }
-
-            return val?.ToString();
         }
 
         /// <summary>
@@ -965,6 +677,410 @@ namespace xivModdingFramework.Cache
             QueueParentFilesUpdate(paths);
         }
 
+        #endregion
+
+        #region Cached item list accessors
+
+        /// <summary>
+        /// Get the ui entries list, optionally with a substring filter.
+        /// </summary>
+        /// <param name="substring"></param>
+        /// <returns></returns>
+        internal static async Task<List<XivFurniture>> GetCachedFurnitureList(string substring = null)
+        {
+            WhereClause where = null;
+            if (substring != null)
+            {
+                where = new WhereClause();
+                where.Comparer = WhereClause.ComparisonType.Like;
+                where.Column = "name";
+                where.Value = "%" + substring + "%";
+            }
+
+            return await BuildListFromTable("housing", where, async (reader) =>
+            {
+                return MakeFurniture(reader);
+            });
+        }
+
+
+        /// <summary>
+        /// Get the ui entries list, optionally with a substring filter.
+        /// </summary>
+        /// <param name="substring"></param>
+        /// <returns></returns>
+        internal static async Task<List<XivUi>> GetCachedUiList(string substring = null)
+        {
+            WhereClause where = null;
+            if (substring != null)
+            {
+                where = new WhereClause();
+                where.Comparer = WhereClause.ComparisonType.Like;
+                where.Column = "name";
+                where.Value = "%" + substring + "%";
+            }
+
+            return await BuildListFromTable("ui", where, async (reader) =>
+            {
+                return MakeUi(reader);
+            });
+        }
+
+        /// <summary>
+        /// Get the minions entries list, optionally with a substring filter.
+        /// </summary>
+        /// <param name="substring"></param>
+        /// <returns></returns>
+        internal static async Task<List<XivMinion>> GetCachedMinionsList(string substring = null)
+        {
+            var where = new WhereClause();
+
+            var minionClause = new WhereClause();
+            minionClause.Column = "category";
+            minionClause.Value = XivStrings.Minions;
+            minionClause.Join = WhereClause.JoinType.And;
+            minionClause.Comparer = WhereClause.ComparisonType.Equal;
+            where.Inner.Add(minionClause);
+
+            if (substring != null)
+            {
+                var w = new WhereClause();
+                w.Comparer = WhereClause.ComparisonType.Like;
+                w.Join = WhereClause.JoinType.And;
+                w.Column = "name";
+                w.Value = "%" + substring + "%";
+                where.Inner.Add(w);
+            }
+
+            try
+            {
+                return await BuildListFromTable("monsters", where, async (reader) =>
+                {
+                    return (XivMinion)MakeMonster(reader);
+                });
+            } catch(Exception ex)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Get the pets entries list, optionally with a substring filter.
+        /// </summary>
+        /// <param name="substring"></param>
+        /// <returns></returns>
+        internal static async Task<List<XivPet>> GetCachedPetList(string substring = null)
+        {
+            var where = new WhereClause();
+
+            var petClause = new WhereClause();
+            petClause.Column = "category";
+            petClause.Value = XivStrings.Pets;
+            petClause.Join = WhereClause.JoinType.And;
+            petClause.Comparer = WhereClause.ComparisonType.Equal;
+            where.Inner.Add(petClause);
+
+            if (substring != null)
+            {
+                var w = new WhereClause();
+                w.Comparer = WhereClause.ComparisonType.Like;
+                w.Join = WhereClause.JoinType.And;
+                w.Column = "name";
+                w.Value = "%" + substring + "%";
+                where.Inner.Add(w);
+            }
+
+            try
+            {
+                return await BuildListFromTable("monsters", where, async (reader) =>
+                {
+                    return (XivPet)MakeMonster(reader);
+                });
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Get the mounts entries list, optionally with a substring filter.
+        /// </summary>
+        /// <param name="substring"></param>
+        /// <returns></returns>
+        internal static async Task<List<XivMount>> GetCachedMountList(string substring = null, string category = null)
+        {
+            var where = new WhereClause();
+
+            if (category != null)
+            {
+                var categoryClause = new WhereClause();
+                categoryClause.Column = "category";
+                categoryClause.Value = category;
+                categoryClause.Join = WhereClause.JoinType.And;
+                categoryClause.Comparer = WhereClause.ComparisonType.Equal;
+                where.Inner.Add(categoryClause);
+            }
+
+            if (substring != null)
+            {
+                var w = new WhereClause();
+                w.Comparer = WhereClause.ComparisonType.Like;
+                w.Join = WhereClause.JoinType.And;
+                w.Column = "name";
+                w.Value = "%" + substring + "%";
+                where.Inner.Add(w);
+            }
+
+            try
+            {
+                return await BuildListFromTable("monsters", where, async (reader) =>
+                {
+                    return (XivMount)MakeMonster(reader);
+                });
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Get the gear entries list, optionally with a substring filter.
+        /// </summary>
+        /// <param name="substring"></param>
+        /// <returns></returns>
+        internal static async Task<List<XivGear>> GetCachedGearList(string substring = null)
+        {
+            WhereClause where = null;
+            if (substring != null)
+            {
+                where = new WhereClause();
+                where.Comparer = WhereClause.ComparisonType.Like;
+                where.Column = "name";
+                where.Value = "%" + substring + "%";
+            }
+
+            List<XivGear> mainHands = new List<XivGear>();
+            List<XivGear> offHands = new List<XivGear>();
+            var list = await BuildListFromTable("items", where, async (reader) =>
+            {
+                var item = MakeGear(reader);
+                if (item.Name.Contains(XivStrings.Main_Hand))
+                {
+                    mainHands.Add(item);
+                } else if (item.Name.Contains(XivStrings.Off_Hand))
+                {
+                    offHands.Add(item);
+                }
+
+                return item;
+            });
+
+            // Assign pairs based on items that came out of the same EXD row.
+            foreach(var item in mainHands)
+            {
+                var pair = offHands.FirstOrDefault(x => x.ExdID == item.ExdID);
+                if(pair != null)
+                {
+                    pair.PairedItem = item;
+                    item.PairedItem = pair;
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Creates the appropriate monster type item from a database row.
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <returns></returns>
+        internal static IItemModel MakeMonster(CacheReader reader)
+        {
+            var cat = reader.GetString("category");
+            IItemModel item;
+
+            if (cat == XivStrings.Minions)
+            {
+                item = new XivMinion
+                {
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = reader.GetString("category"),
+                    Name = reader.GetString("name"),
+                    ModelInfo = new XivMonsterModelInfo
+                    {
+                        ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
+                        PrimaryID = reader.GetInt32("primary_id"),
+                        SecondaryID = reader.GetInt32("secondary_id"),
+                        ImcSubsetID = reader.GetInt32("imc_variant"),
+                    }
+                };
+
+            }
+            else if (cat == XivStrings.Pets)
+            {
+                item = new XivPet
+                {
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = reader.GetString("category"),
+                    Name = reader.GetString("name"),
+                    ModelInfo = new XivMonsterModelInfo
+                    {
+                        ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
+                        PrimaryID = reader.GetInt32("primary_id"),
+                        SecondaryID = reader.GetInt32("secondary_id"),
+                        ImcSubsetID = reader.GetInt32("imc_variant"),
+                    }
+                };
+
+            }
+            else
+            {
+                item = new XivMount
+                {
+                    PrimaryCategory = XivStrings.Companions,
+                    SecondaryCategory = reader.GetString("category"),
+                    Name = reader.GetString("name"),
+                    ModelInfo = new XivMonsterModelInfo
+                    {
+                        ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
+                        PrimaryID = reader.GetInt32("primary_id"),
+                        SecondaryID = reader.GetInt32("secondary_id"),
+                        ImcSubsetID = reader.GetInt32("imc_variant"),
+                    }
+                };
+            }
+
+            return item;
+        }
+        
+        /// <summary>
+        /// Creates a XivGear entry from a database row.
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <returns></returns>
+        internal static XivGear MakeGear(CacheReader reader)
+        {
+            var primaryMi = new XivGearModelInfo();
+
+            var item = new XivGear
+            {
+                ExdID = reader.GetInt32("exd_id"),
+                PrimaryCategory = XivStrings.Gear,
+                SecondaryCategory = reader.GetString("slot_full"),
+                ModelInfo = primaryMi,
+            };
+
+            item.Name = reader.GetString("name");
+            item.IconNumber = (uint)reader.GetInt32("icon_id");
+            primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
+            primaryMi.PrimaryID = reader.GetInt32("primary_id");
+            primaryMi.SecondaryID = reader.GetInt32("secondary_id");
+            primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");
+
+            return item;
+        }
+
+        /// <summary>
+        /// Creates a XivUI item from a database row.
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <returns></returns>
+        internal static XivUi MakeUi(CacheReader reader)
+        {
+            var item = new XivUi
+            {
+                PrimaryCategory = XivStrings.UI,
+                SecondaryCategory = reader.GetString("category"),
+                TertiaryCategory = reader.GetString("subcategory"),
+                Name = reader.GetString("name"),
+                IconNumber = reader.GetInt32("icon_id"),
+                UiPath = reader.GetString("path"),
+            };
+            return item;
+        }
+
+        /// <summary>
+        /// Creates a XivFurniture item from a database row.
+        /// </summary>
+        /// <param name="reader"></param>
+        /// <returns></returns>
+        internal static XivFurniture MakeFurniture(CacheReader reader)
+        {
+            var item = new XivFurniture
+            {
+                PrimaryCategory = XivStrings.Housing,
+                SecondaryCategory = reader.GetString("category"),
+                TertiaryCategory = reader.GetString("subcategory"),
+                Name = reader.GetString("name"),
+                IconNumber = (uint)reader.GetInt32("icon_id"),
+                ModelInfo = new XivModelInfo()
+                {
+                    PrimaryID = reader.GetInt32("primary_id")
+                }
+            };
+            return item;
+        }
+
+
+        #endregion
+
+        /// <summary>
+        /// Sets a meta value to the cache.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        public static void SetMetaValue(string key, string value = null)
+        {
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+                var query = "insert into meta(key, value) values($key,$value) on conflict(key) do update set value = excluded.value";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.Parameters.AddWithValue("key", key);
+                    cmd.Parameters.AddWithValue("value", value);
+                    cmd.ExecuteScalar();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retrieves a meta value from the cache.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public static string GetMetaValue(string key)
+        {
+            string val = null;
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+                var query = "select value from meta where key = $key";
+
+                // Double Using statements are important here to ensure
+                // that the SQLiteCommand and SQLiteConnection can be 
+                // immediately GC'd, and not keep the file handle
+                // open in case we want to destroy the DB File.
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.Parameters.AddWithValue("key", key);
+                    try
+                    {
+                        val = (string)cmd.ExecuteScalar();
+
+                    }
+                    catch (Exception Ex)
+                    {
+                        throw;
+                        // Meta Table doesn't exist.
+                    }
+                }
+            }
+
+            return val?.ToString();
+        }
+
 
         /// <summary>
         /// Retreives the child files in the dependency graph for this file.
@@ -994,7 +1110,7 @@ namespace xivModdingFramework.Cache
             if (list.Count == 0)
             {
                 // Need to pull the raw data to verify a 0 count entry.
-                list = await Dependencies.GetChildFiles(internalFilePath);
+                list = await XivDependencyGraph.GetChildFiles(internalFilePath);
                 if (list != null && list.Count > 0)
                 {
                     await UpdateChildFiles(internalFilePath, list);
@@ -1030,7 +1146,7 @@ namespace xivModdingFramework.Cache
             if (list.Count == 0)
             {
                 // Need to pull the raw data to verify a 0 count entry.
-                list = await Dependencies.GetParentFiles(internalFilePath);
+                list = await XivDependencyGraph.GetParentFiles(internalFilePath);
                 if (list != null && list.Count > 0)
                 {
                     await UpdateParentFiles(internalFilePath, list);
@@ -1041,8 +1157,8 @@ namespace xivModdingFramework.Cache
 
 
         /// <summary>
-        /// Retrieves the entire universe of available, valid roots from the database; or lacking a cache,
-        /// this simply uses the main ItemList to generate it.
+        /// Retrieves the entire universe of available, valid roots from the database.
+        /// Returned in the compound dictionary format of [Primary Type] [Primary Id] [Secondary Type] [Secondary Id] [Slot]
         /// </summary>
         /// <returns></returns>
         public static Dictionary<XivItemType, Dictionary<int, Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>>> GetAllRoots()
@@ -1127,34 +1243,21 @@ namespace xivModdingFramework.Cache
 
         }
 
-        public static XivDependencyRootInfo CreateDependencyRootInfo(string internalPath)
+        public static async Task<XivDependencyRoot> GetFirstRoot(string internalPath)
         {
-            return Dependencies.ExtractRootInfo(internalPath);
-        }
-        public static XivDependencyRoot CreateDependencyRoot(XivDependencyRootInfo info)
-        {
-            return Dependencies.CreateDependencyRoot(info);
-        }
-        public static XivDependencyRoot CreateDependencyRoot(string internalPath)
-        {
-            return Dependencies.CreateDependencyRoot(CreateDependencyRootInfo(internalPath));
-        }
-        public static XivDependencyRootInfo GetItemRootInfo(this IItem item)
-        {
-            var rootFolder = item.GetItemRootFolder();
-            var info = Dependencies.ExtractRootInfo(rootFolder);
-            info.Slot = item.GetItemSlotAbbreviation();
-
-            if(String.IsNullOrWhiteSpace(info.Slot))
+            var roots = await XivDependencyGraph.GetDependencyRoots(internalPath);
+            if(roots.Count > 0)
             {
-                info.Slot = null;
+                return roots[0];
             }
-            return info;
+            return null;
         }
-        public static XivDependencyRoot GetItemRoot(this IItem item)
+
+        public static async Task<List<XivDependencyRoot>> GetRoots(string internalPath)
         {
-            return Dependencies.CreateDependencyRoot(GetItemRootInfo(item));
+            return await XivDependencyGraph.GetDependencyRoots(internalPath);
         }
+
 
 
         public static void ResetRootCache()
@@ -1176,6 +1279,7 @@ namespace xivModdingFramework.Cache
                 }
             }
         }
+
 
         /// <summary>
         /// Saves a dependency root to the DB, for item list crawling.
@@ -1279,7 +1383,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
         {
-            return await Dependencies.GetSiblingFiles(internalFilePath);
+            return await XivDependencyGraph.GetSiblingFiles(internalFilePath);
         }
 
         /// <summary>
@@ -1293,7 +1397,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
         {
-            var roots = await Dependencies.GetDependencyRoots(internalFilePath);
+            var roots = await XivDependencyGraph.GetDependencyRoots(internalFilePath);
             return roots;
         }
 
@@ -1304,7 +1408,7 @@ namespace xivModdingFramework.Cache
         /// <param name="internalFilePath"></param>
         public static async Task UpdateChildFiles(string internalFilePath, List<string> children = null)
         {
-            var level = Dependencies.GetDependencyLevel(internalFilePath);
+            var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Texture)
             {
                 return;
@@ -1313,7 +1417,7 @@ namespace xivModdingFramework.Cache
             // Just updating a single file.
             if (children == null)
             {
-                children = await Dependencies.GetChildFiles(internalFilePath);
+                children = await XivDependencyGraph.GetChildFiles(internalFilePath);
             }
 
             using (var db = new SQLiteConnection(CacheConnectionString))
@@ -1364,7 +1468,7 @@ namespace xivModdingFramework.Cache
         /// <param name="internalFilePath"></param>
         private static async Task UpdateParentFiles(string internalFilePath, List<string> parents = null)
         {
-            var level = Dependencies.GetDependencyLevel(internalFilePath);
+            var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root)
             {
                 return;
@@ -1373,7 +1477,7 @@ namespace xivModdingFramework.Cache
             // Just updating a single file.
             if (parents == null)
             {
-                parents = await Dependencies.GetParentFiles(internalFilePath);
+                parents = await XivDependencyGraph.GetParentFiles(internalFilePath);
             }
 
             using (var db = new SQLiteConnection(CacheConnectionString))
@@ -1444,7 +1548,7 @@ namespace xivModdingFramework.Cache
 
                                 foreach (var file in files)
                                 {
-                                    var level = Dependencies.GetDependencyLevel(file);
+                                    var level = XivDependencyGraph.GetDependencyLevel(file);
                                     if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root)
                                     {
                                         continue;
@@ -1533,7 +1637,7 @@ namespace xivModdingFramework.Cache
                         continue;
                     } else
                     {
-                        level = Dependencies.GetDependencyLevel(file);
+                        level = XivDependencyGraph.GetDependencyLevel(file);
                         if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root ) continue;
 
                         // See if we actually need an update.

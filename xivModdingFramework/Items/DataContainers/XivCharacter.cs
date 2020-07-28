@@ -70,13 +70,13 @@ namespace xivModdingFramework.Items.DataContainers
         /// The Primary Model Information of the Character Item 
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
-        public static IItemModel FromDependencyRoot(XivDependencyRoot root, string nameExtension = "")
+        internal static IItemModel FromDependencyRoot(XivDependencyRoot root)
         {
             var item = new XivCharacter();
             item.ModelInfo = new XivModelInfo();
             item.ModelInfo.PrimaryID = root.Info.PrimaryId;
             item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
-            item.Name = root.Info.GetBaseFileName() + nameExtension;
+            item.Name = root.Info.GetBaseFileName();
             item.PrimaryCategory = XivStrings.Character;
 
             if (root.Info.Slot != null)

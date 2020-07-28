@@ -71,16 +71,17 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
 
-        public static IItemModel FromDependencyRoot(XivDependencyRoot root, string nameExtension = "")
+        internal static IItemModel FromDependencyRoot(XivDependencyRoot root, int imcSubset)
         {
             var item = new XivMount();
             var mi = new XivMonsterModelInfo();
             mi.ModelType = root.Info.PrimaryType;
             mi.PrimaryID = root.Info.PrimaryId;
             mi.SecondaryID = (int)root.Info.SecondaryId;
+            mi.ImcSubsetID = imcSubset;
 
             item.ModelInfo = mi;
-            item.Name = root.Info.GetBaseFileName() + nameExtension;
+            item.Name = root.Info.GetBaseFileName() + "_v" + imcSubset.ToString();
             item.PrimaryCategory = XivStrings.Companions;
             item.SecondaryCategory = XivStrings.Mounts;
 

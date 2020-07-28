@@ -1,33 +1,107 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
-using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
-using System.Resources;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
-using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
-using xivModdingFramework.Models.ModelTextures;
 using xivModdingFramework.Mods;
-using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
-using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 using static xivModdingFramework.Cache.XivCache;
 
 namespace xivModdingFramework.Cache
 {
+
+    /// <summary>
+    /// Holder for extension methods for IItem from the dependency graph.
+    /// Shouldn't really ever need to be accessed directly.
+    /// </summary>
+    public static class ItemRootExtensions
+    {
+        public static XivDependencyRoot GetRoot(this IItem item)
+        {
+            return XivDependencyGraph.CreateDependencyRoot(GetRootInfo(item));
+        }
+        public static XivDependencyRootInfo GetRootInfo(this IItem item)
+        {
+            var rootFolder = item.GetItemRootFolder();
+            var info = XivDependencyGraph.ExtractRootInfo(rootFolder);
+            info.Slot = item.GetItemSlotAbbreviation();
+
+            if (String.IsNullOrWhiteSpace(info.Slot))
+            {
+                info.Slot = null;
+            }
+            return info;
+        }
+
+        public static async Task<List<IItemModel>> GetSharedImcSubsetItems(this IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root != null)
+            {
+                return await root.GetAllItems(item.ModelInfo.ImcSubsetID);
+            }
+            else
+            {
+                return new List<IItemModel>() { (IItemModel)item.Clone() };
+            }
+
+        }
+        public static async Task<List<IItemModel>> GetSharedMaterialItems(this IItemModel item)
+        {
+            // Todo - Could do with cleaning this up to make it work for monsters/etc. too.
+            var sameModelItems = new List<IItemModel>();
+            if (!item.PrimaryCategory.Equals(XivStrings.Gear))
+
+            {
+                sameModelItems.Add((IItemModel)item.Clone());
+                return sameModelItems;
+            }
+            sameModelItems = await item.GetSharedModelItems();
+
+            var imc = new Imc(XivCache.GameInfo.GameDirectory);
+            var originalInfo = await imc.GetImcInfo(item);
+
+            var sameMaterialItems = new List<IItemModel>();
+            foreach (var i in sameModelItems)
+            {
+                var info = await imc.GetImcInfo(i);
+                if (info.Variant == originalInfo.Variant)
+                {
+                    sameMaterialItems.Add(i);
+                }
+            }
+
+            return sameMaterialItems;
+        }
+        public static async Task<List<IItemModel>> GetSharedModelItems(this IItemModel item)
+        {
+            var root = item.GetRoot();
+            var items = new List<IItemModel>();
+            if (root != null) {
+                items = await root.GetAllItems();
+            }
+            if (items.Count == 0) { 
+                items.Add((IItemModel)item.Clone());
+            }
+            return items;
+        }
+
+    }
+
     /// <summary>
     /// The levels of the dependency graph.
     /// </summary>
@@ -63,7 +137,7 @@ namespace xivModdingFramework.Cache
     // A naive representation of a dependency root/root folder in FFXIV's
     // File System.  Provides basic calculated fields, however, more extensive
     // calculations expect this item to be fully qualified and properly contained
-    // in an actual dependency root object.
+    // in an actual dependency root object, accessible via .ToRoot()
     public struct XivDependencyRootInfo :ICloneable
     {
         // Only types with actual dependency structures are supported.
@@ -98,6 +172,11 @@ namespace xivModdingFramework.Cache
         public object Clone()
         {
             return this.MemberwiseClone();
+        }
+
+        public bool IsValid()
+        {
+            return PrimaryType != XivItemType.unknown && PrimaryType != XivItemType.none;
         }
 
         // Type -> Typecode -> Id
@@ -247,6 +326,11 @@ namespace xivModdingFramework.Cache
             return this.ToString().GetHashCode();
         }
 
+        public XivDependencyRoot ToFullRoot()
+        {
+            return XivDependencyGraph.CreateDependencyRoot(this);
+        }
+
     }
 
     /// <summary>
@@ -260,7 +344,7 @@ namespace xivModdingFramework.Cache
     /// A successful creation through those functions should always guarantee a valid DependencyRoot object, which can
     /// fully resolve all of its constituent parts.
     /// 
-    /// Likewise, this class can be turned into an IItem with a generic name via the ToItem() function.
+    /// Likewise, this class can be turned into an IItem with a generic name via the .ToItem() function.
     /// </summary>
     public class XivDependencyRoot
     {
@@ -588,31 +672,195 @@ namespace xivModdingFramework.Cache
         }
 
 
+
         /// <summary>
-        /// Creates and returns an IIteModel instance based on this root's information.
-        /// uses the appropriate subtypes.
+        /// Returns a raw item entry for this root.  Uses generic name, and does not contain an EXD row reference.
         /// </summary>
+        /// <param name="DefaultImcSubset"></param>
         /// <returns></returns>
-        public IItemModel ToItem(string nameExtension = "")
+        public IItemModel ToRawItem(int defaultImcSubset = 0)
         {
-            switch(Info.PrimaryType)
+            // If we couldn't find an item in the DB, or we failed to properly generate the item entry, just generate a default one.
+            switch (Info.PrimaryType)
             {
                 case XivItemType.equipment:
                 case XivItemType.accessory:
                 case XivItemType.weapon:
-                    return XivGear.FromDependencyRoot(this, nameExtension);
+                    return XivGear.FromDependencyRoot(this, defaultImcSubset);
                 case XivItemType.demihuman:
                 case XivItemType.monster:
-                    return XivMount.FromDependencyRoot(this, nameExtension);
+                    return XivMount.FromDependencyRoot(this, defaultImcSubset);
                 case XivItemType.indoor:
                 case XivItemType.outdoor:
-                    return XivFurniture.FromDependencyRoot(this, nameExtension);
+                case XivItemType.furniture:
+                    return XivFurniture.FromDependencyRoot(this);
                 case XivItemType.human:
-                    return XivCharacter.FromDependencyRoot(this, nameExtension);
+                    return XivCharacter.FromDependencyRoot(this);
             }
-            return XivGenericItemModel.FromDependencyRoot(this, nameExtension);
+            return XivGenericItemModel.FromDependencyRoot(this, defaultImcSubset);
+        }
+        /// <summary>
+        /// Creates and returns an IIteModel instance based on this root's information.
+        /// This will match the IItem entry available in the main item lists, if an item exists for this root.
+        /// Otherwise, it will be a generically named one.
+        /// </summary>
+        /// <returns></returns>
+        public IItemModel GetFirstItem(int defaultImcSubset = 0)
+        {
+            using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
+            {
+                db.Open();
+                var rootString = Info.ToString();
+
+                if(Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory || Info.PrimaryType == XivItemType.weapon)
+                {
+                    var query = "select * from items where root = $root order by name asc;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("root", rootString);
+
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            if (reader.NextRow())
+                            {
+                                // Found one.
+                                return XivCache.MakeGear(reader);
+                            }
+                        }
+                    }
+                } else if(Info.PrimaryType == XivItemType.demihuman || Info.PrimaryType == XivItemType.monster)
+                {
+                    var query = "select * from monsters where root = $root order by name asc;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("root", rootString);
+
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            if (reader.NextRow())
+                            {
+                                // Found one.
+                                return XivCache.MakeMonster(reader);
+                            }
+                        }
+                    }
+
+                } else if(Info.PrimaryType == XivItemType.furniture || Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+                {
+                    var query = "select * from furniture where root = $root order by name asc;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("root", rootString);
+
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            if (reader.NextRow())
+                            {
+                                // Found one.
+                                return XivCache.MakeFurniture(reader);
+                            }
+                        }
+                    }
+                }
+            }
+            return ToRawItem(defaultImcSubset);
+
         }
 
+        /// <summary>
+        /// Retrieves all items in this root, including NPC items.
+        /// If an IMC subset is supplied, the list is filtered to that subset before being returned.
+        /// </summary>
+        /// <param name="imcSubset"></param>
+        /// <returns></returns>
+        public async Task<List<IItemModel>> GetAllItems(int imcSubset = -1)
+        {
+
+            var items = new List<IItemModel>();
+            using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
+            {
+                db.Open();
+                var rootString = Info.ToString();
+
+                if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory || Info.PrimaryType == XivItemType.weapon)
+                {
+                    var query = "select * from items where root = $root order by name asc;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("root", rootString);
+
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while(reader.NextRow())
+                            {
+                                // Found one.
+                                items.Add(XivCache.MakeGear(reader));
+                            }
+                        }
+                    }
+                }
+                else if (Info.PrimaryType == XivItemType.demihuman || Info.PrimaryType == XivItemType.monster)
+                {
+                    var query = "select * from monsters where root = $root order by name asc;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("root", rootString);
+
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                // Found one.
+                                items.Add(XivCache.MakeMonster(reader));
+                            }
+                        }
+                    }
+                }
+                else if (Info.PrimaryType == XivItemType.furniture || Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+                {
+                    var query = "select * from furniture where root = $root order by name asc;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("root", rootString);
+
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                // Found one.
+                                items.Add(XivCache.MakeFurniture(reader));
+                            }
+                        }
+                    }
+                }
+            }
+
+            /// For these types we also want to read their IMC file to fill in any missing NPC only versions.
+            if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory || Info.PrimaryType == XivItemType.weapon)
+            {
+                var imc = new Imc(XivCache.GameInfo.GameDirectory);
+                var imcPaths = await GetImcEntryPaths();
+                var imcEntries = await imc.GetEntries(imcPaths);
+
+                // Need to verify all of our IMC sets are properly represented in the item list.
+                for (int i = 0; i <= imcEntries.Count; i++)
+                {
+                    // Already in it.  All set.
+                    if (items.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
+
+                    // Need to create a new item for it.
+                    var npcItem = ToRawItem(i);
+                    items.Add(npcItem);
+                }
+            }
+
+            if(imcSubset >= 0)
+            {
+                items = items.Where(x => x.ModelInfo.ImcSubsetID == imcSubset).ToList();
+            }
+
+            return items;
+        }
     }
 
     /// <summary>
@@ -620,7 +868,7 @@ namespace xivModdingFramework.Cache
     /// This class is automatically spawned and made available by the XivCache class,
     /// and should generally be referenced from there, not directly instantiated otherwise.
     /// </summary>
-    public class XivDependencyGraph
+    internal static class XivDependencyGraph
     {
         /*
          *  File Dependency Tree for FFXIV models works as such 
@@ -711,18 +959,14 @@ namespace xivModdingFramework.Cache
         // Group 2 == PrimaryId
         // Group 3 == SecondaryId (if it exists)
 
-        private static readonly Regex PrimaryExtractionRegex = new Regex("^chara\\/([a-z]+)\\/[a-z]([0-9]{4})(?:\\/obj\\/([a-z]+)\\/[a-z]([0-9]{4})\\/)?.*$");
-
-        public XivDependencyGraph()
-        {
-        }
+        private static readonly Regex PrimaryExtractionRegex = new Regex("^chara\\/([a-z]+)\\/[a-z]([0-9]{4})(?:\\/obj\\/([a-z]+)\\/[a-z]([0-9]{4})\\/?)?.*$");
 
         /// <summary>
         /// Returns all parent files that this child file depends on as part of its rendering process.
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetParentFiles(string internalFilePath)
+        public static async Task<List<string>> GetParentFiles(string internalFilePath)
         {
             // This function should be written in terms of going up
             // the tree to the root, then climbing down through
@@ -815,7 +1059,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetSiblingFiles(string internalFilePath)
+        public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
         {
             var parents = await GetParentFiles(internalFilePath);
             var siblings = new HashSet<string>();
@@ -836,7 +1080,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetChildFiles(string internalFilePath)
+        public static async Task<List<string>> GetChildFiles(string internalFilePath)
         {
 
             var level = GetDependencyLevel(internalFilePath);
@@ -891,7 +1135,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public XivDependencyFileType GetDependencyFileType(string internalFilePath)
+        public static XivDependencyFileType GetDependencyFileType(string internalFilePath)
         {
             var match = _extensionRegex.Match(internalFilePath);
             if (!match.Success)
@@ -938,7 +1182,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public XivDependencyLevel GetDependencyLevel(string internalFilePath)
+        public static XivDependencyLevel GetDependencyLevel(string internalFilePath)
         {
             var fileType = GetDependencyFileType(internalFilePath);
             if(fileType == XivDependencyFileType.invalid)
@@ -950,7 +1194,7 @@ namespace xivModdingFramework.Cache
         }
 
 
-        public XivDependencyRoot CreateDependencyRoot(XivItemType primaryType, int primaryId, XivItemType? secondaryType = null, int? secondaryId = null, string slot = null)
+        public static XivDependencyRoot CreateDependencyRoot(XivItemType primaryType, int primaryId, XivItemType? secondaryType = null, int? secondaryId = null, string slot = null)
         {
             var info = new XivDependencyRootInfo()
             {
@@ -971,7 +1215,7 @@ namespace xivModdingFramework.Cache
         /// <param name="secondaryId"></param>
         /// <param name="slot"></param>
         /// <returns></returns>
-        public XivDependencyRoot CreateDependencyRoot(XivDependencyRootInfo info)
+        public static XivDependencyRoot CreateDependencyRoot(XivDependencyRootInfo info)
         {
             if(!DependencySupportedTypes.Contains(info.PrimaryType) || info.PrimaryId < 0)
             {
@@ -1018,7 +1262,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        private async Task<List<XivDependencyRoot>> GetModdedRoots(string internalFilePath)
+        private static async Task<List<XivDependencyRoot>> GetModdedRoots(string internalFilePath)
         {
 
             var parents = new List<string>();
@@ -1058,7 +1302,7 @@ namespace xivModdingFramework.Cache
         /// <param name="SecondaryId"></param>
         /// <param name="Slot"></param>
         /// <returns></returns>
-        public XivDependencyRootInfo ExtractRootInfo(string internalFilePath)
+        public static XivDependencyRootInfo ExtractRootInfo(string internalFilePath)
         {
 
             XivDependencyRootInfo info = new XivDependencyRootInfo();
@@ -1109,7 +1353,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
+        public static async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
         {
             var roots = new HashSet<XivDependencyRoot>();
 
@@ -1217,7 +1461,7 @@ namespace xivModdingFramework.Cache
             return roots.ToList();
         }
 
-        private async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<string, XivDependencyRootInfo> combinedHashes, XivItemType primary, XivItemType secondary) {
+        private static async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<string, XivDependencyRootInfo> combinedHashes, XivItemType primary, XivItemType secondary) {
 
 
             var result = new List<XivDependencyRootInfo>(3000);
@@ -1326,7 +1570,7 @@ namespace xivModdingFramework.Cache
         /// alive.
         /// </summary>
         /// <returns></returns>
-        public async Task CacheAllRealRoots()
+        public static async Task CacheAllRealRoots()
         {
             ResetRootCache();
             var index = new Index(XivCache.GameInfo.GameDirectory);

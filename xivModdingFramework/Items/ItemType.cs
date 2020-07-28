@@ -351,8 +351,16 @@ namespace xivModdingFramework.Items
             }
             else if (primaryType == XivItemType.ui)
             {
-                var uiItem = (XivUi)item;
-                return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
+                if (item.SecondaryCategory == XivStrings.Paintings)
+                {
+                    modelInfo = ((IItemModel)item).ModelInfo;
+                    return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
+                }
+                else
+                {
+                    var uiItem = (XivUi)item;
+                    return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
+                }
             }
             else if (primaryType == XivItemType.furniture)
             {
