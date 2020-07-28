@@ -1179,40 +1179,37 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="root"></param>
         /// <param name="hash"></param>
-        public static void CacheRoot(XivDependencyRootInfo root)
+        public static void CacheRoot(XivDependencyRootInfo root, SQLiteConnection sqlConnection, SQLiteCommand cmd)
         {
-            using (var db = new SQLiteConnection(RootsCacheConnectionString))
+            cmd.Parameters.AddWithValue("primary_type", root.PrimaryType.ToString());
+            cmd.Parameters.AddWithValue("primary_id", root.PrimaryId);
+
+            // The ifs help make sure these are recorded as null in the SQLite db and not emptystrings/0's
+            if (root.SecondaryType != null)
             {
-                db.Open();
-                var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
-                using (var cmd = new SQLiteCommand(query, db))
-                {
+                cmd.Parameters.AddWithValue("secondary_type", root.SecondaryType.ToString());
+                cmd.Parameters.AddWithValue("secondary_id", (int)root.SecondaryId);
+            } else
+            {
+                cmd.Parameters.AddWithValue("secondary_type", null);
+                cmd.Parameters.AddWithValue("secondary_id", null);
 
-                    cmd.Parameters.AddWithValue("primary_type", root.PrimaryType.ToString());
-                    cmd.Parameters.AddWithValue("primary_id", root.PrimaryId);
+            }
+            if (root.Slot != null)
+            {
+                cmd.Parameters.AddWithValue("slot", root.Slot);
+            } else
+            {
+                cmd.Parameters.AddWithValue("slot", null);
 
-                    // The ifs help make sure these are recorded as null in the SQLite db and not emptystrings/0's
-                    if (root.SecondaryType != null)
-                    {
-                        cmd.Parameters.AddWithValue("secondary_type", root.SecondaryType.ToString());
-                        cmd.Parameters.AddWithValue("secondary_id", (int)root.SecondaryId);
-                    } else
-                    {
-                        cmd.Parameters.AddWithValue("secondary_type", null);
-                        cmd.Parameters.AddWithValue("secondary_id", null);
-
-                    }
-                    if (root.Slot != null)
-                    {
-                        cmd.Parameters.AddWithValue("slot", root.Slot);
-                    } else
-                    {
-                        cmd.Parameters.AddWithValue("slot", null);
-
-                    }
-                    cmd.Parameters.AddWithValue("root_path", root.ToString());
-                    cmd.ExecuteScalar();
-                }
+            }
+            cmd.Parameters.AddWithValue("root_path", root.ToString());
+            try
+            {
+                cmd.ExecuteScalar();
+            } catch (Exception ex) {
+                Console.Write(ex.Message);
+                throw;
             }
         }
 

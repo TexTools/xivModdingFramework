@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SQLite;
 using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
@@ -63,7 +64,7 @@ namespace xivModdingFramework.Cache
     // File System.  Provides basic calculated fields, however, more extensive
     // calculations expect this item to be fully qualified and properly contained
     // in an actual dependency root object.
-    public struct XivDependencyRootInfo
+    public struct XivDependencyRootInfo :ICloneable
     {
         // Only types with actual dependency structures are supported.
         // This means Equipment, Accessory, Monster, and Demihuman.
@@ -93,6 +94,10 @@ namespace xivModdingFramework.Cache
         public override string ToString()
         {
             return GetRootFile();
+        }
+        public object Clone()
+        {
+            return this.MemberwiseClone();
         }
 
         // Type -> Typecode -> Id
@@ -178,6 +183,10 @@ namespace xivModdingFramework.Cache
 
         public string GetRacialModelName(XivRace race)
         {
+            return GetRacialModelName(Int32.Parse(XivRaces.GetRaceCode(race)));
+        }
+        public string GetRacialModelName(int raceRaw)
+        {
             if (SecondaryType != null)
             {
                 throw new NotSupportedException("Cannot generate Racial Model name - Item Type does not use Racial Models.");
@@ -185,7 +194,7 @@ namespace xivModdingFramework.Cache
 
             // Racial models essentially treat the item as if it had a primary type of 
             // Human to start, of the appropriate human type.
-            var pId = race.GetRaceCode();
+            var pId = raceRaw.ToString().PadLeft(4, '0');
             var pPrefix = XivItemTypes.GetSystemPrefix(XivItemType.human);
 
             var sId = PrimaryId.ToString().PadLeft(4, '0');
@@ -293,7 +302,7 @@ namespace xivModdingFramework.Cache
                 }
                 else if (Info.SecondaryType == XivItemType.ear)
                 {
-                    Info.Slot = "ear";
+                    Info.Slot = "zer";
                 }
                 else if (Info.SecondaryType == XivItemType.tail)
                 {
@@ -1061,11 +1070,11 @@ namespace xivModdingFramework.Cache
             var match = PrimaryExtractionRegex.Match(internalFilePath);
             if (match.Success)
             {
-                info.PrimaryType = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[1].Value);
+                info.PrimaryType = XivItemTypes.FromSystemName(match.Groups[1].Value);
                 info.PrimaryId = Int32.Parse(match.Groups[2].Value);
                 if (match.Groups[3].Success)
                 {
-                    info.SecondaryType = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[3].Value);
+                    info.SecondaryType = XivItemTypes.FromSystemName(match.Groups[3].Value);
                     info.SecondaryId = Int32.Parse(match.Groups[4].Value);
                 }
 
@@ -1208,16 +1217,17 @@ namespace xivModdingFramework.Cache
             return roots.ToList();
         }
 
+        private async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<string, XivDependencyRootInfo> combinedHashes, XivItemType primary, XivItemType secondary) {
 
-        private async Task TestAllRoots(Dictionary<string, XivDependencyRootInfo?> combinedHashes, XivItemType primary, XivItemType? secondary) {
 
-
+            var result = new List<XivDependencyRootInfo>(3000);
             await Task.Run(() => {
                 try
                 {
+                    Console.WriteLine("Starting Search for type: " + primary.ToString() + " " + secondary.ToString());
                     var root = new XivDependencyRootInfo();
                     root.PrimaryType = primary;
-                    root.SecondaryType = secondary;
+                    root.SecondaryType = (secondary == XivItemType.none ? null : (XivItemType?) secondary);
                     var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
                     var races = XivRaces.PlayableRaces;
 
@@ -1225,23 +1235,28 @@ namespace xivModdingFramework.Cache
                     {
                         root.PrimaryId = p;
 
-                        if (secondary == null)
+                        if (secondary == XivItemType.none)
                         {
                             var folder = root.GetRootFolder() + "model";
                             var folderHash = HashGenerator.GetHash(folder);
                             var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
+
                             // For these, just let the EDP module verify if there are any races availble for the item?
                             foreach (var slot in slots)
                             {
                                 root.Slot = slot;
-                                foreach (var race in races)
+
+                                // Check every possible race code, not just playables?
+                                //for (int s = 0; s < 10000; p++)
+                                foreach(var race in races)
                                 {
+                                    //var modelName = root.GetRacialModelName(s);
                                     var modelName = root.GetRacialModelName(race);
                                     var fileHash = HashGenerator.GetHash(modelName);
                                     var key = fileHash.ToString() + folderHash.ToString();
                                     if (combinedHashes.ContainsKey(key))
                                     {
-                                        XivCache.CacheRoot(root);
+                                        result.Add((XivDependencyRootInfo)root.Clone());
 
                                         // We don't care how many models there are, just that there *are* any models.
                                         break;
@@ -1257,6 +1272,13 @@ namespace xivModdingFramework.Cache
                                 var folder = root.GetRootFolder() + "model";
                                 var folderHash = HashGenerator.GetHash(folder);
                                 var slots = XivItemTypes.GetAvailableSlots((XivItemType)root.SecondaryType);
+
+                                if(primary == XivItemType.human && secondary == XivItemType.body)
+                                {
+                                    // Human body gets to be a special snowflake.
+                                    slots = XivItemTypes.GetAvailableSlots(XivItemType.equipment);
+                                }
+
                                 // For these, just let the EDP module verify if there are any races availble for the item?
 
                                 if (root.PrimaryId == 201 && root.SecondaryId == 56 && root.PrimaryType == XivItemType.weapon)
@@ -1283,7 +1305,7 @@ namespace xivModdingFramework.Cache
                                     var key = fileHash.ToString() + folderHash.ToString();
                                     if (combinedHashes.ContainsKey(key))
                                     {
-                                        XivCache.CacheRoot(root);
+                                        result.Add((XivDependencyRootInfo)root.Clone());
                                     }
                                 }
                             }
@@ -1293,10 +1315,10 @@ namespace xivModdingFramework.Cache
                     Console.WriteLine(Ex.Message);
                     throw;
                 }
-
             });
+            Console.WriteLine("Found " + result.Count.ToString() + " Entries for type: " + primary.ToString() + " " + secondary.ToString());
+            return result;
         }
-
 
         /// <summary>
         /// This is a simple function that rips through the entire index file, for all 9,999 possible
@@ -1310,19 +1332,18 @@ namespace xivModdingFramework.Cache
             var index = new Index(XivCache.GameInfo.GameDirectory);
             var mergedHashes = await index.GetFileDictionary(XivDataFile._04_Chara);
 
-            var mergedDict = new Dictionary<string, XivDependencyRootInfo?>();
-            foreach(var kv in mergedHashes)
+            var mergedDict = new Dictionary<string, XivDependencyRootInfo>();
+            foreach (var kv in mergedHashes)
             {
-                mergedDict.Add(kv.Key, null);
+                mergedDict.Add(kv.Key, new XivDependencyRootInfo());
             }
 
 
-            var types = new Dictionary<XivItemType, List<XivItemType?>>();
-            foreach(var type in DependencySupportedTypes)
+            var types = new Dictionary<XivItemType, List<XivItemType>>();
+            foreach (var type in DependencySupportedTypes)
             {
-                types.Add(type, new List<XivItemType?>());
+                types.Add(type, new List<XivItemType>());
             }
-
             types[XivItemType.monster].Add(XivItemType.body);
             types[XivItemType.weapon].Add(XivItemType.body);
             types[XivItemType.human].Add(XivItemType.body);
@@ -1331,28 +1352,59 @@ namespace xivModdingFramework.Cache
             types[XivItemType.human].Add(XivItemType.tail);
             types[XivItemType.human].Add(XivItemType.ear);
             types[XivItemType.demihuman].Add(XivItemType.equipment);
-            types[XivItemType.equipment].Add(null);
-            types[XivItemType.accessory].Add(null);
+            types[XivItemType.equipment].Add(XivItemType.none);
+            types[XivItemType.accessory].Add(XivItemType.none);
 
 
-            var tasks = new List<Task>();
+
+            var tasks = new List<Task<List<XivDependencyRootInfo>>>();
             foreach (var kv in types)
             {
                 var primary = kv.Key;
                 foreach (var secondary in kv.Value)
                 {
+                    // Apparently despite all documentation, Dictionary.HasKey() is not actually
+                    // thread safe? Or at least, we'll hit random failures to find dictionary keys if
+                    // we don't clone the dictionary here.   Unsure why.
                     tasks.Add(TestAllRoots(mergedDict, primary, secondary));
                 }
             }
             try
             {
                 await Task.WhenAll(tasks.ToArray());
-            } catch(Exception ex)
+
+            } catch (Exception ex)
             {
                 Console.WriteLine(ex);
                 throw;
             }
 
+            Console.WriteLine("Compiling final root list...");
+            List<XivDependencyRootInfo> allRoots = new List<XivDependencyRootInfo>();
+            foreach(var t in tasks)
+            {
+                allRoots.AddRange(t.Result);
+            }
+
+
+            Console.WriteLine("Saving all valid roots...");
+            using (var db = new SQLiteConnection(RootsCacheConnectionString))
+            {
+                db.Open();
+
+                using (var transaction = db.BeginTransaction())
+                {
+                    var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        foreach(var root in allRoots)
+                        {
+                            XivCache.CacheRoot(root, db, cmd);
+                        }
+                    }
+                    transaction.Commit();
+                }
+            }
         }
 
     }
