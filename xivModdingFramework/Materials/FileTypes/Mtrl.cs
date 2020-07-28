@@ -993,6 +993,7 @@ namespace xivModdingFramework.Materials.FileTypes
         private static readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
         private static readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
         private static readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
+        private static readonly Regex _raceMatch = new Regex("(c[0-9]{4})");
         private static readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
@@ -1005,17 +1006,6 @@ namespace xivModdingFramework.Materials.FileTypes
         {
 
 
-            // So we have to do this step first.
-            var mdlMatch = _raceMatch.Match(mdlPath);
-            var mtrlMatch = _raceMatch.Match(mtrlName);
-
-            // Both Items have racial model information in their path, and the races DON'T match.
-            if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
-            {
-                // In this case, we actually replace the race in the Material the race from the MODEL, which has priority.
-                mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, mdlMatch.Groups[1].Value);
-            }
-
 
             var mtrlFolder = "";
 
@@ -1023,6 +1013,19 @@ namespace xivModdingFramework.Materials.FileTypes
             var match = _skinRegex.Match(mtrlName);
             if (match.Success)
             {
+
+                // Only switch mdl races around if we're a skin texture.
+                var mdlMatch = _raceMatch.Match(mdlPath);
+                var mtrlMatch = _raceMatch.Match(mtrlName);
+
+                // Both Items have racial model information in their path, and the races DON'T match.
+                if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // In this case, we actually replace the race in the Material the race from the MODEL, which has priority.
+                    mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, mdlMatch.Groups[1].Value);
+                }
+
+
                 var race = match.Groups[1].Value;
                 var body = match.Groups[2].Value;
 
@@ -1046,8 +1049,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
             else {
 
-                mdlMatch = _raceRegex.Match(mdlPath);
-                mtrlMatch = _raceRegex.Match(mtrlName);
+                var mdlMatch = _raceRegex.Match(mdlPath);
+                var mtrlMatch = _raceRegex.Match(mtrlName);
 
                 // Both items have racaial information in their path, and the races DON'T match.
                 if(mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
