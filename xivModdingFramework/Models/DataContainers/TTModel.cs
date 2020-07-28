@@ -830,7 +830,7 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
-                var boneDict = ResolveBoneHeirarchy();
+                var boneDict = ResolveBoneHeirarchy(loggingFunction);
 
                 const string creationScript = "CreateImportDB.sql";
                 // Spawn a DB connection to do the raw queries.
@@ -1095,13 +1095,43 @@ namespace xivModdingFramework.Models.DataContainers
 
         #region  Internal Helper Functions
 
+        private float[] NewIdentityMatrix()
+        {
+            var arr = new float [16];
+            arr[0] = 1f;
+            arr[1] = 0f;
+            arr[2] = 0f;
+            arr[3] = 0f;
+
+            arr[4] = 0f;
+            arr[5] = 1f;
+            arr[6] = 0f;
+            arr[7] = 0f;
+
+            arr[8] = 0f;
+            arr[9] = 0f;
+            arr[10] = 1f;
+            arr[11] = 0f;
+
+            arr[12] = 0f;
+            arr[13] = 0f;
+            arr[14] = 0f;
+            arr[15] = 1f;
+            return arr;
+        }
+
         /// <summary>
         /// Resolves the full bone heirarchy necessary to animate this TTModel.
         /// Used when saving the file to DB.  (Or potentially animating it)
         /// </summary>
         /// <returns></returns>
-        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy()
+        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy(Action<bool, string> loggingFunction = null)
         {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
             var fullSkel = new Dictionary<string, SkeletonData>();
             var skelDict = new Dictionary<string, SkeletonData>();
 
@@ -1114,6 +1144,7 @@ namespace xivModdingFramework.Models.DataContainers
 
             var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
             var skeletonData = File.ReadAllLines(skeletonFile);
+            var badBoneId = 900;
 
             // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
             foreach (var b in skeletonData)
@@ -1153,7 +1184,17 @@ namespace xivModdingFramework.Models.DataContainers
                 }
                 else
                 {
-                    throw new Exception($"The skeleton file {skeletonFile} did not contain bone {s}. Consider updating the skeleton file.");
+                    // Create a fake bone for this, rather than strictly crashing out.
+                    var skel = new SkeletonData();
+                    skel.BoneName = s;
+                    skel.BoneNumber = badBoneId;
+                    badBoneId++;
+                    skel.BoneParent = 0;
+                    skel.InversePoseMatrix = NewIdentityMatrix();
+                    skel.PoseMatrix = NewIdentityMatrix();
+
+                    skelDict.Add(s, skel);
+                    loggingFunction(true, $"The skeleton file {skeletonFile} did not contain bone {s}. It has been parented to the root bone.");
                 }
             }
 
