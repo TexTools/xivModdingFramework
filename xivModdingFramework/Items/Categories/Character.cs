@@ -112,7 +112,7 @@ namespace xivModdingFramework.Items.Categories
             {
                 folder = XivStrings.TailMtrlFolder;
             }
-            else if (charaItem.SecondaryCategory == XivStrings.Earring)
+            else if (charaItem.SecondaryCategory == XivStrings.Ear)
             {
                 folder = XivStrings.EarsMtrlFolder;
             }
@@ -174,7 +174,7 @@ namespace xivModdingFramework.Items.Categories
             {
                 folder = XivStrings.TailMDLFolder;
             }
-            else if (charaItem.SecondaryCategory == XivStrings.Earring)
+            else if (charaItem.SecondaryCategory == XivStrings.Ear)
             {
                 folder = XivStrings.EarsMDLFolder;
             }
@@ -234,7 +234,7 @@ namespace xivModdingFramework.Items.Categories
                 typeDict = FaceSlotAbbreviationDictionary;
                 file = XivStrings.FaceMtrlFile;
             }
-            else if (charaItem.SecondaryCategory == XivStrings.Earring)
+            else if (charaItem.SecondaryCategory == XivStrings.Ear)
             {
                 folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
@@ -296,7 +296,7 @@ namespace xivModdingFramework.Items.Categories
                 folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
                 file = XivStrings.TailMtrlFile;
             }
-            else if (charaItem.SecondaryCategory == XivStrings.Earring)
+            else if (charaItem.SecondaryCategory == XivStrings.Ear)
             {
                 folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
 
@@ -387,7 +387,7 @@ namespace xivModdingFramework.Items.Categories
                 typeDict = TailSlotAbbreviationDictionary;
                 file = XivStrings.TailMDLFile;
             }
-            else if (charaItem.SecondaryCategory == XivStrings.Earring)
+            else if (charaItem.SecondaryCategory == XivStrings.Ear)
             {
                 folder = string.Format(XivStrings.EarsMDLFolder, race.GetRaceCode(),
                     num.ToString().PadLeft(4, '0'));
@@ -526,7 +526,7 @@ namespace xivModdingFramework.Items.Categories
         /// </summary>
         private static readonly Dictionary<string, string> EarsSlotAbbreviationDictionary = new Dictionary<string, string>
         {
-            {XivStrings.Earring, "zer"},
+            {XivStrings.Ear, "zer"},
             {XivStrings.InnerEar, "fac_"},
             {XivStrings.OuterEar, "" }
         };

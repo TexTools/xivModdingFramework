@@ -1160,7 +1160,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                     }
-                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Earring))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Ear))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
                     }
@@ -1214,8 +1214,6 @@ namespace xivModdingFramework.Materials.FileTypes
             var race = xivRace.GetRaceCode();
 
             string mtrlFile = "";
-            var mtrlFolder = GetMtrlFolder(itemModel, itemType, xivRace, variant);
-            var version = variant.ToString().PadLeft(4, '0');
 
             switch (itemType)
             {
@@ -1252,7 +1250,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFile = $"mt_c{race}t{bodyVer}_{materialIdenfitier}{MtrlExtension}";
                     }
-                    else if (itemCategory.Equals(XivStrings.Earring))
+                    else if (itemCategory.Equals(XivStrings.Ear))
                     {
                         mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{materialIdenfitier}{MtrlExtension}";
                     }
@@ -1307,6 +1305,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"},
+            {XivStrings.Ear, "zer"},
             {XivStrings.InnerEar, "fac_"},
             {XivStrings.OuterEar, ""}
         };
