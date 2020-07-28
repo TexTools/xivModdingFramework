@@ -57,13 +57,13 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
 
-        public static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        public static IItemModel FromDependencyRoot(XivDependencyRoot root, string nameExtension = "")
         {
             var item = new XivGenericItemModel();
             item.ModelInfo = new XivModelInfo();
             item.ModelInfo.PrimaryID = root.Info.PrimaryId;
             item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
-            item.Name = root.Info.GetBaseFileName();
+            item.Name = root.Info.GetBaseFileName() + nameExtension;
             item.PrimaryCategory = XivStrings.Gear;
 
             return item;

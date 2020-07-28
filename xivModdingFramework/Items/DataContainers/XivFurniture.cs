@@ -68,13 +68,13 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public uint IconNumber { get; set; }
 
-        public static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        public static IItemModel FromDependencyRoot(XivDependencyRoot root, string nameExtension = "")
         {
             var item = new XivFurniture();
             item.ModelInfo = new XivModelInfo();
             item.ModelInfo.PrimaryID = root.Info.PrimaryId;
             item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
-            item.Name = root.Info.GetBaseFileName();
+            item.Name = root.Info.GetBaseFileName() + nameExtension;
             item.PrimaryCategory = XivStrings.Housing;
             if (root.Info.PrimaryType == Enums.XivItemType.indoor)
             {

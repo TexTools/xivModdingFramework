@@ -593,24 +593,24 @@ namespace xivModdingFramework.Cache
         /// uses the appropriate subtypes.
         /// </summary>
         /// <returns></returns>
-        public IItemModel ToItem()
+        public IItemModel ToItem(string nameExtension = "")
         {
             switch(Info.PrimaryType)
             {
                 case XivItemType.equipment:
                 case XivItemType.accessory:
                 case XivItemType.weapon:
-                    return XivGear.FromDependencyRoot(this);
+                    return XivGear.FromDependencyRoot(this, nameExtension);
                 case XivItemType.demihuman:
                 case XivItemType.monster:
-                    return XivMount.FromDependencyRoot(this);
+                    return XivMount.FromDependencyRoot(this, nameExtension);
                 case XivItemType.indoor:
                 case XivItemType.outdoor:
-                    return XivFurniture.FromDependencyRoot(this);
+                    return XivFurniture.FromDependencyRoot(this, nameExtension);
                 case XivItemType.human:
-                    return XivCharacter.FromDependencyRoot(this);
+                    return XivCharacter.FromDependencyRoot(this, nameExtension);
             }
-            return XivGenericItemModel.FromDependencyRoot(this);
+            return XivGenericItemModel.FromDependencyRoot(this, nameExtension);
         }
 
     }

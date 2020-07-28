@@ -1127,15 +1127,18 @@ namespace xivModdingFramework.Cache
 
         }
 
-        public static XivDependencyRoot CreateDependencyRoot(string internalPath)
-        {
-            return Dependencies.CreateDependencyRoot(CreateDependencyRootInfo(internalPath));
-        }
         public static XivDependencyRootInfo CreateDependencyRootInfo(string internalPath)
         {
             return Dependencies.ExtractRootInfo(internalPath);
         }
-
+        public static XivDependencyRoot CreateDependencyRoot(XivDependencyRootInfo info)
+        {
+            return Dependencies.CreateDependencyRoot(info);
+        }
+        public static XivDependencyRoot CreateDependencyRoot(string internalPath)
+        {
+            return Dependencies.CreateDependencyRoot(CreateDependencyRootInfo(internalPath));
+        }
         public static XivDependencyRootInfo GetItemRootInfo(this IItem item)
         {
             var rootFolder = item.GetItemRootFolder();

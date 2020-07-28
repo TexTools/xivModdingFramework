@@ -71,7 +71,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
 
-        public static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        public static IItemModel FromDependencyRoot(XivDependencyRoot root, string nameExtension = "")
         {
             var item = new XivMount();
             var mi = new XivMonsterModelInfo();
@@ -80,7 +80,7 @@ namespace xivModdingFramework.Items.DataContainers
             mi.SecondaryID = (int)root.Info.SecondaryId;
 
             item.ModelInfo = mi;
-            item.Name = root.Info.GetBaseFileName();
+            item.Name = root.Info.GetBaseFileName() + nameExtension;
             item.PrimaryCategory = XivStrings.Companions;
             item.SecondaryCategory = XivStrings.Mounts;
 

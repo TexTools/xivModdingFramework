@@ -92,7 +92,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivGear PairedItem { get; set; }
 
-        public static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        public static IItemModel FromDependencyRoot(XivDependencyRoot root, string nameExtension = "")
         {
             var item = new XivGear();
             item.ModelInfo = new XivGearModelInfo();
@@ -102,7 +102,7 @@ namespace xivModdingFramework.Items.DataContainers
                 item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
             }
 
-            item.Name = root.Info.GetBaseFileName();
+            item.Name = root.Info.GetBaseFileName() + nameExtension;
             item.PrimaryCategory = XivStrings.Gear;
 
             if (root.Info.PrimaryType == Enums.XivItemType.weapon)

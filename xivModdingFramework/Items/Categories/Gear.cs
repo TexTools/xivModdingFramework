@@ -743,21 +743,13 @@ namespace xivModdingFramework.Items.Categories
                 var slot = item.GetItemSlotAbbreviation();
                 var imcEntries = info.GetAllEntries(slot);
 
+                var root = item.GetItemRoot();
                 if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID != 0))
                 {
                     // Need to list default IMC set.
                     // Need to create a new item for it.
-                    var npcItem = new XivGear()
-                    {
-                        Name = "NPC Equipment e" + item.ModelInfo.PrimaryID + " " + slot + " Default Variant",
-                        ModelInfo = new XivGearModelInfo(),
-                        PrimaryCategory = item.PrimaryCategory,
-                        SecondaryCategory = item.SecondaryCategory,
-                        TertiaryCategory = item.TertiaryCategory,
-                        DataFile = item.DataFile,
-                    };
-                    npcItem.ModelInfo.PrimaryID = item.ModelInfo.PrimaryID;
-                    npcItem.ModelInfo.SecondaryID = item.ModelInfo.SecondaryID;
+
+                    var npcItem = root.ToItem("_v0");
                     npcItem.ModelInfo.ImcSubsetID = 0;
                     try
                     {
@@ -778,17 +770,7 @@ namespace xivModdingFramework.Items.Categories
                     if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
 
                     // Need to create a new item for it.
-                    var npcItem = new XivGear()
-                    {
-                        Name = "NPC Equipment e" + item.ModelInfo.PrimaryID + " " + slot + " IMC Variant " + i,
-                        ModelInfo = new XivGearModelInfo(),
-                        PrimaryCategory = item.PrimaryCategory,
-                        SecondaryCategory = item.SecondaryCategory,
-                        TertiaryCategory = item.TertiaryCategory,
-                        DataFile = item.DataFile,
-                    };
-                    npcItem.ModelInfo.PrimaryID = item.ModelInfo.PrimaryID;
-                    npcItem.ModelInfo.SecondaryID = item.ModelInfo.SecondaryID;
+                    var npcItem = root.ToItem("_v" + i.ToString());
                     npcItem.ModelInfo.ImcSubsetID = i;
                     try
                     {
