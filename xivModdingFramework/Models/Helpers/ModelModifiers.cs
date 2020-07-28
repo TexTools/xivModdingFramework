@@ -339,15 +339,6 @@ namespace xivModdingFramework.Models.Helpers
                 var md = rawMdl.LoDList[0].MeshDataList[mIdx];
                 var localMesh = ttModel.MeshGroups[mIdx];
 
-                // Copy over Material
-                var matIdx = md.MeshInfo.MaterialIndex;
-                if (matIdx < rawMdl.PathData.MaterialList.Count)
-                {
-                    var oldMtrl = rawMdl.PathData.MaterialList[matIdx];
-                    localMesh.Material = oldMtrl;
-                }
-
-
                 for (var pIdx = 0; pIdx < md.MeshPartList.Count; pIdx++)
                 {
                     // Can only carry in data to parts that exist
@@ -401,6 +392,9 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     var oldMtrl = rawMdl.PathData.MaterialList[matIdx];
                     localMesh.Material = oldMtrl;
+                } else
+                {
+                    localMesh.Material = rawMdl.PathData.MaterialList[0];
                 }
             }
         }
@@ -831,10 +825,13 @@ namespace xivModdingFramework.Models.Helpers
 
             var totalMajorCorrections = 0;
             var warnings = new List<string>();
+            var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
+                var pIdx = 0;
                 foreach (var p in m.Parts)
                 {
+                    var vIdx = 0;
                     foreach (var v in p.Vertices)
                     {
                         // UV Flipping
@@ -851,8 +848,8 @@ namespace xivModdingFramework.Models.Helpers
                                 while (boneSum != 255)
                                 {
                                     boneSum = 0;
-                                    var mostMajor = -1;
-                                    var most = -1;
+                                    var mostMajor = 0;
+                                    var most = 0;
                                     // Loop them to sum them up.
                                     // and snag the least/most major influences while we're at it.
                                     for (var i = 0; i < v.Weights.Length; i++)
@@ -868,6 +865,14 @@ namespace xivModdingFramework.Models.Helpers
                                             mostMajor = i;
                                             most = value;
                                         }
+                                    }
+
+                                    if(most == 0)
+                                    {
+                                        loggingFunction(true, "Group: " + mIdx + " Part:" + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
+                                        totalMajorCorrections++;
+                                        v.Weights[0] = 255;
+                                        break;
                                     }
 
                                     var alteration = 255 - boneSum;
@@ -893,8 +898,11 @@ namespace xivModdingFramework.Models.Helpers
                                 }
                             }
                         }
+                        vIdx++;
                     }
+                    pIdx++;
                 }
+                mIdx++;
             }
 
             if (totalMajorCorrections > 0)
@@ -1119,6 +1127,7 @@ namespace xivModdingFramework.Models.Helpers
 
             foreach (var m in model.MeshGroups)
             {
+                if (m.Material == null) continue;
                 var mtrlMatch = raceRegex.Match(m.Material);
                 if(mtrlMatch.Success)
                 {
