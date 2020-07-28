@@ -525,7 +525,7 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.Wrists, "wrs"},

@@ -4325,7 +4325,7 @@ namespace xivModdingFramework.Models.FileTypes
                         mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
                         mdlFile = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
-                    else if (itemCategory.Equals(XivStrings.Ears))
+                    else if (itemCategory.Equals(XivStrings.Earring))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/model";
                         mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
@@ -4363,7 +4363,8 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
+            {XivStrings.Ear, "zer"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.LeftRing, "ril"},

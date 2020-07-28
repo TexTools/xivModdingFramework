@@ -601,7 +601,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Legs, "base"},
             {XivStrings.Feet, "base"},
             {XivStrings.Body, "base"},
-            {XivStrings.Ears, "base"},
+            {XivStrings.Earring, "base"},
             {XivStrings.Neck, "base"},
             {XivStrings.Rings, "base"},
             {XivStrings.Wrists, "base"},

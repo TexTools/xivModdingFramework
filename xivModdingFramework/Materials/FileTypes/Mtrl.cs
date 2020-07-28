@@ -1160,7 +1160,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                     }
-                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Ears))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Earring))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
                     }
@@ -1252,7 +1252,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFile = $"mt_c{race}t{bodyVer}_{materialIdenfitier}{MtrlExtension}";
                     }
-                    else if (itemCategory.Equals(XivStrings.Ears))
+                    else if (itemCategory.Equals(XivStrings.Earring))
                     {
                         mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{materialIdenfitier}{MtrlExtension}";
                     }
@@ -1291,7 +1291,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.Wrists, "wrs"},

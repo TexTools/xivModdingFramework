@@ -65,8 +65,8 @@ namespace xivModdingFramework.Items
                     //No-op.
                 }
             }
-            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Ears) || item.SecondaryCategory.Equals(XivStrings.Neck) || 
-                     item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings)))
+            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Earring) || item.SecondaryCategory.Equals(XivStrings.Neck) || 
+                     item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings) || item.SecondaryCategory.Equals(XivStrings.LeftRing)))
             {
                 itemType = XivItemType.accessory;
             }
@@ -144,7 +144,7 @@ namespace xivModdingFramework.Items
             {
                 itemType = XivItemType.hair;
             }
-            else if (item.PrimaryCategory.Equals(XivStrings.Character) && item.SecondaryCategory.Equals( XivStrings.Ears ))
+            else if (item.PrimaryCategory.Equals(XivStrings.Character) && item.SecondaryCategory.Equals( XivStrings.Ear ))
             {
                 itemType = XivItemType.ear;
             }
