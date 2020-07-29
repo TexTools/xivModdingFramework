@@ -167,6 +167,10 @@ namespace xivModdingFramework.Helpers
                 var modding = new Modding(_gameDirectory);
                 var backupsRestored = false;
 
+                // Stop the cache worker since we're blowing up the entire index file and db anyways.
+                // The cache rebuild will start it up again after the cache is rebuilt.
+                XivCache.CacheWorkerEnabled = false;
+
                 try
                 {
                     // Try to restore the index entries to their original values by deleting any files added by TexTools

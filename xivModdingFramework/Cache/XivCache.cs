@@ -4,11 +4,9 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using xivModdingFramework.Exd.FileTypes;
-using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.Categories;
@@ -16,7 +14,6 @@ using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
-using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Cache
@@ -75,15 +72,14 @@ namespace xivModdingFramework.Cache
             set
             {
                 // State cannot be changed during a rebuild.
-                // This shouldn't normally ever occur anyways unless some
-                // parent application is multi-threading cache initializations
-                // while a rebuild is happening.
+                // This shouldn't normally ever occur anyways, but
+                // better to be safe.
                 if (_REBUILDING) return;
 
                 if (value  && _cacheWorker == null)
                 {
 
-                    BackgroundWorker _cacheWorker = new BackgroundWorker
+                    _cacheWorker = new BackgroundWorker
                     {
                         WorkerReportsProgress = true,
                         WorkerSupportsCancellation = true
@@ -1404,14 +1400,15 @@ namespace xivModdingFramework.Cache
 
         /// <summary>
         /// Updates the file children in the dependencies cache.
+        /// Returns the children that were written to the DB.
         /// </summary>
         /// <param name="internalFilePath"></param>
-        public static async Task UpdateChildFiles(string internalFilePath, List<string> children = null)
+        public static async Task<List<string>> UpdateChildFiles(string internalFilePath, List<string> children = null)
         {
             var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Texture)
             {
-                return;
+                return new List<string>();
             }
 
             // Just updating a single file.
@@ -1460,6 +1457,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
+            return children;
         }
 
         /// <summary>
@@ -1567,6 +1565,7 @@ namespace xivModdingFramework.Cache
                 }
             } catch(Exception ex)
             {
+                throw;
                 // No-Op.  This is a non-critical error.
                 // Lacking appropriate parent cache data will just be a slowdown later if we ever need the data.
                 //throw;
@@ -1661,6 +1660,7 @@ namespace xivModdingFramework.Cache
 
             // Ensure we're good and clean up after ourselves.
             SQLiteConnection.ClearAllPools();
+            GC.WaitForPendingFinalizers();
             _cacheWorker = null;
         }
 

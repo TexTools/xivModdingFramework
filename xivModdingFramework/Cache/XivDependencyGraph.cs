@@ -1077,6 +1077,10 @@ namespace xivModdingFramework.Cache
         /// <summary>
         /// Returns all child files that depend on the given parent file path as part of their
         /// rendering process.  Will return NULL if the entry is not in the dependency graph.
+        /// 
+        /// This function is the primary workhorse for generating child files - this function
+        /// should *not* rely on any other cache/etc. information to work.  Just the file path
+        /// and the indexes/dats.
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
@@ -1091,7 +1095,11 @@ namespace xivModdingFramework.Cache
 
             if (level == XivDependencyLevel.Root)
             {
-                var root = (await XivCache.GetDependencyRoots(internalFilePath))[0];
+                // Root evaluations of root paths should never return anything other than a single,
+                // valid root entry, but might as well null check it to be safe.
+                var root = await XivCache.GetFirstRoot(internalFilePath);
+                if (root == null) return null;
+
                 return await root.GetModelFiles();
             }
 
@@ -1105,7 +1113,7 @@ namespace xivModdingFramework.Cache
                     return mdlChildren;
                 } catch
                 {
-                    // It's possible this model doesn't actually exist, in which case, return empty.
+                    // It's possible this model doesn't actually exist, or is corrupt, in which case, return empty.
                     return new List<string>();
                 }
 
@@ -1119,7 +1127,7 @@ namespace xivModdingFramework.Cache
                     return mtrlChildren;
                 } catch
                 {
-                    // It's possible this material doesn't actually exist, in which case, return empty.
+                    // It's possible this material doesn't actually exist, or is corrupt, in which case, return empty.
                     return new List<string>();
                 }
 
@@ -1137,6 +1145,9 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static XivDependencyFileType GetDependencyFileType(string internalFilePath)
         {
+            if(internalFilePath == null)
+                return XivDependencyFileType.invalid;
+
             var match = _extensionRegex.Match(internalFilePath);
             if (!match.Success)
             {
@@ -1184,6 +1195,11 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static XivDependencyLevel GetDependencyLevel(string internalFilePath)
         {
+            if(String.IsNullOrWhiteSpace(internalFilePath))
+            {
+                return XivDependencyLevel.Invalid;
+            }
+
             var fileType = GetDependencyFileType(internalFilePath);
             if(fileType == XivDependencyFileType.invalid)
             {
@@ -1345,10 +1361,10 @@ namespace xivModdingFramework.Cache
         ///     - *Exceptionally* costly or effectively impossible.  As such, upward tree traversals
         ///     - for materials in those categories may be incomplete.
         /// 
-        /// A return value of 0 length indicates that this file is orphaned,
-        /// and has no calculatable dependency information.
+        /// A return value of 0 length indicates that this file is orphaned, or lives in a directory
+        /// with no calculable root info ( ex. chara/shared )
         /// 
-        /// NOTE - Dependency Roots for TEXTURES and MATERIALS cannot be 100% correctly established
+        /// NOTE - Dependency Roots for TEXTURES cannot be 100% populated
         /// without a fully populated cache of mod file children.
         /// </summary>
         /// <param name="internalFilePath"></param>
@@ -1461,6 +1477,16 @@ namespace xivModdingFramework.Cache
             return roots.ToList();
         }
 
+
+        /// <summary>
+        /// Tests all roots of the given type for existence.
+        /// This is an o(10,000 * 10,000) operation. Needless to say, it is very slow
+        /// and should never be run during the course of normal operation.
+        /// </summary>
+        /// <param name="combinedHashes"></param>
+        /// <param name="primary"></param>
+        /// <param name="secondary"></param>
+        /// <returns></returns>
         private static async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<string, XivDependencyRootInfo> combinedHashes, XivItemType primary, XivItemType secondary) {
 
 
@@ -1566,8 +1592,10 @@ namespace xivModdingFramework.Cache
 
         /// <summary>
         /// This is a simple function that rips through the entire index file, for all 9,999 possible
-        /// primary and secondary IDs for each possible category, and verifies they have a root path
-        /// alive.
+        /// primary and secondary IDs for each possible category, and verifies they have at least one
+        /// model file we can identify in their folder.
+        /// 
+        /// The results are stored in root_cache.db (which is also purged at the start of this function)
         /// </summary>
         /// <returns></returns>
         public static async Task CacheAllRealRoots()

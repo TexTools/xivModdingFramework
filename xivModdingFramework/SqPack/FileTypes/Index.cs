@@ -771,6 +771,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
         {
+
+            // Need these for later.
+            var oldChildren = await XivCache.GetChildFiles(fullPath);
+
             await _semaphoreSlim.WaitAsync();
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
@@ -1019,6 +1023,14 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
             _semaphoreSlim.Release();
+
+            // Update the file children in the cache.
+            // In this case, it's really just a delete old references call.
+            await XivCache.UpdateChildFiles(fullPath);
+
+            // Queue up all of our reference changes for rebuilding later.
+            oldChildren.Add(fullPath);
+            XivCache.QueueParentFilesUpdate(oldChildren);
 
             return true;
         }
