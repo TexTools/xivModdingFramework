@@ -179,7 +179,7 @@ namespace xivModdingFramework.Helpers
                     await modding.ToggleAllMods(false);
                     progress?.Report("Restoring index file backups...");
                 }
-                catch
+                catch(Exception ex)
                 {
                     // If an exception occurred due to a corrupted modlist which couldn't be deserealized restore the backup index
                     // files by force

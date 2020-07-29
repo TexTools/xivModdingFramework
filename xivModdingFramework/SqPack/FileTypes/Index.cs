@@ -832,6 +832,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Cancel if we failed to find the file.
                 if (deleteLocation == 0)
                 {
+                    _semaphoreSlim.Release();
                     return false;
                 }
 
@@ -902,6 +903,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (!foundFolder)
                 {
                     // Something went wrong here / The index is in a bad state.
+                    _semaphoreSlim.Release();
                     return false;
                 }
 

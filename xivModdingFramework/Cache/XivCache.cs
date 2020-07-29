@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -808,6 +807,11 @@ namespace xivModdingFramework.Cache
         {
             var where = new WhereClause();
 
+            if(category == null)
+            {
+                category = XivStrings.Mounts;
+            }
+
             if (category != null)
             {
                 var categoryClause = new WhereClause();
@@ -1018,6 +1022,31 @@ namespace xivModdingFramework.Cache
             return item;
         }
 
+        public static async Task<List<IItem>> GetFullItemList()
+        {
+            var items = new List<IItem>();
+
+            var gameDir = GameInfo.GameDirectory;
+            var language = GameInfo.GameLanguage;
+
+            var gear = new Gear(gameDir, language);
+            var companions = new Companions(gameDir, language);
+            var housing = new Housing(gameDir, language);
+            var ui = new UI(gameDir, language);
+            var character = new Character(gameDir, language);
+
+
+            items.AddRange(await gear.GetGearList());
+            items.AddRange(await character.GetCharacterList());
+            items.AddRange(await companions.GetMinionList());
+            items.AddRange(await companions.GetPetList());
+            items.AddRange(await ui.GetUIList());
+            items.AddRange(await housing.GetFurnitureList());
+            items.AddRange(await companions.GetMountList(null, XivStrings.Mounts));
+            items.AddRange(await companions.GetMountList(null, XivStrings.Ornaments));
+
+            return items;
+        }
 
         #endregion
 
@@ -1151,13 +1180,106 @@ namespace xivModdingFramework.Cache
             return list;
         }
 
+        /// <summary>
+        /// Retrieves the entire universe of available roots from the database.
+        /// If that doesn't exist, fallback pulls the entire list of roots from the item list cache.
+        /// </summary>
+        /// <returns></returns>
+        public static List<XivDependencyRootInfo> GetAllRoots()
+        {
+            var allRoots = new List<XivDependencyRootInfo>(5000);
+
+            try
+            {
+                using (var db = new SQLiteConnection(RootsCacheConnectionString))
+                {
+                    // Time to go root hunting.
+                    var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
+                    db.Open();
+
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                var root = new XivDependencyRootInfo();
+                                var pTypeString = reader.GetString("primary_type");
+                                root.PrimaryType = (XivItemType)Enum.Parse(typeof(XivItemType), pTypeString); ;
+                                var sTypeString = reader.GetString("secondary_type");
+                                if (!String.IsNullOrEmpty(sTypeString))
+                                {
+                                    root.SecondaryType = (XivItemType)Enum.Parse(typeof(XivItemType), sTypeString);
+                                }
+                                root.PrimaryId = reader.GetInt32("primary_id");
+                                root.SecondaryId = reader.GetNullableInt32("secondary_id");
+                                root.Slot = reader.GetString("slot");
+                                allRoots.Add(root);
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                //NoOp.  Just fall through to the item list if the root cache is busted.
+            }
+
+            if(allRoots.Count == 0)
+            {
+                using (var db = new SQLiteConnection(CacheConnectionString))
+                {
+                    // Gotta do this for all the supporting types...
+                    var query = "select root from items";
+                    db.Open();
+
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                var rootString = reader.GetString("root");
+                                if (String.IsNullOrEmpty(rootString))
+                                {
+                                    continue;
+                                }
+                                allRoots.Add(XivDependencyGraph.ExtractRootInfo(rootString));
+                            }
+                        }
+                    }
+
+                    // Just monster and items for now.
+                    query = "select root from monsters";
+
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                var rootString = reader.GetString("root");
+                                if (String.IsNullOrEmpty(rootString))
+                                {
+                                    continue;
+                                }
+                                allRoots.Add(XivDependencyGraph.ExtractRootInfo(rootString));
+                            }
+                        }
+                    }
+                }
+            }
+
+            return allRoots;
+        }
+
 
         /// <summary>
         /// Retrieves the entire universe of available, valid roots from the database.
         /// Returned in the compound dictionary format of [Primary Type] [Primary Id] [Secondary Type] [Secondary Id] [Slot]
         /// </summary>
         /// <returns></returns>
-        public static Dictionary<XivItemType, Dictionary<int, Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>>> GetAllRoots()
+        public static Dictionary<XivItemType, Dictionary<int, Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>>> GetAllRootsDictionary()
         {
             // Primary Type => Dictionary of Primary IDs
             // Primary IDs => Dictionary of Primary Secondary Types
@@ -1168,72 +1290,43 @@ namespace xivModdingFramework.Cache
             // This monolith is keyed by
             // [PrimaryType] [PrimaryId] [SecondaryType] [SecondaryId] [Slot]
             var dict = new Dictionary<XivItemType, Dictionary<int, Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>>>();
+            var allRoots = GetAllRoots();
 
-
-            using (var db = new SQLiteConnection(RootsCacheConnectionString))
+            foreach(var root in allRoots)
             {
-                // Set up the actual full query.
-                var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
-                db.Open();
 
-                using (var cmd = new SQLiteCommand(query, db))
+                if (!dict.ContainsKey(root.PrimaryType))
                 {
-                    using (var reader = new CacheReader(cmd.ExecuteReader()))
-                    {
-                        while (reader.NextRow())
-                        {
-                            try
-                            {
-                                var root = new XivDependencyRootInfo();
-                                var pTypeString = reader.GetString("primary_type");
-                                root.PrimaryType = (XivItemType)Enum.Parse(typeof(XivItemType), pTypeString); ;
-                                var sTypeString = reader.GetString("secondary_type");
-                                if(!String.IsNullOrEmpty(sTypeString))
-                                {
-                                    root.SecondaryType = (XivItemType)Enum.Parse(typeof(XivItemType), sTypeString);
-                                }
-                                root.PrimaryId = reader.GetInt32("primary_id");
-                                root.SecondaryId = reader.GetNullableInt32("secondary_id");
-                                root.Slot = reader.GetString("slot");
-
-                                if (!dict.ContainsKey(root.PrimaryType))
-                                {
-                                    dict.Add(root.PrimaryType, new Dictionary<int, Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>>());
-                                }
-                                var pTypeDict = dict[root.PrimaryType];
-
-                                if(!pTypeDict.ContainsKey(root.PrimaryId))
-                                {
-                                    pTypeDict.Add(root.PrimaryId, new Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>());
-                                }
-
-                                var pIdDict = pTypeDict[root.PrimaryId];
-                                var safeSecondary = (XivItemType)(root.SecondaryType == null ? XivItemType.none : root.SecondaryType);
-                                if (!pIdDict.ContainsKey(safeSecondary))
-                                {
-                                    pIdDict.Add(safeSecondary, new Dictionary<int, Dictionary<string, XivDependencyRootInfo>>());
-                                }
-
-                                var sTypeDict = pIdDict[safeSecondary];
-                                var sId = (int)(root.SecondaryId != null ? root.SecondaryId : 0);
-                                if (!sTypeDict.ContainsKey(sId))
-                                {
-                                    sTypeDict.Add(sId, new Dictionary<string, XivDependencyRootInfo>());
-                                }
-                                var sIdDict = sTypeDict[sId];
-
-                                var safeSlot = root.Slot == null ? "" : root.Slot;
-                                sIdDict[safeSlot] = root;
-
-                            }
-                            catch (Exception ex)
-                            {
-                                throw;
-                            }
-                        }
-                    }
+                    dict.Add(root.PrimaryType, new Dictionary<int, Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>>());
                 }
+                var pTypeDict = dict[root.PrimaryType];
+
+                if (!pTypeDict.ContainsKey(root.PrimaryId))
+                {
+                    pTypeDict.Add(root.PrimaryId, new Dictionary<XivItemType, Dictionary<int, Dictionary<string, XivDependencyRootInfo>>>());
+                }
+
+                var pIdDict = pTypeDict[root.PrimaryId];
+                var safeSecondary = (XivItemType)(root.SecondaryType == null ? XivItemType.none : root.SecondaryType);
+                if (!pIdDict.ContainsKey(safeSecondary))
+                {
+                    pIdDict.Add(safeSecondary, new Dictionary<int, Dictionary<string, XivDependencyRootInfo>>());
+                }
+
+                var sTypeDict = pIdDict[safeSecondary];
+                var sId = (int)(root.SecondaryId != null ? root.SecondaryId : 0);
+                if (!sTypeDict.ContainsKey(sId))
+                {
+                    sTypeDict.Add(sId, new Dictionary<string, XivDependencyRootInfo>());
+                }
+                var sIdDict = sTypeDict[sId];
+
+                var safeSlot = root.Slot == null ? "" : root.Slot;
+                sIdDict[safeSlot] = root;
+
             }
+
+
             return dict;
 
 

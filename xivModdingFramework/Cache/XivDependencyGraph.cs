@@ -1076,7 +1076,7 @@ namespace xivModdingFramework.Cache
 
         /// <summary>
         /// Returns all child files that depend on the given parent file path as part of their
-        /// rendering process.  Will return NULL if the entry is not in the dependency graph.
+        /// rendering process.
         /// 
         /// This function is the primary workhorse for generating child files - this function
         /// should *not* rely on any other cache/etc. information to work.  Just the file path
@@ -1090,7 +1090,7 @@ namespace xivModdingFramework.Cache
             var level = GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid)
             {
-                return null;
+                return new List<string>();
             }
 
             if (level == XivDependencyLevel.Root)
