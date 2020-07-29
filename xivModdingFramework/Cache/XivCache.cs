@@ -28,7 +28,7 @@ namespace xivModdingFramework.Cache
         private static DirectoryInfo _rootCachePath;
         public static readonly Version CacheVersion = new Version("0.0.1.1");
         private const string dbFileName = "mod_cache.db";
-        private const string rootCacheFileName = "roots_cache.db";
+        private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
         internal static string CacheConnectionString { get
@@ -313,15 +313,33 @@ namespace xivModdingFramework.Cache
 
             if (!File.Exists(_rootCachePath.FullName))
             {
-                using (var db = new SQLiteConnection(RootsCacheConnectionString))
-                {
-                    db.Open();
-                    var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
-                    var sqlCmd = String.Join("\n", lines);
+                // If we don't have a root cache file, we can do a few things...
+                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var backupFile = cwd + "\\Resources\\DB\\" + rootCacheFileName;
 
-                    using (var cmd = new SQLiteCommand(sqlCmd, db))
+                if (File.Exists(backupFile))
+                {
+                    // Copy the backup over. - Even if the backup is not for the correct patch of 
+                    // FFXIV for this user's region, that's fine.  It's still some reasonable data.
+                    // Worst case situation is either 
+                    //  A - They're missing some raw set listings in the menus (Not a big deal)
+                    //  B - They have some raw set listings in the menus that they don't have yet. (Won't load, not a big deal.)
+                    File.Copy(backupFile, _rootCachePath.FullName);
+                }
+                else
+                {
+                    // No backup DB to use, just create a blank schema, other functions will fallback to using the
+                    // roots from the item list as a partial list.
+                    using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
-                        cmd.ExecuteScalar();
+                        db.Open();
+                        var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
+                        var sqlCmd = String.Join("\n", lines);
+
+                        using (var cmd = new SQLiteCommand(sqlCmd, db))
+                        {
+                            cmd.ExecuteScalar();
+                        }
                     }
                 }
             }
@@ -1488,6 +1506,17 @@ namespace xivModdingFramework.Cache
         {
             var roots = await XivDependencyGraph.GetDependencyRoots(internalFilePath);
             return roots;
+        }
+
+        /// <summary>
+        /// Re-scans the *ENTIRE* list of possible roots in the 040000 DAT file.
+        /// This operation takes a LONG time, and should not be done unless specifically
+        /// user initiated.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task RebuildAllRoots()
+        {
+            await XivDependencyGraph.CacheAllRealRoots();
         }
 
 
