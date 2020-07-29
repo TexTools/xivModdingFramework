@@ -59,11 +59,13 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             foreach (var indexPath in indexPaths)
             {
+                _semaphoreSlim.Wait();
                 using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
                 {
                     bw.BaseStream.Seek(1104, SeekOrigin.Begin);
                     bw.Write(datCount);
                 }
+                _semaphoreSlim.Release();
             }
         }
 
@@ -83,6 +85,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             for (var i = 0; i < indexPaths.Length; i++)
             {
+                _semaphoreSlim.Wait();
                 using (var br = new BinaryReader(File.OpenRead(indexPaths[i])))
                 {
                     br.BaseStream.Seek(1104, SeekOrigin.Begin);
@@ -94,8 +97,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         index2 = br.ReadByte();
                     }
-
                 }
+                _semaphoreSlim.Release();
             }
 
             return (index1, index2);
@@ -110,11 +113,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             byte[] sha1Bytes;
 
+            _semaphoreSlim.Wait();
             using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
             {
                 br.BaseStream.Seek(1040, SeekOrigin.Begin);
                 sha1Bytes = br.ReadBytes(20);
             }
+            _semaphoreSlim.Release();
 
             return sha1Bytes;
         }
@@ -128,11 +133,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             byte[] sha1Bytes;
 
+            _semaphoreSlim.Wait();
             using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
             {
                 br.BaseStream.Seek(1116, SeekOrigin.Begin);
                 sha1Bytes = br.ReadBytes(20);
             }
+            _semaphoreSlim.Release();
 
             return sha1Bytes;
         }
@@ -146,11 +153,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             byte[] sha1Bytes;
 
+            _semaphoreSlim.Wait();
             using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
             {
                 br.BaseStream.Seek(1188, SeekOrigin.Begin);
                 sha1Bytes = br.ReadBytes(20);
             }
+            _semaphoreSlim.Release();
+            
 
             return sha1Bytes;
         }
@@ -332,29 +342,37 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             return Task.Run(() =>
             {
+
+                _semaphoreSlim.Wait();
                 var fileDictionary = new Dictionary<string, int>();
-                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
-
-                // These are the offsets to relevant data
-                const int fileCountOffset = 1036;
-                const int dataStartOffset = 2048;
-
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                try
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var fileCount = br.ReadInt32();
+                    var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                    // These are the offsets to relevant data
+                    const int fileCountOffset = 1036;
+                    const int dataStartOffset = 2048;
 
-                    // loop through each file entry
-                    for (var i = 0; i < fileCount; br.ReadBytes(4), i += 16)
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
-                        var fileNameHash = br.ReadInt32();
-                        var folderPathHash = br.ReadInt32();
-                        var offset = br.ReadInt32() * 8;
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var fileCount = br.ReadInt32();
 
-                        fileDictionary.Add($"{fileNameHash}{folderPathHash}", offset);
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+
+                        // loop through each file entry
+                        for (var i = 0; i < fileCount; br.ReadBytes(4), i += 16)
+                        {
+                            var fileNameHash = br.ReadInt32();
+                            var folderPathHash = br.ReadInt32();
+                            var offset = br.ReadInt32() * 8;
+
+                            fileDictionary.Add($"{fileNameHash}{folderPathHash}", offset);
+                        }
                     }
+                } finally
+                {
+                    _semaphoreSlim.Release();
                 }
 
                 return fileDictionary;
@@ -464,38 +482,47 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            return await Task.Run(() =>
+            bool exists = false;
+
+            await _semaphoreSlim.WaitAsync();
+            try
             {
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                exists = await Task.Run(() =>
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var numOfFiles = br.ReadInt32();
+                   using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                   {
+                       br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                       var numOfFiles = br.ReadInt32();
 
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-                    for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
-                    {
-                        var fileNameHash = br.ReadInt32();
+                       br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                       for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
+                       {
+                           var fileNameHash = br.ReadInt32();
 
-                        if (fileNameHash == fileHash)
-                        {
-                            var folderPathHash = br.ReadInt32();
+                           if (fileNameHash == fileHash)
+                           {
+                               var folderPathHash = br.ReadInt32();
 
-                            if (folderPathHash == folderHash)
-                            {
-                                return true;
-                            }
+                               if (folderPathHash == folderHash)
+                               {
+                                   return true;
+                               }
 
-                            br.ReadBytes(4);
-                        }
-                        else
-                        {
-                            br.ReadBytes(8);
-                        }
-                    }
-                }
-
-                return false;
-            });
+                               br.ReadBytes(4);
+                           }
+                           else
+                           {
+                               br.ReadBytes(8);
+                           }
+                       }
+                   }
+                   return false;
+               });
+            } finally
+            {
+                _semaphoreSlim.Release();
+            }
+            return exists;
         }
 
         /// <summary>
@@ -512,31 +539,38 @@ namespace xivModdingFramework.SqPack.FileTypes
             const int fileCountOffset = 1036;
             const int dataStartOffset = 2048;
 
-            return await Task.Run(() =>
+            await _semaphoreSlim.WaitAsync();
+            try
             {
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                return await Task.Run(() =>
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var numOfFiles = br.ReadInt32();
-
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-                    for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
-                        var fileNameHash = br.ReadInt32();
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var numOfFiles = br.ReadInt32();
 
-                        var folderPathHash = br.ReadInt32();
-
-                        if (folderPathHash == folderHash)
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < numOfFiles; br.ReadBytes(4), i += 16)
                         {
-                            return true;
+                            var fileNameHash = br.ReadInt32();
+
+                            var folderPathHash = br.ReadInt32();
+
+                            if (folderPathHash == folderHash)
+                            {
+                                return true;
+                            }
+
+                            br.ReadBytes(4);
                         }
-
-                        br.ReadBytes(4);
                     }
-                }
 
-                return false;
-            });
+                    return false;
+                });
+            } finally
+            {
+                _semaphoreSlim.Release();
+            }
         }
 
         /// <summary>
@@ -555,31 +589,38 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
-            await Task.Run(() =>
+            await _semaphoreSlim.WaitAsync();
+            try
             {
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                await Task.Run(() =>
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var totalFiles = br.ReadInt32();
-
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-                    for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
-                        br.ReadBytes(4);
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var totalFiles = br.ReadInt32();
 
-                        var folderPathHash = br.ReadInt32();
-
-                        if (folderPathHash == hashedFolder)
-                        {
-                            fileOffsetList.Add(br.ReadInt32() * 8);
-                        }
-                        else
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
                         {
                             br.ReadBytes(4);
+
+                            var folderPathHash = br.ReadInt32();
+
+                            if (folderPathHash == hashedFolder)
+                            {
+                                fileOffsetList.Add(br.ReadInt32() * 8);
+                            }
+                            else
+                            {
+                                br.ReadBytes(4);
+                            }
                         }
                     }
-                }
-            });
+                });
+            }finally
+            {
+                _semaphoreSlim.Release();
+            }
 
             return fileOffsetList;
         }
@@ -599,26 +640,33 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
-            await Task.Run(() =>
+            await _semaphoreSlim.WaitAsync();
+            try
             {
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                await Task.Run(() =>
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var totalFiles = br.ReadInt32();
-
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-                    for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
-                        br.ReadBytes(4);
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var totalFiles = br.ReadInt32();
 
-                        var folderPathHash = br.ReadInt32();
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                        {
+                            br.ReadBytes(4);
 
-                        folderHashList.Add(folderPathHash);
+                            var folderPathHash = br.ReadInt32();
 
-                        br.ReadBytes(4);
+                            folderHashList.Add(folderPathHash);
+
+                            br.ReadBytes(4);
+                        }
                     }
-                }
-            });
+                });
+            } finally
+            {
+                _semaphoreSlim.Release();
+            }
 
             return folderHashList.ToList();
         }
@@ -639,6 +687,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
+            await _semaphoreSlim.WaitAsync();
             await Task.Run(() =>
             {
                 using (var br = new BinaryReader(File.OpenRead(indexPath)))
@@ -663,6 +712,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             });
 
+            _semaphoreSlim.Release();
             return fileHashesList;
         }
 
@@ -682,6 +732,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
+            await _semaphoreSlim.WaitAsync();
             await Task.Run(() =>
             {
                 using (var br = new BinaryReader(File.OpenRead(indexPath)))
@@ -707,6 +758,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
             });
+            _semaphoreSlim.Release();
 
             return fileHashesDict;
         }
@@ -1319,6 +1371,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>The offset which was replaced.</returns>
         private async Task<int> UpdateIndex(long offset, string fullPath, XivDataFile dataFile)
         {
+            // Semaphore for this function is handled by UpdateDataOffset.
             fullPath = fullPath.Replace("\\", "/");
             var folderHash =
                 HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
@@ -1383,6 +1436,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>The offset which was replaced.</returns>
         private async Task UpdateIndex2(long offset, string fullPath, XivDataFile dataFile)
         {
+            // Semaphore for this function is handled by UpdateDataOffset.
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath);
 
@@ -1441,8 +1495,16 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             Directory.CreateDirectory(backupsDirectory.FullName);
 
-            File.Copy(indexPath, indexBackupPath, true);
-            File.Copy(index2Path, index2BackupPath, true);
+            _semaphoreSlim.Wait();
+            try
+            {
+                File.Copy(indexPath, indexBackupPath, true);
+                File.Copy(index2Path, index2BackupPath, true);
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
         }
 
 

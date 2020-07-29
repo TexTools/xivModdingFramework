@@ -1099,8 +1099,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             internalFilePath = internalFilePath.Replace("\\", "/");
 
-            // Store this for later.
-            var oldChildren = await XivCache.GetChildFiles(internalFilePath);
 
             var index = new Index(_gameDirectory);
 
@@ -1108,6 +1106,17 @@ namespace xivModdingFramework.SqPack.FileTypes
             var IsTexToolsAddedFileFlag= await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath+".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
             if (NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag)
                 source = "FilesAddedByTexTools";
+
+            List<string> oldChildren;
+            if (NewFilesNeedToBeAdded)
+            {
+                // New files don't have any old children by definition, so we can skip the check.
+                oldChildren = new List<string>();
+            } else
+            {
+                // Store this for later.
+                oldChildren = await XivCache.GetChildFiles(internalFilePath);
+            }
 
             var datNum = GetLargestDatNumber(dataFile);
 
@@ -1450,12 +1459,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Update the file children in the cache.
             var newChildren = await XivCache.UpdateChildFiles(internalFilePath);
 
-            var modifiedChildren = new List<string>();
+
+            var modifiedReferences = new List<string>();
+            modifiedReferences.Add(internalFilePath);
+
             for (var i = 0; i < newChildren.Count; i++) {
                 if(!oldChildren.Contains(newChildren[i]))
                 {
                     // Added a file reference.
-                    modifiedChildren.Add(newChildren[i]);
+                    modifiedReferences.Add(newChildren[i]);
                 }
             }
 
@@ -1464,15 +1476,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (!newChildren.Contains(oldChildren[i]))
                 {
                     // Deleted a file reference.
-                    modifiedChildren.Add(oldChildren[i]);
+                    modifiedReferences.Add(oldChildren[i]);
                 }
             }
 
-            // If we changed any references, push them onto the cache queue.
-            foreach(var child in modifiedChildren)
-            {
-                XivCache.QueueParentFilesUpdate(child);
-            }
+            // Queue up all of our reference changes for rebuilding later.
+            XivCache.QueueParentFilesUpdate(modifiedReferences);
 
             return offset;
         }
