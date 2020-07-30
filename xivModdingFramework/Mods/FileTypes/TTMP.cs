@@ -231,7 +231,8 @@ namespace xivModdingFramework.Mods.FileTypes
                                 {
                                     name =  modPackData.Name,
                                     author = modPackData.Author,
-                                    version = modPackData.Version.ToString()
+                                    version = modPackData.Version.ToString(),
+                                    url = modPackData.Url
                                 }
                             };
 
@@ -531,6 +532,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
                     modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
 
+                    // TODO - Probably need to look at keying this off more than just the name.
                     var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
 
                     if (!modPackExists)
