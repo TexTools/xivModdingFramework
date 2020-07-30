@@ -421,7 +421,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var dat = new Dat(gameDirectory);
             var modding = new Modding(gameDirectory);
             var modListFullPaths = new List<string>();
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+            var modList = modding.GetModList();
             var modCount = 1;
             var importErrors = "";
 
@@ -530,7 +530,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (modsJson[0].ModPackEntry != null)
                 {
-                    modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+                    modList = modding.GetModList();
 
                     // TODO - Probably need to look at keying this off more than just the name.
                     var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
@@ -540,7 +540,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         modList.ModPacks.Add(modsJson[0].ModPackEntry);
                     }
 
-                    File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+                    modding.SaveModList(modList);
                 }
             } finally
             {

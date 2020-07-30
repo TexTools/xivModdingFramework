@@ -56,9 +56,15 @@ namespace xivModdingFramework.Mods
         {
             return JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
         }
+
+        public void SaveModList(ModList ml)
+        {
+            SaveModList(modList);
+        }
+
         public async Task DeleteAllFilesAddedByTexTools()
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
             var modsToRemove = modList.Mods.Where(it => it.source == "FilesAddedByTexTools");
             foreach(var mod in modsToRemove)
             {
@@ -85,7 +91,7 @@ namespace xivModdingFramework.Mods
                 Mods = new List<Mod>()
             };
 
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -99,7 +105,7 @@ namespace xivModdingFramework.Mods
             {
                 internalFilePath = internalFilePath.Replace("\\", "/");
 
-                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+                var modList = GetModList();
 
                 if (modList == null) return null;
 
@@ -218,7 +224,7 @@ namespace xivModdingFramework.Mods
 
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+            var modList = GetModList();
 
             var entryEnableUpdate = (from entry in modList.Mods
                 where entry.fullPath.Equals(modEntry.fullPath)
@@ -226,7 +232,7 @@ namespace xivModdingFramework.Mods
 
             entryEnableUpdate.enabled = enable;
 
-            File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -238,7 +244,7 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
             List<Mod> mods = null;
 
@@ -279,7 +285,7 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -290,9 +296,9 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
 
-            if(modList == null || modList.modCount == 0) return;
+            if (modList == null || modList.modCount == 0) return;
 
             var modNum = 0;
             foreach (var modEntry in modList.Mods)
@@ -359,7 +365,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
         public async Task DeleteMod(string modItemPath)
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
 
             var modToRemove = (from mod in modList.Mods
                 where mod.fullPath.Equals(modItemPath)
@@ -396,7 +402,7 @@ namespace xivModdingFramework.Mods
             modList.modCount -= 1;
 
 
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -405,7 +411,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
         public async Task DeleteModPack(string modPackName)
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
 
             var modPackItem = (from modPack in modList.ModPacks
                 where modPack.name.Equals(modPackName)
@@ -454,7 +460,7 @@ namespace xivModdingFramework.Mods
             modList.modCount -= modRemoveCount;
             modList.modPackCount -= 1;
 
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
     }
 }

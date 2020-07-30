@@ -1351,7 +1351,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     dataOverwritten = true;
 
-                    var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+                    var modding = new Modding(_gameDirectory);
+                    var modList = modding.GetModList();
 
                     var entryEnableUpdate = (from entry in modList.Mods
                         where entry.fullPath.Equals(modEntry.fullPath)
@@ -1364,7 +1365,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         entryEnableUpdate.modPack = modPack;
                     }
 
-                    File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+                    modding.SaveModList(modList);
                 }
             }
             else
@@ -1374,7 +1375,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 *  write the compressed data in the existing space.
                 */
 
-                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+                var modding = new Modding(_gameDirectory);
+                var modList = modding.GetModList();
 
                 if (modList != null && modList.emptyCount > 0)
                 {
@@ -1452,7 +1454,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             modList.emptyCount -= 1;
                             modList.modCount += 1;
 
-                            File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+                            modding.SaveModList(modList);
 
                             offset = mod.data.modOffset;
 
@@ -1528,7 +1530,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (offset != 0)
                 {
-                    var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(_modListDirectory.FullName));
+                    var modding = new Modding(_gameDirectory);
+                    var modList = modding.GetModList();
                     if (NewFilesNeedToBeAdded)
                     {
                         var success = true;
@@ -1589,7 +1592,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     modList.modCount += 1;
 
-                    File.WriteAllText(_modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+                    modding.SaveModList(modList);
                 }
             }
 
