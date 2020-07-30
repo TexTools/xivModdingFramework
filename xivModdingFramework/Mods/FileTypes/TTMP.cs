@@ -34,6 +34,8 @@ namespace xivModdingFramework.Mods.FileTypes
     {
         private readonly string _currentWizardTTMPVersion = "1.0w";
         private readonly string _currentSimpleTTMPVersion = "1.0s";
+        private const string _minimumAssembly = "1.0.0.0";
+
         private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;
 
@@ -61,10 +63,12 @@ namespace xivModdingFramework.Mods.FileTypes
                 var modPackJson = new ModPackJson
                 {
                     TTMPVersion = _currentWizardTTMPVersion,
+                    MinimumFrameworkVersion = _minimumAssembly,
                     Name = modPackData.Name,
                     Author = modPackData.Author,
                     Version = modPackData.Version.ToString(),
                     Description = modPackData.Description,
+                    Url = modPackData.Url,
                     ModPackPages = new List<ModPackPageJson>()
                 };
 
@@ -123,6 +127,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                         Name = modOptionMod.Value.Name,
                                         Category = modOptionMod.Value.Category.GetEnDisplayName(),
                                         FullPath = modOptionMod.Key,
+                                        IsDefault = modOptionMod.Value.IsDefault,
                                         ModSize = modOptionMod.Value.ModDataBytes.Length,
                                         ModOffset = binaryWriter.BaseStream.Position,
                                         DatFile = dataFile.GetDataFileName(),
@@ -201,6 +206,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     Name = modPackData.Name,
                     Author = modPackData.Author,
                     Version = modPackData.Version.ToString(),
+                    MinimumFrameworkVersion = _minimumAssembly,
+                    Url = modPackData.Url,
                     Description = modPackData.Description,
                     SimpleModsList = new List<ModsJson>()
                 };
@@ -218,6 +225,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 FullPath = simpleModData.FullPath,
                                 ModSize = simpleModData.ModSize,
                                 DatFile = simpleModData.DatFile,
+                                IsDefault = simpleModData.IsDefault,
                                 ModOffset = binaryWriter.BaseStream.Position,
                                 ModPackEntry = new ModPack
                                 {

@@ -42,6 +42,11 @@ namespace xivModdingFramework.Mods.DataContainers
         public string Description { get; set; }
 
         /// <summary>
+        /// Author's supplied URL for the modpack.
+        /// </summary>
+        public string Url { get; set; }
+
+        /// <summary>
         /// A list of pages containing a list of mod groups for that particular page
         /// </summary>
         public List<ModPackPage> ModPackPages { get; set; }

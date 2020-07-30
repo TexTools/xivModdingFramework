@@ -15,6 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
@@ -44,6 +46,36 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The description for the mod pack
         /// </summary>
         public string Description { get; set; }
+
+        /// <summary>
+        /// The modpack's weblink.
+        /// </summary>
+        public string Url { get; set; }
+
+        /// <summary>
+        /// Minimum required version of the Framework to import this modpack file.
+        /// The 1.0.0.0 here is purely a fallback default; it should be assigned to
+        /// in the actual modpack generation.
+        /// </summary>
+        public string MinimumFrameworkVersion = "1.0.0.0";
+
+        /// <summary>
+        /// Generates a hash identifier from this mod's name and author information,
+        /// in lowercase.  For identifying new versions of same mods, potentially.
+        /// </summary>
+        /// <returns></returns>
+        public byte[] GetHash()
+        {
+            using (SHA256 sha = SHA256.Create())
+            {
+                var n = Name.ToLower();
+                var a = Author.ToLower();
+                var key = n + a;
+                var keyBytes = Encoding.Unicode.GetBytes(key);
+                var hash = sha.ComputeHash(keyBytes);
+                return hash;
+            }
+        }
 
         /// <summary>
         /// A list of pages containing a list of mod groups for that particular page
@@ -159,6 +191,16 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The dat file associated with the item
         /// </summary>
         public string DatFile { get; set; }
+
+        /// <summary>
+        /// Indicates if this "Mod" is actually just a placeholder in a modpack, 
+        /// indicating that we want any existing mod on this file to be disabled.
+        /// 
+        /// Default mod entries include completely valid copies of their original
+        /// SE item, for backwards compatability and in case some code imports
+        /// them incorrectly or needs the information for calculations.
+        /// </summary>
+        public bool IsDefault { get; set; }
 
         /// <summary>
         /// The Mod Pack Entry

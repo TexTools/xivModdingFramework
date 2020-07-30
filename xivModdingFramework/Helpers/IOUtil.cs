@@ -252,5 +252,46 @@ namespace xivModdingFramework.Helpers
 
             throw new Exception("Could not resolve data file - Invalid internal FFXIV path.");
         }
+
+        /// <summary>
+        /// Cleans a given string of unusual or potentially invalid characters for most use cases, particularly URLs.
+        /// </summary>
+        /// <param name="st"></param>
+        /// <returns></returns>
+        public static string CleanString(string st)
+        {
+            if(st == null)
+            {
+                return "";
+            }
+
+            
+            const string invalids = "!\"#$%&'()*+,-./@:;<=>[\\]^_`{|}~";
+
+            st = st.Trim();
+            foreach (var c in invalids)
+            {
+                st.Replace(c.ToString(), "");
+            }
+
+            return st;
+        }
+
+        /// <summary>
+        /// Cleans up and validates a string to ensure it's a valid URL.
+        /// If the given URL is totally invalid, NULL is returned.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        public static string ValidateUrl(string url)
+        {
+            url = CleanString(url);
+            if (Constants.UrlValidationRegex.IsMatch(url))
+            {
+                return url;
+            }
+            return null;
+        }
+
     }
 }
