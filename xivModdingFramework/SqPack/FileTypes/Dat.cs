@@ -784,6 +784,144 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
+        public async Task<int> GetCompressedFileSize(int offset, XivDataFile dataFile)
+        {
+
+            var xivTex = new XivTex();
+
+            var decompressedData = new List<byte>();
+
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = ((offset / 8) & 0x0F) / 2;
+
+            await _semaphoreSlim.WaitAsync();
+
+            try
+            {
+                offset = OffsetCorrection(datNum, offset);
+
+                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+
+                return await Task.Run(async () =>
+                {
+                    using (var br = new BinaryReader(File.OpenRead(datPath)))
+                    {
+                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                        var headerLength = br.ReadInt32();
+                        var fileType = br.ReadInt32();
+                        var uncompSize = br.ReadInt32();
+                        var unknown = br.ReadInt32();
+                        var maxBufferSize = br.ReadInt32();
+                        var blockCount = br.ReadInt16();
+
+                        var endOfHeader = offset + headerLength;
+
+                        if (fileType != 2 && fileType != 3 && fileType != 4)
+                        {
+                            throw new NotSupportedException("Cannot get compressed file size of unknown type.");
+                        }
+
+                        int compSize = 0;
+                        // Ok, time to parse the block headers and figure out how long the compressed data runs.
+                        if(fileType == 2)
+                        {
+                            br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+                            var lastSize = 0;
+                            var lastOffset = 0;
+                            for(int i = 0; i < blockCount; i++)
+                            {
+                                br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
+                                var blockOffset = br.ReadInt32();
+                                var blockCompressedSize = br.ReadUInt16();
+
+                                lastOffset = blockOffset;
+                                lastSize = blockCompressedSize;
+                            }
+
+                            // Pretty straight forward.  Header + Total size of the compressed data.
+                            compSize = headerLength + lastOffset + lastSize;
+
+                        } else if(fileType == 3)
+                        {
+
+                            // 24 byte header, then 88 bytes to the first chunk offset.
+                            br.BaseStream.Seek(offset + 112, SeekOrigin.Begin);
+                            var firstOffset = br.ReadInt32();
+
+                            // 24 byte header, then 178 bytes to the start of the block count.
+                            br.BaseStream.Seek(offset + 178, SeekOrigin.Begin);
+
+                            var totalBlocks = 0;
+                            for (var i = 0; i < 11; i++)
+                            {
+                                totalBlocks += br.ReadUInt16();
+                            }
+
+
+                            // 24 byte header, then 208 bytes to the list of block sizes.
+                            br.BaseStream.Seek(offset + 208, SeekOrigin.Begin);
+
+                            var blockSizes = new int[totalBlocks];
+                            for (var i = 0; i < totalBlocks; i++)
+                            {
+                                blockSizes[i] = br.ReadUInt16();
+                            }
+
+                            int totalCompressedSize = 0;
+                            foreach(var size in blockSizes)
+                            {
+                                totalCompressedSize += size;
+                            }
+
+
+                            // Header + Chunk headers + compressed data.
+                            compSize = headerLength + firstOffset + totalCompressedSize;
+                        } else if(fileType == 4)
+                        {
+                            br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+                            // Textures.
+                            var lastOffset = 0;
+                            var lastSize = 0;
+                            var mipMapInfoOffset = offset + 24;
+                            for (int i = 0, j = 0; i < blockCount; i++)
+                            {
+                                br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
+
+                                j = j + 20;
+
+                                var offsetFromHeaderEnd = br.ReadInt32();
+                                var mipMapCompressedSize = br.ReadInt32();
+
+                                
+                                lastOffset = offsetFromHeaderEnd;
+                                lastSize = mipMapCompressedSize;
+                            }
+
+                            // Pretty straight forward.  Header + Total size of the compressed data.
+                            compSize = headerLength + lastOffset + lastSize;
+
+                        }
+
+                        // Fundamentally all files in the dat are padded out to the nearest 256 bytes.
+                        // The DAT import functions actually add this for us normally, so it's not really
+                        // necessary to treat it as part of the 'file size', but for completeness, it doesn't
+                        // hurt to do so, and then it makes our file size match with the modlist entry file sizes.
+                        if(compSize % 256 != 0)
+                        {
+                            var padding = 256 - (compSize % 256);
+                            compSize += padding;
+                        }
+                        return compSize;
+
+                    }
+                });
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
+        }
+
         /// <summary>
         /// Gets the data for Type 4 (Texture) files.
         /// </summary>

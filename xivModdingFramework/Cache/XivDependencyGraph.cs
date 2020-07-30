@@ -487,23 +487,42 @@ namespace xivModdingFramework.Cache
 
         }
 
+        private static readonly Regex _materialSetRegex = new Regex("v[0-9]{4}");
+
         /// <summary>
         /// Gets all the unique material files in this depency chain.
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetMaterialFiles()
+        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1)
         {
             var models = await GetModelFiles();
             var materials = new HashSet<string>();
             if (models != null && models.Count > 0)
             {
-                foreach(var model in models)
+                var dataFile = IOUtil.GetDataFileFromPath(models[0]);
+                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
+
+                foreach (var model in models)
                 {
                     var mdlMats = await XivCache.GetChildFiles(model);
-                    foreach(var mat in mdlMats)
+                    if (materialVariant < 0)
                     {
-                        materials.Add(mat);
+                        foreach (var mat in mdlMats)
+                        {
+                            materials.Add(mat);
+                        }
+                    } else {
+                        var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
+                        foreach (var mat in mdlMats)
+                        {
+                            // Replace any material set references with the new one.
+                            // The hash set will scrub us down to just a single copy.
+                            // This is faster than re-scanning the MDL file.
+                            // And a little more thorough than simply skipping over non-matching refs.
+                            // Since some materials may not have variant references.
+                            materials.Add(_materialSetRegex.Replace(mat, replacement));
+                        }
                     }
                 }
             }
@@ -515,9 +534,9 @@ namespace xivModdingFramework.Cache
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetTextureFiles()
+        public async Task<List<string>> GetTextureFiles(int materialVariant = -1)
         {
-            var materials = await GetMaterialFiles();
+            var materials = await GetMaterialFiles(materialVariant);
             var textures = new HashSet<string>();
             if (materials != null && materials.Count > 0)
             {
