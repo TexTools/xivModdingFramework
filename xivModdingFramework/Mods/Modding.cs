@@ -59,7 +59,7 @@ namespace xivModdingFramework.Mods
 
         public void SaveModList(ModList ml)
         {
-            SaveModList(modList);
+            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
         }
 
         public async Task DeleteAllFilesAddedByTexTools()
