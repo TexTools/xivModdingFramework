@@ -62,14 +62,7 @@ namespace xivModdingFramework.Cache
         }
         public static async Task<List<IItemModel>> GetSharedMaterialItems(this IItemModel item)
         {
-            // Todo - Could do with cleaning this up to make it work for monsters/etc. too.
             var sameModelItems = new List<IItemModel>();
-            if (!item.PrimaryCategory.Equals(XivStrings.Gear))
-
-            {
-                sameModelItems.Add((IItemModel)item.Clone());
-                return sameModelItems;
-            }
             sameModelItems = await item.GetSharedModelItems();
 
             var imc = new Imc(XivCache.GameInfo.GameDirectory);
@@ -1026,28 +1019,32 @@ namespace xivModdingFramework.Cache
 
             } else if(level == XivDependencyLevel.Material)
             {
-                var root = roots[0];
+                var parents = new HashSet<string>();
 
-                var parents = new List<string>();
-
-                // Get all models in this depedency tree.
-                var models = await root.GetModelFiles();
-                foreach (var model in models)
+                // For all our roots (Really just 1)
+                foreach (var root in roots)
                 {
-                    // And check which materials they use.
-                    var materials = await XivCache.GetChildFiles(model);
-                    if (materials.Contains(internalFilePath))
+                    // Get all models in this depedency tree.
+                    var models = await root.GetModelFiles();
+                    foreach (var model in models)
                     {
-                        // If we're used in the model, it's one of our parents.
-                        parents.Add(model);
+                        // And make sure their child files are fully cached.
+                        var materials = await XivCache.GetChildFiles(model);
                     }
                 }
 
-                return parents;
+                // Now we can go to the cache and pull all of our potential parents directly.
+                var cachedParents = await XivCache.GetCacheParents(internalFilePath);
+                foreach(var p in cachedParents)
+                {
+                    parents.Add(p);
+                }
+
+                return parents.ToList();
                 
             } else if(level == XivDependencyLevel.Texture)
             {
-                var parents = new List<string>();
+                var parents = new HashSet<string>();
 
                 // So, textures are the fun case where it's possible for them to have multiple roots.
                 foreach (var root in roots)
@@ -1056,16 +1053,19 @@ namespace xivModdingFramework.Cache
                     var materials = await root.GetMaterialFiles();
                     foreach(var mat in materials)
                     {
-                        // Get all the textures they use.
+                        // And make sure their child files are fully cached.
                         var textures = await XivCache.GetChildFiles(mat);
-                        if(textures.Contains(internalFilePath))
-                        {
-                            parents.Add(mat);
-                        }
                     }
                 }
 
-                return parents;
+                // Now we can go to the cache and pull all of our potential parents directly.
+                var cachedParents = await XivCache.GetCacheParents(internalFilePath);
+                foreach (var p in cachedParents)
+                {
+                    parents.Add(p);
+                }
+
+                return parents.ToList();
             }
 
             // Shouldn't actually be possible to get here, but null to be safe.
