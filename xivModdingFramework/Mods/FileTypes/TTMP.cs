@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
@@ -429,6 +430,28 @@ namespace xivModdingFramework.Mods.FileTypes
             // (Could result in improper parent file calculations, as the parent files may not be actually imported yet)
             XivCache.CacheWorkerEnabled = false;
 
+
+            // Loop through all the incoming mod entries, and only take
+            // the *LAST* mod json entry for each file path.
+            // This keeps us from having to constantly re-query the mod list file, and filters out redundant imports.
+            var filePaths = new HashSet<string>();
+            var newList = new List<ModsJson>(modsJson.Count);
+            for(int i = modsJson.Count -1; i >= 0; i--)
+            {
+                var mj = modsJson[i];
+                if(filePaths.Contains(mj.FullPath))
+                {
+                    // Already have a mod using this path, discard this mod entry.
+                    continue;
+                }
+
+                filePaths.Add(mj.FullPath);
+                newList.Add(mj);
+            }
+            modsJson = newList;
+
+            var importCount = 0;
+
             try
             {
                 foreach (var modListMod in modList.Mods)
@@ -473,11 +496,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                                         var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                                        await dat.WriteToDat(new List<byte>(data), existingEntry,
+                                                        await (dat.WriteToDat(new List<byte>(data), existingEntry,
                                                             modJson.FullPath,
                                                             modJson.Category.GetDisplayName(), modJson.Name,
                                                             XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry);
+                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry));
                                                     }
                                                     else
                                                     {
@@ -485,19 +508,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                                         var data = binaryReader.ReadBytes(modJson.ModSize);
 
-                                                        await dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
+                                                        await (dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                                             modJson.Category.GetDisplayName(), modJson.Name,
                                                             XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry);
-
-                                                    // Add this new entry into the mod list we're testing against
-                                                    // so we don't redundantly add files.
-                                                    var modListEntry = await modding.TryGetModEntry(modJson.FullPath);
-                                                        if (modListEntry != null)
-                                                        {
-                                                            modListFullPaths.Add(modJson.FullPath);
-                                                            modList.Mods.Add(modListEntry);
-                                                        }
+                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry));
                                                     }
                                                 }
                                                 catch (Exception ex)
@@ -511,10 +525,10 @@ namespace xivModdingFramework.Mods.FileTypes
                                                     importErrors +=
                                                         $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
                                                 }
+                                                importCount++;
 
-                                                progress?.Report((modCount, modsJson.Count, string.Empty));
+                                                progress?.Report((importCount, modsJson.Count, string.Empty));
 
-                                                modCount++;
                                             }
                                         }
                                     }
