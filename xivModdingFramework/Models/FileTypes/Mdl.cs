@@ -240,7 +240,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Save the DB file.
 
-            var converterFolder = Directory.GetCurrentDirectory() + "\\converters\\" + fileFormat;
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
             model.SaveToFile(dbPath);
@@ -1860,7 +1861,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public List<string> GetAvailableImporters()
         {
-            const string importerPath = "converters/";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            cwd = cwd.Replace("\\", "/");
+            string importerPath = cwd + "/converters/";
             var ret = new List<string>();
             ret.Add("dae"); // DAE handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
@@ -1883,7 +1886,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public List<string> GetAvailableExporters()
         {
-            const string importerPath = "converters/";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            cwd = cwd.Replace("\\", "/");
+            string importerPath = cwd + "/converters/";
             var ret = new List<string>();
             ret.Add("dae"); // DAE handler is internal.
             ret.Add("obj"); // OBJ handler is internal.
@@ -1911,7 +1916,8 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
         {
 
-            var importerFolder = Directory.GetCurrentDirectory() + "\\converters\\" + importerName;
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            string importerFolder = cwd + "\\converters\\" + importerName;
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
@@ -4205,7 +4211,8 @@ namespace xivModdingFramework.Models.FileTypes
             var skelDict = new Dictionary<string, SkeletonData>();
 
             var skelName = "c" + race.GetRaceCode();
-            var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
             var skeletonData = File.ReadAllLines(skeletonFile);
             var FullSkel = new Dictionary<string, SkeletonData>();
             var FullSkelNum = new Dictionary<int, SkeletonData>();

@@ -1161,7 +1161,8 @@ namespace xivModdingFramework.Models.DataContainers
             }
 
 
-            var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
             var skeletonData = File.ReadAllLines(skeletonFile);
             var badBoneId = 900;
 
