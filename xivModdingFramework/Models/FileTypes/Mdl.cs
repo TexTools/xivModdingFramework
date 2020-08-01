@@ -1974,8 +1974,8 @@ namespace xivModdingFramework.Models.FileTypes
         /// Import a given model
         /// </summary>
         /// <param name="item">The current item being imported</param>
-        /// <param name="currentMdl">The current (modified or unmodified) mdl for the item.</param>
-        /// <param name="fileLocation">The location of the dae file to import</param>
+        /// <param name="race">The racial model to replace of the item</param>
+        /// <param name="path">The location of the dae file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
         ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
