@@ -866,9 +866,9 @@ namespace xivModdingFramework.Models.DataContainers
                             cmd.Parameters.AddWithValue("value", "ffxiv_tt");
                             cmd.ExecuteScalar();
 
-                            // Does the framework NOT have a version identifier?  I couldn't find one, so the Cache version works.
+
                             cmd.Parameters.AddWithValue("key", "version");
-                            cmd.Parameters.AddWithValue("value", XivCache.CacheVersion);
+                            cmd.Parameters.AddWithValue("value", typeof(XivCache).Assembly.GetName().Version);
                             cmd.ExecuteScalar();
 
                             // Axis information
@@ -886,7 +886,7 @@ namespace xivModdingFramework.Models.DataContainers
 
 
                             // FFXIV stores stuff in Meters.
-                            cmd.Parameters.AddWithValue("key", "name");
+                            cmd.Parameters.AddWithValue("key", "root_name");
                             cmd.Parameters.AddWithValue("value", Path.GetFileNameWithoutExtension(Source));
                             cmd.ExecuteScalar();
 
@@ -912,6 +912,21 @@ namespace xivModdingFramework.Models.DataContainers
 
                                 cmd.ExecuteScalar();
                             }
+                        }
+
+                        var modelIdx = 0;
+                        var models = new List<string>() { Path.GetFileNameWithoutExtension(Source) };
+                        foreach (var model in models)
+                        {
+                            query = @"insert into models (model, name) values ($model, $name);";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("model", modelIdx);
+                                cmd.Parameters.AddWithValue("name", model);
+                                cmd.ExecuteScalar();
+
+                            }
+                            modelIdx++;
                         }
 
                         var matIdx = 0;
@@ -963,11 +978,15 @@ namespace xivModdingFramework.Models.DataContainers
                             }
 
 
-                            query = @"insert into meshes (mesh, name, material_id) values ($mesh, $name, $material_id);";
+                            // Groups
+                            query = @"insert into meshes (mesh, name, material_id, model) values ($mesh, $name, $material_id, $model);";
                             using (var cmd = new SQLiteCommand(query, db))
                             {
                                 cmd.Parameters.AddWithValue("name", m.Name);
                                 cmd.Parameters.AddWithValue("mesh", meshIdx);
+
+                                // This is always 0 for now.  Support element for Liinko's work on multi-model export.
+                                cmd.Parameters.AddWithValue("model", 0);
                                 cmd.Parameters.AddWithValue("material_id", GetMaterialIndex(meshIdx));
                                 cmd.ExecuteScalar();
                             }
