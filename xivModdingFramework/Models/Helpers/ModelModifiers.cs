@@ -729,7 +729,7 @@ namespace xivModdingFramework.Models.Helpers
 
 
                 Dictionary<string, Matrix> deformations, decomposed, recalculated;
-                Mdl.GetDeformationMatrices(XivRace.Miqote_Female, out deformations, out decomposed, out recalculated);
+                Mdl.GetDeformationMatrices(targetRace, out deformations, out decomposed, out recalculated);
 
                 // Now we're ready to animate...
 
