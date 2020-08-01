@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -37,6 +38,7 @@ namespace xivModdingFramework.Mods
     {
         private readonly DirectoryInfo _gameDirectory;
         private readonly Version _modlistVersion = new Version(1, 0);
+        private static SemaphoreSlim _modlistSemaphore = new SemaphoreSlim(1);
 
         public DirectoryInfo ModListDirectory { get; }
 
@@ -52,14 +54,79 @@ namespace xivModdingFramework.Mods
 
         }
 
+        // Caching information for modlists.
+        private static Dictionary<string, DateTime> _cachedModlistsModTime = new Dictionary<string, DateTime>();
+        private static Dictionary<string, ModList> _cachedModlists = new Dictionary<string, ModList>();
         public ModList GetModList()
         {
-            return JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            ModList val;
+            _modlistSemaphore.Wait();
+            try
+            {
+                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
+                {
+                    // We have a cached file, and the modList file has not been touched since we cached it.
+                    // Return the cached copy (Skip full read & Json deserialize)
+                    val = _cachedModlists[ModListDirectory.FullName];
+                }
+                else
+                {
+                    // Cache was either stale or missing, load the file from disk and update cache.
+                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+
+                    _cachedModlists[ModListDirectory.FullName] = val;
+                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
+
+                }
+            } finally {
+                _modlistSemaphore.Release();
+            }
+            return val;
+        }
+        public async Task<ModList> GetModListAsync()
+        {
+            ModList val;
+            await _modlistSemaphore.WaitAsync();
+            try
+            {
+                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
+                {
+                    // We have a cached file, and the modList file has not been touched since we cached it.
+                    // Return the cached copy (Skip full read & Json deserialize)
+                    val = _cachedModlists[ModListDirectory.FullName];
+                }
+                else
+                {
+                    // Cache was either stale or missing, load the file from disk and update cache.
+                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+
+                    _cachedModlists[ModListDirectory.FullName] = val;
+                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
+
+                }
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
+            return val;
         }
 
         public void SaveModList(ModList ml)
         {
+            _modlistSemaphore.Wait();
             File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            _modlistSemaphore.Release();
+        }
+        public void SaveModListAsync(ModList ml)
+        {
+            _modlistSemaphore.WaitAsync();
+            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            _modlistSemaphore.Release();
         }
 
         public async Task DeleteAllFilesAddedByTexTools()
