@@ -14,6 +14,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Cache
 {
@@ -257,7 +258,13 @@ namespace xivModdingFramework.Cache
 
                 } catch (Exception Ex)
                 {
-                    SetMetaValue("needs_rebuild", "1");
+                    try
+                    {
+                        SetMetaValue("needs_rebuild", "1");
+                    }
+                    catch {
+                        // No-op.  We're pretty fucked at this point.
+                    }
                     _REBUILDING = false;
                     throw;
                 }
@@ -1154,6 +1161,42 @@ namespace xivModdingFramework.Cache
         }
 
         /// <summary>
+        /// Determines if a file is orphaned or not in the file system.
+        /// An Orphaned file is a custom file which no longer has any files in the filesystem actively referencing it.
+        /// These files may be safely deleted IFF all mods are currently active in ModList.
+        ///     ( Determining if any deactivated mods use the file is much more annoying )
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <returns></returns>
+        public static async Task<bool> IsOrphanedFile(string internalFilePath)
+        {
+            var index = new Index(GameInfo.GameDirectory);
+            // So to be orphaned, a file has to pass(fail) a few criteria.
+
+            // 1. It cannot be a default FFXIV file.  Default files are never treated as orphans for safety.
+            var def = await index.IsDefaultFilePath(internalFilePath);
+            if(def) return false;
+
+            // 2. It has to have updated cache data.
+            await GetParentFiles(internalFilePath);
+
+            // 3. That cache data must specifically have exactly one parent listed, and that parent must be NULL.
+            var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
+            var list = await BuildListFromTable("dependencies_parents", wc, async (reader) =>
+            {
+                return reader.GetString("parent");
+            });
+
+            if(list.Count == 1 && list[0] == null)
+            {
+                return true;
+            }
+            return false;
+
+
+        }
+
+        /// <summary>
         /// Retreives the parent files in the dependency graph for this file.
         /// </summary>
         /// <param name="internalFilePath"></param>
@@ -1179,16 +1222,9 @@ namespace xivModdingFramework.Cache
 
             if (list.Count == 0)
             {
-                // Need to pull the raw data to verify a 0 count entry.
+                // 0 Length list means there was no cached data.
                 list = await XivDependencyGraph.GetParentFiles(internalFilePath);
                 await UpdateParentFiles(internalFilePath, list);
-
-                // So if we updated our own parents, we have to update our children's parents too.
-                // Because we may be a previously orphaned node, that now is re-attached to the main tree.
-                var children = await GetChildFiles(internalFilePath);
-
-                // In short, any parent calculation is always cascading downwards.
-                QueueParentFilesUpdate(children);
             }
             return list;
         }
@@ -1538,12 +1574,39 @@ namespace xivModdingFramework.Cache
                 children = await XivDependencyGraph.GetChildFiles(internalFilePath);
             }
 
+            var oldCacheChildren = new List<string>();
+
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
                 using (var transaction = db.BeginTransaction())
                 {
+                    // Clear out our old children.
                     var query = "delete from dependencies_children where parent = $parent";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("parent", internalFilePath);
+                        cmd.ExecuteScalar();
+                    }
+
+                    // Find all the files that currently point to us as a parent in the cache.
+                    query = "select child from dependencies_parents where parent = $parent";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("parent", internalFilePath);
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                oldCacheChildren.Add(reader.GetString("child"));
+                            }
+                        }
+                    }
+
+                    // And purge all of those cached file's parents (we'll queue them up for recalculation after the transaction is done)
+                    // Could let the queue-up do the purging for us here, but then there's potential that some other thread
+                    // might come in and pluck up bad data between our transaction and queuing call.
+                    query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
                     using (var cmd = new SQLiteCommand(query, db))
                     {
                         cmd.Parameters.AddWithValue("parent", internalFilePath);
@@ -1577,6 +1640,19 @@ namespace xivModdingFramework.Cache
                     transaction.Commit();
                 }
             }
+
+            var toUpdate = new HashSet<string>();
+            foreach (var file in oldCacheChildren)
+            {
+                toUpdate.Add(file);
+            }
+            foreach(var file in children)
+            {
+                toUpdate.Add(file);
+            }
+
+            // Queue everything up that we affected. 
+            QueueParentFilesUpdate(toUpdate.ToList());
 
             return children;
         }
@@ -1806,11 +1882,27 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         internal static async Task<List<string>> GetCacheParents(string internalFilePath)
         {
+            
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            return await BuildListFromTable("dependencies_children", wc, async (reader) =>
+            List<string> parents = await BuildListFromTable("dependencies_children", wc, async (reader) =>
             {
                 return reader.GetString("parent");
             });
+
+            // It's possible this file is a DX9 => 11 conversion texture, in which case we also have to look for references to our
+            // DX9 version.
+            var dx11Name = internalFilePath.Replace("--", "");
+            if (dx11Name != internalFilePath)
+            {
+                wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = dx11Name };
+                List<string> dxParents = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+                {
+                    return reader.GetString("parent");
+                });
+
+                parents.AddRange(dxParents);
+            };
+            return parents;
 
         }
 
