@@ -776,6 +776,38 @@ namespace xivModdingFramework.SqPack.FileTypes
             var oldChildren = await XivCache.GetChildFiles(fullPath);
 
             await _semaphoreSlim.WaitAsync();
+
+            // Test both index files for write access.
+            try
+            {
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+                using (var fs = new FileStream(indexPath, FileMode.Open))
+                {
+                    var canRead = fs.CanRead;
+                    var canWrite = fs.CanWrite;
+                    if (!canRead || !canWrite)
+                    {
+                        throw new Exception();
+                    }
+                }
+                var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+                using (var fs = new FileStream(index2Path, FileMode.Open))
+                {
+                    var canRead = fs.CanRead;
+                    var canWrite = fs.CanWrite;
+                    if (!canRead || !canWrite)
+                    {
+                        throw new Exception();
+                    }
+                }
+            }
+            catch
+            {
+                _semaphoreSlim.Release();
+                throw new Exception("Unable to update Index files.  File(s) are currently in use.");
+            }
+
+
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
@@ -1048,6 +1080,37 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<bool> AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
         {
             await _semaphoreSlim.WaitAsync();
+
+            // Test both index files for write access.
+            try
+            {
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+                using (var fs = new FileStream(indexPath, FileMode.Open))
+                {
+                    var canRead = fs.CanRead;
+                    var canWrite = fs.CanWrite;
+                    if (!canRead || !canWrite)
+                    {
+                        throw new Exception();
+                    }
+                }
+                var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+                using (var fs = new FileStream(index2Path, FileMode.Open))
+                {
+                    var canRead = fs.CanRead;
+                    var canWrite = fs.CanWrite;
+                    if (!canRead || !canWrite)
+                    {
+                        throw new Exception();
+                    }
+                }
+            }
+            catch
+            {
+                _semaphoreSlim.Release();
+                throw new Exception("Unable to update Index files.  File(s) are currently in use.");
+            }
+
             fullPath = fullPath.Replace("\\", "/");
             var pathHash = HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
