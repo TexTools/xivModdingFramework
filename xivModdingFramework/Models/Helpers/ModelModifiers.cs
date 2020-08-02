@@ -711,7 +711,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="model"></param>
         /// <param name="targetRace"></param>
         /// <param name="loggingFunction"></param>
-        public static void ApplyRacialDeform(TTModel model, XivRace targetRace, Action<bool, string> loggingFunction = null)
+        public static void ApplyRacialDeform(TTModel model, XivRace targetRace, bool invert = false, Action<bool, string> loggingFunction = null)
         {
             try
             {
@@ -727,9 +727,35 @@ namespace xivModdingFramework.Models.Helpers
                 }
                 loggingFunction(false, "Attempting to deform model...");
 
-
                 Dictionary<string, Matrix> deformations, decomposed, recalculated;
                 Mdl.GetDeformationMatrices(targetRace, out deformations, out decomposed, out recalculated);
+
+                // Check if deformation is possible
+                var missingDeforms = new HashSet<string>();
+
+                foreach (var m in model.MeshGroups)
+                {
+                    foreach (var mBone in m.Bones)
+                    {
+                        if (!deformations.ContainsKey(mBone))
+                        {
+                            missingDeforms.Add(mBone);
+                        }
+                    }
+                }
+
+                // Throw an exception if there is any missing deform bones
+                if (missingDeforms.Any())
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine();
+                    foreach (var missingDeform in missingDeforms)
+                    {
+                        sb.AppendLine($"{missingDeform}");
+                    }
+
+                    throw new Exception(sb.ToString());
+                }
 
                 // Now we're ready to animate...
 
@@ -755,10 +781,17 @@ namespace xivModdingFramework.Models.Helpers
                                 var boneWeight = (v.Weights[b]) / 255f;
 
                                 var matrix = Matrix.Identity;
-                                if (deformations.ContainsKey(boneName)) {
+                                if (deformations.ContainsKey(boneName)) 
+                                {
                                     matrix = deformations[boneName];
-                                } else {
-                                    throw new Exception("Invalid bone");
+                                    if (invert)
+                                    {
+                                        matrix.Invert();
+                                    }
+                                } 
+                                else 
+                                {
+                                    throw new Exception($"Invalid bone ({boneName})");
                                 }
 
 
