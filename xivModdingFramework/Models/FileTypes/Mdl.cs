@@ -217,7 +217,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Pop the textures out so the exporters can reference them.
             if (includeTextures)
             {
-                await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
+                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
             }
 
             // Validate the skeleton.
@@ -299,15 +299,15 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
         /// </summary>
-        private async Task ExportMaterialsForModel(TTModel model, string outputFilePath, int mtrlVariant = 1)
+        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races)
         {
             var modelName = Path.GetFileNameWithoutExtension(model.Source);
             var directory = Path.GetDirectoryName(outputFilePath);
 
             // Language doesn't actually matter here.
-            var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
-            var _tex = new Tex(_gameDirectory);
-            var _index = new Index(_gameDirectory);
+            var _mtrl = new Mtrl(gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
+            var _tex = new Tex(gameDirectory);
+            var _index = new Index(gameDirectory);
             var materialIdx = 0;
 
 
@@ -315,11 +315,23 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 try
                 {
+                    var mdlPath = model.Source;
+
+                    // Set source race to match so that it doesn't get replaced
+                    if (targetRace != XivRace.All_Races)
+                    {
+                        if (materialName.Contains("b0001"))
+                        {
+                            var currentRace = model.Source.Substring(model.Source.LastIndexOf('c') + 1, 4);
+                            mdlPath = model.Source.Replace(currentRace, targetRace.GetRaceCode());
+                        }
+                    }
+
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
-                    var mtrlPath = _mtrl.GetMtrlPath(model.Source, materialName, mtrlVariant);
+                    var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
                     var mtrlOffset = await _index.GetDataOffset(mtrlPath);
                     var mtrl = await _mtrl.GetMtrlData(mtrlOffset, mtrlPath, 11);
-                    var modelMaps = await ModelTexture.GetModelMaps(_gameDirectory, mtrl);
+                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl);
 
                     // Outgoing file names.
                     var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
