@@ -217,6 +217,12 @@ namespace xivModdingFramework.Models.FileTypes
             // Pop the textures out so the exporters can reference them.
             if (includeTextures)
             {
+                // Fix up our skin references in the model before exporting, to ensure
+                // we supply the right material names to the exporters down-chain.
+                if (model.IsInternal)
+                {
+                    ModelModifiers.FixUpSkinReferences(model, model.Source, null);
+                }
                 await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
             }
 

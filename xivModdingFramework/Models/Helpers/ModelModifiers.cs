@@ -1144,6 +1144,10 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="newInternalPath"></param>
         public static void FixUpSkinReferences(TTModel model, string newInternalPath, Action<bool, string> loggingFunction = null)
         {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
 
             // Here we should to go in and correct any Skin Material references to point to the skin material for this race.
             // It's not actually -NEEDED-, as the game will dynamically resolve them anyways to the player's skin material, but it's good for user expectation and sanity.
