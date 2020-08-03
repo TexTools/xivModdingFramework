@@ -19,7 +19,7 @@ namespace xivModdingFramework.Resources {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class XivStrings {
@@ -448,6 +448,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Decal.
+        /// </summary>
+        internal static string Decal {
+            get {
+                return ResourceManager.GetString("Decal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to DemiHuman.
         /// </summary>
         internal static string DemiHuman {
@@ -574,11 +583,20 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Ears.
+        ///   Looks up a localized string similar to Ear.
         /// </summary>
-        internal static string Ears {
+        internal static string Ear {
             get {
-                return ResourceManager.GetString("Ears", resourceCulture);
+                return ResourceManager.GetString("Ear", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Earring.
+        /// </summary>
+        internal static string Earring {
+            get {
+                return ResourceManager.GetString("Earring", resourceCulture);
             }
         }
         
@@ -1146,6 +1164,15 @@ namespace xivModdingFramework.Resources {
         internal static string Hrothgar_NPC {
             get {
                 return ResourceManager.GetString("Hrothgar_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Human.
+        /// </summary>
+        internal static string Human {
+            get {
+                return ResourceManager.GetString("Human", resourceCulture);
             }
         }
         
@@ -2190,6 +2217,15 @@ namespace xivModdingFramework.Resources {
         internal static string UIFile {
             get {
                 return ResourceManager.GetString("UIFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unknown.
+        /// </summary>
+        internal static string Unknown {
+            get {
+                return ResourceManager.GetString("Unknown", resourceCulture);
             }
         }
         

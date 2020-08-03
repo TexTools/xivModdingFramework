@@ -53,8 +53,7 @@ namespace xivModdingFramework.Items.Categories
         }
         public async Task<List<XivMinion>> GetMinionList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedMinionsList(substring);
+            return await XivCache.GetCachedMinionsList(substring);
         }
 
         /// <summary>
@@ -125,8 +124,7 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<List<XivMount>> GetMountList(string substring = null, string category = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedMountList(substring, category);
+            return await XivCache.GetCachedMountList(substring, category);
         }
 
         /// <summary>
@@ -265,8 +263,7 @@ namespace xivModdingFramework.Items.Categories
 
         public async Task<List<XivPet>> GetPetList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedPetList(substring);
+            return await XivCache.GetCachedPetList(substring);
 
         }
 
@@ -372,7 +369,7 @@ namespace xivModdingFramework.Items.Categories
             var equipPartDictionary = new Dictionary<string, char[]>();
 
             var index = new Index(_gameDirectory);
-            var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
+            var imc = new Imc(_gameDirectory);
             var version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
@@ -528,7 +525,7 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.Wrists, "wrs"},

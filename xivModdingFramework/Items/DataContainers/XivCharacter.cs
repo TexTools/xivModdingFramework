@@ -15,8 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Linq;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -66,6 +70,26 @@ namespace xivModdingFramework.Items.DataContainers
         /// The Primary Model Information of the Character Item 
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
+        internal static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        {
+            var item = new XivCharacter();
+            item.ModelInfo = new XivModelInfo();
+            item.ModelInfo.PrimaryID = root.Info.PrimaryId;
+            item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
+            item.Name = root.Info.GetBaseFileName();
+            item.PrimaryCategory = XivStrings.Character;
+
+            if (root.Info.Slot != null)
+            {
+                item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.FirstOrDefault(x => x.Value == root.Info.Slot).Key;
+            } else
+            {
+                item.SecondaryCategory = XivStrings.Body;
+            }
+
+            return item;
+        }
+
 
         public int CompareTo(object obj)
         {

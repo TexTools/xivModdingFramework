@@ -470,6 +470,25 @@ namespace xivModdingFramework.General.Enums
     /// </summary>
     public static class XivRaces
     {
+        public static readonly List<XivRace> PlayableRaces = new List<XivRace>() {
+            XivRace.Hyur_Midlander_Male,
+            XivRace.Hyur_Midlander_Female,
+            XivRace.Hyur_Highlander_Male,
+            XivRace.Hyur_Highlander_Female,
+            XivRace.Elezen_Male,
+            XivRace.Elezen_Female,
+            XivRace.Miqote_Male,
+            XivRace.Miqote_Female,
+            XivRace.Roegadyn_Male,
+            XivRace.Roegadyn_Female,
+            XivRace.Lalafell_Male,
+            XivRace.Lalafell_Female,
+            XivRace.AuRa_Male,
+            XivRace.AuRa_Female,
+            XivRace.Hrothgar,
+            XivRace.Viera,
+        };
+
         /// <summary>
         /// Gets the description from the enum value, in this case the Race Code
         /// </summary>

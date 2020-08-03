@@ -50,8 +50,7 @@ namespace xivModdingFramework.Items.Categories
         /// <returns>A list of XivFurniture objects containing housing items</returns>
         public async Task<List<XivFurniture>> GetFurnitureList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-            return await cache.GetCachedFurnitureList(substring);
+            return await XivCache.GetCachedFurnitureList(substring);
         }
 
         /// <summary>

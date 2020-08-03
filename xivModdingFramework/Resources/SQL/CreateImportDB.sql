@@ -64,9 +64,18 @@ CREATE TABLE "vertices" (
 	PRIMARY KEY("mesh","part","vertex_id")
 );
 
+-- Models
+CREATE TABLE "models" (
+	"model"	INTEGER NOT NULL,
+	"name"   TEXT,
+
+	Primary KEY("model")
+);
+
 -- Meshes
 CREATE TABLE "meshes" (
 	"mesh"	INTEGER NOT NULL,
+	"model" INTEGER NOT NULL,
 	"material_id" INTEGER,
 	"name"   TEXT,
 

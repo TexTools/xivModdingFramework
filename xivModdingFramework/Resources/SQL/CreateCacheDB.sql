@@ -6,33 +6,7 @@ CREATE TABLE "meta" (
 	PRIMARY KEY("key")
 );
 
-CREATE TABLE "equipment" (
-	"equipment_id"	INTEGER NOT NULL,
-	"slot"		TEXT NOT NULL,
-	"imc_variant"		TEXT NOT NULL,
-	"is_set"	INTEGER NOT NULL,
-	PRIMARY KEY("equipment_id","slot")
-);
-
-CREATE TABLE "weapon" (
-	"weapon_id"	INTEGER NOT NULL,
-	"body_id"	TEXT NOT NULL,
-	PRIMARY KEY("weapon_id","body_id")
-);
-
-CREATE TABLE "monster" (
-	"monster_id"	INTEGER NOT NULL,
-	"body_id"	TEXT NOT NULL,
-	PRIMARY KEY("monster_id","body_id")
-);
-
-CREATE TABLE "demihuman" (
-	"monster_id"		INTEGER NOT NULL,
-	"body_id"			TEXT NOT NULL,
-	"imc_variant"		TEXT NOT NULL,
-	PRIMARY KEY("monster_id","body_id")
-);
-
+-- All Equipment, Accessory, and Human type entries.
 CREATE TABLE "items" (
 	"exd_id"	INTEGER NOT NULL,
 	"name"	TEXT NOT NULL,
@@ -43,30 +17,36 @@ CREATE TABLE "items" (
 	"slot_full"	TEXT NOT NULL,
 	"imc_variant"	INTEGER NOT NULL,
 	"icon_id"	INTEGER NOT NULL,
+	"root"		TEXT,
 	PRIMARY KEY("name", "exd_id")
 );
 
+-- All Dat 06000 stuff.
 CREATE TABLE "ui" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,
 	"path" TEXT,
 	"icon_id" INTEGER NOT NULL,
+	"root"		TEXT,
 	
 	PRIMARY KEY("name", "path", "icon_id")
 );
 
+-- All /bgcommon/ stuff.
 CREATE TABLE "housing" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,
 	"primary_id"	INTEGER NOT NULL,
 	"icon_id"	INTEGER NOT NULL,
+	"root"		TEXT,
 	
 	PRIMARY KEY("category", "name")
 );
 
 
+-- Includes both known monster and demihuman types.
 CREATE TABLE "monsters" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
@@ -74,6 +54,37 @@ CREATE TABLE "monsters" (
 	"secondary_id"	INTEGER NOT NULL,
 	"imc_variant"	INTEGER NOT NULL,
 	"model_type" TEXT NOT NULL,
+	"root"		TEXT,
 	
 	PRIMARY KEY("category", "name", "primary_id", "secondary_id", "imc_variant")
+);
+
+-- Human-readable names for roots.  Cached for snappy access.
+CREATE TABLE "nice_root_names" (
+	"root" TEXT NOT NULL,
+	"nice_name" TEXT NOT NULL,
+
+	PRIMARY KEY("root")
+);
+
+-- File children.  Only guaranteed populated for mod files.
+CREATE TABLE "dependencies_children" (
+	"parent" TEXT NOT NULL,
+	"child" TEXT,
+
+	PRIMARY KEY("parent", "child")
+);
+
+-- File parents.  Only guaranteed populated for mod files when the cache queue length is 0.
+CREATE TABLE "dependencies_parents" (
+	"child" TEXT NOT NULL,
+	"parent" TEXT,
+
+	PRIMARY KEY("child", "parent")
+);
+
+-- Cache worker queue.
+CREATE TABLE "dependencies_update_queue" (
+	"position" INTEGER PRIMARY KEY AUTOINCREMENT,
+	"file" TEXT NOT NULL
 );

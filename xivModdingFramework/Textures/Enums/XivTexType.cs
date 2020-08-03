@@ -32,6 +32,7 @@ namespace xivModdingFramework.Textures.Enums
         Map,
         Icon,
         Vfx,
+        UI,
         Other
     }
 }

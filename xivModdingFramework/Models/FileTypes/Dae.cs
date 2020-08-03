@@ -94,7 +94,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (hasBones)
             {
-                var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
+                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
                 var skeletonData = File.ReadAllLines(skeletonFile);
 
                 // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys

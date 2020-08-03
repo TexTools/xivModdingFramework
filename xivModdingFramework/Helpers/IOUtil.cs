@@ -133,6 +133,8 @@ namespace xivModdingFramework.Helpers
             
             return path;
         }
+
+
         public static XivRace GetRaceFromPath(string path)
         {
             if(path == null)
@@ -152,7 +154,7 @@ namespace xivModdingFramework.Helpers
             }
             else if (path.Contains(".tex") || path.Contains(".mdl") || path.Contains(".atex"))
             {
-                if (path.Contains("accessory") || path.Contains("weapon") || path.Contains("/common/"))
+                if (path.Contains("weapon") || path.Contains("/common/"))
                 {
                     xivRace = XivRace.All_Races;
                 }
@@ -250,5 +252,46 @@ namespace xivModdingFramework.Helpers
 
             throw new Exception("Could not resolve data file - Invalid internal FFXIV path.");
         }
+
+        /// <summary>
+        /// Cleans a given string of unusual or potentially invalid characters for most use cases, particularly URLs.
+        /// </summary>
+        /// <param name="st"></param>
+        /// <returns></returns>
+        public static string CleanString(string st)
+        {
+            if(st == null)
+            {
+                return "";
+            }
+
+            
+            const string invalids = "!\"#$%&'()*+,-./@:;<=>[\\]^_`{|}~";
+
+            st = st.Trim();
+            foreach (var c in invalids)
+            {
+                st.Replace(c.ToString(), "");
+            }
+
+            return st;
+        }
+
+        /// <summary>
+        /// Cleans up and validates a string to ensure it's a valid URL.
+        /// If the given URL is totally invalid, NULL is returned.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        public static string ValidateUrl(string url)
+        {
+            url = CleanString(url);
+            if (Constants.UrlValidationRegex.IsMatch(url))
+            {
+                return url;
+            }
+            return null;
+        }
+
     }
 }

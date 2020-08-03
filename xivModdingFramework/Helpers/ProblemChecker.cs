@@ -162,52 +162,39 @@ namespace xivModdingFramework.Helpers
         {
             return Task.Run(async () =>
             {
-                progress?.Report("Deleting mods...");
-
                 var modding = new Modding(_gameDirectory);
                 var backupsRestored = false;
 
+                // Stop the cache worker since we're blowing up the entire index file and db anyways.
+                // The cache rebuild will start it up again after the cache is rebuilt.
+                XivCache.CacheWorkerEnabled = false;
+
                 try
                 {
-                    // Try to restore the index entries to their original values by deleting any files added by TexTools
-                    // and setting mods to disabled
-                    await modding.DeleteAllFilesAddedByTexTools();
-                    await modding.ToggleAllMods(false);
-                    progress?.Report("Restoring index file backups...");
-                }
-                catch
-                {
-                    // If an exception occurred due to a corrupted modlist which couldn't be deserealized restore the backup index
-                    // files by force
+                    // Try restoring the indexes FIRST.
                     backupsRestored = await RestoreBackups(backupsDirectory);
+                    progress?.Report("Restoring index file backups...");
 
                     if (!backupsRestored)
                     {
                         throw new Exception("Start Over Failed: Index backups missing/outdated.");
                     }
                 }
+                catch(Exception ex)
+                {
+                    try
+                    {
+                        // If the index restore failed, try just disabling.
+                        await modding.DeleteAllFilesAddedByTexTools();
+                        await modding.ToggleAllMods(false);
+                        progress?.Report("Index restore failed, attempting to delete all mods instead...");
+                    } catch
+                    {
+                        throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Disable all mods.");
+                    }
+                }
                 finally
                 {
-                    // If no exception occured, restore the backups anyway just to be safe but don't throw an exception if it fails
-                    // due to outdated or missing backups since setting back the original index values should be enough hopefully
-                    if (!backupsRestored)
-                    {
-                        backupsRestored = await RestoreBackups(backupsDirectory);
-
-                        // If backups were not restored that means they were missing/outdated so try to make new backups now
-                        if (!backupsRestored)
-                        {
-                            try
-                            {
-                                await BackupIndexFiles(backupsDirectory);
-                            }
-                            catch (Exception ex)
-                            {
-                                throw new Exception("Start Over Failed: Failed to update outdated backups.\n\n" + ex.Message);
-                            }
-                        }
-                    }
-
                     progress?.Report("Deleting modded dat files...");
 
                     var dat = new Dat(_gameDirectory);
@@ -241,8 +228,7 @@ namespace xivModdingFramework.Helpers
 
                     await Task.Run(async () =>
                     {
-                        var _cache = new XivCache(_gameDirectory, language);
-                        _cache.RebuildCache();
+                        XivCache.RebuildCache();
                     });
                 }
             });

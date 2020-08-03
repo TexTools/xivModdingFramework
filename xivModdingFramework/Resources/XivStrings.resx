@@ -264,8 +264,8 @@
   <data name="DX9" xml:space="preserve">
     <value>DX9</value>
   </data>
-  <data name="Ears" xml:space="preserve">
-    <value>Ears</value>
+  <data name="Earring" xml:space="preserve">
+    <value>Earring</value>
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>Elezen</value>
@@ -878,5 +878,17 @@
   </data>
   <data name="Seraph" xml:space="preserve">
     <value>Seraph</value>
+  </data>
+  <data name="Decal" xml:space="preserve">
+    <value>Decal</value>
+  </data>
+  <data name="Human" xml:space="preserve">
+    <value>Human</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
+    <value>Ear</value>
   </data>
 </root>

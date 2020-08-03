@@ -80,6 +80,14 @@ namespace xivModdingFramework.Mods.DataContainers
         public string FullPath { get; set; }
 
         /// <summary>
+        /// Whether or not this item is a default SE file.
+        /// These files are still included in full, for the sake
+        /// of backwards compatability, but in the future may have
+        /// handling to simply disable existing mods, rather than copy over.
+        /// </summary>
+        public bool IsDefault = false;
+
+        /// <summary>
         /// The raw mod data
         /// </summary>
         public byte[] ModDataBytes { get; set; }

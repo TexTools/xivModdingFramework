@@ -14,7 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
@@ -92,6 +96,11 @@ namespace xivModdingFramework.Mods.DataContainers
         public bool enabled { get; set; }
 
         /// <summary>
+        /// The minimum framework version necessary to operate on this mod safely.
+        /// </summary>
+        public string minimumFrameworkVersion = "1.0.0.0";
+
+        /// <summary>
         /// The modPack associated with this mod
         /// </summary>
         public ModPack modPack { get; set; }
@@ -132,10 +141,30 @@ namespace xivModdingFramework.Mods.DataContainers
         /// When importing a previously modified texture, this value is used to determine whether the modified data will be overwritten
         /// </remarks>
         public int modSize { get; set; }
+
     }
 
     public class ModPack
     {
+
+        /// <summary>
+        /// Generates a hash identifier from this mod's name and author information,
+        /// in lowercase.  For identifying new versions of same mods, potentially.
+        /// </summary>
+        /// <returns></returns>
+        public byte[] GetHash()
+        {
+            using (SHA256 sha = SHA256.Create())
+            {
+                var n = name.ToLower();
+                var a = author.ToLower();
+                var key = n + a;
+                var keyBytes= Encoding.Unicode.GetBytes(key);
+                var hash = sha.ComputeHash(keyBytes);
+                return hash;
+            }
+        }
+
         /// <summary>
         /// The name of the modpack
         /// </summary>
@@ -150,5 +179,10 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The modpack version
         /// </summary>
         public string version { get; set; }
+
+        /// <summary>
+        /// The URL the author associated with this modpack.
+        /// </summary>
+        public string url { get; set; }
     }
 }

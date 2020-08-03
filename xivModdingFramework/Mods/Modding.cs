@@ -20,6 +20,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -37,6 +38,7 @@ namespace xivModdingFramework.Mods
     {
         private readonly DirectoryInfo _gameDirectory;
         private readonly Version _modlistVersion = new Version(1, 0);
+        private static SemaphoreSlim _modlistSemaphore = new SemaphoreSlim(1);
 
         public DirectoryInfo ModListDirectory { get; }
 
@@ -51,9 +53,85 @@ namespace xivModdingFramework.Mods
             ModListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
         }
+
+        // Caching information for modlists.
+        private static Dictionary<string, DateTime> _cachedModlistsModTime = new Dictionary<string, DateTime>();
+        private static Dictionary<string, ModList> _cachedModlists = new Dictionary<string, ModList>();
+        public ModList GetModList()
+        {
+            ModList val;
+            _modlistSemaphore.Wait();
+            try
+            {
+                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
+                {
+                    // We have a cached file, and the modList file has not been touched since we cached it.
+                    // Return the cached copy (Skip full read & Json deserialize)
+                    val = _cachedModlists[ModListDirectory.FullName];
+                }
+                else
+                {
+                    // Cache was either stale or missing, load the file from disk and update cache.
+                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+
+                    _cachedModlists[ModListDirectory.FullName] = val;
+                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
+
+                }
+            } finally {
+                _modlistSemaphore.Release();
+            }
+            return val;
+        }
+        public async Task<ModList> GetModListAsync()
+        {
+            ModList val;
+            await _modlistSemaphore.WaitAsync();
+            try
+            {
+                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
+                {
+                    // We have a cached file, and the modList file has not been touched since we cached it.
+                    // Return the cached copy (Skip full read & Json deserialize)
+                    val = _cachedModlists[ModListDirectory.FullName];
+                }
+                else
+                {
+                    // Cache was either stale or missing, load the file from disk and update cache.
+                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
+
+                    _cachedModlists[ModListDirectory.FullName] = val;
+                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
+
+                }
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
+            return val;
+        }
+
+        public void SaveModList(ModList ml)
+        {
+            _modlistSemaphore.Wait();
+            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            _modlistSemaphore.Release();
+        }
+        public void SaveModListAsync(ModList ml)
+        {
+            _modlistSemaphore.WaitAsync();
+            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            _modlistSemaphore.Release();
+        }
+
         public async Task DeleteAllFilesAddedByTexTools()
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
             var modsToRemove = modList.Mods.Where(it => it.source == "FilesAddedByTexTools");
             foreach(var mod in modsToRemove)
             {
@@ -80,7 +158,7 @@ namespace xivModdingFramework.Mods
                 Mods = new List<Mod>()
             };
 
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -94,7 +172,7 @@ namespace xivModdingFramework.Mods
             {
                 internalFilePath = internalFilePath.Replace("\\", "/");
 
-                var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+                var modList = GetModList();
 
                 if (modList == null) return null;
 
@@ -213,7 +291,7 @@ namespace xivModdingFramework.Mods
 
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(modListDirectory.FullName));
+            var modList = GetModList();
 
             var entryEnableUpdate = (from entry in modList.Mods
                 where entry.fullPath.Equals(modEntry.fullPath)
@@ -221,7 +299,7 @@ namespace xivModdingFramework.Mods
 
             entryEnableUpdate.enabled = enable;
 
-            File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -233,7 +311,7 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
             List<Mod> mods = null;
 
@@ -274,7 +352,7 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            File.WriteAllText(modListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -285,9 +363,9 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
 
-            if(modList == null || modList.modCount == 0) return;
+            if (modList == null || modList.modCount == 0) return;
 
             var modNum = 0;
             foreach (var modEntry in modList.Mods)
@@ -354,7 +432,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
         public async Task DeleteMod(string modItemPath)
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
 
             var modToRemove = (from mod in modList.Mods
                 where mod.fullPath.Equals(modItemPath)
@@ -362,12 +440,12 @@ namespace xivModdingFramework.Mods
             if (modToRemove.source == "FilesAddedByTexTools")
             {
                 var index = new Index(_gameDirectory);
-                var success = index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                var success = await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
                 if(!success)
                 {
                     throw new Exception("Failed to delete file descriptor.");
                 }
-                success = index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                success = await index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
                 if (!success)
                 {
                     throw new Exception("Failed to delete file descriptor.");
@@ -391,7 +469,7 @@ namespace xivModdingFramework.Mods
             modList.modCount -= 1;
 
 
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
 
         /// <summary>
@@ -400,7 +478,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
         public async Task DeleteModPack(string modPackName)
         {
-            var modList = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
+            var modList = GetModList();
 
             var modPackItem = (from modPack in modList.ModPacks
                 where modPack.name.Equals(modPackName)
@@ -419,12 +497,12 @@ namespace xivModdingFramework.Mods
                 if (modToRemove.source == "FilesAddedByTexTools")
                 {
                     var index = new Index(_gameDirectory);
-                    var success = index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                    var success = await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
                     if (!success)
                     {
                         throw new Exception("Failed to delete file descriptor.");
                     }
-                    success = index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                    success = await index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
                     if (!success)
                     {
                         throw new Exception("Failed to delete file descriptor.");
@@ -449,7 +527,7 @@ namespace xivModdingFramework.Mods
             modList.modCount -= modRemoveCount;
             modList.modPackCount -= 1;
 
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            SaveModList(modList);
         }
     }
 }

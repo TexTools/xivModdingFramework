@@ -261,6 +261,62 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         /// <summary>
+        /// Retrieves the list of texture paths used by the given mtrl path (significantly faster than loading the entire material and scanning it).
+        /// </summary>
+        /// <param name="mtrlPath"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool forceOriginal = false)
+        {
+            var dat = new Dat(_gameDirectory);
+            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal);
+            var uniqueTextures = new HashSet<string>();
+            var texRegex = new Regex(".*\\.tex$");
+
+            using (var br = new BinaryReader(new MemoryStream(mtrlData)))
+            {
+                // Texture count position.
+                br.BaseStream.Seek(12, SeekOrigin.Begin);
+                var textureCount = br.ReadByte();
+                var mapCount = br.ReadByte();
+                var cSetCount = br.ReadByte();
+
+                var offset = 0;
+
+                var dataOffsetBase = 16 + (mapCount * 4) + (cSetCount * 4) + (textureCount * 4);
+
+
+                for(int i = 0; i < textureCount; i++)
+                {
+                    // Jump to the texture name offset.
+                    br.BaseStream.Seek(16 + offset, SeekOrigin.Begin);
+                    var textureNameOffset = br.ReadInt16();
+
+                    // Jump to the texture name.
+                    br.BaseStream.Seek(dataOffsetBase + textureNameOffset, SeekOrigin.Begin);
+
+                    // Read the texture name.
+                    byte a;
+                    List<byte> bytes = new List<byte>(); ;
+                    while ((a = br.ReadByte()) != 0)
+                    {
+                        bytes.Add(a);
+                    }
+
+                    var st = Encoding.ASCII.GetString(bytes.ToArray()).Replace("\0", "");
+
+                    if (texRegex.IsMatch(st))
+                    {
+                        uniqueTextures.Add(st);
+                    }
+
+                    // Bump to next texture name offset.
+                    offset += 4;
+                }
+            }
+            return uniqueTextures.ToList();
+        }
+
+        /// <summary>
         /// Gets the MTRL data for the given offset and path
         /// </summary>
         /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
@@ -268,6 +324,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>XivMtrl containing all the mtrl data</returns>
         public async Task<XivMtrl> GetMtrlData(int mtrlOffset, string mtrlPath, int dxVersion)
         {
+            await GetTexturePathsFromMtrlPath(mtrlPath);
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
 
@@ -276,6 +333,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             XivMtrl xivMtrl = null;
 
+            // Why is there a semaphore here to read an in memory byte block?
             await _semaphoreSlim.WaitAsync();
 
             try
@@ -573,6 +631,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 var mtrlBytes = CreateMtrlFile(xivMtrl, item);
                 var dat = new Dat(_gameDirectory);
 
+                // Create the actual raw MTRL first. - Files should always be created top down.
+                var offset = await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.SecondaryCategory, source);
 
                 // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
                 var mapInfoList = xivMtrl.GetAllMapInfos(false);
@@ -604,8 +664,8 @@ namespace xivModdingFramework.Materials.FileTypes
                     var newOffset = await _tex.TexDDSImporter(xivTex, item, di, source);
 
                 }
-               
-                return await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.SecondaryCategory, source);
+
+                return offset;
             }
             catch(Exception ex)
             {
@@ -858,7 +918,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, DataFile);
+                var imc = new Imc(_gameDirectory);
                 var imcInfo = await imc.GetImcInfo(item);
                 variant = imcInfo.Variant;
                 if (imcInfo.Vfx > 0)
@@ -907,7 +967,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, DataFile);
+                var imc = new Imc(_gameDirectory);
                 var imcInfo = await imc.GetImcInfo(itemModel);
                 variant = imcInfo.Variant;
 
@@ -932,11 +992,11 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
         // Helper regexes for GetMtrlPath.
-        private readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
-        private readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
-        private readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
-        private readonly Regex _raceMatch = new Regex("(c[0-9]{4})");
-        private readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+        private static readonly Regex _raceRegex = new Regex("(c[0-9]{4})");
+        private static readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
+        private static readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
+        private static readonly Regex _raceMatch = new Regex("(c[0-9]{4})");
+        private static readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
         /// Only needed because of the rare exception case of skin materials.
@@ -948,17 +1008,6 @@ namespace xivModdingFramework.Materials.FileTypes
         {
 
 
-            // So we have to do this step first.
-            var mdlMatch = _raceMatch.Match(mdlPath);
-            var mtrlMatch = _raceMatch.Match(mtrlName);
-
-            // Both Items have racial model information in their path, and the races DON'T match.
-            if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
-            {
-                // In this case, we actually replace the race in the Material the race from the MODEL, which has priority.
-                mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, mdlMatch.Groups[1].Value);
-            }
-
 
             var mtrlFolder = "";
 
@@ -966,6 +1015,19 @@ namespace xivModdingFramework.Materials.FileTypes
             var match = _skinRegex.Match(mtrlName);
             if (match.Success)
             {
+
+                // Only switch mdl races around if we're a skin texture.
+                var mdlMatch = _raceMatch.Match(mdlPath);
+                var mtrlMatch = _raceMatch.Match(mtrlName);
+
+                // Both Items have racial model information in their path, and the races DON'T match.
+                if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                {
+                    // In this case, we actually replace the race in the Material the race from the MODEL, which has priority.
+                    mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, mdlMatch.Groups[1].Value);
+                }
+
+
                 var race = match.Groups[1].Value;
                 var body = match.Groups[2].Value;
 
@@ -989,8 +1051,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
             else {
 
-                mdlMatch = _raceRegex.Match(mdlPath);
-                mtrlMatch = _raceRegex.Match(mtrlName);
+                var mdlMatch = _raceRegex.Match(mdlPath);
+                var mtrlMatch = _raceRegex.Match(mtrlName);
 
                 // Both items have racaial information in their path, and the races DON'T match.
                 if(mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
@@ -1050,7 +1112,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // get the items version from the imc file
-                var imc = new Imc(_gameDirectory, DataFile);
+                var imc = new Imc(_gameDirectory);
                 var imcInfo = await imc.GetImcInfo(itemModel);
                 variant = imcInfo.Variant;
             }
@@ -1117,7 +1179,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/material/v{version}";
                     }
-                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Ears))
+                    else if (itemModel.SecondaryCategory.Equals(XivStrings.Ear))
                     {
                         mtrlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/material";
                     }
@@ -1171,8 +1233,6 @@ namespace xivModdingFramework.Materials.FileTypes
             var race = xivRace.GetRaceCode();
 
             string mtrlFile = "";
-            var mtrlFolder = GetMtrlFolder(itemModel, itemType, xivRace, variant);
-            var version = variant.ToString().PadLeft(4, '0');
 
             switch (itemType)
             {
@@ -1209,7 +1269,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlFile = $"mt_c{race}t{bodyVer}_{materialIdenfitier}{MtrlExtension}";
                     }
-                    else if (itemCategory.Equals(XivStrings.Ears))
+                    else if (itemCategory.Equals(XivStrings.Ear))
                     {
                         mtrlFile = $"mt_c{race}z{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{materialIdenfitier}{MtrlExtension}";
                     }
@@ -1248,7 +1308,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.Wrists, "wrs"},
@@ -1264,6 +1324,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"},
+            {XivStrings.Ear, "zer"},
             {XivStrings.InnerEar, "fac_"},
             {XivStrings.OuterEar, ""}
         };
