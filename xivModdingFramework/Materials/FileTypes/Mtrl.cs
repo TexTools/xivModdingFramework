@@ -996,6 +996,7 @@ namespace xivModdingFramework.Materials.FileTypes
         private static readonly Regex _weaponMatch = new Regex("(w[0-9]{4})");
         private static readonly Regex _tailMatch = new Regex("(t[0-9]{4})");
         private static readonly Regex _raceMatch = new Regex("(c[0-9]{4})");
+        private static readonly Regex _bodyRegex = new Regex("(b[0-9]{4})");
         private static readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
@@ -1020,11 +1021,27 @@ namespace xivModdingFramework.Materials.FileTypes
                 var mdlMatch = _raceMatch.Match(mdlPath);
                 var mtrlMatch = _raceMatch.Match(mtrlName);
 
+
                 // Both Items have racial model information in their path, and the races DON'T match.
                 if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
                 {
-                    // In this case, we actually replace the race in the Material the race from the MODEL, which has priority.
-                    mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, mdlMatch.Groups[1].Value);
+
+                    // Need to find the racial skin for this race.
+                    var baseRace = XivRaces.GetXivRace(mdlMatch.Groups[1].Value.Substring(1));
+                    var skinRace = XivRaceTree.GetSkinRace(baseRace);
+                    var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
+
+                    // In this case, we actually replace both with the racial skin material based on the Model, which has priority.
+                    mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, skinRaceString);
+                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, skinRaceString);
+
+                    // If we actually shifted races, reset the body identifier.
+                    // This shouldn't really ever happen, but safety check.
+                    if(baseRace != skinRace)
+                    {
+                        mtrlName = _bodyRegex.Replace(mtrlName, "b0001");
+                        mdlPath = _bodyRegex.Replace(mdlPath, "b0001");
+                    }
                 }
 
 

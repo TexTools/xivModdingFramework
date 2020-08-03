@@ -1134,6 +1134,7 @@ namespace xivModdingFramework.Models.Helpers
         }
 
 
+        private static readonly Regex _skinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
 
         /// <summary>
         /// Fixes up the racial skin references in the model's materials.
@@ -1143,14 +1144,21 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="newInternalPath"></param>
         public static void FixUpSkinReferences(TTModel model, string newInternalPath, Action<bool, string> loggingFunction = null)
         {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
 
             // Here we should to go in and correct any Skin Material references to point to the skin material for this race.
             // It's not actually -NEEDED-, as the game will dynamically resolve them anyways to the player's skin material, but it's good for user expectation and sanity.
 
             var raceRegex = new Regex("(c[0-9]{4})");
+            var bodyRegex = new Regex("(b[0-9]{4})");
+
             // So we have to do this step first.
             var newRaceMatch = raceRegex.Match(newInternalPath);
 
+            // Now model doesn't exist in a racial folder.  Nothing to fix up/impossible to.
             if(!newRaceMatch.Success)
             {
                 return;
@@ -1158,13 +1166,28 @@ namespace xivModdingFramework.Models.Helpers
 
             loggingFunction(false, "Fixing up racial skin references...");
 
+            // Need to find the racial skin for this race.
+            var baseRace = XivRaces.GetXivRace(newRaceMatch.Groups[1].Value.Substring(1));
+            var skinRace = XivRaceTree.GetSkinRace(baseRace);
+            var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
+
+
+
             foreach (var m in model.MeshGroups)
             {
                 if (m.Material == null) continue;
-                var mtrlMatch = raceRegex.Match(m.Material);
-                if(mtrlMatch.Success)
+
+                // Only fix up -skin- materials.
+                if (_skinMaterialRegex.IsMatch(m.Material))
                 {
-                    m.Material.Replace(mtrlMatch.Groups[1].Value, newRaceMatch.Groups[1].Value);
+                    var mtrlMatch = raceRegex.Match(m.Material);
+                    if (mtrlMatch.Success && mtrlMatch.Groups[1].Value != skinRaceString)
+                    {
+                        m.Material = m.Material.Replace(mtrlMatch.Groups[1].Value, skinRaceString);
+
+                        // Reset the body ID if we actually changed races.
+                        m.Material = bodyRegex.Replace(m.Material, "b0001");
+                    }
                 }
             }
 
