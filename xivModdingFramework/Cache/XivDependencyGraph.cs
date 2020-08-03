@@ -546,18 +546,8 @@ namespace xivModdingFramework.Cache
         }
 
 
-        /// <summary>
-        /// Gets all IMC Entries associated with this root node.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<List<string>> GetImcEntryPaths()
+        public string GetRawImcFilePath()
         {
-            // We need to locate and open the IMC file, and then check how many
-            // actual sets are in it, and calculate the pointers to our associated
-            // Set + Slot entries.
-            // Then return them in the format of <ImcPath>::<Offset>
-            var imcEntries = new List<string>();
-
             var imcPath = "";
             if (Info.SecondaryType == null)
             {
@@ -571,6 +561,23 @@ namespace xivModdingFramework.Cache
                 var iId = Info.SecondaryId.ToString().PadLeft(4, '0');
                 imcPath = Info.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
             }
+            return imcPath;
+
+        }
+
+        /// <summary>
+        /// Gets all IMC Entries associated with this root node.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<List<string>> GetImcEntryPaths()
+        {
+            // We need to locate and open the IMC file, and then check how many
+            // actual sets are in it, and calculate the pointers to our associated
+            // Set + Slot entries.
+            // Then return them in the format of <ImcPath>::<Offset>
+            var imcEntries = new List<string>();
+
+            var imcPath = GetRawImcFilePath();
 
 
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
