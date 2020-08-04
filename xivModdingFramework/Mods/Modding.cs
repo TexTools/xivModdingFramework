@@ -389,12 +389,7 @@ namespace xivModdingFramework.Mods
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
-            using (var fileStream = new FileStream(ModListDirectory.FullName, FileMode.Create, FileAccess.Write,
-                FileShare.None, bufferSize: 4096, FileOptions.Asynchronous))
-            {
-                var serialized = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(modList, Formatting.Indented));
-                await fileStream.WriteAsync(serialized, 0, serialized.Length);
-            }
+            SaveModList(modList);
         }
 
         /// <summary>
