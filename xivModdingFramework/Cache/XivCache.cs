@@ -1476,6 +1476,8 @@ namespace xivModdingFramework.Cache
                 return dict;
             }
 
+            bool anyValidMods = false;
+
             var query = "select child, parent from dependencies_parents where child in(";
             foreach(var mod in modList.Mods)
             {
@@ -1483,7 +1485,16 @@ namespace xivModdingFramework.Cache
                 {
                     continue;
                 }
+
+                anyValidMods = true;
                 query += "'" + mod.fullPath + "',";
+            }
+
+
+            // They had mod entries, but all of them are empty.
+            if(!anyValidMods)
+            {
+                return dict;
             }
 
             query = query.Substring(0, query.Length - 1);
