@@ -83,21 +83,26 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}")
             };
 
-            for (var i = 0; i < indexPaths.Length; i++)
+            _semaphoreSlim.Wait();
+            try
             {
-                _semaphoreSlim.Wait();
-                using (var br = new BinaryReader(File.OpenRead(indexPaths[i])))
+                for (var i = 0; i < indexPaths.Length; i++)
                 {
-                    br.BaseStream.Seek(1104, SeekOrigin.Begin);
-                    if (i == 0)
+                    using (var br = new BinaryReader(File.OpenRead(indexPaths[i])))
                     {
-                        index1 = br.ReadByte();
-                    }
-                    else
-                    {
-                        index2 = br.ReadByte();
+                        br.BaseStream.Seek(1104, SeekOrigin.Begin);
+                        if (i == 0)
+                        {
+                            index1 = br.ReadByte();
+                        }
+                        else
+                        {
+                            index2 = br.ReadByte();
+                        }
                     }
                 }
+            } finally
+            {
                 _semaphoreSlim.Release();
             }
 
@@ -114,12 +119,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             byte[] sha1Bytes;
 
             _semaphoreSlim.Wait();
-            using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+            try
             {
-                br.BaseStream.Seek(1040, SeekOrigin.Begin);
-                sha1Bytes = br.ReadBytes(20);
+                using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+                {
+                    br.BaseStream.Seek(1040, SeekOrigin.Begin);
+                    sha1Bytes = br.ReadBytes(20);
+                }
             }
-            _semaphoreSlim.Release();
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
 
             return sha1Bytes;
         }
@@ -134,12 +145,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             byte[] sha1Bytes;
 
             _semaphoreSlim.Wait();
-            using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+            try
             {
-                br.BaseStream.Seek(1116, SeekOrigin.Begin);
-                sha1Bytes = br.ReadBytes(20);
+                using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+                {
+                    br.BaseStream.Seek(1116, SeekOrigin.Begin);
+                    sha1Bytes = br.ReadBytes(20);
+                }
             }
-            _semaphoreSlim.Release();
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
 
             return sha1Bytes;
         }
@@ -154,12 +171,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             byte[] sha1Bytes;
 
             _semaphoreSlim.Wait();
-            using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+            try
             {
-                br.BaseStream.Seek(1188, SeekOrigin.Begin);
-                sha1Bytes = br.ReadBytes(20);
+                using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
+                {
+                    br.BaseStream.Seek(1188, SeekOrigin.Begin);
+                    sha1Bytes = br.ReadBytes(20);
+                }
             }
-            _semaphoreSlim.Release();
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
             
 
             return sha1Bytes;

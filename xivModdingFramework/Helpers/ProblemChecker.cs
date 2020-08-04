@@ -138,6 +138,12 @@ namespace xivModdingFramework.Helpers
             });
         }
 
+        /// <summary>
+        /// This function returns TRUE if the backups should be used, and FALSE if they should not.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="backupsDirectory"></param>
+        /// <returns></returns>
         public Task<bool> CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
         {
             return Task.Run(() =>
@@ -149,10 +155,32 @@ namespace xivModdingFramework.Helpers
 
                 // Since the material addition directly adds to section 1 we can no longer check for outdated using that section header
                 // so instead compare the hashes of sections 2 and 3
-                var backupHashSection2 =  _index.GetIndexSection2Hash(backupDataFile);
-                var currentHashSection2 = _index.GetIndexSection2Hash(currentDataFile);
-                var backupHashSection3 = _index.GetIndexSection3Hash(backupDataFile);
-                var currentHashSection3 = _index.GetIndexSection3Hash(currentDataFile);
+                byte[] currentHashSection2;
+                byte[] currentHashSection3;
+                byte[] backupHashSection2;
+                byte[] backupHashSection3;
+                try
+                {
+                    currentHashSection2 = _index.GetIndexSection2Hash(currentDataFile);
+                    currentHashSection3 = _index.GetIndexSection3Hash(currentDataFile);
+                }
+                catch
+                {
+                    // Base files are fucked, use *any* backups.
+                    return true;
+                }
+
+                try
+                {
+                    backupHashSection2 = _index.GetIndexSection2Hash(backupDataFile);
+                    backupHashSection3 = _index.GetIndexSection3Hash(backupDataFile);
+                }
+                catch
+                {
+                    // Backups are fucked, can't use those.
+                    return false;
+                }
+
 
                 return backupHashSection2.SequenceEqual(currentHashSection2) && backupHashSection3.SequenceEqual(currentHashSection3);
             });
@@ -288,11 +316,18 @@ namespace xivModdingFramework.Helpers
 
                     if (!File.Exists(backupFile.FullName)) continue;
 
-                    var outdatedCheck = await CheckForOutdatedBackups(xivDataFile, backupsDirectory);
-
-                    if (!outdatedCheck)
+                    try
                     {
-                        outdated = true;
+                        var outdatedCheck = await CheckForOutdatedBackups(xivDataFile, backupsDirectory);
+
+                        if (!outdatedCheck)
+                        {
+                            outdated = true;
+                        }
+                    }
+                    catch { 
+                        // If the outdated check errored out, we likely have completely broken internal dat files.
+                        // ( Either deleted or 0 byte files ), so replacing them with *anything* is an improvement.
                     }
                 }
 
