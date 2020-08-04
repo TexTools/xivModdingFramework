@@ -771,10 +771,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
         {
-
-            // Need these for later.
-            var oldChildren = await XivCache.GetChildFiles(fullPath);
-
             await _semaphoreSlim.WaitAsync();
 
             // Test both index files for write access.
@@ -1059,10 +1055,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
 
 
-            // Queue up all of our reference changes for rebuilding later.
-            oldChildren.Add(fullPath);
-            XivCache.QueueChildFilesUpdate(fullPath);
-            XivCache.QueueParentFilesUpdate(oldChildren);
+            // Queue us for updating.
+            XivCache.QueueDependencyUpdate(fullPath);
 
             return true;
         }
@@ -1436,8 +1430,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 // Queue us up for dependency pre-calcluation, since we're a modded file.
-                XivCache.QueueChildFilesUpdate(fullPath);
-                XivCache.QueueParentFilesUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
 
             }
 

@@ -1614,8 +1614,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // Queue our dependency information updates.
-            XivCache.QueueChildFilesUpdate(internalFilePath);
-            XivCache.QueueParentFilesUpdate(internalFilePath);
+            XivCache.QueueDependencyUpdate(internalFilePath);
 
             return offset;
         }
