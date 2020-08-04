@@ -557,6 +557,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     float specAmp = 1.0f + (lipInfluence * 0.25f);
                     newSpecular = MultiplyColor(newSpecular, specAmp);
 
+                    // Face shader supports alpha, unlike normal skin textures.
+                    opacity = baseNormal.B;
                 }
 
 
