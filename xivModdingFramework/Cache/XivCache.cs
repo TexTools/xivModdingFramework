@@ -1481,7 +1481,7 @@ namespace xivModdingFramework.Cache
             var query = "select child, parent from dependencies_parents where child in(";
             foreach(var mod in modList.Mods)
             {
-                if(mod.fullPath == null || mod.fullPath == "" || mod.enabled == false)
+                if(mod.fullPath == null || mod.fullPath == "")
                 {
                     continue;
                 }
