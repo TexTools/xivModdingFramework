@@ -771,10 +771,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile)
         {
-
-            // Need these for later.
-            var oldChildren = await XivCache.GetChildFiles(fullPath);
-
             await _semaphoreSlim.WaitAsync();
 
             // Test both index files for write access.
@@ -1058,13 +1054,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             _semaphoreSlim.Release();
 
-            // Update the file children in the cache.
-            // In this case, it's really just a delete old references call.
-            await XivCache.UpdateChildFiles(fullPath);
 
-            // Queue up all of our reference changes for rebuilding later.
-            oldChildren.Add(fullPath);
-            XivCache.QueueParentFilesUpdate(oldChildren);
+            // Queue us for updating.
+            XivCache.QueueDependencyUpdate(fullPath);
 
             return true;
         }
@@ -1385,7 +1377,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset"></param>
         /// <param name="fullPath"></param>
         /// <returns></returns>
-        public async Task<int> UpdateDataOffset(long offset, string fullPath)
+        public async Task<int> UpdateDataOffset(long offset, string fullPath, bool updateCache = true)
         {
             await _semaphoreSlim.WaitAsync();
             var dataFile = IOUtil.GetDataFileFromPath(fullPath);
@@ -1433,6 +1425,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             _semaphoreSlim.Release();
+
+            if (updateCache)
+            {
+
+                // Queue us up for dependency pre-calcluation, since we're a modded file.
+                XivCache.QueueDependencyUpdate(fullPath);
+
+            }
 
 
 

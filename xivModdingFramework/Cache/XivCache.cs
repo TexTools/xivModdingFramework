@@ -27,7 +27,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("0.0.1.1");
+        public static readonly Version CacheVersion = new Version("1.0.0.1");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -679,7 +679,6 @@ namespace xivModdingFramework.Cache
                     if (m.fullPath != null && m.fullPath != "")
                     {
                         paths.Add(m.fullPath);
-                        await UpdateChildFiles(m.fullPath);
                     }
                 }
                 catch (Exception ex)
@@ -687,7 +686,7 @@ namespace xivModdingFramework.Cache
                     throw;
                 }
             }
-            QueueParentFilesUpdate(paths);
+            await QueueDependencyUpdate(paths);
         }
 
         #endregion
@@ -1615,8 +1614,6 @@ namespace xivModdingFramework.Cache
                     }
 
                     // And purge all of those cached file's parents (we'll queue them up for recalculation after the transaction is done)
-                    // Could let the queue-up do the purging for us here, but then there's potential that some other thread
-                    // might come in and pluck up bad data between our transaction and queuing call.
                     query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1630,7 +1627,7 @@ namespace xivModdingFramework.Cache
                         children = new List<string> { null };
                     }
 
-
+                    // Insert our new data.
                     query = "insert into dependencies_children (parent, child) values ($parent, $child)";
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1648,22 +1645,42 @@ namespace xivModdingFramework.Cache
                             }
                         }
                     }
+
+                    // And for all the new children, purge their old parent information, as it is no longer valid.
+                    query = "delete from dependencies_parents where child in (select child as c_file from dependencies_children where parent = $parent)";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        cmd.Parameters.AddWithValue("parent", internalFilePath);
+                        cmd.ExecuteScalar();
+                    }
+
+                    var toUpdate = new HashSet<string>();
+                    foreach (var file in oldCacheChildren)
+                    {
+                        toUpdate.Add(file);
+                    }
+                    foreach (var file in children)
+                    {
+                        toUpdate.Add(file);
+                    }
+
+                    // Queue up all the files that we parent-purged into the parent queue.
+                    foreach (var c in toUpdate)
+                    {
+                        if (c == null) continue;
+
+                        query = "insert into  dependencies_parents_queue (file) values ($file) on conflict do nothing";
+                        using (var insertCmd = new SQLiteCommand(query, db))
+                        {
+                            insertCmd.Parameters.AddWithValue("file", c);
+                            insertCmd.ExecuteScalar();
+                        }
+                    }
+
+
                     transaction.Commit();
                 }
             }
-
-            var toUpdate = new HashSet<string>();
-            foreach (var file in oldCacheChildren)
-            {
-                toUpdate.Add(file);
-            }
-            foreach(var file in children)
-            {
-                toUpdate.Add(file);
-            }
-
-            // Queue everything up that we affected. 
-            QueueParentFilesUpdate(toUpdate.ToList());
 
             return children;
         }
@@ -1728,23 +1745,31 @@ namespace xivModdingFramework.Cache
             }
         }
 
-
         /// <summary>
-        /// Qeuues a given file up for cache parent file updating.
+        /// Queues dependency information pre-calculation for the given file(s).
         /// </summary>
-        /// <param name="file"></param>
-        public static void QueueParentFilesUpdate(string file)
+        /// <param name="files"></param>
+        /// <returns></returns>
+        public static Task QueueDependencyUpdate(string file)
         {
-            QueueParentFilesUpdate(new List<string>() { file });
+            return QueueDependencyUpdate(new List<string>() { file });
         }
 
         /// <summary>
-        /// Qeuues a given set of files up for cache parent file updating.
+        /// Queues dependency information pre-calculation for the given file(s).
         /// </summary>
-        public static void QueueParentFilesUpdate(List<string> files)
-        {
-            try
+        /// <param name="files"></param>
+        /// <returns></returns>
+        public static Task QueueDependencyUpdate(List<string> files) {
+
+            return Task.Run(async () =>
             {
+                // We need to...
+                // 1. Purge and requeue the parent calculation for all files we had listed as children previously.
+                // 2. Purge our own child file references.
+                // 3. Add this file to both dependency queues.
+                // 4. Add our affected children to the parent queue.
+
                 using (var db = new SQLiteConnection(CacheConnectionString))
                 {
                     db.Open();
@@ -1752,47 +1777,113 @@ namespace xivModdingFramework.Cache
                     {
                         foreach (var file in files)
                         {
-                            // First, clear out all the old data.
-                            var query = "delete from dependencies_parents where child = $child";
-                            using (var delCmd = new SQLiteCommand(query, db))
+
+                            var oldCacheChildren = new List<string>();
+
+                            // Clear out our old children.
+                            var query = "delete from dependencies_children where parent = $parent";
+                            using (var cmd = new SQLiteCommand(query, db))
                             {
-                                delCmd.Parameters.AddWithValue("child", file);
-                                delCmd.ExecuteScalar();
+                                cmd.Parameters.AddWithValue("parent", file);
+                                cmd.ExecuteScalar();
                             }
 
-                            query = "delete from dependencies_update_queue where file = $file";
-                            using (var delCmd = new SQLiteCommand(query, db))
+                            // Find all the files that currently point to us as a parent in the cache.
+                            query = "select child from dependencies_parents where parent = $parent";
+                            using (var cmd = new SQLiteCommand(query, db))
                             {
-                                delCmd.Parameters.AddWithValue("$file", file);
-                                delCmd.ExecuteScalar();
+                                cmd.Parameters.AddWithValue("parent", file);
+                                using (var reader = new CacheReader(cmd.ExecuteReader()))
+                                {
+                                    while (reader.NextRow())
+                                    {
+                                        oldCacheChildren.Add(reader.GetString("child"));
+                                    }
+                                }
                             }
 
-                            // Then insert us into the back of the queue.
-                            query = "insert into  dependencies_update_queue (file) values ($file)";
+                            // And purge all of those cached file's parents.
+                            query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("parent", file);
+                                cmd.ExecuteScalar();
+                            }
+
+                            // Now add us to both queues.
+                            query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
                             using (var insertCmd = new SQLiteCommand(query, db))
                             {
-
-                                var level = XivDependencyGraph.GetDependencyLevel(file);
-                                if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root)
-                                {
-                                    continue;
-                                }
-
-
                                 insertCmd.Parameters.AddWithValue("file", file);
                                 insertCmd.ExecuteScalar();
                             }
+
+                            query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
+                            using (var insertCmd = new SQLiteCommand(query, db))
+                            {
+                                insertCmd.Parameters.AddWithValue("file", file);
+                                insertCmd.ExecuteScalar();
+                            }
+
+                            // Queue up all the files that we parent-purged into the parent queue.
+                            foreach (var c in oldCacheChildren)
+                            {
+                                if (c == null) continue;
+
+                                query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
+                                using (var insertCmd = new SQLiteCommand(query, db))
+                                {
+                                    insertCmd.Parameters.AddWithValue("file", c);
+                                    insertCmd.ExecuteScalar();
+                                }
+                            }
+
                         }
                         transaction.Commit();
                     }
                 }
-            } catch(Exception ex)
+            });
+        }
+
+        private static string PopChildQueue()
+        {
+            string file = null;
+            int position = -1;
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
-                throw;
-                // No-Op.  This is a non-critical error.
-                // Lacking appropriate parent cache data will just be a slowdown later if we ever need the data.
-                //throw;
+                db.Open();
+
+                using (var transaction = db.BeginTransaction())
+                {
+                    // First, clear out all the old data.  This is the most important point.
+                    var query = "select position, file from dependencies_children_queue";
+                    using (var selectCmd = new SQLiteCommand(query, db))
+                    {
+                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        {
+                            if (!reader.NextRow())
+                            {
+                                // No entries left.  Signal the cache worker to shut down gracefully.
+                                return null;
+                            }
+                            // Got the new item.
+                            file = reader.GetString("file");
+                            position = reader.GetInt32("position");
+                        }
+                    }
+
+                    // Delete the row we took and all others that match the filename.
+                    query = "delete from dependencies_children_queue where file = $file";
+                    using (var deleteCmd = new SQLiteCommand(query, db))
+                    {
+                        deleteCmd.Parameters.AddWithValue("file", file);
+                        deleteCmd.ExecuteScalar();
+                    }
+
+                    transaction.Commit();
+                }
             }
+            return file;
         }
 
 
@@ -1804,29 +1895,34 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                // First, clear out all the old data.  This is the most important point.
-                var query = "select position, file from dependencies_update_queue";
-                using (var selectCmd = new SQLiteCommand(query, db))
+                using (var transaction = db.BeginTransaction())
                 {
-                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                    // First, clear out all the old data.  This is the most important point.
+                    var query = "select position, file from dependencies_parents_queue";
+                    using (var selectCmd = new SQLiteCommand(query, db))
                     {
-                        if (!reader.NextRow())
+                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
                         {
-                            // No entries left.  Signal the cache worker to shut down gracefully.
-                            return null;
+                            if (!reader.NextRow())
+                            {
+                                // No entries left.  Signal the cache worker to shut down gracefully.
+                                return null;
+                            }
+                            // Got the new item.
+                            file = reader.GetString("file");
+                            position = reader.GetInt32("position");
                         }
-                        // Got the new item.
-                        file = reader.GetString("file");
-                        position = reader.GetInt32("position");
                     }
-                }
 
-                // Delete the row we took and all others that match the filename.
-                query = "delete from dependencies_update_queue where file = $file";
-                using (var deleteCmd = new SQLiteCommand(query, db))
-                {
-                    deleteCmd.Parameters.AddWithValue("file", file);
-                    deleteCmd.ExecuteScalar();
+                    // Delete the row we took and all others that match the filename.
+                    query = "delete from dependencies_parents_queue where file = $file";
+                    using (var deleteCmd = new SQLiteCommand(query, db))
+                    {
+                        deleteCmd.Parameters.AddWithValue("file", file);
+                        deleteCmd.ExecuteScalar();
+                    }
+
+                    transaction.Commit();
                 }
             }
             return file;
@@ -1835,10 +1931,10 @@ namespace xivModdingFramework.Cache
 
         /// <summary>
         /// This function is a long-running thread function which operates alongside the main
-        /// system.  It pops items off the dependency queue to process and identify what file parents
-        /// they have, as the operation is rather expensive, and cache-able.  If this thread dies, 
+        /// system.  It pops items off the dependency queue to pre-process their dependency information,
+        /// so that accessing it later isn't an incredibly taxing operation.  If this thread dies, 
         /// or is disabled, all functionally will/must continue to operate - however, calls to
-        /// GetParentFiles() may often be significantly slower, as the data may not already be cached.
+        /// GetParentFiles()/GetChildFiles() may often be significantly slower, as the data may not already be cached.
         /// </summary>
         private static void ProcessDependencyQueue(object sender, DoWorkEventArgs e)
         {
@@ -1850,22 +1946,41 @@ namespace xivModdingFramework.Cache
                 XivDependencyLevel level;
                 try
                 {
-                    file = PopParentQueue();
-                    if (file == null)
-                    {
-                        // Nothing in queue.  Time for nap.
-                        //worker.CancelAsync();
-                        Thread.Sleep(1000);
-                        continue;
-                    } else
+                    // Children queue always comes first.  This information is more important and efficient.
+                    file = PopChildQueue();
+                    if (file != null)
                     {
                         level = XivDependencyGraph.GetDependencyLevel(file);
-                        if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root ) continue;
+                        if (level == XivDependencyLevel.Invalid) continue;
 
                         // The get call will automatically cache the data, if it needs updating.
-                        var task = GetParentFiles(file, false);
+                        var task = GetChildFiles(file, false);
                         task.Wait();
-                        var parents = task.Result;
+                        continue;
+
+                    }
+                    else
+                    {
+
+                        // Child queue is empty, we can efficiently process the parent's queue.
+                        file = PopParentQueue();
+                        if (file == null)
+                        {
+                            // Nothing in queue.  Time for nap.
+                            //worker.CancelAsync();
+                            Thread.Sleep(1000);
+                            continue;
+                        }
+                        else
+                        {
+                            level = XivDependencyGraph.GetDependencyLevel(file);
+                            if (level == XivDependencyLevel.Invalid) continue;
+
+                            // The get call will automatically cache the data, if it needs updating.
+                            var task = GetParentFiles(file, false);
+                            task.Wait();
+                            var parents = task.Result;
+                        }
                     }
                 } catch( Exception ex)
                 {
@@ -1929,7 +2044,7 @@ namespace xivModdingFramework.Cache
                 db.Open();
 
                 // First, clear out all the old data.  This is the most important point.
-                var query = "select count(file) as cnt from dependencies_update_queue";
+                var query = "select count(file) as cnt from dependencies_parents_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(selectCmd.ExecuteReader()))
@@ -1937,6 +2052,18 @@ namespace xivModdingFramework.Cache
                         reader.NextRow();
                         // Got the new item.
                         length = reader.GetInt32("cnt");
+                    }
+                }
+
+                // First, clear out all the old data.  This is the most important point.
+                query = "select count(file) as cnt from dependencies_children_queue";
+                using (var selectCmd = new SQLiteCommand(query, db))
+                {
+                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                    {
+                        reader.NextRow();
+                        // Got the new item.
+                        length += reader.GetInt32("cnt");
                     }
                 }
             }
