@@ -83,8 +83,13 @@ CREATE TABLE "dependencies_parents" (
 	PRIMARY KEY("child", "parent")
 );
 
--- Cache worker queue.
-CREATE TABLE "dependencies_update_queue" (
+-- Cache worker queues
+CREATE TABLE "dependencies_children_queue" (
+	"position" INTEGER PRIMARY KEY AUTOINCREMENT,
+	"file" TEXT NOT NULL
+);
+
+CREATE TABLE "dependencies_parents_queue" (
 	"position" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"file" TEXT NOT NULL
 );

@@ -1357,7 +1357,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             bw.Write(new byte[sizeDiff]);
                         }
 
-                        await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath);
+                        await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath, false);
 
                         offset = modEntry.data.modOffset;
 
@@ -1428,7 +1428,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                         throw new Exception("Failed to create file descriptor.");
                                     }
                                 }
-                                var originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath) * 8;
+                                var originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath, false) * 8;
 
                                 // The imported data was larger than the original existing mod,
                                 // and an empty slot large enough for the data was available,
@@ -1553,7 +1553,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 throw new Exception("Failed to create file descriptor.");
                             }
                         }
-                        var oldOffset = await index.UpdateDataOffset(offset, internalFilePath) * 8;
+                        var oldOffset = await index.UpdateDataOffset(offset, internalFilePath, false) * 8;
 
                         /*
                          * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
@@ -1613,10 +1613,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 _lock.Release();
             }
 
-            // Update the file children in the cache.
-            var newChildren = await XivCache.UpdateChildFiles(internalFilePath);
-
-            // Queue us up for parent file pre-calcluation, since we're a modded file.
+            // Queue our dependency information updates.
+            XivCache.QueueChildFilesUpdate(internalFilePath);
             XivCache.QueueParentFilesUpdate(internalFilePath);
 
             return offset;

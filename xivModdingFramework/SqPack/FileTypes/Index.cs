@@ -1058,12 +1058,10 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             _semaphoreSlim.Release();
 
-            // Update the file children in the cache.
-            // In this case, it's really just a delete old references call.
-            await XivCache.UpdateChildFiles(fullPath);
 
             // Queue up all of our reference changes for rebuilding later.
             oldChildren.Add(fullPath);
+            XivCache.QueueChildFilesUpdate(fullPath);
             XivCache.QueueParentFilesUpdate(oldChildren);
 
             return true;
@@ -1385,7 +1383,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset"></param>
         /// <param name="fullPath"></param>
         /// <returns></returns>
-        public async Task<int> UpdateDataOffset(long offset, string fullPath)
+        public async Task<int> UpdateDataOffset(long offset, string fullPath, bool updateCache = true)
         {
             await _semaphoreSlim.WaitAsync();
             var dataFile = IOUtil.GetDataFileFromPath(fullPath);
@@ -1433,6 +1431,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             _semaphoreSlim.Release();
+
+            if (updateCache)
+            {
+
+                // Queue us up for dependency pre-calcluation, since we're a modded file.
+                XivCache.QueueChildFilesUpdate(fullPath);
+                XivCache.QueueParentFilesUpdate(fullPath);
+
+            }
 
 
 
