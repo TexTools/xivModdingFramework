@@ -1229,6 +1229,50 @@ namespace xivModdingFramework.SqPack.FileTypes
             return headerData.ToArray();
         }
 
+
+        /// <summary>
+        /// Gets the first DAT file with space to add a new file to it.
+        /// Ignores default DAT files, and creates a new DAT file if necessary.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile)
+        {
+            var targetDat = -1;
+
+            // Scan all the dat numbers...
+            var largestExisting = GetLargestDatNumber(dataFile);
+            for (int i = 0; i < largestExisting; i++)
+            {
+                var original = await IsOriginalDat(dataFile);
+
+                // Don't let us inject to original dat files.
+                if (original) continue;
+
+                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{i}");
+                var fileSize = new FileInfo(datPath).Length;
+
+                // Dat is already too large, can't write to it.
+                if (fileSize > 2000000000) continue;
+
+                // Found an existing dat that has space.
+                targetDat = i;
+                break;
+            }
+
+            // Didn't find a DAT file with space, gotta create a new one.
+            if (targetDat < 0)
+            {
+                targetDat = CreateNewDat(dataFile);
+            }
+
+            if(targetDat > 7 || targetDat < 0)
+            {
+                throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetDataFileName());
+            }
+            return targetDat;
+        }
+
         /// <summary>
         /// Writes the newly imported data to the .dat for modifications.
         /// </summary>
@@ -1261,7 +1305,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 source = "FilesAddedByTexTools";
 
 
-            var datNum = GetLargestDatNumber(dataFile);
+            // This finds the first dat with space, OR creates one if needed.
+            var datNum = await GetFirstDatWithSpace(dataFile);
 
             var modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
@@ -1288,33 +1333,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var fileLength = new FileInfo(modDatPath).Length;
             _lock.Release();
-
-            // Creates a new Dat if the current dat is at the 2GB limit
-            if (modEntry == null)
-            {
-                if (fileLength >= 2000000000)
-                {
-                    datNum = CreateNewDat(dataFile);
-
-                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
-                }
-                else
-                {
-                    // If it is an original dat file, then create a new mod dat file
-                    if (await IsOriginalDat(dataFile))
-                    {
-                        datNum = CreateNewDat(dataFile);
-
-                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
-                    }
-                }
-            }
-
-            if (datNum >= 8)
-            {
-                throw new NotSupportedException($"Mod data limit has been reached, no new mods can be imported for dat file {dataFile.GetDataFileName()}.\n\n" +
-                    $"Back up any mods you'd like to keep and perform a start over to be able to import new mods.");
-            }
 
             // Checks to make sure the offsets in the mod list are not 0
             // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
@@ -1480,32 +1498,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // If there was no mod entry overwritten, write the new import data at the end of the dat file
                     if (!dataOverwritten)
                     {
-                        /*
-                         * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
-                         * and no empty slot was found for it, then write the data to the highest dat,
-                         * or create a new one if necessary
-                        */
-                        if (modEntry != null)
-                        {
-                            modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
-
-                            fileLength = new FileInfo(modDatPath).Length;
-
-                            if (fileLength >= 2000000000)
-                            {
-                                _lock.Release();
-                                datNum = CreateNewDat(dataFile);
-                                await _lock.WaitAsync();
-
-                                modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
-                            }
-
-                            if (datNum >= 8)
-                            {
-                                throw new NotSupportedException($"Dat limit has been reached, no new mods can be imported for {dataFile.GetDataFileName()}");
-                            }
-                        }
-
                         using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                         {
                             bw.BaseStream.Seek(0, SeekOrigin.End);
