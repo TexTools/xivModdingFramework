@@ -1493,7 +1493,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             if (fileLength >= 2000000000)
                             {
+                                _lock.Release();
                                 datNum = CreateNewDat(dataFile);
+                                await _lock.WaitAsync();
 
                                 modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
                             }
