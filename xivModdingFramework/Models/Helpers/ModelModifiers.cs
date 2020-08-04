@@ -1136,6 +1136,8 @@ namespace xivModdingFramework.Models.Helpers
 
         private static readonly Regex _skinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
 
+
+
         /// <summary>
         /// Fixes up the racial skin references in the model's materials.
         /// this isn't actually necessary as the game will auto-resolve these regardless, but it's nice to do.
@@ -1153,13 +1155,12 @@ namespace xivModdingFramework.Models.Helpers
             // It's not actually -NEEDED-, as the game will dynamically resolve them anyways to the player's skin material, but it's good for user expectation and sanity.
 
             var raceRegex = new Regex("(c[0-9]{4})");
-            var bodyRegex = new Regex("(b[0-9]{4})");
 
             // So we have to do this step first.
             var newRaceMatch = raceRegex.Match(newInternalPath);
 
             // Now model doesn't exist in a racial folder.  Nothing to fix up/impossible to.
-            if(!newRaceMatch.Success)
+            if (!newRaceMatch.Success)
             {
                 return;
             }
@@ -1168,10 +1169,31 @@ namespace xivModdingFramework.Models.Helpers
 
             // Need to find the racial skin for this race.
             var baseRace = XivRaces.GetXivRace(newRaceMatch.Groups[1].Value.Substring(1));
+
+            FixUpSkinReferences(model, baseRace, loggingFunction);
+        }
+
+
+
+
+        /// <summary>
+        /// Fixes up the racial skin references in the model's materials.
+        /// this isn't actually necessary as the game will auto-resolve these regardless, but it's nice to do.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="newInternalPath"></param>
+        public static void FixUpSkinReferences(TTModel model, XivRace baseRace, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
             var skinRace = XivRaceTree.GetSkinRace(baseRace);
             var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
 
-
+            var raceRegex = new Regex("(c[0-9]{4})");
+            var bodyRegex = new Regex("(b[0-9]{4})");
 
             foreach (var m in model.MeshGroups)
             {

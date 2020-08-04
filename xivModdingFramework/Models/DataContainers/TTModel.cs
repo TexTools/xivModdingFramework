@@ -1093,7 +1093,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public void SaveFullToFile(string filePath, Action<bool, string> loggingFunction = null)
+        public void SaveFullToFile(string filePath, string raceId, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -1107,7 +1107,7 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
-                var boneDict = ResolveBoneHeirarchy();
+                var boneDict = ResolveBoneHeirarchy(loggingFunction, raceId);
 
                 // Spawn a DB connection to do the raw queries.
                 // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
@@ -1501,7 +1501,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// Used when saving the file to DB.  (Or potentially animating it)
         /// </summary>
         /// <returns></returns>
-        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy(Action<bool, string> loggingFunction = null)
+        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy(Action<bool, string> loggingFunction = null, string raceId = "")
         {
             if (loggingFunction == null)
             {
@@ -1511,12 +1511,16 @@ namespace xivModdingFramework.Models.DataContainers
             var fullSkel = new Dictionary<string, SkeletonData>();
             var skelDict = new Dictionary<string, SkeletonData>();
 
-            var skelName = Sklb.GetParsedSkelFilename(Source);
-            if(skelName == null)
-            {
-                return skelDict;
-            }
+            var skelName = raceId;
 
+            if (string.IsNullOrEmpty(raceId))
+            {
+                skelName = Sklb.GetParsedSkelFilename(Source);
+                if (skelName == null)
+                {
+                    return skelDict;
+                }
+            }
 
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
