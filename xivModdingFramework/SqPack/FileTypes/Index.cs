@@ -60,12 +60,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             foreach (var indexPath in indexPaths)
             {
                 _semaphoreSlim.Wait();
-                using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
+                try
                 {
-                    bw.BaseStream.Seek(1104, SeekOrigin.Begin);
-                    bw.Write(datCount);
+                    using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
+                    {
+                        bw.BaseStream.Seek(1104, SeekOrigin.Begin);
+                        bw.Write(datCount);
+                    }
                 }
-                _semaphoreSlim.Release();
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
             }
         }
 
@@ -261,33 +267,39 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
             await _semaphoreSlim.WaitAsync();
-
-            // Dump the index into memory, since we're going to have to inject data.
-            byte[] originalIndex = File.ReadAllBytes(index2Path);
-
-            // Get all the segment header data
-            for (int i = 0; i < SegmentHeaders.Length; i++)
+            try
             {
-                SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
-                SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
-            }
 
-            int fileCount = SegmentSizes[0] / 8;
+                // Dump the index into memory, since we're going to have to inject data.
+                byte[] originalIndex = File.ReadAllBytes(index2Path);
 
-            for (int i = 0; i < fileCount; i++)
-            {
-                int position = SegmentOffsets[0] + (i * 8);
-                uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
-                uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
-
-                // Index 2 is just in hash order, so find the spot where we fit in.
-                if (iFullPathHash == uFullPathHash)
+                // Get all the segment header data
+                for (int i = 0; i < SegmentHeaders.Length; i++)
                 {
-                    int signedOffset= BitConverter.ToInt32(originalIndex, position + 4);
-                    return signedOffset * 8;
+                    SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                    SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                }
+
+                int fileCount = SegmentSizes[0] / 8;
+
+                for (int i = 0; i < fileCount; i++)
+                {
+                    int position = SegmentOffsets[0] + (i * 8);
+                    uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
+                    uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
+
+                    // Index 2 is just in hash order, so find the spot where we fit in.
+                    if (iFullPathHash == uFullPathHash)
+                    {
+                        int signedOffset = BitConverter.ToInt32(originalIndex, position + 4);
+                        return signedOffset * 8;
+                    }
                 }
             }
-            _semaphoreSlim.Release();
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
             return 0;
         }
 
@@ -711,31 +723,36 @@ namespace xivModdingFramework.SqPack.FileTypes
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await _semaphoreSlim.WaitAsync();
-            await Task.Run(() =>
+            try
             {
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                await Task.Run(() =>
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var totalFiles = br.ReadInt32();
-
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-                    for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
-                        var hashedFile = br.ReadInt32();
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var totalFiles = br.ReadInt32();
 
-                        var folderPathHash = br.ReadInt32();
-
-                        if (folderPathHash == hashedFolder)
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
                         {
-                            fileHashesList.Add(hashedFile);
+                            var hashedFile = br.ReadInt32();
+
+                            var folderPathHash = br.ReadInt32();
+
+                            if (folderPathHash == hashedFolder)
+                            {
+                                fileHashesList.Add(hashedFile);
+                            }
+
+                            br.ReadBytes(4);
                         }
-
-                        br.ReadBytes(4);
                     }
-                }
-            });
-
-            _semaphoreSlim.Release();
+                });
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
             return fileHashesList;
         }
 
@@ -756,32 +773,38 @@ namespace xivModdingFramework.SqPack.FileTypes
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
 
             await _semaphoreSlim.WaitAsync();
-            await Task.Run(() =>
+            try
             {
-                using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                await Task.Run(() =>
                 {
-                    br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                    var totalFiles = br.ReadInt32();
-
-                    br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-                    for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
                     {
-                        var hashedFile = br.ReadInt32();
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var totalFiles = br.ReadInt32();
 
-                        var folderPathHash = br.ReadInt32();
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < totalFiles; br.ReadBytes(4), i += 16)
+                        {
+                            var hashedFile = br.ReadInt32();
 
-                        if (folderPathHash == hashedFolder)
-                        {
-                            fileHashesDict.Add(hashedFile, br.ReadInt32() * 8);
-                        }
-                        else
-                        {
-                            br.ReadBytes(4);
+                            var folderPathHash = br.ReadInt32();
+
+                            if (folderPathHash == hashedFolder)
+                            {
+                                fileHashesDict.Add(hashedFile, br.ReadInt32() * 8);
+                            }
+                            else
+                            {
+                                br.ReadBytes(4);
+                            }
                         }
                     }
-                }
-            });
-            _semaphoreSlim.Release();
+                });
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
 
             return fileHashesDict;
         }
@@ -880,7 +903,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
 
-                // Cancel if we failed to find the file.
+                // If the file was already deleted, nothing to do here.
                 if (deleteLocation == 0)
                 {
                     _semaphoreSlim.Release();
@@ -953,9 +976,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 if (!foundFolder)
                 {
-                    // Something went wrong here / The index is in a bad state.
-                    _semaphoreSlim.Release();
-                    return false;
+                    // This is a pretty weird state to get here.
+                    // The file had to exist, but the folder it was in had to *not* exist.
+                    // This is tentatively a non-error, as we should really continue and purge the
+                    // Index2 Entry for the file as well, but it's definitely a weird/invalid index state 
+                    // that got us here.
                 }
 
                 
@@ -1078,6 +1103,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
 
 
+            if (!fullPath.Contains(".flag"))
+            {
+                await DeleteFileDescriptor(fullPath + ".flag", dataFile);
+            }
+
+
             // Queue us for updating.
             XivCache.QueueDependencyUpdate(fullPath);
 
@@ -1094,6 +1125,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
         {
+            if(!fullPath.Contains(".flag"))
+            {
+                await AddFileDescriptor(fullPath + ".flag", -1, dataFile);
+            }
+
             await _semaphoreSlim.WaitAsync();
 
             // Test both index files for write access.
@@ -1242,7 +1278,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Set the actual Injected Data
                 Array.Copy(BitConverter.GetBytes(fileHash), 0, modifiedIndex, injectLocation, 4);
                 Array.Copy(BitConverter.GetBytes(pathHash), 0, modifiedIndex, injectLocation + 4, 4);
-                Array.Copy(BitConverter.GetBytes(dataOffset), 0, modifiedIndex, injectLocation + 8, 4);
+                Array.Copy(BitConverter.GetBytes(dataOffset / 8), 0, modifiedIndex, injectLocation + 8, 4);
 
                 // Update the folder structure
                 var folderCount = SegmentSizes[3] / 16;

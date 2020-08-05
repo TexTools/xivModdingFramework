@@ -297,7 +297,22 @@ namespace xivModdingFramework.Cache
             // manually replaces the roots DB.  (It takes an hour or more to build)
             SQLiteConnection.ClearAllPools();
             GC.WaitForPendingFinalizers();
-            File.Delete(_dbPath.FullName);
+
+
+            try
+            {
+                File.Delete(_dbPath.FullName);
+            } catch
+            {
+                // In some select situations sometimes the DB can still be in use
+                // if we were asyncing other things.  Sleep a bit and see if we can succeed after.
+
+                // ( The primary case of this happening is a START OVER without Index backups, where we
+                // transition straight from a full modlist disable into a cache rebuild, without waiting
+                // on the Cache to finish queueing entries into the DB. )
+                Thread.Sleep(1000);
+                File.Delete(_dbPath.FullName);
+            }
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {

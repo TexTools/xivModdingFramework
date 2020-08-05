@@ -241,12 +241,6 @@ namespace xivModdingFramework.Mods
                 {
                     return XivModStatus.Original;
                 }
-                // If modEntry not null but modded offset and original offset are the same as is the case with matadd textures
-                if (modEntry.data.modOffset == modEntry.data.originalOffset)
-                {
-                    // Return original to disable the disable/enable button as there's nothing to toggle between
-                    return XivModStatus.MatAdd;
-                }
 
                 return modEntry.enabled ? XivModStatus.Enabled : XivModStatus.Disabled;
             }
@@ -276,17 +270,28 @@ namespace xivModdingFramework.Mods
             // Matadd textures have the same mod offset as original so nothing to toggle
             if (modEntry.data.originalOffset == modEntry.data.modOffset)
             {
-                return;
-            }
+                // Added file.
+                if (enable && !modEntry.enabled)
+                {
+                    await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                }
+                else if (!enable && modEntry.enabled)
+                {
+                    await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                }
 
-
-            if (enable)
-            {
-                await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath);
             }
             else
-            {
-                await index.UpdateDataOffset(modEntry.data.originalOffset, internalFilePath);
+            { 
+                // Standard mod (file replacement)
+                if (enable)
+                {
+                    await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath);
+                }
+                else
+                {
+                    await index.UpdateDataOffset(modEntry.data.originalOffset, internalFilePath);
+                }
             }
 
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
@@ -338,17 +343,32 @@ namespace xivModdingFramework.Mods
             {
                 if (modEntry.name.Equals(string.Empty)) continue;
                 // Matadd textures have the same mod offset as original so nothing to toggle
-                if (modEntry.data.modOffset == modEntry.data.originalOffset) continue;
-
-                if (enable)
+                if (modEntry.data.originalOffset == modEntry.data.modOffset)
                 {
-                    await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
-                    modEntry.enabled = true;
+                    // Added file.
+                    if (enable && !modEntry.enabled)
+                    {
+                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                    }
+                    else if (!enable && modEntry.enabled)
+                    {
+                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                    }
+
                 }
                 else
                 {
-                    await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
-                    modEntry.enabled = false;
+                    // Standard file (file replacement)
+                    if (enable)
+                    {
+                        await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
+                        modEntry.enabled = true;
+                    }
+                    else
+                    {
+                        await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
+                        modEntry.enabled = false;
+                    }
                 }
             }
 
@@ -372,18 +392,34 @@ namespace xivModdingFramework.Mods
             {
                 if(string.IsNullOrEmpty(modEntry.name)) continue;
                 if(string.IsNullOrEmpty(modEntry.fullPath)) continue;
-                // Matadd textures have the same mod offset as original so nothing to toggle
-                if (modEntry.data.modOffset == modEntry.data.originalOffset) continue;
+                if (modEntry.data.modOffset == modEntry.data.originalOffset)
+                {
+                    // Added file.
+                    if (enable && !modEntry.enabled)
+                    {
+                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        modEntry.enabled = true;
+                    }
+                    else if (!enable && modEntry.enabled)
+                    {
+                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        modEntry.enabled = false;
+                    }
 
-                if (enable && !modEntry.enabled)
-                {
-                    await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
-                    modEntry.enabled = true;
                 }
-                else if (!enable && modEntry.enabled)
+                else
                 {
-                    await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
-                    modEntry.enabled = false;
+                    // Standard mod.
+                    if (enable && !modEntry.enabled)
+                    {
+                        await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
+                        modEntry.enabled = true;
+                    }
+                    else if (!enable && modEntry.enabled)
+                    {
+                        await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
+                        modEntry.enabled = false;
+                    }
                 }
 
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
@@ -435,16 +471,7 @@ namespace xivModdingFramework.Mods
             if (modToRemove.source == "FilesAddedByTexTools")
             {
                 var index = new Index(_gameDirectory);
-                var success = await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                if(!success)
-                {
-                    throw new Exception("Failed to delete file descriptor.");
-                }
-                success = await index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                if (!success)
-                {
-                    throw new Exception("Failed to delete file descriptor.");
-                }
+                await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
             }
             if (modToRemove.enabled)
             {
@@ -492,16 +519,7 @@ namespace xivModdingFramework.Mods
                 if (modToRemove.source == "FilesAddedByTexTools")
                 {
                     var index = new Index(_gameDirectory);
-                    var success = await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                    if (!success)
-                    {
-                        throw new Exception("Failed to delete file descriptor.");
-                    }
-                    success = await index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                    if (!success)
-                    {
-                        throw new Exception("Failed to delete file descriptor.");
-                    }
+                    await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
                 }
                 if (modToRemove.enabled)
                 {
