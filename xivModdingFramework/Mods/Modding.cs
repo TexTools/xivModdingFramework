@@ -476,11 +476,6 @@ namespace xivModdingFramework.Mods
                 {
                     throw new Exception("Failed to delete file descriptor.");
                 }
-                success = await index.DeleteFileDescriptor($"{modItemPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                if (!success)
-                {
-                    throw new Exception("Failed to delete file descriptor.");
-                }
             }
             if (modToRemove.enabled)
             {
@@ -529,11 +524,6 @@ namespace xivModdingFramework.Mods
                 {
                     var index = new Index(_gameDirectory);
                     var success = await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                    if (!success)
-                    {
-                        throw new Exception("Failed to delete file descriptor.");
-                    }
-                    success = await index.DeleteFileDescriptor($"{modToRemove.fullPath}.flag", XivDataFiles.GetXivDataFile(modToRemove.datFile));
                     if (!success)
                     {
                         throw new Exception("Failed to delete file descriptor.");
