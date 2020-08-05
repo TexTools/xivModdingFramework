@@ -215,11 +215,6 @@ namespace xivModdingFramework.Cache
 
         public string GetRootFile()
         {
-            return GetRootFolder() + GetBaseFileName() + ".root";
-        }
-
-        public string GetMetaFile()
-        {
             return GetRootFolder() + GetBaseFileName() + ".meta";
         }
 

@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using xivModdingFramework.Models.FileTypes;
 
@@ -61,11 +64,11 @@ namespace xivModdingFramework.Models.DataContainers
             slotBytes["met"].Add(rawBytes[7]);
 
             Parameters = new Dictionary<string, EquipmentParameter>() {
-                { "top", new EquipmentParameter("top", slotBytes["top"]) },
-                { "dwn", new EquipmentParameter("dwn", slotBytes["dwn"]) },
-                { "glv", new EquipmentParameter("glv", slotBytes["glv"]) },
-                { "sho", new EquipmentParameter("sho", slotBytes["sho"]) },
-                { "met", new EquipmentParameter("met", slotBytes["met"]) }
+                { "top", new EquipmentParameter("top", slotBytes["top"].ToArray()) },
+                { "dwn", new EquipmentParameter("dwn", slotBytes["dwn"].ToArray()) },
+                { "glv", new EquipmentParameter("glv", slotBytes["glv"].ToArray()) },
+                { "sho", new EquipmentParameter("sho", slotBytes["sho"].ToArray()) },
+                { "met", new EquipmentParameter("met", slotBytes["met"].ToArray()) }
             };
         }
         public static List<string> SlotsAsList()
@@ -150,86 +153,126 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public readonly string Slot;
 
-        private List<byte> _rawBytes;
+        /// <summary>
+        /// The raw bits which make up this parameter.
+        /// </summary>
+        private BitArray _bits;
+
 
         /// <summary>
-        /// The binary flag data for this equipment parameter.
-        /// Only the subset of values for this slot will be available.
+        /// The available flags for this EquipmentParameter.
         /// </summary>
-        public Dictionary<EquipmentParameterFlag, bool?> Flags;
+        public List<EquipmentParameterFlag> AvailableFlags
+        {
+            get
+            {
+                return FlagOffsetDictionaries[Slot].Keys.ToList();
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the list of all available flags, with their values.
+        /// Changing the values will not affect the actual underlying data.
+        /// </summary>
+        /// <returns></returns>
+        public Dictionary<EquipmentParameterFlag, bool> GetFlags()
+        {
+            var ret = new Dictionary<EquipmentParameterFlag, bool>();
+            var flags = AvailableFlags;
+            foreach (var flag in flags)
+            {
+                ret.Add(flag, GetFlag(flag));
+            }
+            return ret;
+        }
+
+        /// <summary>
+        /// Set all (or a subset) of flags in this Parameter set at once.
+        /// </summary>
+        /// <param name="flags"></param>
+        public void SetFlags(Dictionary<EquipmentParameterFlag, bool> flags)
+        {
+            foreach(var kv in flags)
+            {
+                SetFlag(kv.Key, kv.Value);
+            }
+        }
 
         /// <summary>
         /// Constructor.  Slot is required.
         /// </summary>
         /// <param name="slot"></param>
-        public EquipmentParameter(string slot, List<byte> rawBytes)
+        public EquipmentParameter(string slot, byte[] rawBytes)
         {
             Slot = slot;
-            var keys = GetFlagList(slot);
-            foreach(var key in keys)
-            {
-                Flags.Add(key, null);
-            }
+            _bits = new BitArray(rawBytes);
+        }
+
+        public bool GetFlag(EquipmentParameterFlag flag)
+        {
+            if(!FlagOffsetDictionaries[Slot].ContainsKey(flag))
+                return false;
+
+            var index = FlagOffsetDictionaries[Slot][flag];
+            return _bits[index];
+        }
+
+        public void SetFlag(EquipmentParameterFlag flag, bool value)
+        {
+            if (!FlagOffsetDictionaries[Slot].ContainsKey(flag))
+                return;
+
+            var index = FlagOffsetDictionaries[Slot][flag];
+            _bits[index] = value;
         }
 
         /// <summary>
         /// Gets the raw bytes of this EquipmentParameter.
         /// </summary>
         /// <returns></returns>
-        public List<byte> GetBytes()
+        public byte[]GetBytes()
         {
-            return _rawBytes;
+            byte[] bytes = new byte[_bits.Count / 8];
+            _bits.CopyTo(bytes, 0);
+            return bytes;
         }
+
 
         /// <summary>
-        /// Get the list of dictionary keys available for this parameter slot.
+        /// A dictionary of [Slot] => [Flag] => [Index within the slot's byte array] for each flag.
         /// </summary>
-        /// <returns></returns>
-        public List<EquipmentParameterFlag> GetFlagList()
-        {
-            var ret = new List<EquipmentParameterFlag>(); ;
-            foreach (var kv in Flags)
+        public static Dictionary<string, Dictionary<EquipmentParameterFlag, int>> FlagOffsetDictionaries {
+            get
             {
-                ret.Add(kv.Key);
-            }
-            return ret;
+                var ret = new Dictionary<string, Dictionary<EquipmentParameterFlag, int>>() {
+                    { "met", new Dictionary<EquipmentParameterFlag, int>() },
+                    { "top", new Dictionary<EquipmentParameterFlag, int>() },
+                    { "glv", new Dictionary<EquipmentParameterFlag, int>() },
+                    { "dwn", new Dictionary<EquipmentParameterFlag, int>() },
+                    { "sho", new Dictionary<EquipmentParameterFlag, int>() },
+                };
+                var flags = Enum.GetValues(typeof(EquipmentParameterFlag)).Cast<EquipmentParameterFlag>();
 
+                foreach(var flag in flags)
+                {
+                    var raw = (int)flag;
+                    var byteIndex = raw / 8;
+
+                    // Find the slot that this byte belongs to.
+                    var slotKv = EquipmentParameterSet.EntryOffsets.Reverse().First(x => x.Value <= byteIndex);
+                    var slot = slotKv.Key;
+                    var slotByteOffset = slotKv.Value;
+
+                    // Compute the relevant bit position within the slot's grouping.
+                    var relevantIndex = raw - (slotByteOffset * 8);
+
+                    ret[slot].Add(flag, relevantIndex);
+                }
+
+                return ret;
+            }
         }
 
-        /// <summary>
-        /// Gets the list of dictionary keys available for this slot type.
-        /// </summary>
-        /// <returns></returns>
-        public static List<EquipmentParameterFlag> GetFlagList(string slot)
-        {
-            var ret = new List<EquipmentParameterFlag>();
-            if (slot == "met")
-            {
-                // Head flags setup.
-
-            }
-            else if (slot == "top")
-            {
-                // Body flags setup.
-
-            }
-            else if (slot == "glv")
-            {
-                // Glove flags setup.
-
-            }
-            else if (slot == "dwn")
-            {
-                // Leg flags setup.
-
-            }
-            else if (slot == "sho")
-            {
-                // Foot flags setup.
-
-            }
-            return ret;
-        }
     }
     
 
@@ -240,6 +283,35 @@ namespace xivModdingFramework.Models.DataContainers
     {
         public bool bit0;
         public bool bit1;
+
+        /// <summary>
+        /// Gets a single byte representation of this entry.
+        /// </summary>
+        /// <returns></returns>
+        public byte GetByte()
+        {
+            BitArray r = new BitArray(8);
+            r[0] = bit0;
+            r[1] = bit1;
+            var arr = new byte[1];
+            r.CopyTo(arr, 0);
+
+            return arr[0];
+        }
+
+        /// <summary>
+        /// Create a EquipmentDeformation Parameter from a full byte representation.
+        /// </summary>
+        /// <returns></returns>
+        public static EquipmentDeformationParameter FromByte(byte b)
+        {
+            BitArray r = new BitArray(new byte[] { b });
+            var def = new EquipmentDeformationParameter();
+            def.bit0 = r[0];
+            def.bit1 = r[1];
+
+            return def;
+        }
     }
 
     /// <summary>

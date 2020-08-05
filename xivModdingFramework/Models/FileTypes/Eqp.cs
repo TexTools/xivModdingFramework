@@ -2,9 +2,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -31,7 +34,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
         // The subset list of races that actually have deformation files.
-        private readonly List<XivRace> DeformationAvailableRaces = new List<XivRace>()
+        public static readonly List<XivRace> DeformationAvailableRaces = new List<XivRace>()
         {
             XivRace.Hyur_Midlander_Male,
             XivRace.Hyur_Midlander_Female,
@@ -63,6 +66,34 @@ namespace xivModdingFramework.Models.FileTypes
         public async Task<EquipmentParameterSet> GetEquipmentParameters(int equipmentId)
         {
             throw new NotImplementedException("Not Yet Implemented.");
+        }
+
+        private static readonly Regex _eqpBinaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
+        public async Task<EquipmentParameter> GetEqpEntry(string pathWithOffset)
+        {
+            var match = _eqpBinaryOffsetRegex.Match(pathWithOffset);
+            if (!match.Success) return null;
+
+            var bitOffset = Int32.Parse(match.Groups[1].Value);
+            var byteOffset = bitOffset / 8;
+
+            var setId = byteOffset / EquipmentParameterEntrySize;
+            var slotOffset = byteOffset % EquipmentParameterEntrySize;
+
+            var slotKv = EquipmentParameterSet.EntryOffsets.Reverse().First(x => x.Value <= slotOffset);
+            var slot = slotKv.Key;
+            var slotByteOffset = slotKv.Value;
+
+            var size = EquipmentParameterSet.EntrySizes[slot];
+
+            var offset = (setId * EquipmentParameterEntrySize) + slotByteOffset;
+
+            var file = await LoadEquipmentParameterFile();
+
+            var bytes = file.Skip(offset).Take(size);
+
+            return new EquipmentParameter(slot, bytes.ToArray());
+
         }
 
         /// <summary>
@@ -122,6 +153,45 @@ namespace xivModdingFramework.Models.FileTypes
             return;
         }
 
+
+
+
+        private static readonly Regex _eqdpBinaryOffsetRegex = new Regex("^(.*c([0-9]{4}).*)" + Constants.BinaryOffsetMarker + "([0-9]+)$");
+
+        /// <summary>
+        /// Retrieves the raw EQDP entries from an arbitrary selection of files/offsets.
+        /// </summary>
+        /// <param name="pathsWithOffsets"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEqdpEntries(List<string> pathsWithOffsets)
+        {
+            var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
+            foreach(var path in pathsWithOffsets)
+            {
+                var match = _eqdpBinaryOffsetRegex.Match(path);
+
+                // Invalid format.
+                if (!match.Success) continue;
+
+                var file = match.Groups[1].Value;
+                var race = XivRaces.GetXivRace(match.Groups[2].Value);
+                var bitOffset = Int32.Parse(match.Groups[3].Value);
+
+                // 2 Bytes per set.
+                int setId = bitOffset / (EquipmentDeformerParameterEntrySize * 8);
+
+                var slotOffset = (bitOffset % (EquipmentDeformerParameterEntrySize * 8)) / EquipmentDeformerParameterEntrySize;
+                var accessory = file.Contains("accessory");
+                var list = EquipmentDeformationParameterSet.SlotsAsList(accessory);
+                var slot = list[slotOffset];
+
+                var set = await GetEquipmentDeformationSet(setId, race, accessory);
+
+                ret.Add(race, set.Parameters[slot]);
+
+            }
+            return ret;
+        }
 
         /// <summary>
         /// Get all the available models for a given piece of equipment.

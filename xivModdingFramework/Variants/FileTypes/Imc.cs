@@ -150,6 +150,37 @@ namespace xivModdingFramework.Variants.FileTypes
             return entries;
         }
 
+        public static byte[] SerializeEntry(XivImc entry)
+        {
+
+            List<byte> bytes = new List<byte>(6);
+            bytes.AddRange(BitConverter.GetBytes((byte)entry.Variant));
+            bytes.AddRange(BitConverter.GetBytes((byte)entry.Unknown));
+            bytes.AddRange(BitConverter.GetBytes((ushort)entry.Mask));
+            bytes.AddRange(BitConverter.GetBytes((ushort)entry.Vfx));
+            return bytes.ToArray();
+        }
+
+        public static XivImc DeserializeEntry(byte[] data)
+        {
+
+            using (var br = new BinaryReader(new MemoryStream(data)))
+            {
+                byte variant = br.ReadByte();
+                byte unknown = br.ReadByte();
+                ushort mask = br.ReadUInt16();
+                ushort vfx = br.ReadUInt16();
+                return new XivImc
+                {
+                    Variant = variant,
+                    Unknown = unknown,
+                    Mask = mask,
+                    Vfx = variant
+                };
+
+            }
+        }
+
 
         /// <summary>
         /// Gets the full IMC information for a given item
