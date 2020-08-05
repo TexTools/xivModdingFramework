@@ -69,7 +69,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         private static readonly Regex _eqpBinaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
-        public async Task<EquipmentParameter> GetEqpEntry(string pathWithOffset)
+        public async Task<EquipmentParameter> GetEqpEntry(string pathWithOffset, bool forceDefault = false)
         {
             var match = _eqpBinaryOffsetRegex.Match(pathWithOffset);
             if (!match.Success) return null;
@@ -88,7 +88,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var offset = (setId * EquipmentParameterEntrySize) + slotByteOffset;
 
-            var file = await LoadEquipmentParameterFile();
+            var file = await LoadEquipmentParameterFile(forceDefault);
 
             var bytes = file.Skip(offset).Take(size);
 
@@ -127,9 +127,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment parameter file.
         /// </summary>
         /// <returns></returns>
-        private async Task<byte[]> LoadEquipmentParameterFile()
+        private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false)
         {
-            return await _dat.GetType2Data(EquipmentParameterFile, false);
+            return await _dat.GetType2Data(EquipmentParameterFile, forceDefault);
         }
 
 
@@ -163,7 +163,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="pathsWithOffsets"></param>
         /// <returns></returns>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEqdpEntries(List<string> pathsWithOffsets)
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEqdpEntries(List<string> pathsWithOffsets, bool forceDefault = false)
         {
             var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
             foreach(var path in pathsWithOffsets)
@@ -185,7 +185,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var list = EquipmentDeformationParameterSet.SlotsAsList(accessory);
                 var slot = list[slotOffset];
 
-                var set = await GetEquipmentDeformationSet(setId, race, accessory);
+                var set = await GetEquipmentDeformationSet(setId, race, accessory, forceDefault);
 
                 ret.Add(race, set.Parameters[slot]);
 
@@ -292,9 +292,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="race"></param>
         /// <param name="accessory"></param>
         /// <returns></returns>
-        private async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false)
+        private async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
         {
-            var raw = await GetRawEquipmentDeformationParameters(equipmentId, race, accessory);
+            var raw = await GetRawEquipmentDeformationParameters(equipmentId, race, accessory, forceDefault);
             if(raw == null)
             {
                 return null;
@@ -331,9 +331,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="race"></param>
         /// <returns></returns>
-        private async Task<ushort?> GetRawEquipmentDeformationParameters(int equipmentId, XivRace race, bool accessory = false)
+        private async Task<ushort?> GetRawEquipmentDeformationParameters(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
         {
-            var data = await LoadEquipmentDeformationFile(race, accessory);
+            var data = await LoadEquipmentDeformationFile(race, accessory, forceDefault);
             var start = EquipmentDeformerParameterHeaderLength + (equipmentId * EquipmentDeformerParameterEntrySize);
             var parameters = new byte[EquipmentParameterEntrySize];
 
@@ -355,11 +355,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment or accessory deformation parameters file for a given race.
         /// </summary>
         /// <returns></returns>
-        private async Task<List<byte>> LoadEquipmentDeformationFile(XivRace race, bool accessory = false)
+        private async Task<List<byte>> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false)
         {
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            return new List<byte>(await _dat.GetType2Data(fileName, false));
+            return new List<byte>(await _dat.GetType2Data(fileName, forceDefault));
         }
 
     }

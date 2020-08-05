@@ -116,10 +116,6 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         private static async Task<ItemMetadata> CreateFromRaw(XivDependencyRoot root, bool forceDefault = false)
         {
-            if(forceDefault == true)
-            {
-                throw new NotImplementedException("Not Yet Implemented.");
-            }
 
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
@@ -132,9 +128,9 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var ret = new ItemMetadata(root);
 
-            ret.ImcEntries = await _imc.GetEntries(imcPaths);
-            ret.EqpEntry = await _eqp.GetEqpEntry(eqpPath);
-            ret.EqdpEntries = await _eqp.GetEqdpEntries(eqdpPaths);
+            ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault);
+            ret.EqpEntry = await _eqp.GetEqpEntry(eqpPath, forceDefault);
+            ret.EqdpEntries = await _eqp.GetEqdpEntries(eqdpPaths, forceDefault);
 
             return ret;
         }
