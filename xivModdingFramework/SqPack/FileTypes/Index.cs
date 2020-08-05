@@ -903,7 +903,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
 
-                // Cancel if we failed to find the file.
+                // If the file was already deleted, nothing to do here.
                 if (deleteLocation == 0)
                 {
                     _semaphoreSlim.Release();
@@ -976,9 +976,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 if (!foundFolder)
                 {
-                    // Something went wrong here / The index is in a bad state.
-                    _semaphoreSlim.Release();
-                    return false;
+                    // This is a pretty weird state to get here.
+                    // The file had to exist, but the folder it was in had to *not* exist.
+                    // This is tentatively a non-error, as we should really continue and purge the
+                    // Index2 Entry for the file as well, but it's definitely a weird/invalid index state 
+                    // that got us here.
                 }
 
                 
