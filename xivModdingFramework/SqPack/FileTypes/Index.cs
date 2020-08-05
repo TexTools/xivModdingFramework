@@ -1101,6 +1101,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             _semaphoreSlim.Release();
 
 
+            if (!fullPath.Contains(".flag"))
+            {
+                await DeleteFileDescriptor(fullPath + ".flag", dataFile);
+            }
+
+
             // Queue us for updating.
             XivCache.QueueDependencyUpdate(fullPath);
 
@@ -1117,6 +1123,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile)
         {
+            if(!fullPath.Contains(".flag"))
+            {
+                await AddFileDescriptor(fullPath + ".flag", -1, dataFile);
+            }
+
             await _semaphoreSlim.WaitAsync();
 
             // Test both index files for write access.
@@ -1265,7 +1276,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Set the actual Injected Data
                 Array.Copy(BitConverter.GetBytes(fileHash), 0, modifiedIndex, injectLocation, 4);
                 Array.Copy(BitConverter.GetBytes(pathHash), 0, modifiedIndex, injectLocation + 4, 4);
-                Array.Copy(BitConverter.GetBytes(dataOffset), 0, modifiedIndex, injectLocation + 8, 4);
+                Array.Copy(BitConverter.GetBytes(dataOffset / 8), 0, modifiedIndex, injectLocation + 8, 4);
 
                 // Update the folder structure
                 var folderCount = SegmentSizes[3] / 16;

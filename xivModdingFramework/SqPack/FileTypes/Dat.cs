@@ -1440,7 +1440,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 {
                                     var success = true;
                                     success = success && await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
-                                    success = success && await index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
                                     if (!success)
                                     {
                                         throw new Exception("Failed to create file descriptor.");
@@ -1541,7 +1540,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             var success = true;
                             success = success && await index.AddFileDescriptor(internalFilePath, offset, dataFile);
-                            success = success && await index.AddFileDescriptor($"{internalFilePath}.flag", -1, dataFile);
                             if (!success)
                             {
                                 throw new Exception("Failed to create file descriptor.");
