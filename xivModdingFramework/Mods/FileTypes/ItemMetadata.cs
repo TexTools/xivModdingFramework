@@ -87,6 +87,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root)
         {
+            if(root == null)
+            {
+                return null;
+            }
 
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
@@ -128,9 +132,18 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var ret = new ItemMetadata(root);
 
-            ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault);
-            ret.EqpEntry = await _eqp.GetEqpEntry(eqpPath, forceDefault);
-            ret.EqdpEntries = await _eqp.GetEqdpEntries(eqdpPaths, forceDefault);
+            if (imcPaths.Count > 0)
+            {
+                ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault);
+            }
+            if (eqpPath != null)
+            {
+                ret.EqpEntry = await _eqp.GetEqpEntry(eqpPath, forceDefault);
+            }
+            if (eqdpPaths.Count > 0)
+            {
+                ret.EqdpEntries = await _eqp.GetEqdpEntries(eqdpPaths, forceDefault);
+            }
 
             return ret;
         }

@@ -187,6 +187,13 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var set = await GetEquipmentDeformationSet(setId, race, accessory, forceDefault);
 
+
+                if(set == null)
+                {
+                    // Either invalid race, or this item doesn't use EQDP sets.
+                    continue;
+                }
+
                 ret.Add(race, set.Parameters[slot]);
 
             }
