@@ -52,7 +52,9 @@ namespace xivModdingFramework.Cache
             var root = item.GetRoot();
             if (root != null)
             {
-                return await root.GetAllItems(item.ModelInfo.ImcSubsetID);
+                var items = await root.GetAllItems(item.ModelInfo.ImcSubsetID);
+                items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
+                return items;
             }
             else
             {
@@ -78,6 +80,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
+            sameMaterialItems = sameMaterialItems.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
             return sameMaterialItems;
         }
         public static async Task<List<IItemModel>> GetSharedModelItems(this IItemModel item)
@@ -90,6 +93,8 @@ namespace xivModdingFramework.Cache
             if (items.Count == 0) { 
                 items.Add((IItemModel)item.Clone());
             }
+
+            items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
             return items;
         }
 
@@ -877,6 +882,8 @@ namespace xivModdingFramework.Cache
             {
                 items = items.Where(x => x.ModelInfo.ImcSubsetID == imcSubset).ToList();
             }
+
+            items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
 
             return items;
         }
