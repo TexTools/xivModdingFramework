@@ -278,6 +278,22 @@ namespace xivModdingFramework.Cache
         {
             return GetRacialModelName(Int32.Parse(XivRaces.GetRaceCode(race)));
         }
+
+        /// <summary>
+        /// Calculates and returns the SGD file name for this root.
+        /// </summary>
+        /// <returns></returns>
+        public string GetSgdName()
+        {
+            if (PrimaryType != XivItemType.indoor && PrimaryType != XivItemType.outdoor)
+            {
+                throw new NotSupportedException("Cannot get SGB File for Non-Furniture item type.");
+            }
+
+            var assetFile = $"{Slot}_b0_m{PrimaryId.ToString().PadLeft(4, '0')}.sgb";
+            return assetFile;
+        }
+
         public string GetRacialModelName(int raceRaw)
         {
             if (SecondaryType != null)
@@ -1592,29 +1608,48 @@ namespace xivModdingFramework.Cache
 
                         if (secondary == XivItemType.none)
                         {
-                            var folder = root.GetRootFolder() + "model";
-                            var folderHash = HashGenerator.GetHash(folder);
-                            var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
-
-                            // For these, just let the EDP module verify if there are any races availble for the item?
-                            foreach (var slot in slots)
+                            if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
                             {
-                                root.Slot = slot;
+                                // For furniture, they're valid as long as they have an SGD file we can find.
+                                root.Slot = primary == XivItemType.indoor ? "fun" : "gar";
 
-                                // Check every possible race code, not just playables?
-                                //for (int s = 0; s < 10000; p++)
-                                foreach(var race in races)
+                                var folder = root.GetRootFolder() + "asset";
+                                var file = root.GetSgdName();
+
+                                var folderHash = HashGenerator.GetHash(folder);
+                                var fileHash = HashGenerator.GetHash(file);
+                                var key = fileHash.ToString() + folderHash.ToString();
+                                if (combinedHashes.ContainsKey(key))
                                 {
-                                    //var modelName = root.GetRacialModelName(s);
-                                    var modelName = root.GetRacialModelName(race);
-                                    var fileHash = HashGenerator.GetHash(modelName);
-                                    var key = fileHash.ToString() + folderHash.ToString();
-                                    if (combinedHashes.ContainsKey(key))
-                                    {
-                                        result.Add((XivDependencyRootInfo)root.Clone());
+                                    result.Add((XivDependencyRootInfo)root.Clone());
+                                }
+                            }
+                            else
+                            {
+                                var folder = root.GetRootFolder() + "model";
+                                var folderHash = HashGenerator.GetHash(folder);
+                                var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
 
-                                        // We don't care how many models there are, just that there *are* any models.
-                                        break;
+                                // For these, just let the EDP module verify if there are any races availble for the item?
+                                foreach (var slot in slots)
+                                {
+                                    root.Slot = slot;
+
+                                    // Check every possible race code, not just playables?
+                                    //for (int s = 0; s < 10000; p++)
+                                    foreach (var race in races)
+                                    {
+                                        //var modelName = root.GetRacialModelName(s);
+                                        var modelName = root.GetRacialModelName(race);
+                                        var fileHash = HashGenerator.GetHash(modelName);
+                                        var key = fileHash.ToString() + folderHash.ToString();
+                                        if (combinedHashes.ContainsKey(key))
+                                        {
+                                            result.Add((XivDependencyRootInfo)root.Clone());
+
+                                            // We don't care how many models there are, just that there *are* any models.
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1632,13 +1667,6 @@ namespace xivModdingFramework.Cache
                                 {
                                     // Human body gets to be a special snowflake.
                                     slots = XivItemTypes.GetAvailableSlots(XivItemType.equipment);
-                                }
-
-                                // For these, just let the EDP module verify if there are any races availble for the item?
-
-                                if (root.PrimaryId == 201 && root.SecondaryId == 56 && root.PrimaryType == XivItemType.weapon)
-                                {
-                                    var z = "d";
                                 }
 
                                 if (slots.Count == 0)
@@ -1695,6 +1723,13 @@ namespace xivModdingFramework.Cache
                 mergedDict.Add(kv.Key, new XivDependencyRootInfo());
             }
 
+            var bgcHashes = await index.GetFileDictionary(XivDataFile._01_Bgcommon);
+
+            var bgcHashDict = new Dictionary<string, XivDependencyRootInfo>();
+            foreach (var kv in bgcHashes)
+            {
+                bgcHashDict.Add(kv.Key, new XivDependencyRootInfo());
+            }
 
             var types = new Dictionary<XivItemType, List<XivItemType>>();
             foreach (var type in DependencySupportedTypes)
@@ -1711,6 +1746,8 @@ namespace xivModdingFramework.Cache
             types[XivItemType.demihuman].Add(XivItemType.equipment);
             types[XivItemType.equipment].Add(XivItemType.none);
             types[XivItemType.accessory].Add(XivItemType.none);
+            types[XivItemType.indoor].Add(XivItemType.none);
+            types[XivItemType.outdoor].Add(XivItemType.none);
 
 
 
@@ -1720,10 +1757,14 @@ namespace xivModdingFramework.Cache
                 var primary = kv.Key;
                 foreach (var secondary in kv.Value)
                 {
-                    // Apparently despite all documentation, Dictionary.HasKey() is not actually
-                    // thread safe? Or at least, we'll hit random failures to find dictionary keys if
-                    // we don't clone the dictionary here.   Unsure why.
-                    tasks.Add(TestAllRoots(mergedDict, primary, secondary));
+                    if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
+                    {
+                        tasks.Add(TestAllRoots(bgcHashDict, primary, secondary));
+                    }
+                    else
+                    {
+                        tasks.Add(TestAllRoots(mergedDict, primary, secondary));
+                    }
                 }
             }
             try
