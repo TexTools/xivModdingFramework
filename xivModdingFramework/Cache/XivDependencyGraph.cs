@@ -290,7 +290,9 @@ namespace xivModdingFramework.Cache
                 throw new NotSupportedException("Cannot get SGB File for Non-Furniture item type.");
             }
 
-            var assetFile = $"{Slot}_b0_m{PrimaryId.ToString().PadLeft(4, '0')}.sgb";
+            var slotFake = PrimaryType == XivItemType.indoor ? "fun" : "gar";
+                
+            var assetFile = $"{slotFake}_b0_m{PrimaryId.ToString().PadLeft(4, '0')}.sgb";
             return assetFile;
         }
 
@@ -432,13 +434,10 @@ namespace xivModdingFramework.Cache
                     // initial crawls up the tree are janky.
                     Info.Slot = "top";
                 }
-            } else if(Info.PrimaryType == XivItemType.indoor)
+            } else if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
             {
-                Info.Slot = "fun";
-
-            } else if(Info.PrimaryType == XivItemType.outdoor)
-            {
-                Info.Slot = "gar";
+                // No slots here!
+                Info.Slot = null;
             }
         }
 
@@ -1443,8 +1442,6 @@ namespace xivModdingFramework.Cache
                 {
                     info.PrimaryType = XivItemTypes.FromSystemName(match.Groups[1].Value);
                     info.PrimaryId = Int32.Parse(match.Groups[2].Value);
-
-                    info.Slot = info.PrimaryType == XivItemType.indoor ? "fun" : "gar";
                 }
             }
 

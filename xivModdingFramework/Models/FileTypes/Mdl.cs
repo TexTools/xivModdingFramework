@@ -4418,8 +4418,6 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"},
             {XivStrings.Tail, "til"},
-            {XivStrings.Furniture_Indoor, "fun"},
-            {XivStrings.Furniture_Outdoor, "gar"}
 
         };
 
