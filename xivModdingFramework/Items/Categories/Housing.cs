@@ -374,16 +374,29 @@ namespace xivModdingFramework.Items.Categories
             return furnitureList;
         }
 
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel)
+        {
+
+            return await GetFurnitureModelParts(itemModel.ModelInfo.PrimaryID, itemModel.SecondaryCategory);
+        }
+
+
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, XivItemType type)
+        {
+            var cat = type == XivItemType.indoor ? XivStrings.Furniture_Indoor : XivStrings.Furniture_Outdoor;
+            return await GetFurnitureModelParts(modelID, cat);
+        }
+
         /// <summary>
         /// Gets the parts list for furniture
         /// </summary>
         /// <param name="itemModel">The item to get the parts for</param>
         /// <returns>A dictionary containing the part string and mdl path string</returns>
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, string category)
         {
             var furniturePartDict = new Dictionary<string, string>();
 
-            var assets = await GetFurnitureAssets(itemModel.ModelInfo.PrimaryID, itemModel.SecondaryCategory);
+            var assets = await GetFurnitureAssets(modelID, category);
 
             foreach (var mdl in assets.MdlList)
             {
@@ -432,11 +445,11 @@ namespace xivModdingFramework.Items.Categories
             return furniturePartDict;
         }
 
-        /// <summary>
-        /// Gets the assets for furniture
-        /// </summary>
-        /// <param name="modelID">The model id to get the assets for</param>
-        /// <returns>A HousingAssets object containing the asset info</returns>
+            /// <summary>
+            /// Gets the assets for furniture
+            /// </summary>
+            /// <param name="modelID">The model id to get the assets for</param>
+            /// <returns>A HousingAssets object containing the asset info</returns>
         private async Task<HousingAssets> GetFurnitureAssets(int modelID, string category)
         {
             var index = new Index(_gameDirectory);
