@@ -9,6 +9,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
+using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
@@ -67,9 +68,10 @@ namespace xivModdingFramework.Cache
             var sameModelItems = new List<IItemModel>();
             sameModelItems = await item.GetSharedModelItems();
 
-            var sameMaterialItems = new List<IItemModel>();
             try
             {
+                var sameMaterialItems = new List<IItemModel>();
+
                 var imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var originalInfo = await imc.GetImcInfo(item);
                 foreach (var i in sameModelItems)
@@ -80,14 +82,15 @@ namespace xivModdingFramework.Cache
                         sameMaterialItems.Add(i);
                     }
                 }
+
+                sameMaterialItems = sameMaterialItems.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
+                return sameMaterialItems;
             } catch
             {
-                // No IMC file exists for this item.
-                // It is by requirement the only item of its type then.
-                sameMaterialItems.Add((IItemModel) item.Clone());
+                // No IMC file exists for this item.  
+                // In this case, it affects all items in the same root.
+                return sameModelItems;
             }
-            sameMaterialItems = sameMaterialItems.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
-            return sameMaterialItems;
         }
         public static async Task<List<IItemModel>> GetSharedModelItems(this IItemModel item)
         {
@@ -189,13 +192,15 @@ namespace xivModdingFramework.Cache
         // Type -> TypeCode -> Id
         private static readonly string RootFolderFormatSecondary = "obj/{0}/{1}{2}/";
 
+        private static readonly string HousingRootFolderFormat = "bgcommon/hou/{0}/general/{1}/";
+
+
         // pPrefix => pId => sPrefix => sId => Slot
         private static readonly string BaseFileFormatWithSlot = "{0}{1}{2}{3}_{4}";
         private static readonly string BaseFileFormatNoSlot = "{0}{1}{2}{3}";
 
         // {0} = BaseFileFormat
         private static readonly string ModelNameFormat = "{0}.mdl";
-
 
         /// <summary>
         /// Gets the file name base for this root.
@@ -226,11 +231,6 @@ namespace xivModdingFramework.Cache
 
         public string GetRootFile()
         {
-            return GetRootFolder() + GetBaseFileName() + ".root";
-        }
-
-        public string GetMetaFile()
-        {
             return GetRootFolder() + GetBaseFileName() + ".meta";
         }
 
@@ -240,23 +240,33 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public string GetRootFolder()
         {
-            var pId = PrimaryId.ToString().PadLeft(4, '0');
-            var primary = String.Format(RootFolderFormatPrimary, new string[] { XivItemTypes.GetSystemName(PrimaryType), XivItemTypes.GetSystemPrefix(PrimaryType), pId });
-
-            var secondary = "";
-            if (SecondaryType != null)
+            if (PrimaryType == XivItemType.indoor || PrimaryType == XivItemType.outdoor)
             {
-                var sId = SecondaryId.ToString().PadLeft(4, '0');
-                var sType = (XivItemType)SecondaryType;
-                secondary = String.Format(RootFolderFormatSecondary, new string[] { XivItemTypes.GetSystemName(sType), XivItemTypes.GetSystemPrefix(sType), sId });
+                // BGCommon Dat stuff.
+                var pId = PrimaryId.ToString().PadLeft(4, '0');
+                return String.Format(HousingRootFolderFormat, new string[] { XivItemTypes.GetSystemName(PrimaryType), pId });
             }
+            else
+            {
+                // All the Dat 4 stuff.
+                var pId = PrimaryId.ToString().PadLeft(4, '0');
+                var primary = String.Format(RootFolderFormatPrimary, new string[] { XivItemTypes.GetSystemName(PrimaryType), XivItemTypes.GetSystemPrefix(PrimaryType), pId });
 
-            return primary + secondary;
+                var secondary = "";
+                if (SecondaryType != null)
+                {
+                    var sId = SecondaryId.ToString().PadLeft(4, '0');
+                    var sType = (XivItemType)SecondaryType;
+                    secondary = String.Format(RootFolderFormatSecondary, new string[] { XivItemTypes.GetSystemName(sType), XivItemTypes.GetSystemPrefix(sType), sId });
+                }
+
+                return primary + secondary;
+            }
         }
 
         public string GetSimpleModelName()
         {
-            if (SecondaryType == null)
+            if (PrimaryType == XivItemType.equipment || PrimaryType == XivItemType.accessory)
             {
                 throw new NotSupportedException("Cannot generate simple model name for this type. EQDP file must Be used.");
             }
@@ -268,6 +278,22 @@ namespace xivModdingFramework.Cache
         {
             return GetRacialModelName(Int32.Parse(XivRaces.GetRaceCode(race)));
         }
+
+        /// <summary>
+        /// Calculates and returns the SGD file name for this root.
+        /// </summary>
+        /// <returns></returns>
+        public string GetSgdName()
+        {
+            if (PrimaryType != XivItemType.indoor && PrimaryType != XivItemType.outdoor)
+            {
+                throw new NotSupportedException("Cannot get SGB File for Non-Furniture item type.");
+            }
+
+            var assetFile = $"{Slot}_b0_m{PrimaryId.ToString().PadLeft(4, '0')}.sgb";
+            return assetFile;
+        }
+
         public string GetRacialModelName(int raceRaw)
         {
             if (SecondaryType != null)
@@ -406,6 +432,13 @@ namespace xivModdingFramework.Cache
                     // initial crawls up the tree are janky.
                     Info.Slot = "top";
                 }
+            } else if(Info.PrimaryType == XivItemType.indoor)
+            {
+                Info.Slot = "fun";
+
+            } else if(Info.PrimaryType == XivItemType.outdoor)
+            {
+                Info.Slot = "gar";
             }
         }
 
@@ -482,6 +515,11 @@ namespace xivModdingFramework.Cache
                     models.Add(Info.GetRootFolder() + "model/" + Info.GetRacialModelName(race));
                 }
                 return models;
+            } else if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+            {
+                var _housing = new Housing(XivCache.GameInfo.GameDirectory, XivCache.GameInfo.GameLanguage);
+                var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.PrimaryType);
+                return housingAssets.Select(x => x.Value).ToList();
             } else {
                 // The rest of the types just have a single, calculateable model path.
                 var folder = Info.GetRootFolder();
@@ -560,6 +598,13 @@ namespace xivModdingFramework.Cache
         public string GetRawImcFilePath()
         {
             var imcPath = "";
+            if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+            {
+                // These types can never have IMC entries.
+                return null;
+            }
+                
+
             if (Info.SecondaryType == null)
             {
                 var iPrefix = XivItemTypes.GetSystemPrefix(Info.PrimaryType);
@@ -889,6 +934,11 @@ namespace xivModdingFramework.Cache
                 items = items.Where(x => x.ModelInfo.ImcSubsetID == imcSubset).ToList();
             }
 
+            if (items.Count == 0) {
+                // May as well make a raw item.
+                items.Add(ToRawItem());
+            }
+
             items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
 
             return items;
@@ -955,18 +1005,8 @@ namespace xivModdingFramework.Cache
             XivItemType.monster,
             XivItemType.demihuman,
             XivItemType.human,
-
-            // XivItemType.body, // Needs some extra custom handling still for skin materials.
-
-            /*
-            // These types need more work for dependency suppport.
-
-            // Furniture primarily needs the appropriate function for resolving the model files,
-            // and the meta sgd(sp?) file that they have instead of an IMC file.
             XivItemType.indoor,
             XivItemType.outdoor,
-            */
-
         };
 
         // Captures the file extension of a file (even if it has a binary extension)
@@ -992,6 +1032,12 @@ namespace xivModdingFramework.Cache
         // Group 3 == SecondaryId (if it exists)
 
         private static readonly Regex PrimaryExtractionRegex = new Regex("^chara\\/([a-z]+)\\/[a-z]([0-9]{4})(?:\\/obj\\/([a-z]+)\\/[a-z]([0-9]{4})\\/?)?.*$");
+
+
+        // Group 0 == Full File path
+        // Group 1 == Type (indoor/outdoor)
+        // Group 2 == Primary Id
+        private static readonly Regex HousingExtractionRegex = new Regex("^bgcommon/hou/([a-z]+)/general/([0-9]+)/?.*$");
 
         /// <summary>
         /// Returns all parent files that this child file depends on as part of its rendering process.
@@ -1110,6 +1156,12 @@ namespace xivModdingFramework.Cache
                     siblings.Add(c);
                 }
             }
+
+            if(siblings.Count == 0)
+            {
+                siblings.Add(internalFilePath);
+            }
+
             return siblings.ToList();
         }
 
@@ -1162,7 +1214,7 @@ namespace xivModdingFramework.Cache
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
                     var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
-                    var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false);
+                    var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false, false);
                     return mtrlChildren;
                 } catch
                 {
@@ -1291,7 +1343,6 @@ namespace xivModdingFramework.Cache
                 // they'll have their root resolved via modlist, if one exists for them.
                 if (info.PrimaryType == XivItemType.equipment
                     || info.PrimaryType == XivItemType.accessory
-                    || info.PrimaryType == XivItemType.human
                     || info.PrimaryType == XivItemType.demihuman)
                 {
                         return null;
@@ -1300,7 +1351,7 @@ namespace xivModdingFramework.Cache
 
             // Only these types can get away without a secondary type.
             if(info.SecondaryType == null) {
-                if (info.PrimaryType != XivItemType.equipment && info.PrimaryType != XivItemType.accessory) {
+                if (info.PrimaryType != XivItemType.equipment && info.PrimaryType != XivItemType.accessory && info.PrimaryType != XivItemType.indoor && info.PrimaryType != XivItemType.outdoor) {
                     return null;
                 }
             }
@@ -1384,7 +1435,18 @@ namespace xivModdingFramework.Cache
                     info.Slot = match.Groups[1].Value;
                 }
             }
+            else
+            {
+                // Might be a housing item.
+                match = HousingExtractionRegex.Match(internalFilePath);
+                if (match.Success)
+                {
+                    info.PrimaryType = XivItemTypes.FromSystemName(match.Groups[1].Value);
+                    info.PrimaryId = Int32.Parse(match.Groups[2].Value);
 
+                    info.Slot = info.PrimaryType == XivItemType.indoor ? "fun" : "gar";
+                }
+            }
 
             return info;
         }
@@ -1546,29 +1608,48 @@ namespace xivModdingFramework.Cache
 
                         if (secondary == XivItemType.none)
                         {
-                            var folder = root.GetRootFolder() + "model";
-                            var folderHash = HashGenerator.GetHash(folder);
-                            var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
-
-                            // For these, just let the EDP module verify if there are any races availble for the item?
-                            foreach (var slot in slots)
+                            if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
                             {
-                                root.Slot = slot;
+                                // For furniture, they're valid as long as they have an SGD file we can find.
+                                root.Slot = primary == XivItemType.indoor ? "fun" : "gar";
 
-                                // Check every possible race code, not just playables?
-                                //for (int s = 0; s < 10000; p++)
-                                foreach(var race in races)
+                                var folder = root.GetRootFolder() + "asset";
+                                var file = root.GetSgdName();
+
+                                var folderHash = HashGenerator.GetHash(folder);
+                                var fileHash = HashGenerator.GetHash(file);
+                                var key = fileHash.ToString() + folderHash.ToString();
+                                if (combinedHashes.ContainsKey(key))
                                 {
-                                    //var modelName = root.GetRacialModelName(s);
-                                    var modelName = root.GetRacialModelName(race);
-                                    var fileHash = HashGenerator.GetHash(modelName);
-                                    var key = fileHash.ToString() + folderHash.ToString();
-                                    if (combinedHashes.ContainsKey(key))
-                                    {
-                                        result.Add((XivDependencyRootInfo)root.Clone());
+                                    result.Add((XivDependencyRootInfo)root.Clone());
+                                }
+                            }
+                            else
+                            {
+                                var folder = root.GetRootFolder() + "model";
+                                var folderHash = HashGenerator.GetHash(folder);
+                                var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
 
-                                        // We don't care how many models there are, just that there *are* any models.
-                                        break;
+                                // For these, just let the EDP module verify if there are any races availble for the item?
+                                foreach (var slot in slots)
+                                {
+                                    root.Slot = slot;
+
+                                    // Check every possible race code, not just playables?
+                                    //for (int s = 0; s < 10000; p++)
+                                    foreach (var race in races)
+                                    {
+                                        //var modelName = root.GetRacialModelName(s);
+                                        var modelName = root.GetRacialModelName(race);
+                                        var fileHash = HashGenerator.GetHash(modelName);
+                                        var key = fileHash.ToString() + folderHash.ToString();
+                                        if (combinedHashes.ContainsKey(key))
+                                        {
+                                            result.Add((XivDependencyRootInfo)root.Clone());
+
+                                            // We don't care how many models there are, just that there *are* any models.
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1586,13 +1667,6 @@ namespace xivModdingFramework.Cache
                                 {
                                     // Human body gets to be a special snowflake.
                                     slots = XivItemTypes.GetAvailableSlots(XivItemType.equipment);
-                                }
-
-                                // For these, just let the EDP module verify if there are any races availble for the item?
-
-                                if (root.PrimaryId == 201 && root.SecondaryId == 56 && root.PrimaryType == XivItemType.weapon)
-                                {
-                                    var z = "d";
                                 }
 
                                 if (slots.Count == 0)
@@ -1649,6 +1723,13 @@ namespace xivModdingFramework.Cache
                 mergedDict.Add(kv.Key, new XivDependencyRootInfo());
             }
 
+            var bgcHashes = await index.GetFileDictionary(XivDataFile._01_Bgcommon);
+
+            var bgcHashDict = new Dictionary<string, XivDependencyRootInfo>();
+            foreach (var kv in bgcHashes)
+            {
+                bgcHashDict.Add(kv.Key, new XivDependencyRootInfo());
+            }
 
             var types = new Dictionary<XivItemType, List<XivItemType>>();
             foreach (var type in DependencySupportedTypes)
@@ -1665,6 +1746,8 @@ namespace xivModdingFramework.Cache
             types[XivItemType.demihuman].Add(XivItemType.equipment);
             types[XivItemType.equipment].Add(XivItemType.none);
             types[XivItemType.accessory].Add(XivItemType.none);
+            types[XivItemType.indoor].Add(XivItemType.none);
+            types[XivItemType.outdoor].Add(XivItemType.none);
 
 
 
@@ -1674,10 +1757,14 @@ namespace xivModdingFramework.Cache
                 var primary = kv.Key;
                 foreach (var secondary in kv.Value)
                 {
-                    // Apparently despite all documentation, Dictionary.HasKey() is not actually
-                    // thread safe? Or at least, we'll hit random failures to find dictionary keys if
-                    // we don't clone the dictionary here.   Unsure why.
-                    tasks.Add(TestAllRoots(mergedDict, primary, secondary));
+                    if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
+                    {
+                        tasks.Add(TestAllRoots(bgcHashDict, primary, secondary));
+                    }
+                    else
+                    {
+                        tasks.Add(TestAllRoots(mergedDict, primary, secondary));
+                    }
                 }
             }
             try

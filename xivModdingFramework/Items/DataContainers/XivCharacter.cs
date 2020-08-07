@@ -76,16 +76,20 @@ namespace xivModdingFramework.Items.DataContainers
             item.ModelInfo = new XivModelInfo();
             item.ModelInfo.PrimaryID = root.Info.PrimaryId;
             item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
-            item.Name = root.Info.GetBaseFileName();
             item.PrimaryCategory = XivStrings.Character;
 
             if (root.Info.Slot != null)
             {
                 item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.FirstOrDefault(x => x.Value == root.Info.Slot).Key;
+
+                //var race = XivRaces.GetXivRace(root.Info.PrimaryId.ToString().PadLeft(4, '0')).GetDisplayName();
+                item.Name = item.SecondaryCategory + " - " + root.Info.GetBaseFileName();
             } else
             {
+                item.Name = root.Info.GetBaseFileName();
                 item.SecondaryCategory = XivStrings.Body;
             }
+
 
             return item;
         }

@@ -27,7 +27,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.1.0");
+        public static readonly Version CacheVersion = new Version("1.0.1.1");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -437,7 +437,7 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into housing ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
+                            insert into furniture ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
                                           values($name, $category, $subcategory, $primary_id, $icon_id, $root)";
 
                         var root = item.GetRootInfo();
@@ -724,7 +724,7 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("housing", where, async (reader) =>
+            return await BuildListFromTable("furniture", where, async (reader) =>
             {
                 return MakeFurniture(reader);
             });

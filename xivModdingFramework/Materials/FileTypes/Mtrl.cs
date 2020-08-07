@@ -260,12 +260,14 @@ namespace xivModdingFramework.Materials.FileTypes
             return mtrlData;
         }
 
+        private static Regex _dummyTextureRegex = new Regex("^bgcommon/texture/dummy_[a-z]\\.tex$");
+
         /// <summary>
         /// Retrieves the list of texture paths used by the given mtrl path (significantly faster than loading the entire material and scanning it).
         /// </summary>
         /// <param name="mtrlPath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool forceOriginal = false)
+        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false)
         {
             var dat = new Dat(_gameDirectory);
             var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal);
@@ -358,8 +360,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
+            var rem = new List<string>();
+            List<string> ret;
+            if (includeDummies)
+            {
+                ret = uniqueTextures.ToList();
+            } else {
+                ret = uniqueTextures.Where(x => !_dummyTextureRegex.IsMatch(x)).ToList();
+            }
 
-            return uniqueTextures.ToList();
+            return ret;
         }
 
         /// <summary>
