@@ -67,19 +67,25 @@ namespace xivModdingFramework.Cache
             var sameModelItems = new List<IItemModel>();
             sameModelItems = await item.GetSharedModelItems();
 
-            var imc = new Imc(XivCache.GameInfo.GameDirectory);
-            var originalInfo = await imc.GetImcInfo(item);
-
             var sameMaterialItems = new List<IItemModel>();
-            foreach (var i in sameModelItems)
+            try
             {
-                var info = await imc.GetImcInfo(i);
-                if (info.Variant == originalInfo.Variant)
+                var imc = new Imc(XivCache.GameInfo.GameDirectory);
+                var originalInfo = await imc.GetImcInfo(item);
+                foreach (var i in sameModelItems)
                 {
-                    sameMaterialItems.Add(i);
+                    var info = await imc.GetImcInfo(i);
+                    if (info.Variant == originalInfo.Variant)
+                    {
+                        sameMaterialItems.Add(i);
+                    }
                 }
+            } catch
+            {
+                // No IMC file exists for this item.
+                // It is by requirement the only item of its type then.
+                sameMaterialItems.Add((IItemModel) item.Clone());
             }
-
             sameMaterialItems = sameMaterialItems.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
             return sameMaterialItems;
         }
