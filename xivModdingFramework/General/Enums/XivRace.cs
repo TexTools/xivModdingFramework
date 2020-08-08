@@ -348,7 +348,7 @@ namespace xivModdingFramework.General.Enums
         }
 
         /// <summary>
-        /// Determines if this race is a parent of a nother given race or not.
+        /// Determines if this race is a parent of another given race or not.
         /// If the values are the same, it is considered TRUE by default.
         /// </summary>
         /// <param name="possibleParent"></param>
@@ -375,6 +375,35 @@ namespace xivModdingFramework.General.Enums
             }
             return false;
 
+        }
+
+        /// <summary>
+        /// Determines if this race is a direct parent of another given race or not.
+        /// If the values are the same, it is considered TRUE by default.
+        /// </summary>
+        /// <param name="possibleParent"></param>
+        /// <param name="possibleChild"></param>
+        /// <returns></returns>
+        public static bool IsDirectParentOf(this XivRace possibleParent, XivRace possibleChild, bool allowSame = true)
+        {
+            CheckTree();
+            if (possibleChild == possibleParent && allowSame)
+            {
+                return true;
+            }
+
+            var node = GetNode(possibleChild);
+
+            if (node?.Parent != null)
+            {
+                node = node.Parent;
+                if (node.Race == possibleParent)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -470,6 +499,25 @@ namespace xivModdingFramework.General.Enums
     /// </summary>
     public static class XivRaces
     {
+        public static readonly List<XivRace> PlayableRaces = new List<XivRace>() {
+            XivRace.Hyur_Midlander_Male,
+            XivRace.Hyur_Midlander_Female,
+            XivRace.Hyur_Highlander_Male,
+            XivRace.Hyur_Highlander_Female,
+            XivRace.Elezen_Male,
+            XivRace.Elezen_Female,
+            XivRace.Miqote_Male,
+            XivRace.Miqote_Female,
+            XivRace.Roegadyn_Male,
+            XivRace.Roegadyn_Female,
+            XivRace.Lalafell_Male,
+            XivRace.Lalafell_Female,
+            XivRace.AuRa_Male,
+            XivRace.AuRa_Female,
+            XivRace.Hrothgar,
+            XivRace.Viera,
+        };
+
         /// <summary>
         /// Gets the description from the enum value, in this case the Race Code
         /// </summary>

@@ -23,6 +23,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using TeximpNet.Compression;
 using TeximpNet.DDS;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -104,6 +105,9 @@ namespace xivModdingFramework.Textures.FileTypes
             var folder = Path.GetDirectoryName(ttp.Path);
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(ttp.Path);
+
+
+
             var offset = 0;
 
             var hashedfolder = 0;
@@ -146,10 +150,6 @@ namespace xivModdingFramework.Textures.FileTypes
             return xivTex;
         }
 
-        public async Task GetIndexFileDictionary()
-        {
-            _indexFileDictionary = await _index.GetFileDictionary(_dataFile);
-        }
 
         public async Task<XivTex> GetTexDataPreFetchedIndex(TexTypePath ttp)
         {
@@ -211,7 +211,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if (itemType != XivItemType.human && itemType != XivItemType.furniture)
             {
                 // Get the mtrl version for the given item from the imc file
-                var imc = new Imc(_gameDirectory, dataFile);
+                var imc = new Imc(_gameDirectory);
                 version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
             }
 
@@ -517,6 +517,11 @@ namespace xivModdingFramework.Textures.FileTypes
             });
 
             return convertedBytes.ToArray();
+        }
+
+        public async Task GetIndexFileDictionary()
+        {
+            _indexFileDictionary = await _index.GetFileDictionary(_dataFile);
         }
 
         /// <summary>
@@ -1227,9 +1232,10 @@ namespace xivModdingFramework.Textures.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
+            {XivStrings.LeftRing, "ril"},
             {XivStrings.Wrists, "wrs"},
             {XivStrings.Head_Body, "top"},
             {XivStrings.Body_Hands, "top"},

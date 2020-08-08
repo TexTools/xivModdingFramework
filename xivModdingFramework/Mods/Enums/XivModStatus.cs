@@ -19,7 +19,6 @@ namespace xivModdingFramework.Mods.Enums
     public enum XivModStatus
     {
         Original,
-        MatAdd,
         Enabled,
         Disabled
     }

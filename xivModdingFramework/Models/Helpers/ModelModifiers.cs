@@ -339,15 +339,6 @@ namespace xivModdingFramework.Models.Helpers
                 var md = rawMdl.LoDList[0].MeshDataList[mIdx];
                 var localMesh = ttModel.MeshGroups[mIdx];
 
-                // Copy over Material
-                var matIdx = md.MeshInfo.MaterialIndex;
-                if (matIdx < rawMdl.PathData.MaterialList.Count)
-                {
-                    var oldMtrl = rawMdl.PathData.MaterialList[matIdx];
-                    localMesh.Material = oldMtrl;
-                }
-
-
                 for (var pIdx = 0; pIdx < md.MeshPartList.Count; pIdx++)
                 {
                     // Can only carry in data to parts that exist
@@ -401,6 +392,9 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     var oldMtrl = rawMdl.PathData.MaterialList[matIdx];
                     localMesh.Material = oldMtrl;
+                } else
+                {
+                    localMesh.Material = rawMdl.PathData.MaterialList[0];
                 }
             }
         }
@@ -717,7 +711,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="model"></param>
         /// <param name="targetRace"></param>
         /// <param name="loggingFunction"></param>
-        public static void ApplyRacialDeform(TTModel model, XivRace targetRace, Action<bool, string> loggingFunction = null)
+        public static void ApplyRacialDeform(TTModel model, XivRace targetRace, bool invert = false, Action<bool, string> loggingFunction = null)
         {
             try
             {
@@ -733,9 +727,35 @@ namespace xivModdingFramework.Models.Helpers
                 }
                 loggingFunction(false, "Attempting to deform model...");
 
-
                 Dictionary<string, Matrix> deformations, decomposed, recalculated;
-                Mdl.GetDeformationMatrices(XivRace.Miqote_Female, out deformations, out decomposed, out recalculated);
+                Mdl.GetDeformationMatrices(targetRace, out deformations, out decomposed, out recalculated);
+
+                // Check if deformation is possible
+                var missingDeforms = new HashSet<string>();
+
+                foreach (var m in model.MeshGroups)
+                {
+                    foreach (var mBone in m.Bones)
+                    {
+                        if (!deformations.ContainsKey(mBone))
+                        {
+                            missingDeforms.Add(mBone);
+                        }
+                    }
+                }
+
+                // Throw an exception if there is any missing deform bones
+                if (missingDeforms.Any())
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine();
+                    foreach (var missingDeform in missingDeforms)
+                    {
+                        sb.AppendLine($"{missingDeform}");
+                    }
+
+                    throw new Exception(sb.ToString());
+                }
 
                 // Now we're ready to animate...
 
@@ -761,10 +781,17 @@ namespace xivModdingFramework.Models.Helpers
                                 var boneWeight = (v.Weights[b]) / 255f;
 
                                 var matrix = Matrix.Identity;
-                                if (deformations.ContainsKey(boneName)) {
+                                if (deformations.ContainsKey(boneName)) 
+                                {
                                     matrix = deformations[boneName];
-                                } else {
-                                    throw new Exception("Invalid bone");
+                                    if (invert)
+                                    {
+                                        matrix.Invert();
+                                    }
+                                } 
+                                else 
+                                {
+                                    throw new Exception($"Invalid bone ({boneName})");
                                 }
 
 
@@ -831,10 +858,13 @@ namespace xivModdingFramework.Models.Helpers
 
             var totalMajorCorrections = 0;
             var warnings = new List<string>();
+            var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
+                var pIdx = 0;
                 foreach (var p in m.Parts)
                 {
+                    var vIdx = 0;
                     foreach (var v in p.Vertices)
                     {
                         // UV Flipping
@@ -851,8 +881,8 @@ namespace xivModdingFramework.Models.Helpers
                                 while (boneSum != 255)
                                 {
                                     boneSum = 0;
-                                    var mostMajor = -1;
-                                    var most = -1;
+                                    var mostMajor = 0;
+                                    var most = 0;
                                     // Loop them to sum them up.
                                     // and snag the least/most major influences while we're at it.
                                     for (var i = 0; i < v.Weights.Length; i++)
@@ -868,6 +898,14 @@ namespace xivModdingFramework.Models.Helpers
                                             mostMajor = i;
                                             most = value;
                                         }
+                                    }
+
+                                    if(most == 0)
+                                    {
+                                        loggingFunction(true, "Group: " + mIdx + " Part:" + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
+                                        totalMajorCorrections++;
+                                        v.Weights[0] = 255;
+                                        break;
                                     }
 
                                     var alteration = 255 - boneSum;
@@ -893,8 +931,11 @@ namespace xivModdingFramework.Models.Helpers
                                 }
                             }
                         }
+                        vIdx++;
                     }
+                    pIdx++;
                 }
+                mIdx++;
             }
 
             if (totalMajorCorrections > 0)
@@ -1093,6 +1134,9 @@ namespace xivModdingFramework.Models.Helpers
         }
 
 
+        private static readonly Regex _skinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+
+
 
         /// <summary>
         /// Fixes up the racial skin references in the model's materials.
@@ -1102,27 +1146,75 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="newInternalPath"></param>
         public static void FixUpSkinReferences(TTModel model, string newInternalPath, Action<bool, string> loggingFunction = null)
         {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
 
             // Here we should to go in and correct any Skin Material references to point to the skin material for this race.
             // It's not actually -NEEDED-, as the game will dynamically resolve them anyways to the player's skin material, but it's good for user expectation and sanity.
 
             var raceRegex = new Regex("(c[0-9]{4})");
+
             // So we have to do this step first.
             var newRaceMatch = raceRegex.Match(newInternalPath);
 
-            if(!newRaceMatch.Success)
+            // Now model doesn't exist in a racial folder.  Nothing to fix up/impossible to.
+            if (!newRaceMatch.Success)
             {
                 return;
             }
 
             loggingFunction(false, "Fixing up racial skin references...");
 
+            // Need to find the racial skin for this race.
+            var baseRace = XivRaces.GetXivRace(newRaceMatch.Groups[1].Value.Substring(1));
+
+            FixUpSkinReferences(model, baseRace, loggingFunction);
+        }
+
+
+
+
+        /// <summary>
+        /// Fixes up the racial skin references in the model's materials.
+        /// this isn't actually necessary as the game will auto-resolve these regardless, but it's nice to do.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="newInternalPath"></param>
+        public static void FixUpSkinReferences(TTModel model, XivRace baseRace, Action<bool, string> loggingFunction = null, string bodyReplacement = "")
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            var skinRace = XivRaceTree.GetSkinRace(baseRace);
+            var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
+
+            var raceRegex = new Regex("(c[0-9]{4})");
+            var bodyRegex = new Regex("(b[0-9]{4})");
+
             foreach (var m in model.MeshGroups)
             {
-                var mtrlMatch = raceRegex.Match(m.Material);
-                if(mtrlMatch.Success)
+                if (m.Material == null) continue;
+
+                // Only fix up -skin- materials.
+                if (_skinMaterialRegex.IsMatch(m.Material))
                 {
-                    m.Material.Replace(mtrlMatch.Groups[1].Value, newRaceMatch.Groups[1].Value);
+                    var mtrlMatch = raceRegex.Match(m.Material);
+                    if (mtrlMatch.Success && mtrlMatch.Groups[1].Value != skinRaceString)
+                    {
+                        m.Material = m.Material.Replace(mtrlMatch.Groups[1].Value, skinRaceString);
+
+                        // Reset the body ID if we actually changed races.
+                        bodyReplacement = string.IsNullOrEmpty(bodyReplacement) ? "b0001" : bodyReplacement;
+                        m.Material = bodyRegex.Replace(m.Material, bodyReplacement);
+                    }
+                    else if (bodyReplacement != "")
+                    {
+                        m.Material = bodyRegex.Replace(m.Material, bodyReplacement);
+                    }
                 }
             }
 

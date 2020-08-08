@@ -15,8 +15,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -54,6 +56,19 @@ namespace xivModdingFramework.Items.DataContainers
         /// The Model Information for the gear item
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
+
+        internal static IItemModel FromDependencyRoot(XivDependencyRoot root, int imcSubset)
+        {
+            var item = new XivGenericItemModel();
+            item.ModelInfo = new XivModelInfo();
+            item.ModelInfo.ImcSubsetID = imcSubset;
+            item.ModelInfo.PrimaryID = root.Info.PrimaryId;
+            item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
+            item.Name = root.Info.GetBaseFileName() + "_v" + imcSubset.ToString();
+            item.PrimaryCategory = XivStrings.Gear;
+
+            return item;
+        }
 
         public int CompareTo(object obj)
         {

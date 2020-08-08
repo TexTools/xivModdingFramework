@@ -178,7 +178,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     Diffuse = new byte[0],
                     Specular = new byte[0],
                     Emissive = new byte[0],
-                    Alpha = new byte[0]
+                    Alpha = new byte[0],
+                    MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
                 };
                 return empty;
             }
@@ -251,7 +252,8 @@ namespace xivModdingFramework.Models.ModelTextures
                 Diffuse = diffuseMap.ToArray(),
                 Specular = specularMap.ToArray(),
                 Emissive = emissiveMap.ToArray(),
-                Alpha = alphaMap.ToArray()
+                Alpha = alphaMap.ToArray(),
+                MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
             };
 
             return modelTextureData;
@@ -557,6 +559,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     float specAmp = 1.0f + (lipInfluence * 0.25f);
                     newSpecular = MultiplyColor(newSpecular, specAmp);
 
+                    // Face shader supports alpha, unlike normal skin textures.
+                    opacity = baseNormal.B;
                 }
 
 

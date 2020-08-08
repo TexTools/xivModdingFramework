@@ -41,7 +41,7 @@ namespace xivModdingFramework.Models.FileTypes
     public class Sklb
     {
         private readonly DirectoryInfo _gameDirectory;
-        private const string SkeletonsFolder = ".\\Skeletons\\";
+        private const string SkeletonsFolder = "\\Skeletons\\";
         public Sklb(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
@@ -128,7 +128,8 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             var externalSkelName = GetParsedSkelFilename(fullMdlPath);
-            var resultPath = SkeletonsFolder + externalSkelName + ".skel";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var resultPath = cwd + SkeletonsFolder + externalSkelName + ".skel";
 
             // If we already have a file, and it's not one of the special types we merge in, just return that.
             if (File.Exists(resultPath) && !IsHairHatFace(fullMdlPath))
@@ -138,7 +139,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
 
-            Directory.CreateDirectory(SkeletonsFolder);
+            Directory.CreateDirectory(cwd + SkeletonsFolder);
 
 
             // Generate a raw .sklb file, if one exists for it.
@@ -146,16 +147,16 @@ namespace xivModdingFramework.Models.FileTypes
             if (skelbFile != null)
             {
 
-                var xmlFile = SkeletonsFolder + internalSkelName + ".xml";
+                var xmlFile = cwd + SkeletonsFolder + internalSkelName + ".xml";
                 File.Delete(xmlFile);
 
                 // And convert that extracted raw .sklb file to XML...
-                
+
                 var proc = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = Directory.GetCurrentDirectory() + "/NotAssetCc.exe",
+                        FileName = cwd + "/NotAssetCc.exe",
                         Arguments = "\"" + skelbFile + "\" \"" + xmlFile + "\"",
                         RedirectStandardOutput = true,
                         UseShellExecute = false,
@@ -313,7 +314,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var havokData = br.ReadBytes(sklbData.Length - dataOffset);
 
-                var outputPath = Directory.GetCurrentDirectory() + "/Skeletons/" + internalSkelName + ".sklb";
+                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var outputPath = cwd + "/Skeletons/" + internalSkelName + ".sklb";
                 File.WriteAllBytes(outputPath, havokData);
                 return outputPath;
             }
@@ -543,7 +545,8 @@ namespace xivModdingFramework.Models.FileTypes
                 race = Path.GetFileNameWithoutExtension(fullMdlPath).Substring(0, 5);
             }
 
-            var skelLoc = Directory.GetCurrentDirectory() + SkeletonsFolder;
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var skelLoc = cwd + SkeletonsFolder;
 
             if (File.Exists(skelLoc + race + ".skel"))
             {
@@ -601,7 +604,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Legs, "base"},
             {XivStrings.Feet, "base"},
             {XivStrings.Body, "base"},
-            {XivStrings.Ears, "base"},
+            {XivStrings.Earring, "base"},
             {XivStrings.Neck, "base"},
             {XivStrings.Rings, "base"},
             {XivStrings.Wrists, "base"},
