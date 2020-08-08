@@ -368,7 +368,14 @@ namespace xivModdingFramework.Cache
                 if(backupDate > currentDate)
                 {
                     // Our backup is newer, copy it through.
-                    File.Copy(backupFile, _rootCachePath.FullName);
+                    try
+                    {
+                        File.Delete(_rootCachePath.FullName);
+                        File.Copy(backupFile, _rootCachePath.FullName);
+                    } catch
+                    {
+                        // No-op, non-critical.
+                    }
                 }
             }
         }
