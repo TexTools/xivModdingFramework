@@ -326,10 +326,21 @@ namespace xivModdingFramework.Models.FileTypes
                     // Set source race to match so that it doesn't get replaced
                     if (targetRace != XivRace.All_Races)
                     {
-                        if (materialName.Contains("b0001"))
+                        var bodyRegex = new Regex("(b[0-9]{4})");
+                        var faceRegex = new Regex("(f[0-9]{4})");
+
+                        if (bodyRegex.Match(materialName).Success)
                         {
                             var currentRace = model.Source.Substring(model.Source.LastIndexOf('c') + 1, 4);
                             mdlPath = model.Source.Replace(currentRace, targetRace.GetRaceCode());
+                        }
+
+                        var faceMatch = faceRegex.Match(materialName);
+                        if (faceMatch.Success)
+                        {
+                            var mdlFace = faceRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
                         }
                     }
 
@@ -4417,7 +4428,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"},
-            {XivStrings.Tail, "til"}
+            {XivStrings.Tail, "til"},
 
         };
 

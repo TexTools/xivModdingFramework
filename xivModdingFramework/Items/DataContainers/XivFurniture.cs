@@ -73,7 +73,6 @@ namespace xivModdingFramework.Items.DataContainers
             var item = new XivFurniture();
             item.ModelInfo = new XivModelInfo();
             item.ModelInfo.PrimaryID = root.Info.PrimaryId;
-            item.ModelInfo.SecondaryID = (int)root.Info.SecondaryId;
             item.Name = root.Info.GetBaseFileName();
             item.PrimaryCategory = XivStrings.Housing;
             if (root.Info.PrimaryType == Enums.XivItemType.indoor)

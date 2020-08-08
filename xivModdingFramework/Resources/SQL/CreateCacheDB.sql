@@ -34,7 +34,7 @@ CREATE TABLE "ui" (
 );
 
 -- All /bgcommon/ stuff.
-CREATE TABLE "housing" (
+CREATE TABLE "furniture" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,

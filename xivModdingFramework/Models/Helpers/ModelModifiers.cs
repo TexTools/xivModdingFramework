@@ -1182,7 +1182,7 @@ namespace xivModdingFramework.Models.Helpers
         /// </summary>
         /// <param name="model"></param>
         /// <param name="newInternalPath"></param>
-        public static void FixUpSkinReferences(TTModel model, XivRace baseRace, Action<bool, string> loggingFunction = null)
+        public static void FixUpSkinReferences(TTModel model, XivRace baseRace, Action<bool, string> loggingFunction = null, string bodyReplacement = "")
         {
             if (loggingFunction == null)
             {
@@ -1208,7 +1208,12 @@ namespace xivModdingFramework.Models.Helpers
                         m.Material = m.Material.Replace(mtrlMatch.Groups[1].Value, skinRaceString);
 
                         // Reset the body ID if we actually changed races.
-                        m.Material = bodyRegex.Replace(m.Material, "b0001");
+                        bodyReplacement = string.IsNullOrEmpty(bodyReplacement) ? "b0001" : bodyReplacement;
+                        m.Material = bodyRegex.Replace(m.Material, bodyReplacement);
+                    }
+                    else if (bodyReplacement != "")
+                    {
+                        m.Material = bodyRegex.Replace(m.Material, bodyReplacement);
                     }
                 }
             }

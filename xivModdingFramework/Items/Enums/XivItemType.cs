@@ -43,8 +43,8 @@ namespace xivModdingFramework.Items.Enums
         [Description("")] decal,
         [Description("")] ui,
         [Description("")] furniture, // This one's a little vague and encompasses really all of /bgcommon/
-        [Description("")] indoor,     // These are the clearer versions, but only used by the dependency graph.
-        [Description("")] outdoor
+        [Description("indoor")] indoor,     // These are the clearer versions, but only used by the dependency graph.
+        [Description("outdoor")] outdoor
     }
 
     public static class XivItemTypes {

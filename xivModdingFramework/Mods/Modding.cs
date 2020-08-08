@@ -22,6 +22,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
@@ -387,6 +388,7 @@ namespace xivModdingFramework.Mods
 
             if (modList == null || modList.modCount == 0) return;
 
+
             var modNum = 0;
             foreach (var modEntry in modList.Mods)
             {
@@ -397,12 +399,12 @@ namespace xivModdingFramework.Mods
                     // Added file.
                     if (enable && !modEntry.enabled)
                     {
-                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath), false);
                         modEntry.enabled = true;
                     }
                     else if (!enable && modEntry.enabled)
                     {
-                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath), false);
                         modEntry.enabled = false;
                     }
 
@@ -412,12 +414,12 @@ namespace xivModdingFramework.Mods
                     // Standard mod.
                     if (enable && !modEntry.enabled)
                     {
-                        await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
+                        await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath, false);
                         modEntry.enabled = true;
                     }
                     else if (!enable && modEntry.enabled)
                     {
-                        await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
+                        await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath, false);
                         modEntry.enabled = false;
                     }
                 }
@@ -425,7 +427,14 @@ namespace xivModdingFramework.Mods
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
+
             SaveModList(modList);
+
+
+            // Do these as a batch query at the end.
+            progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
+            var allPaths = modList.Mods.Select(x => x.fullPath).Where(x => !String.IsNullOrEmpty(x)).ToList();
+            await XivCache.QueueDependencyUpdate(allPaths);
         }
 
         /// <summary>

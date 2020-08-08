@@ -260,12 +260,14 @@ namespace xivModdingFramework.Materials.FileTypes
             return mtrlData;
         }
 
+        private static Regex _dummyTextureRegex = new Regex("^bgcommon/texture/dummy_[a-z]\\.tex$");
+
         /// <summary>
         /// Retrieves the list of texture paths used by the given mtrl path (significantly faster than loading the entire material and scanning it).
         /// </summary>
         /// <param name="mtrlPath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool forceOriginal = false)
+        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false)
         {
             var dat = new Dat(_gameDirectory);
             var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal);
@@ -275,21 +277,25 @@ namespace xivModdingFramework.Materials.FileTypes
             using (var br = new BinaryReader(new MemoryStream(mtrlData)))
             {
                 // Texture count position.
-                br.BaseStream.Seek(12, SeekOrigin.Begin);
+                br.BaseStream.Seek(8, SeekOrigin.Begin);
+                var materialDataSize = br.ReadUInt16();
+                var pathsDataSize = br.ReadUInt16();
                 var textureCount = br.ReadByte();
                 var mapCount = br.ReadByte();
                 var cSetCount = br.ReadByte();
+                var dxInfoDataSize = br.ReadByte();
 
                 var offset = 0;
 
                 var dataOffsetBase = 16 + (mapCount * 4) + (cSetCount * 4) + (textureCount * 4);
 
-
+                var textureDxInfo = new Dictionary<string, ushort>();
                 for(int i = 0; i < textureCount; i++)
                 {
                     // Jump to the texture name offset.
                     br.BaseStream.Seek(16 + offset, SeekOrigin.Begin);
                     var textureNameOffset = br.ReadInt16();
+                    var texDxInfo = br.ReadUInt16();
 
                     // Jump to the texture name.
                     br.BaseStream.Seek(dataOffsetBase + textureNameOffset, SeekOrigin.Begin);
@@ -308,12 +314,62 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         uniqueTextures.Add(st);
                     }
+                    textureDxInfo[st] = texDxInfo;
 
                     // Bump to next texture name offset.
                     offset += 4;
                 }
+
+
+                if (dxInfoDataSize > 0)
+                {
+                    var dxInfoOffset = dataOffsetBase + materialDataSize;
+                    br.BaseStream.Seek(dxInfoOffset, SeekOrigin.Begin);
+                    var dxInfoByte = br.ReadByte();
+
+                    // This is an old DX9 Style material with DX11 conversion textures.
+                    // Make sure we have both texture versions referenced.
+                    if((dxInfoByte & 12) != 12)
+                    {
+                        List<string> add = new List<string>();
+                        foreach(var texture in uniqueTextures)
+                        {
+                            // If this is a texture that has a DX Conversion.
+                            if (textureDxInfo[texture] != 0)
+                            {
+                                if (texture.Contains("--"))
+                                {
+                                    add.Add(texture.Replace("--", ""));
+                                }
+                                else
+                                {
+                                    add.Add(texture.Insert(texture.LastIndexOf("/") + 1, "--"));
+                                }
+                            }
+                            else
+                            {
+                                // This texture does not have a DX 11 conversion texture.
+                            }
+                        }
+
+                        foreach(var s in add)
+                        {
+                            uniqueTextures.Add(s);
+                        }
+                    }
+                }
             }
-            return uniqueTextures.ToList();
+
+            var rem = new List<string>();
+            List<string> ret;
+            if (includeDummies)
+            {
+                ret = uniqueTextures.ToList();
+            } else {
+                ret = uniqueTextures.Where(x => !_dummyTextureRegex.IsMatch(x)).ToList();
+            }
+
+            return ret;
         }
 
         /// <summary>
@@ -324,7 +380,6 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>XivMtrl containing all the mtrl data</returns>
         public async Task<XivMtrl> GetMtrlData(int mtrlOffset, string mtrlPath, int dxVersion)
         {
-            await GetTexturePathsFromMtrlPath(mtrlPath);
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
 

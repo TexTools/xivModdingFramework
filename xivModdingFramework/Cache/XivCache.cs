@@ -27,7 +27,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.0.2");
+        public static readonly Version CacheVersion = new Version("1.0.1.2");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -326,12 +326,13 @@ namespace xivModdingFramework.Cache
                 }
             }
 
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var backupFile = cwd + "\\Resources\\DB\\" + rootCacheFileName;
+
             if (!File.Exists(_rootCachePath.FullName))
             {
-                // If we don't have a root cache file, we can do a few things...
-                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-                var backupFile = cwd + "\\Resources\\DB\\" + rootCacheFileName;
 
+                // If we don't have a root cache file, we can do a few things...
                 if (File.Exists(backupFile))
                 {
                     // Copy the backup over. - Even if the backup is not for the correct patch of 
@@ -355,6 +356,25 @@ namespace xivModdingFramework.Cache
                         {
                             cmd.ExecuteScalar();
                         }
+                    }
+                }
+            }
+            else if(File.Exists(backupFile))
+            {
+                // If we have both a backup and current file, see if the current is out of date.
+                // (If we just updated textools and the download came with a new file)
+                var backupDate = File.GetLastWriteTime(backupFile);
+                var currentDate = File.GetLastWriteTime(_rootCachePath.FullName);
+                if(backupDate > currentDate)
+                {
+                    // Our backup is newer, copy it through.
+                    try
+                    {
+                        File.Delete(_rootCachePath.FullName);
+                        File.Copy(backupFile, _rootCachePath.FullName);
+                    } catch
+                    {
+                        // No-op, non-critical.
                     }
                 }
             }
@@ -437,7 +457,7 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into housing ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
+                            insert into furniture ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
                                           values($name, $category, $subcategory, $primary_id, $icon_id, $root)";
 
                         var root = item.GetRootInfo();
@@ -724,7 +744,7 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("housing", where, async (reader) =>
+            return await BuildListFromTable("furniture", where, async (reader) =>
             {
                 return MakeFurniture(reader);
             });

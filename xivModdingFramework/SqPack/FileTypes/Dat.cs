@@ -98,9 +98,16 @@ namespace xivModdingFramework.SqPack.FileTypes
         public int GetLargestDatNumber(XivDataFile dataFile)
         {
 
+            string[] allFiles = null;
             _lock.Wait();
-            var allFiles = Directory.GetFiles(_gameDirectory.FullName);
-            _lock.Release();
+            try
+            {
+                allFiles = Directory.GetFiles(_gameDirectory.FullName);
+            }
+            finally
+            {
+                _lock.Release();
+            }
 
             var dataFiles = from file in allFiles where file.Contains(dataFile.GetDataFileName()) && file.Contains(".dat") select file;
 
@@ -147,29 +154,35 @@ namespace xivModdingFramework.SqPack.FileTypes
             await Task.Run(async () =>
             {
                 await _lock.WaitAsync();
-                for (var i = 1; i < 20; i++)
+                try
                 {
-                    var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
-
-                    if (File.Exists(datFilePath))
+                    for (var i = 1; i < 20; i++)
                     {
-                        // Due to an issue where 060000 dat1 gets deleted, we are skipping it here
-                        if (datFilePath.Contains("060000.win32.dat1"))
-                        {
-                            continue;
-                        }
-                        using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
-                        {
-                            binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+                        var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
 
-                            if (binaryReader.ReadByte() == 0)
+                        if (File.Exists(datFilePath))
+                        {
+                            // Due to an issue where 060000 dat1 gets deleted, we are skipping it here
+                            if (datFilePath.Contains("060000.win32.dat1"))
                             {
-                                datList.Add(datFilePath);
+                                continue;
+                            }
+                            using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
+                            {
+                                binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+
+                                if (binaryReader.ReadByte() == 0)
+                                {
+                                    datList.Add(datFilePath);
+                                }
                             }
                         }
                     }
                 }
-                _lock.Release();
+                finally
+                {
+                    _lock.Release();
+                }
             });
             return datList;
         }
@@ -1314,22 +1327,27 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
             await _lock.WaitAsync();
-            // If there is an existing modlist entry, use that data to get the modDatPath
-            if (modEntry != null)
+            try
             {
-                datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
-
-                if (!File.Exists(modDatPath))
+                // If there is an existing modlist entry, use that data to get the modDatPath
+                if (modEntry != null)
                 {
-                    _lock.Release();
-                    throw new Exception($"A mod entry is pointing to {Path.GetFileName(modDatPath)}, but the file does not exist.\n\n" +
-                                        $"It is recommended to do a Start Over.");
-                }
-            }
+                    datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
+                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
 
-            var fileLength = new FileInfo(modDatPath).Length;
-            _lock.Release();
+                    if (!File.Exists(modDatPath))
+                    {
+                        throw new Exception($"A mod entry is pointing to {Path.GetFileName(modDatPath)}, but the file does not exist.\n\n" +
+                                            $"It is recommended to do a Start Over.");
+                    }
+                }
+
+                var fileLength = new FileInfo(modDatPath).Length;
+            }
+            finally
+            {
+                _lock.Release();
+            }
 
             // Checks to make sure the offsets in the mod list are not 0
             // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
@@ -1603,7 +1621,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // Queue our dependency information updates.
-            XivCache.QueueDependencyUpdate(internalFilePath);
+            await XivCache.QueueDependencyUpdate(internalFilePath);
 
             return offset;
         }
