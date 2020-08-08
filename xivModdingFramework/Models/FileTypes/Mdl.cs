@@ -327,11 +327,20 @@ namespace xivModdingFramework.Models.FileTypes
                     if (targetRace != XivRace.All_Races)
                     {
                         var bodyRegex = new Regex("(b[0-9]{4})");
+                        var faceRegex = new Regex("(f[0-9]{4})");
 
                         if (bodyRegex.Match(materialName).Success)
                         {
                             var currentRace = model.Source.Substring(model.Source.LastIndexOf('c') + 1, 4);
                             mdlPath = model.Source.Replace(currentRace, targetRace.GetRaceCode());
+                        }
+
+                        var faceMatch = faceRegex.Match(materialName);
+                        if (faceMatch.Success)
+                        {
+                            var mdlFace = faceRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
                         }
                     }
 
