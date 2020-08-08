@@ -399,12 +399,12 @@ namespace xivModdingFramework.Mods
                     // Added file.
                     if (enable && !modEntry.enabled)
                     {
-                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath), false);
                         modEntry.enabled = true;
                     }
                     else if (!enable && modEntry.enabled)
                     {
-                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath), false);
                         modEntry.enabled = false;
                     }
 
