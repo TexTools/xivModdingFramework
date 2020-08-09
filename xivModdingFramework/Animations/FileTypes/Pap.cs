@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -11,7 +13,7 @@ namespace xivModdingFramework.Animations.FileTypes
 {
     public class Pap
     {
-        private DirectoryInfo _gameDirectory;
+        private readonly DirectoryInfo _gameDirectory;
 
         public Pap(DirectoryInfo gameDirectory)
         {
@@ -248,6 +250,41 @@ namespace xivModdingFramework.Animations.FileTypes
             }
 
             return Encoding.ASCII.GetString(name.ToArray()).Replace("\0", "");
+        }
+
+        public bool HavokToXml(byte[] havokData, string papName, string savePath, string assetccPath = "")
+        {
+            try
+            {
+                var papHkx = $"{savePath}/{papName}.hkx";
+
+                var papXml = $"{savePath}/{papName}.xml";
+
+                File.WriteAllBytes(papHkx, havokData);
+
+                var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = assetccPath + "/NotAssetCc.exe",
+                        Arguments = "\"" + papHkx + "\" \"" + papXml + "\"",
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                proc.Start();
+                proc.WaitForExit();
+
+                File.Delete(papHkx);
+            }
+            catch(Exception ex)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }
