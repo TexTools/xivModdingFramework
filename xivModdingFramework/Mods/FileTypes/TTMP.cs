@@ -423,7 +423,6 @@ namespace xivModdingFramework.Mods.FileTypes
             var modding = new Modding(gameDirectory);
             var modListFullPaths = new List<string>();
             var modList = modding.GetModList();
-            var modCount = 1;
             var importErrors = "";
 
             // Disable the cache woker while we're installing multiple items at once, so that we don't process queue items mid-import.
@@ -561,7 +560,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 XivCache.CacheWorkerEnabled = true;
             }
 
-            return (modCount - 1, importErrors);
+            return (importCount, importErrors);
         }
 
         /// <summary>
