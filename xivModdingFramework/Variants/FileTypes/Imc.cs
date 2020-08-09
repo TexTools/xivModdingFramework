@@ -17,8 +17,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
@@ -41,12 +43,10 @@ namespace xivModdingFramework.Variants.FileTypes
     {
         private const string ImcExtension = ".imc";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
 
-        public Imc(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        public Imc(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
         }
 
         /// <summary>
@@ -89,6 +89,68 @@ namespace xivModdingFramework.Variants.FileTypes
         }
 
 
+        private static readonly Regex _pathOnlyRegex = new Regex("^(.*)" + Constants.BinaryOffsetMarker + ".*$");
+        private static readonly Regex _binaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
+
+        /// <summary>
+        /// Retrieves an arbitrary selection of IMC entries based on their path::binaryoffset.
+        /// </summary>
+        /// <param name="pathsWithOffsets"></param>
+        /// <returns></returns>
+        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets)
+        {
+            var entries = new List<XivImc>();
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+
+            var lastPath = "";
+            int imcOffset = 0;
+            byte[] imcByteData = new byte[0];
+
+            foreach (var combinedPath in pathsWithOffsets)
+            {
+                var binaryMatch = _binaryOffsetRegex.Match(combinedPath);
+                var pathMatch = _pathOnlyRegex.Match(combinedPath);
+
+                // Invalid format.
+                if (!pathMatch.Success || !binaryMatch.Success) continue;
+
+                long offset = Int64.Parse(binaryMatch.Groups[1].Value) / 8;
+                string path = pathMatch.Groups[1].Value;
+
+                // Only reload this data if we need to.
+                if (path != lastPath)
+                {
+                    imcOffset = await index.GetDataOffset(path);
+                    imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(path));
+                }
+                lastPath = path;
+
+                // Offset would run us past the end of the file.
+                const int entrySize = 6;
+                if (offset > imcByteData.Length - entrySize) continue;
+
+
+                using (var br = new BinaryReader(new MemoryStream(imcByteData)))
+                {
+                    var subsetCount = br.ReadInt16();
+                    var identifier = (ImcType)br.ReadInt16();
+
+                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                    entries.Add(new XivImc
+                    {
+                        Variant = br.ReadByte(),
+                        Unknown = br.ReadByte(),
+                        Mask = br.ReadUInt16(),
+                        Vfx = br.ReadUInt16()
+                    });
+                }
+
+            }
+            return entries;
+        }
+
+
         /// <summary>
         /// Gets the full IMC information for a given item
         /// </summary>
@@ -108,7 +170,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 throw new InvalidDataException($"Could not find offset for {path}");
             }
 
-            var imcByteData = await dat.GetType2Data(imcOffset, _dataFile);
+            var imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(path));
 
             return await Task.Run(() =>
             {
@@ -328,13 +390,35 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <summary>
         /// A dictionary containing slot offset data in format [Slot Abbreviation, Offset within variant set]
         /// </summary>
-        private static readonly Dictionary<string, int> _slotOffsetDictionary = new Dictionary<string, int>
+        public static readonly Dictionary<string, int> SlotOffsetDictionary = new Dictionary<string, int>
         {
             {"met", 0},
             {"top", 1},
             {"glv", 2},
             {"dwn", 3},
             {"sho", 4},
+            {"ear", 0},
+            {"nek", 1},
+            {"wrs", 2},
+            {"rir", 3},
+            {"ril", 4}
+        };
+        /// <summary>
+        /// A dictionary containing slot offset data in format [Slot Abbreviation, Offset within variant set]
+        /// </summary>
+        public static readonly Dictionary<string, int> EquipmentSlotOffsetDictionary = new Dictionary<string, int>
+        {
+            {"met", 0},
+            {"top", 1},
+            {"glv", 2},
+            {"dwn", 3},
+            {"sho", 4},
+        };
+        /// <summary>
+        /// A dictionary containing slot offset data in format [Slot Abbreviation, Offset within variant set]
+        /// </summary>
+        public static readonly Dictionary<string, int> AccessorySlotOffsetDictionary = new Dictionary<string, int>
+        {
             {"ear", 0},
             {"nek", 1},
             {"wrs", 2},
@@ -398,7 +482,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 var ret = new List<XivImc>(SubsetList.Count);
                 for(int i = 0; i < SubsetList.Count; i++)
                 {
-                    ret.Add(GetEntry(i, slot));
+                    ret.Add(GetEntry(i+1, slot));
                 }
                 return ret;
             }
@@ -429,9 +513,9 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if(_slotOffsetDictionary.ContainsKey(slot) && _slotOffsetDictionary[slot] < subset.Count)
+                if(SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
-                    idx = _slotOffsetDictionary[slot];
+                    idx = SlotOffsetDictionary[slot];
                 }
 
                 return subset[idx];
@@ -457,9 +541,9 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if (_slotOffsetDictionary.ContainsKey(slot) && _slotOffsetDictionary[slot] < subset.Count)
+                if (SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
-                    idx = _slotOffsetDictionary[slot];
+                    idx = SlotOffsetDictionary[slot];
                 }
 
                 // Assign info.

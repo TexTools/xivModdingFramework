@@ -16,14 +16,56 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public Dictionary<string, EquipmentParameter> Parameters;
 
-        public EquipmentParameterSet()
+        // Entry order within the set.
+        public static readonly List<string> EntryOrder = new List<string>()
         {
+            "top", "dwn", "glv", "sho", "met"
+        };
+
+        // Byte sizes within the set.
+        public static readonly Dictionary<string, int> EntrySizes = new Dictionary<string, int>()
+        {
+            { "top", 2 },
+            { "dwn", 1 },
+            { "glv", 1 },
+            { "sho", 1 },
+            { "met", 3 }
+        };
+
+        // Byte offsets within the set.
+        public static readonly Dictionary<string, int> EntryOffsets = new Dictionary<string, int>()
+        {
+            { "top", 0 },
+            { "dwn", 2 },
+            { "glv", 3 },
+            { "sho", 4 },
+            { "met", 5 }
+        };
+
+        public EquipmentParameterSet(List<byte> rawBytes)
+        {
+            var slotBytes = new Dictionary<string, List<byte>>();
+            slotBytes.Add("top", new List<byte>());
+            slotBytes.Add("dwn", new List<byte>());
+            slotBytes.Add("glv", new List<byte>());
+            slotBytes.Add("sho", new List<byte>());
+            slotBytes.Add("met", new List<byte>());
+
+            slotBytes["top"].Add(rawBytes[0]);
+            slotBytes["top"].Add(rawBytes[1]);
+            slotBytes["dwn"].Add(rawBytes[2]);
+            slotBytes["glv"].Add(rawBytes[3]);
+            slotBytes["sho"].Add(rawBytes[4]);
+            slotBytes["met"].Add(rawBytes[5]);
+            slotBytes["met"].Add(rawBytes[6]);
+            slotBytes["met"].Add(rawBytes[7]);
+
             Parameters = new Dictionary<string, EquipmentParameter>() {
-                { "met", new EquipmentParameter("met") },
-                { "top", new EquipmentParameter("top") },
-                { "glv", new EquipmentParameter("glv") },
-                { "dwn", new EquipmentParameter("dwn") },
-                { "sho", new EquipmentParameter("sho") }
+                { "top", new EquipmentParameter("top", slotBytes["top"]) },
+                { "dwn", new EquipmentParameter("dwn", slotBytes["dwn"]) },
+                { "glv", new EquipmentParameter("glv", slotBytes["glv"]) },
+                { "sho", new EquipmentParameter("sho", slotBytes["sho"]) },
+                { "met", new EquipmentParameter("met", slotBytes["met"]) }
             };
         }
         public static List<string> SlotsAsList()
@@ -108,6 +150,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public readonly string Slot;
 
+        private List<byte> _rawBytes;
 
         /// <summary>
         /// The binary flag data for this equipment parameter.
@@ -119,7 +162,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// Constructor.  Slot is required.
         /// </summary>
         /// <param name="slot"></param>
-        public EquipmentParameter(string slot)
+        public EquipmentParameter(string slot, List<byte> rawBytes)
         {
             Slot = slot;
             var keys = GetFlagList(slot);
@@ -127,6 +170,15 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 Flags.Add(key, null);
             }
+        }
+
+        /// <summary>
+        /// Gets the raw bytes of this EquipmentParameter.
+        /// </summary>
+        /// <returns></returns>
+        public List<byte> GetBytes()
+        {
+            return _rawBytes;
         }
 
         /// <summary>

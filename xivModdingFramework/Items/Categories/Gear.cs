@@ -58,9 +58,7 @@ namespace xivModdingFramework.Items.Categories
         }
         public async Task<List<XivGear>> GetGearList(string substring = null)
         {
-            var cache = new XivCache(_gameDirectory, _xivLanguage);
-
-            return await cache.GetCachedGearList(substring);
+            return await XivCache.GetCachedGearList(substring);
         }
 
         /// <summary>
@@ -357,7 +355,7 @@ namespace xivModdingFramework.Items.Categories
         public async Task<List<XivRace>> GetRacesForTextures(XivGear xivGear, XivDataFile dataFile)
         {
             // Get the material version for the item from the imc file
-            var imc = new Imc(_gameDirectory, dataFile);
+            var imc = new Imc(_gameDirectory);
             var gearVersion = (await imc.GetImcInfo(xivGear)).Variant.ToString().PadLeft(4, '0');
 
             var modelID = xivGear.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
@@ -695,123 +693,7 @@ namespace xivModdingFramework.Items.Categories
 
             return ttpList;
         }
-        public async Task<List<IItemModel>> GetSameVariantList(IItemModel item)
-        {
-            var sameModelItems = new List<IItemModel>();
-            if (!item.PrimaryCategory.Equals(XivStrings.Gear))
 
-            {
-                sameModelItems.Add((IItemModel)item.Clone());
-                return sameModelItems;
-            }
-            sameModelItems = await GetSameModelList(item);
-
-            var imc = new Imc(_gameDirectory, XivDataFile._04_Chara);
-            var originalInfo = await imc.GetImcInfo(item);
-
-            var sameMaterialItems = new List<IItemModel>();
-            foreach (var i in sameModelItems)
-            {
-                var info = await imc.GetImcInfo(i);
-                if (info.Variant == originalInfo.Variant)
-                {
-                    sameMaterialItems.Add(i);
-                }
-            }
-
-            return sameMaterialItems;
-        }
-
-        public async Task<List<IItemModel>> GetSameModelList(IItemModel item)
-        {
-            var sameModelItems = new List<IItemModel>();
-
-            //gear
-            if (item.PrimaryCategory.Equals(XivStrings.Gear))
-            {
-                sameModelItems.AddRange(
-                    (await GetGearList())
-                    .Where(it =>
-                    it.ModelInfo.PrimaryID == item.ModelInfo.PrimaryID
-                    && it.ModelInfo.SecondaryID == item.ModelInfo.SecondaryID
-                    && it.SecondaryCategory == item.SecondaryCategory).Select(it => it as IItemModel).ToList()
-                );
-
-                // We don't really care which sub-model gets returned here, we just need a path to pull the data file off of.
-                var imc = new Imc(_gameDirectory, item.DataFile);
-
-                // Language doesn't actually matter for the tests we're doing here.
-                var info = await imc.GetFullImcInfo(item);
-                var slot = item.GetItemSlotAbbreviation();
-                var imcEntries = info.GetAllEntries(slot);
-
-                if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID != 0))
-                {
-                    // Need to list default IMC set.
-                    // Need to create a new item for it.
-                    var npcItem = new XivGear()
-                    {
-                        Name = "NPC Equipment e" + item.ModelInfo.PrimaryID + " " + slot + " Default Variant",
-                        ModelInfo = new XivGearModelInfo(),
-                        PrimaryCategory = item.PrimaryCategory,
-                        SecondaryCategory = item.SecondaryCategory,
-                        TertiaryCategory = item.TertiaryCategory,
-                        DataFile = item.DataFile,
-                    };
-                    npcItem.ModelInfo.PrimaryID = item.ModelInfo.PrimaryID;
-                    npcItem.ModelInfo.SecondaryID = item.ModelInfo.SecondaryID;
-                    npcItem.ModelInfo.ImcSubsetID = 0;
-                    try
-                    {
-                        ((XivGearModelInfo)npcItem.ModelInfo).IsWeapon = ((XivGearModelInfo)item.ModelInfo).IsWeapon;
-                    }
-                    catch
-                    {
-                        // No-op.  Should never actually get here, but safety check on the cast.
-                    }
-
-                    sameModelItems.Add(npcItem);
-                }
-
-                // Need to verify all of our IMC sets are properly represented in the item list.
-                for (int i = 1; i <= imcEntries.Count; i++)
-                {
-                    // Already in it.  All set.
-                    if (sameModelItems.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
-
-                    // Need to create a new item for it.
-                    var npcItem = new XivGear()
-                    {
-                        Name = "NPC Equipment e" + item.ModelInfo.PrimaryID + " " + slot + " IMC Variant " + i,
-                        ModelInfo = new XivGearModelInfo(),
-                        PrimaryCategory = item.PrimaryCategory,
-                        SecondaryCategory = item.SecondaryCategory,
-                        TertiaryCategory = item.TertiaryCategory,
-                        DataFile = item.DataFile,
-                    };
-                    npcItem.ModelInfo.PrimaryID = item.ModelInfo.PrimaryID;
-                    npcItem.ModelInfo.SecondaryID = item.ModelInfo.SecondaryID;
-                    npcItem.ModelInfo.ImcSubsetID = i;
-                    try
-                    {
-                        ((XivGearModelInfo)npcItem.ModelInfo).IsWeapon = ((XivGearModelInfo)item.ModelInfo).IsWeapon;
-                    }
-                    catch
-                    {
-                        // No-op.  Should never actually get here, but safety check on the cast.
-                    }
-
-                    sameModelItems.Add(npcItem);
-                }
-
-            }
-            else
-            {
-                //character
-                sameModelItems.Add((IItemModel)item.Clone());
-            }
-            return sameModelItems;
-        }
 
 
         // A dictionary containg <Slot ID, Gear Category>
@@ -826,7 +708,7 @@ namespace xivModdingFramework.Items.Categories
             {6, XivStrings.Waist },
             {7, XivStrings.Legs },
             {8, XivStrings.Feet },
-            {9, XivStrings.Ears },
+            {9, XivStrings.Earring },
             {10, XivStrings.Neck },
             {11, XivStrings.Wrists },
             {12, XivStrings.Rings },
@@ -892,7 +774,7 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.Wrists, "wrs"},
@@ -920,7 +802,7 @@ namespace xivModdingFramework.Items.Categories
             {"dwn", XivStrings.Legs},
             {"sho", XivStrings.Feet},
             {"top", XivStrings.Body},
-            {"ear", XivStrings.Ears},
+            {"ear", XivStrings.Earring},
             {"nek", XivStrings.Neck},
             {"rir", XivStrings.Rings},
             {"wrs", XivStrings.Wrists},

@@ -34,5 +34,7 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] Alpha { get; set; }
 
         public byte[] Emissive { get; set; }
+
+        public string MaterialPath { get; set; }
     }
 }

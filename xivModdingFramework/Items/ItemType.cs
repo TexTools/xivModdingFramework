@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
@@ -64,8 +65,8 @@ namespace xivModdingFramework.Items
                     //No-op.
                 }
             }
-            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Ears) || item.SecondaryCategory.Equals(XivStrings.Neck) || 
-                     item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings)))
+            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Earring) || item.SecondaryCategory.Equals(XivStrings.Neck) || 
+                     item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings) || item.SecondaryCategory.Equals(XivStrings.LeftRing)))
             {
                 itemType = XivItemType.accessory;
             }
@@ -143,7 +144,7 @@ namespace xivModdingFramework.Items
             {
                 itemType = XivItemType.hair;
             }
-            else if (item.PrimaryCategory.Equals(XivStrings.Character) && item.SecondaryCategory.Equals( XivStrings.Ears ))
+            else if (item.PrimaryCategory.Equals(XivStrings.Character) && item.SecondaryCategory.Equals( XivStrings.Ear ))
             {
                 itemType = XivItemType.ear;
             }
@@ -222,6 +223,87 @@ namespace xivModdingFramework.Items
             return '-';
         }
 
+        // Zero(th) group is the full file path.
+        // First group is the item root path.
+        // Second group is the imc file name.
+        private static readonly Regex _equipmentRegex = new Regex("^(chara/equipment/(e[0-9]{4})/).*");
+        private static readonly Regex _accessoryRegex = new Regex("^(chara/accessory/(a[0-9]{4})/).*");
+        private static readonly Regex _weaponRegex = new Regex("^(chara/weapon/w[0-9]{4}/obj/body/(b[0-9]{4})/).*");
+        private static readonly Regex _monsterRegex = new Regex("^(chara/monster/m[0-9]{4}/obj/body/(b[0-9]{4})/).*");
+        private static readonly Regex _demihumanRegex = new Regex("^(chara/demihuman/d[0-9]{4}/obj/equipment/(e[0-9]{4})/).*");
+        public static XivItemType GetItemTypeFromPath(string path)
+        {
+
+            if (_equipmentRegex.IsMatch(path)) return XivItemType.equipment;
+            if (_accessoryRegex.IsMatch(path)) return XivItemType.accessory;
+            if (_weaponRegex.IsMatch(path)) return XivItemType.weapon;
+            if (_monsterRegex.IsMatch(path)) return XivItemType.monster;
+            if (_demihumanRegex.IsMatch(path)) return XivItemType.demihuman;
+
+            return XivItemType.unknown;
+        }
+
+        /// <summary>
+        /// Finds the root folder for an item, from any child path.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static string GetRootFolderFromPath(string path)
+        {
+            var match = _equipmentRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _accessoryRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _weaponRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _monsterRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+            match = _demihumanRegex.Match(path);
+            if (match.Success) return match.Groups[1].Value;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Finds suffix-less -name- of the IMC File for a given child path..
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        private static string GetIMCNameFromChildPath(string path)
+        {
+            var match = _equipmentRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _accessoryRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _weaponRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _monsterRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+            match = _demihumanRegex.Match(path);
+            if (match.Success) return match.Groups[2].Value;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the IMC path for a given child path.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static string GetIMCPathFromChildPath(string path)
+        {
+
+            var imcName = GetIMCNameFromChildPath(path);
+            var rootFolder = GetRootFolderFromPath(path);
+            if (imcName == null || rootFolder == null)
+            {
+                return null;
+            }
+
+            return rootFolder + imcName + ".imc";
+        }
+
+
         /// <summary>
         /// Get this item's root folder in the FFXIV internal directory structure.
         /// </summary>
@@ -235,9 +317,16 @@ namespace xivModdingFramework.Items
             var secondaryId = "";
             XivModelInfo modelInfo = null;
             try {
-                modelInfo = ((IItemModel)item).ModelInfo;
-                primaryId = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
-                secondaryId = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
+                // Hitting this catch 60,000 time for all the UI elements is really slow.
+                if (item != null && primaryType != XivItemType.ui)
+                {
+                    modelInfo = ((IItemModel)item).ModelInfo;
+                    if (modelInfo != null)
+                    {
+                        primaryId = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
+                        secondaryId = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
+                    }
+                }
             } catch(Exception ex)
             {
                 // No-op.  If it failed it's one of the types we're not going to use it modelInfo on anyways.
@@ -262,8 +351,16 @@ namespace xivModdingFramework.Items
             }
             else if (primaryType == XivItemType.ui)
             {
-                var uiItem = (XivUi)item;
-                return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
+                if (item.SecondaryCategory == XivStrings.Paintings)
+                {
+                    modelInfo = ((IItemModel)item).ModelInfo;
+                    return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
+                }
+                else
+                {
+                    var uiItem = (XivUi)item;
+                    return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
+                }
             }
             else if (primaryType == XivItemType.furniture)
             {

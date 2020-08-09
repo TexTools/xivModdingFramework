@@ -37,6 +37,11 @@ namespace xivModdingFramework.Mods.DataContainers
         public Version Version { get; set; }
 
         /// <summary>
+        /// The modpack Url
+        /// </summary>
+        public string Url = "";
+
+        /// <summary>
         /// The description for the mod pack
         /// </summary>
         public string Description { get; set; }
@@ -69,6 +74,11 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The offset to where the mod data is located
         /// </summary>
         public long ModOffset { get; set; }
+
+        /// <summary>
+        /// If the entry is SE Default data or not.
+        /// </summary>
+        public bool IsDefault = false;
 
         /// <summary>
         /// The size of the mod data

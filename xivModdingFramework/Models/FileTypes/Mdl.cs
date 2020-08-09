@@ -54,6 +54,8 @@ using xivModdingFramework.Variants.FileTypes;
 using SixLabors.ImageSharp.Formats.Png;
 using System.Data;
 using System.Text.RegularExpressions;
+using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Cache;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -100,7 +102,7 @@ namespace xivModdingFramework.Models.FileTypes
             var mtrlVariant = 1;
             try
             {
-                var _imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
+                var _imc = new Imc(_gameDirectory);
                 mtrlVariant = (await _imc.GetImcInfo(item)).Variant;
             }
             catch (Exception ex)
@@ -160,7 +162,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else
             {
-                var imc = new Imc(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
+                var imc = new Imc(_gameDirectory);
                 var model = await GetModel(mdlPath);
                 await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
             }
@@ -215,7 +217,13 @@ namespace xivModdingFramework.Models.FileTypes
             // Pop the textures out so the exporters can reference them.
             if (includeTextures)
             {
-                await ExportMaterialsForModel(model, outputFilePath, mtrlVariant);
+                // Fix up our skin references in the model before exporting, to ensure
+                // we supply the right material names to the exporters down-chain.
+                if (model.IsInternal)
+                {
+                    ModelModifiers.FixUpSkinReferences(model, model.Source, null);
+                }
+                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
             }
 
             // Validate the skeleton.
@@ -238,7 +246,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Save the DB file.
 
-            var converterFolder = Directory.GetCurrentDirectory() + "\\converters\\" + fileFormat;
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
             model.SaveToFile(dbPath);
@@ -296,15 +305,15 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
         /// </summary>
-        private async Task ExportMaterialsForModel(TTModel model, string outputFilePath, int mtrlVariant = 1)
+        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races)
         {
             var modelName = Path.GetFileNameWithoutExtension(model.Source);
             var directory = Path.GetDirectoryName(outputFilePath);
 
             // Language doesn't actually matter here.
-            var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
-            var _tex = new Tex(_gameDirectory);
-            var _index = new Index(_gameDirectory);
+            var _mtrl = new Mtrl(gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
+            var _tex = new Tex(gameDirectory);
+            var _index = new Index(gameDirectory);
             var materialIdx = 0;
 
 
@@ -312,11 +321,34 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 try
                 {
+                    var mdlPath = model.Source;
+
+                    // Set source race to match so that it doesn't get replaced
+                    if (targetRace != XivRace.All_Races)
+                    {
+                        var bodyRegex = new Regex("(b[0-9]{4})");
+                        var faceRegex = new Regex("(f[0-9]{4})");
+
+                        if (bodyRegex.Match(materialName).Success)
+                        {
+                            var currentRace = model.Source.Substring(model.Source.LastIndexOf('c') + 1, 4);
+                            mdlPath = model.Source.Replace(currentRace, targetRace.GetRaceCode());
+                        }
+
+                        var faceMatch = faceRegex.Match(materialName);
+                        if (faceMatch.Success)
+                        {
+                            var mdlFace = faceRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
+                        }
+                    }
+
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
-                    var mtrlPath = _mtrl.GetMtrlPath(model.Source, materialName, mtrlVariant);
+                    var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
                     var mtrlOffset = await _index.GetDataOffset(mtrlPath);
                     var mtrl = await _mtrl.GetMtrlData(mtrlOffset, mtrlPath, 11);
-                    var modelMaps = await ModelTexture.GetModelMaps(_gameDirectory, mtrl);
+                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl);
 
                     // Outgoing file names.
                     var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
@@ -410,6 +442,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns>An XivMdl structure containing all mdl data.</returns>
         public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
         {
+
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
@@ -1676,12 +1709,190 @@ namespace xivModdingFramework.Models.FileTypes
 
 
         /// <summary>
+        /// Extracts and calculates the full MTRL paths from a given MDL file.
+        /// A material variant of -1 gets the materials for ALL variants,
+        /// effectively generating the 'child files' list for an Mdl file.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="getOriginal"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true)
+        {
+            // Language is irrelevant here.
+            var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
+            var _mtrl = new Mtrl(_gameDirectory, dataFile, XivLanguage.None);
+            var _imc = new Imc(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+
+            var materials = new List<string>();
+
+            // Read the raw Material names from the file.
+            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal);
+            if(materialNames.Count == 0)
+            {
+                return materials;
+            }
+
+            var materialVariants = new HashSet<int>();
+            if (materialVariant >= 0)
+            {
+                // If we had a specific variant to get, just use that.
+                materialVariants.Add(materialVariant);
+
+            } else { 
+
+                // Otherwise, we have to resolve all possible variants.
+                var imcPath = ItemType.GetIMCPathFromChildPath(mdlPath);
+                if (imcPath == null)
+                {
+                    // No IMC file means this Mdl doesn't use variants/only has a single variant.
+                    materialVariants.Add(1);
+                }
+                else
+                {
+
+                    // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
+                    try
+                    {
+                        var info = await _imc.GetFullImcInfo(imcPath);
+                        var slotRegex = new Regex("_([a-z]{3}).mdl$");
+                        var slot = "";
+                        var m = slotRegex.Match(mdlPath);
+                        if (m.Success)
+                        {
+                            slot = m.Groups[1].Value;
+                        }
+
+                        // We have to get all of the material variants used for this item now.
+                        var imcInfos = info.GetAllEntries(slot);
+                        foreach (var i in imcInfos)
+                        {
+                            materialVariants.Add(i.Variant);
+                        }
+                    }
+                    catch
+                    {
+                        // Some Dual Wield weapons don't have any IMC entry at all.
+                        // In these cases they just use Material Variant 1 (Which is usually a simple dummy material)
+                        materialVariants.Add(1);
+                    }
+                }
+            }
+
+            // We have to get every material file that this MDL references.
+            // That means every variant of every material referenced.
+            var uniqueMaterialPaths = new HashSet<string>();
+            foreach (var mVariant in materialVariants)
+            {
+                foreach (var mName in materialNames)
+                {
+                    // Material ID 0 is SE's way of saying it doesn't exist.
+                    if (mVariant != 0)
+                    {
+                        var path = _mtrl.GetMtrlPath(mdlPath, mName, mVariant);
+                        uniqueMaterialPaths.Add(path);
+                    }
+                }
+            }
+
+            if(!includeSkin)
+            {
+                var skinRegex = new Regex("chara/human/c[0-9]{4}/obj/body/b[0-9]{4}/material/v[0-9]{4}/.+\\.mtrl");
+                var toRemove = new List<string>();
+                foreach(var mtrl in uniqueMaterialPaths)
+                {
+                    if(skinRegex.IsMatch(mtrl))
+                    {
+                        toRemove.Add(mtrl);
+                    }
+                }
+
+                foreach(var mtrl in toRemove)
+                {
+                    uniqueMaterialPaths.Remove(mtrl);
+                }
+            }
+
+            return uniqueMaterialPaths.ToList();
+        }
+
+
+
+        /// <summary>
+        /// Extracts just the MTRL names from a mdl file.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="getOriginal"></param>
+        /// <returns></returns>
+        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false)
+        {
+            var materials = new List<string>();
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+            var modding = new Modding(_gameDirectory);
+            var mod = await modding.TryGetModEntry(mdlPath);
+            var offset = await index.GetDataOffset(mdlPath);
+
+            var modded = mod != null && mod.enabled;
+            if (getOriginal)
+            {
+                if (modded)
+                {
+                    offset = mod.data.originalOffset;
+                }
+            }
+
+            if (offset == 0)
+            {
+                throw new Exception($"Could not find offset for {mdlPath}");
+            }
+
+            var mdlData = await dat.GetType3Data(offset, _dataFile);
+
+
+            using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
+            {
+                // We skip the Vertex Data Structures for now
+                // This is done so that we can get the correct number of meshes per LoD first
+                br.BaseStream.Seek(64 + 136 * mdlData.MeshCount + 4, SeekOrigin.Begin);
+
+                var PathCount = br.ReadInt32();
+                var PathBlockSize = br.ReadInt32();
+
+
+                Regex materialRegex = new Regex(".*\\.mtrl$");
+
+                for (var i = 0; i < PathCount; i++)
+                {
+                    byte a;
+                    List<byte> bytes = new List<byte>(); ;
+                    while ((a = br.ReadByte()) != 0)
+                    {
+                        bytes.Add(a);
+                    }
+
+                    var st = Encoding.ASCII.GetString(bytes.ToArray()).Replace("\0", "");
+
+                    if (materialRegex.IsMatch(st))
+                    {
+                        materials.Add(st);
+                    }
+                }
+
+            }
+            return materials;
+        }
+
+
+        /// <summary>
         /// Retreieves the available list of file extensions the framework has importers available for.
         /// </summary>
         /// <returns></returns>
         public List<string> GetAvailableImporters()
         {
-            const string importerPath = "converters/";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            cwd = cwd.Replace("\\", "/");
+            string importerPath = cwd + "/converters/";
             var ret = new List<string>();
             ret.Add("dae"); // DAE handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
@@ -1704,7 +1915,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public List<string> GetAvailableExporters()
         {
-            const string importerPath = "converters/";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            cwd = cwd.Replace("\\", "/");
+            string importerPath = cwd + "/converters/";
             var ret = new List<string>();
             ret.Add("dae"); // DAE handler is internal.
             ret.Add("obj"); // OBJ handler is internal.
@@ -1732,7 +1945,8 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
         {
 
-            var importerFolder = Directory.GetCurrentDirectory() + "\\converters\\" + importerName;
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            string importerFolder = cwd + "\\converters\\" + importerName;
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
@@ -1795,8 +2009,8 @@ namespace xivModdingFramework.Models.FileTypes
         /// Import a given model
         /// </summary>
         /// <param name="item">The current item being imported</param>
-        /// <param name="currentMdl">The current (modified or unmodified) mdl for the item.</param>
-        /// <param name="fileLocation">The location of the dae file to import</param>
+        /// <param name="race">The racial model to replace of the item</param>
+        /// <param name="path">The location of the dae file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
         ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
@@ -4026,7 +4240,8 @@ namespace xivModdingFramework.Models.FileTypes
             var skelDict = new Dictionary<string, SkeletonData>();
 
             var skelName = "c" + race.GetRaceCode();
-            var skeletonFile = Directory.GetCurrentDirectory() + "/Skeletons/" + skelName + ".skel";
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
             var skeletonData = File.ReadAllLines(skeletonFile);
             var FullSkel = new Dictionary<string, SkeletonData>();
             var FullSkelNum = new Dictionary<int, SkeletonData>();
@@ -4157,7 +4372,7 @@ namespace xivModdingFramework.Models.FileTypes
                         mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
                         mdlFile = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
                     }
-                    else if (itemCategory.Equals(XivStrings.Ears))
+                    else if (itemCategory.Equals(XivStrings.Ear))
                     {
                         mdlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/model";
                         mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
@@ -4195,7 +4410,8 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
-            {XivStrings.Ears, "ear"},
+            {XivStrings.Earring, "ear"},
+            {XivStrings.Ear, "zer"},
             {XivStrings.Neck, "nek"},
             {XivStrings.Rings, "rir"},
             {XivStrings.LeftRing, "ril"},
@@ -4212,7 +4428,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Etc, "etc"},
             {XivStrings.Accessory, "acc"},
             {XivStrings.Hair, "hir"},
-            {XivStrings.Tail, "til"}
+            {XivStrings.Tail, "til"},
 
         };
 
