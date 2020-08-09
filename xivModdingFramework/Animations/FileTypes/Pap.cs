@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.Animations.DataContainers;
 using xivModdingFramework.Animations.Enums;
 using xivModdingFramework.General.Enums;
@@ -13,12 +14,12 @@ namespace xivModdingFramework.Animations.FileTypes
     {
         private DirectoryInfo _gameDirectory;
 
-        public Pap(DirectoryInfo gameDirectory, XivDataFile dataFile, XivLanguage lang)
+        public Pap(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
         }
 
-        public async void ParsePapFile(string papPath)
+        public async Task<PapModel> ParsePapFile(string papPath)
         {
             var dat = new Dat(_gameDirectory);
 
@@ -89,6 +90,7 @@ namespace xivModdingFramework.Animations.FileTypes
                         switch (prMagic)
                         {
                             case (int)PapPropertyType.TMDH:
+                                papProperty.Type = PapPropertyType.TMDH;
                                 papProperty.TMDH = new PapModel.PapTMDH
                                 {
                                     Index = br.ReadInt32(),
@@ -98,6 +100,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 break;
 
                             case (int)PapPropertyType.TMAL:
+                                papProperty.Type = PapPropertyType.TMAL;
                                 br.ReadInt32(); // length to the end of parameter from this point
 
                                 papProperty.TMAL = new PapModel.PapTMAL
@@ -108,6 +111,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 break;
 
                             case (int)PapPropertyType.TMAC:
+                                papProperty.Type = PapPropertyType.TMAC;
                                 papProperty.TMAC = new PapModel.PapTMAC
                                 {
                                     Index = br.ReadInt32(),
@@ -120,6 +124,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 break;
 
                             case (int)PapPropertyType.TMTR:
+                                papProperty.Type = PapPropertyType.TMTR;
                                 var tmtr = new PapModel.PapTMTR
                                 {
                                     Index = br.ReadInt32(),
@@ -146,6 +151,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 break;
 
                             case (int)PapPropertyType.C009: // This seems to be the animation start or parent animation
+                                papProperty.Type = PapPropertyType.C009;
                                 papProperty.C9 = new PapModel.PapC9
                                 {
                                     Index = br.ReadInt32(),
@@ -169,6 +175,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 break;
 
                             case (int)PapPropertyType.C010: // This is probably facial animations, or animations in general maybe?
+                                papProperty.Type = PapPropertyType.C010;
                                 var c10 = new PapModel.PapC10
                                 {
                                     Index = br.ReadInt16(),
@@ -202,15 +209,16 @@ namespace xivModdingFramework.Animations.FileTypes
                                 break;
 
                             case (int)PapPropertyType.C042: // Animation End?
+                                papProperty.Type = PapPropertyType.C042;
                                 papProperty.C42 = new PapModel.PapC42
                                 {
                                     Index = br.ReadInt16(),
                                     Unknown1 = br.ReadInt16(), // maybe time or frames
                                     Unknown2 = br.ReadInt16(), // maybe time or frames
                                     Unknown3 = br.ReadInt16(),
-                                    Unknown4 = br.ReadInt16(),
-                                    Unknown5 = br.ReadInt16(),
-                                    Unknown6 = br.ReadInt16()
+                                    Unknown4 = br.ReadInt32(),
+                                    Unknown5 = br.ReadInt32(),
+                                    Unknown6 = br.ReadInt32(),
                                 };
                                 break;
                         }
@@ -226,6 +234,8 @@ namespace xivModdingFramework.Animations.FileTypes
                     papModel.PapParameters.Add(i, papParameter);
                 }
             }
+
+            return papModel;
         }
 
 

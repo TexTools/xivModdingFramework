@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using xivModdingFramework.Animations.Enums;
 
 namespace xivModdingFramework.Animations.DataContainers
 {
@@ -43,6 +44,7 @@ namespace xivModdingFramework.Animations.DataContainers
 
         public class PapParameterProperty
         {
+            public PapPropertyType Type { get; set; }
             public int PropertyLength { get; set; }
 
             public PapTMDH TMDH { get; set; }
