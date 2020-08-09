@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Animations.DataContainers;
 using xivModdingFramework.Animations.Enums;
-using xivModdingFramework.General.Enums;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Animations.FileTypes
@@ -91,7 +90,7 @@ namespace xivModdingFramework.Animations.FileTypes
                         {
                             case (int)PapPropertyType.TMDH:
                                 papProperty.Type = PapPropertyType.TMDH;
-                                papProperty.TMDH = new PapModel.PapTMDH
+                                papProperty.Property = new PapModel.PapTMDH
                                 {
                                     Index = br.ReadInt32(),
                                     FrameCount = br.ReadInt16(), // The number of frames in the animation
@@ -103,7 +102,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 papProperty.Type = PapPropertyType.TMAL;
                                 br.ReadInt32(); // length to the end of parameter from this point
 
-                                papProperty.TMAL = new PapModel.PapTMAL
+                                papProperty.Property = new PapModel.PapTMAL
                                 {
                                     Unknown1 = br.ReadInt16(), // something count?
                                     Unknown2 = br.ReadInt16()
@@ -112,7 +111,7 @@ namespace xivModdingFramework.Animations.FileTypes
 
                             case (int)PapPropertyType.TMAC:
                                 papProperty.Type = PapPropertyType.TMAC;
-                                papProperty.TMAC = new PapModel.PapTMAC
+                                papProperty.Property = new PapModel.PapTMAC
                                 {
                                     Index = br.ReadInt32(),
                                     Unknown1 = br.ReadInt32(),
@@ -120,7 +119,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 };
 
                                 br.ReadInt32(); // offset from the beginning of this data (after propertyLength)
-                                papProperty.TMAC.PapTMTRCount = br.ReadInt32();
+                                ((PapModel.PapTMAC)papProperty.Property).PapTMTRCount = br.ReadInt32();
                                 break;
 
                             case (int)PapPropertyType.TMTR:
@@ -147,12 +146,12 @@ namespace xivModdingFramework.Animations.FileTypes
                                 // Go back to saved position
                                 br.BaseStream.Seek(tmtrSavedPos, SeekOrigin.Begin);
 
-                                papProperty.TMTRList.Add(tmtr);
+                                papProperty.PropertyList.Add(tmtr);
                                 break;
 
                             case (int)PapPropertyType.C009: // This seems to be the animation start or parent animation
                                 papProperty.Type = PapPropertyType.C009;
-                                papProperty.C9 = new PapModel.PapC9
+                                papProperty.Property = new PapModel.PapC9
                                 {
                                     Index = br.ReadInt32(),
                                     FrameCount = br.ReadInt32(), // seems to match TMDH frame count (can probably be different for combined animations)
@@ -168,7 +167,7 @@ namespace xivModdingFramework.Animations.FileTypes
                                 // Get the animation names
                                 br.BaseStream.Seek(c9OffsetToAnim - 16, SeekOrigin.Current);
 
-                                papProperty.C9.AnimationName = GetNameOfUnknownLength(br);
+                                ((PapModel.PapC9)papProperty.Property).AnimationName = GetNameOfUnknownLength(br);
 
                                 // Go back to saved position
                                 br.BaseStream.Seek(c9SavedPos, SeekOrigin.Begin);
@@ -205,12 +204,12 @@ namespace xivModdingFramework.Animations.FileTypes
                                 c10.Unknown9 = br.ReadInt16();
                                 c10.Unknown10 = br.ReadInt32();
 
-                                papProperty.C10List.Add(c10);
+                                papProperty.PropertyList.Add(c10);
                                 break;
 
                             case (int)PapPropertyType.C042: // Animation End?
                                 papProperty.Type = PapPropertyType.C042;
-                                papProperty.C42 = new PapModel.PapC42
+                                papProperty.Property = new PapModel.PapC42
                                 {
                                     Index = br.ReadInt16(),
                                     Unknown1 = br.ReadInt16(), // maybe time or frames

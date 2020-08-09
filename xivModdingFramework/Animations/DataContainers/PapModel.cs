@@ -47,19 +47,9 @@ namespace xivModdingFramework.Animations.DataContainers
             public PapPropertyType Type { get; set; }
             public int PropertyLength { get; set; }
 
-            public PapTMDH TMDH { get; set; }
+            public object Property { get; set; }
 
-            public PapTMAL TMAL { get; set; }
-
-            public PapTMAC TMAC { get; set; }
-
-            public List<PapTMTR> TMTRList { get; set; } = new List<PapTMTR>();
-
-            public PapC9 C9 { get; set; }
-
-            public List<PapC10> C10List { get; set; } = new List<PapC10>();
-
-            public PapC42 C42 { get; set; }
+            public List<object> PropertyList { get; set; } = new List<object>();
         }
 
         public class PapTMDH
