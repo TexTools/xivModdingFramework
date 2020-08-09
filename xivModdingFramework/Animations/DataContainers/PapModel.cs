@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using xivModdingFramework.Animations.Enums;
+using xivModdingFramework.Animations.Helpers;
 
 namespace xivModdingFramework.Animations.DataContainers
 {
@@ -50,6 +51,23 @@ namespace xivModdingFramework.Animations.DataContainers
             public object Property { get; set; }
 
             public List<object> PropertyList { get; set; } = new List<object>();
+        }
+
+        public class PapHavokData
+        {
+            public float Duration { get; set; }
+            public int TransformTracks { get; set; }
+            public int FrameCount { get; set; }
+            public int BlockCount { get; set; }
+            public int FramesPerBlock { get; set; }
+            public int MaskAndQuantSize { get; set; }
+            public float BlockDuration { get; set; }
+            public float BlockInverseDuration { get; set; }
+            public float FrameDuration { get; set; }
+            public List<int> BlockOffsets { get; set; } = new List<int>();
+            public List<int> FloatBlockOffsets { get; set; } = new List<int>();
+            public List<int> TransformTrackToBoneIndices { get; set; } = new List<int>();
+            public List<SplineCompressedAnimation.TransformTrack[]> AnimationTracks { get; set; }
         }
 
         public class PapTMDH

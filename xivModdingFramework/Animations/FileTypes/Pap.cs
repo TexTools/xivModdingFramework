@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using xivModdingFramework.Animations.DataContainers;
 using xivModdingFramework.Animations.Enums;
+using xivModdingFramework.Animations.Helpers;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Animations.FileTypes
@@ -20,6 +22,8 @@ namespace xivModdingFramework.Animations.FileTypes
             _gameDirectory = gameDirectory;
         }
 
+        #region Public Methods
+
         public async Task<PapModel> ParsePapFile(string papPath)
         {
             var dat = new Dat(_gameDirectory);
@@ -30,7 +34,7 @@ namespace xivModdingFramework.Animations.FileTypes
 
             using (var br = new BinaryReader(new MemoryStream(papData)))
             {
-                
+
                 // Header   Length: 26 bytes
                 var papHeader = new PapModel.PapHeader();
 
@@ -53,7 +57,7 @@ namespace xivModdingFramework.Animations.FileTypes
                     var animationHeader = new PapModel.PapAnimationHeader();
 
                     // The first 30 bytes seem to be reserved for the animation name
-                    var stringBytes = br.ReadBytes(30); 
+                    var stringBytes = br.ReadBytes(30);
 
                     animationHeader.AnimationName = Encoding.ASCII.GetString(stringBytes.ToArray()).Replace("\0", "");
 
@@ -61,7 +65,7 @@ namespace xivModdingFramework.Animations.FileTypes
                     animationHeader.Unknown2 = br.ReadInt16();
                     animationHeader.AnimationIndex = br.ReadInt16();
                     animationHeader.Unknown3 = br.ReadInt16();
-                    animationHeader.Unknown4 = br.ReadInt16(); 
+                    animationHeader.Unknown4 = br.ReadInt16();
 
                     papModel.AnimationHeaders.Add(animationHeader);
                 }
@@ -239,19 +243,6 @@ namespace xivModdingFramework.Animations.FileTypes
             return papModel;
         }
 
-
-        private string GetNameOfUnknownLength(BinaryReader br)
-        {
-            byte n;
-            var name = new List<byte>();
-            while ((n = br.ReadByte()) != 0)
-            {
-                name.Add(n);
-            }
-
-            return Encoding.ASCII.GetString(name.ToArray()).Replace("\0", "");
-        }
-
         public bool HavokToXml(byte[] havokData, string papName, string savePath, string assetccPath = "")
         {
             try
@@ -279,12 +270,128 @@ namespace xivModdingFramework.Animations.FileTypes
 
                 File.Delete(papHkx);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return false;
             }
 
             return true;
         }
+
+        public void ParseHavokData(string papHavokXmlLoc)
+        {
+            var papHavokData = new PapModel.PapHavokData();
+
+            using (var reader = XmlReader.Create(papHavokXmlLoc))
+            {
+                while (reader.Read())
+                {
+                    if(!reader.IsStartElement()) continue;
+
+                    if (!reader.Name.Equals("hkparam")) continue;
+
+                    var name = reader["name"];
+
+                    // Duration
+                    if (name.Equals("duration"))
+                    {
+                        papHavokData.Duration = reader.ReadElementContentAsFloat();
+                    }
+
+                    // Transform Track
+                    if (name.Equals("numberOfTransformTracks"))
+                    {
+                        papHavokData.TransformTracks = reader.ReadElementContentAsInt();
+                    }
+
+                    // Frame Count
+                    if (name.Equals("numFrames"))
+                    {
+                        papHavokData.FrameCount = reader.ReadElementContentAsInt();
+                    }
+
+                    // Block Count
+                    if (name.Equals("numBlocks"))
+                    {
+                        papHavokData.BlockCount = reader.ReadElementContentAsInt();
+                    }
+
+                    // Frames per Block
+                    if (name.Equals("maxFramesPerBlock"))
+                    {
+                        papHavokData.FramesPerBlock = reader.ReadElementContentAsInt();
+                    }
+
+                    // Mask and Quantization Size
+                    if (name.Equals("maskAndQuantizationSize"))
+                    {
+                        papHavokData.MaskAndQuantSize = reader.ReadElementContentAsInt();
+                    }
+
+                    // Block Duration
+                    if (name.Equals("blockDuration"))
+                    {
+                        papHavokData.BlockDuration = reader.ReadElementContentAsFloat();
+                    }
+
+                    // Block Inverse Duration
+                    if (name.Equals("blockInverseDuration"))
+                    {
+                        papHavokData.BlockInverseDuration = reader.ReadElementContentAsFloat();
+                    }
+
+                    // Frame Duration 
+                    if (name.Equals("frameDuration"))
+                    {
+                        papHavokData.FrameDuration = reader.ReadElementContentAsFloat();
+                    }
+
+                    // Block Offsets
+                    if (name.Equals("blockOffsets"))
+                    {
+                        papHavokData.BlockOffsets.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
+                    }
+
+                    // Float Block Offsets
+                    if (name.Equals("floatBlockOffsets"))
+                    {
+                        papHavokData.FloatBlockOffsets.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
+                    }
+
+                    // Data
+                    if (name.Equals("data"))
+                    {
+                        var data = (int[]) reader.ReadElementContentAs(typeof(int[]), null);
+                        var splineCompressedAnimationData = data.Select(x => (byte) x).ToArray();
+
+                        papHavokData.AnimationTracks = SplineCompressedAnimation.ReadSplineCompressedAnimByteBlock(
+                            splineCompressedAnimationData, papHavokData.TransformTracks, papHavokData.BlockCount);
+                    }
+
+                    // Transform Track To Bone Indices
+                    if (name.Equals("transformTrackToBoneIndices"))
+                    {
+                        papHavokData.TransformTrackToBoneIndices.AddRange((int[])reader.ReadElementContentAs(typeof(int[]), null));
+                    }
+
+                }
+            }
+        }
+        #endregion
+
+
+        #region Private Methods
+        private string GetNameOfUnknownLength(BinaryReader br)
+        {
+            byte n;
+            var name = new List<byte>();
+            while ((n = br.ReadByte()) != 0)
+            {
+                name.Add(n);
+            }
+
+            return Encoding.ASCII.GetString(name.ToArray()).Replace("\0", "");
+        }
+        #endregion
     }
 }
