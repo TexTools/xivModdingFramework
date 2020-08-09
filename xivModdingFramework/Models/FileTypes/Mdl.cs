@@ -328,6 +328,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var bodyRegex = new Regex("(b[0-9]{4})");
                         var faceRegex = new Regex("(f[0-9]{4})");
+                        var tailRegex = new Regex("(t[0-9]{4})");
 
                         if (bodyRegex.Match(materialName).Success)
                         {
@@ -341,6 +342,14 @@ namespace xivModdingFramework.Models.FileTypes
                             var mdlFace = faceRegex.Match(model.Source).Value;
 
                             mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
+                        }
+
+                        var tailMatch = tailRegex.Match(materialName);
+                        if (tailMatch.Success)
+                        {
+                            var mdlTail = tailRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlTail, tailMatch.Value);
                         }
                     }
 
