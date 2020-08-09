@@ -12,14 +12,10 @@ namespace xivModdingFramework.Animations.FileTypes
     public class Pap
     {
         private DirectoryInfo _gameDirectory;
-        private XivDataFile _dataFile;
-        private XivLanguage _xivLanguage;
 
         public Pap(DirectoryInfo gameDirectory, XivDataFile dataFile, XivLanguage lang)
         {
             _gameDirectory = gameDirectory;
-            _xivLanguage = lang;
-            _dataFile = dataFile;
         }
 
         public async void ParsePapFile(string papPath)
@@ -226,6 +222,8 @@ namespace xivModdingFramework.Animations.FileTypes
                     {
                         papParameter.PropertyIndexList.Add(br.ReadInt16());
                     }
+
+                    papModel.PapParameters.Add(i, papParameter);
                 }
             }
         }
