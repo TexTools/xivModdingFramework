@@ -1597,7 +1597,7 @@ namespace xivModdingFramework.Cache
                     root.PrimaryType = primary;
                     root.SecondaryType = (secondary == XivItemType.none ? null : (XivItemType?) secondary);
                     var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-                    var races = XivRaces.PlayableRaces;
+                    var races = (XivRace[])Enum.GetValues(typeof(XivRace));
 
                     for (int p = 0; p < 10000; p++)
                     {
@@ -1633,7 +1633,7 @@ namespace xivModdingFramework.Cache
                                     root.Slot = slot;
 
                                     // Check every possible race code, not just playables?
-                                    //for (int s = 0; s < 10000; p++)
+                                    //for (int s = 0; s < 10000; s++)
                                     foreach (var race in races)
                                     {
                                         //var modelName = root.GetRacialModelName(s);

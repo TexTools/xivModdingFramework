@@ -273,7 +273,18 @@ namespace xivModdingFramework.Models.Helpers
                         if (baseMesh.VertexData.TextureCoordinates1.Count > oldVertexId)
                         {
                             ttVert.UV2 = baseMesh.VertexData.TextureCoordinates1[oldVertexId];
+
+                            if (float.IsNaN(ttVert.UV2.X))
+                            {
+                                ttVert.UV2.X = 0;
+                            }
+
+                            if(float.IsNaN(ttVert.UV2.Y))
+                            {
+                                ttVert.UV2.Y = 0;
+                            }
                         }
+
 
 
                         // Now for the fun part, establishing bones.

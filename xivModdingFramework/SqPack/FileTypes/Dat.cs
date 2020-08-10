@@ -143,11 +143,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         private async Task<bool> IsOriginalDat(XivDataFile dataFile, int datNum, bool alreadyLocked = false)
         {
             var moddedList = await GetModdedDatList(dataFile, alreadyLocked);
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+            var datPath = $"{dataFile.GetDataFileName()}{DatExtension}{datNum}";
             
             for(int i = 0; i < moddedList.Count; i++)
             {
-                moddedList[i] = moddedList[i].Replace("/", "\\");
+                moddedList[i] = Path.GetFileName(moddedList[i]);
             }
 
             return !moddedList.Contains(datPath);
