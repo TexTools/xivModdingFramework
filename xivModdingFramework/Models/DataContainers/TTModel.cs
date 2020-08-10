@@ -1081,7 +1081,7 @@ namespace xivModdingFramework.Models.DataContainers
             } catch(Exception Ex)
             {
                 ModelModifiers.MakeImportReady(this, loggingFunction);
-                throw Ex;
+                throw;
             }
 
             // Undo the export ready at the start.
