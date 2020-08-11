@@ -70,11 +70,17 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int modelDataCheckOffset = 30;
-            int dataLength = 168;
+            int dataLength = 160;
             const int nameDataOffset = 14;
             const int modelDataOffset = 24;
             const int iconDataOffset = 136;
-            int slotDataOffset = 156;
+            int slotDataOffset = 154;
+
+            if(_xivLanguage == XivLanguage.Chinese)
+            {
+                dataLength = 168;
+                slotDataOffset = 156;
+            }
 
             if(_xivLanguage == XivLanguage.Korean)
             {
@@ -94,145 +100,151 @@ namespace xivModdingFramework.Items.Categories
             // Item_0, Item_500, Item_1000, etc.
             await Task.Run(() => Parallel.ForEach(itemDictionary, (item) =>
             {
-                // This checks whether there is any model data present in the current item
-                if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) return;
-
-                var primaryMi = new XivGearModelInfo();
-                var secondaryMi = new XivGearModelInfo();
-                var hasSecondary = false;
-
-                var xivGear = new XivGear
+                try
                 {
-                    ExdID = item.Key,
-                    PrimaryCategory = XivStrings.Gear,
-                    ModelInfo = primaryMi,
-                };
+                    // This checks whether there is any model data present in the current item
+                    if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) return;
 
-                /* Used to determine if the given model is a weapon
-                 * This is important because the data is formatted differently
-                 * The model data is a 16 byte section separated into two 8 byte parts (primary model, secondary model)
-                 * Format is 8 bytes in length with 2 bytes per data point [short, short, short, short]
-                 * Gear: primary model [blank, blank, variant, ID] nothing in secondary model
-                 * Weapon: primary model [blank, variant, body, ID] secondary model [blank, variant, body, ID]
-                */
-                var isWeapon = false;
+                    var primaryMi = new XivGearModelInfo();
+                    var secondaryMi = new XivGearModelInfo();
+                    var hasSecondary = false;
 
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(item.Value)))
-                {
-                    br.BaseStream.Seek(nameDataOffset, SeekOrigin.Begin);
-                    var nameOffset = br.ReadInt16();
-
-                    // Model Data
-                    br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
-
-                    // Primary Model Key
-                    primaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
-                    br.BaseStream.Seek(-8, SeekOrigin.Current);
-
-                    // Primary Blank
-                    var unused = br.ReadInt16();
-
-                    // Primary Variant for weapon, blank otherwise
-                    var weaponVariant = br.ReadInt16();
-
-                    if (weaponVariant != 0)
+                    var xivGear = new XivGear
                     {
-                        primaryMi.ImcSubsetID = weaponVariant;
-                        primaryMi.IsWeapon = true;
-                        isWeapon = true;
-                    }
+                        ExdID = item.Key,
+                        PrimaryCategory = XivStrings.Gear,
+                        ModelInfo = primaryMi,
+                    };
 
-                    // Primary Body if weapon, Variant otherwise
-                    if (isWeapon)
+                    /* Used to determine if the given model is a weapon
+                     * This is important because the data is formatted differently
+                     * The model data is a 16 byte section separated into two 8 byte parts (primary model, secondary model)
+                     * Format is 8 bytes in length with 2 bytes per data point [short, short, short, short]
+                     * Gear: primary model [blank, blank, variant, ID] nothing in secondary model
+                     * Weapon: primary model [blank, variant, body, ID] secondary model [blank, variant, body, ID]
+                    */
+                    var isWeapon = false;
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(item.Value)))
                     {
-                        primaryMi.SecondaryID = br.ReadInt16();
-                    }
-                    else
-                    {
-                        primaryMi.ImcSubsetID = br.ReadInt16();
-                    }
+                        br.BaseStream.Seek(nameDataOffset, SeekOrigin.Begin);
+                        var nameOffset = br.ReadInt16();
 
-                    // Primary Model ID
-                    primaryMi.PrimaryID = br.ReadInt16();
+                        // Model Data
+                        br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
 
-                    // Secondary Model Key
-                    isWeapon = false;
-                    secondaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
-                    br.BaseStream.Seek(-8, SeekOrigin.Current);
+                        // Primary Model Key
+                        primaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
+                        br.BaseStream.Seek(-8, SeekOrigin.Current);
 
-                    // Secondary Blank
-                    var unused2 = br.ReadInt16();
+                        // Primary Blank
+                        var unused = br.ReadInt16();
 
-                    // Secondary Variant for weapon, blank otherwise
-                    weaponVariant = br.ReadInt16();
+                        // Primary Variant for weapon, blank otherwise
+                        var weaponVariant = br.ReadInt16();
 
-                    if (weaponVariant != 0)
-                    {
-                        secondaryMi.ImcSubsetID = weaponVariant;
-                        secondaryMi.IsWeapon = true;
-                        isWeapon = true;
-                    }
-
-                    // Secondary Body if weapon, Variant otherwise
-                    if (isWeapon)
-                    {
-                        secondaryMi.SecondaryID = br.ReadInt16();
-                    }
-                    else
-                    {
-                        secondaryMi.ImcSubsetID = br.ReadInt16();
-                    }
-
-                    // Secondary Model ID
-                    secondaryMi.PrimaryID = br.ReadInt16();
-
-                    // Icon
-                    br.BaseStream.Seek(iconDataOffset, SeekOrigin.Begin);
-                    xivGear.IconNumber = br.ReadUInt16();
-
-                    // Gear Slot/Category
-                    br.BaseStream.Seek(slotDataOffset, SeekOrigin.Begin);
-                    int slotNum = br.ReadByte();
-
-                    // Waist items do not have texture or model data
-                    if (slotNum == 6) return;
-
-                    xivGear.EquipSlotCategory = slotNum;
-                    xivGear.SecondaryCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
-
-                    // Gear Name
-                    var gearNameOffset = dataLength + nameOffset;
-                    var gearNameLength = item.Value.Length - gearNameOffset;
-                    br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                    var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
-                    xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-                    xivGear.Name = xivGear.Name.Trim();
-
-                    // If we have a secondary model
-
-                    XivGear secondaryItem = null;
-                    if(secondaryMi.PrimaryID != 0)
-                    {
-                        // Make a new item for it.
-                        secondaryItem = (XivGear)xivGear.Clone();
-                        secondaryItem.ModelInfo = secondaryMi;
-                        xivGear.Name += " - " + XivStrings.Main_Hand;
-                        secondaryItem.Name += " - " + XivStrings.Off_Hand;
-                        xivGear.PairedItem = secondaryItem;
-                        secondaryItem.PairedItem = xivGear;
-                        xivGear.SecondaryCategory = XivStrings.Dual_Wield;
-                        secondaryItem.SecondaryCategory = XivStrings.Dual_Wield;
-                    }
-
-                    lock (_gearLock)
-                    {
-                        xivGearList.Add(xivGear);
-                        if(secondaryItem != null)
+                        if (weaponVariant != 0)
                         {
-                            xivGearList.Add(secondaryItem);
+                            primaryMi.ImcSubsetID = weaponVariant;
+                            primaryMi.IsWeapon = true;
+                            isWeapon = true;
+                        }
+
+                        // Primary Body if weapon, Variant otherwise
+                        if (isWeapon)
+                        {
+                            primaryMi.SecondaryID = br.ReadInt16();
+                        }
+                        else
+                        {
+                            primaryMi.ImcSubsetID = br.ReadInt16();
+                        }
+
+                        // Primary Model ID
+                        primaryMi.PrimaryID = br.ReadInt16();
+
+                        // Secondary Model Key
+                        isWeapon = false;
+                        secondaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
+                        br.BaseStream.Seek(-8, SeekOrigin.Current);
+
+                        // Secondary Blank
+                        var unused2 = br.ReadInt16();
+
+                        // Secondary Variant for weapon, blank otherwise
+                        weaponVariant = br.ReadInt16();
+
+                        if (weaponVariant != 0)
+                        {
+                            secondaryMi.ImcSubsetID = weaponVariant;
+                            secondaryMi.IsWeapon = true;
+                            isWeapon = true;
+                        }
+
+                        // Secondary Body if weapon, Variant otherwise
+                        if (isWeapon)
+                        {
+                            secondaryMi.SecondaryID = br.ReadInt16();
+                        }
+                        else
+                        {
+                            secondaryMi.ImcSubsetID = br.ReadInt16();
+                        }
+
+                        // Secondary Model ID
+                        secondaryMi.PrimaryID = br.ReadInt16();
+
+                        // Icon
+                        br.BaseStream.Seek(iconDataOffset, SeekOrigin.Begin);
+                        xivGear.IconNumber = br.ReadUInt16();
+
+                        // Gear Slot/Category
+                        br.BaseStream.Seek(slotDataOffset, SeekOrigin.Begin);
+                        int slotNum = br.ReadByte();
+
+                        // Waist items do not have texture or model data
+                        if (slotNum == 6) return;
+
+                        xivGear.EquipSlotCategory = slotNum;
+                        xivGear.SecondaryCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
+
+                        // Gear Name
+                        var gearNameOffset = dataLength + nameOffset;
+                        var gearNameLength = item.Value.Length - gearNameOffset;
+                        br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
+                        var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
+                        xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                        xivGear.Name = xivGear.Name.Trim();
+
+                        // If we have a secondary model
+
+                        XivGear secondaryItem = null;
+                        if (secondaryMi.PrimaryID != 0)
+                        {
+                            // Make a new item for it.
+                            secondaryItem = (XivGear)xivGear.Clone();
+                            secondaryItem.ModelInfo = secondaryMi;
+                            xivGear.Name += " - " + XivStrings.Main_Hand;
+                            secondaryItem.Name += " - " + XivStrings.Off_Hand;
+                            xivGear.PairedItem = secondaryItem;
+                            secondaryItem.PairedItem = xivGear;
+                            xivGear.SecondaryCategory = XivStrings.Dual_Wield;
+                            secondaryItem.SecondaryCategory = XivStrings.Dual_Wield;
+                        }
+
+                        lock (_gearLock)
+                        {
+                            xivGearList.Add(xivGear);
+                            if (secondaryItem != null)
+                            {
+                                xivGearList.Add(secondaryItem);
+                            }
                         }
                     }
+                } catch(Exception ex)
+                {
+                    throw;
                 }
             }));
 
