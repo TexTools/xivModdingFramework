@@ -1608,8 +1608,6 @@ namespace xivModdingFramework.Cache
                             if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
                             {
                                 // For furniture, they're valid as long as they have an SGD file we can find.
-                                root.Slot = primary == XivItemType.indoor ? "fun" : "gar";
-
                                 var folder = root.GetRootFolder() + "asset";
                                 var file = root.GetSgdName();
 
