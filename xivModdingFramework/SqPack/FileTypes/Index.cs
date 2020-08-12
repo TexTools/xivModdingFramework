@@ -1636,51 +1636,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Creates a backup of the index file.
-        /// </summary>
-        /// <param name="backupsDirectory">The directory in which to place the backup files.
-        /// The directory will be created if it does not exist.</param>
-        /// <param name="dataFile">The file to backup.</param>
-        public void CreateIndexBackups(DirectoryInfo backupsDirectory, XivDataFile dataFile)
-        {
-            var fileName = dataFile.GetDataFileName();
-
-            var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
-            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{Index2Extension}");
-
-            var indexBackupPath = Path.Combine(backupsDirectory.FullName, $"{fileName}{IndexExtension}");
-            var index2BackupPath = Path.Combine(backupsDirectory.FullName, $"{fileName}{Index2Extension}");
-
-            Directory.CreateDirectory(backupsDirectory.FullName);
-
-            _semaphoreSlim.Wait();
-            try
-            {
-                File.Copy(indexPath, indexBackupPath, true);
-                File.Copy(index2Path, index2BackupPath, true);
-            }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
-        }
-
-
-        /// <summary>
-        /// Creates a backup of all the index files.
-        /// </summary>
-        /// <param name="backupsDirectory">The directory in which to place the backup files.</param>
-        public void BackupAllIndexFiles(DirectoryInfo backupsDirectory)
-        {
-            var dataFileList = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var dataFile in dataFileList)
-            {
-                CreateIndexBackups(backupsDirectory, dataFile);
-            }
-        }
-
-        /// <summary>
         /// Checks to see whether the index file is locked
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
