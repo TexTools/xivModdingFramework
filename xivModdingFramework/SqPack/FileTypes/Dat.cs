@@ -64,9 +64,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="dataFile">The data file to create a new dat for.</param>
         /// <returns>The new dat number.</returns>
-        public int CreateNewDat(XivDataFile dataFile)
+        public int CreateNewDat(XivDataFile dataFile, bool alreadyLocked = false)
         {
-            var nextDatNumber = GetLargestDatNumber(dataFile) + 1;
+            var nextDatNumber = GetLargestDatNumber(dataFile, alreadyLocked) + 1;
 
             if (nextDatNumber == 8)
             {
@@ -95,18 +95,24 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check.</param>
         /// <returns>The largest dat number for the given data file.</returns>
-        public int GetLargestDatNumber(XivDataFile dataFile)
+        public int GetLargestDatNumber(XivDataFile dataFile, bool alreadyLocked = false)
         {
 
             string[] allFiles = null;
-            _lock.Wait();
+            if (!alreadyLocked)
+            {
+                _lock.Wait();
+            }
             try
             {
                 allFiles = Directory.GetFiles(_gameDirectory.FullName);
             }
             finally
             {
-                _lock.Release();
+                if (!alreadyLocked)
+                {
+                    _lock.Release();
+                }
             }
 
             var dataFiles = from file in allFiles where file.Contains(dataFile.GetDataFileName()) && file.Contains(".dat") select file;
@@ -135,11 +141,17 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The dat file to check.</param>
         /// <returns>True if it is original, false otherwise</returns>
-        private async Task<bool> IsOriginalDat(XivDataFile dataFile)
+        private async Task<bool> IsOriginalDat(XivDataFile dataFile, int datNum, bool alreadyLocked = false)
         {
-            var moddedList = await GetModdedDatList(dataFile);
+            var moddedList = await GetModdedDatList(dataFile, alreadyLocked);
+            var datPath = $"{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            
+            for(int i = 0; i < moddedList.Count; i++)
+            {
+                moddedList[i] = Path.GetFileName(moddedList[i]);
+            }
 
-            return moddedList.Count <= 0;
+            return !moddedList.Contains(datPath);
         }
 
         /// <summary>
@@ -147,13 +159,16 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        public async Task<List<string>> GetModdedDatList(XivDataFile dataFile)
+        public async Task<List<string>> GetModdedDatList(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var datList = new List<string>();
 
             await Task.Run(async () =>
             {
-                await _lock.WaitAsync();
+                if (!alreadyLocked)
+                {
+                    await _lock.WaitAsync();
+                }
                 try
                 {
                     for (var i = 1; i < 20; i++)
@@ -181,7 +196,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 finally
                 {
-                    _lock.Release();
+                    if (!alreadyLocked)
+                    {
+                        _lock.Release();
+                    }
                 }
             });
             return datList;
@@ -1246,15 +1264,15 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile)
+        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var targetDat = -1;
 
             // Scan all the dat numbers...
-            var largestExisting = GetLargestDatNumber(dataFile);
-            for (int i = 0; i < largestExisting; i++)
+            var largestExisting = GetLargestDatNumber(dataFile, alreadyLocked);
+            for (int i = 0; i <= largestExisting; i++)
             {
-                var original = await IsOriginalDat(dataFile);
+                var original = await IsOriginalDat(dataFile, i, alreadyLocked);
 
                 // Don't let us inject to original dat files.
                 if (original) continue;
@@ -1273,7 +1291,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Didn't find a DAT file with space, gotta create a new one.
             if (targetDat < 0)
             {
-                targetDat = CreateNewDat(dataFile);
+                targetDat = CreateNewDat(dataFile, alreadyLocked);
             }
 
             if(targetDat > 7 || targetDat < 0)
@@ -1314,21 +1332,24 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag)
                 source = "FilesAddedByTexTools";
 
-
-            // This finds the first dat with space, OR creates one if needed.
-            var datNum = await GetFirstDatWithSpace(dataFile);
-
-            var modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
-
-            if (category.Equals(itemName))
-            {
-                category = XivStrings.Character;
-            }
+            var datNum = 0;
+            var modDatPath = "";
 
 
             await _lock.WaitAsync();
             try
             {
+
+                // This finds the first dat with space, OR creates one if needed.
+                datNum = await GetFirstDatWithSpace(dataFile, true);
+
+                modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+
+                if (category.Equals(itemName))
+                {
+                    category = XivStrings.Character;
+                }
+
                 // If there is an existing modlist entry, use that data to get the modDatPath
                 if (modEntry != null)
                 {
@@ -1343,30 +1364,22 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
 
                 var fileLength = new FileInfo(modDatPath).Length;
-            }
-            finally
-            {
-                _lock.Release();
-            }
 
-            // Checks to make sure the offsets in the mod list are not 0
-            // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
-            if (modEntry != null)
-            {
-                if (modEntry.data.modOffset == 0)
+                // Checks to make sure the offsets in the mod list are not 0
+                // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
+                if (modEntry != null)
                 {
-                    throw new Exception("The mod offset located in the mod list cannot be 0");
+                    if (modEntry.data.modOffset == 0)
+                    {
+                        throw new Exception("The mod offset located in the mod list cannot be 0");
+                    }
+
+                    if (modEntry.data.originalOffset == 0)
+                    {
+                        throw new Exception("The original offset located in the mod list cannot be 0");
+                    }
                 }
 
-                if (modEntry.data.originalOffset == 0)
-                {
-                    throw new Exception("The original offset located in the mod list cannot be 0");
-                }
-            }
-
-            await _lock.WaitAsync();
-            try
-            {
                 /* 
                  * If the item has been previously modified and the compressed data being imported is smaller or equal to the existing data
                  *  replace the existing data with new data.

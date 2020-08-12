@@ -27,7 +27,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.1.2");
+        public static readonly Version CacheVersion = new Version("1.0.1.3");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -314,10 +314,12 @@ namespace xivModdingFramework.Cache
                 File.Delete(_dbPath.FullName);
             }
 
+
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
-                var lines = File.ReadAllLines("Resources\\SQL\\" + creationScript);
+                var lines = File.ReadAllLines(cwd + "\\Resources\\SQL\\" + creationScript);
                 var sqlCmd = String.Join("\n", lines);
 
                 using (var cmd = new SQLiteCommand(sqlCmd, db))
@@ -326,7 +328,6 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             var backupFile = cwd + "\\Resources\\DB\\" + rootCacheFileName;
 
             if (!File.Exists(_rootCachePath.FullName))

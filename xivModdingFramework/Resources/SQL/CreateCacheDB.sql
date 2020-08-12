@@ -42,7 +42,7 @@ CREATE TABLE "furniture" (
 	"icon_id"	INTEGER NOT NULL,
 	"root"		TEXT,
 	
-	PRIMARY KEY("category", "name")
+	PRIMARY KEY("category", "name", "primary_id")
 );
 
 
