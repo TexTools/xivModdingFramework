@@ -567,6 +567,31 @@ namespace xivModdingFramework.Cache
                     }
                 }
             }
+
+            // Here we get to get a little fancy.
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var modList = _modding.GetModList();
+            var rootFolder = Info.GetRootFolder();
+            var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
+            foreach (var mod in modList.Mods)
+            {
+                if (!mod.enabled) continue;
+
+                // We need to get all of the modded materials in this root, even if they're
+                // orphaned materials.
+                if(mod.fullPath.StartsWith(rootFolder) && mod.fullPath.EndsWith(".mtrl"))
+                {
+                    var material = mod.fullPath;
+                    if (materialVariant >= 0)
+                    {
+                        materials.Add(_materialSetRegex.Replace(material, variantRep));
+                    } else
+                    {
+                        materials.Add(material);
+                    }
+                }
+            }
+
             return materials.ToList();
         }
 
@@ -1061,10 +1086,6 @@ namespace xivModdingFramework.Cache
                 return new List<string>();
             }
 
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-            var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
-            var mod = await _modding.TryGetModEntry(internalFilePath);
 
             var roots = (await XivCache.GetDependencyRoots(internalFilePath));
 
