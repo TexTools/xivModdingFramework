@@ -880,7 +880,7 @@ namespace xivModdingFramework.Models.Helpers
             XivRace race = XivRace.All_Races;
             if (match.Success)
             {
-                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName());
+                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
                 race = XivRaces.GetXivRace(match.Groups[1].Value);
                 RaceConvert(incomingModel, race, modelRace, loggingFunction);
             }
@@ -898,7 +898,7 @@ namespace xivModdingFramework.Models.Helpers
             }
 
             // Extract the original race from the ttModel if we weren't provided with one.
-            if(originalRace == XivRace.All_Races)
+            if (originalRace == XivRace.All_Races)
             {
                 var raceRegex = new Regex("c([0-9]{4})");
                 if (!model.IsInternal)
@@ -907,18 +907,34 @@ namespace xivModdingFramework.Models.Helpers
                     if (match.Success)
                     {
                         originalRace = XivRaces.GetXivRace(match.Groups[1].Value);
-                    } else
+                    }
+                    else
                     {
                         loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
                     }
 
-                } else
+                }
+                else
                 {
                     throw new InvalidDataException("Cannot racially convert external model without provided Original Race value.");
                 }
             }
+            RaceConvertRecursive(model, targetRace, originalRace, loggingFunction);
+            ModelModifiers.CalculateTangents(model, loggingFunction);
+        }
 
 
+        /// <summary>
+        /// Recursive function for converting races.  Split out and set private so that
+        /// We don't constantly recalculate tangents and do re-validation on every pass.
+        /// Raceconvert() is the correct entry point for this function.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="targetRace"></param>
+        /// <param name="originalRace"></param>
+        /// <param name="loggingFunction"></param>
+        private static void RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction)
+        {
             try
             {
                 // Current race is already parent node
@@ -959,8 +975,6 @@ namespace xivModdingFramework.Models.Helpers
                 // The model is still added but no deforms are applied
                 loggingFunction(true, "Unable to convert racial model.");
             }
-
-            ModelModifiers.CalculateTangents(model, loggingFunction);
         }
 
         /// <summary>
