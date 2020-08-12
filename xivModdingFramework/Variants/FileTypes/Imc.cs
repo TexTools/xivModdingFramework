@@ -148,6 +148,30 @@ namespace xivModdingFramework.Variants.FileTypes
             return entries;
         }
 
+        /// <summary>
+        /// Saves a set of IMC entries to file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="entries"></param>
+        /// <returns></returns>
+        internal async Task SaveEntries(string path, string slot, List<XivImc> entries)
+        {
+            var dat = new Dat(_gameDirectory);
+            //var imcByteData = await dat.GetType2Data(path, false);
+            var info = await GetFullImcInfo(path);
+            for(int i = 0; i < entries.Count; i++)
+            {
+                var e = info.GetEntry(i, slot);
+                e.Mask = entries[i].Mask;
+                e.Unknown = entries[i].Unknown;
+                e.Vfx = entries[i].Vfx;
+                e.Variant = entries[i].Variant;
+            }
+
+            // Save the modified info.
+            await SaveFullImcInfo(info, path, Path.GetFileName(path), Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+        }
+
         public static byte[] SerializeEntry(XivImc entry)
         {
 
@@ -517,7 +541,7 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             /// <summary>
-            /// Retrieve a given IMC info. Negative values retrieve the default set.
+            /// Retrieve a given IMC info. Zero or Negative values retrieve the default set.
             /// </summary>
             /// <param name="index">IMC Variant/Subset ID</param>
             /// <param name="slot">Slot Abbreviation</param>

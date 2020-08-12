@@ -506,7 +506,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var type2Data = (await CreateType2Data(data)).ToList();
 
             // Write the modified bytes back to the DAT file.
-            var finalOffset  = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalMetaFileSourceName, Path.GetFileName(internalPath), dataFile, Path.GetFileName(internalPath), 2);
+            var finalOffset  = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalMetaFileSourceName, Path.GetFileName(internalPath), dataFile, Constants.InternalMetaFileSourceName, 2);
 
             if(offset != finalOffset)
             {

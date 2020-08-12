@@ -155,7 +155,14 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         public static async Task ApplyMetadata(ItemMetadata meta)
         {
+            var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
 
+            if (meta.ImcEntries.Count > 0)
+            {
+                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+                var imcPath = meta.Root.GetRawImcFilePath();
+                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries);
+            }
         }
 
 
