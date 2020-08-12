@@ -31,7 +31,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
         // The subset list of races that actually have deformation files.
-        private readonly List<XivRace> DeformationAvailableRaces = new List<XivRace>()
+        public static readonly List<XivRace> DeformationAvailableRaces = new List<XivRace>()
         {
             XivRace.Hyur_Midlander_Male,
             XivRace.Hyur_Midlander_Female,

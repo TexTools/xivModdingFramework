@@ -14,6 +14,7 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using HelixToolkit.SharpDX.Core;
+using System.Runtime.CompilerServices;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -32,6 +33,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool ClearVColor { get; set; }
         public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
+        public XivRace SourceRace { get; set; }
 
 
         /// <summary>
@@ -48,6 +50,7 @@ namespace xivModdingFramework.Models.Helpers
             ClearVColor = false;
             ClearVAlpha = false;
             AutoScale = true;
+            SourceRace = XivRace.All_Races;
         }
 
         /// <summary>
@@ -111,6 +114,15 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.ClearVAlpha(ttModel, loggingFunction);
             }
 
+            if(SourceRace != XivRace.All_Races)
+            {
+                if (currentMdl == null)
+                {
+                    throw new Exception("Cannot racially convert from null MDL.");
+                }
+                ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, loggingFunction);
+            }
+
             // We need to load the original unmodified model to get the shape data.
             if (EnableShapeData)
             {
@@ -141,8 +153,6 @@ namespace xivModdingFramework.Models.Helpers
                 var oldModel = TTModel.FromRaw(originalMdl);
                 ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, loggingFunction);
             }
-
-
         }
     }
 
@@ -849,6 +859,108 @@ namespace xivModdingFramework.Models.Helpers
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Converts a model being imported to match the race of an already existing system file.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="originalRace"></param>
+        /// <param name="loggingFunction"></param>
+        public static void RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            // Extract the original race from the ttModel if we weren't provided with one.
+            var raceRegex = new Regex("c([0-9]{4})");
+            var match = raceRegex.Match(originalModelPath);
+            XivRace race = XivRace.All_Races;
+            if (match.Success)
+            {
+                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName());
+                race = XivRaces.GetXivRace(match.Groups[1].Value);
+                RaceConvert(incomingModel, race, modelRace, loggingFunction);
+            }
+            else
+            {
+                loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
+            }
+        }
+
+        public static void RaceConvert(TTModel model, XivRace targetRace, XivRace originalRace = XivRace.All_Races, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            // Extract the original race from the ttModel if we weren't provided with one.
+            if(originalRace == XivRace.All_Races)
+            {
+                var raceRegex = new Regex("c([0-9]{4})");
+                if (!model.IsInternal)
+                {
+                    var match = raceRegex.Match(model.Source);
+                    if (match.Success)
+                    {
+                        originalRace = XivRaces.GetXivRace(match.Groups[1].Value);
+                    } else
+                    {
+                        loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
+                    }
+
+                } else
+                {
+                    throw new InvalidDataException("Cannot racially convert external model without provided Original Race value.");
+                }
+            }
+
+
+            try
+            {
+                // Current race is already parent node
+                // Direct conversion
+                // [ Current > (apply deform) > Target ]
+                if (originalRace.IsDirectParentOf(targetRace))
+                {
+                    ModelModifiers.ApplyRacialDeform(model, targetRace);
+                }
+                // Target race is parent node of Current race
+                // Convert to parent (invert deform)
+                // [ Current > (apply inverse deform) > Target ]
+                else if (targetRace.IsDirectParentOf(originalRace))
+                {
+                    ModelModifiers.ApplyRacialDeform(model, originalRace, true);
+                }
+                // Current race is not parent of Target Race and Current race has parent
+                // Make a recursive call with the current races parent race
+                // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
+                else if (originalRace.GetNode().Parent != null)
+                {
+                    ModelModifiers.ApplyRacialDeform(model, originalRace, true);
+                    RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                }
+                // Current race has no parent
+                // Make a recursive call with the target races parent race
+                // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
+                else
+                {
+                    ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race);
+                    RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Show a warning that deforms are missing for the target race
+                // This mostly happens with Face, Hair, Tails, Ears, and Female > Male deforms
+                // The model is still added but no deforms are applied
+                loggingFunction(true, "Unable to convert racial model.");
+            }
+
+            ModelModifiers.CalculateTangents(model, loggingFunction);
         }
 
         /// <summary>
