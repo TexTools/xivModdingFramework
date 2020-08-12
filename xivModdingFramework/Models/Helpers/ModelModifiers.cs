@@ -31,6 +31,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool CloneUV2 { get; set; }
         public bool ClearVColor { get; set; }
         public bool ClearVAlpha { get; set; }
+        public bool AutoScale { get; set; }
 
 
         /// <summary>
@@ -46,6 +47,7 @@ namespace xivModdingFramework.Models.Helpers
             CloneUV2 = false;
             ClearVColor = false;
             ClearVAlpha = false;
+            AutoScale = true;
         }
 
         /// <summary>
@@ -129,6 +131,17 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
             }
 
+            if(AutoScale)
+            {
+                if (originalMdl == null)
+                {
+                    throw new Exception("Cannot auto-scale without base model loaded.");
+                }
+
+                var oldModel = TTModel.FromRaw(originalMdl);
+                ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, loggingFunction);
+            }
+
 
         }
     }
@@ -139,6 +152,128 @@ namespace xivModdingFramework.Models.Helpers
     /// </summary>
     public static class ModelModifiers
     {
+
+        /// <summary>
+        /// Automatically rescales the model to correct for unit scaling errors based on comparison of size to the original model.
+        /// </summary>
+        /// <param name="ttModel"></param>
+        /// <param name="originalModel"></param>
+        /// <param name="tolerance"></param>
+        /// <param name="loggingFunction"></param>
+        public static void AutoScaleModel(TTModel ttModel, TTModel originalModel, double tolerance = 0.3, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            loggingFunction(false, "Checking for model scale errors...");
+
+
+            // Calculate the model bounding box sizes.
+            float minX = 9999.0f, minY = 9999.0f, minZ = 9999.0f;
+            float maxX = -9999.0f, maxY = -9999.0f, maxZ = -9999.0f;
+            foreach (var m in ttModel.MeshGroups)
+            {
+                foreach (var p in m.Parts)
+                {
+                    foreach (var v in p.Vertices)
+                    {
+                        minX = minX < v.Position.X ? minX : v.Position.X;
+                        minY = minY < v.Position.Y ? minY : v.Position.Y;
+                        minZ = minZ < v.Position.Z ? minZ : v.Position.Z;
+
+                        maxX = maxX > v.Position.X ? maxX : v.Position.X;
+                        maxY = maxY > v.Position.Y ? maxY : v.Position.Y;
+                        maxZ = maxZ > v.Position.Z ? maxZ : v.Position.Z;
+                    }
+                }
+            }
+
+            Vector3 min = new Vector3(minX, minY, minZ);
+            Vector3 max = new Vector3(maxX, maxY, maxZ);
+            double NewModelSize = Vector3.Distance(min, max);
+
+
+
+            minX = 9999.0f; minY = 9999.0f; minZ = 9999.0f;
+            maxX = -9999.0f; maxY = -9999.0f; maxZ = -9999.0f;
+            foreach (var m in originalModel.MeshGroups)
+            {
+                foreach (var p in m.Parts)
+                {
+                    foreach (var v in p.Vertices)
+                    {
+                        minX = minX < v.Position.X ? minX : v.Position.X;
+                        minY = minY < v.Position.Y ? minY : v.Position.Y;
+                        minZ = minZ < v.Position.Z ? minZ : v.Position.Z;
+
+                        maxX = maxX > v.Position.X ? maxX : v.Position.X;
+                        maxY = maxY > v.Position.Y ? maxY : v.Position.Y;
+                        maxZ = maxZ > v.Position.Z ? maxZ : v.Position.Z;
+                    }
+                }
+            }
+
+            min = new Vector3(minX, minY, minZ);
+            max = new Vector3(maxX, maxY, maxZ);
+            double OldModelSize = Vector3.Distance(min, max);
+
+
+            // Calculate the percentage difference between these two.
+            List<double> possibleConversions = new List<double>()
+            {
+                // Standard metric conversions get first priority.
+                1.0D,
+                10.0D,
+                100.0D,
+                1000.0D,
+                0.1D,
+                0.01D,
+                0.001D,
+                0.0001D,
+
+                // Metric Imperial legacy fuckup conversions get second priority.
+                0.003937007874D,
+                0.03937007874D,
+                0.3937007874D,
+                3.937007874D,
+                39.37007874D,
+
+                // "Correct" Inch conversions come last.
+                254.0D,
+                25.40D,
+                2.540D,
+                0.254D,
+                0.0254D,
+                0.00254D,
+            };
+
+            foreach(var conversion in possibleConversions)
+            {
+                var nSize = NewModelSize * conversion;
+                var diff = (OldModelSize - nSize) / OldModelSize;
+
+                if(Math.Abs(diff) < tolerance)
+                {
+                    if(conversion != 1.0D)
+                    {
+                        loggingFunction(true, "Correcting Scaling Error: Rescaling model by " + conversion);
+                        ScaleModel(ttModel, conversion, loggingFunction);
+                        return;
+                    } else
+                    {
+                        // Done here.
+                        loggingFunction(false, "Model is correctly scaled, no adjustment needed.");
+                        return;
+                    }
+                }
+            }
+
+            loggingFunction(true, "Unable to find appropriate scale for model, scale unchanged.");
+
+        }
+
         public static void ScaleModel(TTModel ttModel, double scale, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)

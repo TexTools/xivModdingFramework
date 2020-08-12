@@ -581,13 +581,17 @@ namespace xivModdingFramework.Cache
                 // orphaned materials.
                 if(mod.fullPath.StartsWith(rootFolder) && mod.fullPath.EndsWith(".mtrl"))
                 {
-                    var material = mod.fullPath;
-                    if (materialVariant >= 0)
+                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot))
                     {
-                        materials.Add(_materialSetRegex.Replace(material, variantRep));
-                    } else
-                    {
-                        materials.Add(material);
+                        var material = mod.fullPath;
+                        if (materialVariant >= 0)
+                        {
+                            materials.Add(_materialSetRegex.Replace(material, variantRep));
+                        }
+                        else
+                        {
+                            materials.Add(material);
+                        }
                     }
                 }
             }
