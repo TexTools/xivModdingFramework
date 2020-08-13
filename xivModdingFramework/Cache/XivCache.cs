@@ -319,7 +319,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
-                var lines = File.ReadAllLines(cwd + "\\Resources\\SQL\\" + creationScript);
+                var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", creationScript));
                 var sqlCmd = String.Join("\n", lines);
 
                 using (var cmd = new SQLiteCommand(sqlCmd, db))
@@ -328,7 +328,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            var backupFile = cwd + "\\Resources\\DB\\" + rootCacheFileName;
+            var backupFile = Path.Combine(cwd,"Resources", "DB", rootCacheFileName);
 
             if (!File.Exists(_rootCachePath.FullName))
             {
@@ -350,7 +350,7 @@ namespace xivModdingFramework.Cache
                     using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
                         db.Open();
-                        var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
+                        var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                         var sqlCmd = String.Join("\n", lines);
 
                         using (var cmd = new SQLiteCommand(sqlCmd, db))
@@ -1435,6 +1435,7 @@ namespace xivModdingFramework.Cache
 
         public static void ResetRootCache()
         {
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
 
             SQLiteConnection.ClearAllPools();
             GC.WaitForPendingFinalizers();
@@ -1443,7 +1444,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
             {
                 db.Open();
-                var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
+                var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                 var sqlCmd = String.Join("\n", lines);
 
                 using (var cmd = new SQLiteCommand(sqlCmd, db))
