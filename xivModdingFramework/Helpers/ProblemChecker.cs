@@ -285,14 +285,16 @@ namespace xivModdingFramework.Helpers
                         "Please check For problems by selecting Help -> Check For Problems");
                 }
 
-                foreach (var xivDataFile in indexFiles)
+
+                var originalFiles = Directory.GetFiles(_gameDirectory.FullName);
+                foreach (var originalFile in originalFiles)
                 {
                     try
                     {
-                        File.Copy($"{_gameDirectory.FullName}\\{xivDataFile.GetDataFileName()}.win32.index",
-                            $"{backupsDirectory}\\{xivDataFile.GetDataFileName()}.win32.index", true);
-                        File.Copy($"{_gameDirectory.FullName}\\{xivDataFile.GetDataFileName()}.win32.index2",
-                            $"{backupsDirectory}\\{xivDataFile.GetDataFileName()}.win32.index2", true);
+                        if (originalFile.Contains(".win32.index"))
+                        {
+                            File.Copy(originalFile, $"{backupsDirectory}/{Path.GetFileName(originalFile)}", true);
+                        }
                     }
                     catch (Exception ex)
                     {
