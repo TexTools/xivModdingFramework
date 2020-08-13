@@ -920,7 +920,7 @@ namespace xivModdingFramework.Models.Helpers
                 }
             }
             RaceConvertRecursive(model, targetRace, originalRace, loggingFunction);
-            ModelModifiers.CalculateTangents(model, loggingFunction);
+            //ModelModifiers.CalculateTangents(model, loggingFunction);
         }
 
 
@@ -942,21 +942,21 @@ namespace xivModdingFramework.Models.Helpers
                 // [ Current > (apply deform) > Target ]
                 if (originalRace.IsDirectParentOf(targetRace))
                 {
-                    ModelModifiers.ApplyRacialDeform(model, targetRace);
+                    ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction);
                 }
                 // Target race is parent node of Current race
                 // Convert to parent (invert deform)
                 // [ Current > (apply inverse deform) > Target ]
                 else if (targetRace.IsDirectParentOf(originalRace))
                 {
-                    ModelModifiers.ApplyRacialDeform(model, originalRace, true);
+                    ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
                 }
                 // Current race is not parent of Target Race and Current race has parent
                 // Make a recursive call with the current races parent race
                 // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
                 else if (originalRace.GetNode().Parent != null)
                 {
-                    ModelModifiers.ApplyRacialDeform(model, originalRace, true);
+                    ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
                     RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
                 }
                 // Current race has no parent
@@ -964,8 +964,8 @@ namespace xivModdingFramework.Models.Helpers
                 // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
                 else
                 {
-                    ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race);
-                    RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                    ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
+                    RaceConvert(model, targetRace.GetNode().Parent.Race, targetRace, loggingFunction);
                 }
             }
             catch (Exception ex)
@@ -992,15 +992,10 @@ namespace xivModdingFramework.Models.Helpers
                     loggingFunction = NoOp;
                 }
 
-                if (!model.IsInternal)
-                {
-                    loggingFunction(true, "Racial deforms can only be implied to internal models.");
-                    return;
-                }
                 loggingFunction(false, "Attempting to deform model...");
 
-                Dictionary<string, Matrix> deformations, decomposed, recalculated;
-                Mdl.GetDeformationMatrices(targetRace, out deformations, out decomposed, out recalculated);
+                Dictionary<string, Matrix> deformations, inverted, normalmatrixes, invertednormalmatrixes;
+                Mdl.GetDeformationMatrices(targetRace, out deformations, out inverted, out normalmatrixes, out invertednormalmatrixes);
 
                 // Check if deformation is possible
                 var missingDeforms = new HashSet<string>();
@@ -1053,12 +1048,16 @@ namespace xivModdingFramework.Models.Helpers
                                 var boneWeight = (v.Weights[b]) / 255f;
 
                                 var matrix = Matrix.Identity;
+                                var normalMatrix = Matrix.Identity;
                                 if (deformations.ContainsKey(boneName)) 
                                 {
                                     matrix = deformations[boneName];
+                                    normalMatrix = normalmatrixes[boneName];
+
                                     if (invert)
                                     {
-                                        matrix.Invert();
+                                        matrix = inverted[boneName];
+                                        normalMatrix = invertednormalmatrixes[boneName];
                                     }
                                 } 
                                 else 
@@ -1068,9 +1067,9 @@ namespace xivModdingFramework.Models.Helpers
 
 
                                 position += MatrixTransform(v.Position, matrix) * boneWeight;
-                                normal += MatrixTransform(v.Normal, matrix) * boneWeight;
-                                binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
-                                tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
+                                binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
+                                tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
                             }
 
                             v.Position = position;

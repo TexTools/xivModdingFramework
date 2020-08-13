@@ -2931,16 +2931,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             Matrix matrix = new Matrix(boneDictionary[skeleton.BoneName].PoseMatrix);
 
-            /*
-            Dictionary<string, Matrix> deformations, decomposed, recalculated;
-            Mdl.GetDeformationMatrices(XivRace.Miqote_Female, out deformations, out decomposed, out recalculated);
-            
-            matrix = decomposed[skeleton.BoneName];
-
-            xmlWriter.WriteString(matrix.Row1.X + " " + matrix.Row1.Y + " " + matrix.Row1.Z + " " + (matrix.Row1.W ) + " ");
-            xmlWriter.WriteString(matrix.Row2.X + " " + matrix.Row2.Y + " " + matrix.Row2.Z + " " + (matrix.Row2.W ) + " ");
-            xmlWriter.WriteString(matrix.Row3.X + " " + matrix.Row3.Y + " " + matrix.Row3.Z + " " + (matrix.Row3.W ) + " ");
-            xmlWriter.WriteString(matrix.Row4.X + " " + matrix.Row4.Y + " " + matrix.Row4.Z + " " + (matrix.Row4.W ) + " ");*/
             
             xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W ) + " ");
             xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W ) + " ");

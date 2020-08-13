@@ -4218,9 +4218,6 @@ namespace xivModdingFramework.Models.FileTypes
             public float[] Matrix = new float[16];
         }
 
-        private static Dictionary<string, Matrix> baseDeformationMatrix;
-        private static Dictionary<string, Matrix> recalculatedDeformationMatrix;
-        private static Dictionary<string, Matrix> decomposedDeformationMatrix;
 
         /// <summary>
         /// Loads the deformation files for attempting racial deformation
@@ -4228,13 +4225,13 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="race"></param>
         /// <param name="deformations"></param>
-        /// <param name="decomposed"></param>
         /// <param name="recalculated"></param>
-        public static void GetDeformationMatrices(XivRace race, out Dictionary<string, Matrix> deformations, out Dictionary<string, Matrix> decomposed, out Dictionary<string, Matrix> recalculated)
+        public static void GetDeformationMatrices(XivRace race, out Dictionary<string, Matrix> deformations, out Dictionary<string, Matrix> invertedDeformations, out Dictionary<string, Matrix> normalDeformations, out Dictionary<string, Matrix> invertedNormalDeformations)
         {
-            baseDeformationMatrix = new Dictionary<string, Matrix>();
-            recalculatedDeformationMatrix = new Dictionary<string, Matrix>();
-            decomposedDeformationMatrix = new Dictionary<string, Matrix>();
+            deformations = new Dictionary<string, Matrix>();
+            invertedDeformations = new Dictionary<string, Matrix>();
+            normalDeformations = new Dictionary<string, Matrix>();
+            invertedNormalDeformations = new Dictionary<string, Matrix>();
 
 
             var deformFile = "Skeletons/c" + race.GetRaceCode() + "_deform.json";
@@ -4243,10 +4240,8 @@ namespace xivModdingFramework.Models.FileTypes
             var deformationData = JsonConvert.DeserializeObject<DeformationBoneSet>(deformationJson);
             foreach (var set in deformationData.Data)
             {
-                baseDeformationMatrix.Add(set.Name, new Matrix(set.Matrix));
+                deformations.Add(set.Name, new Matrix(set.Matrix));
             }
-
-            var skelDict = new Dictionary<string, SkeletonData>();
 
             var skelName = "c" + race.GetRaceCode();
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
@@ -4267,49 +4262,48 @@ namespace xivModdingFramework.Models.FileTypes
 
             var root = FullSkel["n_root"];
 
-            BuildNewTransfromMatrices(root, FullSkel);
-
-
-            deformations = baseDeformationMatrix;
-            decomposed = decomposedDeformationMatrix;
-            recalculated = recalculatedDeformationMatrix;
+            BuildNewTransfromMatrices(root, FullSkel, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
         }
-        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData)
+        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, Dictionary<string, Matrix> deformations, Dictionary<string, Matrix> invertedDeformations, Dictionary<string, Matrix> normalDeformations, Dictionary<string, Matrix> invertedNormalDeformations)
         {
             if (node.BoneParent == -1)
             {
-                recalculatedDeformationMatrix.Add(node.BoneName, baseDeformationMatrix[node.BoneName]);
-                decomposedDeformationMatrix.Add(node.BoneName, baseDeformationMatrix[node.BoneName]);
-                //decomposedDeformationMatrix.Add(node.BoneName, Matrix.Scaling(3.0f,1.0f,1.0f));
-                //recalculatedDeformationMatrix.Add(node.BoneName, Matrix.Scaling(3.0f, 1.0f, 1.0f));
+                if (!deformations.ContainsKey(node.BoneName))
+                {
+                    deformations.Add(node.BoneName, Matrix.Identity);
+                }
+                invertedDeformations.Add(node.BoneName, Matrix.Identity);
+                normalDeformations.Add(node.BoneName, Matrix.Identity);
+                invertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
             }
             else
             {
-                try
+                if (deformations.ContainsKey(node.BoneName))
                 {
-                    if (baseDeformationMatrix.ContainsKey(node.BoneName))
-                    {
-                        var parent = skeletonData.First(x => x.Value.BoneNumber == node.BoneParent);
-                        var decomposed = baseDeformationMatrix[parent.Value.BoneName].Inverted() * baseDeformationMatrix[node.BoneName];
-                        //decomposed = Matrix.Identity;
-                        var recomposed = recalculatedDeformationMatrix[parent.Value.BoneName] * decomposed;
-                        decomposedDeformationMatrix.Add(node.BoneName, decomposed);
-                        recalculatedDeformationMatrix.Add(node.BoneName, recomposed);
-                    }
-                    else
-                    {
-                        recalculatedDeformationMatrix.Add(node.BoneName, Matrix.Identity);
-                    }
+                    invertedDeformations.Add(node.BoneName, deformations[node.BoneName].Inverted());
+
+                    var normalMatrix = deformations[node.BoneName].Inverted();
+                    normalMatrix.Transpose();
+                    normalDeformations.Add(node.BoneName, normalMatrix);
+
+                    var invertexNormalMatrix = deformations[node.BoneName].Inverted();
+                    normalMatrix.Transpose();
+                    invertexNormalMatrix.Invert();
+                    invertedNormalDeformations.Add(node.BoneName, invertexNormalMatrix);
+
                 }
-                catch (Exception ex)
+                else
                 {
-                    var b = "d";
+                    deformations.Add(node.BoneName, Matrix.Identity);
+                    invertedDeformations.Add(node.BoneName, Matrix.Identity);
+                    normalDeformations.Add(node.BoneName, Matrix.Identity);
+                    invertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
                 }
             }
             var children = skeletonData.Where(x => x.Value.BoneParent == node.BoneNumber);
             foreach (var c in children)
             {
-                BuildNewTransfromMatrices(c.Value, skeletonData);
+                BuildNewTransfromMatrices(c.Value, skeletonData, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
             }
         }
 
