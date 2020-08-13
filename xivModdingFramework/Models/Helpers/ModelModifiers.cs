@@ -1017,7 +1017,6 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     // For a bone to be missing in the deformation data completely, it has to have come from a different skeleton, which
                     // had the bone, while our new one has no entry for it at all.  In these cases, just use identity.
-                    var skel = model.ResolveBoneHeirarchy(loggingFunction);
                     foreach(var bone in missingDeforms)
                     {
                         deformations[bone] = Matrix.Identity;
