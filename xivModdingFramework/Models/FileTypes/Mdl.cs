@@ -4294,10 +4294,40 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else
                 {
-                    deformations.Add(node.BoneName, Matrix.Identity);
-                    invertedDeformations.Add(node.BoneName, Matrix.Identity);
-                    normalDeformations.Add(node.BoneName, Matrix.Identity);
-                    invertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
+                    if (!skeletonData.ContainsKey(node.BoneName))
+                    {
+                        deformations[node.BoneName] = Matrix.Identity;
+                        invertedDeformations[node.BoneName] = Matrix.Identity;
+                        normalDeformations[node.BoneName] = Matrix.Identity;
+                        invertedNormalDeformations[node.BoneName] = Matrix.Identity;
+                    }
+                    else
+                    {
+                        var skelEntry = skeletonData[node.BoneName];
+                        while (skelEntry != null)
+                        {
+                            if (deformations.ContainsKey(skelEntry.BoneName))
+                            {
+                                // This parent has a deform.
+                                deformations[node.BoneName] = deformations[skelEntry.BoneName];
+                                invertedDeformations[node.BoneName] = invertedDeformations[skelEntry.BoneName];
+                                normalDeformations[node.BoneName] = normalDeformations[skelEntry.BoneName];
+                                invertedNormalDeformations[node.BoneName] = invertedNormalDeformations[skelEntry.BoneName];
+                                break;
+                            }
+
+                            // Seek our next parent.
+                            skelEntry = skeletonData.FirstOrDefault(x => x.Value.BoneNumber == skelEntry.BoneParent).Value;
+                        }
+
+                        if (skelEntry == null)
+                        {
+                            deformations[node.BoneName] = Matrix.Identity;
+                            invertedDeformations[node.BoneName] = Matrix.Identity;
+                            normalDeformations[node.BoneName] = Matrix.Identity;
+                            invertedNormalDeformations[node.BoneName] = Matrix.Identity;
+                        }
+                    }
                 }
             }
             var children = skeletonData.Where(x => x.Value.BoneParent == node.BoneNumber);

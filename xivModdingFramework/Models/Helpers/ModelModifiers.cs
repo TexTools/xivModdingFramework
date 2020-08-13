@@ -997,6 +997,7 @@ namespace xivModdingFramework.Models.Helpers
                 Dictionary<string, Matrix> deformations, inverted, normalmatrixes, invertednormalmatrixes;
                 Mdl.GetDeformationMatrices(targetRace, out deformations, out inverted, out normalmatrixes, out invertednormalmatrixes);
 
+
                 // Check if deformation is possible
                 var missingDeforms = new HashSet<string>();
 
@@ -1014,14 +1015,16 @@ namespace xivModdingFramework.Models.Helpers
                 // Throw an exception if there is any missing deform bones
                 if (missingDeforms.Any())
                 {
-                    var sb = new StringBuilder();
-                    sb.AppendLine();
-                    foreach (var missingDeform in missingDeforms)
+                    // For a bone to be missing in the deformation data completely, it has to have come from a different skeleton, which
+                    // had the bone, while our new one has no entry for it at all.  In these cases, just use identity.
+                    var skel = model.ResolveBoneHeirarchy(loggingFunction);
+                    foreach(var bone in missingDeforms)
                     {
-                        sb.AppendLine($"{missingDeform}");
+                        deformations[bone] = Matrix.Identity;
+                        inverted[bone] = Matrix.Identity;
+                        normalmatrixes[bone] = Matrix.Identity;
+                        invertednormalmatrixes[bone] = Matrix.Identity;
                     }
-
-                    throw new Exception(sb.ToString());
                 }
 
                 // Now we're ready to animate...
@@ -1049,20 +1052,13 @@ namespace xivModdingFramework.Models.Helpers
 
                                 var matrix = Matrix.Identity;
                                 var normalMatrix = Matrix.Identity;
-                                if (deformations.ContainsKey(boneName)) 
-                                {
-                                    matrix = deformations[boneName];
-                                    normalMatrix = normalmatrixes[boneName];
+                                matrix = deformations[boneName];
+                                normalMatrix = normalmatrixes[boneName];
 
-                                    if (invert)
-                                    {
-                                        matrix = inverted[boneName];
-                                        normalMatrix = invertednormalmatrixes[boneName];
-                                    }
-                                } 
-                                else 
+                                if (invert)
                                 {
-                                    throw new Exception($"Invalid bone ({boneName})");
+                                    matrix = inverted[boneName];
+                                    normalMatrix = invertednormalmatrixes[boneName];
                                 }
 
 
