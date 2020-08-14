@@ -1391,6 +1391,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     if (modEntry.data.modOffset != 0)
                     {
+                        // In cases where the file-addition mod was previously disabled, we need to re-add the file descriptor.
+                        if(NewFilesNeedToBeAdded)
+                        {
+                            var addedFile = await index.AddFileDescriptor(internalFilePath, modEntry.data.modOffset, dataFile);
+                        }
+
                         var sizeDiff = modEntry.data.modSize - importData.Count;
 
                         datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
@@ -1469,12 +1475,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                 if (NewFilesNeedToBeAdded)
                                 {
-                                    var success = true;
-                                    success = success && await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
-                                    if (!success)
-                                    {
-                                        throw new Exception("Failed to create file descriptor.");
-                                    }
+                                    var addedFile = await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
                                 }
                                 var originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath, false) * 8;
 
@@ -1569,12 +1570,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var modList = modding.GetModList();
                         if (NewFilesNeedToBeAdded)
                         {
-                            var success = true;
-                            success = success && await index.AddFileDescriptor(internalFilePath, offset, dataFile);
-                            if (!success)
-                            {
-                                throw new Exception("Failed to create file descriptor.");
-                            }
+                            var addedFile =  await index.AddFileDescriptor(internalFilePath, offset, dataFile);
                         }
                         var oldOffset = await index.UpdateDataOffset(offset, internalFilePath, false) * 8;
 

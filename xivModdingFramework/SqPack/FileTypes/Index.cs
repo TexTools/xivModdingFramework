@@ -1222,7 +1222,10 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             if (iHash == uFileHash)
                             {
-                                // File already exists
+                                // File already exists.  Just update the data offset.
+                                _semaphoreSlim.Release();
+                                await UpdateDataOffset(dataOffset, fullPath, updateCache);
+                                await _semaphoreSlim.WaitAsync();
                                 return false;
                             }
                             else if (iHash > uFileHash)
