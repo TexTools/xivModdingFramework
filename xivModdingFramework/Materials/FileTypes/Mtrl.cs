@@ -321,42 +321,35 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
 
 
-                if (dxInfoDataSize > 0)
+                //var dxInfoOffset = dataOffsetBase + materialDataSize;
+                //br.BaseStream.Seek(dxInfoOffset, SeekOrigin.Begin);
+                //var dxInfoByte = br.ReadByte();
+
+                // Check for DX9/11 Conversion textures.
+                List<string> add = new List<string>();
+                foreach(var texture in uniqueTextures)
                 {
-                    var dxInfoOffset = dataOffsetBase + materialDataSize;
-                    br.BaseStream.Seek(dxInfoOffset, SeekOrigin.Begin);
-                    var dxInfoByte = br.ReadByte();
-
-                    // This is an old DX9 Style material with DX11 conversion textures.
-                    // Make sure we have both texture versions referenced.
-                    if((dxInfoByte & 12) != 12)
+                    // If this is a texture that has a DX Conversion.
+                    if (textureDxInfo[texture] != 0)
                     {
-                        List<string> add = new List<string>();
-                        foreach(var texture in uniqueTextures)
+                        if (texture.Contains("--"))
                         {
-                            // If this is a texture that has a DX Conversion.
-                            if (textureDxInfo[texture] != 0)
-                            {
-                                if (texture.Contains("--"))
-                                {
-                                    add.Add(texture.Replace("--", ""));
-                                }
-                                else
-                                {
-                                    add.Add(texture.Insert(texture.LastIndexOf("/") + 1, "--"));
-                                }
-                            }
-                            else
-                            {
-                                // This texture does not have a DX 11 conversion texture.
-                            }
+                            add.Add(texture.Replace("--", ""));
                         }
-
-                        foreach(var s in add)
+                        else
                         {
-                            uniqueTextures.Add(s);
+                            add.Add(texture.Insert(texture.LastIndexOf("/") + 1, "--"));
                         }
                     }
+                    else
+                    {
+                        // This texture does not have a DX 11 conversion texture.
+                    }
+                }
+
+                foreach(var s in add)
+                {
+                    uniqueTextures.Add(s);
                 }
             }
 
