@@ -543,10 +543,6 @@ namespace xivModdingFramework.Mods.FileTypes
                 });
 
 
-                // Batch cache queueing for after import.
-                var files = modsJson.Select(x => x.FullPath).ToList();
-                XivCache.QueueDependencyUpdate(files);
-
                 if (modsJson[0].ModPackEntry != null)
                 {
                     modList = modding.GetModList();
@@ -560,6 +556,17 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     modding.SaveModList(modList);
+
+                    // Batch cache queueing for after import is all done.
+                    var files = modsJson.Select(x => x.FullPath).ToList();
+                    try
+                    {
+                        XivCache.QueueDependencyUpdate(files);
+                    } catch(Exception ex)
+                    {
+                        throw new Exception("An error occured while trying to update the Cache.\n\n" + ex.Message + "\n\nThe mods were still imported successfully, however, the Cache should be rebuilt.");
+                    }
+
                 }
             } finally
             {
