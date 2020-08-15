@@ -1138,6 +1138,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 await AddFileDescriptor(fullPath + ".flag", -1, dataFile, false);
             }
 
+            uint uOffset = (uint)(dataOffset / 8);
             await _semaphoreSlim.WaitAsync();
             try
             {
@@ -1290,7 +1291,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Set the actual Injected Data
                     Array.Copy(BitConverter.GetBytes(fileHash), 0, modifiedIndex, injectLocation, 4);
                     Array.Copy(BitConverter.GetBytes(pathHash), 0, modifiedIndex, injectLocation + 4, 4);
-                    Array.Copy(BitConverter.GetBytes(dataOffset / 8), 0, modifiedIndex, injectLocation + 8, 4);
+                    Array.Copy(BitConverter.GetBytes(uOffset), 0, modifiedIndex, injectLocation + 8, 4);
 
                     // Update the folder structure
                     var folderCount = SegmentSizes[3] / 16;
@@ -1412,7 +1413,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     // Set the actual Injected Data
                     Array.Copy(BitConverter.GetBytes(uFullPathHash), 0, modifiedIndex, injectLocation, 4);
-                    Array.Copy(BitConverter.GetBytes(dataOffset / 8), 0, modifiedIndex, injectLocation + 4, 4);
+                    Array.Copy(BitConverter.GetBytes(uOffset), 0, modifiedIndex, injectLocation + 4, 4);
 
                     // Update SHA-1 Hashes.
                     SHA1 sha = new SHA1CryptoServiceProvider();

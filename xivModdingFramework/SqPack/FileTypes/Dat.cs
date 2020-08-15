@@ -1429,8 +1429,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If there is an existing modlist entry, use that data to get the modDatPath
                 if (modEntry != null)
                 {
-                    datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
+                    var existingDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
+                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{existingDatNum}");
 
                     if (!File.Exists(modDatPath))
                     {
@@ -1438,8 +1438,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                                             $"It is recommended to do a Start Over.");
                     }
                 }
-
-                var fileLength = new FileInfo(modDatPath).Length;
 
                 // Checks to make sure the offsets in the mod list are not 0
                 // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
@@ -1467,9 +1465,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         var sizeDiff = modEntry.data.modSize - importData.Count;
 
-                        datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
-                        var datOffsetAmount = 16 * datNum;
+                        var oldDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
+                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{oldDatNum}");
+                        var datOffsetAmount = 16 * oldDatNum;
 
                         using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                         {
@@ -1536,9 +1534,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                             {
                                 var sizeDiff = emptyEntryLength - importData.Count;
 
-                                datNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
-                                modDatPath = Path.Combine(_gameDirectory.FullName, $"{mod.datFile}{DatExtension}{datNum}");
-                                var datOffsetAmount = 16 * datNum;
+                                var oldDatNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
+                                modDatPath = Path.Combine(_gameDirectory.FullName, $"{mod.datFile}{DatExtension}{oldDatNum}");
+                                var datOffsetAmount = 16 * oldDatNum;
 
                                 using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                                 {
