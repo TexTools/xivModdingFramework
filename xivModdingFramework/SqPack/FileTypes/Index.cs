@@ -1109,7 +1109,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (!fullPath.Contains(".flag"))
             {
-                await DeleteFileDescriptor(fullPath + ".flag", dataFile);
+                await DeleteFileDescriptor(fullPath + ".flag", dataFile, false);
             }
 
 
@@ -1117,7 +1117,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (updateCache)
             {
                 // Queue us for updating.
-                await XivCache.QueueDependencyUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
             }
 
             return true;
@@ -1135,7 +1135,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             if(!fullPath.Contains(".flag"))
             {
-                await AddFileDescriptor(fullPath + ".flag", -1, dataFile);
+                await AddFileDescriptor(fullPath + ".flag", -1, dataFile, false);
             }
 
             await _semaphoreSlim.WaitAsync();
@@ -1445,7 +1445,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if(updateCache)
             {
                 // Queue us for updating.
-                await XivCache.QueueDependencyUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
             }
 
 
@@ -1514,7 +1514,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 // Queue us up for dependency pre-calcluation, since we're a modded file.
-                await XivCache.QueueDependencyUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
 
             }
 
