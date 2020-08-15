@@ -1430,9 +1430,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (modEntry != null)
                 {
                     var existingDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{existingDatNum}");
+                    var checkPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{existingDatNum}");
 
-                    if (!File.Exists(modDatPath))
+                    if (!File.Exists(checkPath))
                     {
                         throw new Exception($"A mod entry is pointing to {Path.GetFileName(modDatPath)}, but the file does not exist.\n\n" +
                                             $"It is recommended to do a Start Over.");
