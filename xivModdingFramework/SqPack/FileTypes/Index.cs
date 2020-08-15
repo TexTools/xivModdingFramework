@@ -1131,7 +1131,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
         /// <param name="dataFile">Which data file set to use.</param>
         /// <returns></returns>
-        public async Task<bool> AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile, bool updateCache = true)
+        public async Task<bool> AddFileDescriptor(string fullPath, long dataOffset, XivDataFile dataFile, bool updateCache = true)
         {
             if(!fullPath.Contains(".flag"))
             {
@@ -1412,7 +1412,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     // Set the actual Injected Data
                     Array.Copy(BitConverter.GetBytes(uFullPathHash), 0, modifiedIndex, injectLocation, 4);
-                    Array.Copy(BitConverter.GetBytes(dataOffset), 0, modifiedIndex, injectLocation + 4, 4);
+                    Array.Copy(BitConverter.GetBytes(dataOffset / 8), 0, modifiedIndex, injectLocation + 4, 4);
 
                     // Update SHA-1 Hashes.
                     SHA1 sha = new SHA1CryptoServiceProvider();
