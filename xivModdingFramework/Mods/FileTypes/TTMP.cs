@@ -18,6 +18,7 @@ using Newtonsoft.Json;
 using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -499,7 +500,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                             modJson.FullPath,
                                                             modJson.Category.GetDisplayName(), modJson.Name,
                                                             XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry));
+                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry, false));
                                                     }
                                                     else
                                                     {
@@ -510,7 +511,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                         await (dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                                             modJson.Category.GetDisplayName(), modJson.Name,
                                                             XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry));
+                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry, false));
                                                     }
                                                 }
                                                 catch (Exception ex)
@@ -540,6 +541,11 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
                 });
+
+
+                // Batch cache queueing for after import.
+                var files = modsJson.Select(x => x.FullPath).ToList();
+                XivCache.QueueDependencyUpdate(files);
 
                 if (modsJson[0].ModPackEntry != null)
                 {

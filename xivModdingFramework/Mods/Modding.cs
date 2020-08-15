@@ -434,7 +434,7 @@ namespace xivModdingFramework.Mods
             // Do these as a batch query at the end.
             progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
             var allPaths = modList.Mods.Select(x => x.fullPath).Where(x => !String.IsNullOrEmpty(x)).ToList();
-            await XivCache.QueueDependencyUpdate(allPaths);
+            XivCache.QueueDependencyUpdate(allPaths);
         }
 
         /// <summary>
