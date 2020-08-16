@@ -52,6 +52,41 @@ namespace xivModdingFramework.SqPack.FileTypes
             _modListDirectory = modding.ModListDirectory;
         }
 
+        private static long GetMaximumDatSize()
+        {
+            var dxMode = XivCache.GameInfo.DxMode;
+
+            if(dxMode < 11)
+            {
+                return 2000000000;
+            } else
+            {
+                // Check the user's FFXIV installation drive to see what the maximum file size is for their file system.
+                var drive = XivCache.GameInfo.GameDirectory.FullName.Substring(0, 1);
+                return GetMaximumFileSize(drive);
+            }
+        }
+
+        // Returns the maximum file size in bytes on the filesystem type of the specified drive.
+        private static long GetMaximumFileSize(string drive)
+        {
+            var driveInfo = new System.IO.DriveInfo(drive);
+        
+            switch (driveInfo.DriveFormat)
+            {
+                case "FAT16":
+                    return 2147483647;
+                case "FAT32":
+                    return 4294967296;
+                case "NTFS":
+                    // This isn't the actual NTFS limit, but is a safety limit for now while we test higher DAT sizes. (8GB)
+                    // Theoretical offset-addressable maximum is 2^36 for DX11 DAT files.
+                    return 8589934592; 
+                default:
+                    return 8589934592;
+            }
+        }
+
 
         /// <summary>
         /// Creates a new dat file to store modified data.
@@ -1357,7 +1392,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var fileSize = fInfo.Length;
 
                 // Dat is already too large, can't write to it.
-                //if (fileSize > 2000000000) continue;
+                if (fileSize > GetMaximumDatSize()) continue;
 
                 // Found an existing dat that has space.
                 targetDat = i;
