@@ -1432,6 +1432,17 @@ namespace xivModdingFramework.SqPack.FileTypes
             long offset = 0;
             var dataOverwritten = false;
 
+            if(importData == null || importData.Count < 8 )
+            {
+                throw new Exception("Attempted to write NULL data to DAT files.");
+            }
+
+            var fileType = BitConverter.ToInt32(importData.ToArray(), 4);
+            if(fileType < 2 || fileType > 4)
+            {
+                throw new Exception("Attempted to write Invalid data to DAT files.");
+            }
+
 
             internalFilePath = internalFilePath.Replace("\\", "/");
 
@@ -1478,14 +1489,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
                 if (modEntry != null)
                 {
-                    if (modEntry.data.modOffset == 0)
+                    if (modEntry.data.modOffset <= 0)
                     {
-                        throw new Exception("The mod offset located in the mod list cannot be 0");
+                        throw new Exception("The mod offset located in the mod list cannot be 0 or Negative");
                     }
 
-                    if (modEntry.data.originalOffset == 0)
+                    if (modEntry.data.originalOffset <= 0)
                     {
-                        throw new Exception("The original offset located in the mod list cannot be 0");
+                        throw new Exception("The original offset located in the mod list cannot be 0 or Negative.");
                     }
                 }
 
@@ -1561,7 +1572,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             if (!mod.fullPath.Equals(string.Empty) || !mod.datFile.Equals(dataFile.GetDataFileName()))
                                 continue;
 
-                            if (mod.data.modOffset == 0) continue;
+                            if (mod.data.modOffset <= 0) continue;
 
                             var emptyEntryLength = mod.data.modSize;
 
