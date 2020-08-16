@@ -708,10 +708,18 @@ namespace xivModdingFramework.Textures.FileTypes
 
                     surface.FlipVertically();
 
+                    var root = item.GetRoot();
+                    var maxMipCount = 1;
+                    if (root != null  && xivTex.MipMapCount != 0) {
+                        // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
+                        // (Ex. The Default Mat-Add textures)
+                        maxMipCount = -1;
+                    }
+
                     using (var compressor = new Compressor())
                     {
                         // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
-                        compressor.Input.SetMipmapGeneration(true, xivTex.MipMapCount > 1 ? -1: 1);
+                        compressor.Input.SetMipmapGeneration(true, maxMipCount);
                         compressor.Input.SetData(surface);
                         compressor.Compression.Format = compressionFormat;
                         compressor.Compression.SetBGRAPixelFormat();
