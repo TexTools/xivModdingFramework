@@ -188,7 +188,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 try
                 {
-                    for (var i = 1; i < 20; i++)
+                    for (var i = 0; i < 20; i++)
                     {
                         var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
 
@@ -1357,7 +1357,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var fileSize = fInfo.Length;
 
                 // Dat is already too large, can't write to it.
-                if (fileSize > 2000000000) continue;
+                if (fileSize >= 2000000000) continue;
 
                 // Found an existing dat that has space.
                 targetDat = i;
