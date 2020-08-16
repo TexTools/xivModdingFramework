@@ -127,12 +127,12 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <remarks>
         /// Used to revert to the items original texture
         /// </remarks>
-        public int originalOffset { get; set; }
+        public long originalOffset { get; set; }
 
         /// <summary>
         /// The modified offset of the modified item
         /// </summary>
-        public int modOffset { get; set; }
+        public long modOffset { get; set; }
 
         /// <summary>
         /// The size of the modified items data

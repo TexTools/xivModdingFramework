@@ -239,7 +239,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
-        public async Task<int> GetDataOffset(string fullPath)
+        public async Task<long> GetDataOffset(string fullPath)
         {
             var dataFile = IOUtil.GetDataFileFromPath(fullPath);
 
@@ -248,7 +248,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetDataOffset(pathHash, fileHash, dataFile);
 
         }
-        public async Task<int> GetDataOffsetIndex2(string fullPath)
+        public async Task<long> GetDataOffsetIndex2(string fullPath)
         {
             var fullPathHash = HashGenerator.GetHash(fullPath);
             var uFullPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(fullPathHash), 0);
@@ -291,8 +291,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Index 2 is just in hash order, so find the spot where we fit in.
                     if (iFullPathHash == uFullPathHash)
                     {
-                        int signedOffset = BitConverter.ToInt32(originalIndex, position + 4);
-                        return signedOffset * 8;
+                        long offset = (long)iOffset;
+
+                        return offset * 8;
                     }
                 }
             }
@@ -310,12 +311,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFile">The hashed value of the file name</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>The offset to the data</returns>
-        public Task<int> GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
+        public Task<long> GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
         {
             return Task.Run(async () =>
             {
                 var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
-                var offset = 0;
+                long offset = 0;
 
                 // These are the offsets to relevant data
                 const int fileCountOffset = 1036;
@@ -346,7 +347,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 if (folderPathHash == hashedFolder)
                                 {
                                     // this is the entry we are looking for, get the offset and break out of the loop
-                                    offset = br.ReadInt32() * 8;
+                                    offset = br.ReadUInt32() * 8;
                                     break;
                                 }
 
@@ -373,13 +374,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>Dictionary containing (concatenated string of file+folder hashes, offset) </returns>
-        public Task<Dictionary<string, int>> GetFileDictionary(XivDataFile dataFile)
+        public Task<Dictionary<string, long>> GetFileDictionary(XivDataFile dataFile)
         {
             return Task.Run(() =>
             {
 
                 _semaphoreSlim.Wait();
-                var fileDictionary = new Dictionary<string, int>();
+                var fileDictionary = new Dictionary<string, long>();
                 try
                 {
                     var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
@@ -400,7 +401,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             var fileNameHash = br.ReadInt32();
                             var folderPathHash = br.ReadInt32();
-                            var offset = br.ReadInt32() * 8;
+                            long offset = br.ReadUInt32() * 8;
 
                             fileDictionary.Add($"{fileNameHash}{folderPathHash}", offset);
                         }
@@ -1570,7 +1571,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     {
                                         oldOffset = br.ReadInt32();
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
-                                        bw.Write(offset / 8);
+                                        uint uOffset = (uint)(offset / 8);
+                                        bw.Write(uOffset);
                                         break;
                                     }
 
@@ -1627,7 +1629,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 if (fullPathHash == pathHash)
                                 {
                                     bw.BaseStream.Seek(br.BaseStream.Position, SeekOrigin.Begin);
-                                    bw.Write((int) (offset / 8));
+                                    uint uOffset = (uint)(offset / 8);
+                                    bw.Write(uOffset);
                                     break;
                                 }
 

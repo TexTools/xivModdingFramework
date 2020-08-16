@@ -188,7 +188,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 try
                 {
-                    for (var i = 1; i < 20; i++)
+                    for (var i = 0; i < 20; i++)
                     {
                         var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
 
@@ -197,8 +197,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
                                 binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
-
-                                if (binaryReader.ReadByte() != 0)
+                                var b = binaryReader.ReadByte();
+                                if (b != 0)
                                 {
                                     datList.Add(datFilePath);
                                 }
@@ -396,12 +396,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">The offset where the data is located.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> GetType2Data(int offset, XivDataFile dataFile)
+        public async Task<byte[]> GetType2Data(long offset, XivDataFile dataFile)
         {
             var type2Bytes = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int) ((offset / 8) & 0x0F) / 2;
 
             var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
@@ -469,7 +469,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<int> ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
+        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
             string category, string source)
         {
             return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), itemName, internalPath, category, source);
@@ -483,7 +483,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<int> ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
+        public async Task<long> ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
             string category, string source)
         {
             var dataFile = GetDataFileFromPath(internalPath);
@@ -575,7 +575,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             newData.AddRange(headerData);
             newData.AddRange(dataBlocks);
 
-            var newOffset = await WriteToDat(newData, modEntry, internalPath, category, itemName, dataFile, source, 2);
+            long newOffset = await WriteToDat(newData, modEntry, internalPath, category, itemName, dataFile, source, 2);
 
             if (newOffset == 0)
             {
@@ -730,11 +730,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the type 3 data</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(int offset, XivDataFile dataFile)
+        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(long offset, XivDataFile dataFile)
         {
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int) ((offset / 8) & 0x0F) / 2;
 
             offset = OffsetCorrection(datNum, offset);
 
@@ -816,7 +816,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         for (var i = 0; i < totalBlocks; i++)
                         {
-                            var lastPos = (int)br.BaseStream.Position;
+                            long lastPos = br.BaseStream.Position;
 
                             br.ReadBytes(8);
 
@@ -894,7 +894,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        public async Task<int> GetCompressedFileSize(int offset, XivDataFile dataFile)
+        public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
         {
 
             var xivTex = new XivTex();
@@ -902,7 +902,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             await _lock.WaitAsync();
 
@@ -1041,14 +1041,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetType4Data(int offset, XivDataFile dataFile)
+        public async Task<XivTex> GetType4Data(long offset, XivDataFile dataFile)
         {
             var xivTex = new XivTex();
 
             var decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             await _lock.WaitAsync();
 
@@ -1180,10 +1180,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>The file type</returns>
-        public int GetFileType(int offset, XivDataFile dataFile)
+        public int GetFileType(long offset, XivDataFile dataFile)
         {
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             offset = OffsetCorrection(datNum, offset);
 
@@ -1205,10 +1205,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
-        public byte[] GetRawData(int offset, XivDataFile dataFile, int dataSize)
+        public byte[] GetRawData(long offset, XivDataFile dataFile, int dataSize)
         {
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             offset = OffsetCorrection(datNum, offset);
 
@@ -1357,7 +1357,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var fileSize = fInfo.Length;
 
                 // Dat is already too large, can't write to it.
-                if (fileSize > 2000000000) continue;
+                //if (fileSize > 2000000000) continue;
 
                 // Found an existing dat that has space.
                 targetDat = i;
@@ -1390,11 +1390,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="dataType">The data type (2, 3, 4)</param>
         /// <param name="modPack">The modpack associated with the import data if any</param>
         /// <returns>The new offset in which the modified data was placed.</returns>
-        public async Task<int> WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
+        public async Task<long> WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
             string category, string itemName, XivDataFile dataFile, string source, int dataType,
             ModPack modPack = null, bool updateCache = true)
         {
-            var offset = 0;
+            long offset = 0;
             var dataOverwritten = false;
 
 
@@ -1547,7 +1547,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     bw.Write(new byte[sizeDiff]);
                                 }
 
-                                var originalOffset = 0;
+                                long originalOffset = 0;
                                 if (NewFilesNeedToBeAdded)
                                 {
                                     var addedFile = await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile, false);
@@ -1626,7 +1626,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             }
 
                             var datOffsetAmount = 16 * datNum;
-                            offset = (int)bw.BaseStream.Position + datOffsetAmount;
+                            offset = bw.BaseStream.Position + datOffsetAmount;
 
                             if (offset != 0)
                             {
@@ -1648,7 +1648,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var modding = new Modding(_gameDirectory);
                         var modList = modding.GetModList();
 
-                        var oldOffset = 0;
+                        long oldOffset = 0;
                         if (NewFilesNeedToBeAdded)
                         {
                             var addedFile = await index.AddFileDescriptor(internalFilePath, offset, dataFile, false);
@@ -1756,9 +1756,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="datNum">The .dat number being used.</param>
         /// <param name="offset">The offset to correct.</param>
         /// <returns>The corrected offset.</returns>
-        public static int OffsetCorrection(int datNum, int offset)
+        public static long OffsetCorrection(int datNum, long offset)
         {
-            return offset - (16 * datNum);
+            var ret = offset - (16 * datNum);
+            return ret;
         }
     }
 }

@@ -154,7 +154,7 @@ namespace xivModdingFramework.Exd.FileTypes
         /// <returns>A dictionary containing the Index and Raw Data of the ex file</returns>
         public async Task<Dictionary<int, byte[]>> ReadExData(XivEx exFile)
         {
-            var exdNameOffsetDictionary = new Dictionary<int, string>();
+            var exdNameOffsetDictionary = new Dictionary<long, string>();
             var exdDataDictionary = new Dictionary<int, byte[]>();
             var errorString = "";
 

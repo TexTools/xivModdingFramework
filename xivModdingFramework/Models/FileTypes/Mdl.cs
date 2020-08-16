@@ -460,7 +460,7 @@ namespace xivModdingFramework.Models.FileTypes
             var getShapeData = true;
 
 
-            var offset = await index.GetDataOffset(mdlPath);
+            long offset = await index.GetDataOffset(mdlPath);
 
             if (getOriginal)
             {
