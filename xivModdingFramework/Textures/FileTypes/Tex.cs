@@ -710,7 +710,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                     var root = item.GetRoot();
                     var maxMipCount = 1;
-                    if (root != null  && xivTex.MipMapCount != 0) {
+                    if ((root != null  && xivTex.MipMapCount != 0) || xivTex.MipMapCount > 1) {
                         // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
                         // (Ex. The Default Mat-Add textures)
                         maxMipCount = -1;
