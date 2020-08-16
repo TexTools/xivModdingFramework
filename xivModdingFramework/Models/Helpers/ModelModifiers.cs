@@ -1122,14 +1122,15 @@ namespace xivModdingFramework.Models.Helpers
                 CalculateTangents(model, loggingFunction);
             }
 
-            var totalMajorCorrections = 0;
-            var warnings = new List<string>();
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
                 var pIdx = 0;
                 foreach (var p in m.Parts)
                 {
+                    var perPartMajorCorrections = 0;
+                    var warnings = new List<string>();
+
                     var vIdx = 0;
                     foreach (var v in p.Vertices)
                     {
@@ -1168,8 +1169,8 @@ namespace xivModdingFramework.Models.Helpers
 
                                     if(most == 0)
                                     {
-                                        loggingFunction(true, "Group: " + mIdx + " Part:" + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
-                                        totalMajorCorrections++;
+                                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
+                                        perPartMajorCorrections++;
                                         v.Weights[0] = 255;
                                         break;
                                     }
@@ -1177,7 +1178,7 @@ namespace xivModdingFramework.Models.Helpers
                                     var alteration = 255 - boneSum;
                                     if (Math.Abs(alteration) > 1)
                                     {
-                                        totalMajorCorrections++;
+                                        perPartMajorCorrections++;
                                     }
 
                                     if (Math.Abs(alteration) > 255)
@@ -1199,15 +1200,16 @@ namespace xivModdingFramework.Models.Helpers
                         }
                         vIdx++;
                     }
+
+                    if (perPartMajorCorrections > 0)
+                    {
+                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
+                    }
                     pIdx++;
                 }
                 mIdx++;
             }
 
-            if (totalMajorCorrections > 0)
-            {
-                loggingFunction(true, totalMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
-            }
 
         }
 
