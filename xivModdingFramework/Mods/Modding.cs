@@ -81,10 +81,14 @@ namespace xivModdingFramework.Mods
                     _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
 
                 }
-            } finally {
+            }
+            finally
+            {
                 _modlistSemaphore.Release();
             }
-            return val;
+
+            // Always return a deep copy clone of the base ModList, to prevent accidental tampering.
+            return ObjectCloner.Clone<ModList>(val, true);
         }
         public async Task<ModList> GetModListAsync()
         {
@@ -114,7 +118,9 @@ namespace xivModdingFramework.Mods
             {
                 _modlistSemaphore.Release();
             }
-            return val;
+
+            // Always return a deep copy clone of the base ModList, to prevent accidental tampering.
+            return ObjectCloner.Clone<ModList>(val, true);
         }
 
         public void SaveModList(ModList ml)
@@ -268,6 +274,16 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Unable to find mod entry in modlist.");
             }
 
+            if(modEntry.data.originalOffset <= 0 && !enable)
+            {
+                throw new Exception("Cannot disable mod with invalid original offset.");
+            }
+
+            if(enable && modEntry.data.modOffset <= 0)
+            {
+                throw new Exception("Cannot enable mod with invalid mod offset.");
+            }
+
             // Matadd textures have the same mod offset as original so nothing to toggle
             if (modEntry.data.originalOffset == modEntry.data.modOffset)
             {
@@ -342,6 +358,17 @@ namespace xivModdingFramework.Mods
 
             foreach (var modEntry in mods)
             {
+                if (modEntry.data.originalOffset <= 0 && !enable)
+                {
+                    throw new Exception("Cannot disable mod with invalid original offset.");
+                }
+
+                if (enable && modEntry.data.modOffset <= 0)
+                {
+                    throw new Exception("Cannot enable mod with invalid mod offset.");
+                }
+
+
                 if (modEntry.name.Equals(string.Empty)) continue;
                 // Matadd textures have the same mod offset as original so nothing to toggle
                 if (modEntry.data.originalOffset == modEntry.data.modOffset)
@@ -394,6 +421,18 @@ namespace xivModdingFramework.Mods
             {
                 if(string.IsNullOrEmpty(modEntry.name)) continue;
                 if(string.IsNullOrEmpty(modEntry.fullPath)) continue;
+
+                if (modEntry.data.originalOffset <= 0 && !enable)
+                {
+                    throw new Exception("Cannot disable mod with invalid original offset.");
+                }
+
+                if (enable && modEntry.data.modOffset <= 0)
+                {
+                    throw new Exception("Cannot enable mod with invalid mod offset.");
+                }
+
+
                 if (modEntry.data.modOffset == modEntry.data.originalOffset)
                 {
                     // Added file.
@@ -496,8 +535,16 @@ namespace xivModdingFramework.Mods
             modToRemove.data.originalOffset = 0;
             modToRemove.data.dataType = 0;
 
-            modList.emptyCount += 1;
             modList.modCount -= 1;
+
+            if(modToRemove.data.modOffset <= 0)
+            {
+                // Something was wrong with this mod frame.  Purge the entire thing from the list.
+                modList.Mods.Remove(modToRemove);
+            } else
+            {
+                modList.emptyCount += 1;
+            }
 
 
             SaveModList(modList);
