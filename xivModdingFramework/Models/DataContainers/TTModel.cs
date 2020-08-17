@@ -1655,17 +1655,20 @@ namespace xivModdingFramework.Models.DataContainers
                 int pIdx = 0;
                 foreach (var p in m.Parts)
                 {
+
+                    if (p.Vertices.Count == 0) continue;
+
                     bool anyAlpha = false;
                     bool anyColor = false;
-                    bool anyWeirdUVs = false;
-
-                    if(p.Vertices.Count == 0) continue;
+                    bool anyWeirdUV1s = false;
+                    bool anyWeirdUV2s = false;
 
                     foreach (var v in p.Vertices)
                     {
                         anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
                         anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
-                        anyWeirdUVs = anyWeirdUVs || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
+                        anyWeirdUV1s = anyWeirdUV1s || (v.UV1.X > 2 || v.UV1.X < -2 || v.UV1.Y > 2 || v.UV1.Y < -2);
+                        anyWeirdUV2s = anyWeirdUV2s || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
                     }
 
                     if (!anyAlpha)
@@ -1678,7 +1681,12 @@ namespace xivModdingFramework.Models.DataContainers
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
                     }
 
-                    if (anyWeirdUVs)
+                    if (anyWeirdUV1s)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV1 data.  This can have unexpected results on texture placement.  Was this inteneded?");
+                    }
+
+                    if (anyWeirdUV2s)
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this inteneded?");
                     }
