@@ -248,6 +248,236 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetDataOffset(pathHash, fileHash, dataFile);
 
         }
+
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files in the FFXIV file system, using a batch operation for speed.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, long>> GetDataOffsets(List<string> files)
+        {
+            // Here we need to do two things.
+            // 1. Group the files by their data file.
+            // 2. Hash the files into their folder/file hashes and build the dictionaries to pass to the private function.
+
+            // Thankfully, we can just do all of that in one pass.
+
+            // This is keyed by Data File => Folder hash => File Hash => Full File Path
+            // This is used as dictionaries vs compound objects or lists b/c dictionary key look ups are immensely faster than
+            // full list scans, when working with lists of potentially 10000+ files.
+            Dictionary<XivDataFile, Dictionary<int, Dictionary<int, string>>> dict = new Dictionary<XivDataFile, Dictionary<int, Dictionary<int, string>>>();
+
+            foreach(var file in files)
+            {
+                var dataFile = IOUtil.GetDataFileFromPath(file);
+                var pathHash = HashGenerator.GetHash(file.Substring(0, file.LastIndexOf("/", StringComparison.Ordinal)));
+                var fileHash = HashGenerator.GetHash(Path.GetFileName(file));
+
+                
+                if(!dict.ContainsKey(dataFile))
+                {
+                    dict.Add(dataFile, new Dictionary<int, Dictionary<int, string>>());
+                }
+
+                if(!dict[dataFile].ContainsKey(pathHash))
+                {
+                    dict[dataFile].Add(pathHash, new Dictionary<int, string>());
+                }
+
+                if(!dict[dataFile][pathHash].ContainsKey(fileHash))
+                {
+                    dict[dataFile][pathHash].Add(fileHash, file);
+                }
+            }
+
+            var ret = new Dictionary<string, long>();
+            foreach(var kv in dict)
+            {
+                var offsets = await GetDataOffsets(kv.Key, kv.Value);
+
+                foreach(var kv2 in offsets)
+                {
+                    if(!ret.ContainsKey(kv2.Key))
+                    {
+                        ret.Add(kv2.Key, kv2.Value);
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files within the same data file.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        private async Task<Dictionary<string, long>> GetDataOffsets(XivDataFile dataFile, Dictionary<int, Dictionary<int, string>> FolderFiles)
+        {
+            var ret = new Dictionary<string, long>();
+            return await Task.Run(() =>
+            {
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+
+                // These are the offsets to relevant data
+                const int fileCountOffset = 1036;
+                const int dataStartOffset = 2048;
+
+                int count = 0;
+                _semaphoreSlim.Wait();
+                try
+                {
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                    {
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var fileCount = br.ReadInt32();
+
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+
+                        // loop through each file entry
+                        for (var i = 0; i < fileCount; i += 16)
+                        {
+                            var fileNameHash = br.ReadInt32();
+                            var folderPathHash = br.ReadInt32();
+                            long offset = br.ReadUInt32();
+                            var unused = br.ReadInt32();
+
+                            if (FolderFiles.ContainsKey(folderPathHash))
+                            {
+                                if(FolderFiles[folderPathHash].ContainsKey(fileNameHash))
+                                {
+                                    count++;
+                                    ret.Add(FolderFiles[folderPathHash][fileNameHash], offset * 8);
+                                }
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
+
+                return ret;
+            });
+        }
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files in the FFXIV file system, using a batch operation for speed.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, long>> GetDataOffsetsIndex2(List<string> files)
+        {
+            // Here we need to do two things.
+            // 1. Group the files by their data file.
+            // 2. Get their file hashes.
+
+            // Thankfully, we can just do all of that in one pass.
+
+            // This is keyed by Data File => Folder hash => File Hash => Full File Path
+            // This is used as dictionaries vs compound objects or lists b/c dictionary key look ups are immensely faster than
+            // full list scans, when working with lists of potentially 10000+ files.
+            Dictionary<XivDataFile, Dictionary<uint, string>> dict = new Dictionary<XivDataFile, Dictionary<uint, string>>();
+
+            foreach (var file in files)
+            {
+                var dataFile = IOUtil.GetDataFileFromPath(file);
+                var fullHash = (uint) HashGenerator.GetHash(file);
+
+
+                if (!dict.ContainsKey(dataFile))
+                {
+                    dict.Add(dataFile, new Dictionary<uint, string>());
+                }
+
+                if (!dict[dataFile].ContainsKey(fullHash))
+                {
+                    dict[dataFile].Add(fullHash, file);
+                }
+            }
+
+            var ret = new Dictionary<string, long>();
+            foreach (var kv in dict)
+            {
+                var offsets = await GetDataOffsetsIndex2(kv.Key, kv.Value);
+
+                foreach (var kv2 in offsets)
+                {
+                    if (!ret.ContainsKey(kv2.Key))
+                    {
+                        ret.Add(kv2.Key, kv2.Value);
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files within the same data file, via their Index2 entries.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        private async Task<Dictionary<string, long>> GetDataOffsetsIndex2(XivDataFile dataFile, Dictionary<uint, string> fileHashes)
+        {
+            var ret = new Dictionary<string, long>();
+            return await Task.Run(async () =>
+            {
+                var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+
+
+                var SegmentHeaders = new int[4];
+                var SegmentOffsets = new int[4];
+                var SegmentSizes = new int[4];
+
+                // Segment header offsets
+                SegmentHeaders[0] = 1028;                   // Files
+                SegmentHeaders[1] = 1028 + (72 * 1) + 4;    // Unknown
+                SegmentHeaders[2] = 1028 + (72 * 2) + 4;    // Unknown
+                SegmentHeaders[3] = 1028 + (72 * 3) + 4;    // Folders
+
+
+                await _semaphoreSlim.WaitAsync();
+                try
+                {
+
+                    // Might as well grab the whole thing since we're doing a full scan.
+                    byte[] originalIndex = File.ReadAllBytes(index2Path);
+
+                    // Get all the segment header data
+                    for (int i = 0; i < SegmentHeaders.Length; i++)
+                    {
+                        SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                        SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                    }
+
+                    int fileCount = SegmentSizes[0] / 8;
+
+                    for (int i = 0; i < fileCount; i++)
+                    {
+                        int position = SegmentOffsets[0] + (i * 8);
+                        uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
+                        uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
+
+                        // Index 2 is just in hash order, so find the spot where we fit in.
+                        if (fileHashes.ContainsKey(iFullPathHash))
+                        {
+                            long offset = (long)iOffset;
+                            ret.Add(fileHashes[iFullPathHash], offset * 8);
+                        }
+                    }
+                }
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
+                return ret;
+            });
+        }
+
+
         public async Task<long> GetDataOffsetIndex2(string fullPath)
         {
             var fullPathHash = HashGenerator.GetHash(fullPath);

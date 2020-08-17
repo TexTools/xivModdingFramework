@@ -2190,19 +2190,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Check for common user errors.
                 TTModel.CheckCommonUserErrors(ttModel, loggingFunction);
-                if (ttModel.Materials.Count > 4)
-                {
-                    loggingFunction(true, "Model has more than four active materials.  The following materials will be ignored in game: ");
-                    var idx = 0;
-                    foreach (var m in ttModel.Materials)
-                    {
-                        if(idx >= 4)
-                        {
-                            loggingFunction(true, "Material: " + m);
-                        }
-                        idx ++;
-                    }
-                }
 
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");

@@ -1616,6 +1616,12 @@ namespace xivModdingFramework.Models.DataContainers
             return true;
         }
 
+        /// <summary>
+        /// Checks the model for common valid-but-unusual states that users often end up in by accident, providing 
+        /// a warning message for each one, if the conditions are met.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="loggingFunction"></param>
         public static void CheckCommonUserErrors(TTModel model, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
