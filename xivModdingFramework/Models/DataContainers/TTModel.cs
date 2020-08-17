@@ -1659,11 +1659,13 @@ namespace xivModdingFramework.Models.DataContainers
                     bool anyColor = false;
                     bool anyWeirdUVs = false;
 
+                    if(p.Vertices.Count == 0) continue;
+
                     foreach (var v in p.Vertices)
                     {
                         anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
                         anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
-                        anyWeirdUVs = anyWeirdUVs || (v.UV2.X > 2 || v.UV2.X < -1 || v.UV2.Y > 1 || v.UV2.Y < -2);
+                        anyWeirdUVs = anyWeirdUVs || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
                     }
 
                     if (!anyAlpha)
