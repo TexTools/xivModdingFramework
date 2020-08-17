@@ -2188,7 +2188,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Doesn't really matter as these get auto-resolved in game no matter what race they point to.
                 ModelModifiers.FixUpSkinReferences(ttModel, filePath, loggingFunction);
 
-                if(ttModel.Materials.Count > 4)
+                // Check for common user errors.
+                TTModel.CheckCommonUserErrors(ttModel, loggingFunction);
+                if (ttModel.Materials.Count > 4)
                 {
                     loggingFunction(true, "Model has more than four active materials.  The following materials will be ignored in game: ");
                     var idx = 0;

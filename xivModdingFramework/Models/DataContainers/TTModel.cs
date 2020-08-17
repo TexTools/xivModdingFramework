@@ -1613,35 +1613,59 @@ namespace xivModdingFramework.Models.DataContainers
                 return false;
             }
 
+            return true;
+        }
+
+        public static void CheckCommonUserErrors(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+            loggingFunction(false, "Checking for unusual data...");
+
+            if (model.Materials.Count > 4)
+            {
+                loggingFunction(true, "Model has more than four active materials.  The following materials will be ignored in game: ");
+                var idx = 0;
+                foreach (var m in model.Materials)
+                {
+                    if (idx >= 4)
+                    {
+                        loggingFunction(true, "Material: " + m);
+                    }
+                    idx++;
+                }
+            }
 
             int mIdx = 0;
-            foreach(var m in model.MeshGroups)
+            foreach (var m in model.MeshGroups)
             {
                 int pIdx = 0;
-                foreach(var p in m.Parts)
+                foreach (var p in m.Parts)
                 {
                     bool anyAlpha = false;
                     bool anyColor = false;
                     bool anyWeirdUVs = false;
 
-                    foreach(var v in p.Vertices)
+                    foreach (var v in p.Vertices)
                     {
                         anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
                         anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
                         anyWeirdUVs = anyWeirdUVs || (v.UV2.X > 2 || v.UV2.X < -1 || v.UV2.Y > 1 || v.UV2.Y < -2);
                     }
 
-                    if(!anyAlpha)
+                    if (!anyAlpha)
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Alpha channel.  This will render the part invisible in-game.  Was this intended?");
                     }
 
-                    if(!anyColor)
+                    if (!anyColor)
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
                     }
 
-                    if(anyWeirdUVs)
+                    if (anyWeirdUVs)
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this inteneded?");
                     }
@@ -1651,7 +1675,6 @@ namespace xivModdingFramework.Models.DataContainers
                 mIdx++;
             }
 
-            return true;
         }
 
         #endregion
