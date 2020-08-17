@@ -506,6 +506,30 @@ namespace xivModdingFramework.Mods
         }
 
         /// <summary>
+        /// Purges any invalid empty mod blocks from the modlist.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> PurgeInvalidEmptyBlocks()
+        {
+            int removed = 0;
+            var modList = await GetModListAsync();
+            var emptyBlocks = modList.Mods.Where(x => x.name == string.Empty);
+            var toRemove = emptyBlocks.Where(x => x.data.modOffset <= 0).ToList();
+
+            foreach(var block in toRemove)
+            {
+                modList.Mods.Remove(block);
+                removed++;
+            }
+
+            if (removed > 0)
+            {
+                SaveModList(modList);
+            }
+            return removed;
+        } 
+
+        /// <summary>
         /// Deletes a mod from the modlist
         /// </summary>
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
