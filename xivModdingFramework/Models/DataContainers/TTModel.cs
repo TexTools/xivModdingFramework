@@ -1597,8 +1597,9 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 loggingFunction = ModelModifiers.NoOp;
             }
+            loggingFunction(false, "Validating model sanity...");
 
-            if(model.MeshGroups.Count == 0)
+            if (model.MeshGroups.Count == 0)
             {
                 loggingFunction(true, "Model has no data. - Model must have at least one valid Mesh Group.");
                 return false;
@@ -1610,6 +1611,44 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 loggingFunction(true, "Mesh Group 0 has no valid parts - Model must have at least one vertex in Mesh Group 0.");
                 return false;
+            }
+
+
+            int mIdx = 0;
+            foreach(var m in model.MeshGroups)
+            {
+                int pIdx = 0;
+                foreach(var p in m.Parts)
+                {
+                    bool anyAlpha = false;
+                    bool anyColor = false;
+                    bool anyWeirdUVs = false;
+
+                    foreach(var v in p.Vertices)
+                    {
+                        anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
+                        anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
+                        anyWeirdUVs = anyWeirdUVs || (v.UV2.X > 2 || v.UV2.X < -1 || v.UV2.Y > 1 || v.UV2.Y < -2);
+                    }
+
+                    if(!anyAlpha)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Alpha channel.  This will render the part invisible.  Was this intended?");
+                    }
+
+                    if(!anyColor)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
+                    }
+
+                    if(anyWeirdUVs)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this inteneded?");
+                    }
+
+                    pIdx++;
+                }
+                mIdx++;
             }
 
             return true;
