@@ -1633,7 +1633,7 @@ namespace xivModdingFramework.Models.DataContainers
 
                     if(!anyAlpha)
                     {
-                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Alpha channel.  This will render the part invisible.  Was this intended?");
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Alpha channel.  This will render the part invisible in-game.  Was this intended?");
                     }
 
                     if(!anyColor)
