@@ -52,7 +52,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             _modListDirectory = modding.ModListDirectory;
         }
 
-        private static long GetMaximumDatSize()
+        public static long GetMaximumDatSize()
         {
             var dxMode = XivCache.GameInfo.DxMode;
             var is64b = Environment.Is64BitOperatingSystem;
@@ -81,7 +81,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return 4294967296;
                 case "NTFS":
                     // This isn't the actual NTFS limit, but is a safety limit for now while we test higher DAT sizes. (8GB)
-                    // Theoretical offset-addressable maximum is 2^36 for DX11 DAT files.
+                    // Theoretical offset-addressable maximum is 2^35 for DX11, NTFS DAT files.  (28 Shift 7)
                     return 8589934592; 
                 default:
                     return 8589934592;
