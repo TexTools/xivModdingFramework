@@ -55,8 +55,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static long GetMaximumDatSize()
         {
             var dxMode = XivCache.GameInfo.DxMode;
+            var is64b = Environment.Is64BitOperatingSystem;
 
-            if(dxMode < 11)
+            if (dxMode < 11 || !is64b)
             {
                 return 2000000000;
             } else
