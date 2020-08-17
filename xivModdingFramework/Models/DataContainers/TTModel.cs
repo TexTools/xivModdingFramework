@@ -1605,12 +1605,17 @@ namespace xivModdingFramework.Models.DataContainers
                 return false;
             }
 
-
-            var Group0Valid = model.MeshGroups[0].Parts.Any(x => x.Vertices.Count > 0);
-            if(!Group0Valid)
+            var mIdx = 0;
+            foreach(var m in model.MeshGroups)
             {
-                loggingFunction(true, "Mesh Group 0 has no valid parts - Model must have at least one vertex in Mesh Group 0.");
-                return false;
+
+                var valid = m.Parts.Any(x => x.Vertices.Count > 0);
+                if (!valid)
+                {
+                    loggingFunction(true, "Mesh Group: " + mIdx + " Exists but does not have any valid parts.  This will cause FFXIV to crash.  Mesh Groups must be contiguously numbered and contain at least one valid part.");
+                    return false;
+                }
+                mIdx++;
             }
 
             return true;
