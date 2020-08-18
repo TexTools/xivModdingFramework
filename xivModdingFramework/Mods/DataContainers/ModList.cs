@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
@@ -22,7 +23,7 @@ using System.Text;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
-    public class ModList
+    public class ModList : ICloneable 
     {
         /// <summary>
         /// The ModList Version
@@ -53,6 +54,16 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The list of Mods
         /// </summary>
         public List<Mod> Mods { get; set; }
+
+        public object Clone()
+        {
+            // Since reflection methods have proven slightly unstable for this purpose, the safest
+            // method is to simply serialize and deserialize us into a new object.
+
+            // If perf is too bad, we can also introduce a full clone down the chain, but that's
+            // slightly less safe in the event any of the classes ever get extended.
+            return JsonConvert.DeserializeObject<ModList>(JsonConvert.SerializeObject(this));
+        }
 
 
     }

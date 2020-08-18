@@ -88,7 +88,7 @@ namespace xivModdingFramework.Mods
             }
 
             // Always return a deep copy clone of the base ModList, to prevent accidental tampering.
-            return ObjectCloner.Clone<ModList>(val, true);
+            return (ModList) val.Clone();
         }
         public async Task<ModList> GetModListAsync()
         {
@@ -120,7 +120,7 @@ namespace xivModdingFramework.Mods
             }
 
             // Always return a deep copy clone of the base ModList, to prevent accidental tampering.
-            return ObjectCloner.Clone<ModList>(val, true);
+            return (ModList)val.Clone();
         }
 
         public void SaveModList(ModList ml)
