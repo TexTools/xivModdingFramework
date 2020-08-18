@@ -1100,6 +1100,23 @@ namespace xivModdingFramework.Models.Helpers
             return result;
         }
 
+
+        /// <summary>
+        /// Normalizes a byte array to sum to 255 (minus rounding errors)
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private static byte[] Normalize(IEnumerable<byte> data)
+        {
+            double sum = data.Select(x => (double)x).Aggregate((acc, x) => acc + x);
+            double target = 255;
+            double mul = target / sum;
+
+            return data
+                .Select(n => (byte)Math.Round((n * mul)))
+                .ToArray();
+        }
+
         /// <summary>
         /// This function does all the minor adjustments to a Model that makes it
         /// ready for injection into the SE filesystem.  Such as flipping the 
@@ -1144,12 +1161,37 @@ namespace xivModdingFramework.Models.Helpers
                             if (model.HasWeights)
                             {
                                 int boneSum = 0;
+                                var sum = v.Weights.Select(x => (int) x).Aggregate((sum, x) => sum + x);
+
+                                if (sum == 0)
+                                {
+                                    loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
+                                    v.Weights[0] = 255;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                } else if (sum > 500)
+                                {
+                                    loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has extremely abnormal weights; the weight values for the vertex have been reset.");
+                                    v.Weights[0] = 255;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                } else if (sum > 256 || sum < 254)
+                                {
+                                    perPartMajorCorrections++;
+                                }
+                                var og = v.Weights;
+                                v.Weights = Normalize(v.Weights).ToArray();
+                                boneSum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
+
                                 // Weight corrections.
                                 while (boneSum != 255)
                                 {
                                     boneSum = 0;
                                     var mostMajor = 0;
                                     var most = 0;
+
                                     // Loop them to sum them up.
                                     // and snag the least/most major influences while we're at it.
                                     for (var i = 0; i < v.Weights.Length; i++)
@@ -1167,33 +1209,9 @@ namespace xivModdingFramework.Models.Helpers
                                         }
                                     }
 
-                                    if(most == 0)
-                                    {
-                                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
-                                        perPartMajorCorrections++;
-                                        v.Weights[0] = 255;
-                                        break;
-                                    }
-
                                     var alteration = 255 - boneSum;
-                                    if (Math.Abs(alteration) > 1)
-                                    {
-                                        perPartMajorCorrections++;
-                                    }
 
-                                    if (Math.Abs(alteration) > 255)
-                                    {
-                                        // Just No.
-                                        v.Weights[0] = 255;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has extremely abnormal weights; the weight values for the vertex have been reset.");
-                                        break;
-
-                                    }
-
-                                    // Take or Add to the most major bone.
+                                    // Take or Add to the most major bone to resolve rounding errors.
                                     v.Weights[mostMajor] = (byte)(v.Weights[mostMajor] + alteration);
                                     boneSum += alteration;
                                 }
@@ -1201,8 +1219,7 @@ namespace xivModdingFramework.Models.Helpers
                         }
                         vIdx++;
                     }
-
-                    if (perPartMajorCorrections > 0)
+                    if(perPartMajorCorrections > 0)
                     {
                         loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
                     }
