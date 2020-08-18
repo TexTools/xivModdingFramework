@@ -238,7 +238,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 }
                             };
 
-                            var rawData = dat.GetRawData((int) simpleModData.ModOffset,
+                            var rawData = dat.GetRawData(simpleModData.ModOffset,
                                 XivDataFiles.GetXivDataFile(simpleModData.DatFile),
                                 simpleModData.ModSize);
 

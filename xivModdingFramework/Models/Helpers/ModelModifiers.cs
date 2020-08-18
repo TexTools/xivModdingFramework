@@ -1188,12 +1188,13 @@ namespace xivModdingFramework.Models.Helpers
                                         v.Weights[1] = 0;
                                         v.Weights[1] = 0;
                                         v.Weights[1] = 0;
+                                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has extremely abnormal weights; the weight values for the vertex have been reset.");
                                         break;
 
                                     }
 
                                     // Take or Add to the most major bone.
-                                    v.Weights[mostMajor] += (byte)alteration;
+                                    v.Weights[mostMajor] = (byte)(v.Weights[mostMajor] + alteration);
                                     boneSum += alteration;
                                 }
                             }
