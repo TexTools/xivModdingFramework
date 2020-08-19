@@ -124,6 +124,11 @@ namespace xivModdingFramework.Cache
                 throw new Exception("First call to cache must include a valid game directoy.");
             }
 
+            if(gameInfo != null && !gameInfo.GameDirectory.Exists)
+            {
+                throw new Exception("Provided Game Directory does not exist.");
+            }
+
             // Sleep and lock this thread until rebuild is done.
             while (_REBUILDING)
             {

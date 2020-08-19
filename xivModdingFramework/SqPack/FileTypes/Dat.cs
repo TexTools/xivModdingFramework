@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -56,8 +55,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var dxMode = XivCache.GameInfo.DxMode;
             var is64b = Environment.Is64BitOperatingSystem;
+            var runningIn32bMode = IntPtr.Size == 4;
 
-            if (dxMode < 11 || !is64b)
+            if (dxMode < 11 || !is64b || runningIn32bMode)
             {
                 return 2000000000;
             } else
@@ -1365,8 +1365,20 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile, bool alreadyLocked = false)
+        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0, bool alreadyLocked = false)
         {
+            if(fileSize < 0)
+            {
+                throw new InvalidDataException("Cannot check space for a negative size file.");
+            }
+
+            if(fileSize % 256 != 0)
+            {
+                // File will be rounded up to 256 bytes on entry, so we have to account for that.
+                var remainder = 256 - (fileSize % 256);
+                fileSize += remainder;
+            }
+
             var targetDat = -1;
             Dictionary<int, FileInfo> finfos = new Dictionary<int, FileInfo>(8);
 
@@ -1388,10 +1400,19 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (fInfo == null || !fInfo.Exists) break;
                 
 
-                var fileSize = fInfo.Length;
+                var datSize = fInfo.Length;
 
-                // Dat is already too large, can't write to it.
-                if (fileSize > GetMaximumDatSize()) continue;
+                // Files will only be injected on multiples of 256 bytes, so we have to account for the potential
+                // extra padding space to get to that point.
+                if(datSize % 256 != 0)
+                {
+                    var remainder = 256 - (datSize % 256);
+                    datSize += remainder;
+                }
+
+                // Dat is too large to fit this file, we can't write to it.
+                if (datSize + fileSize >= GetMaximumDatSize()) continue;
+
 
                 // Found an existing dat that has space.
                 targetDat = i;
@@ -1462,7 +1483,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 // This finds the first dat with space, OR creates one if needed.
-                datNum = await GetFirstDatWithSpace(dataFile, true);
+                datNum = await GetFirstDatWithSpace(dataFile, importData.Count, true);
 
                 modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
