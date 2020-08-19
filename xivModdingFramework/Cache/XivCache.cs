@@ -65,6 +65,14 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public static bool Initialized
+        {
+            get
+            {
+                return _gameInfo != null;
+            }
+        }
+
         public static bool CacheWorkerEnabled
         {
             get
