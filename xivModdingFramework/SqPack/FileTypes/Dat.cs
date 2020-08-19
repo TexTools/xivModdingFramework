@@ -84,7 +84,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Theoretical offset-addressable maximum is 2^35 for DX11, NTFS DAT files.  (28 Shift 7)
                     return 8589934592; 
                 default:
-                    return 8589934592;
+                    // Unknown HDD Format, default to the basic limit.
+                    return 2000000000;
             }
         }
 
