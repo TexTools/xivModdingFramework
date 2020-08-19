@@ -1048,11 +1048,13 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         }
 
-                        // Fundamentally all files in the dat are padded out to the nearest 256 bytes.
-                        // The DAT import functions actually add this for us normally, so it's not really
-                        // necessary to treat it as part of the 'file size', but for completeness, it doesn't
-                        // hurt to do so, and then it makes our file size match with the modlist entry file sizes.
-                        if(compSize % 256 != 0)
+
+                        // In some extremely rare circumstances, crashes have occurred due to missing the padding data
+                        // at the end of files.  Just throw in an extra 128 to be 100% safe.
+                        compSize += 128;
+
+                        // Round out to the nearest 256 bytes.
+                        if (compSize % 256 != 0)
                         {
                             var padding = 256 - (compSize % 256);
                             compSize += padding;
