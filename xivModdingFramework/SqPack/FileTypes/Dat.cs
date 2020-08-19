@@ -981,7 +981,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 var blockCompressedSize = br.ReadUInt16();
 
                                 lastOffset = blockOffset;
-                                lastSize = blockCompressedSize;
+                                lastSize = blockCompressedSize + 16;    // 16 bytes of header data per block.
                             }
 
                             // Pretty straight forward.  Header + Total size of the compressed data.
@@ -1048,10 +1048,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         }
 
-
-                        // In some extremely rare circumstances, crashes have occurred due to missing the padding data
-                        // at the end of files.  Just throw in an extra 128 to be 100% safe.
-                        compSize += 128;
 
                         // Round out to the nearest 256 bytes.
                         if (compSize % 256 != 0)
