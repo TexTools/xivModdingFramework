@@ -2114,6 +2114,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else if (suffix == "dae")
                 {
+                    loggingFunction(true, "DEPRECATION NOTICE - DAE Import/Export is Deprecated/Legacy Functionality and will be removed in TexTools 2.3.  Consider changing to FBX Import/Export.");
                     // Dae handling is a special snowflake.
                     var dae = new Dae(_gameDirectory, _dataFile);
                     loggingFunction(false, "Loading DAE file...");
