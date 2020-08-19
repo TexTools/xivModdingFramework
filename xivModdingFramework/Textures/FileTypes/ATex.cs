@@ -96,7 +96,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the ATex file</param>
         /// <returns>An XivTex with all the texture data</returns>
-        public async Task<XivTex> GetATexData(int offset)
+        public async Task<XivTex> GetATexData(long offset)
         {
             var dat = new Dat(_gameDirectory);
             var atexData = await dat.GetType2Data(offset, _dataFile);

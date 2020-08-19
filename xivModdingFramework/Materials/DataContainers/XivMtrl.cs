@@ -812,13 +812,25 @@ namespace xivModdingFramework.Materials.DataContainers
             else if (info.Shader == MtrlShader.Standard)
             {
                 SetTextureUsage(XivTexType.Normal);
-                if (info.HasDiffuse)
+                if(info.Preset == MtrlShaderPreset.Default)
+                {
+                    SetTextureUsage(XivTexType.Multi);  
+
+                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti)
+                {
+                    // This seems to crash the game atm.
+                    SetTextureUsage(XivTexType.Diffuse);
+                    SetTextureUsage(XivTexType.Multi);
+                } else
                 {
                     SetTextureUsage(XivTexType.Diffuse);
+                    SetTextureUsage(XivTexType.Multi);
+                }
+                if (info.HasDiffuse)
+                {
                 }
                 if (info.HasMulti || info.HasSpec)
                 {
-                    SetTextureUsage(XivTexType.Multi);
                 }
                 if(info.HasSpec)
                 {
@@ -1578,7 +1590,7 @@ namespace xivModdingFramework.Materials.DataContainers
             presets.Add(MtrlShaderPreset.Default);
             if (shader == MtrlShader.Standard)
             {
-                presets.Add(MtrlShaderPreset.DiffuseMulti);
+                //presets.Add(MtrlShaderPreset.DiffuseMulti);
                 presets.Add(MtrlShaderPreset.DiffuseSpecular);
             } else if(shader == MtrlShader.Skin)
             {
