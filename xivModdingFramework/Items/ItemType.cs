@@ -353,8 +353,16 @@ namespace xivModdingFramework.Items
             {
                 if (item.SecondaryCategory == XivStrings.Paintings)
                 {
-                    modelInfo = ((IItemModel)item).ModelInfo;
-                    return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
+                    try
+                    {
+                        var furnitureItem = (IItemModel)item;
+                        modelInfo = furnitureItem.ModelInfo;
+                        return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
+                    } catch
+                    {
+                        var uiItem = (XivUi)item;
+                        return "ui/icon/" + uiItem.IconNumber.ToString().PadLeft(6, '0');
+                    }
                 }
                 else
                 {
@@ -366,7 +374,17 @@ namespace xivModdingFramework.Items
             {
                 if (item.SecondaryCategory == XivStrings.Paintings)
                 {
-                    return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
+                    try
+                    {
+                        var furnitureItem = (IItemModel)item;
+                        modelInfo = furnitureItem.ModelInfo;
+                        return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
+                    }
+                    catch
+                    {
+                        var uiItem = (XivUi)item;
+                        return "ui/icon/" + uiItem.IconNumber.ToString().PadLeft(6, '0');
+                    }
                 }
                 else
                 {

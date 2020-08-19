@@ -371,7 +371,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
         /// <param name="mtrlPath">The full internal game path for the mtrl</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(int mtrlOffset, string mtrlPath, int dxVersion)
+        public async Task<XivMtrl> GetMtrlData(long mtrlOffset, string mtrlPath, int dxVersion)
         {
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
@@ -672,7 +672,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public async Task<int> ImportMtrl(XivMtrl xivMtrl, IItem item, string source)
+        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source)
         {
             try
             {
@@ -680,7 +680,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                var offset = await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.SecondaryCategory, source);
+                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.SecondaryCategory, source);
 
                 // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
                 var mapInfoList = xivMtrl.GetAllMapInfos(false);

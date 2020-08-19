@@ -1597,22 +1597,105 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 loggingFunction = ModelModifiers.NoOp;
             }
+            loggingFunction(false, "Validating model sanity...");
 
-            if(model.MeshGroups.Count == 0)
+            if (model.MeshGroups.Count == 0)
             {
                 loggingFunction(true, "Model has no data. - Model must have at least one valid Mesh Group.");
                 return false;
             }
 
-
-            var Group0Valid = model.MeshGroups[0].Parts.Any(x => x.Vertices.Count > 0);
-            if(!Group0Valid)
+            var mIdx = 0;
+            foreach(var m in model.MeshGroups)
             {
-                loggingFunction(true, "Mesh Group 0 has no valid parts - Model must have at least one vertex in Mesh Group 0.");
-                return false;
+
+                var valid = m.Parts.Any(x => x.Vertices.Count > 0);
+                if (!valid)
+                {
+                    loggingFunction(true, "Mesh Group: " + mIdx + " Exists but does not have any valid parts.  This will cause FFXIV to crash.  Mesh Groups must be contiguously numbered and contain at least one valid part.");
+                    return false;
+                }
+                mIdx++;
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Checks the model for common valid-but-unusual states that users often end up in by accident, providing 
+        /// a warning message for each one, if the conditions are met.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="loggingFunction"></param>
+        public static void CheckCommonUserErrors(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+            loggingFunction(false, "Checking for unusual data...");
+
+            if (model.Materials.Count > 4)
+            {
+                loggingFunction(true, "Model has more than four active materials.  The following materials will be ignored in game: ");
+                var idx = 0;
+                foreach (var m in model.Materials)
+                {
+                    if (idx >= 4)
+                    {
+                        loggingFunction(true, "Material: " + m);
+                    }
+                    idx++;
+                }
+            }
+
+            int mIdx = 0;
+            foreach (var m in model.MeshGroups)
+            {
+                int pIdx = 0;
+                foreach (var p in m.Parts)
+                {
+
+                    if (p.Vertices.Count == 0) continue;
+
+                    bool anyAlpha = false;
+                    bool anyColor = false;
+                    bool anyWeirdUV1s = false;
+                    bool anyWeirdUV2s = false;
+
+                    foreach (var v in p.Vertices)
+                    {
+                        anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
+                        anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
+                        anyWeirdUV1s = anyWeirdUV1s || (v.UV1.X > 2 || v.UV1.X < -2 || v.UV1.Y > 2 || v.UV1.Y < -2);
+                        anyWeirdUV2s = anyWeirdUV2s || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
+                    }
+
+                    if (!anyAlpha)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Alpha channel.  This will render the part invisible in-game.  Was this intended?");
+                    }
+
+                    if (!anyColor)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
+                    }
+
+                    if (anyWeirdUV1s)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV1 data.  This can have unexpected results on texture placement.  Was this inteneded?");
+                    }
+
+                    if (anyWeirdUV2s)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this inteneded?");
+                    }
+
+                    pIdx++;
+                }
+                mIdx++;
+            }
+
         }
 
         #endregion

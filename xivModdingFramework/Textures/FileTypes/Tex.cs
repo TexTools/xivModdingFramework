@@ -52,7 +52,7 @@ namespace xivModdingFramework.Textures.FileTypes
         private readonly Index _index;
         private readonly Dat _dat;
         private readonly XivDataFile _dataFile;
-        private Dictionary<string, int> _indexFileDictionary;
+        private Dictionary<string, long> _indexFileDictionary;
         private readonly object texLock = new object();
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
 
 
-            var offset = 0;
+            long offset = 0;
 
             var hashedfolder = 0;
             var hashedfile = 0;
@@ -156,7 +156,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var folder = Path.GetDirectoryName(ttp.Path);
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(ttp.Path);
-            var offset = 0;
+            long offset = 0;
 
             lock (texLock)
             {
@@ -570,9 +570,9 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item who's texture we are importing</param>
         /// <param name="ddsFileDirectory">The directory of the dds file being imported</param>
         /// <returns>The offset to the new imported data</returns>
-        public async Task<int> TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory, string source)
+        public async Task<long> TexDDSImporter(XivTex xivTex, IItem item, DirectoryInfo ddsFileDirectory, string source)
         {
-            var offset = 0;
+            long offset = 0;
 
             var modding = new Modding(_gameDirectory);
 
@@ -673,9 +673,9 @@ namespace xivModdingFramework.Textures.FileTypes
             return offset;
         }
 
-        public async Task<int> TexImporter(XivTex xivTex, IItem item, DirectoryInfo fileDirectory, string source)
+        public async Task<long> TexImporter(XivTex xivTex, IItem item, DirectoryInfo fileDirectory, string source)
         {
-            var offset = 0;
+            long offset = 0;
 
             var modding = new Modding(_gameDirectory);
 
@@ -708,10 +708,18 @@ namespace xivModdingFramework.Textures.FileTypes
 
                     surface.FlipVertically();
 
+                    var root = item.GetRoot();
+                    var maxMipCount = 1;
+                    if ((root != null  && xivTex.MipMapCount != 0) || xivTex.MipMapCount > 1) {
+                        // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
+                        // (Ex. The Default Mat-Add textures)
+                        maxMipCount = -1;
+                    }
+
                     using (var compressor = new Compressor())
                     {
                         // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
-                        compressor.Input.SetMipmapGeneration(true, xivTex.MipMapCount > 1 ? -1: 1);
+                        compressor.Input.SetMipmapGeneration(true, maxMipCount);
                         compressor.Input.SetData(surface);
                         compressor.Compression.Format = compressionFormat;
                         compressor.Compression.SetBGRAPixelFormat();
@@ -984,7 +992,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item</param>
         /// <param name="source">The source importing the file</param>
         /// <returns>The new offset</returns>
-        public async Task<int> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang)
+        public async Task<long> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang)
         {
             var colorSetData = new List<Half>();
             byte[] colorSetExtraData = null;

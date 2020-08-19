@@ -32,16 +32,18 @@ namespace xivModdingFramework.Cache
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
-        internal static string CacheConnectionString { get
+        internal static string CacheConnectionString 
+        { 
+            get
             {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
         internal static string RootsCacheConnectionString
         {
             get
             {
-                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100;";
+                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
 
@@ -110,16 +112,21 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool validateCache = true)
+        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, int dxMode = 11, bool validateCache = true, bool enableCacheWorker = true)
         {
-            var gi = new GameInfo(gameDirectory, language);
-            SetGameInfo(gi);
+            var gi = new GameInfo(gameDirectory, language, dxMode);
+            SetGameInfo(gi, enableCacheWorker);
         }
-        public static void SetGameInfo(GameInfo gameInfo = null)
+        public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
         {
             // We need to either have a valid game directory reference in the static already or need one in the constructor.
             if (_gameInfo == null && (gameInfo == null || gameInfo.GameDirectory == null)) {
                 throw new Exception("First call to cache must include a valid game directoy.");
+            }
+
+            if(gameInfo != null && !gameInfo.GameDirectory.Exists)
+            {
+                throw new Exception("Provided Game Directory does not exist.");
             }
 
             // Sleep and lock this thread until rebuild is done.
@@ -128,7 +135,7 @@ namespace xivModdingFramework.Cache
                 Thread.Sleep(10);
             }
 
-            if (_gameInfo == null)
+            if (gameInfo != null)
             {
                 _gameInfo = gameInfo;
             }
@@ -147,7 +154,15 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            CacheWorkerEnabled = true;
+            if (enableCacheWorker)
+            {
+                CacheWorkerEnabled = true;
+            } else
+            {
+                // Explicitly shut down the cache worker if not allowed.
+                // This is potentially necessary if a cache rebuild automatically started it.
+                CacheWorkerEnabled = false;
+            }
 
         }
 

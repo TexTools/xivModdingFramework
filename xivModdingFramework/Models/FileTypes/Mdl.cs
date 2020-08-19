@@ -460,7 +460,7 @@ namespace xivModdingFramework.Models.FileTypes
             var getShapeData = true;
 
 
-            var offset = await index.GetDataOffset(mdlPath);
+            long offset = await index.GetDataOffset(mdlPath);
 
             if (getOriginal)
             {
@@ -2187,6 +2187,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Fix up the skin references, just because we can/it helps user expectation.
                 // Doesn't really matter as these get auto-resolved in game no matter what race they point to.
                 ModelModifiers.FixUpSkinReferences(ttModel, filePath, loggingFunction);
+
+                // Check for common user errors.
+                TTModel.CheckCommonUserErrors(ttModel, loggingFunction);
 
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");

@@ -55,65 +55,46 @@ namespace xivModdingFramework.Mods
 
         }
 
-        // Caching information for modlists.
-        private static Dictionary<string, DateTime> _cachedModlistsModTime = new Dictionary<string, DateTime>();
-        private static Dictionary<string, ModList> _cachedModlists = new Dictionary<string, ModList>();
         public ModList GetModList()
         {
-            ModList val;
+            ModList val = null;
             _modlistSemaphore.Wait();
             try
             {
-                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
-                {
-                    // We have a cached file, and the modList file has not been touched since we cached it.
-                    // Return the cached copy (Skip full read & Json deserialize)
-                    val = _cachedModlists[ModListDirectory.FullName];
-                }
-                else
-                {
-                    // Cache was either stale or missing, load the file from disk and update cache.
-                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
-                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-
-                    _cachedModlists[ModListDirectory.FullName] = val;
-                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
-
-                }
-            } finally {
-                _modlistSemaphore.Release();
-            }
-            return val;
-        }
-        public async Task<ModList> GetModListAsync()
-        {
-            ModList val;
-            await _modlistSemaphore.WaitAsync();
-            try
-            {
-                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
-                {
-                    // We have a cached file, and the modList file has not been touched since we cached it.
-                    // Return the cached copy (Skip full read & Json deserialize)
-                    val = _cachedModlists[ModListDirectory.FullName];
-                }
-                else
-                {
-                    // Cache was either stale or missing, load the file from disk and update cache.
-                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
-                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-
-                    _cachedModlists[ModListDirectory.FullName] = val;
-                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
-
-                }
+                var modlistText = File.ReadAllText(ModListDirectory.FullName);
+                val = JsonConvert.DeserializeObject<ModList>(modlistText);
             }
             finally
             {
                 _modlistSemaphore.Release();
             }
+
+            if(val == null)
+            {
+                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
+            }
+
+            return val;
+        }
+        public async Task<ModList> GetModListAsync()
+        {
+            ModList val = null;
+            await _modlistSemaphore.WaitAsync();
+            try
+            {
+                var modlistText = File.ReadAllText(ModListDirectory.FullName);
+                val = JsonConvert.DeserializeObject<ModList>(modlistText);
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
+
+            if (val == null)
+            {
+                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
+            }
+
             return val;
         }
 
@@ -268,6 +249,16 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Unable to find mod entry in modlist.");
             }
 
+            if(modEntry.data.originalOffset <= 0 && !enable)
+            {
+                throw new Exception("Cannot disable mod with invalid original offset.");
+            }
+
+            if(enable && modEntry.data.modOffset <= 0)
+            {
+                throw new Exception("Cannot enable mod with invalid mod offset.");
+            }
+
             // Matadd textures have the same mod offset as original so nothing to toggle
             if (modEntry.data.originalOffset == modEntry.data.modOffset)
             {
@@ -342,6 +333,17 @@ namespace xivModdingFramework.Mods
 
             foreach (var modEntry in mods)
             {
+                if (modEntry.data.originalOffset <= 0 && !enable)
+                {
+                    throw new Exception("Cannot disable mod with invalid original offset.");
+                }
+
+                if (enable && modEntry.data.modOffset <= 0)
+                {
+                    throw new Exception("Cannot enable mod with invalid mod offset.");
+                }
+
+
                 if (modEntry.name.Equals(string.Empty)) continue;
                 // Matadd textures have the same mod offset as original so nothing to toggle
                 if (modEntry.data.originalOffset == modEntry.data.modOffset)
@@ -394,6 +396,18 @@ namespace xivModdingFramework.Mods
             {
                 if(string.IsNullOrEmpty(modEntry.name)) continue;
                 if(string.IsNullOrEmpty(modEntry.fullPath)) continue;
+
+                if (modEntry.data.originalOffset <= 0 && !enable)
+                {
+                    throw new Exception("Cannot disable mod with invalid original offset.");
+                }
+
+                if (enable && modEntry.data.modOffset <= 0)
+                {
+                    throw new Exception("Cannot enable mod with invalid mod offset.");
+                }
+
+
                 if (modEntry.data.modOffset == modEntry.data.originalOffset)
                 {
                     // Added file.
@@ -467,6 +481,30 @@ namespace xivModdingFramework.Mods
         }
 
         /// <summary>
+        /// Purges any invalid empty mod blocks from the modlist.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> PurgeInvalidEmptyBlocks()
+        {
+            int removed = 0;
+            var modList = await GetModListAsync();
+            var emptyBlocks = modList.Mods.Where(x => x.name == string.Empty);
+            var toRemove = emptyBlocks.Where(x => x.data.modOffset <= 0).ToList();
+
+            foreach(var block in toRemove)
+            {
+                modList.Mods.Remove(block);
+                removed++;
+            }
+
+            if (removed > 0)
+            {
+                SaveModList(modList);
+            }
+            return removed;
+        } 
+
+        /// <summary>
         /// Deletes a mod from the modlist
         /// </summary>
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
@@ -496,8 +534,16 @@ namespace xivModdingFramework.Mods
             modToRemove.data.originalOffset = 0;
             modToRemove.data.dataType = 0;
 
-            modList.emptyCount += 1;
             modList.modCount -= 1;
+
+            if(modToRemove.data.modOffset <= 0)
+            {
+                // Something was wrong with this mod frame.  Purge the entire thing from the list.
+                modList.Mods.Remove(modToRemove);
+            } else
+            {
+                modList.emptyCount += 1;
+            }
 
 
             SaveModList(modList);
