@@ -417,7 +417,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
         /// <returns>The number of total mods imported</returns>
-        public async Task<(int ImportCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
+        public async Task<(int ImportCount, int ErrorCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
             var dat = new Dat(gameDirectory);
@@ -425,6 +425,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var modListFullPaths = new List<string>();
             var modList = modding.GetModList();
             var importErrors = "";
+            var eCount = 0;
 
             // Disable the cache woker while we're installing multiple items at once, so that we don't process queue items mid-import.
             // (Could result in improper parent file calculations, as the parent files may not be actually imported yet)
@@ -516,6 +517,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                 }
                                                 catch (Exception ex)
                                                 {
+                                                    eCount++;
                                                     if (ex.GetType() == typeof(NotSupportedException))
                                                     {
                                                         importErrors = ex.Message;
@@ -573,7 +575,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 XivCache.CacheWorkerEnabled = true;
             }
 
-            return (importCount, importErrors);
+            return (importCount, eCount, importErrors);
         }
 
         /// <summary>
