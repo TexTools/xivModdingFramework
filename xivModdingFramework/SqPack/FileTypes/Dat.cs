@@ -72,7 +72,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static long GetMaximumFileSize(string drive)
         {
             var driveInfo = new System.IO.DriveInfo(drive);
-        
+
             switch (driveInfo.DriveFormat)
             {
                 case "FAT16":
@@ -82,7 +82,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 case "NTFS":
                     // This isn't the actual NTFS limit, but is a safety limit for now while we test higher DAT sizes. (8GB)
                     // Theoretical offset-addressable maximum is 2^35 for DX11, NTFS DAT files.  (28 Shift 7)
-                    return 8589934592; 
+                    return 8589934592;
+                case "exFAT":
+                    // exFAT devices are supposed to be able to take larger sizes, and it works for FFXIV
+                    // But in practice, TexTools can't access file pointers above 2GB on exFAT devices.
+                    // .NET thing probably.
+                    return 2000000000;
                 default:
                     // Unknown HDD Format, default to the basic limit.
                     return 2000000000;
