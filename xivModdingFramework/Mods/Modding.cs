@@ -55,72 +55,47 @@ namespace xivModdingFramework.Mods
 
         }
 
-        // Caching information for modlists.
-        private static Dictionary<string, DateTime> _cachedModlistsModTime = new Dictionary<string, DateTime>();
-        private static Dictionary<string, ModList> _cachedModlists = new Dictionary<string, ModList>();
         public ModList GetModList()
         {
-            ModList val;
+            ModList val = null;
             _modlistSemaphore.Wait();
             try
             {
-                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
-                {
-                    // We have a cached file, and the modList file has not been touched since we cached it.
-                    // Return the cached copy (Skip full read & Json deserialize)
-                    val = _cachedModlists[ModListDirectory.FullName];
-                }
-                else
-                {
-                    // Cache was either stale or missing, load the file from disk and update cache.
-                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
-                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-
-                    _cachedModlists[ModListDirectory.FullName] = val;
-                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
-
-                }
+                var modlistText = File.ReadAllText(ModListDirectory.FullName);
+                val = JsonConvert.DeserializeObject<ModList>(modlistText);
             }
             finally
             {
                 _modlistSemaphore.Release();
             }
 
-            // Always return a deep copy clone of the base ModList, to prevent accidental tampering.
-            return (ModList) val.Clone();
+            if(val == null)
+            {
+                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
+            }
+
+            return val;
         }
         public async Task<ModList> GetModListAsync()
         {
-            ModList val;
+            ModList val = null;
             await _modlistSemaphore.WaitAsync();
             try
             {
-                var modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-                if (_cachedModlists.ContainsKey(ModListDirectory.FullName) && modTime <= _cachedModlistsModTime[ModListDirectory.FullName])
-                {
-                    // We have a cached file, and the modList file has not been touched since we cached it.
-                    // Return the cached copy (Skip full read & Json deserialize)
-                    val = _cachedModlists[ModListDirectory.FullName];
-                }
-                else
-                {
-                    // Cache was either stale or missing, load the file from disk and update cache.
-                    val = JsonConvert.DeserializeObject<ModList>(File.ReadAllText(ModListDirectory.FullName));
-                    modTime = File.GetLastWriteTime(ModListDirectory.FullName);
-
-                    _cachedModlists[ModListDirectory.FullName] = val;
-                    _cachedModlistsModTime[ModListDirectory.FullName] = modTime;
-
-                }
+                var modlistText = File.ReadAllText(ModListDirectory.FullName);
+                val = JsonConvert.DeserializeObject<ModList>(modlistText);
             }
             finally
             {
                 _modlistSemaphore.Release();
             }
 
-            // Always return a deep copy clone of the base ModList, to prevent accidental tampering.
-            return (ModList)val.Clone();
+            if (val == null)
+            {
+                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
+            }
+
+            return val;
         }
 
         public void SaveModList(ModList ml)
