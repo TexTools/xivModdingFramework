@@ -87,7 +87,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // exFAT devices are supposed to be able to take larger sizes, and it works for FFXIV
                     // But in practice, TexTools can't access file pointers above 2GB on exFAT devices.
                     // .NET thing probably.
-                    return 2000000000;
+                    return 8589934592;
                 default:
                     // Unknown HDD Format, default to the basic limit.
                     return 2000000000;
