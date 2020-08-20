@@ -577,7 +577,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 if (folderPathHash == hashedFolder)
                                 {
                                     // this is the entry we are looking for, get the offset and break out of the loop
-                                    offset = br.ReadUInt32() * 8;
+                                    offset = br.ReadUInt32();
+                                    offset = offset * 8;
                                     break;
                                 }
 
