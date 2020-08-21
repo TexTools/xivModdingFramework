@@ -101,9 +101,19 @@ namespace xivModdingFramework.Cache
                 {
                     // Sleep until the cache worker actually stops.
                     _cacheWorker.CancelAsync();
+                    var duration = 0;
                     while(_cacheWorker != null)
                     {
                         Thread.Sleep(10);
+                        duration += 10;
+
+                        if(duration >= 3000)
+                        {
+                            // Something went wrong with the shutdown of the cache worker thread.
+                            // Hopefully whatever went wrong fully crashed the thread.
+                            _cacheWorker = null;
+                            break;
+                        }
                     }
                 }
             }
@@ -2009,7 +2019,9 @@ namespace xivModdingFramework.Cache
 
                         // The get call will automatically cache the data, if it needs updating.
                         var task = GetChildFiles(file, false);
-                        task.Wait();
+
+                        // Set a safety timeout here.
+                        task.Wait(3000);
                         continue;
 
                     }
@@ -2032,8 +2044,10 @@ namespace xivModdingFramework.Cache
 
                             // The get call will automatically cache the data, if it needs updating.
                             var task = GetParentFiles(file, false);
-                            task.Wait();
-                            var parents = task.Result;
+
+                            // Set a safety timeout here.
+                            task.Wait(3000);
+                            continue;
                         }
                     }
                 } catch( Exception ex)

@@ -352,10 +352,12 @@ namespace xivModdingFramework.Mods
                     if (enable && !modEntry.enabled)
                     {
                         await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        modEntry.enabled = true;
                     }
                     else if (!enable && modEntry.enabled)
                     {
                         await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
+                        modEntry.enabled = false;
                     }
 
                 }
