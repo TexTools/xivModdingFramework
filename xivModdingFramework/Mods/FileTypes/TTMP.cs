@@ -429,6 +429,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             // Disable the cache woker while we're installing multiple items at once, so that we don't process queue items mid-import.
             // (Could result in improper parent file calculations, as the parent files may not be actually imported yet)
+            var workerEnabled = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
 
@@ -572,7 +573,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
             } finally
             {
-                XivCache.CacheWorkerEnabled = true;
+                XivCache.CacheWorkerEnabled = workerEnabled;
             }
 
             return (importCount, eCount, importErrors);
