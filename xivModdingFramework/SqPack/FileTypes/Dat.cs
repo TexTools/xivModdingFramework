@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -51,6 +50,49 @@ namespace xivModdingFramework.SqPack.FileTypes
             var modding = new Modding(_gameDirectory);
             modding.CreateModlist();
             _modListDirectory = modding.ModListDirectory;
+        }
+
+        public static long GetMaximumDatSize()
+        {
+            var dxMode = XivCache.GameInfo.DxMode;
+            var is64b = Environment.Is64BitOperatingSystem;
+            var runningIn32bMode = IntPtr.Size == 4;
+
+            if (dxMode < 11 || !is64b || runningIn32bMode)
+            {
+                return 2000000000;
+            } else
+            {
+                // Check the user's FFXIV installation drive to see what the maximum file size is for their file system.
+                var drive = XivCache.GameInfo.GameDirectory.FullName.Substring(0, 1);
+                return GetMaximumFileSize(drive);
+            }
+        }
+
+        // Returns the maximum file size in bytes on the filesystem type of the specified drive.
+        private static long GetMaximumFileSize(string drive)
+        {
+            var driveInfo = new System.IO.DriveInfo(drive);
+
+            switch (driveInfo.DriveFormat)
+            {
+                case "FAT16":
+                    return 2147483647;
+                case "FAT32":
+                    return 4294967296;
+                case "NTFS":
+                    // This isn't the actual NTFS limit, but is a safety limit for now while we test higher DAT sizes. (8GB)
+                    // Theoretical offset-addressable maximum is 2^35 for DX11, NTFS DAT files.  (28 Shift 7)
+                    return 8589934592;
+                case "exFAT":
+                    // exFAT devices are supposed to be able to take larger sizes, and it works for FFXIV
+                    // But in practice, TexTools can't access file pointers above 2GB on exFAT devices.
+                    // .NET thing probably.
+                    return 8589934592;
+                default:
+                    // Unknown HDD Format, default to the basic limit.
+                    return 2000000000;
+            }
         }
 
 
@@ -136,6 +178,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         }
 
+
+        // Whether a DAT is an original dat or a Modded dat never changes during runtime.
+        // As such, we can cache that information, rather than having to constantly re-check the filesystem (somewhat expensive operation)
+        private static Dictionary<XivDataFile, Dictionary<int, bool>> OriginalDatStatus = new Dictionary<XivDataFile, Dictionary<int, bool>>();
+
         /// <summary>
         /// Determines whether a mod dat already exists
         /// </summary>
@@ -143,15 +190,74 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if it is original, false otherwise</returns>
         private async Task<bool> IsOriginalDat(XivDataFile dataFile, int datNum, bool alreadyLocked = false)
         {
-            var moddedList = await GetModdedDatList(dataFile, alreadyLocked);
-            var datPath = $"{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-            
-            for(int i = 0; i < moddedList.Count; i++)
+            if(!OriginalDatStatus.ContainsKey(dataFile))
             {
-                moddedList[i] = Path.GetFileName(moddedList[i]);
+                OriginalDatStatus.Add(dataFile, new Dictionary<int, bool>());
             }
 
-            return !moddedList.Contains(datPath);
+            if(OriginalDatStatus[dataFile].ContainsKey(datNum))
+            {
+                return OriginalDatStatus[dataFile][datNum];
+            }
+
+            var unmoddedList = await GetUnmoddedDatList(dataFile, alreadyLocked);
+            var datPath = $"{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            
+            for(int i = 0; i < unmoddedList.Count; i++)
+            {
+                unmoddedList[i] = Path.GetFileName(unmoddedList[i]);
+            }
+
+            var result = unmoddedList.Contains(datPath);
+            OriginalDatStatus[dataFile][datNum] = result;
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets the modded dat files
+        /// </summary>
+        /// <param name="dataFile">The data file to check</param>
+        /// <returns>A list of modded dat files</returns>
+        public async Task<List<string>> GetUnmoddedDatList(XivDataFile dataFile, bool alreadyLocked = false)
+        {
+            var datList = new List<string>();
+
+            await Task.Run(async () =>
+            {
+                if (!alreadyLocked)
+                {
+                    await _lock.WaitAsync();
+                }
+                try
+                {
+                    for (var i = 0; i < 20; i++)
+                    {
+                        var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
+
+                        if (File.Exists(datFilePath))
+                        {
+                            using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
+                            {
+                                binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+                                var b = binaryReader.ReadByte();
+                                if (b != 0)
+                                {
+                                    datList.Add(datFilePath);
+                                }
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    if (!alreadyLocked)
+                    {
+                        _lock.Release();
+                    }
+                }
+            });
+            return datList;
         }
 
         /// <summary>
@@ -333,12 +439,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">The offset where the data is located.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> GetType2Data(int offset, XivDataFile dataFile)
+        public async Task<byte[]> GetType2Data(long offset, XivDataFile dataFile)
         {
             var type2Bytes = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int) ((offset / 8) & 0x0F) / 2;
 
             var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
@@ -406,7 +512,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<int> ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
+        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
             string category, string source)
         {
             return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), itemName, internalPath, category, source);
@@ -420,7 +526,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<int> ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
+        public async Task<long> ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
             string category, string source)
         {
             var dataFile = GetDataFileFromPath(internalPath);
@@ -442,7 +548,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
 
-        public async Task<int> BinaryEditType2Data(string internalPath, int byteOffset, byte[] bytes)
+        public async Task<long> BinaryEditType2Data(string internalPath, int byteOffset, byte[] bytes)
         {
             int bitOffset = byteOffset * 8;
             BitArray bits = new BitArray(bytes);
@@ -457,12 +563,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="bitOffset"></param>
         /// <param name="bits"></param>
         /// <returns></returns>
-        public async Task<int> BinaryEditType2Data(string internalPath, int bitOffset, BitArray bits)
+        public async Task<long> BinaryEditType2Data(string internalPath, int bitOffset, BitArray bits)
         {
             var _modding = new Modding(_gameDirectory);
             var _index = new Index(_gameDirectory);
             var modEntry = await _modding.TryGetModEntry(internalPath);
-            var offset = 0;
+            long offset = 0;
 
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
 
@@ -505,10 +611,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Convert the data back into the Type 2 Data format SE expects.
             var type2Data = (await CreateType2Data(data)).ToList();
 
-            // Write the modified bytes back to the DAT file.
-            var finalOffset  = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalMetaFileSourceName, Path.GetFileName(internalPath), dataFile, Constants.InternalMetaFileSourceName, 2);
+            long newOffset = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalMetaFileSourceName, internalPath, dataFile, Constants.InternalMetaFileSourceName, 2);
 
-            if(offset != finalOffset)
+            if(offset != newOffset)
             {
                 // TODO - FIXFIX - Validate that we're writing back to the same DAT entry location every time, and not generating new mod entries.
                 throw new Exception("DEBUGGING ERROR - Dat Drift Detected.");
@@ -663,11 +768,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the type 3 data</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(int offset, XivDataFile dataFile)
+        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(long offset, XivDataFile dataFile)
         {
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int) ((offset / 8) & 0x0F) / 2;
 
             offset = OffsetCorrection(datNum, offset);
 
@@ -749,7 +854,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         for (var i = 0; i < totalBlocks; i++)
                         {
-                            var lastPos = (int)br.BaseStream.Position;
+                            long lastPos = br.BaseStream.Position;
 
                             br.ReadBytes(8);
 
@@ -827,7 +932,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        public async Task<int> GetCompressedFileSize(int offset, XivDataFile dataFile)
+        public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
         {
 
             var xivTex = new XivTex();
@@ -835,7 +940,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             await _lock.WaitAsync();
 
@@ -878,7 +983,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 var blockCompressedSize = br.ReadUInt16();
 
                                 lastOffset = blockOffset;
-                                lastSize = blockCompressedSize;
+                                lastSize = blockCompressedSize + 16;    // 16 bytes of header data per block.
                             }
 
                             // Pretty straight forward.  Header + Total size of the compressed data.
@@ -945,11 +1050,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         }
 
-                        // Fundamentally all files in the dat are padded out to the nearest 256 bytes.
-                        // The DAT import functions actually add this for us normally, so it's not really
-                        // necessary to treat it as part of the 'file size', but for completeness, it doesn't
-                        // hurt to do so, and then it makes our file size match with the modlist entry file sizes.
-                        if(compSize % 256 != 0)
+
+                        // Round out to the nearest 256 bytes.
+                        if (compSize % 256 != 0)
                         {
                             var padding = 256 - (compSize % 256);
                             compSize += padding;
@@ -974,14 +1077,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetType4Data(int offset, XivDataFile dataFile)
+        public async Task<XivTex> GetType4Data(long offset, XivDataFile dataFile)
         {
             var xivTex = new XivTex();
 
             var decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             await _lock.WaitAsync();
 
@@ -1113,10 +1216,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>The file type</returns>
-        public int GetFileType(int offset, XivDataFile dataFile)
+        public int GetFileType(long offset, XivDataFile dataFile)
         {
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             offset = OffsetCorrection(datNum, offset);
 
@@ -1138,10 +1241,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
-        public byte[] GetRawData(int offset, XivDataFile dataFile, int dataSize)
+        public byte[] GetRawData(long offset, XivDataFile dataFile, int dataSize)
         {
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = ((offset / 8) & 0x0F) / 2;
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
 
             offset = OffsetCorrection(datNum, offset);
 
@@ -1264,13 +1367,25 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile, bool alreadyLocked = false)
+        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0, bool alreadyLocked = false)
         {
+            if(fileSize < 0)
+            {
+                throw new InvalidDataException("Cannot check space for a negative size file.");
+            }
+
+            if(fileSize % 256 != 0)
+            {
+                // File will be rounded up to 256 bytes on entry, so we have to account for that.
+                var remainder = 256 - (fileSize % 256);
+                fileSize += remainder;
+            }
+
             var targetDat = -1;
+            Dictionary<int, FileInfo> finfos = new Dictionary<int, FileInfo>(8);
 
             // Scan all the dat numbers...
-            var largestExisting = GetLargestDatNumber(dataFile, alreadyLocked);
-            for (int i = 0; i <= largestExisting; i++)
+            for (int i = 0; i < 8; i++)
             {
                 var original = await IsOriginalDat(dataFile, i, alreadyLocked);
 
@@ -1278,10 +1393,28 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (original) continue;
 
                 var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{i}");
-                var fileSize = new FileInfo(datPath).Length;
 
-                // Dat is already too large, can't write to it.
-                if (fileSize > 2000000000) continue;
+
+                var fInfo = new FileInfo(datPath);
+                finfos[i] = fInfo;
+
+                // If the DAT doesn't exist at all, we can assume we need to create a new DAT.
+                if (fInfo == null || !fInfo.Exists) break;
+                
+
+                var datSize = fInfo.Length;
+
+                // Files will only be injected on multiples of 256 bytes, so we have to account for the potential
+                // extra padding space to get to that point.
+                if(datSize % 256 != 0)
+                {
+                    var remainder = 256 - (datSize % 256);
+                    datSize += remainder;
+                }
+
+                // Dat is too large to fit this file, we can't write to it.
+                if (datSize + fileSize >= GetMaximumDatSize()) continue;
+
 
                 // Found an existing dat that has space.
                 targetDat = i;
@@ -1314,12 +1447,23 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="dataType">The data type (2, 3, 4)</param>
         /// <param name="modPack">The modpack associated with the import data if any</param>
         /// <returns>The new offset in which the modified data was placed.</returns>
-        public async Task<int> WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
+        public async Task<long> WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
             string category, string itemName, XivDataFile dataFile, string source, int dataType,
-            ModPack modPack = null)
+            ModPack modPack = null, bool updateCache = true)
         {
-            var offset = 0;
+            long offset = 0;
             var dataOverwritten = false;
+
+            if(importData == null || importData.Count < 8 )
+            {
+                throw new Exception("Attempted to write NULL data to DAT files.");
+            }
+
+            var fileType = BitConverter.ToInt32(importData.ToArray(), 4);
+            if(fileType < 2 || fileType > 4)
+            {
+                throw new Exception("Attempted to write Invalid data to DAT files.");
+            }
 
 
             internalFilePath = internalFilePath.Replace("\\", "/");
@@ -1341,7 +1485,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 // This finds the first dat with space, OR creates one if needed.
-                datNum = await GetFirstDatWithSpace(dataFile, true);
+                datNum = await GetFirstDatWithSpace(dataFile, importData.Count, true);
 
                 modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
@@ -1353,30 +1497,28 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If there is an existing modlist entry, use that data to get the modDatPath
                 if (modEntry != null)
                 {
-                    datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                    modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
+                    var existingDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
+                    var checkPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{existingDatNum}");
 
-                    if (!File.Exists(modDatPath))
+                    if (!File.Exists(checkPath))
                     {
                         throw new Exception($"A mod entry is pointing to {Path.GetFileName(modDatPath)}, but the file does not exist.\n\n" +
                                             $"It is recommended to do a Start Over.");
                     }
                 }
 
-                var fileLength = new FileInfo(modDatPath).Length;
-
                 // Checks to make sure the offsets in the mod list are not 0
                 // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
                 if (modEntry != null)
                 {
-                    if (modEntry.data.modOffset == 0)
+                    if (modEntry.data.modOffset <= 0)
                     {
-                        throw new Exception("The mod offset located in the mod list cannot be 0");
+                        throw new Exception("The mod offset located in the mod list cannot be 0 or Negative");
                     }
 
-                    if (modEntry.data.originalOffset == 0)
+                    if (modEntry.data.originalOffset <= 0)
                     {
-                        throw new Exception("The original offset located in the mod list cannot be 0");
+                        throw new Exception("The original offset located in the mod list cannot be 0 or Negative.");
                     }
                 }
 
@@ -1388,11 +1530,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     if (modEntry.data.modOffset != 0)
                     {
+
                         var sizeDiff = modEntry.data.modSize - importData.Count;
 
-                        datNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{datNum}");
-                        var datOffsetAmount = 16 * datNum;
+                        var oldDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
+                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{oldDatNum}");
+                        var datOffsetAmount = 16 * oldDatNum;
 
                         using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                         {
@@ -1403,7 +1546,15 @@ namespace xivModdingFramework.SqPack.FileTypes
                             bw.Write(new byte[sizeDiff]);
                         }
 
-                        await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath, false);
+                        // In cases where the file-addition mod was previously disabled, we need to re-add the file descriptor.
+                        if (NewFilesNeedToBeAdded)
+                        {
+                            var addedFile = await index.AddFileDescriptor(internalFilePath, modEntry.data.modOffset, dataFile, false);
+                        }
+                        else
+                        {
+                            await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath, false);
+                        }
 
                         offset = modEntry.data.modOffset;
 
@@ -1443,7 +1594,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             if (!mod.fullPath.Equals(string.Empty) || !mod.datFile.Equals(dataFile.GetDataFileName()))
                                 continue;
 
-                            if (mod.data.modOffset == 0) continue;
+                            if (mod.data.modOffset <= 0) continue;
 
                             var emptyEntryLength = mod.data.modSize;
 
@@ -1451,9 +1602,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                             {
                                 var sizeDiff = emptyEntryLength - importData.Count;
 
-                                datNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
-                                modDatPath = Path.Combine(_gameDirectory.FullName, $"{mod.datFile}{DatExtension}{datNum}");
-                                var datOffsetAmount = 16 * datNum;
+                                var oldDatNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
+                                modDatPath = Path.Combine(_gameDirectory.FullName, $"{mod.datFile}{DatExtension}{oldDatNum}");
+                                var datOffsetAmount = 16 * oldDatNum;
 
                                 using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
                                 {
@@ -1464,16 +1615,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     bw.Write(new byte[sizeDiff]);
                                 }
 
+                                long originalOffset = 0;
                                 if (NewFilesNeedToBeAdded)
                                 {
-                                    var success = true;
-                                    success = success && await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile);
-                                    if (!success)
-                                    {
-                                        throw new Exception("Failed to create file descriptor.");
-                                    }
+                                    var addedFile = await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile, false);
+                                    originalOffset = mod.data.modOffset;
                                 }
-                                var originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath, false) * 8;
+                                else
+                                {
+                                    originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath, false) * 8;
+                                }
 
                                 // The imported data was larger than the original existing mod,
                                 // and an empty slot large enough for the data was available,
@@ -1543,7 +1694,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             }
 
                             var datOffsetAmount = 16 * datNum;
-                            offset = (int)bw.BaseStream.Position + datOffsetAmount;
+                            offset = bw.BaseStream.Position + datOffsetAmount;
 
                             if (offset != 0)
                             {
@@ -1564,16 +1715,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         var modding = new Modding(_gameDirectory);
                         var modList = modding.GetModList();
+
+                        long oldOffset = 0;
                         if (NewFilesNeedToBeAdded)
                         {
-                            var success = true;
-                            success = success && await index.AddFileDescriptor(internalFilePath, offset, dataFile);
-                            if (!success)
-                            {
-                                throw new Exception("Failed to create file descriptor.");
-                            }
+                            var addedFile = await index.AddFileDescriptor(internalFilePath, offset, dataFile, false);
+                            oldOffset = offset;
+                        } else
+                        {
+                            oldOffset = await index.UpdateDataOffset(offset, internalFilePath, false) * 8;
                         }
-                        var oldOffset = await index.UpdateDataOffset(offset, internalFilePath, false) * 8;
 
                         /*
                          * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
@@ -1633,8 +1784,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 _lock.Release();
             }
 
-            // Queue our dependency information updates.
-            await XivCache.QueueDependencyUpdate(internalFilePath);
+            if (updateCache)
+            {
+                // Queue our dependency information updates.
+                XivCache.QueueDependencyUpdate(internalFilePath);
+            }
 
             return offset;
         }
@@ -1670,9 +1824,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="datNum">The .dat number being used.</param>
         /// <param name="offset">The offset to correct.</param>
         /// <returns>The corrected offset.</returns>
-        public static int OffsetCorrection(int datNum, int offset)
+        public static long OffsetCorrection(int datNum, long offset)
         {
-            return offset - (16 * datNum);
+            var ret = offset - (16 * datNum);
+            return ret;
         }
     }
 }

@@ -571,6 +571,10 @@ namespace xivModdingFramework.Models.ModelTextures
                 newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
                 opacity = baseNormal.A;
 
+                // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                // tones down the specularity here, but without it the skin is hyper reflective.
+                newSpecular = MultiplyColor(newSpecular, 0.25f);
+
                 // The influence here determines which base color we use.
                 float influenceStrength = ByteToFloat(baseSpecular.A);
 
@@ -579,6 +583,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 // Hair highlight color if available.
                 var targetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
+
 
                 // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
                 if (info.Preset == MtrlShaderPreset.Face)

@@ -954,12 +954,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     var weightCount = cData.Vcounts[vertexId];
                                     for (var wi = 0; wi < weightCount; wi++)
                                     {
-                                        if (wi > 3)
-                                        {
-                                            // FFXIV only supports up to 4 bones per vertex.
-                                            break;
-                                        }
-
                                         start = weightEntryOffsets[vertexId] + (wi * 2);
 
                                         // The Weight Indexes are listed as [JointId WeightId] in pairs.
@@ -970,11 +964,39 @@ namespace xivModdingFramework.Models.FileTypes
                                         var boneName = cData.BoneNumDictionary.First(x => x.Value == jointId).Key;
                                         var weight = cData.BoneWeights[weightId];
 
+                                        if (wi > 3)
+                                        {
+                                            // FFXIV only supports up to 4 bones per vertex, so here we have to decide which weight to cut off.
+                                            var leastIdx = -1;
+                                            var least = 99.0f;
+                                            for(int id = 0; id < 4; id++)
+                                            {
+                                                var w = vert.Weights[id];
+                                                if (w < least || leastIdx < 0)
+                                                {
+                                                    least = w;
+                                                    leastIdx = id;
+                                                }
+                                            }
+
+                                            // If this is a more major bone weight than our current least, replace it.
+                                            if(weight > least)
+                                            {
+                                                wi = leastIdx;
+                                            }
+                                            else
+                                            {
+                                                break;
+                                            }
+                                        }
+
+
                                         // Add the bones to the group bone set at needed.
                                         if (!group.Bones.Contains(boneName))
                                         {
                                             group.Bones.Add(boneName);
                                         }
+
 
                                         // Convert them to the new id and byte format.
                                         byte newBoneId = (byte)group.Bones.IndexOf(boneName);
@@ -2931,16 +2953,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             Matrix matrix = new Matrix(boneDictionary[skeleton.BoneName].PoseMatrix);
 
-            /*
-            Dictionary<string, Matrix> deformations, decomposed, recalculated;
-            Mdl.GetDeformationMatrices(XivRace.Miqote_Female, out deformations, out decomposed, out recalculated);
-            
-            matrix = decomposed[skeleton.BoneName];
-
-            xmlWriter.WriteString(matrix.Row1.X + " " + matrix.Row1.Y + " " + matrix.Row1.Z + " " + (matrix.Row1.W ) + " ");
-            xmlWriter.WriteString(matrix.Row2.X + " " + matrix.Row2.Y + " " + matrix.Row2.Z + " " + (matrix.Row2.W ) + " ");
-            xmlWriter.WriteString(matrix.Row3.X + " " + matrix.Row3.Y + " " + matrix.Row3.Z + " " + (matrix.Row3.W ) + " ");
-            xmlWriter.WriteString(matrix.Row4.X + " " + matrix.Row4.Y + " " + matrix.Row4.Z + " " + (matrix.Row4.W ) + " ");*/
             
             xmlWriter.WriteString(matrix.Column1.X + " " + matrix.Column1.Y + " " + matrix.Column1.Z + " " + (matrix.Column1.W ) + " ");
             xmlWriter.WriteString(matrix.Column2.X + " " + matrix.Column2.Y + " " + matrix.Column2.Z + " " + (matrix.Column2.W ) + " ");

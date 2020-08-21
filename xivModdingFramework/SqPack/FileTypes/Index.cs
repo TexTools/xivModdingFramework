@@ -239,7 +239,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
-        public async Task<int> GetDataOffset(string fullPath)
+        public async Task<long> GetDataOffset(string fullPath)
         {
             var dataFile = IOUtil.GetDataFileFromPath(fullPath);
 
@@ -248,7 +248,237 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetDataOffset(pathHash, fileHash, dataFile);
 
         }
-        public async Task<int> GetDataOffsetIndex2(string fullPath)
+
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files in the FFXIV file system, using a batch operation for speed.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, long>> GetDataOffsets(List<string> files)
+        {
+            // Here we need to do two things.
+            // 1. Group the files by their data file.
+            // 2. Hash the files into their folder/file hashes and build the dictionaries to pass to the private function.
+
+            // Thankfully, we can just do all of that in one pass.
+
+            // This is keyed by Data File => Folder hash => File Hash => Full File Path
+            // This is used as dictionaries vs compound objects or lists b/c dictionary key look ups are immensely faster than
+            // full list scans, when working with lists of potentially 10000+ files.
+            Dictionary<XivDataFile, Dictionary<int, Dictionary<int, string>>> dict = new Dictionary<XivDataFile, Dictionary<int, Dictionary<int, string>>>();
+
+            foreach(var file in files)
+            {
+                var dataFile = IOUtil.GetDataFileFromPath(file);
+                var pathHash = HashGenerator.GetHash(file.Substring(0, file.LastIndexOf("/", StringComparison.Ordinal)));
+                var fileHash = HashGenerator.GetHash(Path.GetFileName(file));
+
+                
+                if(!dict.ContainsKey(dataFile))
+                {
+                    dict.Add(dataFile, new Dictionary<int, Dictionary<int, string>>());
+                }
+
+                if(!dict[dataFile].ContainsKey(pathHash))
+                {
+                    dict[dataFile].Add(pathHash, new Dictionary<int, string>());
+                }
+
+                if(!dict[dataFile][pathHash].ContainsKey(fileHash))
+                {
+                    dict[dataFile][pathHash].Add(fileHash, file);
+                }
+            }
+
+            var ret = new Dictionary<string, long>();
+            foreach(var kv in dict)
+            {
+                var offsets = await GetDataOffsets(kv.Key, kv.Value);
+
+                foreach(var kv2 in offsets)
+                {
+                    if(!ret.ContainsKey(kv2.Key))
+                    {
+                        ret.Add(kv2.Key, kv2.Value);
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files within the same data file.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        private async Task<Dictionary<string, long>> GetDataOffsets(XivDataFile dataFile, Dictionary<int, Dictionary<int, string>> FolderFiles)
+        {
+            var ret = new Dictionary<string, long>();
+            return await Task.Run(() =>
+            {
+                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+
+                // These are the offsets to relevant data
+                const int fileCountOffset = 1036;
+                const int dataStartOffset = 2048;
+
+                int count = 0;
+                _semaphoreSlim.Wait();
+                try
+                {
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                    {
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var fileCount = br.ReadInt32();
+
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+
+                        // loop through each file entry
+                        for (var i = 0; i < fileCount; i += 16)
+                        {
+                            var fileNameHash = br.ReadInt32();
+                            var folderPathHash = br.ReadInt32();
+                            long offset = br.ReadUInt32();
+                            var unused = br.ReadInt32();
+
+                            if (FolderFiles.ContainsKey(folderPathHash))
+                            {
+                                if(FolderFiles[folderPathHash].ContainsKey(fileNameHash))
+                                {
+                                    count++;
+                                    ret.Add(FolderFiles[folderPathHash][fileNameHash], offset * 8);
+                                }
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
+
+                return ret;
+            });
+        }
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files in the FFXIV file system, using a batch operation for speed.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, long>> GetDataOffsetsIndex2(List<string> files)
+        {
+            // Here we need to do two things.
+            // 1. Group the files by their data file.
+            // 2. Get their file hashes.
+
+            // Thankfully, we can just do all of that in one pass.
+
+            // This is keyed by Data File => Folder hash => File Hash => Full File Path
+            // This is used as dictionaries vs compound objects or lists b/c dictionary key look ups are immensely faster than
+            // full list scans, when working with lists of potentially 10000+ files.
+            Dictionary<XivDataFile, Dictionary<uint, string>> dict = new Dictionary<XivDataFile, Dictionary<uint, string>>();
+
+            foreach (var file in files)
+            {
+                var dataFile = IOUtil.GetDataFileFromPath(file);
+                var fullHash = (uint) HashGenerator.GetHash(file);
+
+
+                if (!dict.ContainsKey(dataFile))
+                {
+                    dict.Add(dataFile, new Dictionary<uint, string>());
+                }
+
+                if (!dict[dataFile].ContainsKey(fullHash))
+                {
+                    dict[dataFile].Add(fullHash, file);
+                }
+            }
+
+            var ret = new Dictionary<string, long>();
+            foreach (var kv in dict)
+            {
+                var offsets = await GetDataOffsetsIndex2(kv.Key, kv.Value);
+
+                foreach (var kv2 in offsets)
+                {
+                    if (!ret.ContainsKey(kv2.Key))
+                    {
+                        ret.Add(kv2.Key, kv2.Value);
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+
+        /// <summary>
+        /// Retrieves all of the offsets for an arbitrary list of files within the same data file, via their Index2 entries.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        private async Task<Dictionary<string, long>> GetDataOffsetsIndex2(XivDataFile dataFile, Dictionary<uint, string> fileHashes)
+        {
+            var ret = new Dictionary<string, long>();
+            return await Task.Run(async () =>
+            {
+                var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+
+
+                var SegmentHeaders = new int[4];
+                var SegmentOffsets = new int[4];
+                var SegmentSizes = new int[4];
+
+                // Segment header offsets
+                SegmentHeaders[0] = 1028;                   // Files
+                SegmentHeaders[1] = 1028 + (72 * 1) + 4;    // Unknown
+                SegmentHeaders[2] = 1028 + (72 * 2) + 4;    // Unknown
+                SegmentHeaders[3] = 1028 + (72 * 3) + 4;    // Folders
+
+
+                await _semaphoreSlim.WaitAsync();
+                try
+                {
+
+                    // Might as well grab the whole thing since we're doing a full scan.
+                    byte[] originalIndex = File.ReadAllBytes(index2Path);
+
+                    // Get all the segment header data
+                    for (int i = 0; i < SegmentHeaders.Length; i++)
+                    {
+                        SegmentOffsets[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 4);
+                        SegmentSizes[i] = BitConverter.ToInt32(originalIndex, SegmentHeaders[i] + 8);
+                    }
+
+                    int fileCount = SegmentSizes[0] / 8;
+
+                    for (int i = 0; i < fileCount; i++)
+                    {
+                        int position = SegmentOffsets[0] + (i * 8);
+                        uint iFullPathHash = BitConverter.ToUInt32(originalIndex, position);
+                        uint iOffset = BitConverter.ToUInt32(originalIndex, position + 4);
+
+                        // Index 2 is just in hash order, so find the spot where we fit in.
+                        if (fileHashes.ContainsKey(iFullPathHash))
+                        {
+                            long offset = (long)iOffset;
+                            ret.Add(fileHashes[iFullPathHash], offset * 8);
+                        }
+                    }
+                }
+                finally
+                {
+                    _semaphoreSlim.Release();
+                }
+                return ret;
+            });
+        }
+
+
+        public async Task<long> GetDataOffsetIndex2(string fullPath)
         {
             var fullPathHash = HashGenerator.GetHash(fullPath);
             var uFullPathHash = BitConverter.ToUInt32(BitConverter.GetBytes(fullPathHash), 0);
@@ -291,8 +521,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Index 2 is just in hash order, so find the spot where we fit in.
                     if (iFullPathHash == uFullPathHash)
                     {
-                        int signedOffset = BitConverter.ToInt32(originalIndex, position + 4);
-                        return signedOffset * 8;
+                        long offset = (long)iOffset;
+
+                        return offset * 8;
                     }
                 }
             }
@@ -310,12 +541,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFile">The hashed value of the file name</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>The offset to the data</returns>
-        public Task<int> GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
+        public Task<long> GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
         {
             return Task.Run(async () =>
             {
                 var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
-                var offset = 0;
+                long offset = 0;
 
                 // These are the offsets to relevant data
                 const int fileCountOffset = 1036;
@@ -346,7 +577,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 if (folderPathHash == hashedFolder)
                                 {
                                     // this is the entry we are looking for, get the offset and break out of the loop
-                                    offset = br.ReadInt32() * 8;
+                                    offset = br.ReadUInt32();
+                                    offset = offset * 8;
                                     break;
                                 }
 
@@ -373,13 +605,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>Dictionary containing (concatenated string of file+folder hashes, offset) </returns>
-        public Task<Dictionary<string, int>> GetFileDictionary(XivDataFile dataFile)
+        public Task<Dictionary<string, long>> GetFileDictionary(XivDataFile dataFile)
         {
             return Task.Run(() =>
             {
 
                 _semaphoreSlim.Wait();
-                var fileDictionary = new Dictionary<string, int>();
+                var fileDictionary = new Dictionary<string, long>();
                 try
                 {
                     var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
@@ -400,7 +632,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             var fileNameHash = br.ReadInt32();
                             var folderPathHash = br.ReadInt32();
-                            var offset = br.ReadInt32() * 8;
+                            long offset = br.ReadUInt32() * 8;
 
                             fileDictionary.Add($"{fileNameHash}{folderPathHash}", offset);
                         }
@@ -1109,7 +1341,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (!fullPath.Contains(".flag"))
             {
-                await DeleteFileDescriptor(fullPath + ".flag", dataFile);
+                await DeleteFileDescriptor(fullPath + ".flag", dataFile, false);
             }
 
 
@@ -1117,7 +1349,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (updateCache)
             {
                 // Queue us for updating.
-                await XivCache.QueueDependencyUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
             }
 
             return true;
@@ -1131,13 +1363,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="dataOffset">Raw DAT file offset to use for the new file.</param>
         /// <param name="dataFile">Which data file set to use.</param>
         /// <returns></returns>
-        public async Task<bool> AddFileDescriptor(string fullPath, int dataOffset, XivDataFile dataFile, bool updateCache = true)
+        public async Task<bool> AddFileDescriptor(string fullPath, long dataOffset, XivDataFile dataFile, bool updateCache = true)
         {
             if(!fullPath.Contains(".flag"))
             {
-                await AddFileDescriptor(fullPath + ".flag", -1, dataFile);
+                await AddFileDescriptor(fullPath + ".flag", -1, dataFile, false);
             }
 
+            uint uOffset = (uint)(dataOffset / 8);
             await _semaphoreSlim.WaitAsync();
             try
             {
@@ -1222,7 +1455,10 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             if (iHash == uFileHash)
                             {
-                                // File already exists
+                                // File already exists.  Just update the data offset.
+                                _semaphoreSlim.Release();
+                                await UpdateDataOffset(dataOffset, fullPath, updateCache);
+                                await _semaphoreSlim.WaitAsync();
                                 return false;
                             }
                             else if (iHash > uFileHash)
@@ -1287,7 +1523,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Set the actual Injected Data
                     Array.Copy(BitConverter.GetBytes(fileHash), 0, modifiedIndex, injectLocation, 4);
                     Array.Copy(BitConverter.GetBytes(pathHash), 0, modifiedIndex, injectLocation + 4, 4);
-                    Array.Copy(BitConverter.GetBytes(dataOffset / 8), 0, modifiedIndex, injectLocation + 8, 4);
+                    Array.Copy(BitConverter.GetBytes(uOffset), 0, modifiedIndex, injectLocation + 8, 4);
 
                     // Update the folder structure
                     var folderCount = SegmentSizes[3] / 16;
@@ -1409,7 +1645,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     // Set the actual Injected Data
                     Array.Copy(BitConverter.GetBytes(uFullPathHash), 0, modifiedIndex, injectLocation, 4);
-                    Array.Copy(BitConverter.GetBytes(dataOffset), 0, modifiedIndex, injectLocation + 4, 4);
+                    Array.Copy(BitConverter.GetBytes(uOffset), 0, modifiedIndex, injectLocation + 4, 4);
 
                     // Update SHA-1 Hashes.
                     SHA1 sha = new SHA1CryptoServiceProvider();
@@ -1442,7 +1678,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if(updateCache)
             {
                 // Queue us for updating.
-                await XivCache.QueueDependencyUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
             }
 
 
@@ -1511,7 +1747,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 // Queue us up for dependency pre-calcluation, since we're a modded file.
-                await XivCache.QueueDependencyUpdate(fullPath);
+                XivCache.QueueDependencyUpdate(fullPath);
 
             }
 
@@ -1566,7 +1802,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     {
                                         oldOffset = br.ReadInt32();
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
-                                        bw.Write(offset / 8);
+                                        uint uOffset = (uint)(offset / 8);
+                                        bw.Write(uOffset);
                                         break;
                                     }
 
@@ -1623,7 +1860,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 if (fullPathHash == pathHash)
                                 {
                                     bw.BaseStream.Seek(br.BaseStream.Position, SeekOrigin.Begin);
-                                    bw.Write((int) (offset / 8));
+                                    uint uOffset = (uint)(offset / 8);
+                                    bw.Write(uOffset);
                                     break;
                                 }
 
@@ -1633,51 +1871,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
             });
-        }
-
-        /// <summary>
-        /// Creates a backup of the index file.
-        /// </summary>
-        /// <param name="backupsDirectory">The directory in which to place the backup files.
-        /// The directory will be created if it does not exist.</param>
-        /// <param name="dataFile">The file to backup.</param>
-        public void CreateIndexBackups(DirectoryInfo backupsDirectory, XivDataFile dataFile)
-        {
-            var fileName = dataFile.GetDataFileName();
-
-            var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
-            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{Index2Extension}");
-
-            var indexBackupPath = Path.Combine(backupsDirectory.FullName, $"{fileName}{IndexExtension}");
-            var index2BackupPath = Path.Combine(backupsDirectory.FullName, $"{fileName}{Index2Extension}");
-
-            Directory.CreateDirectory(backupsDirectory.FullName);
-
-            _semaphoreSlim.Wait();
-            try
-            {
-                File.Copy(indexPath, indexBackupPath, true);
-                File.Copy(index2Path, index2BackupPath, true);
-            }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
-        }
-
-
-        /// <summary>
-        /// Creates a backup of all the index files.
-        /// </summary>
-        /// <param name="backupsDirectory">The directory in which to place the backup files.</param>
-        public void BackupAllIndexFiles(DirectoryInfo backupsDirectory)
-        {
-            var dataFileList = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var dataFile in dataFileList)
-            {
-                CreateIndexBackups(backupsDirectory, dataFile);
-            }
         }
 
         /// <summary>

@@ -104,6 +104,7 @@ namespace xivModdingFramework.Variants.FileTypes
             var dat = new Dat(_gameDirectory);
 
             var lastPath = "";
+            long imcOffset = 0;
             byte[] imcByteData = new byte[0];
 
             foreach (var combinedPath in pathsWithOffsets)

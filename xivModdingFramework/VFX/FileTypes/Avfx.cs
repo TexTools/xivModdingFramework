@@ -39,7 +39,7 @@ namespace xivModdingFramework.VFX.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the avfx file</param>
         /// <returns>A list of atex paths</returns>
-        public async Task<List<string>> GetATexPaths(int offset)
+        public async Task<List<string>> GetATexPaths(long offset)
         {
             var atexList = new List<string>();
 

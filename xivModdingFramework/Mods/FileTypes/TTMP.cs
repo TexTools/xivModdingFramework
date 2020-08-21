@@ -18,6 +18,7 @@ using Newtonsoft.Json;
 using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -237,7 +238,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 }
                             };
 
-                            var rawData = dat.GetRawData((int) simpleModData.ModOffset,
+                            var rawData = dat.GetRawData(simpleModData.ModOffset,
                                 XivDataFiles.GetXivDataFile(simpleModData.DatFile),
                                 simpleModData.ModSize);
 
@@ -416,7 +417,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
         /// <returns>The number of total mods imported</returns>
-        public async Task<(int ImportCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
+        public async Task<(int ImportCount, int ErrorCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
             var dat = new Dat(gameDirectory);
@@ -424,9 +425,11 @@ namespace xivModdingFramework.Mods.FileTypes
             var modListFullPaths = new List<string>();
             var modList = modding.GetModList();
             var importErrors = "";
+            var eCount = 0;
 
             // Disable the cache woker while we're installing multiple items at once, so that we don't process queue items mid-import.
             // (Could result in improper parent file calculations, as the parent files may not be actually imported yet)
+            var workerEnabled = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
 
@@ -499,7 +502,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                                             modJson.FullPath,
                                                             modJson.Category.GetDisplayName(), modJson.Name,
                                                             XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry));
+                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry, false));
                                                     }
                                                     else
                                                     {
@@ -510,11 +513,12 @@ namespace xivModdingFramework.Mods.FileTypes
                                                         await (dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
                                                             modJson.Category.GetDisplayName(), modJson.Name,
                                                             XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry));
+                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry, false));
                                                     }
                                                 }
                                                 catch (Exception ex)
                                                 {
+                                                    eCount++;
                                                     if (ex.GetType() == typeof(NotSupportedException))
                                                     {
                                                         importErrors = ex.Message;
@@ -541,6 +545,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                 });
 
+
                 if (modsJson[0].ModPackEntry != null)
                 {
                     modList = modding.GetModList();
@@ -554,13 +559,24 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     modding.SaveModList(modList);
+
+                    // Batch cache queueing for after import is all done.
+                    var files = modsJson.Select(x => x.FullPath).ToList();
+                    try
+                    {
+                        XivCache.QueueDependencyUpdate(files);
+                    } catch(Exception ex)
+                    {
+                        throw new Exception("An error occured while trying to update the Cache.\n\n" + ex.Message + "\n\nThe mods were still imported successfully, however, the Cache should be rebuilt.");
+                    }
+
                 }
             } finally
             {
-                XivCache.CacheWorkerEnabled = true;
+                XivCache.CacheWorkerEnabled = workerEnabled;
             }
 
-            return (importCount, importErrors);
+            return (importCount, eCount, importErrors);
         }
 
         /// <summary>

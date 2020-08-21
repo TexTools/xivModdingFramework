@@ -14,6 +14,7 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using HelixToolkit.SharpDX.Core;
+using System.Runtime.CompilerServices;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -32,6 +33,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool ClearVColor { get; set; }
         public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
+        public XivRace SourceRace { get; set; }
 
 
         /// <summary>
@@ -48,6 +50,7 @@ namespace xivModdingFramework.Models.Helpers
             ClearVColor = false;
             ClearVAlpha = false;
             AutoScale = true;
+            SourceRace = XivRace.All_Races;
         }
 
         /// <summary>
@@ -111,6 +114,15 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.ClearVAlpha(ttModel, loggingFunction);
             }
 
+            if(SourceRace != XivRace.All_Races)
+            {
+                if (currentMdl == null)
+                {
+                    throw new Exception("Cannot racially convert from null MDL.");
+                }
+                ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, loggingFunction);
+            }
+
             // We need to load the original unmodified model to get the shape data.
             if (EnableShapeData)
             {
@@ -141,8 +153,6 @@ namespace xivModdingFramework.Models.Helpers
                 var oldModel = TTModel.FromRaw(originalMdl);
                 ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, loggingFunction);
             }
-
-
         }
     }
 
@@ -852,6 +862,122 @@ namespace xivModdingFramework.Models.Helpers
         }
 
         /// <summary>
+        /// Converts a model being imported to match the race of an already existing system file.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="originalRace"></param>
+        /// <param name="loggingFunction"></param>
+        public static void RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            // Extract the original race from the ttModel if we weren't provided with one.
+            var raceRegex = new Regex("c([0-9]{4})");
+            var match = raceRegex.Match(originalModelPath);
+            XivRace race = XivRace.All_Races;
+            if (match.Success)
+            {
+                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
+                race = XivRaces.GetXivRace(match.Groups[1].Value);
+                RaceConvert(incomingModel, race, modelRace, loggingFunction);
+            }
+            else
+            {
+                loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
+            }
+        }
+
+        public static void RaceConvert(TTModel model, XivRace targetRace, XivRace originalRace = XivRace.All_Races, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            // Extract the original race from the ttModel if we weren't provided with one.
+            if (originalRace == XivRace.All_Races)
+            {
+                var raceRegex = new Regex("c([0-9]{4})");
+                if (!model.IsInternal)
+                {
+                    var match = raceRegex.Match(model.Source);
+                    if (match.Success)
+                    {
+                        originalRace = XivRaces.GetXivRace(match.Groups[1].Value);
+                    }
+                    else
+                    {
+                        loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
+                    }
+
+                }
+                else
+                {
+                    throw new InvalidDataException("Cannot racially convert external model without provided Original Race value.");
+                }
+            }
+            RaceConvertRecursive(model, targetRace, originalRace, loggingFunction);
+            //ModelModifiers.CalculateTangents(model, loggingFunction);
+        }
+
+
+        /// <summary>
+        /// Recursive function for converting races.  Split out and set private so that
+        /// We don't constantly recalculate tangents and do re-validation on every pass.
+        /// Raceconvert() is the correct entry point for this function.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="targetRace"></param>
+        /// <param name="originalRace"></param>
+        /// <param name="loggingFunction"></param>
+        private static void RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction)
+        {
+            try
+            {
+                // Current race is already parent node
+                // Direct conversion
+                // [ Current > (apply deform) > Target ]
+                if (originalRace.IsDirectParentOf(targetRace))
+                {
+                    ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction);
+                }
+                // Target race is parent node of Current race
+                // Convert to parent (invert deform)
+                // [ Current > (apply inverse deform) > Target ]
+                else if (targetRace.IsDirectParentOf(originalRace))
+                {
+                    ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
+                }
+                // Current race is not parent of Target Race and Current race has parent
+                // Make a recursive call with the current races parent race
+                // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
+                else if (originalRace.GetNode().Parent != null)
+                {
+                    ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
+                    RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                }
+                // Current race has no parent
+                // Make a recursive call with the target races parent race
+                // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
+                else
+                {
+                    ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
+                    RaceConvert(model, targetRace.GetNode().Parent.Race, targetRace, loggingFunction);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Show a warning that deforms are missing for the target race
+                // This mostly happens with Face, Hair, Tails, Ears, and Female > Male deforms
+                // The model is still added but no deforms are applied
+                loggingFunction(true, "Unable to convert racial model.");
+            }
+        }
+
+        /// <summary>
         /// Attempts to deform a model from its original race to the given target race.
         /// </summary>
         /// <param name="model"></param>
@@ -866,15 +992,11 @@ namespace xivModdingFramework.Models.Helpers
                     loggingFunction = NoOp;
                 }
 
-                if (!model.IsInternal)
-                {
-                    loggingFunction(true, "Racial deforms can only be implied to internal models.");
-                    return;
-                }
                 loggingFunction(false, "Attempting to deform model...");
 
-                Dictionary<string, Matrix> deformations, decomposed, recalculated;
-                Mdl.GetDeformationMatrices(targetRace, out deformations, out decomposed, out recalculated);
+                Dictionary<string, Matrix> deformations, inverted, normalmatrixes, invertednormalmatrixes;
+                Mdl.GetDeformationMatrices(targetRace, out deformations, out inverted, out normalmatrixes, out invertednormalmatrixes);
+
 
                 // Check if deformation is possible
                 var missingDeforms = new HashSet<string>();
@@ -893,14 +1015,15 @@ namespace xivModdingFramework.Models.Helpers
                 // Throw an exception if there is any missing deform bones
                 if (missingDeforms.Any())
                 {
-                    var sb = new StringBuilder();
-                    sb.AppendLine();
-                    foreach (var missingDeform in missingDeforms)
+                    // For a bone to be missing in the deformation data completely, it has to have come from a different skeleton, which
+                    // had the bone, while our new one has no entry for it at all.  In these cases, just use identity.
+                    foreach(var bone in missingDeforms)
                     {
-                        sb.AppendLine($"{missingDeform}");
+                        deformations[bone] = Matrix.Identity;
+                        inverted[bone] = Matrix.Identity;
+                        normalmatrixes[bone] = Matrix.Identity;
+                        invertednormalmatrixes[bone] = Matrix.Identity;
                     }
-
-                    throw new Exception(sb.ToString());
                 }
 
                 // Now we're ready to animate...
@@ -927,24 +1050,21 @@ namespace xivModdingFramework.Models.Helpers
                                 var boneWeight = (v.Weights[b]) / 255f;
 
                                 var matrix = Matrix.Identity;
-                                if (deformations.ContainsKey(boneName)) 
+                                var normalMatrix = Matrix.Identity;
+                                matrix = deformations[boneName];
+                                normalMatrix = normalmatrixes[boneName];
+
+                                if (invert)
                                 {
-                                    matrix = deformations[boneName];
-                                    if (invert)
-                                    {
-                                        matrix.Invert();
-                                    }
-                                } 
-                                else 
-                                {
-                                    throw new Exception($"Invalid bone ({boneName})");
+                                    matrix = inverted[boneName];
+                                    normalMatrix = invertednormalmatrixes[boneName];
                                 }
 
 
                                 position += MatrixTransform(v.Position, matrix) * boneWeight;
-                                normal += MatrixTransform(v.Normal, matrix) * boneWeight;
-                                binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
-                                tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
+                                binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
+                                tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
                             }
 
                             v.Position = position;
@@ -980,6 +1100,23 @@ namespace xivModdingFramework.Models.Helpers
             return result;
         }
 
+
+        /// <summary>
+        /// Normalizes a byte array to sum to 255 (minus rounding errors)
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private static byte[] Normalize(IEnumerable<byte> data)
+        {
+            double sum = data.Select(x => (double)x).Aggregate((acc, x) => acc + x);
+            double target = 255;
+            double mul = target / sum;
+
+            return data
+                .Select(n => (byte)Math.Round((n * mul)))
+                .ToArray();
+        }
+
         /// <summary>
         /// This function does all the minor adjustments to a Model that makes it
         /// ready for injection into the SE filesystem.  Such as flipping the 
@@ -1002,14 +1139,15 @@ namespace xivModdingFramework.Models.Helpers
                 CalculateTangents(model, loggingFunction);
             }
 
-            var totalMajorCorrections = 0;
-            var warnings = new List<string>();
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
                 var pIdx = 0;
                 foreach (var p in m.Parts)
                 {
+                    var perPartMajorCorrections = 0;
+                    var warnings = new List<string>();
+
                     var vIdx = 0;
                     foreach (var v in p.Vertices)
                     {
@@ -1023,12 +1161,37 @@ namespace xivModdingFramework.Models.Helpers
                             if (model.HasWeights)
                             {
                                 int boneSum = 0;
+                                var sum = v.Weights.Select(x => (int) x).Aggregate((sum, x) => sum + x);
+
+                                if (sum == 0)
+                                {
+                                    loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
+                                    v.Weights[0] = 255;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                } else if (sum > 500)
+                                {
+                                    loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has extremely abnormal weights; the weight values for the vertex have been reset.");
+                                    v.Weights[0] = 255;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                    v.Weights[1] = 0;
+                                } else if (sum > 256 || sum < 254)
+                                {
+                                    perPartMajorCorrections++;
+                                }
+                                var og = v.Weights;
+                                v.Weights = Normalize(v.Weights).ToArray();
+                                boneSum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
+
                                 // Weight corrections.
                                 while (boneSum != 255)
                                 {
                                     boneSum = 0;
                                     var mostMajor = 0;
                                     var most = 0;
+
                                     // Loop them to sum them up.
                                     // and snag the least/most major influences while we're at it.
                                     for (var i = 0; i < v.Weights.Length; i++)
@@ -1046,48 +1209,25 @@ namespace xivModdingFramework.Models.Helpers
                                         }
                                     }
 
-                                    if(most == 0)
-                                    {
-                                        loggingFunction(true, "Group: " + mIdx + " Part:" + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
-                                        totalMajorCorrections++;
-                                        v.Weights[0] = 255;
-                                        break;
-                                    }
-
                                     var alteration = 255 - boneSum;
-                                    if (Math.Abs(alteration) > 1)
-                                    {
-                                        totalMajorCorrections++;
-                                    }
 
-                                    if (Math.Abs(alteration) > 255)
-                                    {
-                                        // Just No.
-                                        v.Weights[0] = 255;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                        break;
-
-                                    }
-
-                                    // Take or Add to the most major bone.
-                                    v.Weights[mostMajor] += (byte)alteration;
+                                    // Take or Add to the most major bone to resolve rounding errors.
+                                    v.Weights[mostMajor] = (byte)(v.Weights[mostMajor] + alteration);
                                     boneSum += alteration;
                                 }
                             }
                         }
                         vIdx++;
                     }
+                    if(perPartMajorCorrections > 0)
+                    {
+                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
+                    }
                     pIdx++;
                 }
                 mIdx++;
             }
 
-            if (totalMajorCorrections > 0)
-            {
-                loggingFunction(true, totalMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
-            }
 
         }
 

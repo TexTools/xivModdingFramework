@@ -35,6 +35,8 @@ namespace xivModdingFramework
         /// </summary>
         public Version GameVersion { get; }
 
+        public int DxMode { get; }
+
 
         /// <summary>
         /// The language used when parsing the game data.
@@ -47,13 +49,14 @@ namespace xivModdingFramework
         /// </summary>
         /// <param name="gameDirectory">The directory in which the game is installed.</param>
         /// <param name="xivLanguage">The language to use when parsing the game data.</param>
-        public GameInfo(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
+        public GameInfo(DirectoryInfo gameDirectory, XivLanguage xivLanguage, int dxMode = 11)
         {
             GameDirectory = gameDirectory;
             GameLanguage  = xivLanguage;
             GameVersion   = GetGameVersion();
+            DxMode = dxMode;
 
-            if (!gameDirectory.FullName.Contains("game\\sqpack\\ffxiv"))
+            if (!gameDirectory.FullName.Contains(Path.Combine("game", "sqpack", "ffxiv")))
             {
                 throw new DirectoryNotFoundException("The given directory is incorrect.\n\nThe directory sould point to the \\game\\sqpack\\ffxiv folder");
             }
@@ -67,7 +70,7 @@ namespace xivModdingFramework
         private Version GetGameVersion()
         {
             var versionBasePath = GameDirectory.FullName.Substring(0, GameDirectory.FullName.IndexOf("sqpack", StringComparison.Ordinal));
-            var versionFile = versionBasePath + "\\" + GameVersionFile;
+            var versionFile = Path.Combine(versionBasePath, GameVersionFile);
 
             var versionData = File.ReadAllLines(versionFile);
             return new Version(versionData[0].Substring(0, versionData[0].LastIndexOf(".", StringComparison.Ordinal)));
