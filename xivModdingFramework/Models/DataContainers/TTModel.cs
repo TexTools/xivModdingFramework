@@ -1599,6 +1599,8 @@ namespace xivModdingFramework.Models.DataContainers
             }
             loggingFunction(false, "Validating model sanity...");
 
+            bool hasWeights = model.HasWeights;
+
             if (model.MeshGroups.Count == 0)
             {
                 loggingFunction(true, "Model has no data. - Model must have at least one valid Mesh Group.");
@@ -1608,12 +1610,17 @@ namespace xivModdingFramework.Models.DataContainers
             var mIdx = 0;
             foreach(var m in model.MeshGroups)
             {
-
-                var valid = m.Parts.Any(x => x.Vertices.Count > 0);
-                if (!valid)
+                if(m.Parts.Count == 0)
                 {
-                    loggingFunction(true, "Mesh Group: " + mIdx + " Exists but does not have any valid parts.  This will cause FFXIV to crash.  Mesh Groups must be contiguously numbered and contain at least one valid part.");
-                    return false;
+                    var part = new TTMeshPart();
+                    part.Name = "Part 0";
+                    m.Parts.Add(part);
+                }
+
+                // Meshes in animated models must have at least one bone in their bone set in order to not generate a crash.
+                if(hasWeights && m.Bones.Count == 0)
+                {
+                    m.Bones.Add("n_root");
                 }
                 mIdx++;
             }
