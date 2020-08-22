@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.FileTypes;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -1050,6 +1051,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile, bool updateCache = true)
         {
             await _semaphoreSlim.WaitAsync();
+
             try
             {
 
@@ -1344,6 +1346,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 await DeleteFileDescriptor(fullPath + ".flag", dataFile, false);
             }
 
+            // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
+            if (fullPath.EndsWith(".meta"))
+            {
+                var root = await XivCache.GetFirstRoot(fullPath);
+                await ItemMetadata.RestoreDefaultMetadata(root);
+            }
 
 
             if (updateCache)

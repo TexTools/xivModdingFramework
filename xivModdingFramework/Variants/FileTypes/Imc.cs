@@ -177,8 +177,8 @@ namespace xivModdingFramework.Variants.FileTypes
         {
 
             List<byte> bytes = new List<byte>(6);
-            bytes.AddRange(BitConverter.GetBytes((byte)entry.Variant));
-            bytes.AddRange(BitConverter.GetBytes((byte)entry.Unknown));
+            bytes.Add((byte)entry.Variant);
+            bytes.Add((byte)entry.Unknown);
             bytes.AddRange(BitConverter.GetBytes((ushort)entry.Mask));
             bytes.AddRange(BitConverter.GetBytes((ushort)entry.Vfx));
             return bytes.ToArray();

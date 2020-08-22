@@ -27,6 +27,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -1473,8 +1474,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
             var IsTexToolsAddedFileFlag = await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath + ".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
-            if (NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag)
-                source = "FilesAddedByTexTools";
 
             var datNum = 0;
             var modDatPath = "";
@@ -1768,8 +1767,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 modSize = importData.Count
                             }
                         };
-                        if (newEntry.source == "FilesAddedByTexTools")
+
+                        if (NewFilesNeedToBeAdded)
                             newEntry.data.originalOffset = newEntry.data.modOffset;
+
                         modList.Mods.Add(newEntry);
 
                         modList.modCount += 1;
@@ -1782,6 +1783,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             } finally
             {
                 _lock.Release();
+            }
+
+
+            var ext = Path.GetExtension(internalFilePath);
+            if(ext == ".meta")
+            {
+                // Retreive the uncompressed meta entry we just wrote.
+                var data = await GetType2Data(offset, dataFile);
+                var meta = await ItemMetadata.Deserialize(data);
+
+                // And write that metadata to the actual constituent files.
+                await ItemMetadata.ApplyMetadata(meta);
             }
 
             if (updateCache)

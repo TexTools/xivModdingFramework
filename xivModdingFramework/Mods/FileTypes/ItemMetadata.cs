@@ -101,10 +101,11 @@ namespace xivModdingFramework.Mods.FileTypes
             if(mod != null && mod.enabled)
             {
                 // We have modded metadata stored in the .meta file in the DAT we can use.
-                var data = await _dat.GetType2Data(filePath, false);
+                //var data = await _dat.GetType2Data(filePath, false);
 
                 // Run it through the binary deserializer and we're good.
-                return await Deserialize(data);
+                //return await Deserialize(data);
+                return await CreateFromRaw(root);
             } else
             {
                 // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.
@@ -148,12 +149,30 @@ namespace xivModdingFramework.Mods.FileTypes
             return ret;
         }
 
+        /// <summary>
+        /// Saves this metadata file to the FFXIV file system.
+        /// </summary>
+        /// <param name="meta"></param>
+        /// <returns></returns>
+        public static async Task SaveMetadata(ItemMetadata meta, string source)
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+
+            var path = meta.Root.Info.GetRootFile();
+            var item = meta.Root.GetFirstItem();
+
+            var entry = await _modding.TryGetModEntry(path);
+
+            await _dat.ImportType2Data(await Serialize(meta), item.Name, path, item.SecondaryCategory, source);
+        }
+
 
         /// <summary>
         /// Applies this Metadata object to the FFXIV file system.
         /// This should only called by Dat.WriteToDat() / RestoreDefaultMetadata()
         /// </summary>
-        public static async Task ApplyMetadata(ItemMetadata meta)
+        internal static async Task ApplyMetadata(ItemMetadata meta)
         {
             var ser = await Serialize(meta);
             var rew = await Deserialize(ser);

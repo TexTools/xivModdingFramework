@@ -218,65 +218,6 @@ namespace xivModdingFramework.Models.FileTypes
                 original.Add(race, set.Parameters[slot]);
             }
 
-            var _index = new Index(_gameDirectory);
-            var _mdl = new Mdl(_gameDirectory, XivDataFile._04_Chara);
-
-            foreach(var race in DeformationAvailableRaces)
-            {
-                if(original.ContainsKey(race) && parameters.ContainsKey(race))
-                {
-                    if(parameters[race].bit1 && !original[race].bit1 )
-                    {
-                        // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
-                        var path = "";
-                        if (!isAccessory)
-                        {
-                            path = String.Format(_EquipmentModelPathFormat, primaryId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
-                        }
-                        else
-                        {
-                            path = String.Format(_AccessoryModelPathFormat, primaryId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
-                        }
-
-                        // File already exists, no adjustments needed.
-                        if ((await _index.FileExists(path))) continue;
-
-                        var baseModelOrder = race.GetModelPriorityList();
-
-                        // Ok, we need to find which racial model to use as our base now...
-                        var baseRace = XivRace.All_Races;
-                        foreach(var targetRace in baseModelOrder)
-                        {
-                            if(original.ContainsKey(targetRace) && original[targetRace].bit1 == true)
-                            {
-                                baseRace = targetRace;
-                                break;
-                            }
-                        }
-
-                        if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
-                        var originalPath = "";
-                        if (!isAccessory)
-                        {
-                            originalPath = String.Format(_EquipmentModelPathFormat, primaryId.ToString().PadLeft(4, '0'), baseRace.GetRaceCode(), slot);
-                        }
-                        else
-                        {
-                            originalPath = String.Format(_AccessoryModelPathFormat, primaryId.ToString().PadLeft(4, '0'), baseRace.GetRaceCode(), slot);
-                        }
-
-
-                        var exists = await _index.FileExists(originalPath);
-                        if (!exists) throw new Exception("Base file for model-copy does not exist: " + originalPath);
-
-                        // Create the new model.
-                        await _mdl.CopyModel(originalPath, path);
-                    }
-                }
-            }
-
-
-
             // 16 Bits per set.
             uint bitOffset = (primaryId * (EquipmentDeformerParameterEntrySize * 8)) + (EquipmentDeformerParameterHeaderLength * 8);
 

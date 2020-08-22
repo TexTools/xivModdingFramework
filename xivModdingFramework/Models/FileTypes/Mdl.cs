@@ -4341,6 +4341,77 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
+        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
+        private string _AccessoryModelPathFormat = "chara/equipment/a{0}/model/c{1}a{0}_{2}.mdl";
+
+        /// <summary>
+        /// Creates a new racial model for a given set/slot by copying from already existing racial models.
+        /// </summary>
+        /// <param name="setId"></param>
+        /// <param name="slot"></param>
+        /// <param name="newRace"></param>
+        /// <returns></returns>
+        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source)
+        {
+
+            var _index = new Index(_gameDirectory);
+            var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+
+            if (!isAccessory)
+            {
+                var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
+                if (!slotOk)
+                {
+                    throw new InvalidDataException("Attempted to get racial models for invalid slot.");
+                }
+            }
+
+            // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
+            var format = "";
+            if (!isAccessory)
+            {
+                format = _EquipmentModelPathFormat;
+            }
+            else
+            {
+                format = _AccessoryModelPathFormat;
+            }
+
+            var path = String.Format(format, setId.ToString().PadLeft(4, '0'), newRace.GetRaceCode(), slot);
+
+            // File already exists, no adjustments needed.
+            if ((await _index.FileExists(path))) return;
+
+            var _eqp = new Eqp(_gameDirectory);
+            var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
+            var baseModelOrder = newRace.GetModelPriorityList();
+
+            // Ok, we need to find which racial model to use as our base now...
+            var baseRace = XivRace.All_Races;
+            var originalPath = "";
+            foreach (var targetRace in baseModelOrder)
+            {
+                if (availableModels.Contains(targetRace))
+                {
+                    originalPath = String.Format(format, setId.ToString().PadLeft(4, '0'), targetRace.GetRaceCode(), slot);
+                    var exists = await _index.FileExists(originalPath);
+                    if (exists)
+                    {
+                        baseRace = targetRace;
+                        break;
+                    } else
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
+
+            // Create the new model.
+            await CopyModel(originalPath, path, source);
+        }
+
         /// <summary>
         /// Copies a given model from a previous path to a new path, including copying the materials and other down-chain items.
         /// 
@@ -4348,7 +4419,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="originalPath"></param>
         /// <param name="newPath"></param>
         /// <returns></returns>
-        public async Task<long> CopyModel(string originalPath, string newPath)
+        public async Task<long> CopyModel(string originalPath, string newPath, string source)
         {
             var _dat = new Dat(_gameDirectory);
             var model = await GetModel(originalPath);
@@ -4398,7 +4469,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var mtrlData = await _dat.GetType2Data(material, false);
                     var compressedData = await _dat.CreateType2Data(mtrlData);
-                    await _dat.WriteToDat(compressedData.ToList(), null, newMtrlPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), xivModdingFramework.Helpers.Constants.InternalMetaFileSourceName, 2);
+                    await _dat.WriteToDat(compressedData.ToList(), null, newMtrlPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), source, 2);
 
                     // Switch out any material references to the material in the model file.
                     foreach(var m in model.MeshGroups)
@@ -4416,7 +4487,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Save the final modified mdl.
             var data = await MakeNewMdlFile(model, xMdl);
-            var offset = await _dat.WriteToDat(data.ToList(), null, newPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), xivModdingFramework.Helpers.Constants.InternalMetaFileSourceName, 3);
+            var offset = await _dat.WriteToDat(data.ToList(), null, newPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), source, 3);
             return offset;
         }
 
