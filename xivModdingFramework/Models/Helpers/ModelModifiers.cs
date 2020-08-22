@@ -965,7 +965,7 @@ namespace xivModdingFramework.Models.Helpers
                 else
                 {
                     ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
-                    RaceConvert(model, targetRace.GetNode().Parent.Race, targetRace, loggingFunction);
+                    RaceConvert(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
                 }
             }
             catch (Exception ex)
