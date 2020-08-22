@@ -36,7 +36,7 @@ namespace xivModdingFramework.Mods.FileTypes
     {
         private readonly string _currentWizardTTMPVersion = "1.0w";
         private readonly string _currentSimpleTTMPVersion = "1.0s";
-        private const string _minimumAssembly = "1.0.0.0";
+        private const string _minimumAssembly = "1.1.0.0";
 
         private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;

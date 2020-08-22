@@ -92,9 +92,9 @@ namespace xivModdingFramework.Models.DataContainers
         Bit2 = 2,
         Bit3 = 3,               // Bit 3 OR Bit 4 is often set on Legacy gear.
         Bit4 = 4,               // Bit 3 OR Bit 4 is often set on Legacy gear.
-        Bit5 = 5,
-        BodyPreventArmHiding = 6,
-        BodyPreventNeckHiding = 7,
+        BodyHideGloves = 5,
+        BodyHideLongGloves = 6,
+        BodyHideGorget = 7,
 
         // Byte 1 - Body
         BodyShowLeg = 8,                // When turned off, Leg hiding data is resolved from this same set, rather than the set of the equipped piece.
@@ -102,8 +102,8 @@ namespace xivModdingFramework.Models.DataContainers
         BodyShowHead = 10,              // When turned off, Head hiding data is resolved from this same set, rather than the set of the equipped piece.
         BodyShowNecklace = 11,
         BodyShowBracelet = 12,          // "Wrist[slot]" is not used in this context b/c it can be confusing with other settings.
-        Bit13 = 13,
-        BodyHideTail = 14,
+        BodyShowTail = 13,
+        BodyTriggersomeShapeData = 14,
         Bit15 = 15,
 
         // Byte 2 - Leg
