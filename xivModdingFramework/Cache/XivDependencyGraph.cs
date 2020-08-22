@@ -765,7 +765,7 @@ namespace xivModdingFramework.Cache
             var order = slots.IndexOf(Info.Slot);
             var subOffset = order * 2; // 2 bits per segment.
 
-            long offset = (entrySize * Info.PrimaryId) + subOffset;
+            long offset = (entrySize * Info.PrimaryId) + subOffset + (Eqp.EquipmentDeformerParameterHeaderLength * 8);
             foreach(var race in XivRaces.PlayableRaces)
             {
                 entries.Add(folder + "c" + race.GetRaceCode() + ".eqdp" + Constants.BinaryOffsetMarker + offset.ToString());

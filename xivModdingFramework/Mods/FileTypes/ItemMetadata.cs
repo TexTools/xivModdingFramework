@@ -155,6 +155,9 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         public static async Task ApplyMetadata(ItemMetadata meta)
         {
+            var ser = await Serialize(meta);
+            var rew = await Deserialize(ser);
+
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
 
             if (meta.ImcEntries.Count > 0)
@@ -162,6 +165,17 @@ namespace xivModdingFramework.Mods.FileTypes
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var imcPath = meta.Root.GetRawImcFilePath();
                 await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries);
+            }
+
+            if(meta.EqpEntry != null)
+            {
+                var eqpPath = meta.Root.GetEqpEntryPath();
+                await _eqp.SaveEqpEntry(eqpPath, meta.EqpEntry);
+            }
+
+            if(meta.EqdpEntries.Count > 0)
+            {
+                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries);
             }
         }
 
@@ -219,7 +233,7 @@ namespace xivModdingFramework.Mods.FileTypes
             Eqp = 3
         };
 
-        const uint _METADATA_VERSION = 0;
+        const uint _METADATA_VERSION = 1;
         const uint _METADATA_HEADER_SIZE = 12;
 
         /// <summary>
@@ -235,11 +249,8 @@ namespace xivModdingFramework.Mods.FileTypes
             // Write general header.
             bytes.AddRange(BitConverter.GetBytes(_METADATA_VERSION));
             var path = meta.Root.Info.GetRootFile();
-            for (int i = 0; i < path.Length; i++)
-            {
-                // TODO - FIXFIX - NEED TO VERIFY THIS IS WRITING SINGLE BYTES FOR EACH CHAR
-                bytes.AddRange(BitConverter.GetBytes(path[i]));
-            }
+            bytes.AddRange(System.Text.Encoding.UTF8.GetBytes(path));
+            bytes.Add(0);
 
             uint entries = 0;
             bool hasImc = false, hasEqp = false, hasEqdp = false;
@@ -263,7 +274,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             bytes.AddRange(BitConverter.GetBytes(entries));
             bytes.AddRange(BitConverter.GetBytes(_METADATA_HEADER_SIZE));
-            bytes.AddRange(BitConverter.GetBytes((uint) bytes.Count));
+            bytes.AddRange(BitConverter.GetBytes((uint) bytes.Count + 4));
 
             
 
@@ -302,6 +313,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 // Serialize IMC Data here.
                 var imcData = SerializeImcData(meta);
                 var offset = bytes.Count;
+                bytes.AddRange(imcData);
 
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)offset), imcHeaderInfoOffset + 4);
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)imcData.Length), imcHeaderInfoOffset + 8);
@@ -312,6 +324,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 // Serialize EQP Data here.
                 var eqpData = SerializeEqpData(meta);
                 var offset = bytes.Count;
+                bytes.AddRange(eqpData);
 
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)offset), eqpHeaderInfoOffset + 4);
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)eqpData.Length), eqpHeaderInfoOffset + 8);
@@ -322,6 +335,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 // Serialize EQP Data here.
                 var eqdpData = SerializeEqdpData(meta);
                 var offset = bytes.Count;
+                bytes.AddRange(eqdpData);
 
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)offset), eqdpHeaderInfoOffset + 4);
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)eqdpData.Length), eqdpHeaderInfoOffset + 8);
@@ -389,7 +403,7 @@ namespace xivModdingFramework.Mods.FileTypes
             foreach (var kv in meta.EqdpEntries)
             {
                 bytes.AddRange(BitConverter.GetBytes((uint)Int32.Parse(kv.Key.GetRaceCode())));
-                bytes.AddRange(BitConverter.GetBytes(kv.Value.GetByte()));
+                bytes.Add(kv.Value.GetByte());
             }
 
             return bytes.ToArray();
@@ -497,7 +511,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 // Per-Segment Header data.
                 reader.BaseStream.Seek(headerEntryStart, SeekOrigin.Begin);
 
-                List<(MetaDataType type, uint size, uint offset)> entries = new List<(MetaDataType type, uint size, uint offset)>();
+                List<(MetaDataType type, uint offset, uint size)> entries = new List<(MetaDataType type, uint size, uint offset)>();
 
                 for(int i = 0; i < headerCount; i++)
                 {
@@ -509,7 +523,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     uint offset = reader.ReadUInt32();
                     uint size = reader.ReadUInt32();
 
-                    entries.Add((type, size, offset));
+                    entries.Add((type, offset, size));
 
                     // Seek to next.
                     reader.BaseStream.Seek(currentOffset + perHeaderSize, SeekOrigin.Begin);

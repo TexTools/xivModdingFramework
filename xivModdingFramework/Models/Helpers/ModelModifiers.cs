@@ -965,7 +965,7 @@ namespace xivModdingFramework.Models.Helpers
                 else
                 {
                     ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
-                    RaceConvert(model, targetRace.GetNode().Parent.Race, targetRace, loggingFunction);
+                    RaceConvert(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
                 }
             }
             catch (Exception ex)
@@ -1420,7 +1420,7 @@ namespace xivModdingFramework.Models.Helpers
         }
 
 
-        private static readonly Regex _skinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+        public static readonly Regex SkinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
 
 
 
@@ -1486,7 +1486,7 @@ namespace xivModdingFramework.Models.Helpers
                 if (m.Material == null) continue;
 
                 // Only fix up -skin- materials.
-                if (_skinMaterialRegex.IsMatch(m.Material))
+                if (SkinMaterialRegex.IsMatch(m.Material))
                 {
                     var mtrlMatch = raceRegex.Match(m.Material);
                     if (mtrlMatch.Success && mtrlMatch.Groups[1].Value != skinRaceString)

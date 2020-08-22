@@ -4342,6 +4342,85 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
+        /// Copies a given model from a previous path to a new path, including copying the materials and other down-chain items.
+        /// 
+        /// </summary>
+        /// <param name="originalPath"></param>
+        /// <param name="newPath"></param>
+        /// <returns></returns>
+        public async Task<long> CopyModel(string originalPath, string newPath)
+        {
+            var _dat = new Dat(_gameDirectory);
+            var model = await GetModel(originalPath);
+            var xMdl = await GetRawMdlData(originalPath);
+
+            var root = await XivCache.GetFirstRoot(newPath);
+            var item = root.GetFirstItem();
+
+            var originalRace = IOUtil.GetRaceFromPath(originalPath);
+            var newRace = IOUtil.GetRaceFromPath(newPath);
+
+            if(originalRace != newRace)
+            {
+                // Convert the model to the new race.
+                ModelModifiers.RaceConvert(model, originalRace, newPath);
+                ModelModifiers.FixUpSkinReferences(model, newPath);
+            }
+
+            var _imc = new Imc(_gameDirectory);
+
+            var imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
+
+            var materialSets = new HashSet<byte>();
+            imcEntries.ForEach(x => materialSets.Add(x.Variant));
+
+            // Language is irrelevant here.
+            var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(newPath), XivLanguage.None);
+
+            // Get all variant materials.
+            var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false);
+            
+            var _raceRegex = new Regex("c[0-9]{4}");
+
+            // Update Material References and clone materials.
+            foreach(var material in materialPaths)
+            {
+                var newMtrlPath = _raceRegex.Replace(material, "c" + newRace.GetRaceCode());
+                if (newMtrlPath == material) continue;
+
+                var io = material.LastIndexOf("/", StringComparison.Ordinal);
+                var baseMatName = material.Substring(io, material.Length - io);
+
+                io = newMtrlPath.LastIndexOf("/", StringComparison.Ordinal);
+                var newMatName = newMtrlPath.Substring(io, newMtrlPath.Length - io);
+                // Time to copy the materials!
+                try
+                {
+                    var mtrlData = await _dat.GetType2Data(material, false);
+                    var compressedData = await _dat.CreateType2Data(mtrlData);
+                    await _dat.WriteToDat(compressedData.ToList(), null, newMtrlPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), xivModdingFramework.Helpers.Constants.InternalMetaFileSourceName, 2);
+
+                    // Switch out any material references to the material in the model file.
+                    foreach(var m in model.MeshGroups)
+                    {
+                        if(m.Material == baseMatName)
+                        {
+                            m.Material = newMatName;
+                        }
+                    }
+                } catch(Exception ex)
+                {
+                    // Hmmm.  The original material didn't exist.   This is pretty not awesome, but I guess a non-critical error...?
+                }
+            }
+
+            // Save the final modified mdl.
+            var data = await MakeNewMdlFile(model, xMdl);
+            var offset = await _dat.WriteToDat(data.ToList(), null, newPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), xivModdingFramework.Helpers.Constants.InternalMetaFileSourceName, 3);
+            return offset;
+        }
+
+        /// <summary>
         /// Gets the MDL path
         /// </summary>
         /// <param name="itemModel">The item model</param>

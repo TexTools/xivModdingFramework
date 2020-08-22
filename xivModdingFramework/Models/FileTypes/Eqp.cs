@@ -68,6 +68,43 @@ namespace xivModdingFramework.Models.FileTypes
             throw new NotImplementedException("Not Yet Implemented.");
         }
 
+        /// <summary>
+        /// Saves the given Equipment Parameter information to the main EQP file for the given set.
+        /// </summary>
+        /// <param name="setId"></param>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public async Task SaveEqpEntry(string pathWithOffset, EquipmentParameter data)
+        {
+
+            var match = _eqpBinaryOffsetRegex.Match(pathWithOffset);
+            if (!match.Success) throw new InvalidDataException("Invalid EQP Path: " + pathWithOffset);
+
+            var bitOffset = Int32.Parse(match.Groups[1].Value);
+            var byteOffset = bitOffset / 8;
+
+            var setId = byteOffset / EquipmentParameterEntrySize;
+            var slotOffset = byteOffset % EquipmentParameterEntrySize;
+
+            var slotKv = EquipmentParameterSet.EntryOffsets.Reverse().First(x => x.Value <= slotOffset);
+            var slot = slotKv.Key;
+            var slotByteOffset = slotKv.Value;
+
+            var size = EquipmentParameterSet.EntrySizes[slot];
+
+            var offset = (setId * EquipmentParameterEntrySize) + slotByteOffset;
+
+            var file = (await LoadEquipmentParameterFile(false)).ToList();
+
+            if (offset + size >= file.Count) throw new InvalidDataException("Invalid EQP Offset: " + pathWithOffset);
+
+            var bytes = data.GetBytes();
+
+            IOUtil.ReplaceBytesAt(file, bytes, offset);
+
+            await _dat.ImportType2Data(file.ToArray(), "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+        }
+
         private static readonly Regex _eqpBinaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
         public async Task<EquipmentParameter> GetEqpEntry(string pathWithOffset, bool forceDefault = false)
         {
@@ -160,6 +197,134 @@ namespace xivModdingFramework.Models.FileTypes
 
         private static readonly Regex _eqdpBinaryOffsetRegex = new Regex("^(.*c([0-9]{4}).*)" + Constants.BinaryOffsetMarker + "([0-9]+)$");
 
+
+        public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters)
+        {
+            var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+
+            if (!isAccessory)
+            {
+                var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
+                if (!slotOk)
+                {
+                    throw new InvalidDataException("Attempted to save racial models for invalid slot.");
+                }
+            }
+
+            var original = new Dictionary<XivRace, EquipmentDeformationParameter>();
+            foreach (var race in DeformationAvailableRaces)
+            {
+                var set = await GetEquipmentDeformationSet((int)primaryId, race, isAccessory);
+                original.Add(race, set.Parameters[slot]);
+            }
+
+            var _index = new Index(_gameDirectory);
+            var _mdl = new Mdl(_gameDirectory, XivDataFile._04_Chara);
+
+            foreach(var race in DeformationAvailableRaces)
+            {
+                if(original.ContainsKey(race) && parameters.ContainsKey(race))
+                {
+                    if(parameters[race].bit1 && !original[race].bit1 )
+                    {
+                        // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
+                        var path = "";
+                        if (!isAccessory)
+                        {
+                            path = String.Format(_EquipmentModelPathFormat, primaryId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
+                        }
+                        else
+                        {
+                            path = String.Format(_AccessoryModelPathFormat, primaryId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
+                        }
+
+                        // File already exists, no adjustments needed.
+                        if ((await _index.FileExists(path))) continue;
+
+                        var baseModelOrder = race.GetModelPriorityList();
+
+                        // Ok, we need to find which racial model to use as our base now...
+                        var baseRace = XivRace.All_Races;
+                        foreach(var targetRace in baseModelOrder)
+                        {
+                            if(original.ContainsKey(targetRace) && original[targetRace].bit1 == true)
+                            {
+                                baseRace = targetRace;
+                                break;
+                            }
+                        }
+
+                        if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
+                        var originalPath = "";
+                        if (!isAccessory)
+                        {
+                            originalPath = String.Format(_EquipmentModelPathFormat, primaryId.ToString().PadLeft(4, '0'), baseRace.GetRaceCode(), slot);
+                        }
+                        else
+                        {
+                            originalPath = String.Format(_AccessoryModelPathFormat, primaryId.ToString().PadLeft(4, '0'), baseRace.GetRaceCode(), slot);
+                        }
+
+
+                        var exists = await _index.FileExists(originalPath);
+                        if (!exists) throw new Exception("Base file for model-copy does not exist: " + originalPath);
+
+                        // Create the new model.
+                        await _mdl.CopyModel(originalPath, path);
+                    }
+                }
+            }
+
+
+
+            // 16 Bits per set.
+            uint bitOffset = (primaryId * (EquipmentDeformerParameterEntrySize * 8)) + (EquipmentDeformerParameterHeaderLength * 8);
+
+            // 2 Bits per slot entry.
+            uint slotOffset = (uint)(EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot) * 2);
+
+            bitOffset += slotOffset;
+            uint byteOffset = bitOffset / 8;
+
+            foreach(var race in DeformationAvailableRaces)
+            {
+                // Don't change races we weren't given information for.
+                if (!parameters.ContainsKey(race)) continue;
+                var entry = parameters[race];
+
+                var rootPath = isAccessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
+                var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+
+                // Load the file and flip the bits as needed.
+                var file = await LoadEquipmentDeformationFile(race, isAccessory, false);
+
+                var byteToModify = file[(int)byteOffset];
+
+                var bitshift = (int)(slotOffset % 8);
+                
+                if(entry.bit0)
+                {
+                    byteToModify = (byte)(byteToModify | (1 << bitshift));
+                } else
+                {
+                    byteToModify = (byte)(byteToModify & ~(1 << bitshift));
+                }
+
+                if (entry.bit1)
+                {
+                    byteToModify = (byte)(byteToModify | (1 << (bitshift + 1)));
+                }
+                else
+                {
+                    byteToModify = (byte)(byteToModify & ~(1 << (bitshift + 1)));
+                }
+
+                file[(int)byteOffset] = byteToModify;
+
+                await _dat.ImportType2Data(file.ToArray(), "_EQDP_INTERNAL_", fileName, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+            }
+        }
+
         /// <summary>
         /// Retrieves the raw EQDP entries from an arbitrary selection of files/offsets.
         /// </summary>
@@ -180,7 +345,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var bitOffset = Int32.Parse(match.Groups[3].Value);
 
                 // 2 Bytes per set.
-                int setId = bitOffset / (EquipmentDeformerParameterEntrySize * 8);
+                int setId = (bitOffset - (EquipmentDeformerParameterHeaderLength * 8)) / (EquipmentDeformerParameterEntrySize * 8);
 
                 var slotOffset = (bitOffset % (EquipmentDeformerParameterEntrySize * 8)) / EquipmentDeformerParameterEntrySize;
                 var accessory = file.Contains("accessory");
@@ -291,6 +456,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             return sets;
         }
+
 
 
         /// <summary>

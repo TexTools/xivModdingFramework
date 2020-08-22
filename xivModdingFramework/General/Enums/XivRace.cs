@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SQLite;
+using System.IO;
 using System.Linq;
 using System.Resources;
 using xivModdingFramework.Resources;
@@ -528,6 +529,290 @@ namespace xivModdingFramework.General.Enums
             var field = value.GetType().GetField(value.ToString());
             var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].Description : value.ToString();
+        }
+
+
+        /// <summary>
+        /// This function gets a semi-arbitrarily defined list of model priority for model conversions.
+        /// In specific, this is used for deciding which model to base new racial models off of.
+        /// 
+        /// These are grouped and ordered in order to try and reduce the chances of pulling a model which 
+        /// won't transform correctly as the new base model.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <returns></returns>
+        public static List<XivRace> GetModelPriorityList(this XivRace race)
+        {
+            var ret = new List<XivRace>();
+            if (race == XivRace.All_Races) throw new InvalidDataException("Cannot get model priority list for race-less model.");
+
+            switch(race)
+            {
+                // Standard Female Races
+                case XivRace.Hyur_Midlander_Female:
+                case XivRace.Hyur_Midlander_Female_NPC:
+                case XivRace.Miqote_Female:
+                case XivRace.Miqote_Female_NPC:
+                case XivRace.AuRa_Female:
+                case XivRace.AuRa_Female_NPC:
+                case XivRace.Viera:
+                case XivRace.Viera_NPC:
+                case XivRace.Hyur_Highlander_Female:
+                case XivRace.Hyur_Highlander_Female_NPC:
+                case XivRace.Elezen_Female:
+                case XivRace.Elezen_Female_NPC:
+                case XivRace.Roegadyn_Female:
+                case XivRace.Roegadyn_Female_NPC:
+                    return new List<XivRace>()
+                    {
+                        // Standard Female Races First
+                        XivRace.Hyur_Midlander_Female,
+                        XivRace.Hyur_Midlander_Female_NPC,
+                        XivRace.Miqote_Female,
+                        XivRace.Miqote_Female_NPC,
+                        XivRace.AuRa_Female,
+                        XivRace.AuRa_Female_NPC,
+                        XivRace.Viera,
+                        XivRace.Viera_NPC,
+                        XivRace.Hyur_Highlander_Female,
+                        XivRace.Hyur_Highlander_Female_NPC,
+                        XivRace.Elezen_Female,
+                        XivRace.Elezen_Female_NPC,
+                        XivRace.Roegadyn_Female,
+                        XivRace.Roegadyn_Female_NPC,
+
+                        // Male Base Races Next
+                        XivRace.Hyur_Midlander_Male,
+                        XivRace.Hyur_Midlander_Male_NPC,
+                        XivRace.Miqote_Male,
+                        XivRace.Miqote_Male_NPC,
+                        XivRace.Elezen_Male,
+                        XivRace.Elezen_Male_NPC,
+                        XivRace.AuRa_Male,
+                        XivRace.AuRa_Male_NPC,
+
+                        // Highlander Next
+                        XivRace.Hyur_Highlander_Male,
+                        XivRace.Hyur_Highlander_Male_NPC,
+
+                        // Roe M?  These are pretty fucked at this point.
+                        XivRace.Roegadyn_Male,
+                        XivRace.Roegadyn_Male_NPC,
+                        XivRace.Hrothgar,
+                        XivRace.Hrothgar_NPC,
+
+                        // Lala ? 
+                        XivRace.Lalafell_Male,
+                        XivRace.Lalafell_Male_NPC,
+                        XivRace.Lalafell_Female,
+                        XivRace.Lalafell_Female_NPC
+                    };
+
+                // Male base races.
+                case XivRace.Hyur_Midlander_Male:
+                case XivRace.Hyur_Midlander_Male_NPC:
+                case XivRace.Miqote_Male:
+                case XivRace.Miqote_Male_NPC:
+                case XivRace.Elezen_Male:
+                case XivRace.Elezen_Male_NPC:
+                case XivRace.AuRa_Male:
+                case XivRace.AuRa_Male_NPC:
+                    return new List<XivRace>()
+                    {
+                        // Male Base Races First
+                        XivRace.Hyur_Midlander_Male,
+                        XivRace.Hyur_Midlander_Male_NPC,
+                        XivRace.Miqote_Male,
+                        XivRace.Miqote_Male_NPC,
+                        XivRace.Elezen_Male,
+                        XivRace.Elezen_Male_NPC,
+                        XivRace.AuRa_Male,
+                        XivRace.AuRa_Male_NPC,
+
+                        // Highlander Next
+                        XivRace.Hyur_Highlander_Male,
+                        XivRace.Hyur_Highlander_Male_NPC,
+                        
+                        // Standard Female Races Next ?  We're getting into trouble territory here.
+                        XivRace.Hyur_Midlander_Female,
+                        XivRace.Hyur_Midlander_Female_NPC,
+                        XivRace.Miqote_Female,
+                        XivRace.Miqote_Female_NPC,
+                        XivRace.AuRa_Female,
+                        XivRace.AuRa_Female_NPC,
+                        XivRace.Viera,
+                        XivRace.Viera_NPC,
+                        XivRace.Hyur_Highlander_Female,
+                        XivRace.Hyur_Highlander_Female_NPC,
+                        XivRace.Elezen_Female,
+                        XivRace.Elezen_Female_NPC,
+                        XivRace.Roegadyn_Female,
+                        XivRace.Roegadyn_Female_NPC,
+
+                        // Roe M? These are pretty fucked at this point.
+                        XivRace.Roegadyn_Male,
+                        XivRace.Roegadyn_Male_NPC,
+                        XivRace.Hrothgar,
+                        XivRace.Hrothgar_NPC,
+
+                        // Lala ? 
+                        XivRace.Lalafell_Male,
+                        XivRace.Lalafell_Male_NPC,
+                        XivRace.Lalafell_Female,
+                        XivRace.Lalafell_Female_NPC
+                    };
+
+                // Highlander gets slightly different resolution order.
+                case XivRace.Hyur_Highlander_Male:
+                case XivRace.Hyur_Highlander_Male_NPC:
+                    return new List<XivRace>()
+                    {
+                        // Highlander First
+                        XivRace.Hyur_Highlander_Male,
+                        XivRace.Hyur_Highlander_Male_NPC,
+                        
+                        // Male Base Races Next
+                        XivRace.Hyur_Midlander_Male,
+                        XivRace.Hyur_Midlander_Male_NPC,
+                        XivRace.Miqote_Male,
+                        XivRace.Miqote_Male_NPC,
+                        XivRace.Elezen_Male,
+                        XivRace.Elezen_Male_NPC,
+                        XivRace.AuRa_Male,
+                        XivRace.AuRa_Male_NPC,
+
+                        // Standard Female Races Next ?  We're getting into trouble territory here.
+                        XivRace.Hyur_Midlander_Female,
+                        XivRace.Hyur_Midlander_Female_NPC,
+                        XivRace.Miqote_Female,
+                        XivRace.Miqote_Female_NPC,
+                        XivRace.AuRa_Female,
+                        XivRace.AuRa_Female_NPC,
+                        XivRace.Viera,
+                        XivRace.Viera_NPC,
+                        XivRace.Hyur_Highlander_Female,
+                        XivRace.Hyur_Highlander_Female_NPC,
+                        XivRace.Elezen_Female,
+                        XivRace.Elezen_Female_NPC,
+                        XivRace.Roegadyn_Female,
+                        XivRace.Roegadyn_Female_NPC,
+
+                        // Roe M? These are pretty fucked at this point.
+                        XivRace.Roegadyn_Male,
+                        XivRace.Roegadyn_Male_NPC,
+                        XivRace.Hrothgar,
+                        XivRace.Hrothgar_NPC,
+
+                        // Lala ? 
+                        XivRace.Lalafell_Male,
+                        XivRace.Lalafell_Male_NPC,
+                        XivRace.Lalafell_Female,
+                        XivRace.Lalafell_Female_NPC
+                    };
+
+                // Big Boys
+                case XivRace.Roegadyn_Male:
+                case XivRace.Roegadyn_Male_NPC:
+                case XivRace.Hrothgar:
+                case XivRace.Hrothgar_NPC:
+                    return new List<XivRace>()
+                    {
+                        // Roe M
+                        XivRace.Roegadyn_Male,
+                        XivRace.Roegadyn_Male_NPC,
+                        XivRace.Hrothgar,
+                        XivRace.Hrothgar_NPC,
+
+                        // Highlander Next
+                        XivRace.Hyur_Highlander_Male,
+                        XivRace.Hyur_Highlander_Male_NPC,
+                        
+                        // Male Base Races Next
+                        XivRace.Hyur_Midlander_Male,
+                        XivRace.Hyur_Midlander_Male_NPC,
+                        XivRace.Miqote_Male,
+                        XivRace.Miqote_Male_NPC,
+                        XivRace.Elezen_Male,
+                        XivRace.Elezen_Male_NPC,
+                        XivRace.AuRa_Male,
+                        XivRace.AuRa_Male_NPC,
+
+                        // Standard Female Races Next ?  We're getting into trouble territory here.
+                        XivRace.Hyur_Midlander_Female,
+                        XivRace.Hyur_Midlander_Female_NPC,
+                        XivRace.Miqote_Female,
+                        XivRace.Miqote_Female_NPC,
+                        XivRace.AuRa_Female,
+                        XivRace.AuRa_Female_NPC,
+                        XivRace.Viera,
+                        XivRace.Viera_NPC,
+                        XivRace.Hyur_Highlander_Female,
+                        XivRace.Hyur_Highlander_Female_NPC,
+                        XivRace.Elezen_Female,
+                        XivRace.Elezen_Female_NPC,
+                        XivRace.Roegadyn_Female,
+                        XivRace.Roegadyn_Female_NPC,
+
+                        // Lala ? 
+                        XivRace.Lalafell_Male,
+                        XivRace.Lalafell_Male_NPC,
+                        XivRace.Lalafell_Female,
+                        XivRace.Lalafell_Female_NPC
+                    };
+
+                // 'Taters
+                case XivRace.Lalafell_Male:
+                case XivRace.Lalafell_Male_NPC:
+                case XivRace.Lalafell_Female:
+                case XivRace.Lalafell_Female_NPC:
+                    return new List<XivRace>()
+                    {
+                        // Lala
+                        XivRace.Lalafell_Male,
+                        XivRace.Lalafell_Male_NPC,
+                        XivRace.Lalafell_Female,
+                        XivRace.Lalafell_Female_NPC,
+                        
+                        // Male Base Races Next
+                        XivRace.Hyur_Midlander_Male,
+                        XivRace.Hyur_Midlander_Male_NPC,
+                        XivRace.Miqote_Male,
+                        XivRace.Miqote_Male_NPC,
+                        XivRace.Elezen_Male,
+                        XivRace.Elezen_Male_NPC,
+                        XivRace.AuRa_Male,
+                        XivRace.AuRa_Male_NPC,
+                        
+                        // Standard Female Races Next ?  We're getting into trouble territory here.
+                        XivRace.Hyur_Midlander_Female,
+                        XivRace.Hyur_Midlander_Female_NPC,
+                        XivRace.Miqote_Female,
+                        XivRace.Miqote_Female_NPC,
+                        XivRace.AuRa_Female,
+                        XivRace.AuRa_Female_NPC,
+                        XivRace.Viera,
+                        XivRace.Viera_NPC,
+                        XivRace.Hyur_Highlander_Female,
+                        XivRace.Hyur_Highlander_Female_NPC,
+                        XivRace.Elezen_Female,
+                        XivRace.Elezen_Female_NPC,
+                        XivRace.Roegadyn_Female,
+                        XivRace.Roegadyn_Female_NPC,
+
+                        // Highlander Next
+                        XivRace.Hyur_Highlander_Male,
+                        XivRace.Hyur_Highlander_Male_NPC,
+
+                        // Roe M
+                        XivRace.Roegadyn_Male,
+                        XivRace.Roegadyn_Male_NPC,
+                        XivRace.Hrothgar,
+                        XivRace.Hrothgar_NPC
+                    };
+
+            }
+            throw new Exception("Unable to resolve racial model test order.");
+
         }
 
         /// <summary>
