@@ -141,37 +141,14 @@ namespace xivModdingFramework.Models.FileTypes
                 System.IO.Directory.CreateDirectory(dir);
             }
 
-
-            if (fileFormat == "dae")
-            {
-                // Validate the skeleton.
-                var sklb = new Sklb(_gameDirectory);
-                var skel = await sklb.CreateParsedSkelFile(mdlPath);
-
-                // If we have weights, but can't find a skel, bad times.
-                if (skel == null)
-                {
-                    throw new InvalidDataException("Unable to resolve model skeleton.");
-                }
-
-                // Special DAE snowflake.
-                var mdl = await GetRawMdlData(mdlPath, getOriginal);
-                var _dae = new Dae(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
-                await _dae.MakeDaeFileFromModel(mdl, outputFilePath, Path.GetFileNameWithoutExtension(skel));
-
-            }
-            else
-            {
-                var imc = new Imc(_gameDirectory);
-                var model = await GetModel(mdlPath);
-                await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
-            }
+            var imc = new Imc(_gameDirectory);
+            var model = await GetModel(mdlPath);
+            await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
         }
 
 
         /// <summary>
         /// Exports a TTModel file to the given output path.
-        /// DOES NOT SUPPORT DAE EXPORT.
         /// </summary>
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
@@ -1903,7 +1880,6 @@ namespace xivModdingFramework.Models.FileTypes
             cwd = cwd.Replace("\\", "/");
             string importerPath = cwd + "/converters/";
             var ret = new List<string>();
-            ret.Add("dae"); // DAE handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
             var directories = Directory.GetDirectories(importerPath);
@@ -1928,7 +1904,6 @@ namespace xivModdingFramework.Models.FileTypes
             cwd = cwd.Replace("\\", "/");
             string importerPath = cwd + "/converters/";
             var ret = new List<string>();
-            ret.Add("dae"); // DAE handler is internal.
             ret.Add("obj"); // OBJ handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
@@ -2019,7 +1994,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="item">The current item being imported</param>
         /// <param name="race">The racial model to replace of the item</param>
-        /// <param name="path">The location of the dae file to import</param>
+        /// <param name="path">The location of the file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
         ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
@@ -2111,16 +2086,6 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     // If we were given no path, load the current model.
                     ttModel = await GetModel(item, race, submeshId);
-                }
-                else if (suffix == "dae")
-                {
-                    loggingFunction(true, "DEPRECATION NOTICE - DAE Import/Export is Deprecated/Legacy Functionality and will be removed in TexTools 2.3.  Consider changing to FBX Import/Export.");
-                    // Dae handling is a special snowflake.
-                    var dae = new Dae(_gameDirectory, _dataFile);
-                    loggingFunction(false, "Loading DAE file...");
-                    var fileLocation = new DirectoryInfo(path);
-                    ttModel = dae.ReadColladaFile(fileLocation, loggingFunction);
-                    loggingFunction(false, "DAE File loaded successfully.");
                 }
                 else if (suffix == "db")
                 {
@@ -2523,9 +2488,6 @@ namespace xivModdingFramework.Models.FileTypes
                 short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].ExtraMeshCount);
                 short higherLodMeshCount = 0;
                 meshCount += higherLodMeshCount;
-                // Update the total mesh count only if there are more meshes than the original
-                // We do not remove mesh if they are missing from the DAE, we just set the mesh metadata to 0
-
                 ogModelData.MeshCount = meshCount;
                 // Recalculate total number of parts.
                 short partCOunt  = 0;

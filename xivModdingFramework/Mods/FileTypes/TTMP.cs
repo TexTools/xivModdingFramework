@@ -34,8 +34,8 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class TTMP
     {
-        private readonly string _currentWizardTTMPVersion = "1.0w";
-        private readonly string _currentSimpleTTMPVersion = "1.0s";
+        private readonly string _currentWizardTTMPVersion = "1.1w";
+        private readonly string _currentSimpleTTMPVersion = "1.1s";
         private const string _minimumAssembly = "1.1.0.0";
 
         private string _tempMPD, _tempMPL, _source;
