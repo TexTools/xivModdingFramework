@@ -83,6 +83,9 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public enum EquipmentParameterFlag
     {
+        // For FULL GEAR PIECES, they're always marked as TRUE = Show
+        // For PARTIAL GEAR PIECES, they're marked as TRUE = HIDE
+
         //Byte 0 - Body
         EnableBodyFlags = 0,
         BodyHideWaist = 1,

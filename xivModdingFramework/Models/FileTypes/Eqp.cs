@@ -90,6 +90,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             var file = await LoadEquipmentParameterFile(forceDefault);
 
+            if (offset + size >= file.Length) return null;
+
             var bytes = file.Skip(offset).Take(size);
 
             return new EquipmentParameter(slot, bytes.ToArray());
