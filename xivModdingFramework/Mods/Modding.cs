@@ -114,7 +114,7 @@ namespace xivModdingFramework.Mods
         public async Task DeleteAllFilesAddedByTexTools()
         {
             var modList = GetModList();
-            var modsToRemove = modList.Mods.Where(it => it.source == "FilesAddedByTexTools");
+            var modsToRemove = modList.Mods.Where(it => it.data.originalOffset == it.data.modOffset);
             foreach(var mod in modsToRemove)
             {
                 await DeleteMod(mod.fullPath);
@@ -517,15 +517,11 @@ namespace xivModdingFramework.Mods
             var modToRemove = (from mod in modList.Mods
                 where mod.fullPath.Equals(modItemPath)
                 select mod).FirstOrDefault();
-            if (modToRemove.source == "FilesAddedByTexTools")
-            {
-                var index = new Index(_gameDirectory);
-                await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-            }
-            if (modToRemove.enabled)
-            {
-                await ToggleModStatus(modItemPath, false);
-            }
+
+            // Mod doesn't exist in the modlist.
+            if (modToRemove == null) return;
+
+            await ToggleModStatus(modItemPath, false);
 
             modToRemove.name = string.Empty;
             modToRemove.category = string.Empty;
@@ -563,6 +559,9 @@ namespace xivModdingFramework.Mods
                 where modPack.name.Equals(modPackName)
                 select modPack).FirstOrDefault();
 
+            // Modpack doesn't exist in the modlist.
+            if (modPackItem == null) return;
+
             modList.ModPacks.Remove(modPackItem);
 
             var modsToRemove = (from mod in modList.Mods
@@ -571,17 +570,10 @@ namespace xivModdingFramework.Mods
 
             var modRemoveCount = modsToRemove.Count;
 
+            List<Mod> modsToPurge = new List<Mod>();
             foreach (var modToRemove in modsToRemove)
             {
-                if (modToRemove.source == "FilesAddedByTexTools")
-                {
-                    var index = new Index(_gameDirectory);
-                    await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                }
-                if (modToRemove.enabled)
-                {
-                    await ToggleModStatus(modToRemove.fullPath, false);
-                }
+                await ToggleModStatus(modToRemove.fullPath, false);
 
                 modToRemove.name = string.Empty;
                 modToRemove.category = string.Empty;
@@ -591,6 +583,17 @@ namespace xivModdingFramework.Mods
                 modToRemove.enabled = false;
                 modToRemove.data.originalOffset = 0;
                 modToRemove.data.dataType = 0;
+
+                if (modToRemove.data.modOffset <= 0)
+                {
+                    modsToPurge.Add(modToRemove);
+                }
+            }
+
+            // Purge any that have invalid data offsets so we don't reuse them.
+            foreach(var m in modsToPurge)
+            {
+                modList.Mods.Remove(m);
             }
 
             modList.emptyCount += modRemoveCount;
