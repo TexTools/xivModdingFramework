@@ -89,6 +89,10 @@ namespace xivModdingFramework.Models.DataContainers
         //Byte 0 - Body
         EnableBodyFlags = 0,
         BodyHideWaist = 1,
+        Bit2 = 2,
+        Bit3 = 3,               // Bit 3 OR Bit 4 is often set on Legacy gear.
+        Bit4 = 4,               // Bit 3 OR Bit 4 is often set on Legacy gear.
+        Bit5 = 5,
         BodyPreventArmHiding = 6,
         BodyPreventNeckHiding = 7,
 
@@ -98,33 +102,48 @@ namespace xivModdingFramework.Models.DataContainers
         BodyShowHead = 10,              // When turned off, Head hiding data is resolved from this same set, rather than the set of the equipped piece.
         BodyShowNecklace = 11,
         BodyShowBracelet = 12,          // "Wrist[slot]" is not used in this context b/c it can be confusing with other settings.
+        Bit13 = 13,
         BodyHideTail = 14,
+        Bit15 = 15,
 
         // Byte 2 - Leg
-        EnableLegFlags = 16,           
-        LegShowFoot = 21,              
+        EnableLegFlags = 16,
+        Bit17 = 17,
+        Bit18 = 18,
+        LegHideHalfboot = 19,
+        Bit20 = 20,
+        LegShowFoot = 21,
+        Bit22 = 22,
+        Bit23 = 23,
 
         // Byte 3 - Hand
         EnableHandFlags = 24,
         HandHideElbow = 25,            // Requires bit 26 on as well to work.
         HandHideForearm = 26,          // "Wrist[anatomy]" is not used in this context b/c it can be confusing with other settings.
+        Bit27 = 27,
         HandShowBracelet = 28,         // "Wrist[slot]" is not used in this context b/c it can be confusing with other settings.
         HandShowRingL = 29,
         HandShowRingR = 30,
+        Bit31 = 31,
 
         // Byte 4 - Foot
         EnableFootFlags = 32,
         FootHideKnee = 33,              // Requires bit 34 on as well to work.
         FootHideCalf = 34,
         FootUsuallyOn = 35,             // Usually set to [1], the remaining bits of this byte are always [0].
+        Bit36 = 36,
+        Bit37 = 37,
+        Bit38 = 38,
+        Bit39 = 39,
 
         // Byte 5 - Head & Hair
         EnableHeadFlags = 40,
-        HeadHideHairTop = 41,          // When set alone, hides top(hat part) of hair.  When set with 42, hides everything.
+        HeadHideScalp = 41,          // When set alone, hides top(hat part) of hair.  When set with 42, hides everything.
         HeadHideHair = 42,             // When set with 41, hides everything neck up.  When set without, hides all hair.
-        HeadShowHair = 43,             // Seems to override bit 42 if set?
+        HeadShowHairOverride = 43,     // Overrides Bit 41 & 42 When set.
         HeadHideNeck = 44,
         HeadShowNecklace = 45,
+        Bit46 = 46,
         HeadShowEarrings = 47,        // This cannot be toggled off without enabling bit 42.
 
         // Byte 6 - Ears/Horns/Etc.    
@@ -139,7 +158,13 @@ namespace xivModdingFramework.Models.DataContainers
 
         // Byte 7 - Shadowbringers Race Settings
         EnableShbFlags = 56,
-        ShbShowHead = 57
+        ShbShowHead = 57,
+        Bit58 = 58,
+        Bit59 = 59,
+        Bit60 = 60,
+        Bit61 = 61,
+        Bit62 = 62,
+        Bit63 = 63,
     }
 
 
