@@ -804,22 +804,6 @@ namespace xivModdingFramework.Models.DataContainers
                 }
             }
 
-            foreach(var m in model.MeshGroups)
-            {
-                // Meshes must have at least one part.
-                if(m.Parts.Count == 0)
-                {
-                    var part = new TTMeshPart();
-                    part.Name = "Part 0";
-                    m.Parts.Add(part);
-                }
-
-                if(m.Bones.Count == 0)
-                {
-                    // Meshes must have at least one bone in their bone set if the model uses bones.
-                    m.Bones.Add("n_root");
-                }
-            }
 
             // Convert the model to FFXIV's internal weirdness.
             ModelModifiers.MakeImportReady(model, loggingFunction);
@@ -1615,13 +1599,14 @@ namespace xivModdingFramework.Models.DataContainers
             }
             loggingFunction(false, "Validating model sanity...");
 
+            bool hasWeights = model.HasWeights;
+
             if (model.MeshGroups.Count == 0)
             {
                 loggingFunction(true, "Model has no data. - Model must have at least one valid Mesh Group.");
                 return false;
             }
 
-            
             var mIdx = 0;
             foreach(var m in model.MeshGroups)
             {
@@ -1631,9 +1616,10 @@ namespace xivModdingFramework.Models.DataContainers
                     part.Name = "Part 0";
                     m.Parts.Add(part);
                 }
-                if(m.Bones.Count == 0)
+
+                // Meshes in animated models must have at least one bone in their bone set in order to not generate a crash.
+                if(hasWeights && m.Bones.Count == 0)
                 {
-                    // Null bone sets cause a crash.
                     m.Bones.Add("n_root");
                 }
                 mIdx++;

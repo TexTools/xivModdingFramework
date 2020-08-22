@@ -501,6 +501,8 @@ namespace xivModdingFramework.Mods
                 where mod.fullPath.Equals(modItemPath)
                 select mod).FirstOrDefault();
 
+            // Mod doesn't exist in the modlist.
+            if (modToRemove == null) return;
 
             if(modToRemove.IsInternal() && !allowInternal)
             {
@@ -552,6 +554,9 @@ namespace xivModdingFramework.Mods
             var modPackItem = (from modPack in modList.ModPacks
                 where modPack.name.Equals(modPackName)
                 select modPack).FirstOrDefault();
+
+            // Modpack doesn't exist in the modlist.
+            if (modPackItem == null) return;
 
             modList.ModPacks.Remove(modPackItem);
 
