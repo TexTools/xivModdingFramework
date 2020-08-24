@@ -229,6 +229,19 @@ namespace xivModdingFramework.Helpers
                 original[index + i] = toInject[i];
             };
         }
+        /// <summary>
+        /// Replaces the bytes in a given byte array with the bytes from another array, starting at the given index of the original array.
+        /// </summary>
+        /// <param name="original"></param>
+        /// <param name="toInject"></param>
+        /// <param name="index"></param>
+        public static void ReplaceBytesAt(byte[] original, byte[] toInject, int index)
+        {
+            for (var i = 0; i < toInject.Length; i++)
+            {
+                original[index + i] = toInject[i];
+            };
+        }
 
 
 

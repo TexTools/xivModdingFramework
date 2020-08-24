@@ -101,7 +101,7 @@ namespace xivModdingFramework.Mods.FileTypes
             if(mod != null && mod.enabled)
             {
                 // We have modded metadata stored in the .meta file in the DAT we can use.
-                //var data = await _dat.GetType2Data(filePath, false);
+                var data = await _dat.GetType2Data(filePath, false);
 
                 // Run it through the binary deserializer and we're good.
                 //return await Deserialize(data);
@@ -128,8 +128,6 @@ namespace xivModdingFramework.Mods.FileTypes
             // These functions generate the path::offset to each of our
             // contiguous metadata entries.
             var imcPaths = await root.GetImcEntryPaths();
-            var eqpPath = root.GetEqpEntryPath();
-            var eqdpPaths = root.GetEqdpEntryPaths();
 
             var ret = new ItemMetadata(root);
 
@@ -137,14 +135,10 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault);
             }
-            if (eqpPath != null)
-            {
-                ret.EqpEntry = await _eqp.GetEqpEntry(eqpPath, forceDefault);
-            }
-            if (eqdpPaths.Count > 0)
-            {
-                ret.EqdpEntries = await _eqp.GetEqdpEntries(eqdpPaths, forceDefault);
-            }
+
+            ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault);
+
+            ret.EqdpEntries = await _eqp.GetEquipmentDeformationParameters(root.Info, forceDefault);
 
             return ret;
         }
@@ -174,9 +168,6 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         internal static async Task ApplyMetadata(ItemMetadata meta)
         {
-            var ser = await Serialize(meta);
-            var rew = await Deserialize(ser);
-
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
 
             if (meta.ImcEntries.Count > 0)
@@ -186,10 +177,10 @@ namespace xivModdingFramework.Mods.FileTypes
                 await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries);
             }
 
-            if(meta.EqpEntry != null)
+            // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
+            if(meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
             {
-                var eqpPath = meta.Root.GetEqpEntryPath();
-                await _eqp.SaveEqpEntry(eqpPath, meta.EqpEntry);
+                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry);
             }
 
             if(meta.EqdpEntries.Count > 0)
@@ -279,7 +270,9 @@ namespace xivModdingFramework.Mods.FileTypes
                 hasImc = true;
             }
 
-            if(meta.EqpEntry != null)
+            // Set 0 is a unique exception where SE hard-coded it to use Set 1's EQP data.  As such, we don't allow that data to be altered
+            // via writing to set 0, just for safety purposes.
+            if(meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
             {
                 entries++;
                 hasEqp = true;
@@ -317,7 +310,7 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
             int eqdpHeaderInfoOffset = 0;
-            if (hasEqp)
+            if (hasEqdp)
             {
                 eqdpHeaderInfoOffset = bytes.Count;
                 bytes.AddRange(BitConverter.GetBytes((uint)MetaDataType.Eqdp));

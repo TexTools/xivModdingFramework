@@ -4304,7 +4304,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
-        private string _AccessoryModelPathFormat = "chara/equipment/a{0}/model/c{1}a{0}_{2}.mdl";
+        private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
 
         /// <summary>
         /// Creates a new racial model for a given set/slot by copying from already existing racial models.

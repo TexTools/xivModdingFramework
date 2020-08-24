@@ -6,9 +6,13 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -21,6 +25,9 @@ namespace xivModdingFramework.Models.FileTypes
         public const string EquipmentDeformerParameterExtension = "eqdp";
         public const string EquipmentDeformerParameterRootPath = "chara/xls/charadb/equipmentdeformerparameter/";
         public const string AccessoryDeformerParameterRootPath = "chara/xls/charadb/accessorydeformerparameter/";
+
+        public static int _EQP_GAP_1_END = -1;
+        public static int _EQP_GAP_2_END = -1;
 
         private readonly DirectoryInfo _gameDirectory;
         private readonly DirectoryInfo _modListDirectory;
@@ -54,6 +61,43 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.Viera,
         };
 
+        // The subset list of races that actually have deformation files.
+        public static readonly List<XivRace> DeformationAvailableRacesWithNPCs = new List<XivRace>()
+        {
+            XivRace.Hyur_Midlander_Male,
+            XivRace.Hyur_Midlander_Female,
+            XivRace.Hyur_Highlander_Male,
+            XivRace.Hyur_Highlander_Female,
+            XivRace.Elezen_Male,
+            XivRace.Elezen_Female,
+            XivRace.Miqote_Male,
+            XivRace.Miqote_Female,
+            XivRace.Roegadyn_Male,
+            XivRace.Roegadyn_Female,
+            XivRace.Lalafell_Male,
+            XivRace.Lalafell_Female,
+            XivRace.AuRa_Male,
+            XivRace.AuRa_Female,
+            XivRace.Hrothgar,
+            XivRace.Viera,
+            XivRace.Hyur_Midlander_Male_NPC,
+            XivRace.Hyur_Midlander_Female_NPC,
+            XivRace.Hyur_Highlander_Male_NPC,
+            XivRace.Hyur_Highlander_Female_NPC,
+            XivRace.Elezen_Male_NPC,
+            XivRace.Elezen_Female_NPC,
+            XivRace.Miqote_Male_NPC,
+            XivRace.Miqote_Female_NPC,
+            XivRace.Roegadyn_Male_NPC,
+            XivRace.Roegadyn_Female_NPC,
+            XivRace.Lalafell_Male_NPC,
+            XivRace.Lalafell_Female_NPC,
+            XivRace.AuRa_Male_NPC,
+            XivRace.AuRa_Female_NPC,
+            XivRace.Hrothgar_NPC,
+            XivRace.Viera_NPC,
+        };
+
         private Dat _dat;
 
         public Eqp(DirectoryInfo gameDirectory)
@@ -71,32 +115,35 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Saves the given Equipment Parameter information to the main EQP file for the given set.
         /// </summary>
-        /// <param name="setId"></param>
+        /// <param name="equipmentId"></param>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task SaveEqpEntry(string pathWithOffset, EquipmentParameter data)
+        public async Task SaveEqpEntry(int equipmentId, EquipmentParameter data)
         {
+            if (equipmentId < 0)
+            {
+                throw new InvalidDataException("Unable to resolve EQP information for invalid equipment ID.");
+            }
 
-            var match = _eqpBinaryOffsetRegex.Match(pathWithOffset);
-            if (!match.Success) throw new InvalidDataException("Invalid EQP Path: " + pathWithOffset);
+            if(equipmentId == 0)
+            {
+                throw new InvalidDataException("Cannot write EQP data for Set 0. (Use Set 1)");
+            }
 
-            var bitOffset = Int32.Parse(match.Groups[1].Value);
-            var byteOffset = bitOffset / 8;
+            var file = (await LoadEquipmentParameterFile(false));
+            var offset = ResolveEqpEntryOffset(file, equipmentId);
 
-            var setId = byteOffset / EquipmentParameterEntrySize;
-            var slotOffset = byteOffset % EquipmentParameterEntrySize;
+            if(offset < 0)
+            {
+                // Not bothering to write a function to decompress empty EQP blocks, since it seems like SE keeps every equipment block with actual equipment in it decompressed.
+                // I suppose in theory we could use it for adding custom items in the e4000 range or something.
+                throw new Exception("Cannot write compressed EQP Entry. (Please report this in Discord!)");
+            }
 
-            var slotKv = EquipmentParameterSet.EntryOffsets.Reverse().First(x => x.Value <= slotOffset);
-            var slot = slotKv.Key;
-            var slotByteOffset = slotKv.Value;
+            var slotOffset = EquipmentParameterSet.EntryOffsets[data.Slot];
 
-            var size = EquipmentParameterSet.EntrySizes[slot];
+            offset += slotOffset;
 
-            var offset = (setId * EquipmentParameterEntrySize) + slotByteOffset;
-
-            var file = (await LoadEquipmentParameterFile(false)).ToList();
-
-            if (offset + size >= file.Count) throw new InvalidDataException("Invalid EQP Offset: " + pathWithOffset);
 
             var bytes = data.GetBytes();
 
@@ -105,34 +152,100 @@ namespace xivModdingFramework.Models.FileTypes
             await _dat.ImportType2Data(file.ToArray(), "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
         }
 
-        private static readonly Regex _eqpBinaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
-        public async Task<EquipmentParameter> GetEqpEntry(string pathWithOffset, bool forceDefault = false)
+
+        /// <summary>
+        /// Retrieves the EQP Entry for a given Item.
+        /// </summary>
+        public async Task<EquipmentParameter> GetEqpEntry(IItem item, bool forceDefault = false)
         {
-            var match = _eqpBinaryOffsetRegex.Match(pathWithOffset);
-            if (!match.Success) return null;
+            if (item == null)
+            {
+                return null;
+            }
 
-            var bitOffset = Int32.Parse(match.Groups[1].Value);
-            var byteOffset = bitOffset / 8;
+            var root = item.GetRoot();
+            if(root == null)
+            {
+                return null;
+            }
 
-            var setId = byteOffset / EquipmentParameterEntrySize;
-            var slotOffset = byteOffset % EquipmentParameterEntrySize;
+            return await GetEqpEntry(root, forceDefault);
+        }
 
-            var slotKv = EquipmentParameterSet.EntryOffsets.Reverse().First(x => x.Value <= slotOffset);
-            var slot = slotKv.Key;
-            var slotByteOffset = slotKv.Value;
+        /// <summary>
+        /// Retrieves the EQP Entry for a given Root.
+        /// </summary>
+        public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRoot root, bool forceDefault = false)
+        {
+            if(root == null)
+            {
+                return null;
+            }
 
-            var size = EquipmentParameterSet.EntrySizes[slot];
+            return await GetEqpEntry(root.Info, forceDefault);
+        }
 
-            var offset = (setId * EquipmentParameterEntrySize) + slotByteOffset;
+        /// <summary>
+        /// Retrieves the EQP Entry for a given Root.
+        /// </summary>
+        public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRootInfo root, bool forceDefault = false)
+        {
+            if(root.PrimaryType != XivItemType.equipment)
+            {
+                return null;
+            }
+
+            return await GetEqpEntry(root.PrimaryId, root.Slot, forceDefault);
+        }
+
+        /// <summary>
+        /// Retrieves the EQP Entry for a given set/slot.
+        /// </summary>
+        /// <param name="equipmentId"></param>
+        /// <param name="slot"></param>
+        /// <param name="forceDefault"></param>
+        /// <returns></returns>
+        public async Task<EquipmentParameter> GetEqpEntry(int equipmentId, string slot, bool forceDefault = false)
+        {
+
+            if(!EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot))
+            {
+                throw new InvalidDataException("Unable to resolve EQP information for invalid slot.");
+            }
+
+            if(equipmentId < 0)
+            {
+                throw new InvalidDataException("Unable to resolve EQP information for invalid equipment ID.");
+            }
+
+            // Set 0 is a special case which SE hard-coded to share with set 1.
+            // In practice, we don't allow users to read or edit it via set 0 to avoid mod conflicts.  Instead, Set 1 must be used.
+            if(equipmentId == 0)
+            {
+                return null;
+            }
+
+
 
             var file = await LoadEquipmentParameterFile(forceDefault);
 
-            if (offset + size >= file.Length) return null;
+            var offset = ResolveEqpEntryOffset(file, equipmentId);
+
+            var slotOffset = EquipmentParameterSet.EntryOffsets[slot];
+            var size = EquipmentParameterSet.EntrySizes[slot];
+
+            // Can't resolve the EQP information currently.
+            if (offset == -1)
+            {
+                return new EquipmentParameter(slot, new byte[size]);
+            }
+
+
+            offset += slotOffset;
 
             var bytes = file.Skip(offset).Take(size);
 
             return new EquipmentParameter(slot, bytes.ToArray());
-
         }
 
         /// <summary>
@@ -193,10 +306,62 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
+        /// <summary>
+        /// Resolves the offset to the given EQP data entry.
+        /// </summary>
+        /// <param name="eqpData"></param>
+        /// <param name="equipmentId"></param>
+        /// <returns></returns>
+        private int ResolveEqpEntryOffset (byte[] file, int equipmentId)
+        {
+            const int blockSize = 160;
+            // 160 Entry blocks.
+            var blockId = equipmentId / blockSize;
+
+            var byteNum = blockId / 8;
+
+            var bit = 1 << (blockId % 8);
+
+            if((file[byteNum] & bit) == 0)
+            {
+                // Block is currently compressed.
+                return -1;
+            }
+
+            // Okay, now we have to go through and find out many uncompressed blocks
+            // exist before our block.
+            int uncompressedBlocks = 0;
+
+            // Loop bytes
+            for(int i = 0; i <= byteNum; i++)
+            {
+                var byt = file[i];
+                // Loop bits
+                for(int b = 0; b < 8; b++)
+                {
+                    if (i == byteNum && b == (blockId % 8))
+                    {
+                        // Done seeking.
+                        break;
+                    }
+
+                    var bt = 1 << b;
+                    var on = (byt & bt) != 0;
+                    if(on)
+                    {
+                        uncompressedBlocks++;
+                    }
+                }
+            }
+
+            var baseOffset = uncompressedBlocks * blockSize;
+            var remainder = equipmentId % blockSize;
+            var offset = (baseOffset + remainder) * EquipmentParameterEntrySize;
+            return offset;
+        }
 
 
-        private static readonly Regex _eqdpBinaryOffsetRegex = new Regex("^(.*c([0-9]{4}).*)" + Constants.BinaryOffsetMarker + "([0-9]+)$");
-
+        #region Equipment Deformation
 
         public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters)
         {
@@ -210,24 +375,24 @@ namespace xivModdingFramework.Models.FileTypes
                     throw new InvalidDataException("Attempted to save racial models for invalid slot.");
                 }
             }
+            var races = parameters.Keys.ToList();
 
             var original = new Dictionary<XivRace, EquipmentDeformationParameter>();
-            foreach (var race in DeformationAvailableRaces)
+            foreach (var race in races)
             {
                 var set = await GetEquipmentDeformationSet((int)primaryId, race, isAccessory);
                 original.Add(race, set.Parameters[slot]);
             }
 
-            // 16 Bits per set.
-            uint bitOffset = (primaryId * (EquipmentDeformerParameterEntrySize * 8)) + (EquipmentDeformerParameterHeaderLength * 8);
+            var slotIdx = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot);
 
-            // 2 Bits per slot entry.
-            uint slotOffset = (uint)(EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot) * 2);
+            var byteOffset = slotIdx / 4;
+            var bitOffset = (slotIdx * 2);
 
-            bitOffset += slotOffset;
-            uint byteOffset = bitOffset / 8;
 
-            foreach(var race in DeformationAvailableRaces)
+
+
+            foreach (var race in races)
             {
                 // Don't change races we weren't given information for.
                 if (!parameters.ContainsKey(race)) continue;
@@ -237,84 +402,90 @@ namespace xivModdingFramework.Models.FileTypes
                 var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
 
                 // Load the file and flip the bits as needed.
-                var file = await LoadEquipmentDeformationFile(race, isAccessory, false);
+                var data = await LoadEquipmentDeformationFile(race, isAccessory, false);
 
-                var byteToModify = file[(int)byteOffset];
+                var offset = ResolveEqdpEntryOffset(data, (int)primaryId);
 
-                var bitshift = (int)(slotOffset % 8);
+                if (offset < 0)
+                {
+                    // Expand the data block, then get the offset again.
+                    data = ExpandEqdpBlock(data, (int)primaryId);
+                    offset = ResolveEqdpEntryOffset(data, (int)primaryId);
+
+                    if(offset < 0)
+                    {
+                        throw new Exception("Failed to expand EQDP Data block.");
+                    }
+                }
+
+
+                var byteToModify = data[offset + byteOffset];
+
                 
                 if(entry.bit0)
                 {
-                    byteToModify = (byte)(byteToModify | (1 << bitshift));
+                    byteToModify = (byte)(byteToModify | (1 << bitOffset));
                 } else
                 {
-                    byteToModify = (byte)(byteToModify & ~(1 << bitshift));
+                    byteToModify = (byte)(byteToModify & ~(1 << bitOffset));
                 }
 
                 if (entry.bit1)
                 {
-                    byteToModify = (byte)(byteToModify | (1 << (bitshift + 1)));
+                    byteToModify = (byte)(byteToModify | (1 << (bitOffset + 1)));
                 }
                 else
                 {
-                    byteToModify = (byte)(byteToModify & ~(1 << (bitshift + 1)));
+                    byteToModify = (byte)(byteToModify & ~(1 << (bitOffset + 1)));
                 }
 
-                file[(int)byteOffset] = byteToModify;
+                data[offset + byteOffset] = byteToModify;
 
-                await _dat.ImportType2Data(file.ToArray(), "_EQDP_INTERNAL_", fileName, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+                await _dat.ImportType2Data(data, "_EQDP_INTERNAL_", fileName, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
             }
         }
 
+        #region Public EQDP Accessors
+
         /// <summary>
-        /// Retrieves the raw EQDP entries from an arbitrary selection of files/offsets.
+        /// Get all the available models for a given piece of equipment.
         /// </summary>
-        /// <param name="pathsWithOffsets"></param>
-        /// <returns></returns>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEqdpEntries(List<string> pathsWithOffsets, bool forceDefault = false)
+        public async Task<List<XivRace>> GetAvailableRacialModels(IItem item, bool forceDefault = false, bool includeNPCs = false)
         {
-            var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
-            foreach(var path in pathsWithOffsets)
+            var root = item.GetRoot();
+            if(root == null)
             {
-                var match = _eqdpBinaryOffsetRegex.Match(path);
-
-                // Invalid format.
-                if (!match.Success) continue;
-
-                var file = match.Groups[1].Value;
-                var race = XivRaces.GetXivRace(match.Groups[2].Value);
-                var bitOffset = Int32.Parse(match.Groups[3].Value);
-
-                // 2 Bytes per set.
-                int setId = (bitOffset - (EquipmentDeformerParameterHeaderLength * 8)) / (EquipmentDeformerParameterEntrySize * 8);
-
-                var slotOffset = (bitOffset % (EquipmentDeformerParameterEntrySize * 8)) / EquipmentDeformerParameterEntrySize;
-                var accessory = file.Contains("accessory");
-                var list = EquipmentDeformationParameterSet.SlotsAsList(accessory);
-                var slot = list[slotOffset];
-
-                var set = await GetEquipmentDeformationSet(setId, race, accessory, forceDefault);
-
-
-                if(set == null)
-                {
-                    // Either invalid race, or this item doesn't use EQDP sets.
-                    continue;
-                }
-
-                ret.Add(race, set.Parameters[slot]);
-
+                throw new InvalidDataException("Cannot get EQDP information for rootless item.");
             }
-            return ret;
+
+            return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs);
         }
 
         /// <summary>
         /// Get all the available models for a given piece of equipment.
         /// </summary>
-        /// <param name="equipmentId"></param>
-        /// <param name="accessory"></param>
-        /// <returns></returns>
-        public async Task<List<XivRace>> GetAvailableRacialModels(int equipmentId, string slot)
+        public async Task<List<XivRace>> GetAvailableRacialModels(XivDependencyRoot root, bool forceDefault = false, bool includeNPCs = false)
+        {
+            return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs);
+        }
+
+        /// <summary>
+        /// Get all the available models for a given piece of equipment.
+        /// </summary>
+        public async Task<List<XivRace>> GetAvailableRacialModels(XivDependencyRootInfo root, bool forceDefault = false, bool includeNPCs = false)
+        {
+            if(root.PrimaryType != XivItemType.equipment && root.PrimaryType != XivItemType.accessory)
+            {
+                throw new InvalidDataException("Cannot get EQDP information for invalid item type.");
+            }
+
+            return await GetAvailableRacialModels(root.PrimaryId, root.Slot, forceDefault, includeNPCs);
+        }
+
+        /// <summary>
+        /// Get all the available models for a given piece of equipment.
+        /// </summary>
+        public async Task<List<XivRace>> GetAvailableRacialModels(int equipmentId, string slot, bool forceDefault = false, bool includeNPCs = false)
         {
             var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
 
@@ -327,52 +498,104 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            var sets = await GetAllEquipmentDeformationSets(equipmentId, isAccessory);
-            var races = new List<XivRace>();
+            var root = new XivDependencyRootInfo();
+            root.PrimaryId = equipmentId;
+            root.Slot = slot;
+            root.PrimaryType = isAccessory ? XivItemType.accessory : XivItemType.equipment;
 
-            if (sets != null)
+            var dict = await GetEquipmentDeformationParameters(root, forceDefault, includeNPCs);
+
+            List<XivRace> races = new List<XivRace>();
+            foreach(var kv in dict)
             {
-                foreach (var kv in sets)
+                // Bit 0 has unknown purpose currently.
+                if(kv.Value.bit1)
                 {
-                    var race = kv.Key;
-                    var set = kv.Value;
-                    var entry = set.Parameters[slot];
-
-                    // Bit0 has unknown purpose currently.
-                    if (entry.bit1)
-                    {
-                        races.Add(race);
-                    }
+                    races.Add(kv.Key);
                 }
-            } else
-            {
-                var _index = new Index(_gameDirectory);
-
-                // Ok, at this point we're in a somewhat unusual item; it's an item that is effectively non-set.
-                // It has an item set ID in the multiple thousands (ex. 5000/9000), so it does not use the EQDP table.
-                // In these cases, there's nothing to do but hard check the model paths, until such a time as we know
-                // how these are resolved.
-                foreach (var race in DeformationAvailableRaces)
-                {
-                    var path = "";
-                    if (!isAccessory)
-                    {
-                        path = String.Format(_EquipmentModelPathFormat, equipmentId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
-                    }
-                    else
-                    {
-                        path = String.Format(_AccessoryModelPathFormat, equipmentId.ToString().PadLeft(4, '0'), race.GetRaceCode(), slot);
-                    }
-                    if(await _index.FileExists(path))
-                    {
-                        races.Add(race);
-                    }
-                }
-
             }
 
             return races;
         }
+
+        /// <summary>
+        /// Retrieves the raw EQDP entries for a given root with slot.
+        /// </summary>
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(IItem item, bool forceDefault = false, bool includeNPCs = false)
+        {
+            var root = item.GetRoot();
+
+            if(root == null)
+            {
+                return new Dictionary<XivRace, EquipmentDeformationParameter>();
+            }
+
+
+            return await GetEquipmentDeformationParameters(root.Info, forceDefault, includeNPCs);
+        }
+
+        /// <summary>
+        /// Retrieves the raw EQDP entries for a given root with slot.
+        /// </summary>
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(XivDependencyRoot root, bool forceDefault = false, bool includeNPCs = false)
+        {
+            return await GetEquipmentDeformationParameters(root.Info, forceDefault, includeNPCs);
+        }
+
+        /// <summary>
+        /// Retrieves the raw EQDP entries for a given root with slot.
+        /// </summary>
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(XivDependencyRootInfo root, bool forceDefault = false, bool includeNPCs = false)
+        {
+            if (root.PrimaryType != XivItemType.equipment && root.PrimaryType != XivItemType.accessory)
+            {
+                return new Dictionary<XivRace, EquipmentDeformationParameter>();
+            }
+
+            return await GetEquipmentDeformationParameters(root.PrimaryId, root.Slot, root.PrimaryType == XivItemType.accessory, forceDefault, includeNPCs);
+        }
+
+        /// <summary>
+        /// Retrieves the raw EQDP entries for a given root with slot.
+        /// </summary>
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(int equipmentId, string slot, bool isAccessory, bool forceDefault = false, bool includeNPCs = false)
+        {
+            var slotOK = false;
+            if (isAccessory)
+            {
+                slotOK = slotOK || EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+            }
+            slotOK = slotOK || EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
+
+            if (!slotOK)
+            {
+                throw new InvalidDataException("Attempted to get EQDP Information for invalid slot.");
+            }
+
+
+            var sets = await GetAllEquipmentDeformationSets(equipmentId, isAccessory, forceDefault, includeNPCs);
+            var races = new List<XivRace>();
+
+            Dictionary<XivRace, EquipmentDeformationParameter> ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
+
+            foreach (var kv in sets)
+            {
+                var race = kv.Key;
+                var set = kv.Value;
+                var entry = set.Parameters[slot];
+                ret.Add(race, entry);
+            }
+
+
+            return ret;
+
+        }
+
+
+
+        #endregion
+
+        #region Raw Internal Functions
 
         /// <summary>
         /// Gets all of the equipment or accessory deformation sets for a given equipment id.
@@ -380,25 +603,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="accessory"></param>
         /// <returns></returns>
-        private async Task<Dictionary<XivRace, EquipmentDeformationParameterSet>> GetAllEquipmentDeformationSets(int equipmentId, bool accessory)
+        private async Task<Dictionary<XivRace, EquipmentDeformationParameterSet>> GetAllEquipmentDeformationSets(int equipmentId, bool accessory, bool forceDefault = false, bool includeNPCs = false)
         {
             var sets = new Dictionary<XivRace, EquipmentDeformationParameterSet>();
 
-            foreach (var race in DeformationAvailableRaces)
+            var races = includeNPCs ? DeformationAvailableRacesWithNPCs : DeformationAvailableRaces;
+            foreach (var race in races)
             {
-                var result = await GetEquipmentDeformationSet(equipmentId, race, accessory);
-                if (result != null) {
-                    sets.Add(race, result);
-                } else
-                {
-                    return null;
-                }
+                var result = await GetEquipmentDeformationSet(equipmentId, race, accessory, forceDefault);
+                sets.Add(race, result);
             }
 
             return sets;
         }
-
-
 
         /// <summary>
         /// Get the equipment or accessory deformation set for a given item and race.
@@ -411,10 +628,6 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
         {
             var raw = await GetRawEquipmentDeformationParameters(equipmentId, race, accessory, forceDefault);
-            if(raw == null)
-            {
-                return null;
-            }
 
             var set = new EquipmentDeformationParameterSet(accessory);
 
@@ -439,29 +652,30 @@ namespace xivModdingFramework.Models.FileTypes
             return set;
         }
 
-        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
-        private string _AccessoryModelPathFormat = "chara/equipment/a{0}/model/c{1}a{0}_{2}.mdl";
         /// <summary>
         /// Get the raw bytes for the equipment or accessory deformation parameters for a given equipment set and race.
         /// </summary>
         /// <param name="equipmentId"></param>
         /// <param name="race"></param>
         /// <returns></returns>
-        private async Task<ushort?> GetRawEquipmentDeformationParameters(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
+        private async Task<ushort> GetRawEquipmentDeformationParameters(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
         {
-            var data = await LoadEquipmentDeformationFile(race, accessory, forceDefault);
-            var start = EquipmentDeformerParameterHeaderLength + (equipmentId * EquipmentDeformerParameterEntrySize);
-            var parameters = new byte[EquipmentParameterEntrySize];
+            var data = (await LoadEquipmentDeformationFile(race, accessory, forceDefault)).ToArray();
 
-            if(start >= data.Count)
+            var offset = ResolveEqdpEntryOffset(data, equipmentId);
+
+            // Some sets don't have entries.  In this case, they're treated as blank/full 0's.
+            if(offset < 0)
             {
-
-                return null;
+                return 0;
             }
 
-            for (var idx = 0; idx < EquipmentDeformerParameterEntrySize; idx++)
+            var parameters = new byte[EquipmentParameterEntrySize];
+
+
+            for (var idx = 0; idx < EquipmentParameterEntrySize; idx++)
             {
-                parameters[idx] = data[start + idx];
+                parameters[idx] = data[offset + idx];
             }
 
             return BitConverter.ToUInt16(parameters, 0);
@@ -471,12 +685,166 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment or accessory deformation parameters file for a given race.
         /// </summary>
         /// <returns></returns>
-        private async Task<List<byte>> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false)
+        private async Task<byte[]> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false)
         {
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            return new List<byte>(await _dat.GetType2Data(fileName, forceDefault));
+            return await _dat.GetType2Data(fileName, forceDefault);
         }
 
+        /// <summary>
+        /// Resolves the entry offset to a given SetID within an EQDP File.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <param name="setId"></param>
+        /// <param name="accessory"></param>
+        /// <param name="forceDefault"></param>
+        /// <returns></returns>
+        private async Task<int> ResolveEqdpEntryOffset(XivRace race, int setId, bool accessory = false, bool forceDefault = false)
+        {
+            var data = await LoadEquipmentDeformationFile(race, accessory, forceDefault);
+            return ResolveEqdpEntryOffset(data.ToArray(), setId);
+
+        }
+
+        /// <summary>
+        /// Resolves the entry offset to a given SetId within an EQDP File.
+        /// </summary>
+        /// <param name="eqdpData"></param>
+        /// <param name="setId"></param>
+        /// <returns></returns>
+        private int ResolveEqdpEntryOffset(byte[] eqdpData, int setId)
+        {
+            const ushort basicHeaderSize = 6;
+            const ushort blockHeaderSize = 2;
+
+            var unknown = BitConverter.ToUInt16(eqdpData, 0);
+            var blockSize = BitConverter.ToUInt16(eqdpData, 2);
+            var blockCount = BitConverter.ToUInt16(eqdpData, 4);
+
+            var headerEntryId = setId / blockSize;
+            var subEntryId = setId % blockSize;
+
+
+            // Offset to the block table entry.
+            var headerEntryOffset = basicHeaderSize + (blockHeaderSize * (setId / blockSize));
+
+            // This gets us the offset after the full header to the start of the data block.
+            var baseDataOffset = BitConverter.ToUInt16(eqdpData, headerEntryOffset);
+
+            // If the data offset is MAX-SHORT, that data block was omitted from the file.
+            if (baseDataOffset == 65535) return -1;
+
+            // 6 Byte basic header, then block table.
+            var fullHeaderLength = basicHeaderSize + (blockHeaderSize * blockCount);
+
+            // Start of the data block our entry lives in.
+            var blockStart = fullHeaderLength + (baseDataOffset * EquipmentDeformerParameterEntrySize);
+
+            // Then move the appropriate number of entries in.
+            var dataOffset = blockStart + (subEntryId * EquipmentDeformerParameterEntrySize);
+
+            return dataOffset;
+        }
+
+
+        /// <summary>
+        /// Expands a collapsed block within an EQDP file to allow for writing information about a given set.
+        /// </summary>
+        /// <param name="eqdpData"></param>
+        /// <param name="setId"></param>
+        /// <returns></returns>
+        private byte[] ExpandEqdpBlock(byte[] eqdpData, int setId)
+        {
+            const ushort basicHeaderSize = 6;
+            const ushort blockHeaderSize = 2;
+
+            var unknown = BitConverter.ToUInt16(eqdpData, 0);
+            var blockSize = BitConverter.ToUInt16(eqdpData, 2);
+            var blockCount = BitConverter.ToUInt16(eqdpData, 4);
+
+            var headerEntryId = setId / blockSize;
+            var subEntryId = setId % blockSize;
+
+
+            // Offset to the block table entry.
+            var headerEntryOffset = basicHeaderSize + (blockHeaderSize * (setId / blockSize));
+
+            // This gets us the offset after the full header to the start of the data block.
+            var baseDataOffset = BitConverter.ToUInt16(eqdpData, headerEntryOffset);
+
+            // If the data offset is not MAX-SHORT, the block is already expanded.
+            if (baseDataOffset != 65535) return eqdpData;
+
+            // Okay, at this point we know we need to expand the block.  We have to do a few things.
+            // 1.  Establish what offset the data should be in.  This means looking back to determine what the last used block's offset was.
+            // 2.  Insert our new offset.
+            // 3.  Update all the following offsets to account for us.
+            // 4.  Copy all the data to a new array, injecting a fresh block at the appropriate offset.
+
+            var lastOffset = -1;
+            for(int i = 6; i < headerEntryOffset; i+=2) {
+                var offset = BitConverter.ToUInt16(eqdpData, i);
+                if(offset != 65535)
+                {
+                    lastOffset = offset;
+                }
+            }
+
+            ushort nextOffset = (ushort)(lastOffset > 0 ? (lastOffset + blockSize) : 0);
+            IOUtil.ReplaceBytesAt(eqdpData, BitConverter.GetBytes(nextOffset), headerEntryOffset);
+
+            // 6 Byte basic header, then block table.
+            var fullHeaderLength = basicHeaderSize + (blockHeaderSize * blockCount);
+
+            for (int i = headerEntryOffset + blockHeaderSize; i < fullHeaderLength; i += 2)
+            {
+                var offset = BitConverter.ToUInt16(eqdpData, i);
+                if (offset != 65535)
+                {
+                    IOUtil.ReplaceBytesAt(eqdpData, BitConverter.GetBytes((ushort)(offset + blockSize)), i);
+                }
+            }
+
+            var usedBlocks = 0;
+            for (int i = 6; i < fullHeaderLength; i += 2)
+            {
+                var offset = BitConverter.ToUInt16(eqdpData, i);
+                if (offset != 65535)
+                {
+                    usedBlocks++;
+                }
+            }
+
+            // Total Size of the data.
+            var totalDataSize = fullHeaderLength + (usedBlocks * blockSize * EquipmentDeformerParameterEntrySize);
+            
+            // Pad out to nearest 512 bytes.
+            var padding = totalDataSize % 512 == 0 ? 0 : 512 - (totalDataSize % 512);
+
+            var finalSize = totalDataSize + padding;
+
+            // Okay, we've now fully updated the initial block table.   We need to copy all the data over.
+            var newDataByteOffset = fullHeaderLength + (nextOffset * 2);
+
+            var newData = new byte[finalSize];
+
+            // Copy the first half of the data in, then a blank block, then the second half of the data.
+            Array.Copy(eqdpData, 0, newData, 0, newDataByteOffset);
+            var rem = eqdpData.Length - newDataByteOffset;
+            var rem2 = newData.Length - newDataByteOffset - (blockSize * EquipmentDeformerParameterEntrySize);
+
+            // Don't let us try to write padding data off the end of the file.
+            rem = rem > rem2 ? rem2 : rem;
+
+            Array.Copy(eqdpData, newDataByteOffset, newData, newDataByteOffset + (blockSize * EquipmentDeformerParameterEntrySize), rem);
+
+            // Return new array.
+            return newData;
+        }
+
+        #endregion
+
+        #endregion
     }
 }

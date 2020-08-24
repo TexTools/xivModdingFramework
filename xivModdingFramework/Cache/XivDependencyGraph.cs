@@ -480,23 +480,6 @@ namespace xivModdingFramework.Cache
 
 
         /// <summary>
-        /// Gets all the binary-offset meta entries associated with this root.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<List<string>> GetMetaEntries()
-        {
-            var metas = new List<string>();
-            var eqp = GetEqpEntryPath();
-            if (eqp != null)
-            {
-                metas.Add(eqp);
-            }
-            metas.AddRange(GetEqdpEntryPaths());
-            metas.AddRange(await GetImcEntryPaths());
-            return metas;
-        }
-
-        /// <summary>
         /// Gets all the model files in this dependency chain.
         /// </summary>
         /// <returns></returns>
@@ -721,58 +704,6 @@ namespace xivModdingFramework.Cache
         {
             { XivItemType.equipment, "chara/xls/equipmentparameter/equipmentparameter.eqp" }
         };
-
-        /// <summary>
-        /// Gets the EQP entry for a given Type+Set+Slot.
-        /// </summary>
-        /// <returns></returns>
-        public string GetEqpEntryPath()
-        {
-            if (!EqpPaths.ContainsKey(Info.PrimaryType))
-                return null;
-
-            var eqpFile = EqpPaths[Info.PrimaryType];
-
-            // Each entry is 64 bits long.
-            const int entrySize = Eqp.EquipmentParameterEntrySize * 8;
-            var subOffset = EquipmentParameterSet.EntryOffsets[Info.Slot] * 8;
-
-            long offset = (entrySize * Info.PrimaryId) + subOffset;
-
-
-            return eqpFile + Constants.BinaryOffsetMarker + offset.ToString();
-        }
-
-
-        /// <summary>
-        /// Retrieves all of the EQDP entries for a given Type+Set+Slot.
-        /// </summary>
-        /// <returns></returns>
-        public List<string> GetEqdpEntryPaths()
-        {
-            // There's an EQDP file for every race,
-            // So we'll have 1 entry per race.
-            var entries = new List<string>();
-            if (!EqdpFolder.ContainsKey(Info.PrimaryType))
-                return entries;
-
-            var folder = EqdpFolder[Info.PrimaryType];
-
-            // Each entry is 16 bits long.
-            const int entrySize = Eqp.EquipmentDeformerParameterEntrySize * 8;
-
-            var slots = EquipmentDeformationParameterSet.SlotsAsList(Info.PrimaryType == XivItemType.accessory);
-            var order = slots.IndexOf(Info.Slot);
-            var subOffset = order * 2; // 2 bits per segment.
-
-            long offset = (entrySize * Info.PrimaryId) + subOffset + (Eqp.EquipmentDeformerParameterHeaderLength * 8);
-            foreach(var race in XivRaces.PlayableRaces)
-            {
-                entries.Add(folder + "c" + race.GetRaceCode() + ".eqdp" + Constants.BinaryOffsetMarker + offset.ToString());
-            }
-
-            return entries;
-        }
 
 
 
