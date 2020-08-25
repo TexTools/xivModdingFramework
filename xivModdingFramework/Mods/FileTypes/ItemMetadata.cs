@@ -21,11 +21,13 @@ namespace xivModdingFramework.Mods.FileTypes
     /// <summary>
     /// .meta files are an arbitrarily created fake file type used for storing and managing item metadata.
     /// 
-    /// A .meta "file" is composed of three elements.
+    /// A .meta "file" is composed of five elements.
     /// 
     /// 1. An EQP entry (Part Hiding Information)
     /// 2. A Set of EQDP Entries (Racial Model Availability)
     /// 3. A Set of IMC Entries (IMC Part Hiding mask, etc.)
+    /// 4. A set of EST Table Entries (Extra Skeleton References)
+    /// 5. A GMP Entry (Gimmick/Visor Information)
     /// 
     /// .meta files must be capable of being serialized and deserialized to a pure binary representation, 
     /// for storage within DAT files or Modpack files if needed.
@@ -36,6 +38,25 @@ namespace xivModdingFramework.Mods.FileTypes
         /// The dependency root that this item meta data entry refers to.
         /// </summary>
         public readonly XivDependencyRoot Root;
+
+        /// <summary>
+        /// Returns if this metadata object actually contains any metadata or not.
+        /// </summary>
+        public bool AnyMetadata
+        {
+            get
+            {
+                bool anyData = false;
+
+                anyData = anyData | ImcEntries.Count > 0;
+                anyData = anyData | EqdpEntries.Count > 0;
+                anyData = anyData | EstEntries.Count > 0;
+                anyData = anyData | GmpEntry != null;
+                anyData = anyData | EqpEntry != null;
+
+                return anyData;
+            }
+        }
 
         /// <summary>
         /// The available IMC entries for this item. (May be length 0)

@@ -159,16 +159,22 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
-        /// Retrieves the skeleton information for a given set for all playable races.
+        /// Retrieves the skeleton information for a given set for all races.
         /// </summary>
         /// <param name=""></param>
         /// <param name="setId"></param>
         /// <param name="forceDefault"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(EstType type, ushort setId, bool forceDefault = false)
+        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(EstType type, ushort setId, bool forceDefault = false, bool includeNpcs = false)
         {
             var entries = await GetEstFile(type, forceDefault);
+            
             var races = Eqp.DeformationAvailableRaces;
+            if(includeNpcs)
+            {
+                races = Eqp.DeformationAvailableRacesWithNPCs;
+            }
+
             var ret = new Dictionary<XivRace, ExtraSkeletonEntry>();
 
             foreach (var race in races)
