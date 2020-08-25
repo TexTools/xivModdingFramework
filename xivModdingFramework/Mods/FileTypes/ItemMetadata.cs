@@ -42,11 +42,20 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         public List<XivImc> ImcEntries = new List<XivImc>();
 
-
         /// <summary>
         /// The available EQDP entries for the item.  (May be length 0)
         /// </summary>
         public Dictionary<XivRace, EquipmentDeformationParameter> EqdpEntries = new Dictionary<XivRace, EquipmentDeformationParameter>();
+
+        /// <summary>
+        /// The available Extra Skeleton Table entries for the item.  (May be length 0);
+        /// </summary>
+        public Dictionary<XivRace, ExtraSkeletonEntry> EstEntries = new Dictionary<XivRace, ExtraSkeletonEntry>();
+
+        /// <summary>
+        /// The available Gimmick Paramater for the item. (May be null)
+        /// </summary>
+        public GimmickParameter GmpEntry;
 
         /// <summary>
         /// The available EQP entry for the item.  (May be null)
@@ -139,6 +148,10 @@ namespace xivModdingFramework.Mods.FileTypes
             ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault);
 
             ret.EqdpEntries = await _eqp.GetEquipmentDeformationParameters(root.Info, forceDefault);
+
+            ret.EstEntries = await Est.GetExtraSkeletonEntries(root, forceDefault);
+
+            ret.GmpEntry = await _eqp.GetGimmickParameter(root, forceDefault);
 
             return ret;
         }

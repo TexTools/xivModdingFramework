@@ -22,6 +22,7 @@ namespace xivModdingFramework.Models.FileTypes
     {
         public const string EquipmentParameterExtension = "edp";
         public const string EquipmentParameterFile = "chara/xls/equipmentparameter/equipmentparameter.eqp";
+        public const string GimmickParameterFile = "chara/xls/equipmentparameter/gimmickparameter.gmp";
         public const string EquipmentDeformerParameterExtension = "eqdp";
         public const string EquipmentDeformerParameterRootPath = "chara/xls/charadb/equipmentdeformerparameter/";
         public const string AccessoryDeformerParameterRootPath = "chara/xls/charadb/accessorydeformerparameter/";
@@ -107,9 +108,82 @@ namespace xivModdingFramework.Models.FileTypes
             _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
         }
 
-        public async Task<EquipmentParameterSet> GetEquipmentParameters(int equipmentId)
+        public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param)
         {
-            throw new NotImplementedException("Not Yet Implemented.");
+            var data = await LoadGimmickParameterFile(false);
+
+            var offset = ResolveEqpEntryOffset(data, equipmentId);
+
+            if (offset == -1)
+            {
+                // Fug.  Gotta write expansion function.
+            }
+
+            IOUtil.ReplaceBytesAt(data, param.GetBytes(), offset);
+
+            await SaveGimmickParameterFile(data);
+        }
+
+        public async Task<GimmickParameter> GetGimmickParameter(IItem item, bool forceDefault = false)
+        {
+            if(item == null)
+            {
+                return null;
+            }
+
+            return await GetGimmickParameter(item.GetRoot(), forceDefault);
+        }
+        public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRoot root, bool forceDefault = false)
+        {
+            if(root == null)
+            {
+                return null;
+            }
+
+            return await GetGimmickParameter(root.Info, forceDefault);
+
+        }
+        public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRootInfo root, bool forceDefault = false) {
+
+            if(root.PrimaryType != XivItemType.equipment || root.Slot != "met")
+            {
+                return null;
+            }
+
+            return await GetGimmickParameter(root.PrimaryId, forceDefault);
+        }
+        public async Task<GimmickParameter> GetGimmickParameter(int equipmentId, bool forceDefault = false)
+        {
+            if(equipmentId < 0 || equipmentId > 10000)
+            {
+                throw new InvalidDataException("Unable to resolve GMP information for invalid equipment ID.");
+            }
+
+            var data = await LoadGimmickParameterFile(forceDefault);
+
+            // The GMP files use the same format as the EQP files.
+            var offset = ResolveEqpEntryOffset(data, equipmentId);
+            if(offset < 0)
+            {
+                // Parameter is in a compressed/empty block, so just return default.
+                return new GimmickParameter();
+            }
+
+            var bytes = new byte[5];
+            Array.Copy(data, offset, bytes, 0, 5);
+
+            var param = new GimmickParameter(bytes);
+
+            return param;
+        }
+
+        private async Task SaveGimmickParameterFile(byte[] bytes)
+        {
+            await _dat.ImportType2Data(bytes, "_GMP_INTERNAL_", GimmickParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+        }
+        private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false)
+        {
+            return await _dat.GetType2Data(GimmickParameterFile, forceDefault);
         }
 
         /// <summary>
@@ -300,7 +374,7 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task SaveEquipmentParameterFile(byte[] file)
         {
 
-            await _dat.ImportType2Data(file, "EquipmentParameterFile", EquipmentParameterFile, "Internal", "TexTools");
+            await _dat.ImportType2Data(file, "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
 
             return;
         }

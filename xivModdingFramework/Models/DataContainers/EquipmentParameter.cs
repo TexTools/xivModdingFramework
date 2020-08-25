@@ -4,11 +4,97 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Models.FileTypes;
 
 namespace xivModdingFramework.Models.DataContainers
 {
 
+    public class GimmickParameter
+    {
+        public bool Enabled;
+        public bool Animated;
+
+        public ushort RotationA;
+        public ushort RotationB;
+        public ushort RotationC;
+
+        public byte UnknownHigh;
+        public byte UnknownLow;
+
+        public GimmickParameter()
+        {
+            Enabled = false;
+            Animated = false;
+
+            RotationA = 0;
+            RotationB = 0;
+            RotationC = 0;
+
+            UnknownHigh = 0;
+            UnknownLow = 0;
+        }
+        public GimmickParameter(byte[] bytes)
+        {
+
+            var l = BitConverter.ToUInt32(bytes, 0);
+
+            Enabled = (l & 1) > 0;
+            Animated = (l & 2) > 0;
+
+            var d1 = l >> 2;
+            RotationA = (ushort)(d1 & 0x3FF);
+
+            var d2 = l >> 12;
+            RotationB = (ushort)(d2 & 0x3FF);
+
+            var d3 = l >> 22;
+            RotationC = (ushort)(d3 & 0x3FF);
+
+            UnknownHigh = (byte)((bytes[4] >> 4) & 0x0F);
+            UnknownLow = (byte)((bytes[4] & 0x0F));
+        }
+
+        /// <summary>
+        /// Retrieves the raw bytewise representation of the parameter.
+        /// </summary>
+        /// <param name="enabled"></param>
+        /// <param name="animated"></param>
+        /// <param name="rotation1"></param>
+        /// <param name="rotation2"></param>
+        /// <param name="rotation3"></param>
+        /// <returns></returns>
+        public byte[] GetBytes()
+        {
+            int ret = 0;
+            if (Enabled)
+            {
+                ret = ret | 1;
+            }
+            if (Animated)
+            {
+                ret = ret | 2;
+            }
+
+            int rot1 = (RotationA & 0x3FF) << 2;
+            int rot2 = (RotationB & 0x3FF) << 12;
+            int rot3 = (RotationC & 0x3FF) << 22;
+
+            ret = ret | rot1;
+            ret = ret | rot2;
+            ret = ret | rot3;
+
+            byte last = (byte)((UnknownHigh << 4) | (UnknownLow & 0x0F));
+
+            var bytes = new byte[5];
+
+            IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes(ret), 0);
+            bytes[4] = last;
+
+            return bytes;
+        }
+    }
 
     public class EquipmentParameterSet
     {
