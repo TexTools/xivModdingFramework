@@ -216,7 +216,6 @@ namespace xivModdingFramework.Models.FileTypes
             return entries[race][setId];
         }
 
-
         private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false)
         {
             var _dat = new Dat(_gameDirectory);
