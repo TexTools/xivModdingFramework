@@ -155,7 +155,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Add/Remove entries.
             foreach (var entry in modifiedEntries)
             {
-                if (entry.SetId == 0)
+                if (entry.SkelId == 0)
                 {
                     // Remove this entry.
                     if (entries[entry.Race].ContainsKey(entry.SetId))
