@@ -756,15 +756,13 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             var stringListBytes = new List<byte>();
-
-            var texId = 0;
+            var texIdx = 0;
             foreach (var texPathString in xivMtrl.TexturePathList)
             {
                 xivMtrl.TexturePathOffsetList.Add(stringListBytes.Count);
                 var path = texPathString;
-
-                // This is an old style DX9 Texture still, make sure to fix it up.
-                if(xivMtrl.TexturePathUnknownList[texId] != 0)
+                // This is an old style DX9/DX11 Mixed Texture reference, make sure to clean it up if needed.
+                if(xivMtrl.TexturePathUnknownList[texIdx] != 0)
                 {
                     path = path.Replace("--", string.Empty);
                 }
