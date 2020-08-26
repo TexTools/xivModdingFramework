@@ -41,8 +41,8 @@ namespace xivModdingFramework.Models.FileTypes
         public const int EquipmentDeformerParameterHeaderLength = 320;
 
 
-        // The subset list of races that actually have deformation files.
-        public static readonly List<XivRace> DeformationAvailableRaces = new List<XivRace>()
+        // The list of all playable races.
+        public static readonly List<XivRace> PlayableRaces = new List<XivRace>()
         {
             XivRace.Hyur_Midlander_Male,
             XivRace.Hyur_Midlander_Female,
@@ -62,8 +62,8 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.Viera,
         };
 
-        // The subset list of races that actually have deformation files.
-        public static readonly List<XivRace> DeformationAvailableRacesWithNPCs = new List<XivRace>()
+        // List of All Races including their NPC Versions
+        public static readonly List<XivRace> PlayableRacesWithNPCs = new List<XivRace>()
         {
             XivRace.Hyur_Midlander_Male,
             XivRace.Hyur_Midlander_Female,
@@ -681,7 +681,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var sets = new Dictionary<XivRace, EquipmentDeformationParameterSet>();
 
-            var races = includeNPCs ? DeformationAvailableRacesWithNPCs : DeformationAvailableRaces;
+            var races = includeNPCs ? PlayableRacesWithNPCs : PlayableRaces;
             foreach (var race in races)
             {
                 var result = await GetEquipmentDeformationSet(equipmentId, race, accessory, forceDefault);

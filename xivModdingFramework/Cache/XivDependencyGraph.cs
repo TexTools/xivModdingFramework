@@ -646,6 +646,11 @@ namespace xivModdingFramework.Cache
 
             var imcPath = GetRawImcFilePath();
 
+            if(String.IsNullOrEmpty(imcPath))
+            {
+                return imcEntries;
+            }
+
 
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
             var index = new Index(_gameDirectory);

@@ -12,10 +12,10 @@ namespace xivModdingFramework.Models.DataContainers
     public class ExtraSkeletonEntry
     {
 
-        public ExtraSkeletonEntry()
+        public ExtraSkeletonEntry(XivRace race, ushort setId)
         {
-            Race = XivRace.All_Races;
-            SetId = 0;
+            Race = race;
+            SetId = setId;
             SkelId = 0;
         }
         public ExtraSkeletonEntry(XivRace race, ushort setId, ushort skelId)
@@ -41,16 +41,17 @@ namespace xivModdingFramework.Models.DataContainers
 
             int offset = (int)(4 + (index * 4));
 
-
-            var ret = new ExtraSkeletonEntry();
-            ret.SetId = BitConverter.ToUInt16(data, offset);
+            var setId = BitConverter.ToUInt16(data, offset);
             var raceId = BitConverter.ToUInt16(data, offset + 2);
-            ret.Race = XivRaces.GetXivRace(raceId.ToString().PadLeft(4, '0'));
+            var race = XivRaces.GetXivRace(raceId.ToString().PadLeft(4, '0'));
+
 
             var baseOffset = 4 + (count * 4);
             offset = (int)(baseOffset + (index * 2));
 
-            ret.SkelId = BitConverter.ToUInt16(data, offset);
+            var skelId = BitConverter.ToUInt16(data, offset);
+
+            var ret = new ExtraSkeletonEntry(race, setId, skelId);
             return ret;
         }
 

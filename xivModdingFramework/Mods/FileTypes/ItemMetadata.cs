@@ -221,6 +221,18 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries);
             }
+
+            if (meta.EstEntries.Count > 0)
+            {
+                var type = Est.GetEstType(meta.Root);
+                var entries = meta.EstEntries.Values.ToList();
+                await Est.SaveExtraSkeletonEntries(type, entries);
+            }
+
+            if(meta.GmpEntry != null)
+            {
+                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry);
+            }
         }
 
 
@@ -274,10 +286,17 @@ namespace xivModdingFramework.Mods.FileTypes
             Invalid = 0,
             Imc = 1,
             Eqdp = 2,
-            Eqp = 3
+            Eqp = 3,
+            Est = 4,
+            Gmp = 5,
         };
 
-        const uint _METADATA_VERSION = 1;
+        const uint _METADATA_VERSION = 2;
+
+        // Version History
+        // 1 - Initial introduction (EQP, IMC, EQDP Files)
+        // 2 - Addition of EST/GMP files.
+
         const uint _METADATA_HEADER_SIZE = 12;
 
         /// <summary>
@@ -297,7 +316,7 @@ namespace xivModdingFramework.Mods.FileTypes
             bytes.Add(0);
 
             uint entries = 0;
-            bool hasImc = false, hasEqp = false, hasEqdp = false;
+            bool hasImc = false, hasEqp = false, hasEqdp = false, hasEst = false, hasGmp = false;
             if(meta.ImcEntries.Count > 0)
             {
                 entries++;
@@ -316,6 +335,17 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 entries++;
                 hasEqdp = true;
+            }
+
+            if (meta.EstEntries.Count > 0)
+            {
+                entries++;
+                hasEst = true;
+            }
+            if (meta.GmpEntry != null)
+            {
+                entries++;
+                hasGmp = true;
             }
 
             bytes.AddRange(BitConverter.GetBytes(entries));
@@ -352,6 +382,26 @@ namespace xivModdingFramework.Mods.FileTypes
                 bytes.AddRange(BitConverter.GetBytes(0));
             }
 
+            int estHeaderInfoOffset = 0;
+            if (hasEst)
+            {
+                estHeaderInfoOffset = bytes.Count;
+                bytes.AddRange(BitConverter.GetBytes((uint)MetaDataType.Est));
+                bytes.AddRange(BitConverter.GetBytes(0));
+                bytes.AddRange(BitConverter.GetBytes(0));
+            }
+
+            int gmpHeaderOffset = 0;
+            if (hasGmp)
+            {
+                gmpHeaderOffset = bytes.Count;
+                bytes.AddRange(BitConverter.GetBytes((uint)MetaDataType.Gmp));
+                bytes.AddRange(BitConverter.GetBytes(0));
+                bytes.AddRange(BitConverter.GetBytes(0));
+            }
+
+
+
 
             // Write the actual data.
             if (hasImc)
@@ -387,8 +437,54 @@ namespace xivModdingFramework.Mods.FileTypes
                 IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)eqdpData.Length), eqdpHeaderInfoOffset + 8);
             }
 
+            if(hasEst)
+            {
+                // Serialize EST Data here.
+                var estData = SerializeEstData(meta);
+                var offset = bytes.Count;
+                bytes.AddRange(estData);
+
+                IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)offset), estHeaderInfoOffset + 4);
+                IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)estData.Length), estHeaderInfoOffset + 8);
+            }
+
+            if(hasGmp)
+            {
+                // Serialize EST Data here.
+                var gmpData = SerializeGmpData(meta);
+                var offset = bytes.Count;
+                bytes.AddRange(gmpData);
+
+                IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)offset), gmpHeaderOffset + 4);
+                IOUtil.ReplaceBytesAt(bytes, BitConverter.GetBytes((uint)gmpData.Length), gmpHeaderOffset + 8);
+
+            }
+
 
             return bytes.ToArray();
+        }
+        private static byte[] SerializeGmpData(ItemMetadata meta)
+        {
+            // GMP data is relatively straight forward.  Just stick the 5 btes in the file.
+            return meta.GmpEntry.GetBytes();
+        }
+
+        private static byte[] SerializeEstData(ItemMetadata meta)
+        {
+            // 6 Bytes per entry.  The entries already contain their Racial information, so there's no need to re-include that.
+            var data = new byte[(meta.EstEntries.Count * 6)];
+
+
+            var idx = 0;
+            foreach (var kv in meta.EstEntries)
+            {
+                var offset = (idx * 6);
+                IOUtil.ReplaceBytesAt(data, BitConverter.GetBytes((ushort)kv.Value.Race.GetRaceCodeInt()), offset);
+                IOUtil.ReplaceBytesAt(data, BitConverter.GetBytes((ushort)kv.Value.SetId), offset + 2);
+                IOUtil.ReplaceBytesAt(data, BitConverter.GetBytes((ushort)kv.Value.SkelId), offset + 4);
+                idx++;
+            }
+            return data;
         }
 
 
@@ -420,7 +516,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        private static List<XivImc> DeserializeImcData(byte[] data, uint dataVersion)
+        private static List<XivImc> DeserializeImcData(byte[] data, XivDependencyRoot root, uint dataVersion)
         {
             const int ImcSubEntrySize = 6;
             var entries = data.Length / ImcSubEntrySize;
@@ -487,7 +583,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        private static Dictionary<XivRace, EquipmentDeformationParameter> DeserializeEqdpData(byte[] data, uint dataVersion)
+        private static Dictionary<XivRace, EquipmentDeformationParameter> DeserializeEqdpData(byte[] data, XivDependencyRoot root, uint dataVersion)
         {
             const int eqdpEntrySize = 5;
             var entries = data.Length / eqdpEntrySize;
@@ -514,7 +610,7 @@ namespace xivModdingFramework.Mods.FileTypes
             // Catch for cases where for some reason the EQP doesn't have all races,
             // for example, SE adding more races in the future, and we're
             // reading old metadata entries.
-            foreach (var race in Eqp.DeformationAvailableRaces) {
+            foreach (var race in Eqp.PlayableRaces) {
                 if(!ret.ContainsKey(race))
                 {
                     ret.Add(race, new EquipmentDeformationParameter());
@@ -522,6 +618,47 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
             return ret;
+        }
+
+        private static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> DeserializeEstData(byte[] data, XivDependencyRoot root, uint dataVersion)
+        {
+
+            if(dataVersion == 1)
+            {
+                // Version 1 didn't include EST data, so just get the defaults.
+                return await Est.GetExtraSkeletonEntries(root);
+            }
+
+
+            // 6 Bytes per entry.
+            var count = data.Length / 6;
+            var ret = new Dictionary<XivRace, ExtraSkeletonEntry>(count);
+
+            for(int i = 0; i < count; i++)
+            {
+                var offset = i * 6;
+                var raceCode = BitConverter.ToUInt16(data, offset);
+                var setId = BitConverter.ToUInt16(data, offset + 2);
+                var skelId = BitConverter.ToUInt16(data, offset + 4);
+
+                var race = XivRaces.GetXivRace(raceCode);
+
+                ret.Add(race, new ExtraSkeletonEntry(race, setId, skelId));
+            }
+
+            return ret;
+        }
+
+        private static async Task<GimmickParameter> DeserializeGmpData(byte[] data, XivDependencyRoot root, uint dataVersion)
+        {
+            if(dataVersion == 1)
+            {
+                // Version 1 didn't have GMP data, so include the default GMP data.
+                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                return await _eqp.GetGimmickParameter(root, true);
+            }
+            // 5 Bytes to parse, ezpz lemon sqzy
+            return new GimmickParameter(data);
         }
 
 
@@ -583,7 +720,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     var bytes = reader.ReadBytes((int) imc.size);
 
                     // Deserialize IMC entry bytes here.
-                    ret.ImcEntries = DeserializeImcData(bytes, version);
+                    ret.ImcEntries = DeserializeImcData(bytes, root, version);
                 }
 
                 var eqp = entries.FirstOrDefault(x => x.type == MetaDataType.Eqp);
@@ -603,8 +740,29 @@ namespace xivModdingFramework.Mods.FileTypes
                     var bytes = reader.ReadBytes((int)eqdp.size);
 
                     // Deserialize EQDP entry bytes here.
-                    ret.EqdpEntries = DeserializeEqdpData(bytes, version);
+                    ret.EqdpEntries = DeserializeEqdpData(bytes, root, version);
                 }
+
+                var est = entries.FirstOrDefault(x => x.type == MetaDataType.Est);
+                if (est.type != MetaDataType.Invalid)
+                {
+                    reader.BaseStream.Seek(est.offset, SeekOrigin.Begin);
+                    var bytes = reader.ReadBytes((int)est.size);
+
+                    // Deserialize EQDP entry bytes here.
+                    ret.EstEntries = await DeserializeEstData(bytes, root, version);
+                }
+
+                var gmp = entries.FirstOrDefault(x => x.type == MetaDataType.Gmp);
+                if (gmp.type != MetaDataType.Invalid)
+                {
+                    reader.BaseStream.Seek(gmp.offset, SeekOrigin.Begin);
+                    var bytes = reader.ReadBytes((int)gmp.size);
+
+                    // Deserialize EQDP entry bytes here.
+                    ret.GmpEntry = await DeserializeGmpData(bytes, root, version);
+                }
+
 
                 // Done deserializing all the parts.
                 return ret;

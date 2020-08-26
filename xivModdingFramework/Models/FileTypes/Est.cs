@@ -109,6 +109,39 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
+        /// Retrieve the list of all possible skeletal selections for a given type.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public static async Task<Dictionary<XivRace, HashSet<int>>> GetAllExtraSkeletons(EstType type, XivRace raceFilter = XivRace.All_Races, bool includeNpcs = false)
+        {
+            var ret = new Dictionary<XivRace, HashSet<int>>();
+            var races = includeNpcs ? Eqp.PlayableRacesWithNPCs : Eqp.PlayableRaces;
+
+            if(raceFilter != XivRace.All_Races)
+            {
+                races = new List<XivRace>();
+                races.Add(raceFilter);
+            }
+
+            var entries = await GetEstFile(type, true);
+
+            foreach (var race in races)
+            {
+                ret.Add(race, new HashSet<int>());
+                if (!entries.ContainsKey(race)) continue;
+
+                var dict = entries[race];
+                foreach (var kv in dict)
+                {
+                    ret[race].Add(kv.Value.SkelId);
+                }
+            }
+
+            return ret;
+        }
+
+        /// <summary>
         /// Saves a given set of modified entries to the EST file.
         /// Entries with a SkeletonID of 0 will be removed.
         /// </summary>
@@ -175,8 +208,29 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var id = (ushort)root.PrimaryId;
+            if (type == EstType.Face || type == EstType.Hair) {
+                id = (ushort)root.SecondaryId;
+            }
+            var entries = await GetExtraSkeletonEntries(type, id, forceDefault);
 
-            return await GetExtraSkeletonEntries(type, id, forceDefault);
+
+            // Hair and Faces have to be further trimmed down to only the entries associated with their root.
+            if (type == EstType.Face || type == EstType.Hair)
+            {
+                var ret = new Dictionary<XivRace, ExtraSkeletonEntry>();
+                var race = XivRaces.GetXivRace(root.PrimaryId);
+
+                if (entries.ContainsKey(race))
+                {
+                    ret.Add(race, entries[race]);
+                } else
+                {
+                    ret.Add(race, new ExtraSkeletonEntry(race, id));
+                }
+                entries = ret;
+            }
+
+            return entries;
         }
 
         /// <summary>
@@ -195,10 +249,10 @@ namespace xivModdingFramework.Models.FileTypes
 
             var entries = await GetEstFile(type, forceDefault);
             
-            var races = Eqp.DeformationAvailableRaces;
+            var races = Eqp.PlayableRaces;
             if(includeNpcs)
             {
-                races = Eqp.DeformationAvailableRacesWithNPCs;
+                races = Eqp.PlayableRacesWithNPCs;
             }
 
             var ret = new Dictionary<XivRace, ExtraSkeletonEntry>();
@@ -211,7 +265,7 @@ namespace xivModdingFramework.Models.FileTypes
                     ret.Add(race, dict[setId]);
                 } else
                 {
-                    ret.Add(race, new ExtraSkeletonEntry());
+                    ret.Add(race, new ExtraSkeletonEntry(race, setId));
                 }
             }
             return ret;
@@ -231,12 +285,12 @@ namespace xivModdingFramework.Models.FileTypes
             var entries = await GetEstFile(type, forceDefault);
 
             if(!entries.ContainsKey(race)) {
-                return new ExtraSkeletonEntry();
+                return new ExtraSkeletonEntry(race, setId);
             }
 
             if(!entries[race].ContainsKey(setId))
             {
-                return new ExtraSkeletonEntry();
+                return new ExtraSkeletonEntry(race, setId);
             }
 
             return entries[race][setId];
@@ -257,7 +311,13 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     entries.Add(entry.Race, new Dictionary<ushort, ExtraSkeletonEntry>());
                 }
-                entries[entry.Race].Add(entry.SetId, entry);
+                
+                if(!entries[entry.Race].ContainsKey(entry.SetId))
+                {
+                    // For whatever reason there is exactly one dupe in the game files, where a Lalafell M face has two identical entries.
+                    // Doesn't seem to matter to SE, so shouldn't matter to us.
+                    entries[entry.Race].Add(entry.SetId, entry);
+                }
             }
 
             return entries;

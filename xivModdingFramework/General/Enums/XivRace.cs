@@ -72,8 +72,6 @@ namespace xivModdingFramework.General.Enums
         [Description("0000")] All_Races,
         [Description("0000")] Monster,
         [Description("0000")] DemiHuman,
-
-
     }
 
     public class XivRaceNode {
@@ -530,6 +528,10 @@ namespace xivModdingFramework.General.Enums
             var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].Description : value.ToString();
         }
+        public static int GetRaceCodeInt(this XivRace value)
+        {
+            return Int32.Parse(GetRaceCode(value));
+        }
 
 
         /// <summary>
@@ -839,6 +841,12 @@ namespace xivModdingFramework.General.Enums
             var races = Enum.GetValues(typeof(XivRace)).Cast<XivRace>();
 
             return races.FirstOrDefault(race => race.GetRaceCode() == value);
+        }
+
+        public static XivRace GetXivRace(int value)
+        {
+            var code = value.ToString().PadLeft(4, '0');
+            return GetXivRace(code);
         }
     }
 }
