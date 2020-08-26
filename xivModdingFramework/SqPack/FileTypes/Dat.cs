@@ -1446,7 +1446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown)
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown")
         {
             var _index = new Index(_gameDirectory);
             var offset = await _index.GetDataOffset(sourcePath);
