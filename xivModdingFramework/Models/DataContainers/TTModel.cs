@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Textures.Enums;
@@ -1088,6 +1089,107 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MakeImportReady(this, loggingFunction);
         }
 
+        public Dictionary<string, SkeletonData> ResolveFullBoneHeirarchy(XivRace race, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
+
+            // First thing we need to do here is scrap through the groups to
+            // pull back out the extra skeletons of the constituent models.
+            var _metRegex = new Regex("e([0-9]{4})_met");
+            var _topRegex = new Regex("e([0-9]{4})_top");
+            var _faceRegex = new Regex("f([0-9]{4})");
+            var _hairRegex = new Regex("h([0-9]{4})");
+
+            int topNum = -1;
+            int metNum = -1;
+            int faceNum = -1;
+            int hairNum = -1;
+
+            foreach (var m in MeshGroups)
+            {
+                var metMatch = _metRegex.Match(m.Name);
+                var topMatch = _topRegex.Match(m.Name);
+                var faceMatch = _faceRegex.Match(m.Name);
+                var hairMatch = _hairRegex.Match(m.Name);
+
+                if (metMatch.Success)
+                {
+                    metNum = Int32.Parse(metMatch.Groups[1].Value);
+                }
+                else if (topMatch.Success)
+                {
+                    topNum = Int32.Parse(topMatch.Groups[1].Value);
+
+                }
+                else if (faceMatch.Success)
+                {
+                    faceNum = Int32.Parse(faceMatch.Groups[1].Value);
+                }
+                else if (hairMatch.Success)
+                {
+                    hairNum = Int32.Parse(hairMatch.Groups[1].Value);
+                }
+            }
+
+            // This is a list of the roots we'll need to pull extra skeleton data for.
+            List<XivDependencyRootInfo> rootsToResolve = new List<XivDependencyRootInfo>();
+
+            if (metNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.equipment;
+                root.PrimaryId = metNum;
+                root.Slot = "met";
+
+                rootsToResolve.Add(root);
+            }
+            if (topNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.equipment;
+                root.PrimaryId = topNum;
+                root.Slot = "top";
+                rootsToResolve.Add(root);
+            }
+            if (faceNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.human;
+                root.PrimaryId = XivRaces.GetRaceCodeInt(race);
+                root.SecondaryType = XivItemType.face;
+                root.SecondaryId = faceNum;
+                root.Slot = "fac";
+                rootsToResolve.Add(root);
+            }
+            if (hairNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.human;
+                root.PrimaryId = XivRaces.GetRaceCodeInt(race);
+                root.SecondaryType = XivItemType.hair;
+                root.SecondaryId = hairNum;
+                root.Slot = "hir";
+                rootsToResolve.Add(root);
+            }
+
+            // No extra skeletons using slots were used, just add the base root so we get the race's standard skeleton at least.
+            if (rootsToResolve.Count == 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.equipment;
+                root.PrimaryId = 0;
+                root.Slot = "top";
+                rootsToResolve.Add(root);
+            }
+
+            var boneDict = ResolveBoneHeirarchy(loggingFunction, rootsToResolve, race);
+            return boneDict;
+        }
+
         /// <summary>
         /// Saves a TTModel to a .DB file for use with external importers/exporters.
         /// </summary>
@@ -1101,13 +1203,16 @@ namespace xivModdingFramework.Models.DataContainers
             }
 
             var directory = Path.GetDirectoryName(filePath);
+            var race = XivRaces.GetXivRace(raceId);
 
+            var boneDict = ResolveFullBoneHeirarchy(race, loggingFunction);
             ModelModifiers.MakeExportReady(this, loggingFunction);
+
+
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
-                var boneDict = ResolveBoneHeirarchy(loggingFunction, raceId);
 
                 // Spawn a DB connection to do the raw queries.
                 // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
@@ -1501,7 +1606,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// Used when saving the file to DB.  (Or potentially animating it)
         /// </summary>
         /// <returns></returns>
-        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy(Action<bool, string> loggingFunction = null, string raceId = "")
+        public Dictionary<string, SkeletonData> ResolveBoneHeirarchy(Action<bool, string> loggingFunction = null, List<XivDependencyRootInfo> roots = null, XivRace race = XivRace.All_Races)
         {
             if (loggingFunction == null)
             {
@@ -1511,69 +1616,93 @@ namespace xivModdingFramework.Models.DataContainers
             var fullSkel = new Dictionary<string, SkeletonData>();
             var skelDict = new Dictionary<string, SkeletonData>();
 
-
-            var path = Source;
-            if (!string.IsNullOrEmpty(raceId))
+            if (roots == null || roots.Count == 0)
             {
-                var reg = new Regex("c[0-9]{4}");
-                path = reg.Replace(path, "c" + raceId);
+                if (!IsInternal)
+                {
+                    throw new Exception("Cannot dynamically resolve bone heirarchy for external model.");
+                }
+
+
+                // We can use the raw function here since we know this is a valid internal model file.
+                XivDependencyRootInfo root = XivDependencyGraph.ExtractRootInfo(Source);
+
+                if (race == XivRace.All_Races)
+                {
+                    race = IOUtil.GetRaceFromPath(Source);
+                }
+                
+
+                // Just our one dynamically found root.
+                roots = new List<XivDependencyRootInfo>() { root };
             }
 
-            var baseSkeletonPath = "";
-            var extraSkeletonPath = "";
+
             Task.Run(async () =>
             {
-                baseSkeletonPath = await Sklb.GetBaseSkeletonFile(path);
-                extraSkeletonPath = await Sklb.GetExtraSkeletonFile(path);
-            }).Wait();
+                bool parsedBase = false;
+                var baseSkeletonPath = "";
+                var extraSkeletonPath = "";
 
-            var skeletonData = File.ReadAllLines(baseSkeletonPath);
-            var badBoneId = 900;
-
-            // Parse both skeleton files, starting with the base file.
-            foreach (var b in skeletonData)
-            {
-                if (b == "") continue;
-                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-                fullSkel.Add(j.BoneName, j);
-            }
-
-            if (!String.IsNullOrEmpty(extraSkeletonPath))
-            {
-
-                Dictionary<int, int> exTranslationTable = new Dictionary<int, int>();
-                skeletonData = File.ReadAllLines(extraSkeletonPath);
-                foreach (var b in skeletonData)
+                foreach (var root in roots)
                 {
-                    if (b == "") continue;
-                    var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                    j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-
-                    if (fullSkel.ContainsKey(j.BoneName))
+                    // Do we need to get the base skel still?
+                    string[] skeletonData;
+                    if (!parsedBase)
                     {
-                        // It's possible for EX Skeletons to replace bones in the original file.
-                        //fullSkel[j.BoneName].PoseMatrix = j.PoseMatrix;
-                        //fullSkel[j.BoneName].InversePoseMatrix = j.InversePoseMatrix;
+                        baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race);
+                        skeletonData = File.ReadAllLines(baseSkeletonPath);
 
-                        exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
+                        // Parse both skeleton files, starting with the base file.
+                        foreach (var b in skeletonData)
+                        {
+                            if (b == "") continue;
+                            var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                            j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+                            fullSkel.Add(j.BoneName, j);
+                        }
+
+                        extraSkeletonPath = await Sklb.GetExtraSkeletonFile(root, race);
+                        parsedBase = true;
                     }
-                    else
+
+
+                    // Did this root have an extra skeleton in use?
+                    if (!String.IsNullOrEmpty(extraSkeletonPath))
                     {
-                        // Run it through the translation to match up with the base skeleton.
-                        j.BoneParent = exTranslationTable[j.BoneParent];
+                        // If it did, add its bones to the resulting skeleton.
+                        Dictionary<int, int> exTranslationTable = new Dictionary<int, int>();
+                        skeletonData = File.ReadAllLines(extraSkeletonPath);
+                        foreach (var b in skeletonData)
+                        {
+                            if (b == "") continue;
+                            var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                            j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
 
-                        // And generate its own new bone number
-                        var originalNumber = j.BoneNumber;
-                        j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+                            if (fullSkel.ContainsKey(j.BoneName))
+                            {
+                                // This is a parent level reference to a base bone.
+                                exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
+                            }
+                            else
+                            {
+                                // Run it through the translation to match up with the base skeleton.
+                                j.BoneParent = exTranslationTable[j.BoneParent];
 
-                        fullSkel.Add(j.BoneName, j);
-                        exTranslationTable.Add(originalNumber, j.BoneNumber);
+                                // And generate its own new bone number
+                                var originalNumber = j.BoneNumber;
+                                j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                                fullSkel.Add(j.BoneName, j);
+                                exTranslationTable.Add(originalNumber, j.BoneNumber);
+                            }
+                        }
                     }
                 }
-            }
+            }).Wait();
 
 
+            var badBoneId = 900;
             foreach (var s in Bones)
             {
                 var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);

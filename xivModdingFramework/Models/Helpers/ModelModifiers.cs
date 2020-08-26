@@ -998,6 +998,7 @@ namespace xivModdingFramework.Models.Helpers
                 Mdl.GetDeformationMatrices(targetRace, out deformations, out inverted, out normalmatrixes, out invertednormalmatrixes);
 
 
+
                 // Check if deformation is possible
                 var missingDeforms = new HashSet<string>();
 
@@ -1015,14 +1016,49 @@ namespace xivModdingFramework.Models.Helpers
                 // Throw an exception if there is any missing deform bones
                 if (missingDeforms.Any())
                 {
+                    // Get the skeleton for this model so we can use it to analyze missing bones.
+                    var dict = model.ResolveBoneHeirarchy(loggingFunction);
+
+
                     // For a bone to be missing in the deformation data completely, it has to have come from a different skeleton, which
                     // had the bone, while our new one has no entry for it at all.  In these cases, just use identity.
-                    foreach(var bone in missingDeforms)
+                    foreach (var bone in missingDeforms)
                     {
-                        deformations[bone] = Matrix.Identity;
-                        inverted[bone] = Matrix.Identity;
-                        normalmatrixes[bone] = Matrix.Identity;
-                        invertednormalmatrixes[bone] = Matrix.Identity;
+                        if (dict.ContainsKey(bone))
+                        {
+                            // This bone actually exists in our skeleton, so it's most likely an EX bone without a deformation matrix.
+                            var parent = dict.FirstOrDefault(x => x.Value.BoneNumber == dict[bone].BoneParent).Value;
+
+                            // Walk up the tree until we find a parent with a deform.
+                            while(parent != null && !deformations.ContainsKey(parent.BoneName))
+                            {
+                                parent = dict.FirstOrDefault(x => x.Value.BoneNumber == parent.BoneParent).Value;
+                            }
+
+                            if(parent != null)
+                            {
+                                // Found a parent? use that bone's deforms.
+                                deformations[bone] = deformations[parent.BoneName];
+                                inverted[bone] = inverted[parent.BoneName];
+                                normalmatrixes[bone] = normalmatrixes[parent.BoneName];
+                                invertednormalmatrixes[bone] = invertednormalmatrixes[parent.BoneName];
+                            } else
+                            {
+                                // No Parent? No Deforms.
+                                deformations[bone] = Matrix.Identity;
+                                inverted[bone] = Matrix.Identity;
+                                normalmatrixes[bone] = Matrix.Identity;
+                                invertednormalmatrixes[bone] = Matrix.Identity;
+                            }
+                        }
+                        else
+                        {
+                            // Bone doesn't exist in the skel, can't deform it.
+                            deformations[bone] = Matrix.Identity;
+                            inverted[bone] = Matrix.Identity;
+                            normalmatrixes[bone] = Matrix.Identity;
+                            invertednormalmatrixes[bone] = Matrix.Identity;
+                        }
                     }
                 }
 

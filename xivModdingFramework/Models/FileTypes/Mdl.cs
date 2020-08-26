@@ -4194,7 +4194,21 @@ namespace xivModdingFramework.Models.FileTypes
 
             var skelName = "c" + race.GetRaceCode();
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
+            var skeletonFile = cwd + "/Skeletons/" + skelName + "b0001.skel";
+
+            if (!File.Exists(skeletonFile))
+            {
+                // Need to extract the Skel file real quick like.
+                var tempRoot = new XivDependencyRootInfo();
+                tempRoot.PrimaryType = XivItemType.equipment;
+                tempRoot.PrimaryId = 0;
+                tempRoot.Slot = "top";
+                Task.Run(async () =>
+                {
+                    await Sklb.GetBaseSkeletonFile(tempRoot, race);
+                }).Wait();
+            }
+
             var skeletonData = File.ReadAllLines(skeletonFile);
             var FullSkel = new Dictionary<string, SkeletonData>();
             var FullSkelNum = new Dictionary<int, SkeletonData>();

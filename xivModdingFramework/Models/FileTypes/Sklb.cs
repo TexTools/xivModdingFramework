@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Utilities;
 using Newtonsoft.Json;
 using SharpDX;
@@ -30,6 +31,7 @@ using System.Xml;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Resources;
@@ -57,7 +59,20 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task<string> GetBaseSkeletonFile(string fullMdlPath)
         {
-            var file = await GetBaseSkelbPath(fullMdlPath);
+            var root = await XivCache.GetFirstRoot(fullMdlPath);
+
+            var race = XivRace.All_Races;
+            if (root.Info.PrimaryType == XivItemType.human || root.Info.PrimaryType == XivItemType.equipment || root.Info.PrimaryType == XivItemType.accessory)
+            {
+                race = XivRaces.GetXivRace(fullMdlPath.Substring(1, 4));
+            }
+
+            return await GetBaseSkeletonFile(root.Info, race);
+        }
+        public static async Task<string> GetBaseSkeletonFile(XivDependencyRootInfo root, XivRace race) 
+        {
+            var file = await GetBaseSkelbPath(root, race);
+
             var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
 
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
@@ -80,7 +95,21 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task<string> GetExtraSkeletonFile(string fullMdlPath)
         {
-            var file = await GetExtraSkelbPath(fullMdlPath);
+            var root = await XivCache.GetFirstRoot(fullMdlPath);
+
+            var estType = Est.GetEstType(root);
+            if (estType == Est.EstType.Invalid) return null;
+
+            // This is a hair/hat/face/body model at this point so this is a safe pull.
+            var race = XivRaces.GetXivRace(fullMdlPath.Substring(1, 4));
+
+            return await GetExtraSkeletonFile(root.Info, race);
+        }
+
+
+        public static async Task<string> GetExtraSkeletonFile(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
+        {
+            var file = await GetExtraSkelbPath(root, race);
             if (file == null) return null;
 
             var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
@@ -131,34 +160,26 @@ namespace xivModdingFramework.Models.FileTypes
             File.Delete(rawFile);
         }
 
-        private static async Task<string> GetExtraSkelbPath(string fullMdlPath)
+        private static async Task<string> GetExtraSkelbPath(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
         {
-            var root = await XivCache.GetFirstRoot(fullMdlPath);
 
             var type = Est.GetEstType(root);
 
             // Type doesn't use extra skels.
             if (type == Est.EstType.Invalid) return null;
 
-            var fileName = Path.GetFileNameWithoutExtension(fullMdlPath);
 
-            var id = (ushort)root.Info.PrimaryId;
+            var id = (ushort)root.PrimaryId;
             if (type == Est.EstType.Face || type == Est.EstType.Hair)
             {
-                id = (ushort)root.Info.SecondaryId;
+                id = (ushort)root.SecondaryId;
             }
 
-            XivRace race = XivRace.All_Races;
             // Hair and face types have a race defined at root level.
-            if (type == Est.EstType.Face || type == Est.EstType.Hair)
+            if ((type == Est.EstType.Face || type == Est.EstType.Hair) && race != XivRace.All_Races)
             {
                 var ret = new Dictionary<XivRace, ExtraSkeletonEntry>();
-                race = XivRaces.GetXivRace(root.Info.PrimaryId);
-            } else
-            {
-                // Gear have race defined at model level.
-                var rc = fileName.Substring(1, 4);
-                race = XivRaces.GetXivRace(rc);
+                race = XivRaces.GetXivRace(root.PrimaryId);
             }
 
 
@@ -166,8 +187,20 @@ namespace xivModdingFramework.Models.FileTypes
             var skelId = entry.SkelId;
             if(skelId == 0)
             {
-                // No extra skeleton for this model.
-                return null;
+                if (race == XivRace.Hyur_Midlander_Male) return null;
+
+                // Okay, this model, *as defined* has no EX Skeleton.  _HOWEVER_ its parent skeleton could.
+                // So we need to re-call and check up the chain until we hit Hyur M.
+
+                var parent = XivRaceTree.GetNode(race).Parent;
+                if(parent == null)
+                {
+                    return null;
+                }
+
+                // It's worth noting in these cases, the Skeletal bones themselves will still be using the matrices appropriate
+                // for their parent race in this method, but that should be sufficient for now.
+                return await GetExtraSkelbPath(root, parent.Race);
             }
 
             var prefix = Est.GetSystemPrefix(type);
@@ -177,43 +210,39 @@ namespace xivModdingFramework.Models.FileTypes
             var path = $"chara/human/c{raceCode}/skeleton/{slot}/{prefix}{skelCode}/skl_c{raceCode}{prefix}{skelCode}.sklb";
             return path;
         }
-        /// <summary>
-        /// Retrieves the file path to the model's base skeleton file.
-        /// </summary>
-        /// <param name="fullMdlPath"></param>
-        private static async Task<string> GetBaseSkelbPath(string fullMdlPath)
+
+
+            /// <summary>
+            /// Retrieves the file path to the model's base skeleton file.
+            /// </summary>
+            /// <param name="fullMdlPath"></param>
+        private static async Task<string> GetBaseSkelbPath(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
         {
             var skelFolder = "";
             var skelFile = "";
-            if (IsNonhuman(fullMdlPath))
+            if (root.PrimaryType != XivItemType.human && root.PrimaryType != XivItemType.equipment && root.PrimaryType != XivItemType.accessory)
             {
-                // Weapons / Monsters / Demihumans are simple enough cases, we just have to use different formatting strings.
-                if (IsWeapon(fullMdlPath))
-                {
-                    skelFolder = string.Format(XivStrings.WeapSkelFolder, fullMdlPath.Substring(1, 4), "0001");
-                    skelFile = string.Format(XivStrings.WeapSkelFile, fullMdlPath.Substring(1, 4), "0001");
-                }
-                else if (IsMonster(fullMdlPath))
-                {
-                    skelFolder = string.Format(XivStrings.MonsterSkelFolder, fullMdlPath.Substring(1, 4), "0001");
-                    skelFile = string.Format(XivStrings.MonsterSkelFile, fullMdlPath.Substring(1, 4), "0001");
-                }
-                else if (IsDemihuman(fullMdlPath))
-                {
-                    skelFolder = string.Format(XivStrings.DemiSkelFolder, fullMdlPath.Substring(1, 4), "0001");
-                    skelFile = string.Format(XivStrings.DemiSkelFile, fullMdlPath.Substring(1, 4), "0001");
-                }
+                var typeName = XivItemTypes.GetSystemName(root.PrimaryType);
+                var prefix = XivItemTypes.GetSystemPrefix(root.PrimaryType);
+                var id = root.PrimaryId.ToString().PadLeft(4, '0');
+                var bodyCode = "0001";
+                var path = $"chara/{typeName}/{prefix}{id}/skeleton/base/b{bodyCode}/skl_{prefix}{id}b{bodyCode}.sklb";
+                return path;
             } else
             {
-                var fileName = Path.GetFileNameWithoutExtension(fullMdlPath);
 
-                var raceCode = fileName.Substring(1, 4);
+                // Equipment and accessories need an external race passed in.
+                var raceCode = race.GetRaceCode();
+                if (root.PrimaryType == XivItemType.human && race != XivRace.All_Races)
+                {
+                    raceCode = root.PrimaryId.ToString().PadLeft(4, '0');
+                }
+
                 var bodyCode = "0001";
                 skelFolder = $"chara/human/c{raceCode}/skeleton/base/b{bodyCode}";
                 skelFile = $"skl_c{raceCode}b{bodyCode}.sklb";
+                return skelFolder + "/" + skelFile;
             }
-
-            return skelFolder + "/" + skelFile;
         }
 
         /// <summary>
