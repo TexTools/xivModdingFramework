@@ -124,7 +124,7 @@ namespace xivModdingFramework.Mods.DataContainers
 
         public bool IsInternal()
         {
-            return source == Constants.InternalMetaFileSourceName;
+            return source == Constants.InternalModSourceName;
         }
 
         public bool IsCustomFile()

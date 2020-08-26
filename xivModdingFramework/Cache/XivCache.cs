@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -119,6 +120,19 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public enum CacheRebuildReason
+        {
+            CacheOK,
+            NoCache,
+            CacheVersionUpdate,
+            FFXIVUpdate,
+            LanguageChanged,
+            RebuildFlag,
+            ManualRequest,
+            InvalidData
+        }
+
+        public static event EventHandler<CacheRebuildReason> CacheRebuilding;
 
         private static BackgroundWorker _cacheWorker;
 
@@ -166,9 +180,10 @@ namespace xivModdingFramework.Cache
             if (!_REBUILDING)
             {
 
-                if (CacheNeedsRebuild() && !_REBUILDING)
+                var reason = CacheNeedsRebuild();
+                if (reason != CacheRebuildReason.CacheOK && !_REBUILDING)
                 {
-                    RebuildCache();
+                    RebuildCache(reason);
                 }
             }
 
@@ -187,26 +202,31 @@ namespace xivModdingFramework.Cache
         /// <summary>
         /// Tests if the cache needs to be rebuilt (and starts the process if it does.)
         /// </summary>
-        private static bool CacheNeedsRebuild()
+        private static CacheRebuildReason CacheNeedsRebuild()
         {
-            Func<bool> checkValidation = () =>
+            Func<CacheRebuildReason> checkValidation = () =>
             {
                 try
                 {
-                    // Cache structure updated?
-                    var val = GetMetaValue("cache_version");
-                    var version = new Version(val);
-                    if (version != CacheVersion)
+                    if(!File.Exists(_dbPath.FullName))
                     {
-                        return true;
+                        return CacheRebuildReason.NoCache;
                     }
 
-                    // FFXIV Updated?
-                    val = GetMetaValue("ffxiv_version");
-                    version = new Version(val);
+                    // FFXIV Updated?  This one always gets highest priority for reason.
+                    var val = GetMetaValue("ffxiv_version");
+                    var version = new Version(val);
                     if (version != _gameInfo.GameVersion)
                     {
-                        return true;
+                        return CacheRebuildReason.FFXIVUpdate;
+                    }
+
+                    // Cache structure updated?
+                    val = GetMetaValue("cache_version");
+                    version = new Version(val);
+                    if (version != CacheVersion)
+                    {
+                        return CacheRebuildReason.CacheVersionUpdate;
                     }
 
                     if (_gameInfo.GameLanguage != XivLanguage.None)
@@ -215,7 +235,7 @@ namespace xivModdingFramework.Cache
                         val = GetMetaValue("language");
                         if (val != _gameInfo.GameLanguage.ToString())
                         {
-                            return true;
+                            return CacheRebuildReason.LanguageChanged;
                         }
                     }
 
@@ -223,19 +243,19 @@ namespace xivModdingFramework.Cache
                     val = GetMetaValue("needs_rebuild");
                     if (val != null)
                     {
-                        return true;
+                        return CacheRebuildReason.RebuildFlag;
                     }
 
-                    return false;
+                    return CacheRebuildReason.CacheOK;
                 }
                 catch (Exception Ex)
                 {
-                    return true;
+                    return CacheRebuildReason.InvalidData;
                 }
             };
 
             var result = checkValidation();
-            if (result)
+            if (result != CacheRebuildReason.CacheOK)
             {
                 // Ensure we cleaned up after ourselves
                 // in preprartion for calling rebuild.
@@ -253,10 +273,16 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache()
+        public static void RebuildCache(CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
         {
             CacheWorkerEnabled = false;
             _REBUILDING = true;
+
+            if (CacheRebuilding != null)
+            {
+                // If there are any event listeners, invoke them.
+                CacheRebuilding.Invoke(null, reason);
+            }
 
             Task.Run(async () =>
             {
@@ -293,6 +319,13 @@ namespace xivModdingFramework.Cache
                 {
                     try
                     {
+                        // If we failed an update due to a post-patch error, keep us stuck in that state
+                        // until a TexTools update and a proper completed rebuild.
+                        if (reason == CacheRebuildReason.FFXIVUpdate)
+                        {
+                            SetMetaValue("ffxiv_version", new Version(0,0,0,0).ToString());
+                        }
+
                         SetMetaValue("needs_rebuild", "1");
                     }
                     catch {

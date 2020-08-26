@@ -256,7 +256,7 @@ namespace xivModdingFramework.Mods
 
             var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
-            var result = await ToggleMod(enable, modEntry);
+            var result = await ToggleModUnsafe(enable, modEntry);
             if(!result)
             {
                 return result;
@@ -304,7 +304,7 @@ namespace xivModdingFramework.Mods
 
             foreach (var modEntry in mods)
             {
-                await ToggleMod(enable, modEntry);
+                await ToggleModUnsafe(enable, modEntry);
             }
 
             SaveModList(modList);
@@ -318,7 +318,7 @@ namespace xivModdingFramework.Mods
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        private async Task<bool> ToggleMod(bool enable, Mod mod, bool includeInternal = false)
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal = false)
         {
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
@@ -412,7 +412,7 @@ namespace xivModdingFramework.Mods
                 // Save disabling these for last.
                 if (modEntry.IsInternal()) continue;
 
-                await ToggleMod(enable, modEntry);
+                await ToggleModUnsafe(enable, modEntry);
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
@@ -422,7 +422,7 @@ namespace xivModdingFramework.Mods
                 var internalEntries = modList.Mods.Where(x => x.IsInternal());
                 foreach (var modEntry in internalEntries)
                 {
-                    await ToggleMod(enable, modEntry, true);
+                    await ToggleModUnsafe(enable, modEntry, true);
                 }
             }
 

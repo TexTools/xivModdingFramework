@@ -170,7 +170,7 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             // Save the modified info.
-            await SaveFullImcInfo(info, path, Path.GetFileName(path), Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+            await SaveFullImcInfo(info, path, Path.GetFileName(path), Constants.InternalModSourceName, Constants.InternalModSourceName);
         }
 
         public static byte[] SerializeEntry(XivImc entry)

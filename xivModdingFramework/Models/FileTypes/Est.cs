@@ -349,7 +349,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             var _dat = new Dat(_gameDirectory);
-            await _dat.ImportType2Data(data, "_EST_INTERNAL_", EstFiles[type], Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+            await _dat.ImportType2Data(data, "_EST_INTERNAL_", EstFiles[type], Constants.InternalModSourceName, Constants.InternalModSourceName);
         }
 
     }

@@ -179,7 +179,7 @@ namespace xivModdingFramework.Models.FileTypes
 
         private async Task SaveGimmickParameterFile(byte[] bytes)
         {
-            await _dat.ImportType2Data(bytes, "_GMP_INTERNAL_", GimmickParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+            await _dat.ImportType2Data(bytes, "_GMP_INTERNAL_", GimmickParameterFile, Constants.InternalModSourceName, Constants.InternalModSourceName);
         }
         private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false)
         {
@@ -223,7 +223,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(file, bytes, offset);
 
-            await _dat.ImportType2Data(file.ToArray(), "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+            await _dat.ImportType2Data(file.ToArray(), "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalModSourceName, Constants.InternalModSourceName);
         }
 
 
@@ -374,7 +374,7 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task SaveEquipmentParameterFile(byte[] file)
         {
 
-            await _dat.ImportType2Data(file, "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+            await _dat.ImportType2Data(file, "_EQP_INTERNAL_", EquipmentParameterFile, Constants.InternalModSourceName, Constants.InternalModSourceName);
 
             return;
         }
@@ -515,7 +515,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 data[offset + byteOffset] = byteToModify;
 
-                await _dat.ImportType2Data(data, "_EQDP_INTERNAL_", fileName, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+                await _dat.ImportType2Data(data, "_EQDP_INTERNAL_", fileName, Constants.InternalModSourceName, Constants.InternalModSourceName);
             }
         }
 

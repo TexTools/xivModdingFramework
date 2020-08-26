@@ -39,7 +39,7 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// </summary>
     public class Dat
     {
-        private const string DatExtension = ".win32.dat";
+        public const string DatExtension = ".win32.dat";
         private readonly DirectoryInfo _gameDirectory;
         private readonly DirectoryInfo _modListDirectory;
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
@@ -581,7 +581,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var originalData = await GetType2Data(offset, dataFile);
 
                 // Binary edit files are written to the modlist with our specific internal flag as the source and category.
-                offset = await ImportType2Data(originalData, Path.GetFileName(internalPath), internalPath, Constants.InternalMetaFileSourceName, Constants.InternalMetaFileSourceName);
+                offset = await ImportType2Data(originalData, Path.GetFileName(internalPath), internalPath, Constants.InternalModSourceName, Constants.InternalModSourceName);
                 modEntry = await _modding.TryGetModEntry(internalPath);
             }
 
@@ -610,7 +610,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Convert the data back into the Type 2 Data format SE expects.
             var type2Data = (await CreateType2Data(data)).ToList();
 
-            long newOffset = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalMetaFileSourceName, internalPath, dataFile, Constants.InternalMetaFileSourceName, 2);
+            long newOffset = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalModSourceName, internalPath, dataFile, Constants.InternalModSourceName, 2);
 
             if(offset != newOffset)
             {
