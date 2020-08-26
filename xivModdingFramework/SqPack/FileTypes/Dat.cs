@@ -547,8 +547,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-
-
         public async Task<long> BinaryEditType2Data(string internalPath, int byteOffset, byte[] bytes)
         {
             int bitOffset = byteOffset * 8;
@@ -1267,6 +1265,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
+
+
+
+
         /// <summary>
         /// Creates the header for the compressed texture data to be imported.
         /// </summary>
@@ -1433,6 +1435,45 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetDataFileName());
             }
             return targetDat;
+        }
+
+        /// <summary>
+        /// Copies a given file to a new location in the game files.
+        /// </summary>
+        /// <param name="sourcePath"></param>
+        /// <param name="targetPath"></param>
+        /// <param name="category"></param>
+        /// <param name="itemName"></param>
+        /// <param name="source"></param>
+        /// <returns></returns>
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown)
+        {
+            var _index = new Index(_gameDirectory);
+            var offset = await _index.GetDataOffset(sourcePath);
+            var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
+            return await CopyFile(offset, dataFile, targetPath, category, itemName, source);
+        }
+
+        /// <summary>
+        /// Copies a file from a given offset to a new path in the game files.
+        /// </summary>
+        /// <param name="originalOffset"></param>
+        /// <param name="originalDataFile"></param>
+        /// <param name="targetPath"></param>
+        /// <param name="category"></param>
+        /// <param name="itemName"></param>
+        /// <param name="source"></param>
+        /// <returns></returns>
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown")
+        {
+            var _modding = new Modding(_gameDirectory);
+
+            var ftype = GetFileType(originalOffset, originalDataFile);
+            var size = await GetCompressedFileSize(originalOffset, originalDataFile);
+            var data = GetRawData(originalOffset, originalDataFile, size);
+            var modEntry = await _modding.TryGetModEntry(targetPath);
+
+            return await WriteToDat(data.ToList(), modEntry, targetPath, category, itemName, IOUtil.GetDataFileFromPath(targetPath), source, ftype);
         }
 
         /// <summary>

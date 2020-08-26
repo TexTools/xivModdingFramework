@@ -567,7 +567,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if(SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
+                if(slot != null && SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
                     idx = SlotOffsetDictionary[slot];
                 }

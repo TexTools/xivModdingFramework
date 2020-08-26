@@ -91,6 +91,22 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
+        public static char GetSystemPrefix(EstType type)
+        {
+            switch(type)
+            {
+                case EstType.Head:
+                    return 'm';
+                case EstType.Body:
+                    return 't';
+                case EstType.Face:
+                    return 'f';
+                case EstType.Hair:
+                    return 'h';
+                default:
+                    throw new Exception("Cannot get prefix for Invalid EST Type.");
+            }
+        }
 
         /// <summary>
         /// Saves a given set of modified entries to the EST file.
@@ -153,6 +169,11 @@ namespace xivModdingFramework.Models.FileTypes
         public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(XivDependencyRootInfo root, bool forceDefault = false)
         {
             var type = GetEstType(root);
+            if(type == EstType.Invalid)
+            {
+                return new Dictionary<XivRace, ExtraSkeletonEntry>();
+            }
+
             var id = (ushort)root.PrimaryId;
 
             return await GetExtraSkeletonEntries(type, id, forceDefault);
@@ -167,6 +188,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(EstType type, ushort setId, bool forceDefault = false, bool includeNpcs = false)
         {
+            if (type == EstType.Invalid)
+            {
+                return new Dictionary<XivRace, ExtraSkeletonEntry>();
+            }
+
             var entries = await GetEstFile(type, forceDefault);
             
             var races = Eqp.DeformationAvailableRaces;
