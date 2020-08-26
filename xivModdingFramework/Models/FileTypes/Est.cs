@@ -91,6 +91,23 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
+        public static string GetSystemSlot(EstType type)
+        {
+            switch (type)
+            {
+                case EstType.Head:
+                    return "met";
+                case EstType.Body:
+                    return "top";
+                case EstType.Face:
+                    return "face";
+                case EstType.Hair:
+                    return "hair";
+                default:
+                    throw new Exception("Cannot get slot for Invalid EST Type.");
+            }
+
+        }
         public static char GetSystemPrefix(EstType type)
         {
             switch(type)
@@ -270,6 +287,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             return ret;
         }
+
 
         /// <summary>
         /// Retrieves the extra skeleton entry for a given Type/Race/Equipment Set.

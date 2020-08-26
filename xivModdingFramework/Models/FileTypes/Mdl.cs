@@ -203,23 +203,6 @@ namespace xivModdingFramework.Models.FileTypes
                 await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
             }
 
-            // Validate the skeleton.
-            if (model.HasWeights)
-            {
-                // The TTModel.SaveToFile function will re-resolve this var using a more
-                // speedy, synchronous function, so we don't need to hang onto it.
-                // We just need to call this here to ensure the .skel file is
-                // created, if needed.
-                var sklb = new Sklb(_gameDirectory);
-                var skel = await sklb.CreateParsedSkelFile(model.Source);
-
-                // If we have weights, but can't find a skel, bad times.
-                if (skel == null)
-                {
-                    throw new InvalidDataException("Unable to resolve model skeleton.");
-                }
-            }
-
 
             // Save the DB file.
 

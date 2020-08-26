@@ -1511,23 +1511,26 @@ namespace xivModdingFramework.Models.DataContainers
             var fullSkel = new Dictionary<string, SkeletonData>();
             var skelDict = new Dictionary<string, SkeletonData>();
 
-            var skelName = raceId;
 
-            if (string.IsNullOrEmpty(raceId))
+            var path = Source;
+            if (!string.IsNullOrEmpty(raceId))
             {
-                skelName = Sklb.GetParsedSkelFilename(Source);
-                if (skelName == null)
-                {
-                    return skelDict;
-                }
+                var reg = new Regex("c[0-9]{4}");
+                path = reg.Replace(path, "c" + raceId);
             }
 
-            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
-            var skeletonData = File.ReadAllLines(skeletonFile);
+            var baseSkeletonPath = "";
+            var extraSkeletonPath = "";
+            Task.Run(async () =>
+            {
+                baseSkeletonPath = await Sklb.GetBaseSkeletonFile(path);
+                extraSkeletonPath = await Sklb.GetExtraSkeletonFile(path);
+            }).Wait();
+
+            var skeletonData = File.ReadAllLines(baseSkeletonPath);
             var badBoneId = 900;
 
-            // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
+            // Parse both skeleton files, starting with the base file.
             foreach (var b in skeletonData)
             {
                 if (b == "") continue;
@@ -1535,6 +1538,41 @@ namespace xivModdingFramework.Models.DataContainers
                 j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
                 fullSkel.Add(j.BoneName, j);
             }
+
+            if (!String.IsNullOrEmpty(extraSkeletonPath))
+            {
+
+                Dictionary<int, int> exTranslationTable = new Dictionary<int, int>();
+                skeletonData = File.ReadAllLines(extraSkeletonPath);
+                foreach (var b in skeletonData)
+                {
+                    if (b == "") continue;
+                    var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                    j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+
+                    if (fullSkel.ContainsKey(j.BoneName))
+                    {
+                        // It's possible for EX Skeletons to replace bones in the original file.
+                        //fullSkel[j.BoneName].PoseMatrix = j.PoseMatrix;
+                        //fullSkel[j.BoneName].InversePoseMatrix = j.InversePoseMatrix;
+
+                        exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
+                    }
+                    else
+                    {
+                        // Run it through the translation to match up with the base skeleton.
+                        j.BoneParent = exTranslationTable[j.BoneParent];
+
+                        // And generate its own new bone number
+                        var originalNumber = j.BoneNumber;
+                        j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                        fullSkel.Add(j.BoneName, j);
+                        exTranslationTable.Add(originalNumber, j.BoneNumber);
+                    }
+                }
+            }
+
 
             foreach (var s in Bones)
             {
@@ -1575,7 +1613,7 @@ namespace xivModdingFramework.Models.DataContainers
                     skel.PoseMatrix = NewIdentityMatrix();
 
                     skelDict.Add(s, skel);
-                    loggingFunction(true, $"The skeleton file {skeletonFile} did not contain bone {s}. It has been parented to the root bone.");
+                    loggingFunction(true, $"The base game skeleton did not contain bone {s}. It has been parented to the root bone.");
                 }
             }
 
