@@ -769,7 +769,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 stringListBytes.AddRange(Encoding.UTF8.GetBytes(path));
                 stringListBytes.Add(0);
-                texId++;
+                texIdx++;
             }
 
             foreach (var mapPathString in xivMtrl.MapPathList)
