@@ -1355,6 +1355,45 @@ namespace xivModdingFramework.Cache
             return uniqueRoots.ToList();
         }
 
+        /// <summary>
+        /// Extracts dependency root info from purely a file name.  This is primarily useful when looking at 
+        /// .mtrl files, where we want to find what actual folder they're contained in based upon their name reference
+        /// in a .mdl file.
+        /// </summary>
+        /// <param name="filenameWithoutExtension"></param>
+        /// <returns></returns>
+        public static XivDependencyRootInfo ExtractRootInfoFilenameOnly(string filenameWithoutExtension)
+        {
+            var regex = new Regex("([a-z])([0-9]{4})([a-z])([0-9]{4})");
+            var match = regex.Match(filenameWithoutExtension);
+            if(!match.Success)
+            {
+                return new XivDependencyRootInfo();
+            }
+
+            var primaryPrefix = match.Groups[1].Value;
+            var primaryId = Int32.Parse(match.Groups[2].Value);
+            var secondaryPrefix = match.Groups[3].Value;
+            var secondaryId = Int32.Parse(match.Groups[4].Value);
+
+            var root = new XivDependencyRootInfo();
+
+            root.PrimaryType = XivItemTypes.FromSystemPrefix(primaryPrefix[0]);
+            root.PrimaryId = primaryId;
+            root.SecondaryType = XivItemTypes.FromSystemPrefix(secondaryPrefix[0]);
+            root.SecondaryId = secondaryId;
+
+            if ((root.SecondaryType == XivItemType.equipment || root.SecondaryType == XivItemType.accessory)&& root.PrimaryType == XivItemType.human)
+            {
+                // Flip flop time for these.
+                root.SecondaryType = null;
+                root.SecondaryId = null;
+                root.PrimaryType = XivItemTypes.FromSystemPrefix(secondaryPrefix[0]);
+                root.PrimaryId = secondaryId;
+            }
+
+            return root;
+        }
 
         /// <summary>
         /// Extracts the various import information pieces from an internal path.

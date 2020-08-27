@@ -22,6 +22,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -48,31 +49,61 @@ namespace xivModdingFramework.Items.Categories
         /// <returns>A list containing XivCharacter data</returns>
         public Task<List<XivCharacter>> GetCharacterList()
         {
-            return Task.Run(() =>
+            return Task.Run(async () =>
             {
-                var characterList = new List<XivCharacter>
+                var races = Eqp.PlayableRacesWithNPCs;
+                races = races.OrderBy(x => x.GetRaceCodeInt()).ToList();
+
+                // A simple method to check what face/hair/etc. numbers exist is just to see if their texture folders exist.
+                var characterList = new List<XivCharacter>();
+
+                foreach (var race in races)
                 {
-                    new XivCharacter
-                        {Name = XivStrings.Body, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Body},
-                    new XivCharacter
-                        {Name = XivStrings.Face, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Face},
-                    new XivCharacter
-                        {Name = XivStrings.Hair, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Hair},
-                    new XivCharacter
-                        {Name = XivStrings.Tail, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Tail},
-                    new XivCharacter
-                        {Name = XivStrings.Ear, PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Ear},
-                    new XivCharacter
-                    {
-                        Name = XivStrings.Face_Paint, PrimaryCategory = XivStrings.Character,
-                        SecondaryCategory = XivStrings.Face_Paint
-                    },
-                    new XivCharacter
-                    {
-                        Name = XivStrings.Equipment_Decals, PrimaryCategory = XivStrings.Character,
-                        SecondaryCategory = XivStrings.Equipment_Decals
-                    }
-                };
+                    var raceCode = race.GetRaceCodeInt();
+                    var c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Body };
+                    c.ModelInfo = new XivModelInfo();
+                    c.ModelInfo.PrimaryID = raceCode;
+                    c.ModelInfo.SecondaryID = 0;
+                    characterList.Add(c);
+
+                    c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Face };
+                    c.ModelInfo = new XivModelInfo();
+                    c.ModelInfo.PrimaryID = raceCode;
+                    c.ModelInfo.SecondaryID = 0;
+                    characterList.Add(c);
+
+                    c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Hair };
+                    c.ModelInfo = new XivModelInfo();
+                    c.ModelInfo.PrimaryID = raceCode;
+                    c.ModelInfo.SecondaryID = 0;
+                    characterList.Add(c);
+
+                    c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Tail };
+                    c.ModelInfo = new XivModelInfo();
+                    c.ModelInfo.PrimaryID = raceCode;
+                    c.ModelInfo.SecondaryID = 0;
+                    characterList.Add(c);
+
+                    c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Ear };
+                    c.ModelInfo = new XivModelInfo();
+                    c.ModelInfo.PrimaryID = raceCode;
+                    c.ModelInfo.SecondaryID = 0;
+                    characterList.Add(c);
+                }
+
+
+                characterList.Add(new XivCharacter
+                {
+                    Name = XivStrings.Face_Paint,
+                    PrimaryCategory = XivStrings.Character,
+                    SecondaryCategory = XivStrings.Face_Paint
+                });
+                characterList.Add(new XivCharacter
+                {
+                    Name = XivStrings.Equipment_Decals,
+                    PrimaryCategory = XivStrings.Character,
+                    SecondaryCategory = XivStrings.Equipment_Decals
+                });
 
                 return characterList;
             });
@@ -138,6 +169,48 @@ namespace xivModdingFramework.Items.Categories
             }
 
             return availableRacesAndNumbers;
+        }
+        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem)
+        {
+
+            var race = charaItem.ModelInfo.PrimaryID.ToString().PadLeft(4,'0');
+            var availableRacesAndNumbers = new Dictionary<XivRace, int[]>();
+
+            var folder = "";
+
+            if (charaItem.SecondaryCategory == XivStrings.Hair)
+            {
+                folder = XivStrings.HairMtrlFolder;
+            }
+            else if (charaItem.SecondaryCategory == XivStrings.Face)
+            {
+                folder = XivStrings.FaceMtrlFolder;
+            }
+            else if (charaItem.SecondaryCategory == XivStrings.Body)
+            {
+                folder = XivStrings.BodyMtrlFolder;
+            }
+            else if (charaItem.SecondaryCategory == XivStrings.Tail)
+            {
+                folder = XivStrings.TailMtrlFolder;
+            }
+            else if (charaItem.SecondaryCategory == XivStrings.Ear)
+            {
+                folder = XivStrings.EarsMtrlFolder;
+            }
+
+            var testDictionary = new Dictionary<int, int>();
+
+            for (var i = 1; i <= 300; i++)
+            {
+                var mtrl = string.Format(folder, race, i.ToString().PadLeft(4, '0'));
+
+                testDictionary.Add(HashGenerator.GetHash(mtrl), i);
+            }
+
+            var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+            numList.Sort();
+            return numList.ToArray();
         }
 
         /// <summary>
@@ -411,52 +484,54 @@ namespace xivModdingFramework.Items.Categories
             return typeList;
         }
 
-        public async Task<int[]> GetDecalNums(IItem item)
+        public enum XivDecalType
         {
-            var decalLock = new object();
-            var decalList = new List<int>();
-            List<int> fileList;
+            Invalid,
+            FacePaint, 
+            Equipment
+        };
+        public async Task<List<string>> GetDecalPaths(XivDecalType type)
+        {
 
-            if (item.SecondaryCategory.Equals(XivStrings.Face_Paint))
+            const int decalMax = 300;
+
+            List<string> ret = new List<string>();
+            if (type == XivDecalType.FacePaint)
             {
-                fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
+                var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
                     XivDataFile._04_Chara);
 
-                await Task.Run(() => Parallel.For(0, 200, (i) =>
+                for (int i = 0; i < decalMax; i++)
                 {
                     var file = string.Format(XivStrings.FacePaintFile, i);
 
-                    lock (decalLock)
+                    if (fileList.Contains(HashGenerator.GetHash(file)))
                     {
-                        if (fileList.Contains(HashGenerator.GetHash(file)))
-                        {
-                            decalList.Add(i);
-                        }
+                        ret.Add(XivStrings.FacePaintFolder + "/" + file);
                     }
-                }));
+
+                }
             }
-            else
+            else if(type == XivDecalType.Equipment)
             {
-                fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
+                var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
                     XivDataFile._04_Chara);
 
-                await Task.Run(() => Parallel.For(0, 300, (i) =>
+
+                for (int i = 0; i < decalMax; i++)
                 {
                     var file = string.Format(XivStrings.EquipDecalFile, i);
 
-                    lock (decalLock)
+                    if (fileList.Contains(HashGenerator.GetHash(file)))
                     {
-                        if (fileList.Contains(HashGenerator.GetHash(file)))
-                        {
-                            decalList.Add(i);
-                        }
+                        ret.Add(XivStrings.EquipDecalFolder + "/" + file);
                     }
-                }));
+                }
+                ret.Add(XivStrings.EquipDecalFolder + "/_stigma.tex");
             }
 
-            decalList.Sort();
 
-            return decalList.ToArray();
+            return ret;
         }
 
         /// <summary>

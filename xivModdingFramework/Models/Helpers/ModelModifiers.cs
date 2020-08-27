@@ -880,47 +880,31 @@ namespace xivModdingFramework.Models.Helpers
             XivRace race = XivRace.All_Races;
             if (match.Success)
             {
-                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
                 race = XivRaces.GetXivRace(match.Groups[1].Value);
-                RaceConvert(incomingModel, race, modelRace, loggingFunction);
+                if (modelRace == race)
+                {
+                    // Nothing needs to be done.
+                    return;
+                }
+
+                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
+
+                var oSource = incomingModel.Source;
+                incomingModel.Source = originalModelPath;
+
+                try
+                {
+                    RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction);
+                }
+                finally
+                {
+                    incomingModel.Source = oSource;
+                }
             }
             else
             {
                 loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
             }
-        }
-
-        public static void RaceConvert(TTModel model, XivRace targetRace, XivRace originalRace = XivRace.All_Races, Action<bool, string> loggingFunction = null)
-        {
-            if (loggingFunction == null)
-            {
-                loggingFunction = NoOp;
-            }
-
-            // Extract the original race from the ttModel if we weren't provided with one.
-            if (originalRace == XivRace.All_Races)
-            {
-                var raceRegex = new Regex("c([0-9]{4})");
-                if (!model.IsInternal)
-                {
-                    var match = raceRegex.Match(model.Source);
-                    if (match.Success)
-                    {
-                        originalRace = XivRaces.GetXivRace(match.Groups[1].Value);
-                    }
-                    else
-                    {
-                        loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
-                    }
-
-                }
-                else
-                {
-                    throw new InvalidDataException("Cannot racially convert external model without provided Original Race value.");
-                }
-            }
-            RaceConvertRecursive(model, targetRace, originalRace, loggingFunction);
-            //ModelModifiers.CalculateTangents(model, loggingFunction);
         }
 
 
@@ -957,7 +941,7 @@ namespace xivModdingFramework.Models.Helpers
                 else if (originalRace.GetNode().Parent != null)
                 {
                     ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
-                    RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                    RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
                 }
                 // Current race has no parent
                 // Make a recursive call with the target races parent race
@@ -965,7 +949,7 @@ namespace xivModdingFramework.Models.Helpers
                 else
                 {
                     ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
-                    RaceConvert(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
+                    RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
                 }
             }
             catch (Exception ex)

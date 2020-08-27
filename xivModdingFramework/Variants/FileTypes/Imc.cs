@@ -531,13 +531,25 @@ namespace xivModdingFramework.Variants.FileTypes
             public List<XivImc> DefaultSubset { get; set; }
 
             // Gets all (non-default) IMC entries for a given slot.
-            public List<XivImc> GetAllEntries(string slot = "")
+            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = false)
             {
                 var ret = new List<XivImc>(SubsetList.Count);
-                for(int i = 0; i < SubsetList.Count; i++)
+                if (includeDefault)
                 {
-                    ret.Add(GetEntry(i+1, slot));
+                    for (int i = 0; i <= SubsetList.Count; i++)
+                    {
+                        ret.Add(GetEntry(i, slot));
+                    }
                 }
+                else
+                {
+                    for (int i = 1; i <= SubsetList.Count; i++)
+                    {
+                        ret.Add(GetEntry(i, slot));
+                    }
+                }
+
+
                 return ret;
             }
 

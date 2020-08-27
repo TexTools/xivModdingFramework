@@ -13,6 +13,7 @@ using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;

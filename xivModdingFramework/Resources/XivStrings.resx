@@ -891,4 +891,7 @@
   <data name="Ear" xml:space="preserve">
     <value>Ear</value>
   </data>
+  <data name="HUD" xml:space="preserve">
+    <value>HUD</value>
+  </data>
 </root>
