@@ -529,7 +529,7 @@ namespace xivModdingFramework.Models.FileTypes
             var root = item.GetRoot();
             if(root == null)
             {
-                throw new InvalidDataException("Cannot get EQDP information for rootless item.");
+                return new List<XivRace>();
             }
 
             return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs);
@@ -550,7 +550,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             if(root.PrimaryType != XivItemType.equipment && root.PrimaryType != XivItemType.accessory)
             {
-                throw new InvalidDataException("Cannot get EQDP information for invalid item type.");
+                return new List<XivRace>();
             }
 
             return await GetAvailableRacialModels(root.PrimaryId, root.Slot, forceDefault, includeNPCs);
@@ -568,7 +568,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
                 if(!slotOk)
                 {
-                    throw new InvalidDataException("Attempted to get racial models for invalid slot.");
+                    return new List<XivRace>();
                 }
             }
 

@@ -176,9 +176,9 @@ namespace xivModdingFramework.Models.DataContainers
         EnableBodyFlags = 0,
         BodyHideWaist = 1,
         Bit2 = 2,
-        Bit3 = 3,               // Bit 3 OR Bit 4 is often set on Legacy gear.
-        Bit4 = 4,               // Bit 3 OR Bit 4 is often set on Legacy gear.
-        BodyHideGloves = 5,
+        BodyHideShortGloves = 3, // Bit 3 OR Bit 4 is often set on Legacy gear.
+        Bit4 = 4,                // Bit 3 OR Bit 4 is often set on Legacy gear.
+        BodyHideMidGloves = 5,
         BodyHideLongGloves = 6,
         BodyHideGorget = 7,
 

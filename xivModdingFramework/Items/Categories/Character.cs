@@ -170,7 +170,7 @@ namespace xivModdingFramework.Items.Categories
 
             return availableRacesAndNumbers;
         }
-        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem)
+        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem, bool materials = true)
         {
 
             var race = charaItem.ModelInfo.PrimaryID.ToString().PadLeft(4,'0');
@@ -180,23 +180,23 @@ namespace xivModdingFramework.Items.Categories
 
             if (charaItem.SecondaryCategory == XivStrings.Hair)
             {
-                folder = XivStrings.HairMtrlFolder;
+                folder = materials ? XivStrings.HairMtrlFolder : XivStrings.HairMDLFolder;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Face)
             {
-                folder = XivStrings.FaceMtrlFolder;
+                folder = materials ? XivStrings.FaceMtrlFolder : XivStrings.FaceMDLFolder;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Body)
             {
-                folder = XivStrings.BodyMtrlFolder;
+                folder = materials ? XivStrings.BodyMtrlFolder : XivStrings.BodyMDLFolder;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Tail)
             {
-                folder = XivStrings.TailMtrlFolder;
+                folder = materials ? XivStrings.TailMtrlFolder : XivStrings.TailMDLFolder;
             }
             else if (charaItem.SecondaryCategory == XivStrings.Ear)
             {
-                folder = XivStrings.EarsMtrlFolder;
+                folder = materials ? XivStrings.EarsMtrlFolder : XivStrings.EarsMDLFolder;
             }
 
             var testDictionary = new Dictionary<int, int>();
