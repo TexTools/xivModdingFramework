@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
@@ -43,11 +44,17 @@ namespace xivModdingFramework.Items.Categories
             _index = new Index(_gameDirectory);
         }
 
+        public async Task<List<XivCharacter>> GetCharacterList(string substring = null)
+        {
+            return await XivCache.GetCachedCharacterList(substring);
+        }
+
+
         /// <summary>
         /// Gets the List to be displayed under the Character category
         /// </summary>
         /// <returns>A list containing XivCharacter data</returns>
-        public Task<List<XivCharacter>> GetCharacterList()
+        public Task<List<XivCharacter>> GetUnCachedCharacterList()
         {
             return Task.Run(async () =>
             {
@@ -64,31 +71,92 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    characterList.Add(c);
+
+                    // Only add to this listing if there is any data.
+                    var matNumbers = await GetNumbersForCharacterItem(c);
+                    if (matNumbers.Length > 0)
+                    {
+                        characterList.Add(c);
+                    }
+                    else { 
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        if(mdlNumbers.Length > 0)
+                        {
+                            characterList.Add(c);
+                        }
+                    }
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Face };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    characterList.Add(c);
+                    matNumbers = await GetNumbersForCharacterItem(c);
+                    if (matNumbers.Length > 0)
+                    {
+                        characterList.Add(c);
+                    }
+                    else
+                    {
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        if (mdlNumbers.Length > 0)
+                        {
+                            characterList.Add(c);
+                        }
+                    }
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Hair };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    characterList.Add(c);
+                    matNumbers = await GetNumbersForCharacterItem(c);
+                    if (matNumbers.Length > 0)
+                    {
+                        characterList.Add(c);
+                    }
+                    else
+                    {
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        if (mdlNumbers.Length > 0)
+                        {
+                            characterList.Add(c);
+                        }
+                    }
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Tail };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    characterList.Add(c);
+                    matNumbers = await GetNumbersForCharacterItem(c);
+                    if (matNumbers.Length > 0)
+                    {
+                        characterList.Add(c);
+                    }
+                    else
+                    {
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        if (mdlNumbers.Length > 0)
+                        {
+                            characterList.Add(c);
+                        }
+                    }
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Ear };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    characterList.Add(c);
+                    matNumbers = await GetNumbersForCharacterItem(c);
+                    if (matNumbers.Length > 0)
+                    {
+                        characterList.Add(c);
+                    }
+                    else
+                    {
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        if (mdlNumbers.Length > 0)
+                        {
+                            characterList.Add(c);
+                        }
+                    }
                 }
 
 
@@ -626,5 +694,7 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Tail, "til"},
             {XivStrings.Etc, "etc"}
         };
+
+
     }
 }
