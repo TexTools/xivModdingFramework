@@ -520,32 +520,57 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public async Task<List<string>> GetMaterialFiles(int materialVariant = -1)
         {
-            var models = await GetModelFiles();
-            var materials = new HashSet<string>();
-            if (models != null && models.Count > 0)
-            {
-                var dataFile = IOUtil.GetDataFileFromPath(models[0]);
-                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
 
-                foreach (var model in models)
+            var materials = new HashSet<string>();
+            if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
+            {
+                // Bleargh.  So here's the exception of exception class.  Because the "models" in human body are 
+                // are so sparse and all over the place, relying on them is impossible.  Thankfully, body types only ever
+                // have one vanilla material.
+                var primary = Info.PrimaryId.ToString().PadLeft(4, '0');
+                var body = Info.SecondaryId.ToString().PadLeft(4, '0');
+                var path= $"chara/human/c{primary}/obj/body/b{body}/material/v0001/mt_c{primary}b{body}_a.mtrl";
+
+                // Just validate it exists and call it a day.
+                var index = new Index(XivCache.GameInfo.GameDirectory);
+                var exists = await index.FileExists(path);
+                if(exists)
                 {
-                    var mdlMats = await XivCache.GetChildFiles(model);
-                    if (materialVariant < 0)
+                    materials.Add(path);
+                }
+
+                materialVariant = 1;
+            }
+            else
+            {
+                var models = await GetModelFiles();
+                if (models != null && models.Count > 0)
+                {
+                    var dataFile = IOUtil.GetDataFileFromPath(models[0]);
+                    var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
+
+                    foreach (var model in models)
                     {
-                        foreach (var mat in mdlMats)
+                        var mdlMats = await XivCache.GetChildFiles(model);
+                        if (materialVariant < 0)
                         {
-                            materials.Add(mat);
+                            foreach (var mat in mdlMats)
+                            {
+                                materials.Add(mat);
+                            }
                         }
-                    } else {
-                        var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
-                        foreach (var mat in mdlMats)
+                        else
                         {
-                            // Replace any material set references with the new one.
-                            // The hash set will scrub us down to just a single copy.
-                            // This is faster than re-scanning the MDL file.
-                            // And a little more thorough than simply skipping over non-matching refs.
-                            // Since some materials may not have variant references.
-                            materials.Add(_materialSetRegex.Replace(mat, replacement));
+                            var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
+                            foreach (var mat in mdlMats)
+                            {
+                                // Replace any material set references with the new one.
+                                // The hash set will scrub us down to just a single copy.
+                                // This is faster than re-scanning the MDL file.
+                                // And a little more thorough than simply skipping over non-matching refs.
+                                // Since some materials may not have variant references.
+                                materials.Add(_materialSetRegex.Replace(mat, replacement));
+                            }
                         }
                     }
                 }
@@ -1285,13 +1310,6 @@ namespace xivModdingFramework.Cache
         public static XivDependencyRoot CreateDependencyRoot(XivDependencyRootInfo info)
         {
             if(!DependencySupportedTypes.Contains(info.PrimaryType) || info.PrimaryId < 0)
-            {
-                return null;
-            }
-
-            // Human - Body is an absolute mess of exceptions and weird cross-references.
-            // Just don't support it for now.
-            if(info.PrimaryType == XivItemType.human && info.SecondaryType == XivItemType.body)
             {
                 return null;
             }
