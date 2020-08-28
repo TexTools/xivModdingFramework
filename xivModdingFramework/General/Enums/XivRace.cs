@@ -836,6 +836,19 @@ namespace xivModdingFramework.General.Enums
         /// </summary>
         /// <param name="value">The race string</param>
         /// <returns>The XivRace enum</returns>
+        public static XivRace GetXivRaceFromDisplayName(string value)
+        {
+            var races = Enum.GetValues(typeof(XivRace)).Cast<XivRace>();
+
+            return races.FirstOrDefault(race => race.GetDisplayName() == value);
+        }
+
+
+        /// <summary>
+        /// Gets the enum value from the description
+        /// </summary>
+        /// <param name="value">The race string</param>
+        /// <returns>The XivRace enum</returns>
         public static XivRace GetXivRace(string value)
         {
             var races = Enum.GetValues(typeof(XivRace)).Cast<XivRace>();
