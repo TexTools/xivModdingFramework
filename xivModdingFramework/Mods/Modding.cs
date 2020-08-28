@@ -27,6 +27,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.Enums;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -114,10 +115,20 @@ namespace xivModdingFramework.Mods
         public async Task DeleteAllFilesAddedByTexTools()
         {
             var modList = GetModList();
-            var modsToRemove = modList.Mods.Where(it => it.data.originalOffset == it.data.modOffset);
+            var modsToRemove = modList.Mods.Where(x => x.data.modOffset == x.data.originalOffset);
+
+            // Delete user files first.
             foreach(var mod in modsToRemove)
             {
+                if (mod.IsInternal()) continue;
                 await DeleteMod(mod.fullPath);
+            }
+
+            // Then delete system files.
+            foreach (var mod in modsToRemove)
+            {
+                if (mod.IsInternal()) continue;
+                await DeleteMod(mod.fullPath, true);
             }
         }
         /// <summary>
@@ -233,7 +244,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="internalFilePath">The internal file path of the mod</param>
         /// <param name="enable">The status of the mod</param>
-        public async Task ToggleModStatus(string internalFilePath, bool enable)
+        public async Task<bool> ToggleModStatus(string internalFilePath, bool enable)
         {
             var index = new Index(_gameDirectory);
 
@@ -241,62 +252,22 @@ namespace xivModdingFramework.Mods
             {
                 throw new Exception("File Path missing, unable to toggle mod.");
             }
+            var modList = GetModList();
 
-            var modEntry = await TryGetModEntry(internalFilePath);
+            var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
-            if (modEntry == null)
+            var result = await ToggleModUnsafe(enable, modEntry);
+            if(!result)
             {
-                throw new Exception("Unable to find mod entry in modlist.");
-            }
-
-            if(modEntry.data.originalOffset <= 0 && !enable)
-            {
-                throw new Exception("Cannot disable mod with invalid original offset.");
-            }
-
-            if(enable && modEntry.data.modOffset <= 0)
-            {
-                throw new Exception("Cannot enable mod with invalid mod offset.");
-            }
-
-            // Matadd textures have the same mod offset as original so nothing to toggle
-            if (modEntry.data.originalOffset == modEntry.data.modOffset)
-            {
-                // Added file.
-                if (enable && !modEntry.enabled)
-                {
-                    await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
-                }
-                else if (!enable && modEntry.enabled)
-                {
-                    await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
-                }
-
-            }
-            else
-            { 
-                // Standard mod (file replacement)
-                if (enable)
-                {
-                    await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath);
-                }
-                else
-                {
-                    await index.UpdateDataOffset(modEntry.data.originalOffset, internalFilePath);
-                }
+                return result;
             }
 
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
-            var modList = GetModList();
-
-            var entryEnableUpdate = (from entry in modList.Mods
-                where entry.fullPath.Equals(modEntry.fullPath)
-                select entry).FirstOrDefault();
-
-            entryEnableUpdate.enabled = enable;
 
             SaveModList(modList);
+
+            return result;
         }
 
         /// <summary>
@@ -333,51 +304,89 @@ namespace xivModdingFramework.Mods
 
             foreach (var modEntry in mods)
             {
-                if (modEntry.data.originalOffset <= 0 && !enable)
-                {
-                    throw new Exception("Cannot disable mod with invalid original offset.");
-                }
-
-                if (enable && modEntry.data.modOffset <= 0)
-                {
-                    throw new Exception("Cannot enable mod with invalid mod offset.");
-                }
-
-
-                if (modEntry.name.Equals(string.Empty)) continue;
-                // Matadd textures have the same mod offset as original so nothing to toggle
-                if (modEntry.data.originalOffset == modEntry.data.modOffset)
-                {
-                    // Added file.
-                    if (enable && !modEntry.enabled)
-                    {
-                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath));
-                        modEntry.enabled = true;
-                    }
-                    else if (!enable && modEntry.enabled)
-                    {
-                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath));
-                        modEntry.enabled = false;
-                    }
-
-                }
-                else
-                {
-                    // Standard file (file replacement)
-                    if (enable)
-                    {
-                        await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath);
-                        modEntry.enabled = true;
-                    }
-                    else
-                    {
-                        await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath);
-                        modEntry.enabled = false;
-                    }
-                }
+                await ToggleModUnsafe(enable, modEntry);
             }
 
             SaveModList(modList);
+        }
+
+        /// <summary>
+        /// Performs the most low-level mod enable/disable functions, without saving the modlist,
+        /// ergo this should only be called by functions which will handle saving the modlist after
+        /// they're done performing all modlist operations.
+        /// </summary>
+        /// <param name="enable"></param>
+        /// <param name="mod"></param>
+        /// <returns></returns>
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal = false)
+        {
+            if (mod == null) return false;
+            if (string.IsNullOrEmpty(mod.name)) return false;
+            if (string.IsNullOrEmpty(mod.fullPath)) return false;
+
+            if (mod.data.originalOffset <= 0 && !enable)
+            {
+                throw new Exception("Cannot disable mod with invalid original offset.");
+            }
+
+            if (enable && mod.data.modOffset <= 0)
+            {
+                throw new Exception("Cannot enable mod with invalid mod offset.");
+            }
+            
+            if(mod.IsInternal() && !includeInternal)
+            {
+                // Don't allow toggling internal mods unless we were specifically told to.
+                return false;
+            }
+
+            var index = new Index(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+
+            if (mod.data.modOffset == mod.data.originalOffset)
+            {
+                // Added file.
+                if (enable && !mod.enabled)
+                {
+                    await index.AddFileDescriptor(mod.fullPath, mod.data.modOffset, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                    mod.enabled = true;
+
+                    // Check if we're re-enabling a metadata mod.
+                    var ext = Path.GetExtension(mod.fullPath);
+                    if (ext == ".meta")
+                    {
+                        // Retreive the uncompressed meta entry we just enabled.
+                        var data = await dat.GetType2Data(mod.fullPath, false);
+                        var meta = await ItemMetadata.Deserialize(data);
+
+                        // And write that metadata to the actual constituent files.
+                        await ItemMetadata.ApplyMetadata(meta);
+                    }
+                }
+                else if (!enable && mod.enabled)
+                {
+
+                    // Delete file descriptor handles removing metadata as needed on its own.
+                    await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                    mod.enabled = false;
+                }
+                
+            }
+            else
+            {
+                // Standard mod.
+                if (enable && !mod.enabled)
+                {
+                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, false);
+                    mod.enabled = true;
+                }
+                else if (!enable && mod.enabled)
+                {
+                    await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, false);
+                    mod.enabled = false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -392,55 +401,29 @@ namespace xivModdingFramework.Mods
 
             if (modList == null || modList.modCount == 0) return;
 
+            // If we're doing a full disable, remove even internal subfiles so we don't 
+            // potentially pollute our index backups.
+            bool includeInternal = enable == false;
+
 
             var modNum = 0;
             foreach (var modEntry in modList.Mods)
             {
-                if(string.IsNullOrEmpty(modEntry.name)) continue;
-                if(string.IsNullOrEmpty(modEntry.fullPath)) continue;
+                // Save disabling these for last.
+                if (modEntry.IsInternal()) continue;
 
-                if (modEntry.data.originalOffset <= 0 && !enable)
-                {
-                    throw new Exception("Cannot disable mod with invalid original offset.");
-                }
-
-                if (enable && modEntry.data.modOffset <= 0)
-                {
-                    throw new Exception("Cannot enable mod with invalid mod offset.");
-                }
-
-
-                if (modEntry.data.modOffset == modEntry.data.originalOffset)
-                {
-                    // Added file.
-                    if (enable && !modEntry.enabled)
-                    {
-                        await index.AddFileDescriptor(modEntry.fullPath, modEntry.data.modOffset, IOUtil.GetDataFileFromPath(modEntry.fullPath), false);
-                        modEntry.enabled = true;
-                    }
-                    else if (!enable && modEntry.enabled)
-                    {
-                        await index.DeleteFileDescriptor(modEntry.fullPath, IOUtil.GetDataFileFromPath(modEntry.fullPath), false);
-                        modEntry.enabled = false;
-                    }
-
-                }
-                else
-                {
-                    // Standard mod.
-                    if (enable && !modEntry.enabled)
-                    {
-                        await index.UpdateDataOffset(modEntry.data.modOffset, modEntry.fullPath, false);
-                        modEntry.enabled = true;
-                    }
-                    else if (!enable && modEntry.enabled)
-                    {
-                        await index.UpdateDataOffset(modEntry.data.originalOffset, modEntry.fullPath, false);
-                        modEntry.enabled = false;
-                    }
-                }
-
+                await ToggleModUnsafe(enable, modEntry);
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
+            }
+
+            if (includeInternal)
+            {
+                // Disable these last, just to avoid any potential strangeness.
+                var internalEntries = modList.Mods.Where(x => x.IsInternal());
+                foreach (var modEntry in internalEntries)
+                {
+                    await ToggleModUnsafe(enable, modEntry, true);
+                }
             }
 
 
@@ -510,7 +493,7 @@ namespace xivModdingFramework.Mods
         /// Deletes a mod from the modlist
         /// </summary>
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
-        public async Task DeleteMod(string modItemPath)
+        public async Task DeleteMod(string modItemPath, bool allowInternal = false)
         {
             var modList = GetModList();
 
@@ -521,7 +504,20 @@ namespace xivModdingFramework.Mods
             // Mod doesn't exist in the modlist.
             if (modToRemove == null) return;
 
-            await ToggleModStatus(modItemPath, false);
+            if(modToRemove.IsInternal() && !allowInternal)
+            {
+                throw new Exception("Cannot delete internal data without explicit toggle.");
+            }
+
+            if (modToRemove.IsCustomFile())
+            {
+                var index = new Index(_gameDirectory);
+                await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+            }
+            if (modToRemove.enabled)
+            {
+                await ToggleModStatus(modItemPath, false);
+            }
 
             modToRemove.name = string.Empty;
             modToRemove.category = string.Empty;
@@ -570,10 +566,17 @@ namespace xivModdingFramework.Mods
 
             var modRemoveCount = modsToRemove.Count;
 
-            List<Mod> modsToPurge = new List<Mod>();
             foreach (var modToRemove in modsToRemove)
             {
-                await ToggleModStatus(modToRemove.fullPath, false);
+                if (modToRemove.data.originalOffset == modToRemove.data.modOffset)
+                {
+                    var index = new Index(_gameDirectory);
+                    await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                }
+                if (modToRemove.enabled)
+                {
+                    await ToggleModStatus(modToRemove.fullPath, false);
+                }
 
                 modToRemove.name = string.Empty;
                 modToRemove.category = string.Empty;
@@ -583,17 +586,6 @@ namespace xivModdingFramework.Mods
                 modToRemove.enabled = false;
                 modToRemove.data.originalOffset = 0;
                 modToRemove.data.dataType = 0;
-
-                if (modToRemove.data.modOffset <= 0)
-                {
-                    modsToPurge.Add(modToRemove);
-                }
-            }
-
-            // Purge any that have invalid data offsets so we don't reuse them.
-            foreach(var m in modsToPurge)
-            {
-                modList.Mods.Remove(m);
             }
 
             modList.emptyCount += modRemoveCount;

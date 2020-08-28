@@ -90,11 +90,11 @@ namespace xivModdingFramework.Textures.FileTypes
         public async Task<XivTex> GetTexData(MapInfo map)
         {
 
-            var dataFile = IOUtil.GetDataFileFromPath(map.path);
+            var dataFile = IOUtil.GetDataFileFromPath(map.Path);
             var ttp = new TexTypePath()
             {
                 DataFile = dataFile,
-                Path = map.path,
+                Path = map.Path,
                 Type = map.Usage
             };
             return await GetTexData(ttp);

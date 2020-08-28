@@ -103,7 +103,9 @@ namespace xivModdingFramework.Items.Enums
         {
             foreach (XivItemType type in (XivItemType[])Enum.GetValues(typeof(XivItemType)))
             {
-                if (type.GetSystemPrefix()[0] == value)
+                var prefix = type.GetSystemPrefix();
+                if (prefix.Length == 0) continue;
+                if (prefix[0] == value)
                 {
                     return type;
                 }

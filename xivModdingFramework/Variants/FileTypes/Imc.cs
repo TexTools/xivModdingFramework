@@ -97,7 +97,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// </summary>
         /// <param name="pathsWithOffsets"></param>
         /// <returns></returns>
-        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets)
+        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false)
         {
             var entries = new List<XivImc>();
             var index = new Index(_gameDirectory);
@@ -121,8 +121,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 // Only reload this data if we need to.
                 if (path != lastPath)
                 {
-                    imcOffset = await index.GetDataOffset(path);
-                    imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(path));
+                    imcByteData = await dat.GetType2Data(path, forceDefault);
                 }
                 lastPath = path;
 
@@ -148,6 +147,61 @@ namespace xivModdingFramework.Variants.FileTypes
 
             }
             return entries;
+        }
+
+        /// <summary>
+        /// Saves a set of IMC entries to file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="entries"></param>
+        /// <returns></returns>
+        internal async Task SaveEntries(string path, string slot, List<XivImc> entries)
+        {
+            var dat = new Dat(_gameDirectory);
+            //var imcByteData = await dat.GetType2Data(path, false);
+            var info = await GetFullImcInfo(path);
+            for(int i = 0; i < entries.Count; i++)
+            {
+                var e = info.GetEntry(i, slot);
+                e.Mask = entries[i].Mask;
+                e.Unknown = entries[i].Unknown;
+                e.Vfx = entries[i].Vfx;
+                e.Variant = entries[i].Variant;
+            }
+
+            // Save the modified info.
+            await SaveFullImcInfo(info, path, Path.GetFileName(path), Constants.InternalModSourceName, Constants.InternalModSourceName);
+        }
+
+        public static byte[] SerializeEntry(XivImc entry)
+        {
+
+            List<byte> bytes = new List<byte>(6);
+            bytes.Add((byte)entry.Variant);
+            bytes.Add((byte)entry.Unknown);
+            bytes.AddRange(BitConverter.GetBytes((ushort)entry.Mask));
+            bytes.AddRange(BitConverter.GetBytes((ushort)entry.Vfx));
+            return bytes.ToArray();
+        }
+
+        public static XivImc DeserializeEntry(byte[] data)
+        {
+
+            using (var br = new BinaryReader(new MemoryStream(data)))
+            {
+                byte variant = br.ReadByte();
+                byte unknown = br.ReadByte();
+                ushort mask = br.ReadUInt16();
+                ushort vfx = br.ReadUInt16();
+                return new XivImc
+                {
+                    Variant = variant,
+                    Unknown = unknown,
+                    Mask = mask,
+                    Vfx = variant
+                };
+
+            }
         }
 
 
@@ -477,18 +531,30 @@ namespace xivModdingFramework.Variants.FileTypes
             public List<XivImc> DefaultSubset { get; set; }
 
             // Gets all (non-default) IMC entries for a given slot.
-            public List<XivImc> GetAllEntries(string slot = "")
+            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = false)
             {
                 var ret = new List<XivImc>(SubsetList.Count);
-                for(int i = 0; i < SubsetList.Count; i++)
+                if (includeDefault)
                 {
-                    ret.Add(GetEntry(i+1, slot));
+                    for (int i = 0; i <= SubsetList.Count; i++)
+                    {
+                        ret.Add(GetEntry(i, slot));
+                    }
                 }
+                else
+                {
+                    for (int i = 1; i <= SubsetList.Count; i++)
+                    {
+                        ret.Add(GetEntry(i, slot));
+                    }
+                }
+
+
                 return ret;
             }
 
             /// <summary>
-            /// Retrieve a given IMC info. Negative values retrieve the default set.
+            /// Retrieve a given IMC info. Zero or Negative values retrieve the default set.
             /// </summary>
             /// <param name="index">IMC Variant/Subset ID</param>
             /// <param name="slot">Slot Abbreviation</param>
@@ -513,7 +579,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if(SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
+                if(slot != null && SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
                     idx = SlotOffsetDictionary[slot];
                 }

@@ -1168,6 +1168,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to HUD.
+        /// </summary>
+        internal static string HUD {
+            get {
+                return ResourceManager.GetString("HUD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Human.
         /// </summary>
         internal static string Human {

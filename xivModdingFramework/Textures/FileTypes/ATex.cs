@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -55,7 +56,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
-            var vfxPath = await GetVfxPath(itemModel, itemType);
+            var vfxPath = await GetVfxPath(itemModel);
 
             var vfxOffset = await index.GetDataOffset(HashGenerator.GetHash(vfxPath.Folder), HashGenerator.GetHash(vfxPath.File),
                 _dataFile);
@@ -122,41 +123,73 @@ namespace xivModdingFramework.Textures.FileTypes
             return xivTex;
         }
 
+        public static char GetVfxPrefix(XivDependencyRootInfo root)
+        {
+            var itemType = root.PrimaryType;
+            if(root.PrimaryType == XivItemType.demihuman)
+            {
+                itemType = (XivItemType)root.SecondaryType;
+            }
+
+            if(itemType == XivItemType.equipment)
+            {
+                return 'e';
+            } else if (itemType == XivItemType.weapon)
+            {
+                return 'w';
+            }
+            else if (itemType == XivItemType.monster)
+            {
+                return 'm';
+            }
+            else
+            {
+                return '\0';
+            }
+        }
+
         /// <summary>
         /// Gets the avfx path
         /// </summary>
         /// <param name="itemModel">The item to get the avfx path for</param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>A tuple containing the path folder and file</returns>
-        private async Task<(string Folder, string File)> GetVfxPath(IItemModel itemModel, XivItemType itemType)
+        public static async Task<(string Folder, string File)> GetVfxPath(IItemModel itemModel)
         {
             // get the vfx version from the imc file
-            var imc = new Imc(_gameDirectory);
+            var imc = new Imc(XivCache.GameInfo.GameDirectory);
             var imcInfo = await imc.GetImcInfo(itemModel);
             int vfx = imcInfo.Vfx;
 
-            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var root = itemModel.GetRootInfo();
+            return await GetVfxPath(root, vfx);
+
+        }
+        public static async Task<(string Folder, string File)> GetVfxPath(XivDependencyRootInfo root, int vfx) { 
+
+            var type = root.PrimaryType;
+            var id = root.PrimaryId.ToString().PadLeft(4, '0');
+            var bodyVer = root.SecondaryId.ToString().PadLeft(4, '0');
+            var prefix = XivItemTypes.GetSystemPrefix(type);
+            var vfxPrefix = GetVfxPrefix(root);
 
             string vfxFolder, vfxFile;
 
-            switch (itemType)
-            {
+            switch (type)
+            {//
+
                 case XivItemType.equipment:
-                    vfxFolder = $"chara/{itemType}/e{id}/vfx/eff";
-                    vfxFile = $"ve{vfx.ToString().PadLeft(4, '0')}.avfx";
+                    vfxFolder = $"chara/{type}/{prefix}{id}/vfx/eff";
+                    vfxFile = $"v{vfxPrefix}{vfx.ToString().PadLeft(4, '0')}.avfx";
                     break;
                 case XivItemType.weapon:
-                    vfxFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/vfx/eff";
-                    vfxFile = $"vw{vfx.ToString().PadLeft(4, '0')}.avfx";
-                    break;
                 case XivItemType.monster:
-                    vfxFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/vfx/eff";
-                    vfxFile = $"vm{vfx.ToString().PadLeft(4, '0')}.avfx";
+                    vfxFolder = $"chara/{type}/{prefix}{id}/obj/body/b{bodyVer}/vfx/eff";
+                    vfxFile = $"v{vfxPrefix}{vfx.ToString().PadLeft(4, '0')}.avfx";
                     break;
                 case XivItemType.demihuman:
-                    vfxFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/vfx/eff";
-                    vfxFile = $"ve{vfx.ToString().PadLeft(4, '0')}.avfx";
+                    vfxFolder = $"chara/{type}/{prefix}{id}/obj/equipment/e{bodyVer}/vfx/eff";
+                    vfxFile = $"v{vfxPrefix}{vfx.ToString().PadLeft(4, '0')}.avfx";
                     break;
                 default:
                     vfxFolder = "";

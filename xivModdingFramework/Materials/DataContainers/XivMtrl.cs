@@ -311,7 +311,6 @@ namespace xivModdingFramework.Materials.DataContainers
                     break;
             }
 
-            info.HasColorset = ColorSetData.Count > 0;
             // Check the transparency bit.
             const ushort transparencyBit = 16;
             const ushort backfaceBit = 1;
@@ -448,15 +447,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 return;
             }
 
-            if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass || info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture)
-            {
-                info.HasColorset = true;
-            }
-            else
-            {
-                info.HasColorset = false;
-            }
-
             RegenerateTextureUsageList(info);
             RegenerateShaderParameterList(info);
 
@@ -587,13 +577,13 @@ namespace xivModdingFramework.Materials.DataContainers
                 return null;
             }
 
-            info.path = "";
+            info.Path = "";
             if ( mapIndex < TexturePathList.Count )
             {
-                info.path = TexturePathList[mapIndex];
+                info.Path = TexturePathList[mapIndex];
             }
 
-            info.path = TokenizePath(info.path, info.Usage);
+            info.Path = TokenizePath(info.Path, info.Usage);
             return info;
         }
 
@@ -622,7 +612,7 @@ namespace xivModdingFramework.Materials.DataContainers
             }
 
             var info = new MapInfo();
-            info.path = path;
+            info.Path = path;
             
             foreach(var descriptor in TextureDescriptorList)
             {
@@ -647,7 +637,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
             }
 
-            info.path = TokenizePath(info.path, info.Usage);
+            info.Path = TokenizePath(info.Path, info.Usage);
 
             return info;
         }
@@ -718,30 +708,30 @@ namespace xivModdingFramework.Materials.DataContainers
             var defaultFileName = GetDefaultTexureName(info.Usage);
 
             // No path, assign it by default.
-            if (info.path.Trim() == "")
+            if (info.Path.Trim() == "")
             {
-                info.path = rootPath + "/" + defaultFileName;
+                info.Path = rootPath + "/" + defaultFileName;
             }
 
             // Detokenize paths
-            info.path = DetokenizePath(info.path, info.Usage);
+            info.Path = DetokenizePath(info.Path, info.Usage);
 
             // Test the path goes to a legitimate DAT file.
             try
             {
-                IOUtil.GetDataFileFromPath(info.path);
+                IOUtil.GetDataFileFromPath(info.Path);
             } catch
             {
                 // Prefix the item's personal path onto it.
-                info.path = ItemPathToken + "/" + info.path;
-                info.path = DetokenizePath(info.path, info.Usage);
+                info.Path = ItemPathToken + "/" + info.Path;
+                info.Path = DetokenizePath(info.Path, info.Usage);
             }
 
             // Ensure .tex or .atex ending for sanity.
-            var match = Regex.Match(info.path, "\\.a?tex$");
+            var match = Regex.Match(info.Path, "\\.a?tex$");
             if(!match.Success)
             {
-                info.path = info.path += ".tex";
+                info.Path = info.Path += ".tex";
             }
 
 
@@ -765,11 +755,11 @@ namespace xivModdingFramework.Materials.DataContainers
             // Inject the new string
             if(raw.TextureIndex == TexturePathList.Count)
             {
-                TexturePathList.Add(info.path);
+                TexturePathList.Add(info.Path);
                 TexturePathUnknownList.Add((short) 0); // This value seems to always be 0 for textures.
             } else
             {
-                TexturePathList[(int) raw.TextureIndex] = info.path;
+                TexturePathList[(int) raw.TextureIndex] = info.Path;
             }
         }
 
@@ -1040,7 +1030,7 @@ namespace xivModdingFramework.Materials.DataContainers
             for(var i = 0; i < TexturePathList.Count; i++)
             {
                 var info = new MapInfo();
-                info.path = TexturePathList[i];
+                info.Path = TexturePathList[i];
                 info.Format = MtrlTextureDescriptorFormat.Other;
                 info.Usage = XivTexType.Other;
 
@@ -1078,7 +1068,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
                 if (tokenize)
                 {
-                    info.path = TokenizePath(info.path, info.Usage);
+                    info.Path = TokenizePath(info.Path, info.Usage);
                 }
                 ret.Add(info);
             }
@@ -1102,17 +1092,17 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 if (shaderInfo.Shader == MtrlShader.Skin && map.Usage == XivTexType.Multi)
                 {
-                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = XivTexType.Skin };
+                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = XivTexType.Skin };
 
-                } else if (shaderInfo.Shader == MtrlShader.Furniture && map.path.Contains("dummy")) {
+                } else if (shaderInfo.Shader == MtrlShader.Furniture && map.Path.Contains("dummy")) {
                     // Dummy textures are skipped.
                     continue;
                 }
                 else
                 {
-                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = map.Usage };
+                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = map.Usage };
                 }
-                var fName = Path.GetFileNameWithoutExtension(map.path);
+                var fName = Path.GetFileNameWithoutExtension(map.Path);
                 if (fName != "")
                 {
                     var name = map.Usage.ToString() + ": " + fName;
@@ -1498,7 +1488,21 @@ namespace xivModdingFramework.Materials.DataContainers
         public MtrlShaderPreset Preset;
         public bool TransparencyEnabled;
         public bool RenderBackfaces = false;
-        public bool HasColorset = false;
+        
+        public bool HasColorset {
+            get
+            {
+                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
         public bool HasDiffuse
         {
             get
@@ -1609,7 +1613,7 @@ namespace xivModdingFramework.Materials.DataContainers
     {
         public XivTexType Usage;
         public MtrlTextureDescriptorFormat Format;
-        public string path;
+        public string Path;
 
 
         public object Clone()

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -12,6 +13,7 @@ using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -27,13 +29,13 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.1.4");
+        public static readonly Version CacheVersion = new Version("1.0.1.6");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
-        internal static string CacheConnectionString 
-        { 
+        internal static string CacheConnectionString
+        {
             get
             {
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
@@ -86,7 +88,7 @@ namespace xivModdingFramework.Cache
                 // better to be safe.
                 if (_REBUILDING) return;
 
-                if (value  && _cacheWorker == null)
+                if (value && _cacheWorker == null)
                 {
 
                     _cacheWorker = new BackgroundWorker
@@ -97,17 +99,17 @@ namespace xivModdingFramework.Cache
                     _cacheWorker.DoWork += ProcessDependencyQueue;
                     _cacheWorker.RunWorkerAsync();
                 }
-                else if(value == false && _cacheWorker != null) 
+                else if (value == false && _cacheWorker != null)
                 {
                     // Sleep until the cache worker actually stops.
                     _cacheWorker.CancelAsync();
                     var duration = 0;
-                    while(_cacheWorker != null)
+                    while (_cacheWorker != null)
                     {
                         Thread.Sleep(10);
                         duration += 10;
 
-                        if(duration >= 3000)
+                        if (duration >= 3000)
                         {
                             // Something went wrong with the shutdown of the cache worker thread.
                             // Hopefully whatever went wrong fully crashed the thread.
@@ -119,6 +121,19 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public enum CacheRebuildReason
+        {
+            CacheOK,
+            NoCache,
+            CacheVersionUpdate,
+            FFXIVUpdate,
+            LanguageChanged,
+            RebuildFlag,
+            ManualRequest,
+            InvalidData
+        }
+
+        public static event EventHandler<CacheRebuildReason> CacheRebuilding;
 
         private static BackgroundWorker _cacheWorker;
 
@@ -142,7 +157,7 @@ namespace xivModdingFramework.Cache
                 throw new Exception("First call to cache must include a valid game directoy.");
             }
 
-            if(gameInfo != null && !gameInfo.GameDirectory.Exists)
+            if (gameInfo != null && !gameInfo.GameDirectory.Exists)
             {
                 throw new Exception("Provided Game Directory does not exist.");
             }
@@ -166,9 +181,10 @@ namespace xivModdingFramework.Cache
             if (!_REBUILDING)
             {
 
-                if (CacheNeedsRebuild() && !_REBUILDING)
+                var reason = CacheNeedsRebuild();
+                if (reason != CacheRebuildReason.CacheOK && !_REBUILDING)
                 {
-                    RebuildCache();
+                    RebuildCache(reason);
                 }
             }
 
@@ -187,26 +203,31 @@ namespace xivModdingFramework.Cache
         /// <summary>
         /// Tests if the cache needs to be rebuilt (and starts the process if it does.)
         /// </summary>
-        private static bool CacheNeedsRebuild()
+        private static CacheRebuildReason CacheNeedsRebuild()
         {
-            Func<bool> checkValidation = () =>
+            Func<CacheRebuildReason> checkValidation = () =>
             {
                 try
                 {
-                    // Cache structure updated?
-                    var val = GetMetaValue("cache_version");
-                    var version = new Version(val);
-                    if (version != CacheVersion)
+                    if (!File.Exists(_dbPath.FullName))
                     {
-                        return true;
+                        return CacheRebuildReason.NoCache;
                     }
 
-                    // FFXIV Updated?
-                    val = GetMetaValue("ffxiv_version");
-                    version = new Version(val);
+                    // FFXIV Updated?  This one always gets highest priority for reason.
+                    var val = GetMetaValue("ffxiv_version");
+                    var version = new Version(val);
                     if (version != _gameInfo.GameVersion)
                     {
-                        return true;
+                        return CacheRebuildReason.FFXIVUpdate;
+                    }
+
+                    // Cache structure updated?
+                    val = GetMetaValue("cache_version");
+                    version = new Version(val);
+                    if (version != CacheVersion)
+                    {
+                        return CacheRebuildReason.CacheVersionUpdate;
                     }
 
                     if (_gameInfo.GameLanguage != XivLanguage.None)
@@ -215,7 +236,7 @@ namespace xivModdingFramework.Cache
                         val = GetMetaValue("language");
                         if (val != _gameInfo.GameLanguage.ToString())
                         {
-                            return true;
+                            return CacheRebuildReason.LanguageChanged;
                         }
                     }
 
@@ -223,19 +244,19 @@ namespace xivModdingFramework.Cache
                     val = GetMetaValue("needs_rebuild");
                     if (val != null)
                     {
-                        return true;
+                        return CacheRebuildReason.RebuildFlag;
                     }
 
-                    return false;
+                    return CacheRebuildReason.CacheOK;
                 }
                 catch (Exception Ex)
                 {
-                    return true;
+                    return CacheRebuildReason.InvalidData;
                 }
             };
 
             var result = checkValidation();
-            if (result)
+            if (result != CacheRebuildReason.CacheOK)
             {
                 // Ensure we cleaned up after ourselves
                 // in preprartion for calling rebuild.
@@ -253,10 +274,16 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache()
+        public static void RebuildCache(CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
         {
             CacheWorkerEnabled = false;
             _REBUILDING = true;
+
+            if (CacheRebuilding != null)
+            {
+                // If there are any event listeners, invoke them.
+                CacheRebuilding.Invoke(null, reason);
+            }
 
             Task.Run(async () =>
             {
@@ -273,6 +300,7 @@ namespace xivModdingFramework.Cache
 
                     var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
                     tasks.Add(RebuildItemsCache());
+                    tasks.Add(RebuildCharactersCache());
                     tasks.Add(RebuildMonstersCache());
                     tasks.Add(RebuildUiCache());
                     tasks.Add(RebuildFurnitureCache());
@@ -293,6 +321,13 @@ namespace xivModdingFramework.Cache
                 {
                     try
                     {
+                        // If we failed an update due to a post-patch error, keep us stuck in that state
+                        // until a TexTools update and a proper completed rebuild.
+                        if (reason == CacheRebuildReason.FFXIVUpdate)
+                        {
+                            SetMetaValue("ffxiv_version", new Version(0, 0, 0, 0).ToString());
+                        }
+
                         SetMetaValue("needs_rebuild", "1");
                     }
                     catch {
@@ -360,7 +395,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            var backupFile = Path.Combine(cwd,"Resources", "DB", rootCacheFileName);
+            var backupFile = Path.Combine(cwd, "Resources", "DB", rootCacheFileName);
 
             if (!File.Exists(_rootCachePath.FullName))
             {
@@ -392,13 +427,13 @@ namespace xivModdingFramework.Cache
                     }
                 }
             }
-            else if(File.Exists(backupFile))
+            else if (File.Exists(backupFile))
             {
                 // If we have both a backup and current file, see if the current is out of date.
                 // (If we just updated textools and the download came with a new file)
                 var backupDate = File.GetLastWriteTime(backupFile);
                 var currentDate = File.GetLastWriteTime(_rootCachePath.FullName);
-                if(backupDate > currentDate)
+                if (backupDate > currentDate)
                 {
                     // Our backup is newer, copy it through.
                     try
@@ -501,7 +536,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
-                            if(root.IsValid())
+                            if (root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
                             } else
@@ -681,12 +716,57 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        private static async Task RebuildCharactersCache()
+        {
+            var _character = new Character(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+            var items = await _character.GetUnCachedCharacterList();
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+                using (var transaction = db.BeginTransaction())
+                {
+                    foreach (var item in items)
+                    {
+                        var query = @"insert into characters ( primary_id, slot, slot_full, name, root) 
+                                                  values    ( $primary_id,$slot,$slot_full,$name,$root)";
+                        var root = item.GetRootInfo();
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            if (item.ModelInfo != null)
+                            {
+                                cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                            } else
+                            {
+                                cmd.Parameters.AddWithValue("primary_id", 0);
+                            }
+                            cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
+                            cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
+                            cmd.Parameters.AddWithValue("name", item.Name);
+                            if (root.IsValid())
+                            {
+                                cmd.Parameters.AddWithValue("root", root.ToString());
+                            }
+                            else
+                            {
+                                cmd.Parameters.AddWithValue("root", null);
+                            }
+                            cmd.ExecuteScalar();
+                        }
+                    }
+                    transaction.Commit();
+                }
+            }
+        }
+        private static async Task RebuildItemsCache()
+        {
+            await RebuildGearCache();
+        }
 
         /// <summary>
         /// Populate the items table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildItemsCache()
+        private static async Task RebuildGearCache()
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -929,6 +1009,28 @@ namespace xivModdingFramework.Cache
                 throw;
             }
         }
+        internal static async Task<List<XivCharacter>> GetCachedCharacterList(string substring = null)
+        {
+            WhereClause where = null;
+
+            if (substring != null)
+            {
+                where.Comparer = WhereClause.ComparisonType.Like;
+                where.Join = WhereClause.JoinType.And;
+                where.Column = "name";
+                where.Value = "%" + substring + "%";
+            }
+
+            List<XivCharacter> mainHands = new List<XivCharacter>();
+            var list = await BuildListFromTable("characters", where, async (reader) =>
+            {
+                var item = MakeCharacter(reader);
+
+                return item;
+            });
+
+            return list;
+        }
 
         /// <summary>
         /// Get the gear entries list, optionally with a substring filter.
@@ -938,13 +1040,15 @@ namespace xivModdingFramework.Cache
         internal static async Task<List<XivGear>> GetCachedGearList(string substring = null)
         {
             WhereClause where = null;
+
             if (substring != null)
             {
-                where = new WhereClause();
                 where.Comparer = WhereClause.ComparisonType.Like;
+                where.Join = WhereClause.JoinType.And;
                 where.Column = "name";
                 where.Value = "%" + substring + "%";
             }
+
 
             List<XivGear> mainHands = new List<XivGear>();
             List<XivGear> offHands = new List<XivGear>();
@@ -1039,6 +1143,23 @@ namespace xivModdingFramework.Cache
             return item;
         }
         
+        internal static XivCharacter MakeCharacter(CacheReader reader)
+        {
+            var mi = new XivModelInfo();
+
+            var item = new XivCharacter
+            {
+                PrimaryCategory = XivStrings.Character,
+                SecondaryCategory = reader.GetString("slot_full"),
+                ModelInfo = mi,
+            };
+
+            item.Name = reader.GetString("name");
+            mi.PrimaryID = reader.GetInt32("primary_id");
+            mi.SecondaryID = 0;
+            return item;
+        }
+
         /// <summary>
         /// Creates a XivGear entry from a database row.
         /// </summary>
@@ -2219,6 +2340,7 @@ namespace xivModdingFramework.Cache
             public enum ComparisonType
             {
                 Equal,
+                NotEqual,
                 Like
             }
             public enum JoinType
@@ -2309,7 +2431,10 @@ namespace xivModdingFramework.Cache
                     {
                         result += " = ";
                     }
-                    else
+                    else if(Comparer == ComparisonType.NotEqual)
+                    {
+                        result += " != ";
+                    } else
                     {
                         result += " like ";
                     }

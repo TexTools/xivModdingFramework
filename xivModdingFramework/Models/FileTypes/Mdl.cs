@@ -141,37 +141,14 @@ namespace xivModdingFramework.Models.FileTypes
                 System.IO.Directory.CreateDirectory(dir);
             }
 
-
-            if (fileFormat == "dae")
-            {
-                // Validate the skeleton.
-                var sklb = new Sklb(_gameDirectory);
-                var skel = await sklb.CreateParsedSkelFile(mdlPath);
-
-                // If we have weights, but can't find a skel, bad times.
-                if (skel == null)
-                {
-                    throw new InvalidDataException("Unable to resolve model skeleton.");
-                }
-
-                // Special DAE snowflake.
-                var mdl = await GetRawMdlData(mdlPath, getOriginal);
-                var _dae = new Dae(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
-                await _dae.MakeDaeFileFromModel(mdl, outputFilePath, Path.GetFileNameWithoutExtension(skel));
-
-            }
-            else
-            {
-                var imc = new Imc(_gameDirectory);
-                var model = await GetModel(mdlPath);
-                await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
-            }
+            var imc = new Imc(_gameDirectory);
+            var model = await GetModel(mdlPath);
+            await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
         }
 
 
         /// <summary>
         /// Exports a TTModel file to the given output path.
-        /// DOES NOT SUPPORT DAE EXPORT.
         /// </summary>
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
@@ -224,23 +201,6 @@ namespace xivModdingFramework.Models.FileTypes
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
                 await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
-            }
-
-            // Validate the skeleton.
-            if (model.HasWeights)
-            {
-                // The TTModel.SaveToFile function will re-resolve this var using a more
-                // speedy, synchronous function, so we don't need to hang onto it.
-                // We just need to call this here to ensure the .skel file is
-                // created, if needed.
-                var sklb = new Sklb(_gameDirectory);
-                var skel = await sklb.CreateParsedSkelFile(model.Source);
-
-                // If we have weights, but can't find a skel, bad times.
-                if (skel == null)
-                {
-                    throw new InvalidDataException("Unable to resolve model skeleton.");
-                }
             }
 
 
@@ -1903,7 +1863,6 @@ namespace xivModdingFramework.Models.FileTypes
             cwd = cwd.Replace("\\", "/");
             string importerPath = cwd + "/converters/";
             var ret = new List<string>();
-            ret.Add("dae"); // DAE handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
             var directories = Directory.GetDirectories(importerPath);
@@ -1928,7 +1887,6 @@ namespace xivModdingFramework.Models.FileTypes
             cwd = cwd.Replace("\\", "/");
             string importerPath = cwd + "/converters/";
             var ret = new List<string>();
-            ret.Add("dae"); // DAE handler is internal.
             ret.Add("obj"); // OBJ handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
@@ -2019,7 +1977,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="item">The current item being imported</param>
         /// <param name="race">The racial model to replace of the item</param>
-        /// <param name="path">The location of the dae file to import</param>
+        /// <param name="path">The location of the file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
         ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
@@ -2111,16 +2069,6 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     // If we were given no path, load the current model.
                     ttModel = await GetModel(item, race, submeshId);
-                }
-                else if (suffix == "dae")
-                {
-                    loggingFunction(true, "DEPRECATION NOTICE - DAE Import/Export is Deprecated/Legacy Functionality and will be removed in TexTools 2.3.  Consider changing to FBX Import/Export.");
-                    // Dae handling is a special snowflake.
-                    var dae = new Dae(_gameDirectory, _dataFile);
-                    loggingFunction(false, "Loading DAE file...");
-                    var fileLocation = new DirectoryInfo(path);
-                    ttModel = dae.ReadColladaFile(fileLocation, loggingFunction);
-                    loggingFunction(false, "DAE File loaded successfully.");
                 }
                 else if (suffix == "db")
                 {
@@ -2523,9 +2471,6 @@ namespace xivModdingFramework.Models.FileTypes
                 short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].ExtraMeshCount);
                 short higherLodMeshCount = 0;
                 meshCount += higherLodMeshCount;
-                // Update the total mesh count only if there are more meshes than the original
-                // We do not remove mesh if they are missing from the DAE, we just set the mesh metadata to 0
-
                 ogModelData.MeshCount = meshCount;
                 // Recalculate total number of parts.
                 short partCOunt  = 0;
@@ -4249,7 +4194,21 @@ namespace xivModdingFramework.Models.FileTypes
 
             var skelName = "c" + race.GetRaceCode();
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
+            var skeletonFile = cwd + "/Skeletons/" + skelName + "b0001.skel";
+
+            if (!File.Exists(skeletonFile))
+            {
+                // Need to extract the Skel file real quick like.
+                var tempRoot = new XivDependencyRootInfo();
+                tempRoot.PrimaryType = XivItemType.equipment;
+                tempRoot.PrimaryId = 0;
+                tempRoot.Slot = "top";
+                Task.Run(async () =>
+                {
+                    await Sklb.GetBaseSkeletonFile(tempRoot, race);
+                }).Wait();
+            }
+
             var skeletonData = File.ReadAllLines(skeletonFile);
             var FullSkel = new Dictionary<string, SkeletonData>();
             var FullSkelNum = new Dictionary<int, SkeletonData>();
@@ -4339,6 +4298,156 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 BuildNewTransfromMatrices(c.Value, skeletonData, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
             }
+        }
+
+        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
+        private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+
+        /// <summary>
+        /// Creates a new racial model for a given set/slot by copying from already existing racial models.
+        /// </summary>
+        /// <param name="setId"></param>
+        /// <param name="slot"></param>
+        /// <param name="newRace"></param>
+        /// <returns></returns>
+        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source)
+        {
+
+            var _index = new Index(_gameDirectory);
+            var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+
+            if (!isAccessory)
+            {
+                var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
+                if (!slotOk)
+                {
+                    throw new InvalidDataException("Attempted to get racial models for invalid slot.");
+                }
+            }
+
+            // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
+            var format = "";
+            if (!isAccessory)
+            {
+                format = _EquipmentModelPathFormat;
+            }
+            else
+            {
+                format = _AccessoryModelPathFormat;
+            }
+
+            var path = String.Format(format, setId.ToString().PadLeft(4, '0'), newRace.GetRaceCode(), slot);
+
+            // File already exists, no adjustments needed.
+            if ((await _index.FileExists(path))) return;
+
+            var _eqp = new Eqp(_gameDirectory);
+            var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
+            var baseModelOrder = newRace.GetModelPriorityList();
+
+            // Ok, we need to find which racial model to use as our base now...
+            var baseRace = XivRace.All_Races;
+            var originalPath = "";
+            foreach (var targetRace in baseModelOrder)
+            {
+                if (availableModels.Contains(targetRace))
+                {
+                    originalPath = String.Format(format, setId.ToString().PadLeft(4, '0'), targetRace.GetRaceCode(), slot);
+                    var exists = await _index.FileExists(originalPath);
+                    if (exists)
+                    {
+                        baseRace = targetRace;
+                        break;
+                    } else
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
+
+            // Create the new model.
+            await CopyModel(originalPath, path, source);
+        }
+
+        /// <summary>
+        /// Copies a given model from a previous path to a new path, including copying the materials and other down-chain items.
+        /// 
+        /// </summary>
+        /// <param name="originalPath"></param>
+        /// <param name="newPath"></param>
+        /// <returns></returns>
+        public async Task<long> CopyModel(string originalPath, string newPath, string source)
+        {
+            var _dat = new Dat(_gameDirectory);
+            var model = await GetModel(originalPath);
+            var xMdl = await GetRawMdlData(originalPath);
+
+            var root = await XivCache.GetFirstRoot(newPath);
+            var item = root.GetFirstItem();
+
+            var originalRace = IOUtil.GetRaceFromPath(originalPath);
+            var newRace = IOUtil.GetRaceFromPath(newPath);
+
+            if(originalRace != newRace)
+            {
+                // Convert the model to the new race.
+                ModelModifiers.RaceConvert(model, originalRace, newPath);
+                ModelModifiers.FixUpSkinReferences(model, newPath);
+            }
+
+            var _imc = new Imc(_gameDirectory);
+
+            var imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
+
+            var materialSets = new HashSet<byte>();
+            imcEntries.ForEach(x => materialSets.Add(x.Variant));
+
+            // Language is irrelevant here.
+            var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(newPath), XivLanguage.None);
+
+            // Get all variant materials.
+            var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false);
+            
+            var _raceRegex = new Regex("c[0-9]{4}");
+
+            // Update Material References and clone materials.
+            foreach(var material in materialPaths)
+            {
+                var newMtrlPath = _raceRegex.Replace(material, "c" + newRace.GetRaceCode());
+                if (newMtrlPath == material) continue;
+
+                var io = material.LastIndexOf("/", StringComparison.Ordinal);
+                var baseMatName = material.Substring(io, material.Length - io);
+
+                io = newMtrlPath.LastIndexOf("/", StringComparison.Ordinal);
+                var newMatName = newMtrlPath.Substring(io, newMtrlPath.Length - io);
+                // Time to copy the materials!
+                try
+                {
+                    var mtrlData = await _dat.GetType2Data(material, false);
+                    var compressedData = await _dat.CreateType2Data(mtrlData);
+                    await _dat.WriteToDat(compressedData.ToList(), null, newMtrlPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), source, 2);
+
+                    // Switch out any material references to the material in the model file.
+                    foreach(var m in model.MeshGroups)
+                    {
+                        if(m.Material == baseMatName)
+                        {
+                            m.Material = newMatName;
+                        }
+                    }
+                } catch(Exception ex)
+                {
+                    // Hmmm.  The original material didn't exist.   This is pretty not awesome, but I guess a non-critical error...?
+                }
+            }
+
+            // Save the final modified mdl.
+            var data = await MakeNewMdlFile(model, xMdl);
+            var offset = await _dat.WriteToDat(data.ToList(), null, newPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), source, 3);
+            return offset;
         }
 
         /// <summary>

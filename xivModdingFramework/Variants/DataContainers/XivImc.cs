@@ -63,19 +63,10 @@ namespace xivModdingFramework.Variants.DataContainers
         public byte[] GetBytes(ImcType type)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(BitConverter.GetBytes(Variant));
+            bytes.Add(Variant);
+            bytes.Add(Unknown);
             bytes.AddRange(BitConverter.GetBytes(Mask));
-            if (type == ImcType.NonSet)
-            {
-                // Always 0 for non-set entries, their VFX number is the
-                // same as their Material Variant #.
-                bytes.AddRange(BitConverter.GetBytes(((ushort)0)));
-            }
-            else
-            {
-                // Actual VFX number.
-                bytes.AddRange(BitConverter.GetBytes(Vfx));
-            }
+            bytes.AddRange(BitConverter.GetBytes(Vfx));
             return bytes.ToArray();
         }
 
