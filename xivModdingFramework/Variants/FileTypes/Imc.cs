@@ -282,7 +282,7 @@ namespace xivModdingFramework.Variants.FileTypes
                     Variant = variant,
                     Unknown = unknown,
                     Mask = mask,
-                    Vfx = variant
+                    Vfx = vfx
                 };
 
             }
