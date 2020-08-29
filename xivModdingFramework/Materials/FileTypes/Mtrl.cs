@@ -1090,7 +1090,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
         }
-        public string GetMtrlFolder(XivDependencyRootInfo root, int materialSet) 
+        public string GetMtrlFolder(XivDependencyRootInfo root, int materialSet = -1) 
         {
             // These types have exactly one material set, but don't have an IMC file saying so.
             if(root.SecondaryType == XivItemType.hair ||
@@ -1101,7 +1101,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var mtrlFolder = root.GetRootFolder() + "material";
-            if (materialSet != 0)
+            if (materialSet > 0)
             {
                 var version = materialSet.ToString().PadLeft(4, '0');
                 mtrlFolder += $"/v{version}";
