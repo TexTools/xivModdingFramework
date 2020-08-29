@@ -1446,7 +1446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown")
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
         {
             var _index = new Index(_gameDirectory);
             var offset = await _index.GetDataOffset(sourcePath);
@@ -1464,9 +1464,16 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown")
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
         {
             var _modding = new Modding(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+
+            var exists = await _index.FileExists(targetPath);
+            if(exists && !overwrite)
+            {
+                return await _index.GetDataOffset(targetPath);
+            }
 
             var ftype = GetFileType(originalOffset, originalDataFile);
             var size = await GetCompressedFileSize(originalOffset, originalDataFile);

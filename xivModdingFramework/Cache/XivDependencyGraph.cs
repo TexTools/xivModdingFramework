@@ -923,8 +923,9 @@ namespace xivModdingFramework.Cache
             }
 
             if (items.Count == 0) {
+                var val = imcSubset >= 0 ? imcSubset : 0;
                 // May as well make a raw item.
-                items.Add(ToRawItem());
+                items.Add(ToRawItem(val));
             }
 
             items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();

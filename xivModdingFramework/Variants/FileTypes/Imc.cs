@@ -233,11 +233,24 @@ namespace xivModdingFramework.Variants.FileTypes
             var info = await GetFullImcInfo(path);
             for(int i = 0; i < entries.Count; i++)
             {
-                var e = info.GetEntry(i, slot);
+                XivImc e;
+                if (i >= info.SubsetCount + 1)
+                {
+                    e = new XivImc();
+                }
+                else
+                {
+                    e = info.GetEntry(i, slot);
+                }
                 e.Mask = entries[i].Mask;
                 e.Unknown = entries[i].Unknown;
                 e.Vfx = entries[i].Vfx;
                 e.Variant = entries[i].Variant;
+
+                if (i >= info.SubsetCount + 1)
+                {
+                    info.SetEntry(e, i, slot, true);
+                }
             }
 
             // Save the modified info.
@@ -466,7 +479,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
             itemName ??= Path.GetFileName(path);
             category ??= "Meta";
-            source ??= "Internal";
+            source ??= "Unknown";
 
             await dat.ImportType2Data(data.ToArray(), itemName, path, category, source);
         }
@@ -658,13 +671,13 @@ namespace xivModdingFramework.Variants.FileTypes
                 return subset[idx];
             }
 
-            public void SetEntry(XivImc info, int subsetID = -1, string slot = "")
+            public void SetEntry(XivImc info, int subsetID = -1, string slot = "", bool allowNew = false)
             {
                 // Variant IDs are 1 based, not 0 based.
                 var index = subsetID - 1;
 
                 // Invalid Index, return default.
-                if (index >= SubsetCount || index < 0)
+                if ((index >= SubsetCount && !allowNew) || index < 0)
                 {
                     index = -1;
                 }
@@ -673,7 +686,28 @@ namespace xivModdingFramework.Variants.FileTypes
                 var subset = DefaultSubset;
                 if (index >= 0)
                 {
-                    subset = SubsetList[index];
+                    if (index >= SubsetCount)
+                    {
+                        subset = new List<XivImc>();
+                        if(TypeIdentifier == ImcType.Set)
+                        {
+                            // Five entries for set types.
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                        } else
+                        {
+                            // One entry for nonset types.
+                            subset.Add(info);
+                        }
+                        SubsetList.Add(subset);
+                    }
+                    else
+                    {
+                        subset = SubsetList[index];
+                    }
                 }
 
                 // Get which offset the slot uses.
