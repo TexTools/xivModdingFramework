@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -47,6 +48,76 @@ namespace xivModdingFramework.Variants.FileTypes
         public Imc(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
+        }
+
+        public static bool UsesImc(IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root == null) return false;
+            return UsesImc(root);
+
+        }
+        public static bool UsesImc(XivDependencyRoot root)
+        {
+            if (root == null) return false;
+            return UsesImc(root.Info);
+        }
+        public static bool UsesImc(XivDependencyRootInfo root)
+        {
+
+            if (root.PrimaryType == XivItemType.human)
+            {
+                return false;
+            }
+            else if (root.PrimaryType == XivItemType.indoor || root.PrimaryType == XivItemType.outdoor)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// A simple function that retrieves the material set ID of an item,
+        /// whether via IMC or default value.
+        /// 
+        /// A value of -1 indicates that material sets are not used at all on this item.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public async Task<int> GetMaterialSetId(IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root == null) return -1;
+
+            if(root.Info.PrimaryType == XivItemType.human)
+            {
+                if(root.Info.SecondaryType == XivItemType.hair
+                    || root.Info.SecondaryType == XivItemType.tail
+                    || root.Info.SecondaryType == XivItemType.body)
+                {
+                    // These use material sets (always set 1), but have no IMC file.
+                    return 1;
+                } else
+                {
+                    return -1;
+                }
+            } else if(root.Info.PrimaryType == XivItemType.indoor || root.Info.PrimaryType == XivItemType.outdoor)
+            {
+                return -1;
+            } else
+            {
+                try
+                {
+                    var entry = await GetImcInfo(item);
+                    return entry.Variant;
+                } catch
+                {
+                    return -1;
+                }
+            }
         }
 
         /// <summary>
@@ -531,7 +602,7 @@ namespace xivModdingFramework.Variants.FileTypes
             public List<XivImc> DefaultSubset { get; set; }
 
             // Gets all (non-default) IMC entries for a given slot.
-            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = false)
+            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = true)
             {
                 var ret = new List<XivImc>(SubsetList.Count);
                 if (includeDefault)

@@ -1733,10 +1733,13 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // We have to get all of the material variants used for this item now.
-                        var imcInfos = info.GetAllEntries(slot);
+                        var imcInfos = info.GetAllEntries(slot, true);
                         foreach (var i in imcInfos)
                         {
-                            materialVariants.Add(i.Variant);
+                            if (i.Variant != 0)
+                            {
+                                materialVariants.Add(i.Variant);
+                            }
                         }
                     }
                     catch

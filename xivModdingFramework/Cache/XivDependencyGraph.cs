@@ -713,11 +713,10 @@ namespace xivModdingFramework.Cache
             }
 
             var offset = startingOffset + subOffset;
-            imcEntries.Add(imcPath + Constants.BinaryOffsetMarker + (offset * 8).ToString());
 
-            for(int i = 0; i < subsetCount; i++)
+            for(int i = 0; i <= subsetCount; i++)
             {
-                offset = startingOffset + ((i + 1) * entrySize) + subOffset;
+                offset = startingOffset + (i * entrySize) + subOffset;
                 imcEntries.Add(imcPath + Constants.BinaryOffsetMarker + (offset * 8).ToString());
             }
 
@@ -907,7 +906,7 @@ namespace xivModdingFramework.Cache
                 var imcEntries = await imc.GetEntries(imcPaths);
 
                 // Need to verify all of our IMC sets are properly represented in the item list.
-                for (int i = 0; i <= imcEntries.Count; i++)
+                for (int i = 0; i <  imcEntries.Count; i++)
                 {
                     // Already in it.  All set.
                     if (items.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
@@ -1132,6 +1131,7 @@ namespace xivModdingFramework.Cache
         public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
         {
             var parents = await GetParentFiles(internalFilePath);
+            if (parents == null) return null;
             var siblings = new HashSet<string>();
             foreach(var p in parents)
             {
