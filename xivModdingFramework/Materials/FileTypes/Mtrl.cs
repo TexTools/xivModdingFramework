@@ -245,14 +245,21 @@ namespace xivModdingFramework.Materials.FileTypes
             string mtrlPath = "";
             long mtrlOffset = 0;
             var index = new Index(_gameDirectory);
+            var extractMSet = new Regex("v([0-9]{4})/");
 
             // Get the root from the material file in specific.
             var root = XivDependencyGraph.ExtractRootInfoFilenameOnly(mtrlFile);
-            if (mtrlFile.Count(x => x == '/') > 1)
+            if ((!mtrlFile.StartsWith("chara/")) && mtrlFile.Count(x => x == '/') > 1)
             {
                 // This is an absolute path reference.
                 mtrlPath = mtrlFile;
             } else {
+                var mSetMatch = extractMSet.Match(mtrlFile);
+                if(mSetMatch.Success && materialSet < 0)
+                {
+                    materialSet = Int32.Parse(mSetMatch.Groups[1].Value);
+                }
+                mtrlFile = Path.GetFileName(mtrlFile);
 
                 // Get mtrl path
                 var mtrlFolder = GetMtrlFolder(root, materialSet);

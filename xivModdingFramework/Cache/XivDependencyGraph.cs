@@ -207,7 +207,7 @@ namespace xivModdingFramework.Cache
         /// Ex c0101f0001_fac
         /// </summary>
         /// <returns></returns>
-        public string GetBaseFileName()
+        public string GetBaseFileName(bool includeSlot = true)
         {
             var pId = PrimaryId.ToString().PadLeft(4, '0');
             var pPrefix = XivItemTypes.GetSystemPrefix(PrimaryType);
@@ -219,7 +219,7 @@ namespace xivModdingFramework.Cache
                 sPrefix = XivItemTypes.GetSystemPrefix((XivItemType)SecondaryType);
             }
 
-            if (Slot != null)
+            if (Slot != null && includeSlot)
             {
                 return String.Format(BaseFileFormatWithSlot, new string[] { pPrefix, pId, sPrefix, sId, Slot });
             }
