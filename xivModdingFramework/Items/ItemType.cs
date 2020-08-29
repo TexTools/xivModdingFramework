@@ -427,7 +427,7 @@ namespace xivModdingFramework.Items
                 }
                 else if (secondaryType == XivItemType.ear)
                 {
-                    ret += "ears/z";
+                    ret += "zear/z";
                 }
 
                 ret += secondaryId;
