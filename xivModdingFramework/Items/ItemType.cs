@@ -180,6 +180,25 @@ namespace xivModdingFramework.Items
                 }
             }
 
+            if(item.GetType() == typeof(XivMount))
+            {
+                var m = (XivMount)item;
+                if(m.ModelInfo != null && m.ModelInfo.GetType() == typeof(XivMonsterModelInfo))
+                {
+                    var mi = (XivMonsterModelInfo)m.ModelInfo;
+                    if(mi.ModelType == XivItemType.demihuman)
+                    {
+                        // Slot has to be extracted from name here.
+                        var rex = new Regex("d[0-9]{4}e[0-9]{4}_([a-z]{3})");
+                        var match = rex.Match(item.Name);
+                        if(match.Success)
+                        {
+                            return match.Groups[1].Value;
+                        }
+                    }
+                }
+            }
+
             // This is not actually correct currently for Demihuman models.
             // Demihuman models have their own Equipment slots, but that information is currently
             // Not pulled into textools, so they'll just end up with missing slot abbreviations.

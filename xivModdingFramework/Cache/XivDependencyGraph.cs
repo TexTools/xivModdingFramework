@@ -589,7 +589,7 @@ namespace xivModdingFramework.Cache
                 // orphaned materials.
                 if(mod.fullPath.StartsWith(rootFolder) && mod.fullPath.EndsWith(".mtrl"))
                 {
-                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot))
+                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
                     {
                         var material = mod.fullPath;
                         if (materialVariant >= 0)
