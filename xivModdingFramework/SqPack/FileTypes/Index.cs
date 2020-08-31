@@ -1779,6 +1779,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
             var oldOffset = 0;
+            bool found = false;
 
             // These are the offsets to relevant data
             const int fileCountOffset = 1036;
@@ -1808,6 +1809,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                     if (folderPathHash == folderHash)
                                     {
+                                        found = true;
                                         oldOffset = br.ReadInt32();
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
                                         uint uOffset = (uint)(offset / 8);
@@ -1826,6 +1828,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
             });
+
+            if (!found)
+            {
+                throw new Exception("Cannot update index information for non-existent file.");
+            }
+
+            if(oldOffset == 0)
+            {
+                throw new Exception("Cannot update index information for file with null data offset.");
+            }
 
             return oldOffset;
         }

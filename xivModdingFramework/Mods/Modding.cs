@@ -343,7 +343,7 @@ namespace xivModdingFramework.Mods
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            if (mod.data.modOffset == mod.data.originalOffset)
+            if (mod.IsCustomFile())
             {
                 // Added file.
                 if (enable && !mod.enabled)
@@ -434,35 +434,6 @@ namespace xivModdingFramework.Mods
             progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
             var allPaths = modList.Mods.Select(x => x.fullPath).Where(x => !String.IsNullOrEmpty(x)).ToList();
             XivCache.QueueDependencyUpdate(allPaths);
-        }
-
-        /// <summary>
-        /// Disables all mods from older modlist
-        /// </summary>
-        public async Task DisableOldModList(DirectoryInfo oldModListDirectory)
-        {
-            var index = new Index(_gameDirectory);
-
-            using (var sr = new StreamReader(oldModListDirectory.FullName))
-            {
-                string line;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    var modEntry = JsonConvert.DeserializeObject<OriginalModList>(line);
-
-                    if (!string.IsNullOrEmpty(modEntry.fullPath))
-                    {
-                        try
-                        {
-                            await index.UpdateDataOffset(modEntry.originalOffset, modEntry.fullPath);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new Exception($"Unable to disable {modEntry.name} | {modEntry.fullPath}");
-                        }
-                    }
-                }
-            }
         }
 
         /// <summary>
