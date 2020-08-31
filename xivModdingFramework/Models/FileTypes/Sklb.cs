@@ -167,6 +167,8 @@ namespace xivModdingFramework.Models.FileTypes
             var application = "/NotAssetCc.exe";
             var extraFlags = "";
 
+            bool usedTemp = false;
+
             // Okay, in this case, NotAssetCC won't work.
             if(ContainsUnicodeCharacter(cwd))
             {
@@ -175,8 +177,15 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     application = "/AssetCc2.exe";
                     extraFlags = "-s ";
+
+                    // Asset CC2 *can* process files that exist in unicode directories, but they must be
+                    // provided as relative paths which themselves do not contain unicode.
+                    xmlFile = Path.Combine("Skeletons", Path.GetFileName(xmlFile));
+                    rawFile = Path.Combine("Skeletons", Path.GetFileName(rawFile));
                 } else
                 {
+                    usedTemp = true;
+
                     // Unicode path and we don't have AssetCC2.
                     // Check if a temp path has unicode in it.
                     var tempFileXml = Path.GetTempFileName();
@@ -225,6 +234,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     FileName = cwd + application,
                     Arguments = extraFlags + "\"" + rawFile + "\" \"" + xmlFile + "\"",
+                    WorkingDirectory = cwd,
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
@@ -233,7 +243,7 @@ namespace xivModdingFramework.Models.FileTypes
             proc.Start();
             proc.WaitForExit();
 
-            if(originalXml != xmlFile)
+            if(usedTemp)
             {
                 // Copy the file back into the right position if needed and delete temp folder items.
                 File.Copy(xmlFile, originalXml);
