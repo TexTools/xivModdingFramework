@@ -43,6 +43,8 @@ namespace xivModdingFramework.Items
         {
             XivItemType itemType;
 
+            if (item.PrimaryCategory == null || item.SecondaryCategory == null) return XivItemType.unknown;
+
             if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) || 
                 item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Dual_Wield) || item.SecondaryCategory.Equals(XivStrings.Food))
             {

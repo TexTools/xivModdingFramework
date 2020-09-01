@@ -161,6 +161,11 @@ namespace xivModdingFramework.Mods
         /// <returns>The mod entry if found, null otherwise</returns>
         public Task<Mod> TryGetModEntry(string internalFilePath)
         {
+            if(String.IsNullOrWhiteSpace(internalFilePath))
+            {
+                return null;
+            }
+
             return Task.Run(() =>
             {
                 internalFilePath = internalFilePath.Replace("\\", "/");

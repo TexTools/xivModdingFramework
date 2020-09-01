@@ -38,7 +38,8 @@ namespace xivModdingFramework.Textures.Enums
         [XivTexFormatDescription("13344", "DXT1\tRGB")] DXT1,
         [XivTexFormatDescription("13360", "DXT3\tARGB")] DXT3,
         [XivTexFormatDescription("13361", "DXT5\tARGB")] DXT5,
-        [XivTexFormatDescription("16704", "D16")] D16
+        [XivTexFormatDescription("16704", "D16")] D16,
+        [XivTexFormatDescription("0", "INVALID")] INVALID
     }
 
     /// <summary>

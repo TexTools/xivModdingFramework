@@ -405,7 +405,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
         /// <returns>A tuple containing the compressed DDS data, a list of offsets to the mipmap parts, a list with the number of parts per mipmap.</returns>
-        public static async Task<(List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts)> ReadDDS(BinaryReader br, XivTex xivTex, int newWidth, int newHeight, int newMipCount)
+        public static async Task<(List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts)> ReadDDS(BinaryReader br, XivTexFormat format, int newWidth, int newHeight, int newMipCount)
         {
             var compressedDDS = new List<byte>();
             var mipPartOffsets = new List<short>();
@@ -413,7 +413,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             int mipLength;
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 case XivTexFormat.DXT1:
                     mipLength = (newWidth * newHeight) / 2;

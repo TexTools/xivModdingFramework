@@ -1650,19 +1650,26 @@ namespace xivModdingFramework.Models.DataContainers
                     string[] skeletonData;
                     if (!parsedBase)
                     {
-                        baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race);
-                        skeletonData = File.ReadAllLines(baseSkeletonPath);
-
-                        // Parse both skeleton files, starting with the base file.
-                        foreach (var b in skeletonData)
+                        try
                         {
-                            if (b == "") continue;
-                            var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                            j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-                            fullSkel.Add(j.BoneName, j);
-                        }
+                            baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race);
+                            skeletonData = File.ReadAllLines(baseSkeletonPath);
 
-                        extraSkeletonPath = await Sklb.GetExtraSkeletonFile(root, race);
+                            // Parse both skeleton files, starting with the base file.
+                            foreach (var b in skeletonData)
+                            {
+                                if (b == "") continue;
+                                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+                                fullSkel.Add(j.BoneName, j);
+                            }
+
+                            extraSkeletonPath = await Sklb.GetExtraSkeletonFile(root, race);
+                        } catch(Exception ex)
+                        {
+                            // If we failed to resolve the bones for some reason, log the error message and use a blank skel.
+                            loggingFunction(true, "Error Parsing Skeleton ("+ baseSkeletonPath.ToString() +"):" + ex.Message);
+                        }
                         parsedBase = true;
                     }
 
@@ -1670,32 +1677,39 @@ namespace xivModdingFramework.Models.DataContainers
                     // Did this root have an extra skeleton in use?
                     if (!String.IsNullOrEmpty(extraSkeletonPath))
                     {
-                        // If it did, add its bones to the resulting skeleton.
-                        Dictionary<int, int> exTranslationTable = new Dictionary<int, int>();
-                        skeletonData = File.ReadAllLines(extraSkeletonPath);
-                        foreach (var b in skeletonData)
+                        try
                         {
-                            if (b == "") continue;
-                            var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                            j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-
-                            if (fullSkel.ContainsKey(j.BoneName))
+                            // If it did, add its bones to the resulting skeleton.
+                            Dictionary<int, int> exTranslationTable = new Dictionary<int, int>();
+                            skeletonData = File.ReadAllLines(extraSkeletonPath);
+                            foreach (var b in skeletonData)
                             {
-                                // This is a parent level reference to a base bone.
-                                exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
-                            }
-                            else
-                            {
-                                // Run it through the translation to match up with the base skeleton.
-                                j.BoneParent = exTranslationTable[j.BoneParent];
+                                if (b == "") continue;
+                                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
 
-                                // And generate its own new bone number
-                                var originalNumber = j.BoneNumber;
-                                j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+                                if (fullSkel.ContainsKey(j.BoneName))
+                                {
+                                    // This is a parent level reference to a base bone.
+                                    exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
+                                }
+                                else
+                                {
+                                    // Run it through the translation to match up with the base skeleton.
+                                    j.BoneParent = exTranslationTable[j.BoneParent];
 
-                                fullSkel.Add(j.BoneName, j);
-                                exTranslationTable.Add(originalNumber, j.BoneNumber);
+                                    // And generate its own new bone number
+                                    var originalNumber = j.BoneNumber;
+                                    j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                                    fullSkel.Add(j.BoneName, j);
+                                    exTranslationTable.Add(originalNumber, j.BoneNumber);
+                                }
                             }
+                        } catch(Exception ex)
+                        {
+                            // If we failed to resolve the bones for some reason, log the error message and use a blank skel.
+                            loggingFunction(true, "Error Parsing Extra Skeleton (" + extraSkeletonPath.ToString() + "):" + ex.Message);
                         }
                     }
                 }

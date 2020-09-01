@@ -730,7 +730,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     var di = Tex.GetDefaultTexturePath(mapInfo.Usage);
 
-                    var newOffset = await _tex.TexDDSImporter(xivTex, item, di, source);
+                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source);
 
                 }
 

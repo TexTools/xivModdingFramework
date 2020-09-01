@@ -1280,7 +1280,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <returns>The created header data.</returns>
-        public byte[] MakeType4DatHeader(XivTex xivTex, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
+        public byte[] MakeType4DatHeader(XivTexFormat format, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
         {
             var headerData = new List<byte>();
 
@@ -1299,7 +1299,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var mipOffsetIndex = 80;
             var uncompMipSize = newHeight * newWidth;
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 case XivTexFormat.DXT1:
                     uncompMipSize = (newWidth * newHeight) / 2;

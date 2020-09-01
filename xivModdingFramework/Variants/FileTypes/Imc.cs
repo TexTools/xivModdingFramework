@@ -146,13 +146,19 @@ namespace xivModdingFramework.Variants.FileTypes
             } catch
             {
                 // Some dual wield items don't have a second IMC, and just default to the first.
-                var gear = (XivGear)item;
-                if (gear != null && gear.PairedItem != null)
+                if (typeof(XivGear) == item.GetType())
                 {
-                    var pair = gear.PairedItem;
-                    var imcPath = GetImcPath(pair);
-                    var path = imcPath.Folder + "/" + imcPath.File;
-                    return await (GetFullImcInfo(path));
+                    var gear = (XivGear)item;
+                    if (gear != null && gear.PairedItem != null)
+                    {
+                        var pair = gear.PairedItem;
+                        var imcPath = GetImcPath(pair);
+                        var path = imcPath.Folder + "/" + imcPath.File;
+                        return await (GetFullImcInfo(path));
+                    }
+                } else
+                {
+                    throw new InvalidDataException("Unable to get IMC data for item: " + item.Name);
                 }
             }
 

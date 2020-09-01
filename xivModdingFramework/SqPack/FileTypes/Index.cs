@@ -565,29 +565,25 @@ namespace xivModdingFramework.SqPack.FileTypes
                         br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
 
                         // loop through each file entry
-                        for (var i = 0; i < fileCount; br.ReadBytes(4), i += 16)
+                        for (var i = 0; i < fileCount; i += 16)
                         {
+                            // 16 Bytes per entry.
                             var fileNameHash = br.ReadInt32();
+                            var folderPathHash = br.ReadInt32();
+                            long fileoffset = br.ReadUInt32();
+                            var unknown = br.ReadUInt32();
 
                             // check if the provided file name hash matches the current file name hash
                             if (fileNameHash == hashedFile)
                             {
-                                var folderPathHash = br.ReadInt32();
 
                                 // check if the provided folder path hash matches the current folder path hash
                                 if (folderPathHash == hashedFolder)
                                 {
                                     // this is the entry we are looking for, get the offset and break out of the loop
-                                    offset = br.ReadUInt32();
-                                    offset = offset * 8;
+                                    offset = fileoffset * 8;
                                     break;
                                 }
-
-                                br.ReadBytes(4);
-                            }
-                            else
-                            {
-                                br.ReadBytes(8);
                             }
                         }
                     }
@@ -1816,8 +1812,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                                         bw.Write(uOffset);
                                         break;
                                     }
-
-                                    br.ReadBytes(4);
+                                    else
+                                    {
+                                        br.ReadBytes(4);
+                                    }
                                 }
                                 else
                                 {
