@@ -490,7 +490,7 @@ namespace xivModdingFramework.Cache
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
                 var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot);
+                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true);
                 var models = new List<string>();
                 foreach(var race in races)
                 {
