@@ -92,14 +92,9 @@ namespace xivModdingFramework.Items.Categories
             int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
-            if(_xivLanguage == XivLanguage.Chinese)
+            if(_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 168;
-            }
-
-            if (_xivLanguage == XivLanguage.Korean)
-            {
-                itemDataLength = 160;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -176,142 +171,75 @@ namespace xivModdingFramework.Items.Categories
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
         private async Task<List<XivFurniture>> GetPaintings()
         {
-            if (_xivLanguage == XivLanguage.Korean)
+            var paintingsLock = new object();
+            // These are the offsets to relevant data
+            // These will need to be changed if data gets added or removed with a patch            
+            int iconNumberOffset = 0;
+
+            const int itemNameDataOffset = 14;
+            const int housingIndexOffset = 112;
+            int itemDataLength = 160;
+            const int itemIconDataOffset = 136;
+
+            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var pictureDictionary = await ex.ReadExData(XivEx.picture);
+            var itemDictionary = await ex.ReadExData(XivEx.item);
+
+            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
             {
-                var paintingsLock = new object();
-                // These are the offsets to relevant data
-                // These will need to be changed if data gets added or removed with a patch
-                const int itemIndexOffset = 0;
-                const int iconNumberOffset = 4;
-
-                const int itemNameDataOffset = 14;
-                const int itemDataLength = 160;
-                const int itemIconDataOffset = 136;
-
-                var ex = new Ex(_gameDirectory, _xivLanguage);
-                var pictureDictionary = await ex.ReadExData(XivEx.picture);
-                var itemDictionary = await ex.ReadExData(XivEx.item);
-
-                var furnitureList = new List<XivFurniture>();
-
-                await Task.Run(() => Parallel.ForEach(pictureDictionary.Values, (housingItem) =>
-                {
-                    var item = new XivFurniture
-                    {
-                        PrimaryCategory = XivStrings.Housing,
-                        SecondaryCategory = XivStrings.Paintings,
-                        ModelInfo = new XivModelInfo()
-                    };
-
-                    using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
-                    {
-                        br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                        var itemIndex = br.ReadInt32();
-
-                        br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-                        item.ModelInfo.PrimaryID = br.ReadInt32();
-
-                        using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
-                        {
-                            br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
-                            var nameOffset = br1.ReadInt16();
-
-                            br1.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
-                            item.IconNumber = br1.ReadUInt16();
-
-                            var gearNameOffset = itemDataLength + nameOffset;
-                            var gearNameLength = itemDictionary[itemIndex].Length - gearNameOffset;
-                            br1.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                            var nameString = Encoding.UTF8.GetString(br1.ReadBytes(gearNameLength)).Replace("\0", "");
-                            item.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-                        }
-                    }
-
-                    if (!item.Name.Equals(string.Empty))
-                    {
-                        lock (paintingsLock)
-                        {
-                            furnitureList.Add(item);
-                        }
-                    }
-                }));
-
-                furnitureList.Sort();
-
-                return furnitureList;
+                itemDataLength = 168;
             }
-            else
+
+
+            var furnitureList = new List<XivFurniture>();
+
+            await Task.Run(() => Parallel.ForEach(itemDictionary.Values, (item) =>
             {
-                var paintingsLock = new object();
-                // These are the offsets to relevant data
-                // These will need to be changed if data gets added or removed with a patch            
-                int iconNumberOffset = 0;
-
-                const int itemNameDataOffset = 14;
-                const int housingIndexOffset = 112;
-                int itemDataLength = 160;
-                const int itemIconDataOffset = 136;
-
-                var ex = new Ex(_gameDirectory, _xivLanguage);
-                var pictureDictionary = await ex.ReadExData(XivEx.picture);
-                var itemDictionary = await ex.ReadExData(XivEx.item);
-
-                if (_xivLanguage == XivLanguage.Chinese)
+                var painting = new XivFurniture
                 {
-                    itemDataLength = 168;
+                    PrimaryCategory = XivStrings.Housing,
+                    SecondaryCategory = XivStrings.Paintings,
+                    ModelInfo = new XivModelInfo()
+                };
+
+                using (var br = new BinaryReaderBE(new MemoryStream(item)))
+                {
+                    br.BaseStream.Seek(housingIndexOffset, SeekOrigin.Begin);
+                    var pictureIndex = br.ReadInt32();
+
+                    if (pictureIndex == 0 || pictureIndex > (pictureDictionary.Count - 1)) return;
+
+                    br.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
+                    var nameOffset = br.ReadInt16();
+
+                    br.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
+                    painting.IconNumber = br.ReadUInt16();
+
+                    var gearNameOffset = itemDataLength + nameOffset;
+                    var gearNameLength = item.Length - gearNameOffset;
+                    br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
+                    var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
+                    painting.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+
+                    using (var br1 = new BinaryReaderBE(new MemoryStream(pictureDictionary[pictureIndex])))
+                    {
+                        br1.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
+                        painting.ModelInfo.PrimaryID = br1.ReadInt32();
+                    }
                 }
 
-
-                var furnitureList = new List<XivFurniture>();
-
-                await Task.Run(() => Parallel.ForEach(itemDictionary.Values, (item) =>
+                if (!painting.Name.Equals(string.Empty) && (painting.Name.IndexOf("painting", System.StringComparison.OrdinalIgnoreCase) >= 0))
                 {
-                    var painting = new XivFurniture
+                    lock (paintingsLock)
                     {
-                        PrimaryCategory = XivStrings.Housing,
-                        SecondaryCategory = XivStrings.Paintings,
-                        ModelInfo = new XivModelInfo()
-                    };
-
-                    using (var br = new BinaryReaderBE(new MemoryStream(item)))
-                    {
-                        br.BaseStream.Seek(housingIndexOffset, SeekOrigin.Begin);
-                        var pictureIndex = br.ReadInt32();
-
-                        if (pictureIndex == 0 || pictureIndex > (pictureDictionary.Count - 1)) return;
-
-                        br.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
-                        var nameOffset = br.ReadInt16();
-
-                        br.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
-                        painting.IconNumber = br.ReadUInt16();
-
-                        var gearNameOffset = itemDataLength + nameOffset;
-                        var gearNameLength = item.Length - gearNameOffset;
-                        br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                        var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
-                        painting.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-
-                        using (var br1 = new BinaryReaderBE(new MemoryStream(pictureDictionary[pictureIndex])))
-                        {
-                            br1.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-                            painting.ModelInfo.PrimaryID = br1.ReadInt32();
-                        }
+                        furnitureList.Add(painting);
                     }
+                }
+            }));
 
-                    if (!painting.Name.Equals(string.Empty) && (painting.Name.IndexOf("painting", System.StringComparison.OrdinalIgnoreCase) >= 0))
-                    {
-                        lock (paintingsLock)
-                        {
-                            furnitureList.Add(painting);
-                        }
-                    }
-                }));
+            furnitureList.Sort();
 
-                furnitureList.Sort();
-
-                return furnitureList;
-            }
+            return furnitureList;
         }
 
         /// <summary>
@@ -331,14 +259,9 @@ namespace xivModdingFramework.Items.Categories
             int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
-            if (_xivLanguage == XivLanguage.Chinese)
+            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 168;
-            }
-
-            if (_xivLanguage == XivLanguage.Korean)
-            {
-                itemDataLength = 160;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
