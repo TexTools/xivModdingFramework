@@ -22,6 +22,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.SqPack.FileTypes;
@@ -49,6 +50,9 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>A list of TexTypePath containing the atex info</returns>
         public async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel)
         {
+            // Gear is the only type we know how to retrieve atex information for.
+            if (itemModel.GetType() != typeof(XivGear)) return new List<TexTypePath>();
+
             var atexTexTypePathList = new List<TexTypePath>();
 
             var index = new Index(_gameDirectory);
@@ -61,9 +65,9 @@ namespace xivModdingFramework.Textures.FileTypes
             var vfxOffset = await index.GetDataOffset(HashGenerator.GetHash(vfxPath.Folder), HashGenerator.GetHash(vfxPath.File),
                 _dataFile);
 
-            if (vfxOffset == 0)
+            if (vfxOffset <= 0)
             {
-                throw new Exception($"Could not find offset for vfx path {vfxPath.Folder}/{vfxPath.File}");
+                return new List<TexTypePath>();
             }
 
             var aTexPaths = new List<string>();

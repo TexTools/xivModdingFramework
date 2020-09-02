@@ -76,16 +76,10 @@ namespace xivModdingFramework.Items.Categories
             const int iconDataOffset = 136;
             int slotDataOffset = 154;
 
-            if(_xivLanguage == XivLanguage.Chinese)
+            if(_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
             {
                 dataLength = 168;
                 slotDataOffset = 156;
-            }
-
-            if(_xivLanguage == XivLanguage.Korean)
-            {
-                dataLength = 160;
-                slotDataOffset = 154;
             }
 
             var xivGearList = new List<XivGear>();
@@ -660,50 +654,6 @@ namespace xivModdingFramework.Items.Categories
 
 
             return searchResultsList;
-        }
-
-        /// <summary>
-        /// Gets the Icon info for a specific gear item
-        /// </summary>
-        /// <param name="gearItem">The gear item</param>
-        /// <returns>A list of TexTypePath containing Icon Info</returns>
-        public async Task<List<TexTypePath>> GetIconInfo(XivGear gearItem)
-        {
-            var ttpList = new List<TexTypePath>();
-
-            var iconString = gearItem.IconNumber.ToString();
-
-            var iconBaseNum = iconString.Substring(0, 2).PadRight(iconString.Length, '0');
-            var iconFolder = $"ui/icon/{iconBaseNum.PadLeft(6, '0')}";
-            var iconHQFolder = $"{iconFolder}/hq";
-            var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
-
-            if (await _index.FileExists(HashGenerator.GetHash(iconFile), HashGenerator.GetHash(iconFolder),
-                XivDataFile._06_Ui))
-            {
-                ttpList.Add(new TexTypePath
-                {
-                    Name = "Icon",
-                    Path = $"{iconFolder}/{iconFile}",
-                    Type = XivTexType.Icon,
-                    DataFile = XivDataFile._06_Ui
-                });
-            }
-
-
-            if (await _index.FileExists(HashGenerator.GetHash(iconFile), HashGenerator.GetHash(iconHQFolder),
-                XivDataFile._06_Ui))
-            {
-                ttpList.Add(new TexTypePath
-                {
-                    Name = "HQ Icon",
-                    Path = $"{iconHQFolder}/{iconFile}",
-                    Type = XivTexType.Icon,
-                    DataFile = XivDataFile._06_Ui
-                });
-            }
-
-            return ttpList;
         }
 
 

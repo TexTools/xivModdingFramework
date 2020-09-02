@@ -1280,7 +1280,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <returns>The created header data.</returns>
-        public byte[] MakeType4DatHeader(XivTex xivTex, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
+        public byte[] MakeType4DatHeader(XivTexFormat format, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
         {
             var headerData = new List<byte>();
 
@@ -1299,7 +1299,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var mipOffsetIndex = 80;
             var uncompMipSize = newHeight * newWidth;
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 case XivTexFormat.DXT1:
                     uncompMipSize = (newWidth * newHeight) / 2;
@@ -1446,7 +1446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown")
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
         {
             var _index = new Index(_gameDirectory);
             var offset = await _index.GetDataOffset(sourcePath);
@@ -1464,9 +1464,16 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown")
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
         {
             var _modding = new Modding(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+
+            var exists = await _index.FileExists(targetPath);
+            if(exists && !overwrite)
+            {
+                return await _index.GetDataOffset(targetPath);
+            }
 
             var ftype = GetFileType(originalOffset, originalDataFile);
             var size = await GetCompressedFileSize(originalOffset, originalDataFile);

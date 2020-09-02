@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using SharpDX;
 using System;
 using System.Collections.Generic;
@@ -361,6 +362,22 @@ namespace xivModdingFramework.Materials.DataContainers
                 if(GetTextureUsage(XivTexType.Skin) == null)
                 {
                     info.Preset = MtrlShaderPreset.Face;
+                }
+                
+                if(ShaderParameterList.Any(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial))
+                {
+                    var param = ShaderParameterList.First(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial);
+                    if(param.Args[0] == 0)
+                    {
+                        if(info.Preset == MtrlShaderPreset.Face)
+                        {
+                            info.Preset = MtrlShaderPreset.FaceNoPores;
+
+                        } else
+                        {
+                            info.Preset = MtrlShaderPreset.BodyNoPores;
+                        }
+                    }
                 }
             } else if(info.Shader == MtrlShader.Hair)
             {
@@ -855,15 +872,26 @@ namespace xivModdingFramework.Materials.DataContainers
             if (info.Shader == MtrlShader.Skin)
             {
                 args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinOutline, null);
-                args.Add(MtrlShaderParameterId.SkinUnknown1, null);
+                args.Add(MtrlShaderParameterId.SkinMatParamRow2, null);
+                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
+                //args.Add(MtrlShaderParameterId.SkinWetnessLerp, new List<float>() { 1.0f });
+                //args.Add(MtrlShaderParameterId.SkinMatParamRow2, new List<float>() { 1.0f, 1.0f, 1.0f });
                 args.Add(MtrlShaderParameterId.SkinUnknown2, null);
-                args.Add(MtrlShaderParameterId.SkinUnknown3, null);
-                args.Add(MtrlShaderParameterId.RacialSkin1, null);
-                args.Add(MtrlShaderParameterId.RacialSkin2, null);
+                args.Add(MtrlShaderParameterId.SkinFresnel, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
 
-                if (info.Preset == MtrlShaderPreset.Face)
+                if(info.Preset == MtrlShaderPreset.BodyNoPores || info.Preset == MtrlShaderPreset.FaceNoPores)
+                {
+                    args.Add(MtrlShaderParameterId.SkinTileMaterial, new List<float>() { 0 });
+                    args.Add(MtrlShaderParameterId.SkinTileMultiplier, new List<float>() { 0, 0 });
+
+                } else
+                {
+                    args.Add(MtrlShaderParameterId.SkinTileMaterial, null);
+                    args.Add(MtrlShaderParameterId.SkinTileMultiplier, null);
+                }
+
+                if (info.Preset == MtrlShaderPreset.Face && info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
                     args.Add(MtrlShaderParameterId.Face1, null);
                 }
@@ -877,16 +905,16 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 args.Add(MtrlShaderParameterId.Equipment1, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
-                args.Add(MtrlShaderParameterId.RacialSkin1, null);
+                args.Add(MtrlShaderParameterId.SkinFresnel, null);
                 args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinOutline, null);
+                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
             }
             else if(info.Shader == MtrlShader.Hair)
             {
                 args.Add(MtrlShaderParameterId.Equipment1, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
                 args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinOutline, null);
+                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
                 args.Add(MtrlShaderParameterId.Hair1, null);
                 args.Add(MtrlShaderParameterId.Hair2, null);
 
@@ -1436,7 +1464,9 @@ namespace xivModdingFramework.Materials.DataContainers
         Default,      
         DiffuseMulti,    
         DiffuseSpecular,
+        BodyNoPores,
         Face,
+        FaceNoPores,
         FaceBright,
     }
 
@@ -1450,10 +1480,10 @@ namespace xivModdingFramework.Materials.DataContainers
         Common2 = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
 
         SkinColor = 740963549,          // This skin args seem to be the same for all races.
-        SkinOutline = 2569562539,
-        SkinUnknown1 = 390837838,
+        SkinWetnessLerp = 2569562539,
+        SkinMatParamRow2 = 390837838,
         SkinUnknown2 = 950420322,          // Always all 0 data?
-        SkinUnknown3 = 1112929012,
+        SkinTileMaterial = 1112929012,
 
         Face1 = 2274043692,
 
@@ -1463,8 +1493,8 @@ namespace xivModdingFramework.Materials.DataContainers
         Hair1 = 364318261,          // Character Hair Color?
         Hair2 = 3042205627,         // Character Highlight Color
 
-        RacialSkin1 = 1659128399,         // This arg is the same for most races, but Highlander and Roe M use a different value
-        RacialSkin2 = 778088561,          // Roe M is the only one that has a change to this arg's data.?
+        SkinFresnel = 1659128399,         // This arg is the same for most races, but Highlander and Roe M use a different value
+        SkinTileMultiplier = 778088561,          // Roe M is the only one that has a change to this arg's data.?
 
         Furniture1 = 1066058257,
         Furniture2 = 337060565,
@@ -1598,7 +1628,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 presets.Add(MtrlShaderPreset.DiffuseSpecular);
             } else if(shader == MtrlShader.Skin)
             {
+                presets.Add(MtrlShaderPreset.BodyNoPores);
                 presets.Add(MtrlShaderPreset.Face);
+                presets.Add(MtrlShaderPreset.FaceNoPores);
             } else if(shader == MtrlShader.Hair)
             {
                 presets.Add(MtrlShaderPreset.Face);

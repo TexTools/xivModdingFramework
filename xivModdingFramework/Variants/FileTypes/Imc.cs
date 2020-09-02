@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
@@ -49,6 +50,76 @@ namespace xivModdingFramework.Variants.FileTypes
             _gameDirectory = gameDirectory;
         }
 
+        public static bool UsesImc(IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root == null) return false;
+            return UsesImc(root);
+
+        }
+        public static bool UsesImc(XivDependencyRoot root)
+        {
+            if (root == null) return false;
+            return UsesImc(root.Info);
+        }
+        public static bool UsesImc(XivDependencyRootInfo root)
+        {
+
+            if (root.PrimaryType == XivItemType.human)
+            {
+                return false;
+            }
+            else if (root.PrimaryType == XivItemType.indoor || root.PrimaryType == XivItemType.outdoor)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// A simple function that retrieves the material set ID of an item,
+        /// whether via IMC or default value.
+        /// 
+        /// A value of -1 indicates that material sets are not used at all on this item.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public async Task<int> GetMaterialSetId(IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root == null) return -1;
+
+            if(root.Info.PrimaryType == XivItemType.human)
+            {
+                if(root.Info.SecondaryType == XivItemType.hair
+                    || root.Info.SecondaryType == XivItemType.tail
+                    || root.Info.SecondaryType == XivItemType.body)
+                {
+                    // These use material sets (always set 1), but have no IMC file.
+                    return 1;
+                } else
+                {
+                    return -1;
+                }
+            } else if(root.Info.PrimaryType == XivItemType.indoor || root.Info.PrimaryType == XivItemType.outdoor)
+            {
+                return -1;
+            } else
+            {
+                try
+                {
+                    var entry = await GetImcInfo(item);
+                    return entry.Variant;
+                } catch
+                {
+                    return -1;
+                }
+            }
+        }
+
         /// <summary>
         /// Gets the relevant IMC information for a given item
         /// </summary>
@@ -75,13 +146,19 @@ namespace xivModdingFramework.Variants.FileTypes
             } catch
             {
                 // Some dual wield items don't have a second IMC, and just default to the first.
-                var gear = (XivGear)item;
-                if (gear != null && gear.PairedItem != null)
+                if (typeof(XivGear) == item.GetType())
                 {
-                    var pair = gear.PairedItem;
-                    var imcPath = GetImcPath(pair);
-                    var path = imcPath.Folder + "/" + imcPath.File;
-                    return await (GetFullImcInfo(path));
+                    var gear = (XivGear)item;
+                    if (gear != null && gear.PairedItem != null)
+                    {
+                        var pair = gear.PairedItem;
+                        var imcPath = GetImcPath(pair);
+                        var path = imcPath.Folder + "/" + imcPath.File;
+                        return await (GetFullImcInfo(path));
+                    }
+                } else
+                {
+                    throw new InvalidDataException("Unable to get IMC data for item: " + item.Name);
                 }
             }
 
@@ -162,11 +239,24 @@ namespace xivModdingFramework.Variants.FileTypes
             var info = await GetFullImcInfo(path);
             for(int i = 0; i < entries.Count; i++)
             {
-                var e = info.GetEntry(i, slot);
+                XivImc e;
+                if (i >= info.SubsetCount + 1)
+                {
+                    e = new XivImc();
+                }
+                else
+                {
+                    e = info.GetEntry(i, slot);
+                }
                 e.Mask = entries[i].Mask;
                 e.Unknown = entries[i].Unknown;
                 e.Vfx = entries[i].Vfx;
                 e.Variant = entries[i].Variant;
+
+                if (i >= info.SubsetCount + 1)
+                {
+                    info.SetEntry(e, i, slot, true);
+                }
             }
 
             // Save the modified info.
@@ -198,7 +288,7 @@ namespace xivModdingFramework.Variants.FileTypes
                     Variant = variant,
                     Unknown = unknown,
                     Mask = mask,
-                    Vfx = variant
+                    Vfx = vfx
                 };
 
             }
@@ -395,7 +485,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
             itemName ??= Path.GetFileName(path);
             category ??= "Meta";
-            source ??= "Internal";
+            source ??= "Unknown";
 
             await dat.ImportType2Data(data.ToArray(), itemName, path, category, source);
         }
@@ -531,7 +621,7 @@ namespace xivModdingFramework.Variants.FileTypes
             public List<XivImc> DefaultSubset { get; set; }
 
             // Gets all (non-default) IMC entries for a given slot.
-            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = false)
+            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = true)
             {
                 var ret = new List<XivImc>(SubsetList.Count);
                 if (includeDefault)
@@ -587,13 +677,13 @@ namespace xivModdingFramework.Variants.FileTypes
                 return subset[idx];
             }
 
-            public void SetEntry(XivImc info, int subsetID = -1, string slot = "")
+            public void SetEntry(XivImc info, int subsetID = -1, string slot = "", bool allowNew = false)
             {
                 // Variant IDs are 1 based, not 0 based.
                 var index = subsetID - 1;
 
                 // Invalid Index, return default.
-                if (index >= SubsetCount || index < 0)
+                if ((index >= SubsetCount && !allowNew) || index < 0)
                 {
                     index = -1;
                 }
@@ -602,7 +692,28 @@ namespace xivModdingFramework.Variants.FileTypes
                 var subset = DefaultSubset;
                 if (index >= 0)
                 {
-                    subset = SubsetList[index];
+                    if (index >= SubsetCount)
+                    {
+                        subset = new List<XivImc>();
+                        if(TypeIdentifier == ImcType.Set)
+                        {
+                            // Five entries for set types.
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                        } else
+                        {
+                            // One entry for nonset types.
+                            subset.Add(info);
+                        }
+                        SubsetList.Add(subset);
+                    }
+                    else
+                    {
+                        subset = SubsetList[index];
+                    }
                 }
 
                 // Get which offset the slot uses.

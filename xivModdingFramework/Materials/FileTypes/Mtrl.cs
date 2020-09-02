@@ -114,12 +114,12 @@ namespace xivModdingFramework.Materials.FileTypes
             { MtrlShaderParameterId.Common2, new List<float>(){ 1f } },
             { MtrlShaderParameterId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
             { MtrlShaderParameterId.Reflection1, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.SkinOutline, new List<float>(){ 3f } },
-            { MtrlShaderParameterId.RacialSkin1, new List<float>(){ 0.02f, 0.02f, 0.02f } },
-            { MtrlShaderParameterId.SkinUnknown1, new List<float>(){ 0.4f, 0.4f, 0.4f } },
+            { MtrlShaderParameterId.SkinWetnessLerp, new List<float>(){ 3f } },
+            { MtrlShaderParameterId.SkinFresnel, new List<float>(){ 0.02f, 0.02f, 0.02f } },
+            { MtrlShaderParameterId.SkinMatParamRow2, new List<float>(){ 0.4f, 0.4f, 0.4f } },
             { MtrlShaderParameterId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderParameterId.RacialSkin2, new List<float>(){ 65f, 100f } },
-            { MtrlShaderParameterId.SkinUnknown3, new List<float>(){ 63f } },
+            { MtrlShaderParameterId.SkinTileMultiplier, new List<float>(){ 65f, 100f } },
+            { MtrlShaderParameterId.SkinTileMaterial, new List<float>(){ 63f } },
             { MtrlShaderParameterId.Equipment1, new List<float>(){ 0f } },
             { MtrlShaderParameterId.Face1, new List<float>(){ 32f } },
             { MtrlShaderParameterId.Hair1, new List<float>(){ 0.35f } },
@@ -245,14 +245,21 @@ namespace xivModdingFramework.Materials.FileTypes
             string mtrlPath = "";
             long mtrlOffset = 0;
             var index = new Index(_gameDirectory);
+            var extractMSet = new Regex("v([0-9]{4})/");
 
             // Get the root from the material file in specific.
             var root = XivDependencyGraph.ExtractRootInfoFilenameOnly(mtrlFile);
-            if (mtrlFile.Count(x => x == '/') > 1)
+            if ((!mtrlFile.StartsWith("chara/")) && mtrlFile.Count(x => x == '/') > 1)
             {
                 // This is an absolute path reference.
                 mtrlPath = mtrlFile;
             } else {
+                var mSetMatch = extractMSet.Match(mtrlFile);
+                if(mSetMatch.Success && materialSet < 0)
+                {
+                    materialSet = Int32.Parse(mSetMatch.Groups[1].Value);
+                }
+                mtrlFile = Path.GetFileName(mtrlFile);
 
                 // Get mtrl path
                 var mtrlFolder = GetMtrlFolder(root, materialSet);
@@ -723,7 +730,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     var di = Tex.GetDefaultTexturePath(mapInfo.Usage);
 
-                    var newOffset = await _tex.TexDDSImporter(xivTex, item, di, source);
+                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source);
 
                 }
 
@@ -1083,7 +1090,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
         }
-        public string GetMtrlFolder(XivDependencyRootInfo root, int materialSet) 
+        public string GetMtrlFolder(XivDependencyRootInfo root, int materialSet = -1) 
         {
             // These types have exactly one material set, but don't have an IMC file saying so.
             if(root.SecondaryType == XivItemType.hair ||
@@ -1094,7 +1101,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var mtrlFolder = root.GetRootFolder() + "material";
-            if (materialSet != 0)
+            if (materialSet > 0)
             {
                 var version = materialSet.ToString().PadLeft(4, '0');
                 mtrlFolder += $"/v{version}";

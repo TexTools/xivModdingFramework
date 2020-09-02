@@ -207,7 +207,7 @@ namespace xivModdingFramework.Cache
         /// Ex c0101f0001_fac
         /// </summary>
         /// <returns></returns>
-        public string GetBaseFileName()
+        public string GetBaseFileName(bool includeSlot = true)
         {
             var pId = PrimaryId.ToString().PadLeft(4, '0');
             var pPrefix = XivItemTypes.GetSystemPrefix(PrimaryType);
@@ -219,7 +219,7 @@ namespace xivModdingFramework.Cache
                 sPrefix = XivItemTypes.GetSystemPrefix((XivItemType)SecondaryType);
             }
 
-            if (Slot != null)
+            if (Slot != null && includeSlot)
             {
                 return String.Format(BaseFileFormatWithSlot, new string[] { pPrefix, pId, sPrefix, sId, Slot });
             }
@@ -490,7 +490,7 @@ namespace xivModdingFramework.Cache
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
                 var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot);
+                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true);
                 var models = new List<string>();
                 foreach(var race in races)
                 {
@@ -589,7 +589,7 @@ namespace xivModdingFramework.Cache
                 // orphaned materials.
                 if(mod.fullPath.StartsWith(rootFolder) && mod.fullPath.EndsWith(".mtrl"))
                 {
-                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot))
+                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
                     {
                         var material = mod.fullPath;
                         if (materialVariant >= 0)
@@ -713,11 +713,10 @@ namespace xivModdingFramework.Cache
             }
 
             var offset = startingOffset + subOffset;
-            imcEntries.Add(imcPath + Constants.BinaryOffsetMarker + (offset * 8).ToString());
 
-            for(int i = 0; i < subsetCount; i++)
+            for(int i = 0; i <= subsetCount; i++)
             {
-                offset = startingOffset + ((i + 1) * entrySize) + subOffset;
+                offset = startingOffset + (i * entrySize) + subOffset;
                 imcEntries.Add(imcPath + Constants.BinaryOffsetMarker + (offset * 8).ToString());
             }
 
@@ -907,7 +906,7 @@ namespace xivModdingFramework.Cache
                 var imcEntries = await imc.GetEntries(imcPaths);
 
                 // Need to verify all of our IMC sets are properly represented in the item list.
-                for (int i = 0; i <= imcEntries.Count; i++)
+                for (int i = 0; i <  imcEntries.Count; i++)
                 {
                     // Already in it.  All set.
                     if (items.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
@@ -924,8 +923,9 @@ namespace xivModdingFramework.Cache
             }
 
             if (items.Count == 0) {
+                var val = imcSubset >= 0 ? imcSubset : 0;
                 // May as well make a raw item.
-                items.Add(ToRawItem());
+                items.Add(ToRawItem(val));
             }
 
             items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
@@ -1123,6 +1123,7 @@ namespace xivModdingFramework.Cache
             return null;
         }
 
+
         /// <summary>
         /// Returns all same-level sibling files for the given sibling file.
         /// Note: This includes the file itself.
@@ -1132,6 +1133,7 @@ namespace xivModdingFramework.Cache
         public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
         {
             var parents = await GetParentFiles(internalFilePath);
+            if (parents == null) return null;
             var siblings = new HashSet<string>();
             foreach(var p in parents)
             {

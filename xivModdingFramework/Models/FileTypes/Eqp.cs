@@ -97,6 +97,8 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.AuRa_Female_NPC,
             XivRace.Hrothgar_NPC,
             XivRace.Viera_NPC,
+            XivRace.NPC_Male,
+            XivRace.NPC_Female
         };
 
         private Dat _dat;
@@ -671,6 +673,31 @@ namespace xivModdingFramework.Models.FileTypes
 
         #region Raw Internal Functions
 
+        // Cache to help reduce the amount of checks we have to do to see what EQDP files actually exist, since this can never change at runtime.
+        // Keyed by [IsAccessory][XivRace] => Exists(t/f)
+        private static Dictionary<bool, Dictionary<XivRace, bool>> _eqdpFileExistsCache = new Dictionary<bool, Dictionary<XivRace, bool>>()
+        {
+            { true, new Dictionary<XivRace, bool>() },
+            { false, new Dictionary<XivRace, bool>() }
+        };
+
+        private static async Task<bool> EqdpFileExists(XivRace race, bool accessory)
+        {
+            if(_eqdpFileExistsCache[accessory].ContainsKey(race))
+            {
+                return _eqdpFileExistsCache[accessory][race];
+            }
+
+            var index = new Index(XivCache.GameInfo.GameDirectory);
+            var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
+            var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+            var exists = await index.FileExists(fileName);
+
+            _eqdpFileExistsCache[accessory].Add(race, exists);
+
+            return exists;
+        }
+
         /// <summary>
         /// Gets all of the equipment or accessory deformation sets for a given equipment id.
         /// </summary>
@@ -684,6 +711,7 @@ namespace xivModdingFramework.Models.FileTypes
             var races = includeNPCs ? PlayableRacesWithNPCs : PlayableRaces;
             foreach (var race in races)
             {
+                if (!await EqdpFileExists(race, accessory)) continue;
                 var result = await GetEquipmentDeformationSet(equipmentId, race, accessory, forceDefault);
                 sets.Add(race, result);
             }

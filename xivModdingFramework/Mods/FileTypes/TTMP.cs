@@ -420,6 +420,8 @@ namespace xivModdingFramework.Mods.FileTypes
         public async Task<(int ImportCount, int ErrorCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
+            if (modsJson == null || modsJson.Count == 0) return (0, 0, "");
+
             var dat = new Dat(gameDirectory);
             var modding = new Modding(gameDirectory);
             var modListFullPaths = new List<string>();
@@ -586,6 +588,8 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns>The data type</returns>
         private int GetDataType(string path)
         {
+            if (String.IsNullOrEmpty(path)) return 0;
+
             if (path.Contains(".tex"))
             {
                 return 4;

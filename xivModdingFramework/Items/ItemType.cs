@@ -43,6 +43,8 @@ namespace xivModdingFramework.Items
         {
             XivItemType itemType;
 
+            if (item.PrimaryCategory == null || item.SecondaryCategory == null) return XivItemType.unknown;
+
             if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) || 
                 item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Dual_Wield) || item.SecondaryCategory.Equals(XivStrings.Food))
             {
@@ -177,6 +179,25 @@ namespace xivModdingFramework.Items
                 catch
                 {
                     // Use the default logic if we failed the cast.
+                }
+            }
+
+            if(item.GetType() == typeof(XivMount))
+            {
+                var m = (XivMount)item;
+                if(m.ModelInfo != null && m.ModelInfo.GetType() == typeof(XivMonsterModelInfo))
+                {
+                    var mi = (XivMonsterModelInfo)m.ModelInfo;
+                    if(mi.ModelType == XivItemType.demihuman)
+                    {
+                        // Slot has to be extracted from name here.
+                        var rex = new Regex("d[0-9]{4}e[0-9]{4}_([a-z]{3})");
+                        var match = rex.Match(item.Name);
+                        if(match.Success)
+                        {
+                            return match.Groups[1].Value;
+                        }
+                    }
                 }
             }
 
@@ -427,7 +448,7 @@ namespace xivModdingFramework.Items
                 }
                 else if (secondaryType == XivItemType.ear)
                 {
-                    ret += "ears/z";
+                    ret += "zear/z";
                 }
 
                 ret += secondaryId;

@@ -28,6 +28,7 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
+using System.Xml.Schema;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -125,6 +126,13 @@ namespace xivModdingFramework.Models.FileTypes
             return parsedFile;
         }
 
+        private static bool ContainsUnicodeCharacter(string input)
+        {
+            const int MaxAnsiCode = 255;
+
+            return input.Any(c => c > MaxAnsiCode);
+        }
+
         private static async Task ExtractAndParseSkel(string file)
         {
 
@@ -137,27 +145,114 @@ namespace xivModdingFramework.Models.FileTypes
 
             var rawFile = await ExtractSkelb(file);
 
-            // Conver that to XML.
-            var xmlFile = Path.ChangeExtension(parsedFile, ".xml");
-            var proc = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = cwd + "/NotAssetCc.exe",
-                    Arguments = "\"" + rawFile + "\" \"" + xmlFile + "\"",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-
-            proc.Start();
-            proc.WaitForExit();
+            var xmlFile = await ConvertSkelToXml(rawFile);
 
             ParseSkeleton(xmlFile);
 
             File.Delete(xmlFile);
             File.Delete(rawFile);
+        }
+        private static async Task<string> ConvertSkelToXml(string rawFile)
+        {
+            // Conver that to XML.
+
+            var xmlFile = Path.ChangeExtension(rawFile, ".xml");
+            var originalXml = xmlFile;
+            var originalRaw = rawFile;
+
+            File.Delete(xmlFile);
+
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+
+            var application = "/NotAssetCc.exe";
+            var extraFlags = "";
+
+            bool usedTemp = false;
+
+            // Okay, in this case, NotAssetCC won't work.
+            if(ContainsUnicodeCharacter(cwd))
+            {
+                // Does AssetCC exist? Use that.
+                if(File.Exists(cwd + "/AssetCc2.exe"))
+                {
+                    application = "/AssetCc2.exe";
+                    extraFlags = "-s ";
+
+                    // Asset CC2 *can* process files that exist in unicode directories, but they must be
+                    // provided as relative paths which themselves do not contain unicode.
+                    xmlFile = Path.Combine("Skeletons", Path.GetFileName(xmlFile));
+                    rawFile = Path.Combine("Skeletons", Path.GetFileName(rawFile));
+                } else
+                {
+                    usedTemp = true;
+
+                    // Unicode path and we don't have AssetCC2.
+                    // Check if a temp path has unicode in it.
+                    var tempFileXml = Path.GetTempFileName();
+                    var tempFileRaw = Path.GetTempFileName();
+
+                    if (!ContainsUnicodeCharacter(tempFileXml) && !ContainsUnicodeCharacter(tempFileRaw))
+                    {
+                        // Okay, we can use a temp file instead.
+                        xmlFile = tempFileXml;
+                        rawFile = tempFileRaw;
+
+                        // Copy the raw file to the temp folder.
+                        File.Delete(tempFileRaw);
+                        File.Delete(tempFileXml);
+                        File.Copy(originalRaw, tempFileRaw);
+                    } else
+                    {
+                        // Temp folder ALSO has unicode in it.  See if we can write to root then.
+                        DriveInfo cDrive = new DriveInfo("C");
+                        var rootDir = cDrive.RootDirectory;
+                        var guid = Guid.NewGuid().ToString();
+                        tempFileXml = Path.Combine(rootDir.FullName, guid + ".xml");
+                        tempFileRaw = Path.Combine(rootDir.FullName, guid + ".sklb");
+
+                        try
+                        {
+                            // Try to copy the sklb file into their root directory.
+                            File.Copy(rawFile, tempFileRaw);
+
+                            xmlFile = tempFileXml;
+                            rawFile = tempFileRaw;
+                        } catch
+                        {
+                            // We have a unicode path, asset CC doesn't exist, the Temp path is also unicode, and we can't write to the base root folder.
+                            // At this point, we have to just give the user an error to get AssetCC or correct the folders.
+                            throw new Exception("Cannot run NotAssetCC with Unicode paths.\nEither obtain AssetCc2.exe or run TexTools in a non-unicode path.");
+                        }
+                    }
+                }
+            }
+
+
+            var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = cwd + application,
+                    Arguments = extraFlags + "\"" + rawFile + "\" \"" + xmlFile + "\"",
+                    WorkingDirectory = cwd,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            proc.Start();
+            proc.WaitForExit();
+
+            if(usedTemp)
+            {
+                // Copy the file back into the right position if needed and delete temp folder items.
+                File.Copy(xmlFile, originalXml);
+                File.Delete(xmlFile);
+                File.Delete(rawFile);
+            }
+
+
+            return originalXml;
         }
 
         private static async Task<string> GetExtraSkelbPath(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)

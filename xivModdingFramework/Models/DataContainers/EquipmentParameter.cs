@@ -216,7 +216,7 @@ namespace xivModdingFramework.Models.DataContainers
         EnableFootFlags = 32,
         FootHideKnee = 33,              // Requires bit 34 on as well to work.
         FootHideCalf = 34,
-        FootUsuallyOn = 35,             // Usually set to [1], the remaining bits of this byte are always [0].
+        FootHideAnkle = 35,             // Usually set to [1], the remaining bits of this byte are always [0].
         Bit36 = 36,
         Bit37 = 37,
         Bit38 = 38,
@@ -349,6 +349,11 @@ namespace xivModdingFramework.Models.DataContainers
             byte[] bytes = new byte[_bits.Count / 8];
             _bits.CopyTo(bytes, 0);
             return bytes;
+        }
+
+        public void SetBytes(byte[] bytes)
+        {
+            _bits = new BitArray(bytes);
         }
 
 
