@@ -34,9 +34,9 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class TTMP
     {
-        private readonly string _currentWizardTTMPVersion = "1.0w";
-        private readonly string _currentSimpleTTMPVersion = "1.0s";
-        private const string _minimumAssembly = "1.0.0.0";
+        private readonly string _currentWizardTTMPVersion = "1.1w";
+        private readonly string _currentSimpleTTMPVersion = "1.1s";
+        private const string _minimumAssembly = "1.1.0.0";
 
         private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;
@@ -420,6 +420,8 @@ namespace xivModdingFramework.Mods.FileTypes
         public async Task<(int ImportCount, int ErrorCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
+            if (modsJson == null || modsJson.Count == 0) return (0, 0, "");
+
             var dat = new Dat(gameDirectory);
             var modding = new Modding(gameDirectory);
             var modListFullPaths = new List<string>();
@@ -586,6 +588,8 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns>The data type</returns>
         private int GetDataType(string path)
         {
+            if (String.IsNullOrEmpty(path)) return 0;
+
             if (path.Contains(".tex"))
             {
                 return 4;

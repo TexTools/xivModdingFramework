@@ -880,47 +880,31 @@ namespace xivModdingFramework.Models.Helpers
             XivRace race = XivRace.All_Races;
             if (match.Success)
             {
-                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
                 race = XivRaces.GetXivRace(match.Groups[1].Value);
-                RaceConvert(incomingModel, race, modelRace, loggingFunction);
+                if (modelRace == race)
+                {
+                    // Nothing needs to be done.
+                    return;
+                }
+
+                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
+
+                var oSource = incomingModel.Source;
+                incomingModel.Source = originalModelPath;
+
+                try
+                {
+                    RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction);
+                }
+                finally
+                {
+                    incomingModel.Source = oSource;
+                }
             }
             else
             {
                 loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
             }
-        }
-
-        public static void RaceConvert(TTModel model, XivRace targetRace, XivRace originalRace = XivRace.All_Races, Action<bool, string> loggingFunction = null)
-        {
-            if (loggingFunction == null)
-            {
-                loggingFunction = NoOp;
-            }
-
-            // Extract the original race from the ttModel if we weren't provided with one.
-            if (originalRace == XivRace.All_Races)
-            {
-                var raceRegex = new Regex("c([0-9]{4})");
-                if (!model.IsInternal)
-                {
-                    var match = raceRegex.Match(model.Source);
-                    if (match.Success)
-                    {
-                        originalRace = XivRaces.GetXivRace(match.Groups[1].Value);
-                    }
-                    else
-                    {
-                        loggingFunction(true, "Racial Conversion cancelled - Model is not a racial model.");
-                    }
-
-                }
-                else
-                {
-                    throw new InvalidDataException("Cannot racially convert external model without provided Original Race value.");
-                }
-            }
-            RaceConvertRecursive(model, targetRace, originalRace, loggingFunction);
-            //ModelModifiers.CalculateTangents(model, loggingFunction);
         }
 
 
@@ -957,7 +941,7 @@ namespace xivModdingFramework.Models.Helpers
                 else if (originalRace.GetNode().Parent != null)
                 {
                     ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
-                    RaceConvert(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                    RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
                 }
                 // Current race has no parent
                 // Make a recursive call with the target races parent race
@@ -965,7 +949,7 @@ namespace xivModdingFramework.Models.Helpers
                 else
                 {
                     ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
-                    RaceConvert(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
+                    RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
                 }
             }
             catch (Exception ex)
@@ -998,6 +982,7 @@ namespace xivModdingFramework.Models.Helpers
                 Mdl.GetDeformationMatrices(targetRace, out deformations, out inverted, out normalmatrixes, out invertednormalmatrixes);
 
 
+
                 // Check if deformation is possible
                 var missingDeforms = new HashSet<string>();
 
@@ -1015,14 +1000,49 @@ namespace xivModdingFramework.Models.Helpers
                 // Throw an exception if there is any missing deform bones
                 if (missingDeforms.Any())
                 {
+                    // Get the skeleton for this model so we can use it to analyze missing bones.
+                    var dict = model.ResolveBoneHeirarchy(loggingFunction);
+
+
                     // For a bone to be missing in the deformation data completely, it has to have come from a different skeleton, which
                     // had the bone, while our new one has no entry for it at all.  In these cases, just use identity.
-                    foreach(var bone in missingDeforms)
+                    foreach (var bone in missingDeforms)
                     {
-                        deformations[bone] = Matrix.Identity;
-                        inverted[bone] = Matrix.Identity;
-                        normalmatrixes[bone] = Matrix.Identity;
-                        invertednormalmatrixes[bone] = Matrix.Identity;
+                        if (dict.ContainsKey(bone))
+                        {
+                            // This bone actually exists in our skeleton, so it's most likely an EX bone without a deformation matrix.
+                            var parent = dict.FirstOrDefault(x => x.Value.BoneNumber == dict[bone].BoneParent).Value;
+
+                            // Walk up the tree until we find a parent with a deform.
+                            while(parent != null && !deformations.ContainsKey(parent.BoneName))
+                            {
+                                parent = dict.FirstOrDefault(x => x.Value.BoneNumber == parent.BoneParent).Value;
+                            }
+
+                            if(parent != null)
+                            {
+                                // Found a parent? use that bone's deforms.
+                                deformations[bone] = deformations[parent.BoneName];
+                                inverted[bone] = inverted[parent.BoneName];
+                                normalmatrixes[bone] = normalmatrixes[parent.BoneName];
+                                invertednormalmatrixes[bone] = invertednormalmatrixes[parent.BoneName];
+                            } else
+                            {
+                                // No Parent? No Deforms.
+                                deformations[bone] = Matrix.Identity;
+                                inverted[bone] = Matrix.Identity;
+                                normalmatrixes[bone] = Matrix.Identity;
+                                invertednormalmatrixes[bone] = Matrix.Identity;
+                            }
+                        }
+                        else
+                        {
+                            // Bone doesn't exist in the skel, can't deform it.
+                            deformations[bone] = Matrix.Identity;
+                            inverted[bone] = Matrix.Identity;
+                            normalmatrixes[bone] = Matrix.Identity;
+                            invertednormalmatrixes[bone] = Matrix.Identity;
+                        }
                     }
                 }
 
@@ -1420,7 +1440,7 @@ namespace xivModdingFramework.Models.Helpers
         }
 
 
-        private static readonly Regex _skinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+        public static readonly Regex SkinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
 
 
 
@@ -1486,7 +1506,7 @@ namespace xivModdingFramework.Models.Helpers
                 if (m.Material == null) continue;
 
                 // Only fix up -skin- materials.
-                if (_skinMaterialRegex.IsMatch(m.Material))
+                if (SkinMaterialRegex.IsMatch(m.Material))
                 {
                     var mtrlMatch = raceRegex.Match(m.Material);
                     if (mtrlMatch.Success && mtrlMatch.Groups[1].Value != skinRaceString)

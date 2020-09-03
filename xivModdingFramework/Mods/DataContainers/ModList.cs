@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Security.Cryptography;
 using System.Text;
+using xivModdingFramework.Helpers;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
@@ -120,6 +121,16 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The mod data including offsets
         /// </summary>
         public Data data { get; set; }
+
+        public bool IsInternal()
+        {
+            return source == Constants.InternalModSourceName;
+        }
+
+        public bool IsCustomFile()
+        {
+            return data.modOffset == data.originalOffset;
+        }
     }
 
     public class Data

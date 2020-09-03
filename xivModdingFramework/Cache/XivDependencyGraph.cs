@@ -207,7 +207,7 @@ namespace xivModdingFramework.Cache
         /// Ex c0101f0001_fac
         /// </summary>
         /// <returns></returns>
-        public string GetBaseFileName()
+        public string GetBaseFileName(bool includeSlot = true)
         {
             var pId = PrimaryId.ToString().PadLeft(4, '0');
             var pPrefix = XivItemTypes.GetSystemPrefix(PrimaryType);
@@ -219,7 +219,7 @@ namespace xivModdingFramework.Cache
                 sPrefix = XivItemTypes.GetSystemPrefix((XivItemType)SecondaryType);
             }
 
-            if (Slot != null)
+            if (Slot != null && includeSlot)
             {
                 return String.Format(BaseFileFormatWithSlot, new string[] { pPrefix, pId, sPrefix, sId, Slot });
             }
@@ -480,23 +480,6 @@ namespace xivModdingFramework.Cache
 
 
         /// <summary>
-        /// Gets all the binary-offset meta entries associated with this root.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<List<string>> GetMetaEntries()
-        {
-            var metas = new List<string>();
-            var eqp = GetEqpEntryPath();
-            if (eqp != null)
-            {
-                metas.Add(eqp);
-            }
-            metas.AddRange(GetEqdpEntryPaths());
-            metas.AddRange(await GetImcEntryPaths());
-            return metas;
-        }
-
-        /// <summary>
         /// Gets all the model files in this dependency chain.
         /// </summary>
         /// <returns></returns>
@@ -507,7 +490,7 @@ namespace xivModdingFramework.Cache
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
                 var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot);
+                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true);
                 var models = new List<string>();
                 foreach(var race in races)
                 {
@@ -537,32 +520,57 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public async Task<List<string>> GetMaterialFiles(int materialVariant = -1)
         {
-            var models = await GetModelFiles();
-            var materials = new HashSet<string>();
-            if (models != null && models.Count > 0)
-            {
-                var dataFile = IOUtil.GetDataFileFromPath(models[0]);
-                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
 
-                foreach (var model in models)
+            var materials = new HashSet<string>();
+            if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
+            {
+                // Bleargh.  So here's the exception of exception class.  Because the "models" in human body are 
+                // are so sparse and all over the place, relying on them is impossible.  Thankfully, body types only ever
+                // have one vanilla material.
+                var primary = Info.PrimaryId.ToString().PadLeft(4, '0');
+                var body = Info.SecondaryId.ToString().PadLeft(4, '0');
+                var path= $"chara/human/c{primary}/obj/body/b{body}/material/v0001/mt_c{primary}b{body}_a.mtrl";
+
+                // Just validate it exists and call it a day.
+                var index = new Index(XivCache.GameInfo.GameDirectory);
+                var exists = await index.FileExists(path);
+                if(exists)
                 {
-                    var mdlMats = await XivCache.GetChildFiles(model);
-                    if (materialVariant < 0)
+                    materials.Add(path);
+                }
+
+                materialVariant = 1;
+            }
+            else
+            {
+                var models = await GetModelFiles();
+                if (models != null && models.Count > 0)
+                {
+                    var dataFile = IOUtil.GetDataFileFromPath(models[0]);
+                    var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
+
+                    foreach (var model in models)
                     {
-                        foreach (var mat in mdlMats)
+                        var mdlMats = await XivCache.GetChildFiles(model);
+                        if (materialVariant < 0)
                         {
-                            materials.Add(mat);
+                            foreach (var mat in mdlMats)
+                            {
+                                materials.Add(mat);
+                            }
                         }
-                    } else {
-                        var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
-                        foreach (var mat in mdlMats)
+                        else
                         {
-                            // Replace any material set references with the new one.
-                            // The hash set will scrub us down to just a single copy.
-                            // This is faster than re-scanning the MDL file.
-                            // And a little more thorough than simply skipping over non-matching refs.
-                            // Since some materials may not have variant references.
-                            materials.Add(_materialSetRegex.Replace(mat, replacement));
+                            var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
+                            foreach (var mat in mdlMats)
+                            {
+                                // Replace any material set references with the new one.
+                                // The hash set will scrub us down to just a single copy.
+                                // This is faster than re-scanning the MDL file.
+                                // And a little more thorough than simply skipping over non-matching refs.
+                                // Since some materials may not have variant references.
+                                materials.Add(_materialSetRegex.Replace(mat, replacement));
+                            }
                         }
                     }
                 }
@@ -581,7 +589,7 @@ namespace xivModdingFramework.Cache
                 // orphaned materials.
                 if(mod.fullPath.StartsWith(rootFolder) && mod.fullPath.EndsWith(".mtrl"))
                 {
-                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot))
+                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
                     {
                         var material = mod.fullPath;
                         if (materialVariant >= 0)
@@ -663,6 +671,11 @@ namespace xivModdingFramework.Cache
 
             var imcPath = GetRawImcFilePath();
 
+            if(String.IsNullOrEmpty(imcPath))
+            {
+                return imcEntries;
+            }
+
 
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
             var index = new Index(_gameDirectory);
@@ -700,11 +713,10 @@ namespace xivModdingFramework.Cache
             }
 
             var offset = startingOffset + subOffset;
-            imcEntries.Add(imcPath + Constants.BinaryOffsetMarker + (offset * 8).ToString());
 
-            for(int i = 0; i < subsetCount; i++)
+            for(int i = 0; i <= subsetCount; i++)
             {
-                offset = startingOffset + ((i + 1) * entrySize) + subOffset;
+                offset = startingOffset + (i * entrySize) + subOffset;
                 imcEntries.Add(imcPath + Constants.BinaryOffsetMarker + (offset * 8).ToString());
             }
 
@@ -721,58 +733,6 @@ namespace xivModdingFramework.Cache
         {
             { XivItemType.equipment, "chara/xls/equipmentparameter/equipmentparameter.eqp" }
         };
-
-        /// <summary>
-        /// Gets the EQP entry for a given Type+Set+Slot.
-        /// </summary>
-        /// <returns></returns>
-        public string GetEqpEntryPath()
-        {
-            if (!EqpPaths.ContainsKey(Info.PrimaryType))
-                return null;
-
-            var eqpFile = EqpPaths[Info.PrimaryType];
-
-            // Each entry is 64 bits long.
-            const int entrySize = Eqp.EquipmentParameterEntrySize * 8;
-            var subOffset = EquipmentParameterSet.EntryOffsets[Info.Slot] * 8;
-
-            long offset = (entrySize * Info.PrimaryId) + subOffset;
-
-
-            return eqpFile + Constants.BinaryOffsetMarker + offset.ToString();
-        }
-
-
-        /// <summary>
-        /// Retrieves all of the EQDP entries for a given Type+Set+Slot.
-        /// </summary>
-        /// <returns></returns>
-        public List<string> GetEqdpEntryPaths()
-        {
-            // There's an EQDP file for every race,
-            // So we'll have 1 entry per race.
-            var entries = new List<string>();
-            if (!EqdpFolder.ContainsKey(Info.PrimaryType))
-                return entries;
-
-            var folder = EqdpFolder[Info.PrimaryType];
-
-            // Each entry is 16 bits long.
-            const int entrySize = Eqp.EquipmentDeformerParameterEntrySize * 8;
-
-            var slots = EquipmentDeformationParameterSet.SlotsAsList(Info.PrimaryType == XivItemType.accessory);
-            var order = slots.IndexOf(Info.Slot);
-            var subOffset = order * 2; // 2 bits per segment.
-
-            long offset = (entrySize * Info.PrimaryId) + subOffset;
-            foreach(var race in XivRaces.PlayableRaces)
-            {
-                entries.Add(folder + "c" + race.GetRaceCode() + ".eqdp" + Constants.BinaryOffsetMarker + offset.ToString());
-            }
-
-            return entries;
-        }
 
 
 
@@ -946,7 +906,7 @@ namespace xivModdingFramework.Cache
                 var imcEntries = await imc.GetEntries(imcPaths);
 
                 // Need to verify all of our IMC sets are properly represented in the item list.
-                for (int i = 0; i <= imcEntries.Count; i++)
+                for (int i = 0; i <  imcEntries.Count; i++)
                 {
                     // Already in it.  All set.
                     if (items.Any(x => x.ModelInfo.ImcSubsetID == i)) continue;
@@ -963,8 +923,9 @@ namespace xivModdingFramework.Cache
             }
 
             if (items.Count == 0) {
+                var val = imcSubset >= 0 ? imcSubset : 0;
                 // May as well make a raw item.
-                items.Add(ToRawItem());
+                items.Add(ToRawItem(val));
             }
 
             items = items.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
@@ -1162,6 +1123,7 @@ namespace xivModdingFramework.Cache
             return null;
         }
 
+
         /// <summary>
         /// Returns all same-level sibling files for the given sibling file.
         /// Note: This includes the file itself.
@@ -1171,6 +1133,7 @@ namespace xivModdingFramework.Cache
         public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
         {
             var parents = await GetParentFiles(internalFilePath);
+            if (parents == null) return null;
             var siblings = new HashSet<string>();
             foreach(var p in parents)
             {
@@ -1353,13 +1316,6 @@ namespace xivModdingFramework.Cache
                 return null;
             }
 
-            // Human - Body is an absolute mess of exceptions and weird cross-references.
-            // Just don't support it for now.
-            if(info.PrimaryType == XivItemType.human && info.SecondaryType == XivItemType.body)
-            {
-                return null;
-            }
-
             if (info.Slot == null)
             {
                 // Safety checks.  Custom-name textures can often end up with set being resolvable
@@ -1419,6 +1375,45 @@ namespace xivModdingFramework.Cache
             return uniqueRoots.ToList();
         }
 
+        /// <summary>
+        /// Extracts dependency root info from purely a file name.  This is primarily useful when looking at 
+        /// .mtrl files, where we want to find what actual folder they're contained in based upon their name reference
+        /// in a .mdl file.
+        /// </summary>
+        /// <param name="filenameWithoutExtension"></param>
+        /// <returns></returns>
+        public static XivDependencyRootInfo ExtractRootInfoFilenameOnly(string filenameWithoutExtension)
+        {
+            var regex = new Regex("([a-z])([0-9]{4})([a-z])([0-9]{4})");
+            var match = regex.Match(filenameWithoutExtension);
+            if(!match.Success)
+            {
+                return new XivDependencyRootInfo();
+            }
+
+            var primaryPrefix = match.Groups[1].Value;
+            var primaryId = Int32.Parse(match.Groups[2].Value);
+            var secondaryPrefix = match.Groups[3].Value;
+            var secondaryId = Int32.Parse(match.Groups[4].Value);
+
+            var root = new XivDependencyRootInfo();
+
+            root.PrimaryType = XivItemTypes.FromSystemPrefix(primaryPrefix[0]);
+            root.PrimaryId = primaryId;
+            root.SecondaryType = XivItemTypes.FromSystemPrefix(secondaryPrefix[0]);
+            root.SecondaryId = secondaryId;
+
+            if ((root.SecondaryType == XivItemType.equipment || root.SecondaryType == XivItemType.accessory)&& root.PrimaryType == XivItemType.human)
+            {
+                // Flip flop time for these.
+                root.SecondaryType = null;
+                root.SecondaryId = null;
+                root.PrimaryType = XivItemTypes.FromSystemPrefix(secondaryPrefix[0]);
+                root.PrimaryId = secondaryId;
+            }
+
+            return root;
+        }
 
         /// <summary>
         /// Extracts the various import information pieces from an internal path.

@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.FileTypes;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -564,29 +565,25 @@ namespace xivModdingFramework.SqPack.FileTypes
                         br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
 
                         // loop through each file entry
-                        for (var i = 0; i < fileCount; br.ReadBytes(4), i += 16)
+                        for (var i = 0; i < fileCount; i += 16)
                         {
+                            // 16 Bytes per entry.
                             var fileNameHash = br.ReadInt32();
+                            var folderPathHash = br.ReadInt32();
+                            long fileoffset = br.ReadUInt32();
+                            var unknown = br.ReadUInt32();
 
                             // check if the provided file name hash matches the current file name hash
                             if (fileNameHash == hashedFile)
                             {
-                                var folderPathHash = br.ReadInt32();
 
                                 // check if the provided folder path hash matches the current folder path hash
                                 if (folderPathHash == hashedFolder)
                                 {
                                     // this is the entry we are looking for, get the offset and break out of the loop
-                                    offset = br.ReadUInt32();
-                                    offset = offset * 8;
+                                    offset = fileoffset * 8;
                                     break;
                                 }
-
-                                br.ReadBytes(4);
-                            }
-                            else
-                            {
-                                br.ReadBytes(8);
                             }
                         }
                     }
@@ -1050,6 +1047,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile, bool updateCache = true)
         {
             await _semaphoreSlim.WaitAsync();
+
             try
             {
 
@@ -1344,6 +1342,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 await DeleteFileDescriptor(fullPath + ".flag", dataFile, false);
             }
 
+            // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
+            if (fullPath.EndsWith(".meta"))
+            {
+                var root = await XivCache.GetFirstRoot(fullPath);
+                await ItemMetadata.RestoreDefaultMetadata(root);
+            }
 
 
             if (updateCache)
@@ -1771,6 +1775,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 HashGenerator.GetHash(fullPath.Substring(0, fullPath.LastIndexOf("/", StringComparison.Ordinal)));
             var fileHash = HashGenerator.GetHash(Path.GetFileName(fullPath));
             var oldOffset = 0;
+            bool found = false;
 
             // These are the offsets to relevant data
             const int fileCountOffset = 1036;
@@ -1800,14 +1805,17 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                     if (folderPathHash == folderHash)
                                     {
+                                        found = true;
                                         oldOffset = br.ReadInt32();
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
                                         uint uOffset = (uint)(offset / 8);
                                         bw.Write(uOffset);
                                         break;
                                     }
-
-                                    br.ReadBytes(4);
+                                    else
+                                    {
+                                        br.ReadBytes(4);
+                                    }
                                 }
                                 else
                                 {
@@ -1818,6 +1826,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
             });
+
+            if (!found)
+            {
+                throw new Exception("Cannot update index information for non-existent file.");
+            }
+
+            if(oldOffset == 0)
+            {
+                throw new Exception("Cannot update index information for file with null data offset.");
+            }
 
             return oldOffset;
         }

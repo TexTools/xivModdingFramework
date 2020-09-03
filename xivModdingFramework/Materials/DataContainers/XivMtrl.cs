@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using SharpDX;
 using System;
 using System.Collections.Generic;
@@ -311,7 +312,6 @@ namespace xivModdingFramework.Materials.DataContainers
                     break;
             }
 
-            info.HasColorset = ColorSetData.Count > 0;
             // Check the transparency bit.
             const ushort transparencyBit = 16;
             const ushort backfaceBit = 1;
@@ -362,6 +362,22 @@ namespace xivModdingFramework.Materials.DataContainers
                 if(GetTextureUsage(XivTexType.Skin) == null)
                 {
                     info.Preset = MtrlShaderPreset.Face;
+                }
+                
+                if(ShaderParameterList.Any(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial))
+                {
+                    var param = ShaderParameterList.First(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial);
+                    if(param.Args[0] == 0)
+                    {
+                        if(info.Preset == MtrlShaderPreset.Face)
+                        {
+                            info.Preset = MtrlShaderPreset.FaceNoPores;
+
+                        } else
+                        {
+                            info.Preset = MtrlShaderPreset.BodyNoPores;
+                        }
+                    }
                 }
             } else if(info.Shader == MtrlShader.Hair)
             {
@@ -446,15 +462,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 // Returning here ensures shader information
                 // is not bashed unless edited.
                 return;
-            }
-
-            if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass || info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture)
-            {
-                info.HasColorset = true;
-            }
-            else
-            {
-                info.HasColorset = false;
             }
 
             RegenerateTextureUsageList(info);
@@ -587,13 +594,13 @@ namespace xivModdingFramework.Materials.DataContainers
                 return null;
             }
 
-            info.path = "";
+            info.Path = "";
             if ( mapIndex < TexturePathList.Count )
             {
-                info.path = TexturePathList[mapIndex];
+                info.Path = TexturePathList[mapIndex];
             }
 
-            info.path = TokenizePath(info.path, info.Usage);
+            info.Path = TokenizePath(info.Path, info.Usage);
             return info;
         }
 
@@ -622,7 +629,7 @@ namespace xivModdingFramework.Materials.DataContainers
             }
 
             var info = new MapInfo();
-            info.path = path;
+            info.Path = path;
             
             foreach(var descriptor in TextureDescriptorList)
             {
@@ -647,7 +654,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
             }
 
-            info.path = TokenizePath(info.path, info.Usage);
+            info.Path = TokenizePath(info.Path, info.Usage);
 
             return info;
         }
@@ -718,30 +725,30 @@ namespace xivModdingFramework.Materials.DataContainers
             var defaultFileName = GetDefaultTexureName(info.Usage);
 
             // No path, assign it by default.
-            if (info.path.Trim() == "")
+            if (info.Path.Trim() == "")
             {
-                info.path = rootPath + "/" + defaultFileName;
+                info.Path = rootPath + "/" + defaultFileName;
             }
 
             // Detokenize paths
-            info.path = DetokenizePath(info.path, info.Usage);
+            info.Path = DetokenizePath(info.Path, info.Usage);
 
             // Test the path goes to a legitimate DAT file.
             try
             {
-                IOUtil.GetDataFileFromPath(info.path);
+                IOUtil.GetDataFileFromPath(info.Path);
             } catch
             {
                 // Prefix the item's personal path onto it.
-                info.path = ItemPathToken + "/" + info.path;
-                info.path = DetokenizePath(info.path, info.Usage);
+                info.Path = ItemPathToken + "/" + info.Path;
+                info.Path = DetokenizePath(info.Path, info.Usage);
             }
 
             // Ensure .tex or .atex ending for sanity.
-            var match = Regex.Match(info.path, "\\.a?tex$");
+            var match = Regex.Match(info.Path, "\\.a?tex$");
             if(!match.Success)
             {
-                info.path = info.path += ".tex";
+                info.Path = info.Path += ".tex";
             }
 
 
@@ -765,11 +772,11 @@ namespace xivModdingFramework.Materials.DataContainers
             // Inject the new string
             if(raw.TextureIndex == TexturePathList.Count)
             {
-                TexturePathList.Add(info.path);
+                TexturePathList.Add(info.Path);
                 TexturePathUnknownList.Add((short) 0); // This value seems to always be 0 for textures.
             } else
             {
-                TexturePathList[(int) raw.TextureIndex] = info.path;
+                TexturePathList[(int) raw.TextureIndex] = info.Path;
             }
         }
 
@@ -865,15 +872,26 @@ namespace xivModdingFramework.Materials.DataContainers
             if (info.Shader == MtrlShader.Skin)
             {
                 args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinOutline, null);
-                args.Add(MtrlShaderParameterId.SkinUnknown1, null);
+                args.Add(MtrlShaderParameterId.SkinMatParamRow2, null);
+                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
+                //args.Add(MtrlShaderParameterId.SkinWetnessLerp, new List<float>() { 1.0f });
+                //args.Add(MtrlShaderParameterId.SkinMatParamRow2, new List<float>() { 1.0f, 1.0f, 1.0f });
                 args.Add(MtrlShaderParameterId.SkinUnknown2, null);
-                args.Add(MtrlShaderParameterId.SkinUnknown3, null);
-                args.Add(MtrlShaderParameterId.RacialSkin1, null);
-                args.Add(MtrlShaderParameterId.RacialSkin2, null);
+                args.Add(MtrlShaderParameterId.SkinFresnel, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
 
-                if (info.Preset == MtrlShaderPreset.Face)
+                if(info.Preset == MtrlShaderPreset.BodyNoPores || info.Preset == MtrlShaderPreset.FaceNoPores)
+                {
+                    args.Add(MtrlShaderParameterId.SkinTileMaterial, new List<float>() { 0 });
+                    args.Add(MtrlShaderParameterId.SkinTileMultiplier, new List<float>() { 0, 0 });
+
+                } else
+                {
+                    args.Add(MtrlShaderParameterId.SkinTileMaterial, null);
+                    args.Add(MtrlShaderParameterId.SkinTileMultiplier, null);
+                }
+
+                if (info.Preset == MtrlShaderPreset.Face && info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
                     args.Add(MtrlShaderParameterId.Face1, null);
                 }
@@ -887,16 +905,16 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 args.Add(MtrlShaderParameterId.Equipment1, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
-                args.Add(MtrlShaderParameterId.RacialSkin1, null);
+                args.Add(MtrlShaderParameterId.SkinFresnel, null);
                 args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinOutline, null);
+                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
             }
             else if(info.Shader == MtrlShader.Hair)
             {
                 args.Add(MtrlShaderParameterId.Equipment1, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
                 args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinOutline, null);
+                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
                 args.Add(MtrlShaderParameterId.Hair1, null);
                 args.Add(MtrlShaderParameterId.Hair2, null);
 
@@ -1040,7 +1058,7 @@ namespace xivModdingFramework.Materials.DataContainers
             for(var i = 0; i < TexturePathList.Count; i++)
             {
                 var info = new MapInfo();
-                info.path = TexturePathList[i];
+                info.Path = TexturePathList[i];
                 info.Format = MtrlTextureDescriptorFormat.Other;
                 info.Usage = XivTexType.Other;
 
@@ -1078,7 +1096,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
                 if (tokenize)
                 {
-                    info.path = TokenizePath(info.path, info.Usage);
+                    info.Path = TokenizePath(info.Path, info.Usage);
                 }
                 ret.Add(info);
             }
@@ -1102,17 +1120,17 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 if (shaderInfo.Shader == MtrlShader.Skin && map.Usage == XivTexType.Multi)
                 {
-                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = XivTexType.Skin };
+                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = XivTexType.Skin };
 
-                } else if (shaderInfo.Shader == MtrlShader.Furniture && map.path.Contains("dummy")) {
+                } else if (shaderInfo.Shader == MtrlShader.Furniture && map.Path.Contains("dummy")) {
                     // Dummy textures are skipped.
                     continue;
                 }
                 else
                 {
-                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.path, Type = map.Usage };
+                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = map.Usage };
                 }
-                var fName = Path.GetFileNameWithoutExtension(map.path);
+                var fName = Path.GetFileNameWithoutExtension(map.Path);
                 if (fName != "")
                 {
                     var name = map.Usage.ToString() + ": " + fName;
@@ -1446,7 +1464,9 @@ namespace xivModdingFramework.Materials.DataContainers
         Default,      
         DiffuseMulti,    
         DiffuseSpecular,
+        BodyNoPores,
         Face,
+        FaceNoPores,
         FaceBright,
     }
 
@@ -1460,10 +1480,10 @@ namespace xivModdingFramework.Materials.DataContainers
         Common2 = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
 
         SkinColor = 740963549,          // This skin args seem to be the same for all races.
-        SkinOutline = 2569562539,
-        SkinUnknown1 = 390837838,
+        SkinWetnessLerp = 2569562539,
+        SkinMatParamRow2 = 390837838,
         SkinUnknown2 = 950420322,          // Always all 0 data?
-        SkinUnknown3 = 1112929012,
+        SkinTileMaterial = 1112929012,
 
         Face1 = 2274043692,
 
@@ -1473,8 +1493,8 @@ namespace xivModdingFramework.Materials.DataContainers
         Hair1 = 364318261,          // Character Hair Color?
         Hair2 = 3042205627,         // Character Highlight Color
 
-        RacialSkin1 = 1659128399,         // This arg is the same for most races, but Highlander and Roe M use a different value
-        RacialSkin2 = 778088561,          // Roe M is the only one that has a change to this arg's data.?
+        SkinFresnel = 1659128399,         // This arg is the same for most races, but Highlander and Roe M use a different value
+        SkinTileMultiplier = 778088561,          // Roe M is the only one that has a change to this arg's data.?
 
         Furniture1 = 1066058257,
         Furniture2 = 337060565,
@@ -1498,7 +1518,21 @@ namespace xivModdingFramework.Materials.DataContainers
         public MtrlShaderPreset Preset;
         public bool TransparencyEnabled;
         public bool RenderBackfaces = false;
-        public bool HasColorset = false;
+        
+        public bool HasColorset {
+            get
+            {
+                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
         public bool HasDiffuse
         {
             get
@@ -1594,7 +1628,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 presets.Add(MtrlShaderPreset.DiffuseSpecular);
             } else if(shader == MtrlShader.Skin)
             {
+                presets.Add(MtrlShaderPreset.BodyNoPores);
                 presets.Add(MtrlShaderPreset.Face);
+                presets.Add(MtrlShaderPreset.FaceNoPores);
             } else if(shader == MtrlShader.Hair)
             {
                 presets.Add(MtrlShaderPreset.Face);
@@ -1609,7 +1645,7 @@ namespace xivModdingFramework.Materials.DataContainers
     {
         public XivTexType Usage;
         public MtrlTextureDescriptorFormat Format;
-        public string path;
+        public string Path;
 
 
         public object Clone()

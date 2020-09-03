@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
@@ -404,18 +405,30 @@ namespace xivModdingFramework.Items.Categories
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var root = itemModel.GetRoot();
+
 
             var mdlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/model";
 
             var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara);
 
-            foreach (var slotAbr in SlotAbbreviationDictionary)
+            if (root == null || root.Info.Slot == null)
             {
-                var mdlFile = $"d{id}e{bodyVer}_{slotAbr.Value}.mdl";
-
-                if (files.Contains(HashGenerator.GetHash(mdlFile)))
+                foreach (var slotAbr in SlotAbbreviationDictionary)
                 {
-                    equipPartList.Add(slotAbr.Key);
+                    var mdlFile = $"d{id}e{bodyVer}_{slotAbr.Value}.mdl";
+
+                    if (files.Contains(HashGenerator.GetHash(mdlFile)))
+                    {
+                        equipPartList.Add(slotAbr.Key);
+                    }
+                }
+            } else
+            {
+                var niceSlotName = SlotAbbreviationDictionary.FirstOrDefault(x => x.Value == root.Info.Slot).Key;
+                if (!string.IsNullOrEmpty(niceSlotName))
+                {
+                    equipPartList.Add(niceSlotName);
                 }
             }
 

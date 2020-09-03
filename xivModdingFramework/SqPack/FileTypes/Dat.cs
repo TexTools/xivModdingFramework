@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,6 +27,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -37,7 +39,7 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// </summary>
     public class Dat
     {
-        private const string DatExtension = ".win32.dat";
+        public const string DatExtension = ".win32.dat";
         private readonly DirectoryInfo _gameDirectory;
         private readonly DirectoryInfo _modListDirectory;
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
@@ -531,93 +533,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             var dataFile = GetDataFileFromPath(internalPath);
             var modding = new Modding(_gameDirectory);
 
-            var newData = new List<byte>();
-            var headerData = new List<byte>();
-            var dataBlocks = new List<byte>();
-
-            // Checks if the item being imported already exists in the modlist
             var modEntry = await modding.TryGetModEntry(internalPath);
+            var newData = (await CreateType2Data(dataToImport)).ToList();
 
-            // Header size is defaulted to 128, but may need to change if the data being imported is very large.
-            headerData.AddRange(BitConverter.GetBytes(128));
-            headerData.AddRange(BitConverter.GetBytes(2));
-            headerData.AddRange(BitConverter.GetBytes(dataToImport.Length));
-
-            var dataOffset = 0;
-            var totalCompSize = 0;
-            var uncompressedLength = dataToImport.Length;
-
-            var partCount = (int)Math.Ceiling(uncompressedLength / 16000f);
-
-            headerData.AddRange(BitConverter.GetBytes(partCount));
-
-            var remainder = uncompressedLength;
-
-            using (var binaryReader = new BinaryReader(new MemoryStream(dataToImport)))
-            {
-                binaryReader.BaseStream.Seek(0, SeekOrigin.Begin);
-
-                for (var i = 1; i <= partCount; i++)
-                {
-                    if (i == partCount)
-                    {
-                        var compressedData = await IOUtil.Compressor(binaryReader.ReadBytes(remainder));
-                        var padding = 128 - ((compressedData.Length + 16) % 128);
-
-                        dataBlocks.AddRange(BitConverter.GetBytes(16));
-                        dataBlocks.AddRange(BitConverter.GetBytes(0));
-                        dataBlocks.AddRange(BitConverter.GetBytes(compressedData.Length));
-                        dataBlocks.AddRange(BitConverter.GetBytes(remainder));
-                        dataBlocks.AddRange(compressedData);
-                        dataBlocks.AddRange(new byte[padding]);
-
-                        headerData.AddRange(BitConverter.GetBytes(dataOffset));
-                        headerData.AddRange(BitConverter.GetBytes((short)((compressedData.Length + 16) + padding)));
-                        headerData.AddRange(BitConverter.GetBytes((short)remainder));
-
-                        totalCompSize = dataOffset + ((compressedData.Length + 16) + padding);
-                    }
-                    else
-                    {
-                        var compressedData = await IOUtil.Compressor(binaryReader.ReadBytes(16000));
-                        var padding = 128 - ((compressedData.Length + 16) % 128);
-
-                        dataBlocks.AddRange(BitConverter.GetBytes(16));
-                        dataBlocks.AddRange(BitConverter.GetBytes(0));
-                        dataBlocks.AddRange(BitConverter.GetBytes(compressedData.Length));
-                        dataBlocks.AddRange(BitConverter.GetBytes(16000));
-                        dataBlocks.AddRange(compressedData);
-                        dataBlocks.AddRange(new byte[padding]);
-
-                        headerData.AddRange(BitConverter.GetBytes(dataOffset));
-                        headerData.AddRange(BitConverter.GetBytes((short)((compressedData.Length + 16) + padding)));
-                        headerData.AddRange(BitConverter.GetBytes((short)16000));
-
-                        dataOffset += ((compressedData.Length + 16) + padding);
-                        remainder -= 16000;
-                    }
-                }
-            }
-
-            headerData.InsertRange(12, BitConverter.GetBytes(totalCompSize / 128));
-            headerData.InsertRange(16, BitConverter.GetBytes(totalCompSize / 128));
-
-            var headerSize = 128;
-
-            if (headerData.Count > 128)
-            {
-                headerData.RemoveRange(0, 4);
-                headerData.InsertRange(0, BitConverter.GetBytes(256));
-                headerSize = 256;
-            }
-            var headerPadding = headerSize - headerData.Count;
-
-            headerData.AddRange(new byte[headerPadding]);
-
-            newData.AddRange(headerData);
-            newData.AddRange(dataBlocks);
-
-            long newOffset = await WriteToDat(newData, modEntry, internalPath, category, itemName, dataFile, source, 2);
+            var newOffset = await WriteToDat(newData, modEntry, internalPath, category, itemName, dataFile, source, 2);
 
             if (newOffset == 0)
             {
@@ -626,6 +545,82 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return newOffset;
         }
+
+
+        public async Task<long> BinaryEditType2Data(string internalPath, int byteOffset, byte[] bytes)
+        {
+            int bitOffset = byteOffset * 8;
+            BitArray bits = new BitArray(bytes);
+            return await BinaryEditType2Data(internalPath, bitOffset, bits);
+        }
+
+        /// <summary>
+        /// Alters the data of the given type 2 file, applying the modifications to the existing
+        /// internal modification to the file as needed.
+        /// </summary>
+        /// <param name="internalPath"></param>
+        /// <param name="bitOffset"></param>
+        /// <param name="bits"></param>
+        /// <returns></returns>
+        public async Task<long> BinaryEditType2Data(string internalPath, int bitOffset, BitArray bits)
+        {
+            var _modding = new Modding(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+            var modEntry = await _modding.TryGetModEntry(internalPath);
+            long offset = 0;
+
+            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
+
+            if(modEntry != null)
+            {
+                offset = modEntry.data.modOffset;
+            } else
+            {
+                // This file hasn't been modified yet.  Create a clone of it first.
+                offset = await _index.GetDataOffset(internalPath);
+                var originalData = await GetType2Data(offset, dataFile);
+
+                // Binary edit files are written to the modlist with our specific internal flag as the source and category.
+                offset = await ImportType2Data(originalData, Path.GetFileName(internalPath), internalPath, Constants.InternalModSourceName, Constants.InternalModSourceName);
+                modEntry = await _modding.TryGetModEntry(internalPath);
+            }
+
+            if(modEntry == null)
+            {
+                throw new Exception("Unable to generate or access mod entry for binary file: " + internalPath);
+            }
+
+            // Retrieve the binary data.
+            var data = await GetType2Data(offset, dataFile);
+
+            // Convert it to a bit array.
+            var bitData = new BitArray(data);
+
+            // Write in the new bits.
+            var sourceIdx = 0;
+            for(int i = bitOffset; i < bitOffset + bits.Count; i++)
+            {
+                bitData[i] = bits[sourceIdx];
+                sourceIdx++;
+            }
+
+            // Write the modified bits back to the main byte array.
+            bitData.CopyTo(data, 0);
+
+            // Convert the data back into the Type 2 Data format SE expects.
+            var type2Data = (await CreateType2Data(data)).ToList();
+
+            long newOffset = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalModSourceName, internalPath, dataFile, Constants.InternalModSourceName, 2);
+
+            if(offset != newOffset)
+            {
+                // TODO - FIXFIX - Validate that we're writing back to the same DAT entry location every time, and not generating new mod entries.
+                throw new Exception("DEBUGGING ERROR - Dat Drift Detected.");
+            }
+
+            return offset;
+        }
+
         /// <summary>
         /// Create any Type 2 data
         /// </summary>
@@ -1270,6 +1265,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
+
+
+
+
         /// <summary>
         /// Creates the header for the compressed texture data to be imported.
         /// </summary>
@@ -1281,7 +1280,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <returns>The created header data.</returns>
-        public byte[] MakeType4DatHeader(XivTex xivTex, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
+        public byte[] MakeType4DatHeader(XivTexFormat format, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
         {
             var headerData = new List<byte>();
 
@@ -1300,7 +1299,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var mipOffsetIndex = 80;
             var uncompMipSize = newHeight * newWidth;
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 case XivTexFormat.DXT1:
                     uncompMipSize = (newWidth * newHeight) / 2;
@@ -1439,6 +1438,52 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Copies a given file to a new location in the game files.
+        /// </summary>
+        /// <param name="sourcePath"></param>
+        /// <param name="targetPath"></param>
+        /// <param name="category"></param>
+        /// <param name="itemName"></param>
+        /// <param name="source"></param>
+        /// <returns></returns>
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
+        {
+            var _index = new Index(_gameDirectory);
+            var offset = await _index.GetDataOffset(sourcePath);
+            var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
+            return await CopyFile(offset, dataFile, targetPath, category, itemName, source);
+        }
+
+        /// <summary>
+        /// Copies a file from a given offset to a new path in the game files.
+        /// </summary>
+        /// <param name="originalOffset"></param>
+        /// <param name="originalDataFile"></param>
+        /// <param name="targetPath"></param>
+        /// <param name="category"></param>
+        /// <param name="itemName"></param>
+        /// <param name="source"></param>
+        /// <returns></returns>
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
+        {
+            var _modding = new Modding(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+
+            var exists = await _index.FileExists(targetPath);
+            if(exists && !overwrite)
+            {
+                return await _index.GetDataOffset(targetPath);
+            }
+
+            var ftype = GetFileType(originalOffset, originalDataFile);
+            var size = await GetCompressedFileSize(originalOffset, originalDataFile);
+            var data = GetRawData(originalOffset, originalDataFile, size);
+            var modEntry = await _modding.TryGetModEntry(targetPath);
+
+            return await WriteToDat(data.ToList(), modEntry, targetPath, category, itemName, IOUtil.GetDataFileFromPath(targetPath), source, ftype);
+        }
+
+        /// <summary>
         /// Writes the newly imported data to the .dat for modifications.
         /// </summary>
         /// <param name="importData">The data to be written.</param>
@@ -1477,8 +1522,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
             var IsTexToolsAddedFileFlag = await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath + ".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
-            if (NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag)
-                source = "FilesAddedByTexTools";
 
             var datNum = 0;
             var modDatPath = "";
@@ -1772,8 +1815,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 modSize = importData.Count
                             }
                         };
-                        if (newEntry.source == "FilesAddedByTexTools")
+
+                        if (NewFilesNeedToBeAdded)
                             newEntry.data.originalOffset = newEntry.data.modOffset;
+
                         modList.Mods.Add(newEntry);
 
                         modList.modCount += 1;
@@ -1786,6 +1831,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             } finally
             {
                 _lock.Release();
+            }
+
+
+            var ext = Path.GetExtension(internalFilePath);
+            if(ext == ".meta")
+            {
+                // Retreive the uncompressed meta entry we just wrote.
+                var data = await GetType2Data(offset, dataFile);
+                var meta = await ItemMetadata.Deserialize(data);
+
+                // And write that metadata to the actual constituent files.
+                await ItemMetadata.ApplyMetadata(meta);
             }
 
             if (updateCache)
