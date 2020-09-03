@@ -87,7 +87,7 @@ namespace xivModdingFramework.Helpers
         /// <param name="item">The item to be saved</param>
         /// <param name="saveDirectory">The base directory to save to</param>
         /// <returns>A string containing the full save path for the given item</returns>
-        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
+        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races, int primaryNumber = -1)
         {
             string path, validItemName;
 
@@ -123,9 +123,12 @@ namespace xivModdingFramework.Helpers
                 {
                     path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{validItemName}";
                 }
-                else
+                else if(primaryNumber >= 0)
                 {
-                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{validItemName}/{race}/{((IItemModel)item).ModelInfo.SecondaryID}";
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{item.SecondaryCategory}/{race}/{primaryNumber}";
+                } else
+                {
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{item.SecondaryCategory}/{race}/{((IItemModel)item).ModelInfo.SecondaryID}";
                 }
             }
             else

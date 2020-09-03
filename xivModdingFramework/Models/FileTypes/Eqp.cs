@@ -463,7 +463,7 @@ namespace xivModdingFramework.Models.FileTypes
             var slotIdx = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot);
 
             var byteOffset = slotIdx / 4;
-            var bitOffset = (slotIdx * 2);
+            var bitOffset = (slotIdx * 2) % 8;
 
 
 
