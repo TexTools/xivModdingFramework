@@ -1072,9 +1072,9 @@ namespace xivModdingFramework.Materials.FileTypes
             var root = item.GetRootInfo();
             if (root == null) return -1;
 
-            if (root.SecondaryType == XivItemType.hair ||
+            if (root.PrimaryType == XivItemType.human && (root.SecondaryType == XivItemType.hair ||
                 root.SecondaryType == XivItemType.body ||
-                root.SecondaryType == XivItemType.tail)
+                root.SecondaryType == XivItemType.tail))
             {
                 return 1;
             }
