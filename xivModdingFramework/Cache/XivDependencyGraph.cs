@@ -511,7 +511,7 @@ namespace xivModdingFramework.Cache
                 var modelPath = modelFolder + "/" + Info.GetSimpleModelName();
 
 
-                if (Info.PrimaryType == XivItemType.human && Info.SecondaryId / 100 >= 1)
+                if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair && Info.SecondaryId / 100 >= 1)
                 {
                     // For human types, if their model is missing, the version 00xx is used instead.
                     var index = new Index(XivCache.GameInfo.GameDirectory);
@@ -586,7 +586,7 @@ namespace xivModdingFramework.Cache
                                 var m = mat;
 
                                 // Human types have their material ID automatically changed over.
-                                if (Info.PrimaryType == XivItemType.human)
+                                if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
                                 {
                                     m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
                                 }
@@ -603,7 +603,14 @@ namespace xivModdingFramework.Cache
                                 // This is faster than re-scanning the MDL file.
                                 // And a little more thorough than simply skipping over non-matching refs.
                                 // Since some materials may not have variant references.
-                                materials.Add(_materialSetRegex.Replace(mat, replacement));
+                                var m = _materialSetRegex.Replace(mat, replacement);
+
+                                // Human types have their material ID automatically fixed to match.
+                                if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                                {
+                                    m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                                }
+                                materials.Add(m);
                             }
                         }
                     }
