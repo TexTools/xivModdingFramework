@@ -503,9 +503,28 @@ namespace xivModdingFramework.Cache
                 var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.PrimaryType);
                 return housingAssets.Select(x => x.Value).ToList();
             } else {
+
+
                 // The rest of the types just have a single, calculateable model path.
                 var folder = Info.GetRootFolder();
-                var modelPath = folder + "model/" + Info.GetSimpleModelName();
+                var modelFolder = folder + "model";
+                var modelPath = modelFolder + "/" + Info.GetSimpleModelName();
+
+
+                if (Info.PrimaryType == XivItemType.human && Info.SecondaryId / 100 >= 1)
+                {
+                    // For human types, if their model is missing, the version 00xx is used instead.
+                    var index = new Index(XivCache.GameInfo.GameDirectory);
+                    if(!(await index.FileExists(modelPath)))
+                    {
+                        var replacementNumber = (Info.SecondaryId % 100);
+                        var alteredRoot = new XivDependencyRoot(Info.PrimaryType, Info.PrimaryId, Info.SecondaryType, replacementNumber, Info.Slot);
+
+                        return await alteredRoot.GetModelFiles();
+                    }
+
+                }
+
                 return new List<string>() { modelPath };
             }
 
@@ -547,16 +566,31 @@ namespace xivModdingFramework.Cache
                 if (models != null && models.Count > 0)
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(models[0]);
+
                     var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, dataFile);
+
+                    Regex secondaryRex = null;
+                    string secondaryTypePrefix = null;
+                    if (Info.PrimaryType == XivItemType.human) {
+                        secondaryTypePrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
+                        secondaryRex = new Regex("(" + secondaryTypePrefix +"[0-9]{4})");
+                    }
 
                     foreach (var model in models)
                     {
                         var mdlMats = await XivCache.GetChildFiles(model);
-                        if (materialVariant < 0)
+                        if (materialVariant <= 0)
                         {
                             foreach (var mat in mdlMats)
                             {
-                                materials.Add(mat);
+                                var m = mat;
+
+                                // Human types have their material ID automatically changed over.
+                                if (Info.PrimaryType == XivItemType.human)
+                                {
+                                    m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                                }
+                                materials.Add(m);
                             }
                         }
                         else
@@ -899,7 +933,7 @@ namespace xivModdingFramework.Cache
             }
 
             /// For these types we also want to read their IMC file to fill in any missing NPC only versions.
-            if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory || Info.PrimaryType == XivItemType.weapon)
+            if (Imc.UsesImc(this))
             {
                 var imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var imcPaths = await GetImcEntryPaths();
