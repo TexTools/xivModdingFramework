@@ -276,6 +276,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
             mtrlOffset = await index.GetDataOffset(mtrlPath);
 
+            if(mtrlOffset == 0)
+            {
+                return null;
+            }
+
             var mtrlData = await GetMtrlData(mtrlOffset, mtrlPath, dxVersion);
 
             return mtrlData;

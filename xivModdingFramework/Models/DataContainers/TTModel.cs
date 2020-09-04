@@ -1557,6 +1557,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// <returns></returns>
         public static TTModel FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
         {
+            if(rawMdl == null)
+            {
+                return null;
+            }
+
             if (loggingFunction == null)
             {
                 loggingFunction = ModelModifiers.NoOp;

@@ -1093,6 +1093,48 @@ namespace xivModdingFramework.Models.Helpers
                             v.Tangent = tangent;
                         }
                     }
+
+                    // Same thing, but for the Shape Data parts.
+                    foreach(var p in m.ShapeParts)
+                    {
+                        foreach(var v in p.Vertices)
+                        {
+                            Vector3 position = Vector3.Zero;
+                            Vector3 normal = Vector3.Zero;
+                            Vector3 binormal = Vector3.Zero;
+                            Vector3 tangent = Vector3.Zero;
+
+                            // And each bone in that vertex.
+                            for (var b = 0; b < 4; b++)
+                            {
+                                if (v.Weights[b] == 0) continue;
+                                var boneName = m.Bones[v.BoneIds[b]];
+                                var boneWeight = (v.Weights[b]) / 255f;
+
+                                var matrix = Matrix.Identity;
+                                var normalMatrix = Matrix.Identity;
+                                matrix = deformations[boneName];
+                                normalMatrix = normalmatrixes[boneName];
+
+                                if (invert)
+                                {
+                                    matrix = inverted[boneName];
+                                    normalMatrix = invertednormalmatrixes[boneName];
+                                }
+
+
+                                position += MatrixTransform(v.Position, matrix) * boneWeight;
+                                normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
+                                binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
+                                tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
+                            }
+
+                            v.Position = position;
+                            v.Normal = normal;
+                            v.Binormal = binormal;
+                            v.Tangent = tangent;
+                        }
+                    }
                 }
             }
             catch(Exception ex)
@@ -1287,6 +1329,7 @@ namespace xivModdingFramework.Models.Helpers
             {
                 loggingFunction = NoOp;
             }
+            if (model == null) return;
 
             loggingFunction(false, "Calculating Tangents...");
             var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));

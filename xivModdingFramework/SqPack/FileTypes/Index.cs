@@ -986,6 +986,53 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Gets the entire universe of hash pairs (folder, file) for a datafile.
+        /// </summary>
+        public async Task<Dictionary<int, HashSet<int>>> GetAllHashes(XivDataFile dataFile)
+        {
+            var ret = new Dictionary<int, HashSet<int>>();
+
+            // These are the offsets to relevant data
+            const int fileCountOffset = 1036;
+            const int dataStartOffset = 2048;
+
+            var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+
+            await _semaphoreSlim.WaitAsync();
+            try
+            {
+                await Task.Run(() =>
+                {
+                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
+                    {
+                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
+                        var totalFiles = br.ReadInt32();
+
+                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
+                        for (var i = 0; i < totalFiles; i += 16)
+                        {
+                            var hashedFile = br.ReadInt32();
+                            var folderPathHash = br.ReadInt32();
+                            if(!ret.ContainsKey(folderPathHash))
+                            {
+                                ret.Add(folderPathHash, new HashSet<int>());
+                            }
+                            ret[folderPathHash].Add(hashedFile);
+
+                            br.ReadBytes(4);
+                            br.ReadBytes(4);
+                        }
+                    }
+                });
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
+            return ret;
+        }
+
+        /// <summary>
         /// Get all the file hash and file offset in a given folder 
         /// </summary>
         /// <param name="hashedFolder">The hashed value of the folder path</param>

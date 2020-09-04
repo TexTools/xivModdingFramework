@@ -433,7 +433,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offset for {mdlPath}");
+                return null;
             }
 
             var mdlData = await dat.GetType3Data(offset, _dataFile);
