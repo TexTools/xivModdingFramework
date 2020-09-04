@@ -802,7 +802,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
             if (info.Shader == MtrlShader.Skin)
             {
-                if (info.Preset == MtrlShaderPreset.Face)
+                if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
                     SetTextureUsage(XivTexType.Normal);
                     SetTextureUsage(XivTexType.Diffuse);
