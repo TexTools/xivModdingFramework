@@ -1287,6 +1287,7 @@ namespace xivModdingFramework.Models.Helpers
             {
                 loggingFunction = NoOp;
             }
+            if (model == null) return;
 
             loggingFunction(false, "Calculating Tangents...");
             var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));

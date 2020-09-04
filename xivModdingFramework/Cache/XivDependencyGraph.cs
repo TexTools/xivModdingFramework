@@ -1646,7 +1646,7 @@ namespace xivModdingFramework.Cache
         /// <param name="primary"></param>
         /// <param name="secondary"></param>
         /// <returns></returns>
-        private static async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<string, XivDependencyRootInfo> combinedHashes, XivItemType primary, XivItemType secondary) {
+        private static async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<int, HashSet<int>> Hashes, XivItemType primary, XivItemType secondary) {
 
 
             var result = new List<XivDependencyRootInfo>(3000);
@@ -1659,6 +1659,24 @@ namespace xivModdingFramework.Cache
                     root.SecondaryType = (secondary == XivItemType.none ? null : (XivItemType?) secondary);
                     var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
                     var races = (XivRace[])Enum.GetValues(typeof(XivRace));
+                    var slots = XivItemTypes.GetAvailableSlots(primary);
+                    if(secondary != XivItemType.none)
+                    {
+                        slots = XivItemTypes.GetAvailableSlots(secondary);
+
+                        if(primary == XivItemType.human && secondary == XivItemType.body)
+                        {
+                            slots = XivItemTypes.GetAvailableSlots(XivItemType.equipment);
+                            slots.Add("");
+                        }
+                    }
+                    
+                    if(slots.Count == 0)
+                    {
+                        slots.Add("");
+                    }
+
+                    var usesImc = Imc.UsesImc(root);
 
                     for (int p = 0; p < 10000; p++)
                     {
@@ -1666,46 +1684,43 @@ namespace xivModdingFramework.Cache
 
                         if (secondary == XivItemType.none)
                         {
+                            var folder = root.GetRootFolder();
+                            folder = folder.Substring(0, folder.Length - 1);
                             if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
                             {
-                                // For furniture, they're valid as long as they have an SGD file we can find.
-                                var folder = root.GetRootFolder() + "asset";
-                                var file = root.GetSgdName();
+                                // For furniture, they're valid as long as they have an assets folder we can find.
+                                var assetFolder = folder + "/asset";
+                                var folderHash = HashGenerator.GetHash(assetFolder);
 
-                                var folderHash = HashGenerator.GetHash(folder);
-                                var fileHash = HashGenerator.GetHash(file);
-                                var key = fileHash.ToString() + folderHash.ToString();
-                                if (combinedHashes.ContainsKey(key))
+                                var sgdName = root.GetSgdName();
+                                var sgdHash = HashGenerator.GetHash(sgdName);
+
+                                if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(sgdHash))
                                 {
                                     result.Add((XivDependencyRootInfo)root.Clone());
                                 }
                             }
                             else
                             {
-                                var folder = root.GetRootFolder() + "model";
+                                // Test to see if the IMC file exists.
                                 var folderHash = HashGenerator.GetHash(folder);
-                                var slots = XivItemTypes.GetAvailableSlots(root.PrimaryType);
+                                var imcName = root.GetBaseFileName(false) + ".imc";
+                                var imcHash = HashGenerator.GetHash(imcName);
 
-                                // For these, just let the EDP module verify if there are any races availble for the item?
-                                foreach (var slot in slots)
+                                if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(imcHash))
                                 {
-                                    root.Slot = slot;
-
-                                    // Check every possible race code, not just playables?
-                                    //for (int s = 0; s < 10000; s++)
-                                    foreach (var race in races)
+                                    foreach (var slot in slots)
                                     {
-                                        //var modelName = root.GetRacialModelName(s);
-                                        var modelName = root.GetRacialModelName(race);
-                                        var fileHash = HashGenerator.GetHash(modelName);
-                                        var key = fileHash.ToString() + folderHash.ToString();
-                                        if (combinedHashes.ContainsKey(key))
+                                        var sl = slot == "" ? null : slot;
+                                        var nRoot = new XivDependencyRootInfo()
                                         {
-                                            result.Add((XivDependencyRootInfo)root.Clone());
-
-                                            // We don't care how many models there are, just that there *are* any models.
-                                            break;
-                                        }
+                                            PrimaryId = root.PrimaryId,
+                                            PrimaryType = root.PrimaryType,
+                                            SecondaryId = root.SecondaryId,
+                                            SecondaryType = root.SecondaryType,
+                                            Slot = sl
+                                        };
+                                        result.Add(nRoot);
                                     }
                                 }
                             }
@@ -1715,36 +1730,105 @@ namespace xivModdingFramework.Cache
                             for (int s = 0; s < 10000; s++)
                             {
                                 root.SecondaryId = s;
-                                var folder = root.GetRootFolder() + "model";
-                                var folderHash = HashGenerator.GetHash(folder);
-                                var slots = XivItemTypes.GetAvailableSlots((XivItemType)root.SecondaryType);
+                                var folder = root.GetRootFolder();
+                                folder = folder.Substring(0, folder.Length - 1);
 
-                                if(primary == XivItemType.human && secondary == XivItemType.body)
+                                // If their root folder exists (has an IMC entry in it) they're valid.
+                                if (usesImc)
                                 {
-                                    // Human body gets to be a special snowflake.
-                                    slots = XivItemTypes.GetAvailableSlots(XivItemType.equipment);
-                                }
+                                    // Test to see if the IMC file exists.
+                                    var folderHash = HashGenerator.GetHash(folder);
+                                    var imcName = XivItemTypes.GetSystemPrefix((XivItemType)root.SecondaryType) + root.SecondaryId.ToString().PadLeft(4,'0') + ".imc";
+                                    var imcHash = HashGenerator.GetHash(imcName);
 
-                                if (slots.Count == 0)
-                                {
-                                    slots.Add("");
+                                    if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(imcHash))
+                                    {
+                                        foreach (var slot in slots)
+                                        {
+                                            var sl = slot == "" ? null : slot;
+                                            var nRoot = new XivDependencyRootInfo()
+                                            {
+                                                PrimaryId = root.PrimaryId,
+                                                PrimaryType = root.PrimaryType,
+                                                SecondaryId = root.SecondaryId,
+                                                SecondaryType = root.SecondaryType,
+                                                Slot = sl
+                                            };
+                                            result.Add(nRoot);
+                                        }
+                                    }
                                 }
-                                foreach (var slot in slots)
+                                else if(!usesImc)
                                 {
-                                    if (slot == "")
+
+                                    var mfolder = folder + "/model";
+                                    var mfolderHash = HashGenerator.GetHash(mfolder);
+                                    var matFolder = folder + "/material";
+                                    var matFolderHash = HashGenerator.GetHash(matFolder);
+                                    var matFolder1 = folder + "/material/v0001";
+                                    var matFolder1Hash = HashGenerator.GetHash(matFolder1);
+                                    var texFolder = folder + "/texture";
+                                    var texFolderHash = HashGenerator.GetHash(texFolder);
+
+                                    // Things that don't use IMC files are basically only the human tree, which is a complete mess.
+                                    foreach (var slot in slots)
                                     {
-                                        root.Slot = null;
-                                    }
-                                    else
-                                    {
-                                        root.Slot = slot;
-                                    }
-                                    var modelName = root.GetSimpleModelName();
-                                    var fileHash = HashGenerator.GetHash(modelName);
-                                    var key = fileHash.ToString() + folderHash.ToString();
-                                    if (combinedHashes.ContainsKey(key))
-                                    {
-                                        result.Add((XivDependencyRootInfo)root.Clone());
+                                        var sl = slot == "" ? null : slot;
+                                        var nRoot = new XivDependencyRootInfo()
+                                        {
+                                            PrimaryId = root.PrimaryId,
+                                            PrimaryType = root.PrimaryType,
+                                            SecondaryId = root.SecondaryId,
+                                            SecondaryType = root.SecondaryType,
+                                            Slot = sl
+                                        };
+
+                                        // If they have an MDL or MTRL we can resolve, they're valid.
+
+                                        var mdlFile = nRoot.GetBaseFileName(true) + ".mdl";
+                                        var mdlFileHash = HashGenerator.GetHash(mdlFile);
+
+                                        var mtrlFile = "mt_" + nRoot.GetBaseFileName(true)  + "_a.mtrl";
+                                        var mtrlFileHash = HashGenerator.GetHash(mtrlFile);
+
+                                        var hasModel = Hashes.ContainsKey(mfolderHash) && Hashes[mfolderHash].Contains(mdlFileHash);
+                                        var hasMat = Hashes.ContainsKey(matFolderHash) && Hashes[matFolderHash].Contains(mtrlFileHash);
+                                        var hasMat1 = Hashes.ContainsKey(matFolder1Hash) && Hashes[matFolder1Hash].Contains(mtrlFileHash);
+                                        var hasTex = Hashes.ContainsKey(texFolderHash);
+
+
+                                        if (hasMat || hasMat1 || hasModel)
+                                        {
+                                            if (secondary == XivItemType.body)
+                                            {
+                                                var nRoot2 = new XivDependencyRootInfo()
+                                                {
+                                                    PrimaryId = root.PrimaryId,
+                                                    PrimaryType = root.PrimaryType,
+                                                    SecondaryId = root.SecondaryId,
+                                                    SecondaryType = root.SecondaryType,
+                                                    Slot = null
+                                                };
+                                                result.Add(nRoot2);
+                                            }
+                                            else
+                                            {
+                                                foreach (var slot2 in slots)
+                                                {
+                                                    var sl2 = slot2 == "" ? null : slot2;
+                                                    var nRoot2 = new XivDependencyRootInfo()
+                                                    {
+                                                        PrimaryId = root.PrimaryId,
+                                                        PrimaryType = root.PrimaryType,
+                                                        SecondaryId = root.SecondaryId,
+                                                        SecondaryType = root.SecondaryType,
+                                                        Slot = sl2
+                                                    };
+                                                    result.Add(nRoot2);
+                                                }
+                                            }
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1771,21 +1855,10 @@ namespace xivModdingFramework.Cache
         {
             ResetRootCache();
             var index = new Index(XivCache.GameInfo.GameDirectory);
-            var mergedHashes = await index.GetFileDictionary(XivDataFile._04_Chara);
 
-            var mergedDict = new Dictionary<string, XivDependencyRootInfo>();
-            foreach (var kv in mergedHashes)
-            {
-                mergedDict.Add(kv.Key, new XivDependencyRootInfo());
-            }
+            var hashes = await index.GetAllHashes(XivDataFile._04_Chara);
+            var bgcHashes = await index.GetAllHashes(XivDataFile._01_Bgcommon);
 
-            var bgcHashes = await index.GetFileDictionary(XivDataFile._01_Bgcommon);
-
-            var bgcHashDict = new Dictionary<string, XivDependencyRootInfo>();
-            foreach (var kv in bgcHashes)
-            {
-                bgcHashDict.Add(kv.Key, new XivDependencyRootInfo());
-            }
 
             var types = new Dictionary<XivItemType, List<XivItemType>>();
             foreach (var type in DependencySupportedTypes)
@@ -1802,9 +1875,7 @@ namespace xivModdingFramework.Cache
             types[XivItemType.demihuman].Add(XivItemType.equipment);
             types[XivItemType.equipment].Add(XivItemType.none);
             types[XivItemType.accessory].Add(XivItemType.none);
-            types[XivItemType.indoor].Add(XivItemType.none);
             types[XivItemType.outdoor].Add(XivItemType.none);
-
 
 
             var tasks = new List<Task<List<XivDependencyRootInfo>>>();
@@ -1815,11 +1886,11 @@ namespace xivModdingFramework.Cache
                 {
                     if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
                     {
-                        tasks.Add(TestAllRoots(bgcHashDict, primary, secondary));
+                        tasks.Add(TestAllRoots(bgcHashes,  primary, secondary));
                     }
                     else
                     {
-                        tasks.Add(TestAllRoots(mergedDict, primary, secondary));
+                        tasks.Add(TestAllRoots(hashes,  primary, secondary));
                     }
                 }
             }

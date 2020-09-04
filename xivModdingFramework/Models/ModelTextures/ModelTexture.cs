@@ -56,6 +56,8 @@ namespace xivModdingFramework.Models.ModelTextures
         // Optional values.
         public Color? HairHighlightColor;
 
+        public bool InvertNormalGreen = false;
+
 
 
         // One for each colorset row.  Null for undyed.
@@ -75,6 +77,7 @@ namespace xivModdingFramework.Models.ModelTextures
             FurnitureColor = new Color(141, 60, 204, 255);
 
             HairHighlightColor = new Color(77, 126, 240, 255);
+            InvertNormalGreen = false;
 
             DyeColors = new List<Color?>(16);
             for(int i = 0; i < 16; i++)
@@ -209,6 +212,11 @@ namespace xivModdingFramework.Models.ModelTextures
                     if(specularPixels != null)
                     { 
                         baseSpecularColor = new Color(specularPixels[i - 3], specularPixels[i - 2], specularPixels[i - 1], specularPixels[i]);
+                    }
+
+                    if(colors != null && colors.InvertNormalGreen)
+                    {
+                        baseNormalColor[1] = (byte)(255 - baseNormalColor[1]);
                     }
 
                     byte colorsetValue = baseNormalColor.A;
