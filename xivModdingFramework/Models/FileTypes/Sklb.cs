@@ -110,6 +110,21 @@ namespace xivModdingFramework.Models.FileTypes
 
         public static async Task<string> GetExtraSkeletonFile(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
         {
+            if(root.SecondaryType == XivItemType.ear)
+            {
+                // Viera ears technically use their associated face's Extra Skeleton to resolve the bones.  Kinda weird, but whatever.
+                // The bones are nearly identical for all the faces, so just use face 1
+                var nRoot = new XivDependencyRootInfo()
+                {
+                    PrimaryType = root.PrimaryType,
+                    PrimaryId = root.PrimaryId,
+                    SecondaryId = 1,
+                    SecondaryType = XivItemType.face,
+                    Slot = "fac"
+                };
+                root = nRoot;
+            }
+
             var file = await GetExtraSkelbPath(root, race);
             if (file == null) return null;
 
