@@ -1203,6 +1203,10 @@ namespace xivModdingFramework.Models.DataContainers
             }
 
             var directory = Path.GetDirectoryName(filePath);
+            if (raceId.StartsWith("c"))
+            {
+                raceId = raceId.Substring(1, 4);
+            }
             var race = XivRaces.GetXivRace(raceId);
 
             var boneDict = ResolveFullBoneHeirarchy(race, loggingFunction);
