@@ -37,7 +37,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <summary>
         /// The dependency root that this item meta data entry refers to.
         /// </summary>
-        public readonly XivDependencyRoot Root;
+        public XivDependencyRoot Root;
 
         /// <summary>
         /// Returns if this metadata object actually contains any metadata or not.
