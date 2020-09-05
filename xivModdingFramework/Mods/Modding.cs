@@ -161,29 +161,35 @@ namespace xivModdingFramework.Mods
         /// <returns>The mod entry if found, null otherwise</returns>
         public Task<Mod> TryGetModEntry(string internalFilePath)
         {
-            if(String.IsNullOrWhiteSpace(internalFilePath))
+            try
+            {
+                if (String.IsNullOrWhiteSpace(internalFilePath))
+                {
+                    return null;
+                }
+
+                return Task.Run(() =>
+                {
+                    internalFilePath = internalFilePath.Replace("\\", "/");
+
+                    var modList = GetModList();
+
+                    if (modList == null) return null;
+
+                    foreach (var modEntry in modList.Mods)
+                    {
+                        if (modEntry.fullPath.Equals(internalFilePath))
+                        {
+                            return modEntry;
+                        }
+                    }
+
+                    return null;
+                });
+            } catch(Exception ex)
             {
                 return null;
             }
-
-            return Task.Run(() =>
-            {
-                internalFilePath = internalFilePath.Replace("\\", "/");
-
-                var modList = GetModList();
-
-                if (modList == null) return null;
-
-                foreach (var modEntry in modList.Mods)
-                {
-                    if (modEntry.fullPath.Equals(internalFilePath))
-                    {
-                        return modEntry;
-                    }
-                }
-
-                return null;
-            });
         }
 
         /// <summary>
