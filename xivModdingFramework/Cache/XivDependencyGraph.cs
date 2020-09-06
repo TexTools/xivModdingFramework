@@ -558,7 +558,18 @@ namespace xivModdingFramework.Cache
                     materials.Add(path);
                 }
 
-                materialVariant = 1;
+                if(Info.PrimaryId == XivRace.Hrothgar.GetRaceCodeInt())
+                {
+                    // JK, Hrothgar actually have 5 material sets (that's how their fur pattern stuff is set)
+                    for (int i = 2; i <= 5; i++)
+                    {
+                        var mSet = i.ToString().PadLeft(4, '0');
+                        path = $"chara/human/c{primary}/obj/body/b{body}/material/v{mSet}/mt_c{primary}b{body}_a.mtrl";
+                        materials.Add(path);
+                    }
+                }
+
+                materialVariant = -1;
             }
             else
             {
