@@ -74,6 +74,8 @@ namespace xivModdingFramework.Mods
                     foreach (var avfx in avfxSets)
                     {
                         var avfxStuff = await ATex.GetVfxPath(Source.Info, avfx);
+                        if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
+
                         var path = avfxStuff.Folder + "/" + avfxStuff.File;
                         if (await _index.FileExists(path))
                         {
@@ -159,21 +161,24 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Removing existing modifications to destination root...");
                 }
 
-                var dPath = Destination.Info.GetRootFolder();
-                foreach (var mod in modlist.Mods)
+                if (Destination != Source)
                 {
-                    if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
+                    var dPath = Destination.Info.GetRootFolder();
+                    foreach (var mod in modlist.Mods)
                     {
-                        if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
+                        if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
                         {
-                            // If this is a slotless root, purge everything.
-                            await _modding.DeleteMod(mod.fullPath, false);
-                        }
-                        else if(allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.Slot))
-                        {
-                            // Otherwise, only purge the files we're replacing, and anything else that
-                            // contains our slot name.
-                            await _modding.DeleteMod(mod.fullPath, false);
+                            if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
+                            {
+                                // If this is a slotless root, purge everything.
+                                await _modding.DeleteMod(mod.fullPath, false);
+                            }
+                            else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.Slot))
+                            {
+                                // Otherwise, only purge the files we're replacing, and anything else that
+                                // contains our slot name.
+                                await _modding.DeleteMod(mod.fullPath, false);
+                            }
                         }
                     }
                 }
@@ -190,6 +195,10 @@ namespace xivModdingFramework.Mods
                     var dst = kv.Value;
                     var xmdl = await _mdl.GetRawMdlData(src);
                     var tmdl = TTModel.FromRaw(xmdl);
+
+                    if (xmdl == null || tmdl == null)
+                        continue;
+
                     tmdl.Source = dst;
                     xmdl.MdlPath = dst;
 
