@@ -28,7 +28,7 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns></returns>
-        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource)
+        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, IProgress<string> ProgressReporter = null)
         {
 
             var df = IOUtil.GetDataFileFromPath(Source.ToString());
@@ -38,7 +38,16 @@ namespace xivModdingFramework.Mods
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, df, XivCache.GameInfo.GameLanguage);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
+
+
+
+
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Analyzing items and variants...");
+            }
             // First, try to get everything, to ensure it's all valid.
             var originalMetadata = await ItemMetadata.GetMetadata(Source);
             var originalModelPaths = await Source.GetModelFiles();
@@ -80,6 +89,10 @@ namespace xivModdingFramework.Mods
             Dictionary<string, string> newTexturePaths = new Dictionary<string, string>();
             Dictionary<string, string> newAvfxPaths = new Dictionary<string, string>();
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Calculating files to copy...");
+            }
 
             // For each path, replace any instances of our primary and secondary types.
             foreach (var path in originalModelPaths)
@@ -112,6 +125,31 @@ namespace xivModdingFramework.Mods
             var iCat = destItem.SecondaryCategory;
             var iName = destItem.Name;
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Getting modlist...");
+            }
+            var modlist = await _modding.GetModListAsync();
+
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Removing existing modifications to destination root...");
+            }
+
+            var dPath = Destination.Info.GetRootFolder();
+            foreach(var mod in modlist.Mods)
+            {
+                if (mod.fullPath.StartsWith(dPath))
+                {
+                    await _modding.DeleteMod(mod.fullPath, false);
+                }
+            }
+
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Copying models...");
+            }
+
             // Load, Edit, and resave the model files.
             foreach (var kv in newModelPaths)
             {
@@ -136,6 +174,10 @@ namespace xivModdingFramework.Mods
                 await _dat.WriteToDat(bytes.ToList(), null, dst, iCat, iName, df, ApplicationSource, 3);
             }
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Copying textures...");
+            }
             // Raw Copy all Texture files to the new destinations to avoid having the MTRL save functions auto-generate blank textures.
             foreach (var kv in newTexturePaths)
             {
@@ -145,6 +187,11 @@ namespace xivModdingFramework.Mods
                 await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
             }
 
+
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Copying materials...");
+            }
             HashSet<string> CopiedMaterials = new HashSet<string>();
             // Load every Material file and edit the texture references to the new texture paths.
             foreach(var kv in newMaterialPaths)
@@ -178,6 +225,10 @@ namespace xivModdingFramework.Mods
                 }
             }
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Copying VFX...");
+            }
             // Copy VFX files.
             foreach (var kv in newAvfxPaths)
             {
@@ -187,6 +238,10 @@ namespace xivModdingFramework.Mods
                 await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
             }
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Creating missing variants...");
+            }
             // Check to see if we need to add any variants
             var cloneNum = newMetadata.ImcEntries.Count >= 2 ? 1 : 0;
             while(originalDestinationMetadata.ImcEntries.Count > newMetadata.ImcEntries.Count)
@@ -195,11 +250,19 @@ namespace xivModdingFramework.Mods
                 newMetadata.ImcEntries.Add((XivImc)newMetadata.ImcEntries[cloneNum].Clone());
             }
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Copying metdata...");
+            }
             // Save the new Metadata file.
             await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource);
 
 
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Filling in missing material sets...");
+            }
             // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
             if (Imc.UsesImc(Destination))
             {
@@ -236,6 +299,12 @@ namespace xivModdingFramework.Mods
                         await _dat.CopyFile(existentCopy, destPath, iCat, iName, ApplicationSource, true);
                     }
                 }
+            }
+
+
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Root copy complete.");
             }
         }
 
