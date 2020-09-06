@@ -891,7 +891,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     args.Add(MtrlShaderParameterId.SkinTileMultiplier, null);
                 }
 
-                if (info.Preset == MtrlShaderPreset.Face && info.Preset == MtrlShaderPreset.FaceNoPores)
+                if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
                     args.Add(MtrlShaderParameterId.Face1, null);
                 }
