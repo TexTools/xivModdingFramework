@@ -150,7 +150,7 @@ namespace xivModdingFramework.Mods
                 var dPath = Destination.Info.GetRootFolder();
                 foreach (var mod in modlist.Mods)
                 {
-                    if (mod.fullPath.StartsWith(dPath))
+                    if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
                     {
                         await _modding.DeleteMod(mod.fullPath, false);
                     }
