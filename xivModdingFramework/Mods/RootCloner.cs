@@ -164,7 +164,7 @@ namespace xivModdingFramework.Mods
                 {
                     if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
                     {
-                        if (Destination.Info.Slot == null)
+                        if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
                         {
                             // If this is a slotless root, purge everything.
                             await _modding.DeleteMod(mod.fullPath, false);
@@ -377,7 +377,11 @@ namespace xivModdingFramework.Mods
                 {
                     if (allFiles.Contains(mod.fullPath))
                     {
-                        mod.modPack = modPack;
+                        // Don't claim common path items into our modpack.
+                        if (!mod.fullPath.StartsWith(CommonPath))
+                        {
+                            mod.modPack = modPack;
+                        }
                     }
                 }
 
