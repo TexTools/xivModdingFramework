@@ -159,21 +159,24 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Removing existing modifications to destination root...");
                 }
 
-                var dPath = Destination.Info.GetRootFolder();
-                foreach (var mod in modlist.Mods)
+                if (Destination != Source)
                 {
-                    if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
+                    var dPath = Destination.Info.GetRootFolder();
+                    foreach (var mod in modlist.Mods)
                     {
-                        if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
+                        if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
                         {
-                            // If this is a slotless root, purge everything.
-                            await _modding.DeleteMod(mod.fullPath, false);
-                        }
-                        else if(allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.Slot))
-                        {
-                            // Otherwise, only purge the files we're replacing, and anything else that
-                            // contains our slot name.
-                            await _modding.DeleteMod(mod.fullPath, false);
+                            if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
+                            {
+                                // If this is a slotless root, purge everything.
+                                await _modding.DeleteMod(mod.fullPath, false);
+                            }
+                            else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.Slot))
+                            {
+                                // Otherwise, only purge the files we're replacing, and anything else that
+                                // contains our slot name.
+                                await _modding.DeleteMod(mod.fullPath, false);
+                            }
                         }
                     }
                 }
