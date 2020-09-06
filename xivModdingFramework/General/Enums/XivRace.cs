@@ -314,6 +314,19 @@ namespace xivModdingFramework.General.Enums
                 Children = new List<XivRaceNode>()
             });
 
+            dict.Add(XivRace.NPC_Male, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Hyur_Midlander_Male],
+                Race = XivRace.NPC_Male,
+                Children = new List<XivRaceNode>()
+            });
+            dict.Add(XivRace.NPC_Female, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Hyur_Midlander_Female],
+                Race = XivRace.NPC_Female,
+                Children = new List<XivRaceNode>()
+            });
+
 
             tree = dict[XivRace.Hyur_Midlander_Male];
         }
