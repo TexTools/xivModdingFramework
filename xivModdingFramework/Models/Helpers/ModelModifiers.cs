@@ -1001,7 +1001,7 @@ namespace xivModdingFramework.Models.Helpers
                 if (missingDeforms.Any())
                 {
                     // Get the skeleton for this model so we can use it to analyze missing bones.
-                    var dict = model.ResolveBoneHeirarchy(loggingFunction);
+                    var dict = model.ResolveBoneHeirarchy(null, XivRace.All_Races, null, loggingFunction);
 
 
                     // For a bone to be missing in the deformation data completely, it has to have come from a different skeleton, which
