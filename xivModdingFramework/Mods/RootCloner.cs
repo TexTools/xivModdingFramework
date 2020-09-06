@@ -74,6 +74,8 @@ namespace xivModdingFramework.Mods
                     foreach (var avfx in avfxSets)
                     {
                         var avfxStuff = await ATex.GetVfxPath(Source.Info, avfx);
+                        if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
+
                         var path = avfxStuff.Folder + "/" + avfxStuff.File;
                         if (await _index.FileExists(path))
                         {
@@ -193,6 +195,10 @@ namespace xivModdingFramework.Mods
                     var dst = kv.Value;
                     var xmdl = await _mdl.GetRawMdlData(src);
                     var tmdl = TTModel.FromRaw(xmdl);
+
+                    if (xmdl == null || tmdl == null)
+                        continue;
+
                     tmdl.Source = dst;
                     xmdl.MdlPath = dst;
 
