@@ -11,6 +11,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.FileTypes;
@@ -301,6 +302,39 @@ namespace xivModdingFramework.Mods
                 }
             }
 
+            if (ProgressReporter != null)
+            {
+                ProgressReporter.Report("Updating modlist...");
+            }
+
+            // Here we're going to go through and edit all the modded items to be joined together in a modpack for convenience.
+            modlist = await _modding.GetModListAsync();
+
+            var files = newModelPaths.Select(x => x.Value).Union(
+                newMaterialPaths.Select(x => x.Value)).Union(
+                newAvfxPaths.Select(x => x.Value)).Union(
+                newTexturePaths.Select(x => x.Value));
+
+            var allFiles = new HashSet<string>();
+            foreach(var f in files)
+            {
+                allFiles.Add(f);
+            }
+
+
+            var modPack = new ModPack() { author = "System", name = "Item Copy - " + iName, url = "", version = "1.0" };
+            foreach(var mod in modlist.Mods)
+            {
+                if(allFiles.Contains(mod.fullPath))
+                {
+                    mod.modPack = modPack;
+                }
+            }
+
+            modlist.ModPacks.Add(modPack);
+            modlist.modPackCount++;
+
+            _modding.SaveModList(modlist);
 
             if (ProgressReporter != null)
             {
