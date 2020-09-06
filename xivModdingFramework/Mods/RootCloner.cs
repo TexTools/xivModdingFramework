@@ -13,6 +13,8 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.FileTypes;
+using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Mods
@@ -43,12 +45,32 @@ namespace xivModdingFramework.Mods
             var originalMaterialPaths = await Source.GetMaterialFiles();
             var originalTexturePaths= await Source.GetTextureFiles();
 
+            var originalVfxPaths = new HashSet<string>();
+            if(Imc.UsesImc(Source))
+            {
+                var avfxSets = originalMetadata.ImcEntries.Select(x => x.Vfx).Distinct();
+                foreach(var avfx in avfxSets)
+                {
+                    var avfxStuff = await ATex.GetVfxPath(Source.Info, avfx);
+                    var path = avfxStuff.Folder + "/" + avfxStuff.File;
+                    if (await _index.FileExists(path))
+                    {
+                        originalVfxPaths.Add(path);
+                    }
+                }
+            }
+
+
+
+
 
             // Time to start editing things.
 
             // First, get a new, clean copy of the metadata, pointed at the new root.
             var newMetadata = await ItemMetadata.GetMetadata(Source);
             newMetadata.Root = Destination.Info.ToFullRoot();
+            var originalDestinationMetadata = await ItemMetadata.GetMetadata(Destination);
+
 
             // Now figure out the path names for all of our new paths.
             // These dictionarys map Old Path => New Path
@@ -56,6 +78,7 @@ namespace xivModdingFramework.Mods
             Dictionary<string, string> newMaterialPaths = new Dictionary<string, string>();
             Dictionary<string, string> newMaterialFileNames = new Dictionary<string, string>();
             Dictionary<string, string> newTexturePaths = new Dictionary<string, string>();
+            Dictionary<string, string> newAvfxPaths = new Dictionary<string, string>();
 
 
             // For each path, replace any instances of our primary and secondary types.
@@ -80,10 +103,14 @@ namespace xivModdingFramework.Mods
                 newTexturePaths.Add(path, UpdatePath(Source, Destination, path));
             }
 
+            foreach (var path in originalVfxPaths)
+            {
+                newAvfxPaths.Add(path, UpdatePath(Source, Destination, path));
+            }
+
             var destItem = Destination.GetFirstItem();
             var iCat = destItem.SecondaryCategory;
             var iName = destItem.Name;
-
 
             // Load, Edit, and resave the model files.
             foreach (var kv in newModelPaths)
@@ -118,31 +145,98 @@ namespace xivModdingFramework.Mods
                 await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
             }
 
+            HashSet<string> CopiedMaterials = new HashSet<string>();
             // Load every Material file and edit the texture references to the new texture paths.
             foreach(var kv in newMaterialPaths)
             {
                 var src = kv.Key;
                 var dst = kv.Value;
-                var offset = await _index.GetDataOffset(src);
-                var xivMtrl = await _mtrl.GetMtrlData(offset, src, 11);
-                xivMtrl.MTRLPath = dst;
-
-                for(int i = 0; i < xivMtrl.TexturePathList.Count; i++)
+                try
                 {
-                    foreach (var tkv in newTexturePaths)
+                    var offset = await _index.GetDataOffset(src);
+                    if (offset == 0) continue;
+                    var xivMtrl = await _mtrl.GetMtrlData(offset, src, 11);
+                    xivMtrl.MTRLPath = dst;
+
+                    for (int i = 0; i < xivMtrl.TexturePathList.Count; i++)
                     {
-                        xivMtrl.TexturePathList[i] = xivMtrl.TexturePathList[i].Replace(tkv.Key, tkv.Value);
+                        foreach (var tkv in newTexturePaths)
+                        {
+                            xivMtrl.TexturePathList[i] = xivMtrl.TexturePathList[i].Replace(tkv.Key, tkv.Value);
+                        }
+                    }
+
+                    await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource);
+                    CopiedMaterials.Add(dst);
+                } catch(Exception ex)
+                {
+                    // Clear out the mtrl and let the functions later handle it.
+                    bool original = await _index.IsDefaultFilePath(dst);
+                    if (!original) {
+                        await _index.DeleteFileDescriptor(dst, df, false);
                     }
                 }
+            }
 
-                await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource);
+            // Copy VFX files.
+            foreach (var kv in newAvfxPaths)
+            {
+                var src = kv.Key;
+                var dst = kv.Value;
+
+                await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
+            }
+
+            // Check to see if we need to add any variants
+            var cloneNum = newMetadata.ImcEntries.Count >= 2 ? 1 : 0;
+            while(originalDestinationMetadata.ImcEntries.Count > newMetadata.ImcEntries.Count)
+            {
+                // Clone Variant 1 into the variants we are missing.
+                newMetadata.ImcEntries.Add((XivImc)newMetadata.ImcEntries[cloneNum].Clone());
             }
 
             // Save the new Metadata file.
             await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource);
 
-            // TODO -- Copy AVFX file(s) over
-            // TODO -- Validate all variants/material sets for valid materials, and copy materials as needed to fix.
+
+
+            // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
+            if (Imc.UsesImc(Destination))
+            {
+                var mSets = newMetadata.ImcEntries.Select(x => x.Variant).Distinct();
+                foreach (var mSetId in mSets)
+                {
+                    var path = Destination.Info.GetRootFolder() + "material/v" + mSetId.ToString().PadLeft(4, '0') + "/";
+                    foreach (var mkv in newMaterialFileNames)
+                    {
+                        // See if the material was copied over.
+                        var destPath = path + mkv.Value;
+                        if (CopiedMaterials.Contains(destPath)) continue;
+
+                        string existentCopy = null;
+
+                        // If not, find a material where one *was* copied over.
+                        foreach (var mSetId2 in mSets)
+                        {
+                            var p2 = Destination.Info.GetRootFolder() + "material/v" + mSetId2.ToString().PadLeft(4, '0') + "/";
+                            foreach (var cmat2 in CopiedMaterials)
+                            {
+                                if (cmat2 == p2 + mkv.Value)
+                                {
+                                    existentCopy = cmat2;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Shouldn't ever actually hit this, but if we do, nothing to be done about it.
+                        if (existentCopy == null) continue;
+
+                        // Copy the material over.
+                        await _dat.CopyFile(existentCopy, destPath, iCat, iName, ApplicationSource, true);
+                    }
+                }
+            }
         }
 
         const string CommonPath = "chara/common/";
@@ -189,6 +283,10 @@ namespace xivModdingFramework.Mods
 
             var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");
             var match = rex.Match(file);
+            if(!match.Success)
+            {
+                return file;
+            }
 
             if (Source.Info.SecondaryType == null)
             {

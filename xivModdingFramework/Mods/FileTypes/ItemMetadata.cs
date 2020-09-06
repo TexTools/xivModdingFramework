@@ -134,8 +134,8 @@ namespace xivModdingFramework.Mods.FileTypes
                 var data = await _dat.GetType2Data(filePath, false);
 
                 // Run it through the binary deserializer and we're good.
-                //return await Deserialize(data);
-                return await CreateFromRaw(root);
+                return await Deserialize(data);
+                //return await CreateFromRaw(root);
             } else
             {
                 // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.
