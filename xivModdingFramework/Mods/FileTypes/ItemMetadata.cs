@@ -37,7 +37,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <summary>
         /// The dependency root that this item meta data entry refers to.
         /// </summary>
-        public readonly XivDependencyRoot Root;
+        public XivDependencyRoot Root;
 
         /// <summary>
         /// Returns if this metadata object actually contains any metadata or not.
@@ -134,8 +134,8 @@ namespace xivModdingFramework.Mods.FileTypes
                 var data = await _dat.GetType2Data(filePath, false);
 
                 // Run it through the binary deserializer and we're good.
-                //return await Deserialize(data);
-                return await CreateFromRaw(root);
+                return await Deserialize(data);
+                //return await CreateFromRaw(root);
             } else
             {
                 // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.

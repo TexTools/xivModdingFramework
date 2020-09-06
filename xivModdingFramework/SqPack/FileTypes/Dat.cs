@@ -1451,7 +1451,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var _index = new Index(_gameDirectory);
             var offset = await _index.GetDataOffset(sourcePath);
             var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, category, itemName, source);
+            return await CopyFile(offset, dataFile, targetPath, category, itemName, source, overwrite);
         }
 
         /// <summary>

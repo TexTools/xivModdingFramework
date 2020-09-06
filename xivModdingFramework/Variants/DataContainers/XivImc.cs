@@ -26,7 +26,7 @@ namespace xivModdingFramework.Variants.DataContainers
     /// <summary>
     /// The IMC information for a Specific Variant of a Specific Slot in a Gear Set.
     /// </summary>
-    public class XivImc
+    public class XivImc : ICloneable
     {
         /// <summary>
         /// The Material Set / Variant #
@@ -111,6 +111,11 @@ namespace xivModdingFramework.Variants.DataContainers
 
             Mask = (ushort)(Mask & (~bit));
 
+        }
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
         }
 
     }
