@@ -105,6 +105,7 @@ namespace xivModdingFramework.Models.FileTypes
             var race = XivRaces.GetXivRace(fullMdlPath.Substring(1, 4));
 
             return await GetExtraSkeletonFile(root.Info, race);
+            
         }
 
 
@@ -137,7 +138,18 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 return parsedFile;
             }
-            await ExtractAndParseSkel(file);
+
+            try
+            {
+                // In some cases, the extra skeleton doesn't actually exist, despite the 
+                // game files saying it should.  In these cases, SE actually intends to 
+                // default to the base skel.
+                await ExtractAndParseSkel(file);
+            }
+            catch
+            {
+                return null;
+            }
             return parsedFile;
         }
 

@@ -1436,6 +1436,10 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static XivDependencyRootInfo ExtractRootInfoFilenameOnly(string filenameWithoutExtension)
         {
+            if(String.IsNullOrEmpty(filenameWithoutExtension))
+            {
+                return new XivDependencyRootInfo();
+            }
             var regex = new Regex("([a-z])([0-9]{4})([a-z])([0-9]{4})");
             var match = regex.Match(filenameWithoutExtension);
             if(!match.Success)
