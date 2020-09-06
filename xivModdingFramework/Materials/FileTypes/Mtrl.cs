@@ -1098,9 +1098,9 @@ namespace xivModdingFramework.Materials.FileTypes
         public string GetMtrlFolder(XivDependencyRootInfo root, int materialSet = -1) 
         {
             // These types have exactly one material set, but don't have an IMC file saying so.
-            if(root.SecondaryType == XivItemType.hair ||
+            if((root.SecondaryType == XivItemType.hair ||
                 root.SecondaryType == XivItemType.body ||
-                root.SecondaryType == XivItemType.tail )
+                root.SecondaryType == XivItemType.tail ) && materialSet <= 0)
             {
                 materialSet = 1; 
             }

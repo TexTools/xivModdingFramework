@@ -195,8 +195,8 @@ namespace xivModdingFramework.Models.DataContainers
         // Byte 2 - Leg
         EnableLegFlags = 16,
         Bit17 = 17,
-        Bit18 = 18,
-        LegHideHalfboot = 19,
+        LegHideShortBoot = 18,
+        LegHideHalfBoot = 19,
         Bit20 = 20,
         LegShowFoot = 21,
         Bit22 = 22,
