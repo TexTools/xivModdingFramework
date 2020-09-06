@@ -29,7 +29,7 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns></returns>
-        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, IProgress<string> ProgressReporter = null)
+        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, IProgress<string> ProgressReporter = null)
         {
 
             if (ProgressReporter != null)
@@ -40,7 +40,6 @@ namespace xivModdingFramework.Mods
             XivCache.CacheWorkerEnabled = false;
             try
             {
-
                 var df = IOUtil.GetDataFileFromPath(Source.ToString());
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
@@ -51,7 +50,11 @@ namespace xivModdingFramework.Mods
                 var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
 
-
+                bool locked = _index.IsIndexLocked(df);
+                if(locked)
+                {
+                    throw new Exception("Game files currently in use.");
+                }
 
 
                 if (ProgressReporter != null)
@@ -78,10 +81,6 @@ namespace xivModdingFramework.Mods
                         }
                     }
                 }
-
-
-
-
 
                 // Time to start editing things.
 
@@ -133,6 +132,7 @@ namespace xivModdingFramework.Mods
                 }
 
                 var destItem = Destination.GetFirstItem();
+                var srcItem = (await Source.GetAllItems(singleVariant))[0];
                 var iCat = destItem.SecondaryCategory;
                 var iName = destItem.Name;
 
@@ -263,6 +263,32 @@ namespace xivModdingFramework.Mods
                     newMetadata.ImcEntries.Add((XivImc)newMetadata.ImcEntries[cloneNum].Clone());
                 }
 
+
+                if (singleVariant >= 0)
+                {
+                    if (ProgressReporter != null)
+                    {
+                        ProgressReporter.Report("Setting single-variant data...");
+                    }
+
+                    if (singleVariant < newMetadata.ImcEntries.Count)
+                    {
+                        var v = newMetadata.ImcEntries[singleVariant];
+
+                        for(int i = 0; i < newMetadata.ImcEntries.Count; i++)
+                        {
+                            newMetadata.ImcEntries[i] = (XivImc)v.Clone();
+                        }
+                    }
+                }
+
+                // Update Skeleton references to be for the correct set Id.
+                var setId = Destination.Info.SecondaryId == null ? (ushort)Destination.Info.PrimaryId : (ushort)Destination.Info.SecondaryId;
+                foreach(var entry in newMetadata.EstEntries)
+                {
+                    entry.Value.SetId = setId;
+                }
+
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Copying metdata...");
@@ -334,7 +360,7 @@ namespace xivModdingFramework.Mods
                 }
 
 
-                var modPack = new ModPack() { author = "System", name = "Item Copy - " + iName, url = "", version = "1.0" };
+                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name, url = "", version = "1.0" };
                 foreach (var mod in modlist.Mods)
                 {
                     if (allFiles.Contains(mod.fullPath))
