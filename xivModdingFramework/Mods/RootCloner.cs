@@ -136,6 +136,18 @@ namespace xivModdingFramework.Mods
                 var iCat = destItem.SecondaryCategory;
                 var iName = destItem.Name;
 
+
+                var files = newModelPaths.Select(x => x.Value).Union(
+                    newMaterialPaths.Select(x => x.Value)).Union(
+                    newAvfxPaths.Select(x => x.Value)).Union(
+                    newTexturePaths.Select(x => x.Value));
+
+                var allFiles = new HashSet<string>();
+                foreach (var f in files)
+                {
+                    allFiles.Add(f);
+                }
+
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Getting modlist...");
@@ -152,7 +164,17 @@ namespace xivModdingFramework.Mods
                 {
                     if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
                     {
-                        await _modding.DeleteMod(mod.fullPath, false);
+                        if (Destination.Info.Slot == null)
+                        {
+                            // If this is a slotless root, purge everything.
+                            await _modding.DeleteMod(mod.fullPath, false);
+                        }
+                        else if(allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.Slot))
+                        {
+                            // Otherwise, only purge the files we're replacing, and anything else that
+                            // contains our slot name.
+                            await _modding.DeleteMod(mod.fullPath, false);
+                        }
                     }
                 }
 
@@ -348,16 +370,6 @@ namespace xivModdingFramework.Mods
                 // Here we're going to go through and edit all the modded items to be joined together in a modpack for convenience.
                 modlist = await _modding.GetModListAsync();
 
-                var files = newModelPaths.Select(x => x.Value).Union(
-                    newMaterialPaths.Select(x => x.Value)).Union(
-                    newAvfxPaths.Select(x => x.Value)).Union(
-                    newTexturePaths.Select(x => x.Value));
-
-                var allFiles = new HashSet<string>();
-                foreach (var f in files)
-                {
-                    allFiles.Add(f);
-                }
 
 
                 var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name, url = "", version = "1.0" };
