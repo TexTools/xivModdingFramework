@@ -91,6 +91,24 @@ namespace xivModdingFramework.Mods
                 newMetadata.Root = Destination.Info.ToFullRoot();
                 var originalDestinationMetadata = await ItemMetadata.GetMetadata(Destination);
 
+                // Set 0 needs special handling.
+                if(Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
+                {
+                    var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
+                    var set1Metadata = await ItemMetadata.GetMetadata(set1Root);
+
+                    newMetadata.EqpEntry = set1Metadata.EqpEntry;
+
+                    if (Source.Info.Slot == "met")
+                    {
+                        newMetadata.GmpEntry = set1Metadata.GmpEntry;
+                    }
+                } else if (Destination.Info.PrimaryType == XivItemType.equipment && Destination.Info.PrimaryId == 0)
+                {
+                    newMetadata.EqpEntry = null;
+                    newMetadata.GmpEntry = null;
+                }
+
 
                 // Now figure out the path names for all of our new paths.
                 // These dictionarys map Old Path => New Path
@@ -143,12 +161,13 @@ namespace xivModdingFramework.Mods
                     newMaterialPaths.Select(x => x.Value)).Union(
                     newAvfxPaths.Select(x => x.Value)).Union(
                     newTexturePaths.Select(x => x.Value));
-
                 var allFiles = new HashSet<string>();
                 foreach (var f in files)
                 {
                     allFiles.Add(f);
                 }
+
+                allFiles.Add(Destination.Info.GetRootFile());
 
                 if (ProgressReporter != null)
                 {
