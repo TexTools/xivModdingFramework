@@ -407,7 +407,7 @@ namespace xivModdingFramework.Mods
 
 
 
-                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name, url = "", version = "1.0" };
+                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " -> " + iName, url = "", version = "1.0" };
                 foreach (var mod in modlist.Mods)
                 {
                     if (allFiles.Contains(mod.fullPath))
