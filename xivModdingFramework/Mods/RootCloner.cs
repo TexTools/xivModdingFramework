@@ -405,11 +405,7 @@ namespace xivModdingFramework.Mods
                 {
                     if (allFiles.Contains(mod.fullPath))
                     {
-                        // Don't claim common path items into our modpack.
-                        if (!mod.fullPath.StartsWith(CommonPath))
-                        {
-                            mod.modPack = modPack;
-                        }
+                        mod.modPack = modPack;
                     }
                 }
 
