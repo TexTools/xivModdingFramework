@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Materials.FileTypes;
@@ -30,7 +31,7 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns></returns>
-        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, IProgress<string> ProgressReporter = null)
+        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null)
         {
 
             if (ProgressReporter != null)
@@ -408,8 +409,8 @@ namespace xivModdingFramework.Mods
                 modlist = await _modding.GetModListAsync();
 
 
-
-                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " -> " + iName, url = "", version = "1.0" };
+                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+                List<Mod> mods = new List<Mod>();
                 foreach (var mod in modlist.Mods)
                 {
                     if (allFiles.Contains(mod.fullPath))
@@ -419,6 +420,8 @@ namespace xivModdingFramework.Mods
                         mod.category = iCat;
                         mod.source = ApplicationSource;
                         mod.modPack = modPack;
+
+                        mods.Add(mod);
                     }
                 }
 
@@ -426,6 +429,43 @@ namespace xivModdingFramework.Mods
                 modlist.modPackCount++;
 
                 _modding.SaveModList(modlist);
+
+                if(saveDirectory != null)
+                {
+
+                    ProgressReporter.Report("Creating TTMP File...");
+                    var desc = "Item Converter Modpack - " + srcItem.Name + " -> " + iName + "\nCreated at: " + DateTime.Now.ToString();
+                    // Time to save the modlist to file.
+                    var dir = new DirectoryInfo(saveDirectory);
+                    var _ttmp = new TTMP(dir, ApplicationSource);
+                    var smpd = new SimpleModPackData()
+                    {
+                        Author = modPack.author,
+                        Description = desc,
+                        Url = modPack.url,
+                        Version = new Version(1, 0, 0),
+                        Name = modPack.name,
+                        SimpleModDataList = new List<SimpleModData>()
+                    };
+
+                    foreach(var mod in mods)
+                    {
+                        var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+                        var smd = new SimpleModData()
+                        {
+                            Name = iName,
+                            FullPath = mod.fullPath,
+                            DatFile = df.GetDataFileName(),
+                            Category = iCat,
+                            IsDefault = false,
+                            ModSize = size,
+                            ModOffset = mod.data.modOffset
+                        };
+                        smpd.SimpleModDataList.Add(smd);
+                    }
+
+                    await _ttmp.CreateSimpleModPack(smpd, XivCache.GameInfo.GameDirectory, null, true);
+                }
 
                 if (ProgressReporter != null)
                 {
@@ -463,25 +503,19 @@ namespace xivModdingFramework.Mods
         {
             if(Destination.Info.PrimaryType == XivItemType.human && Destination.Info.SecondaryType == XivItemType.hair && Path.GetExtension(path) == ".mtrl")
             {
-                // Hair material paths are actually hard-coded into the game, so there's some wild stuff that has to go on here.
-                if (Destination.Info.SecondaryId > 115 && Destination.Info.SecondaryId <= 200)
-                {
-                    // Hairs between 115 and 200 have forced material path sharing enabled.
-                    var digit3 = Destination.Info.SecondaryId / 100;
-                    var race = digit3 % 2 == 0 ? 101 : 201;
+                var hairRoot = Mtrl.GetHairMaterialRoot(Destination.Info);
 
-                    // Force the race code to the appropriate one.
-                    var raceReplace = new Regex("/c[0-9]{4}");
-                    path = raceReplace.Replace(path, "/c" + race.ToString().PadLeft(4, '0'));
+                // Force the race code to the appropriate one.
+                var raceReplace = new Regex("/c[0-9]{4}");
+                path = raceReplace.Replace(path, "/c" + hairRoot.PrimaryId.ToString().PadLeft(4, '0'));
 
-                    var hairReplace= new Regex("/h[0-9]{4}");
-                    path = hairReplace.Replace(path, "/h" + Destination.Info.SecondaryId.ToString().PadLeft(4, '0'));
+                var hairReplace= new Regex("/h[0-9]{4}");
+                path = hairReplace.Replace(path, "/h" + hairRoot.SecondaryId.ToString().PadLeft(4, '0'));
 
-                    // Hairs between 115 and 200 have forced material path sharing enabled.
-                    path = Path.GetDirectoryName(path);
-                    path = path.Replace('\\', '/');
-                    return path;
-                }
+                // Hairs between 115 and 200 have forced material path sharing enabled.
+                path = Path.GetDirectoryName(path);
+                path = path.Replace('\\', '/');
+                return path;
             }
 
             // So first off, just copy anything from the old root folder to the new one.
@@ -511,28 +545,21 @@ namespace xivModdingFramework.Mods
 
             if (Destination.Info.PrimaryType == XivItemType.human && Destination.Info.SecondaryType == XivItemType.hair && Path.GetExtension(path) == ".mtrl")
             {
-                // Hair material paths are actually hard-coded into the game, so there's some wild stuff that has to go on here.
-                if (Destination.Info.SecondaryId > 115 && Destination.Info.SecondaryId <= 200)
-                {
-                    // Hairs between 115 and 200 have forced material path sharing enabled.
-                    var digit3 = Destination.Info.SecondaryId / 100;
-                    var race = digit3 % 2 == 0 ? 101 : 201;
+                var hairRoot = Mtrl.GetHairMaterialRoot(Destination.Info);
 
-                    // Force the race code to the appropriate one.
-                    var raceReplace = new Regex("^mt_c[0-9]{4}h[0-9]{4}");
-                    file = raceReplace.Replace(file, "mt_c" + race.ToString().PadLeft(4, '0') + "h" + Destination.Info.SecondaryId.ToString().PadLeft(4, '0'));
+                // Force replace the root information to the correct one for this target hair.
+                var raceReplace = new Regex("^mt_c[0-9]{4}h[0-9]{4}");
+                file = raceReplace.Replace(file, "mt_c" + hairRoot.PrimaryId.ToString().PadLeft(4, '0') + "h" + hairRoot.SecondaryId.ToString().PadLeft(4, '0'));
 
-                    // So for these, the first half of the filename is hard-coded locked (the c#### part)
-                    // We have to get gimmicky and play around with the suffixing.
-                    var initialPartRex = new Regex("^(mt_c[0-9]{4}h[0-9]{4})(?:_c[0-9]{4})?(.+)$");
-                    var m = initialPartRex.Match(file);
+                // Jam in a suffix into the MTRL to make it unique/non-colliding.
+                var initialPartRex = new Regex("^(mt_c[0-9]{4}h[0-9]{4})(?:_c[0-9]{4})?(.+)$");
+                var m = initialPartRex.Match(file);
 
-                    // ???
-                    if (!m.Success) return file;
+                // ???
+                if (!m.Success) return file;
 
-                    file = m.Groups[1].Value + "_c" + Destination.Info.PrimaryId.ToString().PadLeft(4, '0') + m.Groups[2].Value;
-                    return file;
-                }
+                file = m.Groups[1].Value + "_c" + Destination.Info.PrimaryId.ToString().PadLeft(4, '0') + m.Groups[2].Value;
+                return file;
             }
 
             var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");

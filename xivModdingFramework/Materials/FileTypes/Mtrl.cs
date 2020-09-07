@@ -1116,7 +1116,62 @@ namespace xivModdingFramework.Materials.FileTypes
 
         }
         
+        /// <summary>
+        /// Hair is extremely annoying and uses literal hard-coded paths for things based on hair ID.
+        /// </summary>
+        /// <param name="root"></param>
+        /// <returns></returns>
+        public static XivDependencyRootInfo GetHairMaterialRoot(XivDependencyRootInfo root)
+        {
+            if(root.PrimaryType != XivItemType.human || root.SecondaryType != XivItemType.hair)
+            {
+                throw new InvalidDataException("Cannot get hair material info for non-hair root.");
+            }
 
+            if(root.SecondaryId < 101)
+            {
+                // Racial uniques.
+                return root;
+            } else if (root.SecondaryId < 116)
+            {
+                // 101-115 have Midlander M/F, and Miqo M/F
+                if (root.PrimaryId == 701 || root.PrimaryId == 801)
+                {
+                    return root;
+                }
+                else
+                {
+                    var isFemale = ((root.PrimaryId / 100) % 2) == 0;
+                    return new XivDependencyRootInfo()
+                    {
+                        PrimaryId = isFemale ? 201 : 101,
+                        PrimaryType = root.PrimaryType,
+                        SecondaryType = root.SecondaryType,
+                        SecondaryId = root.SecondaryId,
+                        Slot = root.Slot
+                    };
+                }
+
+            } else if (root.SecondaryId < 201)
+            {
+                // These have just Midlander M/F
+                var isFemale = ((root.PrimaryId / 100) % 2) == 0;
+                return new XivDependencyRootInfo()
+                {
+                    PrimaryId = isFemale ? 201 : 101,
+                    PrimaryType = root.PrimaryType,
+                    SecondaryType = root.SecondaryType,
+                    SecondaryId = root.SecondaryId,
+                    Slot = root.Slot
+                };
+
+            } else
+            {
+                // Back to uniques.
+                return root;
+            }
+
+        }
         public void Dipose()
         {
             _semaphoreSlim?.Dispose();
