@@ -199,7 +199,7 @@ namespace xivModdingFramework.Mods
                                 // If this is a slotless root, purge everything.
                                 await _modding.DeleteMod(mod.fullPath, false);
                             }
-                            else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.Slot))
+                            else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.GetBaseFileName(true)))
                             {
                                 // Otherwise, only purge the files we're replacing, and anything else that
                                 // contains our slot name.

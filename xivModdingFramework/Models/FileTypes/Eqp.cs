@@ -112,13 +112,26 @@ namespace xivModdingFramework.Models.FileTypes
 
         public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param)
         {
+            if (equipmentId == 0)
+            {
+                throw new InvalidDataException("Cannot write GMP data for Set 0. (Use Set 1)");
+            }
+
             var data = await LoadGimmickParameterFile(false);
 
             var offset = ResolveEqpEntryOffset(data, equipmentId);
 
             if (offset == -1)
             {
-                // Fug.  Gotta write expansion function.
+                // Expand the block, then get the offset.
+                // (GMP files use an identical file structure to EQP files)
+                data = ExpandEqpBlock(data, equipmentId);
+                offset = ResolveEqpEntryOffset(data, equipmentId);
+
+                if(offset <= 0)
+                {
+                    throw new InvalidDataException("Unable to resolve GMP data offset.");
+                }
             }
 
             IOUtil.ReplaceBytesAt(data, param.GetBytes(), offset);
