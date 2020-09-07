@@ -405,6 +405,10 @@ namespace xivModdingFramework.Mods
                 {
                     if (allFiles.Contains(mod.fullPath))
                     {
+                        // Ensure all of our modified files are attributed correctly.
+                        mod.name = iName;
+                        mod.category = iCat;
+                        mod.source = ApplicationSource;
                         mod.modPack = modPack;
                     }
                 }
@@ -429,9 +433,16 @@ namespace xivModdingFramework.Mods
 
         private static string UpdatePath(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
-            // Things that live in the common folder get to stay there/don't get copied.
-            if (path.StartsWith(CommonPath)) return path;
+            // For common path items, copy them to our own personal mimic of the path.
+            if (path.StartsWith(CommonPath))
+            {
+                var len = CommonPath.Length;
+                var afterCommon = path.Substring(len);
+                path = Destination.Info.GetRootFolder() + "common/" + afterCommon;
+                return path;
+            }
 
+            // Things that live in the common folder get to stay there/don't get copied.
 
             var file = UpdateFileName(Source, Destination, path);
             var folder = UpdateFolder(Source, Destination, path);
@@ -441,6 +452,8 @@ namespace xivModdingFramework.Mods
 
         private static string UpdateFolder(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
+
+
             // So first off, just copy anything from the old root folder to the new one.
             var match = RemoveRootPathRegex.Match(path);
             if(match.Success)
