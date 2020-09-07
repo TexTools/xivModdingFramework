@@ -89,7 +89,14 @@ namespace xivModdingFramework.Mods
                 // First, get a new, clean copy of the metadata, pointed at the new root.
                 var newMetadata = await ItemMetadata.GetMetadata(Source);
                 newMetadata.Root = Destination.Info.ToFullRoot();
-                var originalDestinationMetadata = await ItemMetadata.GetMetadata(Destination);
+                ItemMetadata originalDestinationMetadata = null;
+                try
+                {
+                    originalDestinationMetadata = await ItemMetadata.GetMetadata(Destination);
+                } catch
+                {
+                    originalDestinationMetadata = new ItemMetadata(Destination);
+                }
 
                 // Set 0 needs special handling.
                 if(Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
