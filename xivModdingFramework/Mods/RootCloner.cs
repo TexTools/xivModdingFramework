@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Materials.FileTypes;
@@ -30,7 +31,7 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns></returns>
-        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, IProgress<string> ProgressReporter = null)
+        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null)
         {
 
             if (ProgressReporter != null)
@@ -408,8 +409,8 @@ namespace xivModdingFramework.Mods
                 modlist = await _modding.GetModListAsync();
 
 
-
-                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " -> " + iName, url = "", version = "1.0" };
+                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+                List<Mod> mods = new List<Mod>();
                 foreach (var mod in modlist.Mods)
                 {
                     if (allFiles.Contains(mod.fullPath))
@@ -419,6 +420,8 @@ namespace xivModdingFramework.Mods
                         mod.category = iCat;
                         mod.source = ApplicationSource;
                         mod.modPack = modPack;
+
+                        mods.Add(mod);
                     }
                 }
 
@@ -426,6 +429,43 @@ namespace xivModdingFramework.Mods
                 modlist.modPackCount++;
 
                 _modding.SaveModList(modlist);
+
+                if(saveDirectory != null)
+                {
+
+                    ProgressReporter.Report("Creating TTMP File...");
+                    var desc = "Item Converter Modpack - " + srcItem.Name + " -> " + iName + "\nCreated at: " + DateTime.Now.ToString();
+                    // Time to save the modlist to file.
+                    var dir = new DirectoryInfo(saveDirectory);
+                    var _ttmp = new TTMP(dir, ApplicationSource);
+                    var smpd = new SimpleModPackData()
+                    {
+                        Author = modPack.author,
+                        Description = desc,
+                        Url = modPack.url,
+                        Version = new Version(1, 0, 0),
+                        Name = modPack.name,
+                        SimpleModDataList = new List<SimpleModData>()
+                    };
+
+                    foreach(var mod in mods)
+                    {
+                        var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+                        var smd = new SimpleModData()
+                        {
+                            Name = iName,
+                            FullPath = mod.fullPath,
+                            DatFile = df.GetDataFileName(),
+                            Category = iCat,
+                            IsDefault = false,
+                            ModSize = size,
+                            ModOffset = mod.data.modOffset
+                        };
+                        smpd.SimpleModDataList.Add(smd);
+                    }
+
+                    await _ttmp.CreateSimpleModPack(smpd, XivCache.GameInfo.GameDirectory, null, true);
+                }
 
                 if (ProgressReporter != null)
                 {
