@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -460,12 +461,27 @@ namespace xivModdingFramework.Mods
 
         private static string UpdateFolder(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
-            if(Source.Info.PrimaryType == XivItemType.human && Path.GetExtension(path) == ".mtrl")
+            if(Destination.Info.PrimaryType == XivItemType.human && Destination.Info.SecondaryType == XivItemType.hair && Path.GetExtension(path) == ".mtrl")
             {
-                // For hair MTRLs we have to keep the same MTRL folder.
-                path = Path.GetDirectoryName(path);
-                path = path.Replace('\\', '/');
-                return path;
+                // Hair material paths are actually hard-coded into the game, so there's some wild stuff that has to go on here.
+                if (Destination.Info.SecondaryId > 115 && Destination.Info.SecondaryId <= 200)
+                {
+                    // Hairs between 115 and 200 have forced material path sharing enabled.
+                    var digit3 = Destination.Info.SecondaryId / 100;
+                    var race = digit3 % 2 == 0 ? 101 : 201;
+
+                    // Force the race code to the appropriate one.
+                    var raceReplace = new Regex("/c[0-9]{4}");
+                    path = raceReplace.Replace(path, "/c" + race.ToString().PadLeft(4, '0'));
+
+                    var hairReplace= new Regex("/h[0-9]{4}");
+                    path = hairReplace.Replace(path, "/h" + Destination.Info.SecondaryId.ToString().PadLeft(4, '0'));
+
+                    // Hairs between 115 and 200 have forced material path sharing enabled.
+                    path = Path.GetDirectoryName(path);
+                    path = path.Replace('\\', '/');
+                    return path;
+                }
             }
 
             // So first off, just copy anything from the old root folder to the new one.
@@ -492,6 +508,32 @@ namespace xivModdingFramework.Mods
         private static string UpdateFileName(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
             var file = Path.GetFileName(path);
+
+            if (Destination.Info.PrimaryType == XivItemType.human && Destination.Info.SecondaryType == XivItemType.hair && Path.GetExtension(path) == ".mtrl")
+            {
+                // Hair material paths are actually hard-coded into the game, so there's some wild stuff that has to go on here.
+                if (Destination.Info.SecondaryId > 115 && Destination.Info.SecondaryId <= 200)
+                {
+                    // Hairs between 115 and 200 have forced material path sharing enabled.
+                    var digit3 = Destination.Info.SecondaryId / 100;
+                    var race = digit3 % 2 == 0 ? 101 : 201;
+
+                    // Force the race code to the appropriate one.
+                    var raceReplace = new Regex("^mt_c[0-9]{4}h[0-9]{4}");
+                    file = raceReplace.Replace(file, "mt_c" + race.ToString().PadLeft(4, '0') + "h" + Destination.Info.SecondaryId.ToString().PadLeft(4, '0'));
+
+                    // So for these, the first half of the filename is hard-coded locked (the c#### part)
+                    // We have to get gimmicky and play around with the suffixing.
+                    var initialPartRex = new Regex("^(mt_c[0-9]{4}h[0-9]{4})(?:_c[0-9]{4})?(.+)$");
+                    var m = initialPartRex.Match(file);
+
+                    // ???
+                    if (!m.Success) return file;
+
+                    file = m.Groups[1].Value + "_c" + Destination.Info.PrimaryId.ToString().PadLeft(4, '0') + m.Groups[2].Value;
+                    return file;
+                }
+            }
 
             var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");
             var match = rex.Match(file);
