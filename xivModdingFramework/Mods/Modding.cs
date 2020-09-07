@@ -290,35 +290,44 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
-            var modList = GetModList();
-            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-            List<Mod> mods = null;
-
-            if (modPackName.Equals("Standalone (Non-ModPack)"))
+            var workerState = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
+            try
             {
-                mods = (from mod in modList.Mods
-                    where mod.modPack == null
-                    select mod).ToList();
+                var modList = GetModList();
+                var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+                List<Mod> mods = null;
+
+                if (modPackName.Equals("Standalone (Non-ModPack)"))
+                {
+                    mods = (from mod in modList.Mods
+                            where mod.modPack == null
+                            select mod).ToList();
+                }
+                else
+                {
+                    mods = (from mod in modList.Mods
+                            where mod.modPack != null && mod.modPack.name.Equals(modPackName)
+                            select mod).ToList();
+                }
+
+
+                if (mods == null)
+                {
+                    throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
+                }
+
+                foreach (var modEntry in mods)
+                {
+                    await ToggleModUnsafe(enable, modEntry);
+                }
+
+                SaveModList(modList);
             }
-            else
+            finally
             {
-                mods = (from mod in modList.Mods
-                    where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                    select mod).ToList();
+                XivCache.CacheWorkerEnabled = workerState;
             }
-
-
-            if (mods == null)
-            {
-                throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
-            }
-
-            foreach (var modEntry in mods)
-            {
-                await ToggleModUnsafe(enable, modEntry);
-            }
-
-            SaveModList(modList);
         }
 
         /// <summary>
@@ -540,41 +549,49 @@ namespace xivModdingFramework.Mods
             // Modpack doesn't exist in the modlist.
             if (modPackItem == null) return;
 
-            modList.ModPacks.Remove(modPackItem);
-
-            var modsToRemove = (from mod in modList.Mods
-                where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                select mod).ToList();
-
-            var modRemoveCount = modsToRemove.Count;
-
-            foreach (var modToRemove in modsToRemove)
+            var cacheState = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
+            try
             {
-                if (modToRemove.data.originalOffset == modToRemove.data.modOffset)
+                modList.ModPacks.Remove(modPackItem);
+
+                var modsToRemove = (from mod in modList.Mods
+                                    where mod.modPack != null && mod.modPack.name.Equals(modPackName)
+                                    select mod).ToList();
+
+                var modRemoveCount = modsToRemove.Count;
+
+                foreach (var modToRemove in modsToRemove)
                 {
-                    var index = new Index(_gameDirectory);
-                    await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                }
-                if (modToRemove.enabled)
-                {
-                    await ToggleModStatus(modToRemove.fullPath, false);
+                    if (modToRemove.data.originalOffset == modToRemove.data.modOffset)
+                    {
+                        var index = new Index(_gameDirectory);
+                        await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
+                    }
+                    if (modToRemove.enabled)
+                    {
+                        await ToggleModStatus(modToRemove.fullPath, false);
+                    }
+
+                    modToRemove.name = string.Empty;
+                    modToRemove.category = string.Empty;
+                    modToRemove.fullPath = string.Empty;
+                    modToRemove.source = string.Empty;
+                    modToRemove.modPack = null;
+                    modToRemove.enabled = false;
+                    modToRemove.data.originalOffset = 0;
+                    modToRemove.data.dataType = 0;
                 }
 
-                modToRemove.name = string.Empty;
-                modToRemove.category = string.Empty;
-                modToRemove.fullPath = string.Empty;
-                modToRemove.source = string.Empty;
-                modToRemove.modPack = null;
-                modToRemove.enabled = false;
-                modToRemove.data.originalOffset = 0;
-                modToRemove.data.dataType = 0;
+                modList.emptyCount += modRemoveCount;
+                modList.modCount -= modRemoveCount;
+                modList.modPackCount -= 1;
+
+                SaveModList(modList);
+            } finally
+            {
+                XivCache.CacheWorkerEnabled = cacheState;
             }
-
-            modList.emptyCount += modRemoveCount;
-            modList.modCount -= modRemoveCount;
-            modList.modPackCount -= 1;
-
-            SaveModList(modList);
         }
     }
 }

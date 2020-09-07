@@ -293,6 +293,8 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class TTModel
     {
+        public static string _SETTINGS_KEY_EXPORT_ALL_BONES = "setting_export_all_bones";
+
         /// <summary>
         /// The internal or external file path where this TTModel originated from.
         /// </summary>
@@ -832,7 +834,10 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
-                var boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, Bones, loggingFunction);
+                var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
+                var bones = useAllBones ? null : Bones;
+
+                var boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
 
                 const string creationScript = "CreateImportDB.sql";
                 // Spawn a DB connection to do the raw queries.
@@ -1711,8 +1716,8 @@ namespace xivModdingFramework.Models.DataContainers
                                 {
                                     // This is a parent level reference to a base bone.
                                     exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
-                                }
-                                else
+                                } 
+                                else if (exTranslationTable.ContainsKey(j.BoneParent))
                                 {
                                     // Run it through the translation to match up with the base skeleton.
                                     j.BoneParent = exTranslationTable[j.BoneParent];
@@ -1723,6 +1728,19 @@ namespace xivModdingFramework.Models.DataContainers
 
                                     fullSkel.Add(j.BoneName, j);
                                     exTranslationTable.Add(originalNumber, j.BoneNumber);
+                                } else
+                                {
+                                    // This is a root bone in the EX skeleton that has no parent element in the base skeleton.
+                                    // Just stick it onto the root bone.
+                                    j.BoneParent = fullSkel["n_root"].BoneNumber;
+
+                                    // And generate its own new bone number
+                                    var originalNumber = j.BoneNumber;
+                                    j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                                    fullSkel.Add(j.BoneName, j);
+                                    exTranslationTable.Add(originalNumber, j.BoneNumber);
+
                                 }
                             }
                         } catch(Exception ex)

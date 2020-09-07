@@ -1261,7 +1261,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        public static void SetMetaValue(string key, string value = null)
+        public static void SetMetaValue(string key, string value)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -1274,6 +1274,20 @@ namespace xivModdingFramework.Cache
                     cmd.ExecuteScalar();
                 }
             }
+        }
+        public static void SetMetaValue(string key, bool value)
+        {
+            SetMetaValue(key, value ? "True" : "False");
+        }
+        public static bool GetMetaValueBoolean(string key)
+        {
+            var st = GetMetaValue(key);
+
+            bool result = false;
+            bool success = Boolean.TryParse(st, out result);
+
+            if (!success) return false;
+            return result;
         }
 
         /// <summary>
@@ -2075,38 +2089,40 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                using (var transaction = db.BeginTransaction())
+                var query = "select position, file from dependencies_children_queue";
+                using (var selectCmd = new SQLiteCommand(query, db))
                 {
-                    var query = "select position, file from dependencies_children_queue";
-                    using (var selectCmd = new SQLiteCommand(query, db))
+                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
                     {
-                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        if (!reader.NextRow())
                         {
-                            if (!reader.NextRow())
-                            {
-                                // No entries left.
-                                return null;
-                            }
-                            // Got the new item.
-                            file = reader.GetString("file");
-                            position = reader.GetInt32("position");
+                            // No entries left.
+                            return null;
                         }
+                        // Got the new item.
+                        file = reader.GetString("file");
+                        position = reader.GetInt32("position");
                     }
-
-                    // Delete the row we took and all others that match the filename.
-                    query = "delete from dependencies_children_queue where file = $file";
-                    using (var deleteCmd = new SQLiteCommand(query, db))
-                    {
-                        deleteCmd.Parameters.AddWithValue("file", file);
-                        deleteCmd.ExecuteScalar();
-                    }
-
-                    transaction.Commit();
                 }
             }
             return file;
         }
 
+        public static void RemoveFromChildQueue(string file)
+        {
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+
+                // Delete the row we took and all others that match the filename.
+                var query = "delete from dependencies_children_queue where file = $file";
+                using (var deleteCmd = new SQLiteCommand(query, db))
+                {
+                    deleteCmd.Parameters.AddWithValue("file", file);
+                    deleteCmd.ExecuteScalar();
+                }
+            }
+        }
 
         private static string PopParentQueue()
         {
@@ -2116,36 +2132,38 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                using (var transaction = db.BeginTransaction())
+                var query = "select position, file from dependencies_parents_queue";
+                using (var selectCmd = new SQLiteCommand(query, db))
                 {
-                    var query = "select position, file from dependencies_parents_queue";
-                    using (var selectCmd = new SQLiteCommand(query, db))
+                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
                     {
-                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        if (!reader.NextRow())
                         {
-                            if (!reader.NextRow())
-                            {
-                                // No entries left.
-                                return null;
-                            }
-                            // Got the new item.
-                            file = reader.GetString("file");
-                            position = reader.GetInt32("position");
+                            // No entries left.
+                            return null;
                         }
+                        // Got the new item.
+                        file = reader.GetString("file");
+                        position = reader.GetInt32("position");
                     }
-
-                    // Delete the row we took and all others that match the filename.
-                    query = "delete from dependencies_parents_queue where file = $file";
-                    using (var deleteCmd = new SQLiteCommand(query, db))
-                    {
-                        deleteCmd.Parameters.AddWithValue("file", file);
-                        deleteCmd.ExecuteScalar();
-                    }
-
-                    transaction.Commit();
                 }
             }
             return file;
+        }
+        public static void RemoveFromParentQueue(string file)
+        {
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+
+                // Delete the row we took and all others that match the filename.
+                var query = "delete from dependencies_parents_queue where file = $file";
+                using (var deleteCmd = new SQLiteCommand(query, db))
+                {
+                    deleteCmd.Parameters.AddWithValue("file", file);
+                    deleteCmd.ExecuteScalar();
+                }
+            }
         }
 
 
@@ -2178,6 +2196,7 @@ namespace xivModdingFramework.Cache
 
                         // Set a safety timeout here.
                         task.Wait(3000);
+                        RemoveFromChildQueue(file);
                         continue;
 
                     }
@@ -2203,6 +2222,7 @@ namespace xivModdingFramework.Cache
 
                             // Set a safety timeout here.
                             task.Wait(3000);
+                            RemoveFromParentQueue(file);
                             continue;
                         }
                     }

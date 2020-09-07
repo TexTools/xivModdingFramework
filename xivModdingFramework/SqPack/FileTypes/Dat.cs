@@ -696,16 +696,17 @@ namespace xivModdingFramework.SqPack.FileTypes
             headerData.InsertRange(12, BitConverter.GetBytes(totalCompSize / 128));
             headerData.InsertRange(16, BitConverter.GetBytes(totalCompSize / 128));
 
-            var headerSize = 128;
-
-            if (headerData.Count > 128)
+            var headerSize = headerData.Count;
+            var rem = headerSize % 128;
+            if(rem != 0)
             {
-                headerData.RemoveRange(0, 4);
-                headerData.InsertRange(0, BitConverter.GetBytes(256));
-                headerSize = 256;
+                headerSize += (128 - rem);
             }
-            var headerPadding = headerSize - headerData.Count;
 
+            headerData.RemoveRange(0, 4);
+            headerData.InsertRange(0, BitConverter.GetBytes(headerSize));
+
+            var headerPadding = rem == 0 ? 0 : 128 - rem;
             headerData.AddRange(new byte[headerPadding]);
 
             newData.AddRange(headerData);

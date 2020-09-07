@@ -112,13 +112,26 @@ namespace xivModdingFramework.Models.FileTypes
 
         public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param)
         {
+            if (equipmentId == 0)
+            {
+                throw new InvalidDataException("Cannot write GMP data for Set 0. (Use Set 1)");
+            }
+
             var data = await LoadGimmickParameterFile(false);
 
             var offset = ResolveEqpEntryOffset(data, equipmentId);
 
             if (offset == -1)
             {
-                // Fug.  Gotta write expansion function.
+                // Expand the block, then get the offset.
+                // (GMP files use an identical file structure to EQP files)
+                data = ExpandEqpBlock(data, equipmentId);
+                offset = ResolveEqpEntryOffset(data, equipmentId);
+
+                if(offset <= 0)
+                {
+                    throw new InvalidDataException("Unable to resolve GMP data offset.");
+                }
             }
 
             IOUtil.ReplaceBytesAt(data, param.GetBytes(), offset);
@@ -211,9 +224,15 @@ namespace xivModdingFramework.Models.FileTypes
 
             if(offset < 0)
             {
-                // Not bothering to write a function to decompress empty EQP blocks, since it seems like SE keeps every equipment block with actual equipment in it decompressed.
-                // I suppose in theory we could use it for adding custom items in the e4000 range or something.
-                throw new Exception("Cannot write compressed EQP Entry. (Please report this in Discord!)");
+                // Expand the data block, then try again.
+                file = ExpandEqpBlock(file, equipmentId);
+
+                offset = ResolveEqpEntryOffset(file, equipmentId);
+
+                if(offset < 0)
+                {
+                    throw new InvalidDataException("Unable to determine EQP set offset.");
+                }
             }
 
             var slotOffset = EquipmentParameterSet.EntryOffsets[data.Slot];
@@ -381,6 +400,91 @@ namespace xivModdingFramework.Models.FileTypes
             return;
         }
 
+
+        /// <summary>
+        /// Expands a compressed EQP block.
+        /// </summary>
+        /// <param name="eqpData"></param>
+        /// <param name="setId"></param>
+        /// <returns></returns>
+        private byte[] ExpandEqpBlock(byte[] eqpData, int setId)
+        {
+            const int blockSize = 160;
+            // 160 Entry blocks.
+            var blockId = setId / blockSize;
+            var byteNum = blockId / 8;
+            var bit = 1 << (blockId % 8);
+
+            if ((eqpData[byteNum] & bit) != 0)
+            {
+                // Block is already uncompressed.
+                return eqpData;
+            }
+
+            // Flip the flag bit.
+            eqpData[byteNum] = (byte)(eqpData[byteNum] | bit);
+
+            // Okay, now we have to go through and find out many uncompressed blocks
+            // exist before our block.
+            int uncompressedBlocks = 0;
+            int totalUncompressedBlocks = 0;
+
+            // Loop bytes
+            bool found = false;
+            for (int i = 0; i < 8; i++)
+            {
+                var byt = eqpData[i];
+                // Loop bits
+                for (int b = 0; b < 8; b++)
+                {
+                    if (i == byteNum && b == (blockId % 8))
+                    {
+                        // Done seeking.
+                        found = true;
+                    }
+
+                    var bt = 1 << b;
+                    var on = (byt & bt) != 0;
+                    if (on)
+                    {
+                        if (!found)
+                        {
+                            uncompressedBlocks++;
+                        }
+                        totalUncompressedBlocks++;
+                    }
+                }
+            }
+
+            // This is the offset where our new block will start.
+            var baseOffset = uncompressedBlocks * blockSize;
+
+            // Total Size of the data.
+            var totalDataSize = (totalUncompressedBlocks * blockSize * EquipmentParameterEntrySize);
+
+            // Pad out to nearest 512 bytes.
+            var padding = totalDataSize % 512 == 0 ? 0 : 512 - (totalDataSize % 512);
+
+            var finalSize = totalDataSize + padding;
+
+            // Okay, we've now fully updated the initial block table.   We need to copy all the data over.
+            var newDataByteOffset = (baseOffset * EquipmentParameterEntrySize);
+
+            var newData = new byte[finalSize];
+
+            // Copy the first half of the data in, then a blank block, then the second half of the data.
+            Array.Copy(eqpData, 0, newData, 0, newDataByteOffset);
+            var rem = eqpData.Length - newDataByteOffset;
+            var rem2 = newData.Length - newDataByteOffset - (blockSize * EquipmentDeformerParameterEntrySize);
+
+            // Don't let us try to write padding data off the end of the file.
+            rem = rem > rem2 ? rem2 : rem;
+
+            Array.Copy(eqpData, newDataByteOffset, newData, newDataByteOffset + (blockSize * EquipmentDeformerParameterEntrySize), rem);
+
+            // Return new array.
+            return newData;
+        }
 
         /// <summary>
         /// Resolves the offset to the given EQP data entry.

@@ -712,7 +712,6 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns></returns>
         public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID )
         {
-            
             // Ensure file exists.
             if (!File.Exists(externalPath))
             {
@@ -748,7 +747,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
 
                 // Check if the texture being imported has been imported before
-                CompressionFormat compressionFormat;
+                CompressionFormat compressionFormat = CompressionFormat.BGRA;
 
                 switch (texFormat)
                 {
@@ -762,33 +761,40 @@ namespace xivModdingFramework.Textures.FileTypes
                         compressionFormat = CompressionFormat.BGRA;
                         break;
                     default:
-                        throw new Exception($"Format {texFormat} is not currently supported for BMP import\n\nPlease use the DDS import option instead.");
+                        if (!isDds)
+                        {
+                            throw new Exception($"Format {texFormat} is not currently supported for BMP import\n\nPlease use the DDS import option instead.");
+                        }
+                        break;
                 }
 
-                using (var surface = Surface.LoadFromFile(externalPath))
+                if (!isDds)
                 {
-                    if (surface == null)
-                        throw new FormatException($"Unsupported texture format");
-
-                    surface.FlipVertically();
-
-                    var maxMipCount = 1;
-                    if (root != null)
+                    using (var surface = Surface.LoadFromFile(externalPath))
                     {
-                        // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
-                        // (Ex. The Default Mat-Add textures)
-                        maxMipCount = -1;
-                    }
+                        if (surface == null)
+                            throw new FormatException($"Unsupported texture format");
 
-                    using (var compressor = new Compressor())
-                    {
-                        // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
-                        compressor.Input.SetMipmapGeneration(true, maxMipCount);
-                        compressor.Input.SetData(surface);
-                        compressor.Compression.Format = compressionFormat;
-                        compressor.Compression.SetBGRAPixelFormat();
+                        surface.FlipVertically();
 
-                        compressor.Process(out ddsContainer);
+                        var maxMipCount = 1;
+                        if (root != null)
+                        {
+                            // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
+                            // (Ex. The Default Mat-Add textures)
+                            maxMipCount = -1;
+                        }
+
+                        using (var compressor = new Compressor())
+                        {
+                            // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
+                            compressor.Input.SetMipmapGeneration(true, maxMipCount);
+                            compressor.Input.SetData(surface);
+                            compressor.Compression.Format = compressionFormat;
+                            compressor.Compression.SetBGRAPixelFormat();
+
+                            compressor.Process(out ddsContainer);
+                        }
                     }
                 }
 
