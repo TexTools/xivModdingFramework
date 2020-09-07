@@ -235,8 +235,36 @@ namespace xivModdingFramework.Variants.FileTypes
         internal async Task SaveEntries(string path, string slot, List<XivImc> entries)
         {
             var dat = new Dat(_gameDirectory);
-            //var imcByteData = await dat.GetType2Data(path, false);
-            var info = await GetFullImcInfo(path);
+            var index = new Index(_gameDirectory);
+
+            var exists = await index.FileExists(path);
+            FullImcInfo info;
+            if(exists)
+            {
+                info = await GetFullImcInfo(path);
+            } else
+            {
+                var ri = XivDependencyGraph.ExtractRootInfo(path);
+                if (ri.SecondaryType == null)
+                {
+                    info = new FullImcInfo()
+                    {
+                        DefaultSubset = new List<XivImc>() { new XivImc(), new XivImc(), new XivImc(), new XivImc(), new XivImc() },
+                        SubsetList = new List<List<XivImc>>(),
+                        TypeIdentifier = ImcType.Set
+                    };
+                } else
+                {
+                    info = new FullImcInfo()
+                    {
+                        DefaultSubset = new List<XivImc>() { new XivImc() },
+                        SubsetList = new List<List<XivImc>>(),
+                        TypeIdentifier = ImcType.NonSet
+                    };
+                }
+            }
+
+
             for(int i = 0; i < entries.Count; i++)
             {
                 XivImc e;
@@ -451,15 +479,6 @@ namespace xivModdingFramework.Variants.FileTypes
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
-
-
-            var imcOffset = await index.GetDataOffset(path);
-
-            // No writing new IMC files.
-            if (imcOffset == 0)
-            {
-                throw new InvalidDataException($"Could not find offset for {path}");
-            }
 
             var data = new List<byte>();
 
