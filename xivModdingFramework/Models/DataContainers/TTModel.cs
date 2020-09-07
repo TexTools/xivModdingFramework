@@ -1711,8 +1711,8 @@ namespace xivModdingFramework.Models.DataContainers
                                 {
                                     // This is a parent level reference to a base bone.
                                     exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
-                                }
-                                else
+                                } 
+                                else if (exTranslationTable.ContainsKey(j.BoneParent))
                                 {
                                     // Run it through the translation to match up with the base skeleton.
                                     j.BoneParent = exTranslationTable[j.BoneParent];
@@ -1723,6 +1723,19 @@ namespace xivModdingFramework.Models.DataContainers
 
                                     fullSkel.Add(j.BoneName, j);
                                     exTranslationTable.Add(originalNumber, j.BoneNumber);
+                                } else
+                                {
+                                    // This is a root bone in the EX skeleton that has no parent element in the base skeleton.
+                                    // Just stick it onto the root bone.
+                                    j.BoneParent = fullSkel["n_root"].BoneNumber;
+
+                                    // And generate its own new bone number
+                                    var originalNumber = j.BoneNumber;
+                                    j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                                    fullSkel.Add(j.BoneName, j);
+                                    exTranslationTable.Add(originalNumber, j.BoneNumber);
+
                                 }
                             }
                         } catch(Exception ex)
