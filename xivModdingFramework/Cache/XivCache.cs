@@ -1261,7 +1261,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        public static void SetMetaValue(string key, string value = null)
+        public static void SetMetaValue(string key, string value)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -1274,6 +1274,20 @@ namespace xivModdingFramework.Cache
                     cmd.ExecuteScalar();
                 }
             }
+        }
+        public static void SetMetaValue(string key, bool value)
+        {
+            SetMetaValue(key, value ? "True" : "False");
+        }
+        public static bool GetMetaValueBoolean(string key)
+        {
+            var st = GetMetaValue(key);
+
+            bool result = false;
+            bool success = Boolean.TryParse(st, out result);
+
+            if (!success) return false;
+            return result;
         }
 
         /// <summary>

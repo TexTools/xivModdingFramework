@@ -293,6 +293,8 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class TTModel
     {
+        public static string _SETTINGS_KEY_EXPORT_ALL_BONES = "setting_export_all_bones";
+
         /// <summary>
         /// The internal or external file path where this TTModel originated from.
         /// </summary>
@@ -832,7 +834,10 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
-                var boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, Bones, loggingFunction);
+                var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
+                var bones = useAllBones ? null : Bones;
+
+                var boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
 
                 const string creationScript = "CreateImportDB.sql";
                 // Spawn a DB connection to do the raw queries.
