@@ -183,7 +183,7 @@ namespace xivModdingFramework.Models.DataContainers
         BodyHideGorget = 7,
 
         // Byte 1 - Body
-        BodyShowLeg = 8,                // When turned off, Leg hiding data is resolved from this same set, rather than the set of the equipped piece.
+        BodyShowLeg = 8,                // When turned off,  Leg hiding data is resolved from this same set, rather than the set of the equipped piece.
         BodyShowHand = 9,               // When turned off, Hand hiding data is resolved from this same set, rather than the set of the equipped piece.
         BodyShowHead = 10,              // When turned off, Head hiding data is resolved from this same set, rather than the set of the equipped piece.
         BodyShowNecklace = 11,
@@ -194,9 +194,9 @@ namespace xivModdingFramework.Models.DataContainers
 
         // Byte 2 - Leg
         EnableLegFlags = 16,
-        Bit17 = 17,
-        LegHideShortBoot = 18,
-        LegHideHalfBoot = 19,
+        LegHideKneePads = 17,           // atr_lpd
+        LegHideShortBoot = 18,          // atr_leg
+        LegHideHalfBoot = 19,           // atr_leg
         Bit20 = 20,
         LegShowFoot = 21,
         Bit22 = 22,
