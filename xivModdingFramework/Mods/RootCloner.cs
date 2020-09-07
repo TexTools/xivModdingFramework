@@ -246,6 +246,7 @@ namespace xivModdingFramework.Mods
                 {
                     ProgressReporter.Report("Copying textures...");
                 }
+
                 // Raw Copy all Texture files to the new destinations to avoid having the MTRL save functions auto-generate blank textures.
                 foreach (var kv in newTexturePaths)
                 {
@@ -459,7 +460,13 @@ namespace xivModdingFramework.Mods
 
         private static string UpdateFolder(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
-
+            if(Source.Info.PrimaryType == XivItemType.human && Path.GetExtension(path) == ".mtrl")
+            {
+                // For hair MTRLs we have to keep the same MTRL folder.
+                path = Path.GetDirectoryName(path);
+                path = path.Replace('\\', '/');
+                return path;
+            }
 
             // So first off, just copy anything from the old root folder to the new one.
             var match = RemoveRootPathRegex.Match(path);
