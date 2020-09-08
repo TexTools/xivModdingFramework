@@ -1421,6 +1421,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 await AddFileDescriptor(fullPath + ".flag", -1, dataFile, false);
             }
 
+            if(dataOffset <= 0)
+            {
+                // Don't let us write totally invalid offsets to the indexes.
+                throw new InvalidDataException("Cannot write invalid data offset to file.");
+            }
+
             uint uOffset = (uint)(dataOffset / 8);
             await _semaphoreSlim.WaitAsync();
             try
@@ -1751,6 +1757,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<int> UpdateDataOffset(long offset, string fullPath, bool updateCache = true)
         {
+
+            if(offset <= 0)
+            {
+                throw new InvalidDataException("Cannot write invalid data offset to index files.");
+            }
+
             var oldOffset = 0;
 
             await _semaphoreSlim.WaitAsync();
