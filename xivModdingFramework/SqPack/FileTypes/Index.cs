@@ -1854,6 +1854,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     {
                                         found = true;
                                         oldOffset = br.ReadInt32();
+
+                                        if (oldOffset == 0)
+                                        {
+                                            throw new Exception("Cannot update index information for file with null data offset.");
+                                        }
+
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
                                         uint uOffset = (uint)(offset / 8);
                                         bw.Write(uOffset);
@@ -1879,10 +1885,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Cannot update index information for non-existent file.");
             }
 
-            if(oldOffset == 0)
-            {
-                throw new Exception("Cannot update index information for file with null data offset.");
-            }
 
             return oldOffset;
         }
