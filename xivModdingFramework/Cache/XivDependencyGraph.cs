@@ -77,7 +77,7 @@ namespace xivModdingFramework.Cache
                 foreach (var i in sameModelItems)
                 {
                     var info = await imc.GetImcInfo(i);
-                    if (info.Variant == originalInfo.Variant)
+                    if (info.MaterialSet == originalInfo.MaterialSet)
                     {
                         sameMaterialItems.Add(i);
                     }

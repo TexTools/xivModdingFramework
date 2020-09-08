@@ -103,7 +103,7 @@ namespace xivModdingFramework.Models.FileTypes
             try
             {
                 var _imc = new Imc(_gameDirectory);
-                mtrlVariant = (await _imc.GetImcInfo(item)).Variant;
+                mtrlVariant = (await _imc.GetImcInfo(item)).MaterialSet;
             }
             catch (Exception ex)
             {
@@ -1736,9 +1736,9 @@ namespace xivModdingFramework.Models.FileTypes
                         var imcInfos = info.GetAllEntries(slot, true);
                         foreach (var i in imcInfos)
                         {
-                            if (i.Variant != 0)
+                            if (i.MaterialSet != 0)
                             {
-                                materialVariants.Add(i.Variant);
+                                materialVariants.Add(i.MaterialSet);
                             }
                         }
                     }
@@ -4405,7 +4405,7 @@ namespace xivModdingFramework.Models.FileTypes
             var imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
 
             var materialSets = new HashSet<byte>();
-            imcEntries.ForEach(x => materialSets.Add(x.Variant));
+            imcEntries.ForEach(x => materialSets.Add(x.MaterialSet));
 
             // Language is irrelevant here.
             var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(newPath), XivLanguage.None);

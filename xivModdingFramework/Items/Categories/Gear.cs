@@ -362,7 +362,7 @@ namespace xivModdingFramework.Items.Categories
         {
             // Get the material version for the item from the imc file
             var imc = new Imc(_gameDirectory);
-            var gearVersion = (await imc.GetImcInfo(xivGear)).Variant.ToString().PadLeft(4, '0');
+            var gearVersion = (await imc.GetImcInfo(xivGear)).MaterialSet.ToString().PadLeft(4, '0');
 
             var modelID = xivGear.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
 

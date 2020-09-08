@@ -283,7 +283,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 // Get the mtrl version for the given item from the imc file
                 var imc = new Imc(_gameDirectory);
-                version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
+                version = (await imc.GetImcInfo(itemModel)).MaterialSet.ToString().PadLeft(4, '0');
             }
 
             var parts = Constants.Alphabet;

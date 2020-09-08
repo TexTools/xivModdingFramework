@@ -219,7 +219,7 @@ namespace xivModdingFramework.Materials.FileTypes
             try
             {
                 var imcEntry = await imc.GetImcInfo(item);
-                materialSet = imcEntry.Variant;
+                materialSet = imcEntry.MaterialSet;
             }
             catch
             {
@@ -1088,7 +1088,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 var imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var entry = await imc.GetImcInfo((IItemModel)item);
-                return entry.Variant;
+                return entry.MaterialSet;
             } catch
             {
                 return 0;

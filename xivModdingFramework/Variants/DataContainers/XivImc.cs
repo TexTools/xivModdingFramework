@@ -31,12 +31,12 @@ namespace xivModdingFramework.Variants.DataContainers
         /// <summary>
         /// The Material Set / Variant #
         /// </summary>
-        public byte Variant { get; set; }
+        public byte MaterialSet { get; set; }
 
         /// <summary>
         /// Unknown byte next to the Variant
         /// </summary>
-        public byte Unknown { get; set; }
+        public byte Decal { get; set; }
 
         /// <summary>
         /// The IMC mask data
@@ -63,8 +63,8 @@ namespace xivModdingFramework.Variants.DataContainers
         public byte[] GetBytes(ImcType type)
         {
             var bytes = new List<byte>();
-            bytes.Add(Variant);
-            bytes.Add(Unknown);
+            bytes.Add(MaterialSet);
+            bytes.Add(Decal);
             bytes.AddRange(BitConverter.GetBytes(Mask));
             bytes.AddRange(BitConverter.GetBytes(Vfx));
             return bytes.ToArray();
