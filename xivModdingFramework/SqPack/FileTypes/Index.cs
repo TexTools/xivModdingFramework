@@ -1508,8 +1508,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                             {
                                 // File already exists.  Just update the data offset.
                                 _semaphoreSlim.Release();
-                                await UpdateDataOffset(dataOffset, fullPath, updateCache);
-                                await _semaphoreSlim.WaitAsync();
+                                try
+                                {
+                                    await UpdateDataOffset(dataOffset, fullPath, updateCache);
+                                }
+                                finally
+                                {
+                                    await _semaphoreSlim.WaitAsync();
+                                }
                                 return false;
                             }
                             else if (iHash > uFileHash)
