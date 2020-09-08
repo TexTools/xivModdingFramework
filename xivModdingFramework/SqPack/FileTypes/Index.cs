@@ -1416,16 +1416,21 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> AddFileDescriptor(string fullPath, long dataOffset, XivDataFile dataFile, bool updateCache = true)
         {
-            if(!fullPath.Contains(".flag"))
+            bool isFlag = false;
+            if(!fullPath.EndsWith(".flag"))
             {
+                if (dataOffset <= 0)
+                {
+                    // Don't let us write totally invalid offsets to the indexes.
+                    throw new InvalidDataException("Cannot write invalid data offset to file.");
+                }
+
                 await AddFileDescriptor(fullPath + ".flag", -1, dataFile, false);
+            } else
+            {
+                isFlag = true;
             }
 
-            if(dataOffset <= 0)
-            {
-                // Don't let us write totally invalid offsets to the indexes.
-                throw new InvalidDataException("Cannot write invalid data offset to file.");
-            }
 
             uint uOffset = (uint)(dataOffset / 8);
             await _semaphoreSlim.WaitAsync();
@@ -1512,15 +1517,18 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             if (iHash == uFileHash)
                             {
-                                // File already exists.  Just update the data offset.
-                                _semaphoreSlim.Release();
-                                try
+                                if (!isFlag)
                                 {
-                                    await UpdateDataOffset(dataOffset, fullPath, updateCache);
-                                }
-                                finally
-                                {
-                                    await _semaphoreSlim.WaitAsync();
+                                    // File already exists.  Just update the data offset.
+                                    _semaphoreSlim.Release();
+                                    try
+                                    {
+                                        await UpdateDataOffset(dataOffset, fullPath, updateCache);
+                                    }
+                                    finally
+                                    {
+                                        await _semaphoreSlim.WaitAsync();
+                                    }
                                 }
                                 return false;
                             }
