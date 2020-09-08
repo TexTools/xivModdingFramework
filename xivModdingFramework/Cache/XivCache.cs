@@ -2191,12 +2191,18 @@ namespace xivModdingFramework.Cache
                         level = XivDependencyGraph.GetDependencyLevel(file);
                         if (level == XivDependencyLevel.Invalid) continue;
 
-                        // The get call will automatically cache the data, if it needs updating.
-                        var task = GetChildFiles(file, false);
+                        try
+                        {
+                            // The get call will automatically cache the data, if it needs updating.
+                            var task = GetChildFiles(file, false);
 
-                        // Set a safety timeout here.
-                        task.Wait(3000);
-                        RemoveFromChildQueue(file);
+                            // Set a safety timeout here.
+                            task.Wait(3000);
+                        }
+                        finally
+                        {
+                            RemoveFromChildQueue(file);
+                        }
                         continue;
 
                     }
@@ -2217,12 +2223,17 @@ namespace xivModdingFramework.Cache
                             level = XivDependencyGraph.GetDependencyLevel(file);
                             if (level == XivDependencyLevel.Invalid) continue;
 
-                            // The get call will automatically cache the data, if it needs updating.
-                            var task = GetParentFiles(file, false);
+                            try
+                            {
+                                // The get call will automatically cache the data, if it needs updating.
+                                var task = GetParentFiles(file, false);
 
-                            // Set a safety timeout here.
-                            task.Wait(3000);
-                            RemoveFromParentQueue(file);
+                                // Set a safety timeout here.
+                                task.Wait(3000);
+                            } finally
+                            {
+                                RemoveFromParentQueue(file);
+                            }
                             continue;
                         }
                     }

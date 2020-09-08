@@ -1883,7 +1883,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                         if (oldOffset == 0)
                                         {
-                                            throw new Exception("Cannot update index information for file with null data offset.");
+                                            throw new Exception("Cannot update index information for file with invalid data offset.");
                                         }
 
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
