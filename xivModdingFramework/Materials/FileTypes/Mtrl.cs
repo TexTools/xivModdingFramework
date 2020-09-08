@@ -100,7 +100,7 @@ namespace xivModdingFramework.Materials.FileTypes
         public static Dictionary<XivTexType, TextureUsageStruct> TextureUsageValues = new Dictionary<XivTexType, TextureUsageStruct>()
         {
             { XivTexType.Normal, new TextureUsageStruct() { TextureType = 4113354501, Unknown = 2815623008 } },
-            { XivTexType.Multi, new TextureUsageStruct() { TextureType = 3531043187, Unknown = 4083110193 } },
+            { XivTexType.Decal, new TextureUsageStruct() { TextureType = 3531043187, Unknown = 4083110193 } },
             { XivTexType.Diffuse, new TextureUsageStruct() { TextureType = 3054951514, Unknown = 1611594207 } },
             { XivTexType.Specular, new TextureUsageStruct() { TextureType = 3367837167, Unknown = 2687453224 } },
             { XivTexType.Skin, new TextureUsageStruct() { TextureType = 940355280, Unknown = 735790577 } },
@@ -110,8 +110,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
         // Shader Parameter defaults.  For most of them they seem to be used as multipliers.
         public static Dictionary<MtrlShaderParameterId, List<float>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<float>>() {
-            { MtrlShaderParameterId.Common1, new List<float>(){ 0.5f } },
-            { MtrlShaderParameterId.Common2, new List<float>(){ 1f } },
+            { MtrlShaderParameterId.AlphaLimiter, new List<float>(){ 0.5f } },
+            { MtrlShaderParameterId.Occlusion, new List<float>(){ 1f } },
             { MtrlShaderParameterId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
             { MtrlShaderParameterId.Reflection1, new List<float>(){ 1f } },
             { MtrlShaderParameterId.SkinWetnessLerp, new List<float>(){ 3f } },
