@@ -54,7 +54,12 @@ namespace xivModdingFramework.Variants.DataContainers
         /// Only a few items have VFX data associated with them
         /// Some examples would be any of the Lux weapons
         /// </remarks>
-        public ushort Vfx { get; set; }
+        public byte Vfx { get; set; }
+
+        /// <summary>
+        /// Material animation byte
+        /// </summary>
+        public byte Animation { get; set; }
 
         /// <summary>
         /// Returns the raw bytes that make up this IMC entry.
@@ -66,7 +71,8 @@ namespace xivModdingFramework.Variants.DataContainers
             bytes.Add(MaterialSet);
             bytes.Add(Decal);
             bytes.AddRange(BitConverter.GetBytes(Mask));
-            bytes.AddRange(BitConverter.GetBytes(Vfx));
+            bytes.Add(Vfx);
+            bytes.Add(Animation);
             return bytes.ToArray();
         }
 

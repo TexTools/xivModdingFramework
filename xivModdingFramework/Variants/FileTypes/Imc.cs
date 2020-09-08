@@ -218,7 +218,8 @@ namespace xivModdingFramework.Variants.FileTypes
                         MaterialSet = br.ReadByte(),
                         Decal = br.ReadByte(),
                         Mask = br.ReadUInt16(),
-                        Vfx = br.ReadUInt16()
+                        Vfx = br.ReadByte(),
+                        Animation = br.ReadByte()
                     });
                 }
 
@@ -279,6 +280,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 e.Mask = entries[i].Mask;
                 e.Decal = entries[i].Decal;
                 e.Vfx = entries[i].Vfx;
+                e.Animation = entries[i].Animation;
                 e.MaterialSet = entries[i].MaterialSet;
 
                 if (i >= info.SubsetCount + 1)
@@ -298,7 +300,8 @@ namespace xivModdingFramework.Variants.FileTypes
             bytes.Add((byte)entry.MaterialSet);
             bytes.Add((byte)entry.Decal);
             bytes.AddRange(BitConverter.GetBytes((ushort)entry.Mask));
-            bytes.AddRange(BitConverter.GetBytes((ushort)entry.Vfx));
+            bytes.Add((byte)entry.Vfx);
+            bytes.Add((byte)entry.Animation);
             return bytes.ToArray();
         }
 
@@ -310,13 +313,15 @@ namespace xivModdingFramework.Variants.FileTypes
                 byte variant = br.ReadByte();
                 byte unknown = br.ReadByte();
                 ushort mask = br.ReadUInt16();
-                ushort vfx = br.ReadUInt16();
+                byte vfx = br.ReadByte();
+                byte anim = br.ReadByte();
                 return new XivImc
                 {
                     MaterialSet = variant,
                     Decal = unknown,
                     Mask = mask,
-                    Vfx = vfx
+                    Vfx = vfx,
+                    Animation = anim
                 };
 
             }
@@ -364,14 +369,16 @@ namespace xivModdingFramework.Variants.FileTypes
                         byte variant = br.ReadByte();
                         byte unknown = br.ReadByte();
                         ushort mask = br.ReadUInt16();
-                        ushort vfx = br.ReadUInt16();
+                        byte vfx = br.ReadByte();
+                        byte anim = br.ReadByte();
 
                         imcData.DefaultSubset.Add(new XivImc
                         {
                             MaterialSet = variant,
                             Decal = unknown,
                             Mask = mask,
-                            Vfx = variant
+                            Vfx = variant,
+                            Animation = anim
                         });
 
                         for (var i = 0; i < subsetCount; i++)
@@ -379,14 +386,16 @@ namespace xivModdingFramework.Variants.FileTypes
                             variant = br.ReadByte();
                             unknown = br.ReadByte();
                             mask = br.ReadUInt16();
-                            vfx = br.ReadUInt16();
+                            vfx = br.ReadByte();
+                            anim = br.ReadByte();
 
                             var newEntry = new XivImc
                             {
                                 MaterialSet = variant,
                                 Decal = unknown,
                                 Mask = mask,
-                                Vfx = vfx
+                                Vfx = vfx,
+                                Animation = anim
                             };
                             var subset = new List<XivImc>() { newEntry };
                             imcData.SubsetList.Add(subset);
@@ -398,15 +407,15 @@ namespace xivModdingFramework.Variants.FileTypes
                         imcData.DefaultSubset = new List<XivImc>()
                         {
                             new XivImc
-                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                         };
 
                         for (var i = 0; i < subsetCount; i++)
@@ -415,15 +424,15 @@ namespace xivModdingFramework.Variants.FileTypes
                             var imcGear = new List<XivImc>()
                             {
                                 new XivImc
-                                    {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             };
                             imcData.SubsetList.Add(imcGear);
                         }
