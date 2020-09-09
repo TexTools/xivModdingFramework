@@ -469,6 +469,7 @@ namespace xivModdingFramework.Models.ModelTextures
             newDiffuse = baseDiffuse;
             newSpecular = baseSpecular;
 
+
             // This var is technically defined in the Shaders parameters.
             // But we can use a constant copy of it for now, since it's largely non-changeable.
             const float PlayerColorMultiplier = 1.4f;
@@ -487,13 +488,13 @@ namespace xivModdingFramework.Models.ModelTextures
                     // Has a raw specular.
                     newSpecular = baseSpecular;
 
-                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti)
+                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti || info.Preset == MtrlShaderPreset.Monster)
                 {
                     // Has a raw diffuse.
                     newDiffuse = baseDiffuse;
 
                     // But we also have to modulate that diffuse color by the multi red channel.
-                    newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
+                    //newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
 
                     newDiffuse.A = baseNormal.B;
 

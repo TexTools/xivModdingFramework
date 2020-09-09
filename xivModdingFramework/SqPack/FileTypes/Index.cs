@@ -1416,10 +1416,21 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<bool> AddFileDescriptor(string fullPath, long dataOffset, XivDataFile dataFile, bool updateCache = true)
         {
-            if(!fullPath.Contains(".flag"))
+            bool isFlag = false;
+            if(!fullPath.EndsWith(".flag"))
             {
+                if (dataOffset <= 0)
+                {
+                    // Don't let us write totally invalid offsets to the indexes.
+                    throw new InvalidDataException("Cannot write invalid data offset to file.");
+                }
+
                 await AddFileDescriptor(fullPath + ".flag", -1, dataFile, false);
+            } else
+            {
+                isFlag = true;
             }
+
 
             uint uOffset = (uint)(dataOffset / 8);
             await _semaphoreSlim.WaitAsync();
@@ -1506,10 +1517,19 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             if (iHash == uFileHash)
                             {
-                                // File already exists.  Just update the data offset.
-                                _semaphoreSlim.Release();
-                                await UpdateDataOffset(dataOffset, fullPath, updateCache);
-                                await _semaphoreSlim.WaitAsync();
+                                if (!isFlag)
+                                {
+                                    // File already exists.  Just update the data offset.
+                                    _semaphoreSlim.Release();
+                                    try
+                                    {
+                                        await UpdateDataOffset(dataOffset, fullPath, updateCache);
+                                    }
+                                    finally
+                                    {
+                                        await _semaphoreSlim.WaitAsync();
+                                    }
+                                }
                                 return false;
                             }
                             else if (iHash > uFileHash)
@@ -1745,6 +1765,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<int> UpdateDataOffset(long offset, string fullPath, bool updateCache = true)
         {
+
+            if(offset <= 0)
+            {
+                throw new InvalidDataException("Cannot write invalid data offset to index files.");
+            }
+
             var oldOffset = 0;
 
             await _semaphoreSlim.WaitAsync();
@@ -1854,6 +1880,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                                     {
                                         found = true;
                                         oldOffset = br.ReadInt32();
+
+                                        if (oldOffset == 0)
+                                        {
+                                            throw new Exception("Cannot update index information for file with invalid data offset.");
+                                        }
+
                                         bw.BaseStream.Seek(br.BaseStream.Position - 4, SeekOrigin.Begin);
                                         uint uOffset = (uint)(offset / 8);
                                         bw.Write(uOffset);
@@ -1879,10 +1911,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Cannot update index information for non-existent file.");
             }
 
-            if(oldOffset == 0)
-            {
-                throw new Exception("Cannot update index information for file with null data offset.");
-            }
 
             return oldOffset;
         }

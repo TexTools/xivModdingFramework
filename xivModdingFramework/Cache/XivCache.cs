@@ -2189,14 +2189,24 @@ namespace xivModdingFramework.Cache
                     if (file != null)
                     {
                         level = XivDependencyGraph.GetDependencyLevel(file);
-                        if (level == XivDependencyLevel.Invalid) continue;
+                        if (level == XivDependencyLevel.Invalid)
+                        {
+                            RemoveFromChildQueue(file);
+                            continue;
+                        }
 
-                        // The get call will automatically cache the data, if it needs updating.
-                        var task = GetChildFiles(file, false);
+                        try
+                        {
+                            // The get call will automatically cache the data, if it needs updating.
+                            var task = GetChildFiles(file, false);
 
-                        // Set a safety timeout here.
-                        task.Wait(3000);
-                        RemoveFromChildQueue(file);
+                            // Set a safety timeout here.
+                            task.Wait(3000);
+                        }
+                        finally
+                        {
+                            RemoveFromChildQueue(file);
+                        }
                         continue;
 
                     }
@@ -2215,14 +2225,23 @@ namespace xivModdingFramework.Cache
                         else
                         {
                             level = XivDependencyGraph.GetDependencyLevel(file);
-                            if (level == XivDependencyLevel.Invalid) continue;
+                            if (level == XivDependencyLevel.Invalid)
+                            {
+                                RemoveFromParentQueue(file);
+                                continue;
+                            }
 
-                            // The get call will automatically cache the data, if it needs updating.
-                            var task = GetParentFiles(file, false);
+                            try
+                            {
+                                // The get call will automatically cache the data, if it needs updating.
+                                var task = GetParentFiles(file, false);
 
-                            // Set a safety timeout here.
-                            task.Wait(3000);
-                            RemoveFromParentQueue(file);
+                                // Set a safety timeout here.
+                                task.Wait(3000);
+                            } finally
+                            {
+                                RemoveFromParentQueue(file);
+                            }
                             continue;
                         }
                     }

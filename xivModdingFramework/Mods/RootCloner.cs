@@ -365,7 +365,7 @@ namespace xivModdingFramework.Mods
                 // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
                 if (Imc.UsesImc(Destination))
                 {
-                    var mSets = newMetadata.ImcEntries.Select(x => x.Variant).Distinct();
+                    var mSets = newMetadata.ImcEntries.Select(x => x.MaterialSet).Distinct();
                     foreach (var mSetId in mSets)
                     {
                         var path = Destination.Info.GetRootFolder() + "material/v" + mSetId.ToString().PadLeft(4, '0') + "/";

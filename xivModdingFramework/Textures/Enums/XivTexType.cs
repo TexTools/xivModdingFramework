@@ -33,6 +33,7 @@ namespace xivModdingFramework.Textures.Enums
         Icon,
         Vfx,
         UI,
+        Decal,
         Other
     }
 }

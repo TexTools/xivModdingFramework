@@ -336,6 +336,10 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.RenderBackfaces = true;
             }
 
+            var txul = TextureUsageList;
+            var txdl = TextureDescriptorList;
+            var shpl = ShaderParameterList;
+
             info.Preset = MtrlShaderPreset.Default;
             if (info.Shader == MtrlShader.Standard)
             {
@@ -347,7 +351,14 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     if(hasSpec)
                     {
-                        info.Preset = MtrlShaderPreset.DiffuseSpecular;
+                        if (GetTextureUsage(XivTexType.Specular) != null)
+                        {
+                            info.Preset = MtrlShaderPreset.Monster;
+                        }
+                        else
+                        {
+                            info.Preset = MtrlShaderPreset.DiffuseSpecular;
+                        }
                     } else
                     {
                         info.Preset = MtrlShaderPreset.DiffuseMulti;
@@ -806,7 +817,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     SetTextureUsage(XivTexType.Normal);
                     SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Multi);
+                    SetTextureUsage(XivTexType.Decal);
                     SetTextureUsage(XivTexType.Specular);
                 }
                 else
@@ -819,42 +830,36 @@ namespace xivModdingFramework.Materials.DataContainers
             else if (info.Shader == MtrlShader.Standard)
             {
                 SetTextureUsage(XivTexType.Normal);
-                if(info.Preset == MtrlShaderPreset.Default)
+                if (info.Preset == MtrlShaderPreset.Default)
                 {
-                    SetTextureUsage(XivTexType.Multi);  
+                    SetTextureUsage(XivTexType.Decal);
 
-                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti)
+                }
+                else if (info.Preset == MtrlShaderPreset.DiffuseMulti)
                 {
                     // This seems to crash the game atm.
                     SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Multi);
-                } else
+                    SetTextureUsage(XivTexType.Decal);
+                }
+                else if (info.Preset == MtrlShaderPreset.Monster)
                 {
                     SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Multi);
+                    SetTextureUsage(XivTexType.Decal);
+
+                    // This flag seems to convert Specular textures to Multi textures.
+                    SetTextureUsage(XivTexType.Specular);
                 }
-                if (info.HasDiffuse)
+                else
                 {
-                }
-                if (info.HasMulti || info.HasSpec)
-                {
-                }
-                if(info.HasSpec)
-                {
-                    // What does this do?  It's only found on extremely rare items with specular maps,
-                    // and if when we add it/touch it, it either totally breaks the specularity, or crashes.
-                    // And on the items it is involved in, adding/removing it seems to do nothing.
-                    // Might be a glass shader only value?
-                    // SetTextureUsage(XivTexType.Specular);  
+                    SetTextureUsage(XivTexType.Diffuse);
+                    SetTextureUsage(XivTexType.Decal);
                 }
             }
             else
             {
                 // This is uh... Glass shader?  I think is the only fall through here.
                 SetTextureUsage(XivTexType.Normal);
-                SetTextureUsage(XivTexType.Diffuse);
-                SetTextureUsage(XivTexType.Multi);
-                SetTextureUsage(XivTexType.Specular);
+                SetTextureUsage(XivTexType.Decal);
             }
 
         }
@@ -866,16 +871,14 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             var args = new Dictionary<MtrlShaderParameterId, List<float>>();
 
-            args.Add(MtrlShaderParameterId.Common1, null);
-            args.Add(MtrlShaderParameterId.Common2, null);
+            args.Add(MtrlShaderParameterId.AlphaLimiter, null);
+            args.Add(MtrlShaderParameterId.Occlusion, null);
 
             if (info.Shader == MtrlShader.Skin)
             {
                 args.Add(MtrlShaderParameterId.SkinColor, null);
                 args.Add(MtrlShaderParameterId.SkinMatParamRow2, null);
                 args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
-                //args.Add(MtrlShaderParameterId.SkinWetnessLerp, new List<float>() { 1.0f });
-                //args.Add(MtrlShaderParameterId.SkinMatParamRow2, new List<float>() { 1.0f, 1.0f, 1.0f });
                 args.Add(MtrlShaderParameterId.SkinUnknown2, null);
                 args.Add(MtrlShaderParameterId.SkinFresnel, null);
                 args.Add(MtrlShaderParameterId.Reflection1, null);
@@ -896,10 +899,21 @@ namespace xivModdingFramework.Materials.DataContainers
                     args.Add(MtrlShaderParameterId.Face1, null);
                 }
             }
-            else if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
+            else if (info.Shader == MtrlShader.Standard)
             {
-                args.Add(MtrlShaderParameterId.Equipment1, null);
-                args.Add(MtrlShaderParameterId.Reflection1, null);
+                if (info.Preset == MtrlShaderPreset.Monster)
+                {
+                    args.Remove(MtrlShaderParameterId.AlphaLimiter);
+                    args.Remove(MtrlShaderParameterId.Occlusion);
+                    args.Add(MtrlShaderParameterId.AlphaLimiter, new List<float>() { 0.5f });
+                    args.Add(MtrlShaderParameterId.Occlusion, new List<float>() { 0.25f });
+                    args.Add(MtrlShaderParameterId.Hair1, new List<float>() { 0 });
+                }
+                else
+                {
+                    args.Add(MtrlShaderParameterId.Equipment1, null);
+                    args.Add(MtrlShaderParameterId.Reflection1, null);
+                }
             }
             else if (info.Shader == MtrlShader.Iris)
             {
@@ -923,6 +937,13 @@ namespace xivModdingFramework.Materials.DataContainers
                     // Limbals use a 3x skin color modifier.
                     args[MtrlShaderParameterId.SkinColor] = new List<float>() { 3f, 3f, 3f };
                 }
+            }
+            else if(info.Shader == MtrlShader.Glass)
+            {
+                args.Remove(MtrlShaderParameterId.AlphaLimiter);
+                args.Remove(MtrlShaderParameterId.Occlusion);
+                args.Add(MtrlShaderParameterId.AlphaLimiter, new List<float>() { 0.25f });
+                args.Add(MtrlShaderParameterId.Hair2, new List<float>() { 1.0f });
             }
 
 
@@ -1468,6 +1489,7 @@ namespace xivModdingFramework.Materials.DataContainers
         Face,
         FaceNoPores,
         FaceBright,
+        Monster,
     }
 
     /// <summary>
@@ -1476,8 +1498,8 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public enum MtrlShaderParameterId : uint
     {
-        Common1 = 699138595,        // Used in every material.  Overwriting bytes with 0s seems to have no effect.
-        Common2 = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
+        AlphaLimiter = 699138595,        // Used in every material.  Overwriting bytes with 0s seems to have no effect.
+        Occlusion = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
 
         SkinColor = 740963549,          // This skin args seem to be the same for all races.
         SkinWetnessLerp = 2569562539,
@@ -1575,7 +1597,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Standard && Preset == MtrlShaderPreset.DiffuseSpecular)
+                if (Shader == MtrlShader.Standard && (Preset == MtrlShaderPreset.DiffuseSpecular || Preset == MtrlShaderPreset.Monster))
                 {
                     return true;
                 } else if(Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
@@ -1626,6 +1648,7 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 //presets.Add(MtrlShaderPreset.DiffuseMulti);
                 presets.Add(MtrlShaderPreset.DiffuseSpecular);
+                presets.Add(MtrlShaderPreset.Monster);
             } else if(shader == MtrlShader.Skin)
             {
                 presets.Add(MtrlShaderPreset.BodyNoPores);
