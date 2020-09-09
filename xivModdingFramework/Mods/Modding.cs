@@ -267,7 +267,7 @@ namespace xivModdingFramework.Mods
 
             var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
-            var result = await ToggleModUnsafe(enable, modEntry);
+            var result = await ToggleModUnsafe(enable, modEntry, false, true);
             if(!result)
             {
                 return result;
@@ -319,7 +319,7 @@ namespace xivModdingFramework.Mods
 
                 foreach (var modEntry in mods)
                 {
-                    await ToggleModUnsafe(enable, modEntry);
+                    await ToggleModUnsafe(enable, modEntry, false, true);
                 }
 
                 SaveModList(modList);
@@ -338,7 +338,7 @@ namespace xivModdingFramework.Mods
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal = false)
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal = false, bool updateCache = false)
         {
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
@@ -368,7 +368,7 @@ namespace xivModdingFramework.Mods
                 // Added file.
                 if (enable && !mod.enabled)
                 {
-                    await index.AddFileDescriptor(mod.fullPath, mod.data.modOffset, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                    await index.AddFileDescriptor(mod.fullPath, mod.data.modOffset, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
                     mod.enabled = true;
 
                     // Check if we're re-enabling a metadata mod.
@@ -387,7 +387,7 @@ namespace xivModdingFramework.Mods
                 {
 
                     // Delete file descriptor handles removing metadata as needed on its own.
-                    await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                    await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
                     mod.enabled = false;
                 }
                 
@@ -397,12 +397,12 @@ namespace xivModdingFramework.Mods
                 // Standard mod.
                 if (enable && !mod.enabled)
                 {
-                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, false);
+                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, updateCache);
                     mod.enabled = true;
                 }
                 else if (!enable && mod.enabled)
                 {
-                    await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, false);
+                    await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, updateCache);
                     mod.enabled = false;
                 }
             }
@@ -432,7 +432,7 @@ namespace xivModdingFramework.Mods
                 // Save disabling these for last.
                 if (modEntry.IsInternal()) continue;
 
-                await ToggleModUnsafe(enable, modEntry);
+                await ToggleModUnsafe(enable, modEntry, false, false);
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
@@ -442,7 +442,7 @@ namespace xivModdingFramework.Mods
                 var internalEntries = modList.Mods.Where(x => x.IsInternal());
                 foreach (var modEntry in internalEntries)
                 {
-                    await ToggleModUnsafe(enable, modEntry, true);
+                    await ToggleModUnsafe(enable, modEntry, true, false);
                 }
             }
 
