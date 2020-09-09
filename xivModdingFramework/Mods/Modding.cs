@@ -338,7 +338,7 @@ namespace xivModdingFramework.Mods
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal = false, bool updateCache = false)
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache)
         {
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
