@@ -2189,7 +2189,11 @@ namespace xivModdingFramework.Cache
                     if (file != null)
                     {
                         level = XivDependencyGraph.GetDependencyLevel(file);
-                        if (level == XivDependencyLevel.Invalid) continue;
+                        if (level == XivDependencyLevel.Invalid)
+                        {
+                            RemoveFromChildQueue(file);
+                            continue;
+                        }
 
                         try
                         {
@@ -2221,7 +2225,11 @@ namespace xivModdingFramework.Cache
                         else
                         {
                             level = XivDependencyGraph.GetDependencyLevel(file);
-                            if (level == XivDependencyLevel.Invalid) continue;
+                            if (level == XivDependencyLevel.Invalid)
+                            {
+                                RemoveFromParentQueue(file);
+                                continue;
+                            }
 
                             try
                             {
