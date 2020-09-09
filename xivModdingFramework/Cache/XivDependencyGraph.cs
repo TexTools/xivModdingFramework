@@ -168,6 +168,18 @@ namespace xivModdingFramework.Cache
         // Slot may not exist for all types.
         public string? Slot;
 
+        public XivDependencyRootInfo GetOtherSlot(string slot)
+        {
+            return new XivDependencyRootInfo()
+            {
+                PrimaryId = PrimaryId,
+                PrimaryType = PrimaryType,
+                SecondaryId = SecondaryId,
+                SecondaryType = SecondaryType,
+                Slot = slot
+            };
+        }
+
         /// <summary>
         /// Converts this dependency root into a raw string entry.
         /// </summary>
