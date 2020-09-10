@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core.Core2D;
 using System;
 using System.Collections.Generic;
+using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -25,6 +27,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.SqPack.DataContainers;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -1406,6 +1409,131 @@ namespace xivModdingFramework.SqPack.FileTypes
             return true;
         }
 
+        /// <summary>
+        /// Creates an Index File object from the game index files.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        public async Task<IndexFile> GetIndexFile(XivDataFile dataFile, IndexType type = IndexType.Index1)
+        {
+            if (type == IndexType.Invalid) throw new InvalidDataException("Invalid Index Type");
+
+            var indexPath = "";
+            if (type == IndexType.Index1)
+            {
+                indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
+            }
+            else
+            {
+                indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+            }
+
+            // Dump the index into memory, since we're going to read the entire thing anyways.
+            byte[] data = File.ReadAllBytes(indexPath);
+            return await GetIndexFile(data, type);
+        }
+
+        /// <summary>
+        /// Creates an IndexFile object from bytes.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public async Task<IndexFile> GetIndexFile(byte[] data, IndexType type) { 
+            var indexFile = new IndexFile();
+            indexFile.Type = type;
+
+            int headerSize = BitConverter.ToInt32(data, 12);
+
+            indexFile.TotalSegmentHeaderSize = BitConverter.ToUInt32(data, headerSize);
+
+            List<IndexSegment> segments = new List<IndexSegment>();
+            for(int segmentId = 0; segmentId < 4; segmentId++)
+            {
+                var offset = (segmentId * 72) + (headerSize + 4);
+                if(segmentId > 0)
+                {
+                    offset += 4;
+                }
+
+                var segment = new IndexSegment();
+                segment.Type = indexFile.Type;
+
+                segment.Unknown = BitConverter.ToInt32(data, offset);
+                int segmentOffset = BitConverter.ToInt32(data, offset + 4);
+                int segmentSize = BitConverter.ToInt32(data, offset + 8);
+
+                var shabytes = new byte[20];
+                Array.Copy(data, offset + 12, shabytes, 0, shabytes.Length);
+                segment.ShaBlock = shabytes;
+
+                var segmentData = new byte[segmentSize];
+                Array.Copy(data, segmentOffset, segmentData, 0, segmentSize);
+
+                for(int x = 0; x < segmentSize; x+= segment.EntrySize)
+                {
+                    IndexEntry entry;
+                    if (segment.Type == IndexType.Index1)
+                    {
+                        if (segmentId == 0)
+                        {
+                            entry = new FileIndexEntry();
+                        }
+                        else if (segmentId == 3)
+                        {
+                            entry = new FolderIndexEntry();
+                        }
+                        else
+                        {
+                            entry = new RawIndexEntry();
+                        }
+                    } else
+                    {
+                        if (segmentId == 0)
+                        {
+                            entry = new FileIndex2Entry();
+                        }
+                        else
+                        {
+                            entry = new RawIndexEntry();
+                        }
+                    }
+
+                    var bytes = new byte[segment.EntrySize];
+                    Array.Copy(segmentData, x, bytes, 0, segment.EntrySize);
+                    entry.SetBytes(bytes);
+
+                    segment.Entries.Add(entry);
+                }
+
+                if(segmentId == 0)
+                {
+                    segment.HeaderSize = 76;
+                } else if(segmentId == 3)
+                {
+                    if(segment.Type == IndexType.Index2)
+                    {
+                        segment.KeepIntact = true;
+                    }
+                    segment.HeaderSize = 72;
+                }
+                else
+                {
+                    segment.HeaderSize = 72;
+                    segment.KeepIntact = true;
+                }
+
+                segments.Add(segment);
+            }
+
+            indexFile.Segments = segments;
+            var header = new byte[headerSize];
+            Array.Copy(data, 0, header, 0, headerSize);
+            indexFile.Header = header;
+
+            return indexFile;
+        }
+
+
 
         /// <summary>
         /// Adds a new file descriptor/stub into the Index files.
@@ -2003,3 +2131,4 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
     }
 }
+ 
