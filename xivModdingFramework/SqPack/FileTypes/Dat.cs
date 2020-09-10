@@ -1601,7 +1601,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                  */
                 if (modEntry != null && importData.Count <= modEntry.data.modSize)
                 {
-                    if (modEntry.data.modOffset != 0)
+                    if (modEntry.data.modOffset > 0)
                     {
 
                         var sizeDiff = modEntry.data.modSize - importData.Count;
