@@ -997,7 +997,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            ushort nextOffset = (ushort)(lastOffset > 0 ? (lastOffset + blockSize) : 0);
+            ushort nextOffset = (ushort)(lastOffset >= 0 ? (lastOffset + blockSize) : 0);
             IOUtil.ReplaceBytesAt(eqdpData, BitConverter.GetBytes(nextOffset), headerEntryOffset);
 
             // 6 Byte basic header, then block table.
