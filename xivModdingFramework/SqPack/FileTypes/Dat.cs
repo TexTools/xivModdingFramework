@@ -1548,6 +1548,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
             var IsTexToolsAddedFileFlag = await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath + ".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
+            NewFilesNeedToBeAdded = NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag || (modEntry != null && modEntry.IsCustomFile());
 
             var datNum = 0;
             var modDatPath = "";

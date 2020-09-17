@@ -2100,7 +2100,6 @@ namespace xivModdingFramework.Models.FileTypes
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
 
-                loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 XivMdl ogMdl = null;
 
@@ -2115,6 +2114,8 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     ogMdl = currentMdl;
                 }
+
+                loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 // Apply our Model Modifier options to the model.
                 options.Apply(ttModel, currentMdl, ogMdl, loggingFunction);
