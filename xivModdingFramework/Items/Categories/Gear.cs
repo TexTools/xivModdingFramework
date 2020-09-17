@@ -745,7 +745,7 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Body_Hands_Legs, "top"},
             {XivStrings.Body_Legs_Feet, "top"},
             {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "top"},
+            {XivStrings.Legs_Feet, "dwn"},
             {XivStrings.All, "top"},
             {XivStrings.Face, "fac"},
             {XivStrings.Iris, "iri"},
