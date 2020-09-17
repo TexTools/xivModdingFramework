@@ -876,10 +876,10 @@ namespace xivModdingFramework.Models.FileTypes
                 return 0;
             }
 
-            var parameters = new byte[EquipmentParameterEntrySize];
+            var parameters = new byte[EquipmentDeformerParameterEntrySize];
 
 
-            for (var idx = 0; idx < EquipmentParameterEntrySize; idx++)
+            for (var idx = 0; idx < EquipmentDeformerParameterEntrySize; idx++)
             {
                 parameters[idx] = data[offset + idx];
             }
