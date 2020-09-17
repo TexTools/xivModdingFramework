@@ -436,9 +436,9 @@ namespace xivModdingFramework.Mods
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
-            if (includeInternal)
+            if (includeInternal && !enable)
             {
-                // Disable these last, just to avoid any potential strangeness.
+                // Disable these last.
                 var internalEntries = modList.Mods.Where(x => x.IsInternal());
                 foreach (var modEntry in internalEntries)
                 {
@@ -448,6 +448,17 @@ namespace xivModdingFramework.Mods
 
 
             SaveModList(modList);
+
+            if (includeInternal && !enable)
+            {
+                // Now go ahead and delete the internal files, to prevent them
+                // being accidentally re-enabled (They should be re-built by the metadata file imports)
+                var internalEntries = modList.Mods.Where(x => x.IsInternal());
+                foreach (var modEntry in internalEntries)
+                {
+                    await DeleteMod(modEntry.fullPath, true);
+                }
+            }
 
 
             // Do these as a batch query at the end.
