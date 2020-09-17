@@ -486,10 +486,16 @@ namespace xivModdingFramework.Variants.FileTypes
 
         public async Task SaveFullImcInfo(FullImcInfo info, string path, string itemName = null, string category = null, string source = null)
         {
+            if (info == null || info.TypeIdentifier != ImcType.Set && info.TypeIdentifier != ImcType.NonSet)
+            {
+                throw new InvalidDataException("Cannot save invalid IMC file.");
+            }
+
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var data = new List<byte>();
+
 
             // 4 Header bytes.
             data.AddRange(BitConverter.GetBytes((short) info.SubsetCount));
@@ -607,9 +613,9 @@ namespace xivModdingFramework.Variants.FileTypes
             /// Get the number of subsets.
             ///  -NOT- the same as number of material variants.
             /// </summary>
-            public int SubsetCount { get
+            public short SubsetCount { get
                 {
-                    return SubsetList.Count;
+                    return (short)SubsetList.Count;
                 }
                 set {
                     throw new NotSupportedException("Attempted to directly set SubsetCount.");

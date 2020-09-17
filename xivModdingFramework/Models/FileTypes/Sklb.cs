@@ -298,7 +298,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Hair and face types have a race defined at root level.
-            if ((type == Est.EstType.Face || type == Est.EstType.Hair) && race != XivRace.All_Races)
+            if ((type == Est.EstType.Face || type == Est.EstType.Hair) && race == XivRace.All_Races)
             {
                 var ret = new Dictionary<XivRace, ExtraSkeletonEntry>();
                 race = XivRaces.GetXivRace(root.PrimaryId);

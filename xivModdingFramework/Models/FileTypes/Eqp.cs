@@ -876,10 +876,10 @@ namespace xivModdingFramework.Models.FileTypes
                 return 0;
             }
 
-            var parameters = new byte[EquipmentParameterEntrySize];
+            var parameters = new byte[EquipmentDeformerParameterEntrySize];
 
 
-            for (var idx = 0; idx < EquipmentParameterEntrySize; idx++)
+            for (var idx = 0; idx < EquipmentDeformerParameterEntrySize; idx++)
             {
                 parameters[idx] = data[offset + idx];
             }
@@ -997,7 +997,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            ushort nextOffset = (ushort)(lastOffset > 0 ? (lastOffset + blockSize) : 0);
+            ushort nextOffset = (ushort)(lastOffset >= 0 ? (lastOffset + blockSize) : 0);
             IOUtil.ReplaceBytesAt(eqdpData, BitConverter.GetBytes(nextOffset), headerEntryOffset);
 
             // 6 Byte basic header, then block table.

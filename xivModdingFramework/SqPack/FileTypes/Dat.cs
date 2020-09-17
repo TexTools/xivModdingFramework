@@ -442,6 +442,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
         public async Task<byte[]> GetType2Data(long offset, XivDataFile dataFile)
         {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file data without valid offset.");
+            }
+
+
             var type2Bytes = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
@@ -770,6 +776,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
         public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(long offset, XivDataFile dataFile)
         {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file data without valid offset.");
+            }
 
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int) ((offset / 8) & 0x0F) / 2;
@@ -934,6 +944,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
         {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file size data without valid offset.");
+            }
+
 
             var xivTex = new XivTex();
 
@@ -1079,6 +1094,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>An XivTex containing all the type 4 texture data</returns>
         public async Task<XivTex> GetType4Data(long offset, XivDataFile dataFile)
         {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file size data without valid offset.");
+            }
+
             var xivTex = new XivTex();
 
             var decompressedData = new List<byte>();
@@ -1528,6 +1548,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
             var IsTexToolsAddedFileFlag = await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath + ".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
+            NewFilesNeedToBeAdded = NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag || (modEntry != null && modEntry.IsCustomFile());
 
             var datNum = 0;
             var modDatPath = "";
@@ -1581,7 +1602,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                  */
                 if (modEntry != null && importData.Count <= modEntry.data.modSize)
                 {
-                    if (modEntry.data.modOffset != 0)
+                    if (modEntry.data.modOffset > 0)
                     {
 
                         var sizeDiff = modEntry.data.modSize - importData.Count;
@@ -1843,9 +1864,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             var ext = Path.GetExtension(internalFilePath);
             if(ext == ".meta")
             {
+                
                 // Retreive the uncompressed meta entry we just wrote.
                 var data = await GetType2Data(offset, dataFile);
                 var meta = await ItemMetadata.Deserialize(data);
+
+                meta.Validate(internalFilePath);
 
                 // And write that metadata to the actual constituent files.
                 await ItemMetadata.ApplyMetadata(meta);
