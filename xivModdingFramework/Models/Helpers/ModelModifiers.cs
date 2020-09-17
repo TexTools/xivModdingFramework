@@ -686,7 +686,10 @@ namespace xivModdingFramework.Models.Helpers
                                     // Because we're using the index offset that's relative to the original model's mesh group index list.
                                     var indexId = d.BaseIndex;
 
-                                    ttPart.Replacements.Add(indexId, vertexId);
+                                    if (!ttPart.Replacements.ContainsKey(indexId))
+                                    {
+                                        ttPart.Replacements.Add(indexId, vertexId);
+                                    }
                                 }
                                 newGroup.ShapeParts.Add(ttPart);
                             }

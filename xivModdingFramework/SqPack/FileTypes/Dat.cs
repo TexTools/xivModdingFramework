@@ -1548,6 +1548,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
             var IsTexToolsAddedFileFlag = await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath + ".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
+            NewFilesNeedToBeAdded = NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag || (modEntry != null && modEntry.IsCustomFile());
 
             var datNum = 0;
             var modDatPath = "";
@@ -1863,9 +1864,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             var ext = Path.GetExtension(internalFilePath);
             if(ext == ".meta")
             {
+                
                 // Retreive the uncompressed meta entry we just wrote.
                 var data = await GetType2Data(offset, dataFile);
                 var meta = await ItemMetadata.Deserialize(data);
+
+                meta.Validate(internalFilePath);
 
                 // And write that metadata to the actual constituent files.
                 await ItemMetadata.ApplyMetadata(meta);
