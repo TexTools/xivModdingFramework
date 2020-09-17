@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -86,6 +87,31 @@ namespace xivModdingFramework.Mods.FileTypes
         public ItemMetadata(XivDependencyRoot root)
         {
             Root = root;
+        }
+
+        /// <summary>
+        /// Validates this metadata file to ensure it is being written to the correct location.
+        /// </summary>
+        public void Validate(string path)
+        {
+            const string prefix = "INVALID METADATA ERROR: ";
+            if (Root == null)
+            {
+                throw new InvalidDataException(prefix + "Internal Root is NULL.");
+            }
+
+            if(Root.Info.GetRootFile() != path)
+            {
+                throw new InvalidDataException(prefix + "Internal file path not match destination file path.");
+            }
+
+            foreach(var entry in EstEntries)
+            {
+                if(entry.Value.SetId != Root.Info.PrimaryId && entry.Value.SetId != Root.Info.SecondaryId)
+                {
+                    throw new InvalidDataException(prefix + "Extra Skeleton Table entries do not match internal set number.");
+                }
+            }
         }
 
         /// <summary>

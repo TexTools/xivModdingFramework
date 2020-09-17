@@ -379,6 +379,8 @@ namespace xivModdingFramework.Mods
                         var data = await dat.GetType2Data(mod.fullPath, false);
                         var meta = await ItemMetadata.Deserialize(data);
 
+                        meta.Validate(mod.fullPath);
+
                         // And write that metadata to the actual constituent files.
                         await ItemMetadata.ApplyMetadata(meta);
                     }
