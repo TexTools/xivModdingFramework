@@ -1910,9 +1910,6 @@ namespace xivModdingFramework.Cache
             types[XivItemType.equipment].Add(XivItemType.none);
             types[XivItemType.accessory].Add(XivItemType.none);
             types[XivItemType.outdoor].Add(XivItemType.none);
-            types.Clear();
-            types.Add(XivItemType.human, new List<XivItemType>());
-            types[XivItemType.human].Add(XivItemType.tail);
 
             var tasks = new List<Task<List<XivDependencyRootInfo>>>();
             foreach (var kv in types)
