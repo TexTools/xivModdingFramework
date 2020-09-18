@@ -326,6 +326,7 @@ namespace xivModdingFramework.Mods.FileTypes
             dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
 
+            // Beep boop
             bool doSave = false;
             if (index == null)
             {
