@@ -320,7 +320,10 @@ namespace xivModdingFramework.Mods.FileTypes
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(meta.Root.Info.GetRootFile());
-            var item = meta.Root.GetFirstItem();
+
+            var dummyItem = new XivGenericItemModel();
+            dummyItem.Name = Constants.InternalModSourceName;
+            dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
 
             bool doSave = false;
@@ -336,30 +339,30 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var imcPath = meta.Root.GetRawImcFilePath();
-                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, item, index, modlist);
+                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, index, modlist);
             }
 
             // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
             if(meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
             {
-                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, item, index, modlist);
+                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, index, modlist);
             }
 
             if(meta.EqdpEntries.Count > 0)
             {
-                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, item, index, modlist);
+                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, index, modlist);
             }
 
             if (meta.EstEntries.Count > 0)
             {
                 var type = Est.GetEstType(meta.Root);
                 var entries = meta.EstEntries.Values.ToList();
-                await Est.SaveExtraSkeletonEntries(type, entries, item, index, modlist);
+                await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, index, modlist);
             }
 
             if(meta.GmpEntry != null)
             {
-                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, item, index, modlist);
+                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist);
             }
 
             if (doSave)
