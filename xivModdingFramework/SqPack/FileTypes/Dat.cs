@@ -1596,11 +1596,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                 try
                 {
                     var root = await XivCache.GetFirstRoot(internalFilePath);
-                    var item = root.GetFirstItem();
+                    if (root != null)
+                    {
+                        var item = root.GetFirstItem();
 
-                    referenceItem = item;
-                    itemName = referenceItem.Name;
-                    category = referenceItem.SecondaryCategory;
+                        referenceItem = item;
+                        itemName = referenceItem.Name;
+                        category = referenceItem.SecondaryCategory;
+                    }
                 }
                 catch
                 {

@@ -58,8 +58,15 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             var processCount = await Task.Run<int>(() =>
             {
-                _tempMPD = Path.GetTempFileName();
-                _tempMPL = Path.GetTempFileName();
+                var guid = Guid.NewGuid();
+
+                var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
+                Directory.CreateDirectory(dir);
+
+
+                _tempMPD = Path.Combine(dir, "TTMPD.mpd");
+                _tempMPL = Path.Combine(dir, "TTMPL.mpl");
+
                 var imageList = new Dictionary<string, string>();
                 var pageCount = 1;
 
@@ -75,7 +82,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     ModPackPages = new List<ModPackPageJson>()
                 };
 
-                using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Open)))
+                using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Create)))
                 {
                     foreach (var modPackPage in modPackData.ModPackPages)
                     {
@@ -469,6 +476,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
 
                     // Okay, we need to do a few things here.
+                    // 0 - Extract the MPD file (tests so far with streaming the ZIP data have all failed)
                     // 1 - Copy all the mod data to the DAT files.
                     // 2 - Update all the indices.
                     // 3 - Update the Modlist
@@ -483,8 +491,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
                     Dictionary<string, int> FileTypes = new Dictionary<string, int>();
 
-                    // 1 - Copy all the mod data to the DAT files.
 
+                    // 0 - Extract the MPD file.
                     using(var zf = ZipFile.Read(modPackDirectory.FullName))
                     {
                         progress.Report((0, 0, "Unzipping TTMP File..."));
@@ -505,6 +513,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
 
+                    // 1 - Copy all the mod data to the DAT files.
                     var count = 0;
                     progress.Report((0, 0, "Writing new mod data to DAT files..."));
                     using (var binaryReader = new BinaryReader(new FileStream(_tempMPD, FileMode.Open)))
