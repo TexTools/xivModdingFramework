@@ -1673,7 +1673,7 @@ namespace xivModdingFramework.Cache
         /// <param name="primary"></param>
         /// <param name="secondary"></param>
         /// <returns></returns>
-        private static async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<int, HashSet<int>> Hashes, XivItemType primary, XivItemType secondary) {
+        private static async Task<List<XivDependencyRootInfo>> TestAllRoots(Dictionary<uint, HashSet<uint>> Hashes, XivItemType primary, XivItemType secondary) {
 
 
             var result = new List<XivDependencyRootInfo>(3000);
@@ -1717,10 +1717,10 @@ namespace xivModdingFramework.Cache
                             {
                                 // For furniture, they're valid as long as they have an assets folder we can find.
                                 var assetFolder = folder + "/asset";
-                                var folderHash = HashGenerator.GetHash(assetFolder);
+                                var folderHash = (uint)HashGenerator.GetHash(assetFolder);
 
                                 var sgdName = root.GetSgdName();
-                                var sgdHash = HashGenerator.GetHash(sgdName);
+                                var sgdHash = (uint)HashGenerator.GetHash(sgdName);
 
                                 if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(sgdHash))
                                 {
@@ -1730,9 +1730,9 @@ namespace xivModdingFramework.Cache
                             else
                             {
                                 // Test to see if the IMC file exists.
-                                var folderHash = HashGenerator.GetHash(folder);
+                                var folderHash = (uint)HashGenerator.GetHash(folder);
                                 var imcName = root.GetBaseFileName(false) + ".imc";
-                                var imcHash = HashGenerator.GetHash(imcName);
+                                var imcHash = (uint)HashGenerator.GetHash(imcName);
 
                                 if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(imcHash))
                                 {
@@ -1764,9 +1764,9 @@ namespace xivModdingFramework.Cache
                                 if (usesImc)
                                 {
                                     // Test to see if the IMC file exists.
-                                    var folderHash = HashGenerator.GetHash(folder);
+                                    var folderHash = (uint)HashGenerator.GetHash(folder);
                                     var imcName = XivItemTypes.GetSystemPrefix((XivItemType)root.SecondaryType) + root.SecondaryId.ToString().PadLeft(4,'0') + ".imc";
-                                    var imcHash = HashGenerator.GetHash(imcName);
+                                    var imcHash = (uint)HashGenerator.GetHash(imcName);
 
                                     if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(imcHash))
                                     {
@@ -1789,13 +1789,13 @@ namespace xivModdingFramework.Cache
                                 {
 
                                     var mfolder = folder + "/model";
-                                    var mfolderHash = HashGenerator.GetHash(mfolder);
+                                    var mfolderHash = (uint)HashGenerator.GetHash(mfolder);
                                     var matFolder = folder + "/material";
-                                    var matFolderHash = HashGenerator.GetHash(matFolder);
+                                    var matFolderHash = (uint)HashGenerator.GetHash(matFolder);
                                     var matFolder1 = folder + "/material/v0001";
-                                    var matFolder1Hash = HashGenerator.GetHash(matFolder1);
+                                    var matFolder1Hash = (uint)HashGenerator.GetHash(matFolder1);
                                     var texFolder = folder + "/texture";
-                                    var texFolderHash = HashGenerator.GetHash(texFolder);
+                                    var texFolderHash = (uint)HashGenerator.GetHash(texFolder);
 
                                     // Things that don't use IMC files are basically only the human tree, which is a complete mess.
                                     foreach (var slot in slots)
@@ -1813,7 +1813,7 @@ namespace xivModdingFramework.Cache
                                         // If they have an MDL or MTRL we can resolve, they're valid.
 
                                         var mdlFile = nRoot.GetBaseFileName(true) + ".mdl";
-                                        var mdlFileHash = HashGenerator.GetHash(mdlFile);
+                                        var mdlFileHash = (uint)HashGenerator.GetHash(mdlFile);
 
                                         var mtrlFile = "mt_" + nRoot.GetBaseFileName(true)  + "_a.mtrl";
                                         if(secondary == XivItemType.tail)
@@ -1823,7 +1823,7 @@ namespace xivModdingFramework.Cache
                                             mtrlFile = "mt_" + nRoot.GetBaseFileName(false) + "_a.mtrl";
                                         }
 
-                                        var mtrlFileHash = HashGenerator.GetHash(mtrlFile);
+                                        var mtrlFileHash = (uint)HashGenerator.GetHash(mtrlFile);
 
                                         var hasModel = Hashes.ContainsKey(mfolderHash) && Hashes[mfolderHash].Contains(mdlFileHash);
                                         var hasMat = Hashes.ContainsKey(matFolderHash) && Hashes[matFolderHash].Contains(mtrlFileHash);
