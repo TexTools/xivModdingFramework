@@ -682,7 +682,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // ModList is updated now.  Time to expand the Metadata files.
                     Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
-                    List<ItemMetadata> metadataEntries = new List<ItemMetadata>();
+                    Dictionary<XivDataFile, List<ItemMetadata>> metadataEntries = new Dictionary<XivDataFile, List<ItemMetadata>>;
                     foreach (var file in filePaths)
                     {
                         if (ErroneousFiles.Contains(file)) continue;
@@ -697,6 +697,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 if (!indexFiles.ContainsKey(df))
                                 {
                                     indexFiles.Add(df, await _index.GetIndexFile(df));
+                                    metadataEntries.Add(df, new List<ItemMetadata>());
                                 }
 
                                 var metaRaw = await dat.GetType2Data(longOffset, df);
@@ -704,7 +705,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 meta.Validate(file);
 
-                                metadataEntries.Add(meta);
+                                metadataEntries[df].Add(meta);
                             } catch(Exception ex)
                             {
                                 ErroneousFiles.Add(file);
@@ -716,7 +717,11 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
 
-                    await ItemMetadata.ApplyMetadataBatched(metadataEntries, indexFiles[XivDataFile._04_Chara], modList);
+                    foreach(var ifKv in indexFiles)
+                    {
+                        await ItemMetadata.ApplyMetadataBatched(metadataEntries[ifKv.Key], ifKv.Value, modList);
+
+                    }
 
                     foreach(var kv in indexFiles)
                     {
