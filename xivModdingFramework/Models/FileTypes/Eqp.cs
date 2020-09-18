@@ -111,6 +111,60 @@ namespace xivModdingFramework.Models.FileTypes
             _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
         }
 
+        public async Task SaveGmpEntries(List<(uint PrimaryId, GimmickParameter GmpData)> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
+        {
+            foreach (var tuple in entries)
+            {
+                if (tuple.PrimaryId == 0)
+                {
+                    throw new InvalidDataException("Cannot write GMP data for Set 0. (Use Set 1)");
+                }
+            }
+
+            var file = (await LoadGimmickParameterFile(false));
+
+
+            var offsets = new Dictionary<uint, int>();
+            var clean = false;
+
+            // Resolve offsets, expanding on the first pass.
+            // (GMP files use an identical file structure to EQP files)
+            while (!clean)
+            {
+                clean = true;
+                foreach (var tuple in entries)
+                {
+                    var offset = ResolveEqpEntryOffset(file, (int)tuple.PrimaryId);
+
+                    if (offset < 0)
+                    {
+                        clean = false;
+                        // Expand the data block, then try again.
+                        file = ExpandEqpBlock(file, (int)tuple.PrimaryId);
+
+                        offset = ResolveEqpEntryOffset(file, (int)tuple.PrimaryId);
+
+                        if (offset < 0)
+                        {
+                            throw new InvalidDataException("Unable to determine EQP set offset.");
+                        }
+                    }
+
+                    offsets.Add(tuple.PrimaryId, offset);
+                }
+            }
+
+
+            foreach (var tuple in entries)
+            {
+                var offset = offsets[tuple.PrimaryId];
+                IOUtil.ReplaceBytesAt(file, tuple.GmpData.GetBytes(), offset);
+            }
+
+            await SaveGimmickParameterFile(file, referenceItem, cachedIndexFile, cachedModList);
+
+        }
+
         public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             if (equipmentId == 0)
@@ -129,7 +183,7 @@ namespace xivModdingFramework.Models.FileTypes
                 data = ExpandEqpBlock(data, equipmentId);
                 offset = ResolveEqpEntryOffset(data, equipmentId);
 
-                if(offset <= 0)
+                if (offset <= 0)
                 {
                     throw new InvalidDataException("Unable to resolve GMP data offset.");
                 }
@@ -142,7 +196,7 @@ namespace xivModdingFramework.Models.FileTypes
 
         public async Task<GimmickParameter> GetGimmickParameter(IItem item, bool forceDefault = false)
         {
-            if(item == null)
+            if (item == null)
             {
                 return null;
             }
@@ -151,7 +205,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
         public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRoot root, bool forceDefault = false)
         {
-            if(root == null)
+            if (root == null)
             {
                 return null;
             }
@@ -161,7 +215,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
         public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRootInfo root, bool forceDefault = false) {
 
-            if(root.PrimaryType != XivItemType.equipment || root.Slot != "met")
+            if (root.PrimaryType != XivItemType.equipment || root.Slot != "met")
             {
                 return null;
             }
@@ -170,7 +224,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
         public async Task<GimmickParameter> GetGimmickParameter(int equipmentId, bool forceDefault = false)
         {
-            if(equipmentId < 0 || equipmentId > 10000)
+            if (equipmentId < 0 || equipmentId > 10000)
             {
                 throw new InvalidDataException("Unable to resolve GMP information for invalid equipment ID.");
             }
@@ -179,7 +233,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // The GMP files use the same format as the EQP files.
             var offset = ResolveEqpEntryOffset(data, equipmentId);
-            if(offset < 0)
+            if (offset < 0)
             {
                 // Parameter is in a compressed/empty block, so just return default.
                 return new GimmickParameter();
@@ -203,6 +257,73 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
+        /// Saves multiple EQP entries in  batch process.
+        /// </summary>
+        /// <param name="entries"></param>
+        /// <param name="referenceItem"></param>
+        /// <param name="cachedIndexFile"></param>
+        /// <param name="cachedModList"></param>
+        /// <returns></returns>
+        public async Task SaveEqpEntries(List<(uint PrimaryId, EquipmentParameter EqpData)> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
+        {
+            foreach (var tuple in entries)
+            {
+                if (tuple.PrimaryId == 0)
+                {
+                    throw new InvalidDataException("Cannot write EQP data for Set 0. (Use Set 1)");
+                }
+            }
+
+            var file = (await LoadEquipmentParameterFile(false));
+
+
+            var offsets = new Dictionary<uint, int>();
+            var clean = false;
+
+            // Resolve offsets, expanding on the first pass.
+            while(!clean)
+            {
+                clean = true;
+                foreach (var tuple in entries)
+                {
+                    var offset = ResolveEqpEntryOffset(file, (int)tuple.PrimaryId);
+
+                    if (offset < 0)
+                    {
+                        clean = false;
+                        // Expand the data block, then try again.
+                        file = ExpandEqpBlock(file, (int)tuple.PrimaryId);
+
+                        offset = ResolveEqpEntryOffset(file, (int)tuple.PrimaryId);
+
+                        if (offset < 0)
+                        {
+                            throw new InvalidDataException("Unable to determine EQP set offset.");
+                        }
+                    }
+
+                    if (!offsets.ContainsKey(tuple.PrimaryId))
+                    {
+                        offsets.Add(tuple.PrimaryId, offset);
+                    }
+                }
+            }
+
+
+            foreach(var tuple in entries)
+            {
+                var offset = offsets[tuple.PrimaryId];
+                var slotOffset = EquipmentParameterSet.EntryOffsets[tuple.EqpData.Slot];
+                offset += slotOffset;
+                var bytes = tuple.EqpData.GetBytes();
+                IOUtil.ReplaceBytesAt(file, bytes, offset);
+            }
+
+
+            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+        }
+
+        /// <summary>
         /// Saves the given Equipment Parameter information to the main EQP file for the given set.
         /// </summary>
         /// <param name="equipmentId"></param>
@@ -215,7 +336,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new InvalidDataException("Unable to resolve EQP information for invalid equipment ID.");
             }
 
-            if(equipmentId == 0)
+            if (equipmentId == 0)
             {
                 throw new InvalidDataException("Cannot write EQP data for Set 0. (Use Set 1)");
             }
@@ -223,14 +344,14 @@ namespace xivModdingFramework.Models.FileTypes
             var file = (await LoadEquipmentParameterFile(false));
             var offset = ResolveEqpEntryOffset(file, equipmentId);
 
-            if(offset < 0)
+            if (offset < 0)
             {
                 // Expand the data block, then try again.
                 file = ExpandEqpBlock(file, equipmentId);
 
                 offset = ResolveEqpEntryOffset(file, equipmentId);
 
-                if(offset < 0)
+                if (offset < 0)
                 {
                     throw new InvalidDataException("Unable to determine EQP set offset.");
                 }
@@ -245,7 +366,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(file, bytes, offset);
 
-            await _dat.ImportType2Data(file.ToArray(),EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
 
 
@@ -260,7 +381,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var root = item.GetRoot();
-            if(root == null)
+            if (root == null)
             {
                 return null;
             }
@@ -273,7 +394,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRoot root, bool forceDefault = false)
         {
-            if(root == null)
+            if (root == null)
             {
                 return null;
             }
@@ -286,7 +407,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRootInfo root, bool forceDefault = false)
         {
-            if(root.PrimaryType != XivItemType.equipment)
+            if (root.PrimaryType != XivItemType.equipment)
             {
                 return null;
             }
@@ -304,19 +425,19 @@ namespace xivModdingFramework.Models.FileTypes
         public async Task<EquipmentParameter> GetEqpEntry(int equipmentId, string slot, bool forceDefault = false)
         {
 
-            if(!EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot))
+            if (!EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot))
             {
                 throw new InvalidDataException("Unable to resolve EQP information for invalid slot.");
             }
 
-            if(equipmentId < 0)
+            if (equipmentId < 0)
             {
                 throw new InvalidDataException("Unable to resolve EQP information for invalid equipment ID.");
             }
 
             // Set 0 is a special case which SE hard-coded to share with set 1.
             // In practice, we don't allow users to read or edit it via set 0 to avoid mod conflicts.  Instead, Set 1 must be used.
-            if(equipmentId == 0)
+            if (equipmentId == 0)
             {
                 return null;
             }
@@ -357,7 +478,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             // This item doesn't have equipment parameters.
-            if(start >= data.Length)
+            if (start >= data.Length)
             {
                 return null;
             }
@@ -493,7 +614,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="eqpData"></param>
         /// <param name="equipmentId"></param>
         /// <returns></returns>
-        private int ResolveEqpEntryOffset (byte[] file, int equipmentId)
+        private int ResolveEqpEntryOffset(byte[] file, int equipmentId)
         {
             const int blockSize = 160;
             // 160 Entry blocks.
@@ -503,7 +624,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var bit = 1 << (blockId % 8);
 
-            if((file[byteNum] & bit) == 0)
+            if ((file[byteNum] & bit) == 0)
             {
                 // Block is currently compressed.
                 return -1;
@@ -514,11 +635,11 @@ namespace xivModdingFramework.Models.FileTypes
             int uncompressedBlocks = 0;
 
             // Loop bytes
-            for(int i = 0; i <= byteNum; i++)
+            for (int i = 0; i <= byteNum; i++)
             {
                 var byt = file[i];
                 // Loop bits
-                for(int b = 0; b < 8; b++)
+                for (int b = 0; b < 8; b++)
                 {
                     if (i == byteNum && b == (blockId % 8))
                     {
@@ -528,7 +649,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var bt = 1 << b;
                     var on = (byt & bt) != 0;
-                    if(on)
+                    if (on)
                     {
                         uncompressedBlocks++;
                     }
@@ -543,6 +664,208 @@ namespace xivModdingFramework.Models.FileTypes
 
 
         #region Equipment Deformation
+
+        /// <summary>
+        /// Writes a batch set of EQDP entries.
+        /// </summary>
+        /// <param name="entries"></param>
+        /// <param name="referenceItem"></param>
+        /// <param name="cachedIndexFile"></param>
+        /// <param name="cachedModList"></param>
+        /// <returns></returns>
+        public async Task SaveEqdpEntries(Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
+        {
+            // Group entries into Accessories and Non-Accessories.
+            var accessories = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
+            var equipment = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
+
+            foreach (var raceKv in entries)
+            {
+                var race = raceKv.Key;
+                foreach(var e in raceKv.Value)
+                {
+                    var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(e.Slot);
+
+                    if (!isAccessory)
+                    {
+                        var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(e.Slot);
+                        if (!slotOk)
+                        {
+                            throw new InvalidDataException("Attempted to save racial models for invalid slot.");
+                        }
+                    }
+
+                    if(isAccessory)
+                    {
+                        if(!accessories.ContainsKey(race))
+                        {
+                            accessories.Add(race, new List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>());
+                        }
+
+                        accessories[race].Add(e);
+                    } else
+                    {
+                        if (!equipment.ContainsKey(race))
+                        {
+                            equipment.Add(race, new List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>());
+                        }
+
+                        equipment[race].Add(e);
+                    }
+
+                }
+            }
+
+            // First loop all races in the equipment segment.
+            foreach(var raceKv in equipment)
+            {
+                var race = raceKv.Key;
+                var fileName = EquipmentDeformerParameterRootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+                var data = await LoadEquipmentDeformationFile(race, false, false);
+
+                // Loop through until we've expanded all of the data entries that we need in order to write the data.
+                bool clean = false;
+                Dictionary<int, int> SetOffsets = new Dictionary<int, int>(raceKv.Value.Count);
+                while(clean == false)
+                {
+                    SetOffsets.Clear();
+                    clean = true;
+                    foreach (var tuple in raceKv.Value)
+                    {
+                        var offset = ResolveEqdpEntryOffset(data, (int)tuple.PrimaryId);
+
+                        if (offset < 0)
+                        {
+                            clean = false;
+                            // Expand the data block, then get the offset again.
+                            data = ExpandEqdpBlock(data, (int)tuple.PrimaryId);
+                            offset = ResolveEqdpEntryOffset(data, (int)tuple.PrimaryId);
+
+                            if (offset < 0)
+                            {
+                                throw new Exception("Failed to expand EQDP Data block.");
+                            }
+                        }
+
+                        if (!SetOffsets.ContainsKey((int)tuple.PrimaryId))
+                        {
+                            SetOffsets.Add((int)tuple.PrimaryId, offset);
+                        }
+                    }
+                }
+
+                // Update the actual data elements.
+                foreach(var tuple in raceKv.Value)
+                {
+                    var slotIdx = EquipmentDeformationParameterSet.SlotsAsList(false).IndexOf(tuple.Slot);
+
+                    var byteOffset = slotIdx / 4;
+                    var bitOffset = (slotIdx * 2) % 8;
+
+                    var offset = SetOffsets[(int)tuple.PrimaryId];
+                    var byteToModify = data[offset + byteOffset];
+
+
+                    if (tuple.Entry.bit0)
+                    {
+                        byteToModify = (byte)(byteToModify | (1 << bitOffset));
+                    }
+                    else
+                    {
+                        byteToModify = (byte)(byteToModify & ~(1 << bitOffset));
+                    }
+
+                    if (tuple.Entry.bit1)
+                    {
+                        byteToModify = (byte)(byteToModify | (1 << (bitOffset + 1)));
+                    }
+                    else
+                    {
+                        byteToModify = (byte)(byteToModify & ~(1 << (bitOffset + 1)));
+                    }
+
+                    data[offset + byteOffset] = byteToModify;
+                }
+
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            }
+
+            // Loop Accessories
+            foreach (var raceKv in accessories)
+            {
+                var race = raceKv.Key;
+                var fileName = AccessoryDeformerParameterRootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+                var data = await LoadEquipmentDeformationFile(race, true, false);
+
+                // Loop through until we've expanded all of the data entries that we need in order to write the data.
+                bool clean = false;
+                Dictionary<int, int> SetOffsets = new Dictionary<int, int>(raceKv.Value.Count);
+                while (clean == false)
+                {
+                    SetOffsets.Clear();
+                    clean = true;
+                    foreach (var tuple in raceKv.Value)
+                    {
+                        var offset = ResolveEqdpEntryOffset(data, (int)tuple.PrimaryId);
+
+                        if (offset < 0)
+                        {
+                            clean = false;
+                            // Expand the data block, then get the offset again.
+                            data = ExpandEqdpBlock(data, (int)tuple.PrimaryId);
+                            offset = ResolveEqdpEntryOffset(data, (int)tuple.PrimaryId);
+
+                            if (offset < 0)
+                            {
+                                throw new Exception("Failed to expand EQDP Data block.");
+                            }
+                        }
+
+                        if (!SetOffsets.ContainsKey((int)tuple.PrimaryId))
+                        {
+                            SetOffsets.Add((int)tuple.PrimaryId, offset);
+                        }
+                    }
+                }
+
+                // Update the actual data elements.
+                foreach (var tuple in raceKv.Value)
+                {
+                    var slotIdx = EquipmentDeformationParameterSet.SlotsAsList(true).IndexOf(tuple.Slot);
+
+                    var byteOffset = slotIdx / 4;
+                    var bitOffset = (slotIdx * 2) % 8;
+
+                    var offset = SetOffsets[(int)tuple.PrimaryId];
+                    var byteToModify = data[offset + byteOffset];
+
+
+                    if (tuple.Entry.bit0)
+                    {
+                        byteToModify = (byte)(byteToModify | (1 << bitOffset));
+                    }
+                    else
+                    {
+                        byteToModify = (byte)(byteToModify & ~(1 << bitOffset));
+                    }
+
+                    if (tuple.Entry.bit1)
+                    {
+                        byteToModify = (byte)(byteToModify | (1 << (bitOffset + 1)));
+                    }
+                    else
+                    {
+                        byteToModify = (byte)(byteToModify & ~(1 << (bitOffset + 1)));
+                    }
+
+                    data[offset + byteOffset] = byteToModify;
+                }
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+
+            }
+
+
+        }
 
         public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {

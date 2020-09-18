@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
@@ -162,8 +163,8 @@ namespace xivModdingFramework.Mods.FileTypes
                 var data = await _dat.GetType2Data(filePath, false);
 
                 // Run it through the binary deserializer and we're good.
-                return await Deserialize(data);
-                //return await CreateFromRaw(root);
+                //return await Deserialize(data);
+                return await CreateFromRaw(root);
             } else
             {
                 // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.
@@ -223,6 +224,91 @@ namespace xivModdingFramework.Mods.FileTypes
             await _dat.ImportType2Data(await Serialize(meta), path, source, item);
         }
 
+        /// <summary>
+        /// Applies multiple metadata mods simultaneously for performance gains.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="index"></param>
+        /// <param name="modlist"></param>
+        /// <returns></returns>
+        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist)
+        {
+            var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+
+            var dummyItem = new XivGenericItemModel();
+            dummyItem.Name = Constants.InternalModSourceName;
+            dummyItem.SecondaryCategory = Constants.InternalModSourceName;
+
+            Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> eqdpEntries = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
+            Dictionary<Est.EstType, List<ExtraSkeletonEntry>> estEntries = new Dictionary<Est.EstType, List<ExtraSkeletonEntry>>();
+            List<(uint PrimaryId, EquipmentParameter EqpData)> eqpEntries = new List<(uint PrimaryId, EquipmentParameter EqpData)>();
+            List<(uint PrimaryId, GimmickParameter GmpData)> gmpEntries = new List<(uint PrimaryId, GimmickParameter GmpData)>();
+
+            foreach (var meta in data)
+            {
+                // Construct the parameter collections for each function call.
+                foreach(var kv in meta.EqdpEntries)
+                {
+                    if (!eqdpEntries.ContainsKey(kv.Key))
+                    {
+                        eqdpEntries.Add(kv.Key, new List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>());
+                    }
+
+                    eqdpEntries[kv.Key].Add(((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, kv.Value));
+                }
+
+                var estType = Est.GetEstType(meta.Root);
+                foreach (var kv in meta.EstEntries)
+                {
+                    if (!estEntries.ContainsKey(estType))
+                    {
+                        estEntries.Add(estType, new List<ExtraSkeletonEntry>());
+                    }
+
+                    estEntries[estType].Add(kv.Value);
+                }
+
+                if (meta.EqpEntry != null)
+                {
+                    eqpEntries.Add(((uint)meta.Root.Info.PrimaryId, meta.EqpEntry));
+                }
+
+                if (meta.GmpEntry != null)
+                {
+                    gmpEntries.Add(((uint)meta.Root.Info.PrimaryId, meta.GmpEntry));
+                }
+            }
+
+            // Batch install functions for these three.
+            await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
+            await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
+            await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
+
+            // The EST function already does batch applications by nature of how it works,
+            // so just call it once for each of the four EST types represented.
+            foreach (var kv in estEntries)
+            {
+                await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
+            }
+
+
+            // IMC Files don't really overlap that often, so it's
+            // not a significant loss generally to just write them individually.
+            foreach (var meta in data)
+            {
+                if (meta.ImcEntries.Count > 0)
+                {
+                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+                    var imcPath = meta.Root.GetRawImcFilePath();
+                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, index, modlist);
+                }
+            }
+
+            await _index.SaveIndexFile(index);
+            await _modding.SaveModListAsync(modlist);
+        }
 
         /// <summary>
         /// Applies this Metadata object to the FFXIV file system.

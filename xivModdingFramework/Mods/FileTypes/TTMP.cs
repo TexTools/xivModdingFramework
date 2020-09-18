@@ -680,8 +680,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     count = 0;
                     progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
 
-                    // ModList is update now.  Time to expand the Metadata files.
+                    // ModList is updated now.  Time to expand the Metadata files.
                     Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
+                    List<ItemMetadata> metadataEntries = new List<ItemMetadata>();
                     foreach (var file in filePaths)
                     {
                         if (ErroneousFiles.Contains(file)) continue;
@@ -703,7 +704,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 meta.Validate(file);
 
-                                await ItemMetadata.ApplyMetadata(meta, indexFiles[df], modList);
+                                metadataEntries.Add(meta);
                             } catch(Exception ex)
                             {
                                 ErroneousFiles.Add(file);
@@ -714,6 +715,8 @@ namespace xivModdingFramework.Mods.FileTypes
                             progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
                         }
                     }
+
+                    await ItemMetadata.ApplyMetadataBatched(metadataEntries, indexFiles[XivDataFile._04_Chara], modList);
 
                     foreach(var kv in indexFiles)
                     {
