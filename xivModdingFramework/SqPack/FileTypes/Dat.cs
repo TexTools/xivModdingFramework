@@ -25,6 +25,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
@@ -540,9 +541,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             var modding = new Modding(_gameDirectory);
 
             var modEntry = await modding.TryGetModEntry(internalPath);
-            var newData = (await CreateType2Data(dataToImport)).ToList();
+            var newData = (await CreateType2Data(dataToImport));
 
-            var newOffset = await WriteToDat(newData, modEntry, internalPath, category, itemName, dataFile, source, 2);
+            var newOffset = await WriteModFile(newData, internalPath, source);
 
             if (newOffset == 0)
             {
@@ -614,9 +615,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             bitData.CopyTo(data, 0);
 
             // Convert the data back into the Type 2 Data format SE expects.
-            var type2Data = (await CreateType2Data(data)).ToList();
+            var type2Data = (await CreateType2Data(data));
 
-            long newOffset = await WriteToDat(type2Data, modEntry, internalPath, Constants.InternalModSourceName, internalPath, dataFile, Constants.InternalModSourceName, 2);
+            var newOffset = await WriteModFile(type2Data, internalPath, Constants.InternalModSourceName);
 
             if(offset != newOffset)
             {
@@ -1501,388 +1502,187 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return await _index.GetDataOffset(targetPath);
             }
 
-            var ftype = GetFileType(originalOffset, originalDataFile);
             var size = await GetCompressedFileSize(originalOffset, originalDataFile);
             var data = GetRawData(originalOffset, originalDataFile, size);
-            var modEntry = await _modding.TryGetModEntry(targetPath);
 
-            return await WriteToDat(data.ToList(), modEntry, targetPath, category, itemName, IOUtil.GetDataFileFromPath(targetPath), source, ftype);
+            return await WriteModFile(data, targetPath, source);
         }
 
-        /// <summary>
-        /// Writes the newly imported data to the .dat for modifications.
-        /// </summary>
-        /// <param name="importData">The data to be written.</param>
-        /// <param name="modEntry">The modlist entry (if any) for the given file.</param>
-        /// <param name="internalFilePath">The internal file path of the item being modified.</param>
-        /// <param name="category">The category of the item.</param>
-        /// <param name="itemName">The name of the item being modified.</param>
-        /// <param name="dataFile">The data file to which we write the data</param>
-        /// <param name="source">The source/application that is writing to the dat.</param>
-        /// <param name="dataType">The data type (2, 3, 4)</param>
-        /// <param name="modPack">The modpack associated with the import data if any</param>
-        /// <returns>The new offset in which the modified data was placed.</returns>
-        public async Task<long> WriteToDat(List<byte> importData, Mod modEntry, string internalFilePath,
-            string category, string itemName, XivDataFile dataFile, string source, int dataType,
-            ModPack modPack = null, bool updateCache = true)
-        {
-            long offset = 0;
-            var dataOverwritten = false;
 
-            if(importData == null || importData.Count < 8 )
+        /// <summary>
+        /// Writes a new block of data to the given data file, without changing 
+        /// the indexes.  Returns the raw-index-style offset to the new data.
+        /// </summary>
+        /// <param name="importData"></param>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        public async Task<uint> WriteToDat(byte[] importData, XivDataFile dataFile)
+        {
+            // Perform basic validation.
+            if (importData == null || importData.Length < 8)
             {
                 throw new Exception("Attempted to write NULL data to DAT files.");
             }
 
-            var fileType = BitConverter.ToInt32(importData.ToArray(), 4);
-            if(fileType < 2 || fileType > 4)
+            var fileType = BitConverter.ToInt32(importData, 4);
+            if (fileType < 2 || fileType > 4)
             {
                 throw new Exception("Attempted to write Invalid data to DAT files.");
             }
 
-
-            internalFilePath = internalFilePath.Replace("\\", "/");
-
-
-            var index = new Index(_gameDirectory);
-
-            var NewFilesNeedToBeAdded = !await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath)), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
-            var IsTexToolsAddedFileFlag = await index.FileExists(HashGenerator.GetHash(Path.GetFileName(internalFilePath + ".flag")), HashGenerator.GetHash($"{Path.GetDirectoryName(internalFilePath).Replace("\\", "/")}"), dataFile);
-            NewFilesNeedToBeAdded = NewFilesNeedToBeAdded || IsTexToolsAddedFileFlag || (modEntry != null && modEntry.IsCustomFile());
-
-            var datNum = 0;
-            var modDatPath = "";
-
-
+            long filePointer = 0;
             await _lock.WaitAsync();
             try
             {
-
                 // This finds the first dat with space, OR creates one if needed.
-                datNum = await GetFirstDatWithSpace(dataFile, importData.Count, true);
+                var datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
+                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
-                modDatPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
-
-                if (category.Equals(itemName))
+                // Copy the data into the file.
+                using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
                 {
-                    category = XivStrings.Character;
-                }
+                    bw.BaseStream.Seek(0, SeekOrigin.End);
 
-                // If there is an existing modlist entry, use that data to get the modDatPath
-                if (modEntry != null)
-                {
-                    var existingDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                    var checkPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{existingDatNum}");
-
-                    if (!File.Exists(checkPath))
+                    // Make sure we're starting on an actual accessible interval.
+                    while ((bw.BaseStream.Position % 256) != 0)
                     {
-                        throw new Exception($"A mod entry is pointing to {Path.GetFileName(modDatPath)}, but the file does not exist.\n\n" +
-                                            $"It is recommended to do a Start Over.");
-                    }
-                }
-
-                // Checks to make sure the offsets in the mod list are not 0
-                // If they are 0, something went wrong in the import proccess (Technically shouldn't happen)
-                if (modEntry != null)
-                {
-                    if (modEntry.data.modOffset <= 0)
-                    {
-                        throw new Exception("The mod offset located in the mod list cannot be 0 or Negative");
+                        bw.Write((byte)0);
                     }
 
-                    if (modEntry.data.originalOffset <= 0)
+                    filePointer = bw.BaseStream.Position;
+
+                    // Write data.
+                    bw.Write(importData);
+
+                    // Make sure we end on an accessible interval as well to be safe.
+                    while ((bw.BaseStream.Position % 256) != 0)
                     {
-                        throw new Exception("The original offset located in the mod list cannot be 0 or Negative.");
+                        bw.Write((byte)0);
                     }
                 }
 
-                /* 
-                 * If the item has been previously modified and the compressed data being imported is smaller or equal to the existing data
-                 *  replace the existing data with new data.
-                 */
-                if (modEntry != null && importData.Count <= modEntry.data.modSize)
-                {
-                    if (modEntry.data.modOffset > 0)
-                    {
+                var intFormat = (uint)(filePointer / 8);
+                uint datIdentifier = (uint)(datNum * 2);
 
-                        var sizeDiff = modEntry.data.modSize - importData.Count;
+                uint indexOffset = (uint) (intFormat | datIdentifier);
 
-                        var oldDatNum = ((modEntry.data.modOffset / 8) & 0x0F) / 2;
-                        modDatPath = Path.Combine(_gameDirectory.FullName, $"{modEntry.datFile}{DatExtension}{oldDatNum}");
-                        var datOffsetAmount = 16 * oldDatNum;
-
-                        using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
-                        {
-                            bw.BaseStream.Seek(modEntry.data.modOffset - datOffsetAmount, SeekOrigin.Begin);
-
-                            bw.Write(importData.ToArray());
-
-                            bw.Write(new byte[sizeDiff]);
-                        }
-
-                        // In cases where the file-addition mod was previously disabled, we need to re-add the file descriptor.
-                        if (NewFilesNeedToBeAdded)
-                        {
-                            var addedFile = await index.AddFileDescriptor(internalFilePath, modEntry.data.modOffset, dataFile, false);
-                        }
-                        else
-                        {
-                            await index.UpdateDataOffset(modEntry.data.modOffset, internalFilePath, false);
-                        }
-
-                        offset = modEntry.data.modOffset;
-
-                        dataOverwritten = true;
-
-                        var modding = new Modding(_gameDirectory);
-                        var modList = modding.GetModList();
-
-                        var entryEnableUpdate = (from entry in modList.Mods
-                                                 where entry.fullPath.Equals(modEntry.fullPath)
-                                                 select entry).FirstOrDefault();
-
-                        entryEnableUpdate.enabled = true;
-
-                        if (modPack != null)
-                        {
-                            entryEnableUpdate.modPack = modPack;
-                        }
-
-                        modding.SaveModList(modList);
-                    }
-                }
-                else
-                {
-                    /* 
-                     * If there is an empty entry in the modlist and the compressed data being imported is smaller or equal to the available space
-                    *  write the compressed data in the existing space.
-                    */
-
-                    var modding = new Modding(_gameDirectory);
-                    var modList = modding.GetModList();
-
-                    if (modList != null && modList.emptyCount > 0)
-                    {
-                        foreach (var mod in modList.Mods)
-                        {
-                            if (!mod.fullPath.Equals(string.Empty) || !mod.datFile.Equals(dataFile.GetDataFileName()))
-                                continue;
-
-                            if (mod.data.modOffset <= 0) continue;
-
-                            var emptyEntryLength = mod.data.modSize;
-
-                            if (emptyEntryLength > importData.Count)
-                            {
-                                var sizeDiff = emptyEntryLength - importData.Count;
-
-                                var oldDatNum = ((mod.data.modOffset / 8) & 0x0F) / 2;
-                                modDatPath = Path.Combine(_gameDirectory.FullName, $"{mod.datFile}{DatExtension}{oldDatNum}");
-                                var datOffsetAmount = 16 * oldDatNum;
-
-                                using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
-                                {
-                                    bw.BaseStream.Seek(mod.data.modOffset - datOffsetAmount, SeekOrigin.Begin);
-
-                                    bw.Write(importData.ToArray());
-
-                                    bw.Write(new byte[sizeDiff]);
-                                }
-
-                                long originalOffset = 0;
-                                if (NewFilesNeedToBeAdded)
-                                {
-                                    var addedFile = await index.AddFileDescriptor(internalFilePath, mod.data.modOffset, dataFile, false);
-                                    originalOffset = mod.data.modOffset;
-                                }
-                                else
-                                {
-                                    originalOffset = await index.UpdateDataOffset(mod.data.modOffset, internalFilePath, false) * 8;
-                                }
-
-                                // The imported data was larger than the original existing mod,
-                                // and an empty slot large enough for the data was available,
-                                // so we need to empty out the original entry so it may be used later
-                                if (modEntry != null)
-                                {
-                                    var entryToEmpty = (from entry in modList.Mods
-                                                        where entry.fullPath.Equals(modEntry.fullPath)
-                                                        select entry).FirstOrDefault();
-
-                                    originalOffset = entryToEmpty.data.originalOffset;
-
-                                    entryToEmpty.name = string.Empty;
-                                    entryToEmpty.category = string.Empty;
-                                    entryToEmpty.fullPath = string.Empty;
-                                    entryToEmpty.source = string.Empty;
-                                    entryToEmpty.modPack = null;
-                                    entryToEmpty.enabled = false;
-                                    entryToEmpty.data.originalOffset = 0;
-                                    entryToEmpty.data.dataType = 0;
-
-                                    modList.emptyCount += 1;
-                                }
-
-                                // Replace the empty entry with the new data
-                                mod.source = source;
-                                mod.name = itemName;
-                                mod.category = category;
-                                mod.fullPath = internalFilePath;
-                                mod.datFile = dataFile.GetDataFileName();
-                                mod.data.originalOffset = originalOffset;
-                                mod.data.dataType = dataType;
-                                mod.enabled = true;
-                                mod.modPack = modPack;
-
-                                modList.emptyCount -= 1;
-                                modList.modCount += 1;
-
-                                modding.SaveModList(modList);
-
-                                offset = mod.data.modOffset;
-
-                                dataOverwritten = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    // If there was no mod entry overwritten, write the new import data at the end of the dat file
-                    if (!dataOverwritten)
-                    {
-                        using (var bw = new BinaryWriter(File.OpenWrite(modDatPath)))
-                        {
-                            bw.BaseStream.Seek(0, SeekOrigin.End);
-
-                            while ((bw.BaseStream.Position & 0xFF) != 0)
-                            {
-                                bw.Write((byte)0);
-                            }
-
-                            var eof = (int)bw.BaseStream.Position + importData.Count;
-
-                            while ((eof & 0xFF) != 0)
-                            {
-                                importData.AddRange(new byte[16]);
-                                eof = eof + 16;
-                            }
-
-                            var datOffsetAmount = 16 * datNum;
-                            offset = bw.BaseStream.Position + datOffsetAmount;
-
-                            if (offset != 0)
-                            {
-                                bw.Write(importData.ToArray());
-                            }
-                            else
-                            {
-                                throw new Exception("There was an issue obtaining the offset to write to.");
-                            }
-                        }
-                    }
-                }
-
-                // If there was no mod entry overwritten, write a new mod entry
-                if (!dataOverwritten)
-                {
-                    if (offset != 0)
-                    {
-                        var modding = new Modding(_gameDirectory);
-                        var modList = modding.GetModList();
-
-                        long oldOffset = 0;
-                        if (NewFilesNeedToBeAdded)
-                        {
-                            var addedFile = await index.AddFileDescriptor(internalFilePath, offset, dataFile, false);
-                            oldOffset = offset;
-                        } else
-                        {
-                            oldOffset = await index.UpdateDataOffset(offset, internalFilePath, false) * 8;
-                        }
-
-                        /*
-                         * If the item has been previously modified, but the new compressed data to be imported is larger than the existing data,
-                         * and no empty slot was found for it, then empty out the entry from the modlist, 
-                         * leaving the offset and size intact for future use
-                        */
-                        if (modEntry != null)
-                        {
-                            var entryToEmpty = (from entry in modList.Mods
-                                                where entry.fullPath.Equals(modEntry.fullPath)
-                                                select entry).FirstOrDefault();
-
-                            oldOffset = entryToEmpty.data.originalOffset;
-
-                            entryToEmpty.name = string.Empty;
-                            entryToEmpty.category = string.Empty;
-                            entryToEmpty.fullPath = string.Empty;
-                            entryToEmpty.source = string.Empty;
-                            entryToEmpty.modPack = null;
-                            entryToEmpty.enabled = false;
-                            entryToEmpty.data.originalOffset = 0;
-                            entryToEmpty.data.dataType = 0;
-
-                            modList.emptyCount += 1;
-                        }
-
-                        var newEntry = new Mod
-                        {
-                            source = source,
-                            name = itemName,
-                            category = category,
-                            fullPath = internalFilePath,
-                            datFile = dataFile.GetDataFileName(),
-                            enabled = true,
-                            modPack = modPack,
-                            data = new Data
-                            {
-                                dataType = dataType,
-                                originalOffset = oldOffset,
-                                modOffset = offset,
-                                modSize = importData.Count
-                            }
-                        };
-
-                        if (NewFilesNeedToBeAdded)
-                            newEntry.data.originalOffset = newEntry.data.modOffset;
-
-                        modList.Mods.Add(newEntry);
-
-                        modList.modCount += 1;
-
-                        modding.SaveModList(modList);
-                    }
-                }
-
-
+                return indexOffset;
             } finally
             {
                 _lock.Release();
             }
+        }
 
 
+        /// <summary>
+        /// Writes a given block of data to the DAT files, updates the index to point to it for the given file path,
+        /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
+        /// </summary>
+        /// <param name="fileData"></param>
+        /// <param name="internalFilePath"></param>
+        /// <param name="sourceApplication"></param>
+        /// <returns></returns>
+        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null)
+        {
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+            var df = IOUtil.GetDataFileFromPath(internalFilePath);
+
+
+            string itemName = "Unknown";
+            string category = "Unknown";
+            if (referenceItem == null)
+            {
+                try
+                {
+                    var root = await XivCache.GetFirstRoot(internalFilePath);
+                    var item = root.GetFirstItem();
+
+                    referenceItem = item;
+                    itemName = referenceItem.Name;
+                    category = referenceItem.SecondaryCategory;
+                }
+                catch
+                {
+                    itemName = Path.GetFileName(internalFilePath);
+                }
+            } else
+            {
+                itemName = referenceItem.Name;
+                category = referenceItem.SecondaryCategory;
+            }
+
+            // Update the DAT files.
+            var rawOffset = await WriteToDat(fileData, df);
+
+
+            // Update the Index files.
+            var retOffset = ((long)rawOffset) * 8L;
+            var originalOffset = await _index.UpdateDataOffset(retOffset, internalFilePath, true);
+            var longOriginal = ((long)originalOffset) * 8L;
+
+
+            var fileType = BitConverter.ToInt32(fileData, 4);
+
+            // Update the Mod List file.
+            var modList = _modding.GetModList();
+            var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
+
+
+            if (mod == null)
+            {
+                // Determine if this is an original game file or not.
+                var fileAdditionMod = originalOffset == 0;
+
+                mod = new Mod()
+                {
+                    name = itemName,
+                    category = category,
+                    datFile = df.GetDataFileName(),
+                    source = sourceApplication,
+                    fullPath = internalFilePath,
+                    data = new Data()
+                };
+                mod.data.modOffset = retOffset;
+                mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
+                mod.data.dataType = fileType;
+                mod.enabled = true;
+                mod.modPack = null;
+                modList.Mods.Add(mod);
+
+                modList.modCount += 1;
+            } else
+            {
+                mod.data.modOffset = retOffset;
+                mod.enabled = true;
+                mod.modPack = null;
+                mod.data.dataType = fileType;
+                mod.name = itemName;
+                mod.category = category;
+                mod.source = sourceApplication;
+            }
+
+            await _modding.SaveModListAsync(modList);
+
+            // Perform metadata expansion if needed.
             var ext = Path.GetExtension(internalFilePath);
             if(ext == ".meta")
             {
-                
-                // Retreive the uncompressed meta entry we just wrote.
-                var data = await GetType2Data(offset, dataFile);
-                var meta = await ItemMetadata.Deserialize(data);
+                var metaRaw = await GetType2Data(retOffset, df);
+                var meta = await ItemMetadata.Deserialize(metaRaw);
 
                 meta.Validate(internalFilePath);
 
-                // And write that metadata to the actual constituent files.
                 await ItemMetadata.ApplyMetadata(meta);
             }
 
-            if (updateCache)
-            {
-                // Queue our dependency information updates.
-                XivCache.QueueDependencyUpdate(internalFilePath);
-            }
+            // Queue cache update.
+            XivCache.QueueDependencyUpdate(internalFilePath);
 
-            return offset;
+            // Job done.
+            return retOffset;
         }
+
 
         /// <summary>
         /// Dictionary that holds [Texture Code, Texture Format] data

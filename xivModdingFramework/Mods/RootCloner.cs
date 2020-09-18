@@ -241,7 +241,7 @@ namespace xivModdingFramework.Mods
 
                     // Save new Model.
                     var bytes = await _mdl.MakeNewMdlFile(tmdl, xmdl, null);
-                    await _dat.WriteToDat(bytes.ToList(), null, dst, iCat, iName, df, ApplicationSource, 3);
+                    await _dat.WriteModFile(bytes, dst, ApplicationSource);
                 }
 
                 if (ProgressReporter != null)

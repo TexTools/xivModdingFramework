@@ -2160,7 +2160,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (!rawDataOnly)
                 {
                     loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                    await dat.WriteToDat(bytes.ToList(), modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
+                    await dat.WriteModFile(bytes, filePath, source);
                 }
 
                 loggingFunction(false, "Job done!");
@@ -4432,7 +4432,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var mtrlData = await _dat.GetType2Data(material, false);
                     var compressedData = await _dat.CreateType2Data(mtrlData);
-                    await _dat.WriteToDat(compressedData.ToList(), null, newMtrlPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), source, 2);
+                    await _dat.WriteModFile(compressedData, newMtrlPath, source, item);
 
                     // Switch out any material references to the material in the model file.
                     foreach(var m in model.MeshGroups)
@@ -4450,7 +4450,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Save the final modified mdl.
             var data = await MakeNewMdlFile(model, xMdl);
-            var offset = await _dat.WriteToDat(data.ToList(), null, newPath, item.SecondaryCategory, item.Name, IOUtil.GetDataFileFromPath(newPath), source, 3);
+            var offset = await _dat.WriteModFile(data, newPath, source, item);
             return offset;
         }
 

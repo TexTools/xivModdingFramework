@@ -505,8 +505,7 @@ namespace xivModdingFramework.Materials.FileTypes
                                 .Replace("\0", "");
                             var dx11FileName = Path.GetFileName(texturePath).Insert(0, "--");
 
-                            if (await index.FileExists(HashGenerator.GetHash(dx11FileName),
-                                HashGenerator.GetHash(Path.GetDirectoryName(texturePath).Replace("\\", "/")),
+                            if (await index.FileExists(Path.GetDirectoryName(texturePath).Replace("\\", "/") + "/" + dx11FileName,
                                 DataFile))
                             {
                                 texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
@@ -715,9 +714,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 foreach (var mapInfo in mapInfoList)
                 {
                     var path = mapInfo.Path;
-                    var fileHash = HashGenerator.GetHash(Path.GetFileName(path));
-                    var pathHash = HashGenerator.GetHash(path.Substring(0, path.LastIndexOf("/", StringComparison.Ordinal)));
-                    var exists = await _index.FileExists(fileHash, pathHash, IOUtil.GetDataFileFromPath(path));
+                    var exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
 
                     if(exists)
                     {

@@ -26,6 +26,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -468,6 +469,23 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 await Task.Run(async () =>
                 {
+
+                    // Okay, we need to do a few things here.
+                    // 1 - Copy all the mod data to the DAT files.
+                    // 2 - Update all the indices.
+                    // 3 - Update the Modlist
+                    // 4 - Expand Metadata
+                    // 5 - Queue Cache Updates.
+
+                    // We only need the actual Zip file during the initial copy stage.
+
+                    HashSet<string> ErroneousFiles = new HashSet<string>();
+
+                    Dictionary<string, uint> DatOffsets = new Dictionary<string, uint>();
+                    Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
+                    Dictionary<string, int> FileTypes = new Dictionary<string, int>();
+
+                    // 1 - Copy all the mod data to the DAT files.
                     using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
                     {
                         foreach (var zipEntry in archive.Entries)
@@ -490,49 +508,28 @@ namespace xivModdingFramework.Mods.FileTypes
                                             {
                                                 try
                                                 {
-                                                    if (modListFullPaths.Contains(modJson.FullPath))
+                                                    binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
+                                                    var data = binaryReader.ReadBytes(modJson.ModSize);
+                                                    var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
+                                                    var offset = await dat.WriteToDat(data, df);
+                                                    DatOffsets.Add(modJson.FullPath, offset);
+
+                                                    var dataType = BitConverter.ToInt32(data, 4);
+                                                    FileTypes.Add(modJson.FullPath, dataType);
+
+                                                    if(!FilesPerDf.ContainsKey(df))
                                                     {
-                                                        var existingEntry = (from entry in modList.Mods
-                                                                             where entry.fullPath.Equals(modJson.FullPath)
-                                                                             select entry).FirstOrDefault();
-
-                                                        binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
-
-                                                        var data = binaryReader.ReadBytes(modJson.ModSize);
-
-                                                        await (dat.WriteToDat(new List<byte>(data), existingEntry,
-                                                            modJson.FullPath,
-                                                            modJson.Category.GetDisplayName(), modJson.Name,
-                                                            XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry, false));
+                                                        FilesPerDf.Add(df, new List<string>());
                                                     }
-                                                    else
-                                                    {
-                                                        binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
 
-                                                        var data = binaryReader.ReadBytes(modJson.ModSize);
-
-                                                        await (dat.WriteToDat(new List<byte>(data), null, modJson.FullPath,
-                                                            modJson.Category.GetDisplayName(), modJson.Name,
-                                                            XivDataFiles.GetXivDataFile(modJson.DatFile), _source,
-                                                            GetDataType(modJson.FullPath), modJson.ModPackEntry, false));
-                                                    }
+                                                    FilesPerDf[df].Add(modJson.FullPath);
                                                 }
                                                 catch (Exception ex)
                                                 {
-                                                    eCount++;
-                                                    if (ex.GetType() == typeof(NotSupportedException))
-                                                    {
-                                                        importErrors = ex.Message;
-                                                        break;
-                                                    }
-
+                                                    ErroneousFiles.Add(modJson.FullPath);
                                                     importErrors +=
                                                         $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
                                                 }
-                                                importCount++;
-
-                                                progress?.Report((importCount, modsJson.Count, string.Empty));
 
                                             }
                                         }
@@ -545,12 +542,30 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                         }
                     }
-                });
 
+                    // We've now copied the data into the game files, we now need to update the indices.
+                    var _index = new Index(XivCache.GameInfo.GameDirectory);
+                    Dictionary<string, uint> OriginalOffsets = new Dictionary<string, uint>();
+                    foreach(var kv in FilesPerDf)
+                    {
+                        // Load each index file and update all the files within it as needed.
+                        var df = kv.Key;
+                        var index = await _index.GetIndexFile(df);
 
-                if (modsJson[0].ModPackEntry != null)
-                {
-                    modList = modding.GetModList();
+                        foreach (var file in kv.Value)
+                        {
+                            var original = index.SetDataOffset(file, DatOffsets[file]);
+                            OriginalOffsets.Add(file, original);
+                        }
+
+                        await _index.SaveIndexFile(index);
+                    }
+
+                    // Dat files and indices are updated, time to update the modlist.
+
+                    // Update the Mod List file.
+                    var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+                    var modList = _modding.GetModList();
 
                     // TODO - Probably need to look at keying this off more than just the name.
                     var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
@@ -559,20 +574,85 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         modList.ModPacks.Add(modsJson[0].ModPackEntry);
                     }
+                    var modPack = modList.ModPacks.First(x => x.name == modsJson[0].ModPackEntry.name);
 
-                    modding.SaveModList(modList);
+                    foreach (var file in filePaths) {
 
-                    // Batch cache queueing for after import is all done.
+                        var mod = modList.Mods.FirstOrDefault(x => x.fullPath == file);
+                        var json = modsJson.First(x => x.FullPath == file);
+                        var longOffset = ((long)DatOffsets[file]) * 8L;
+                        var originalOffset = OriginalOffsets[file];
+                        var longOriginal = ((long)originalOffset) * 8L;
+                        var fileType = FileTypes[file];
+                        var df = IOUtil.GetDataFileFromPath(file);
+
+                        if (mod == null)
+                        {
+                            // Determine if this is an original game file or not.
+                            var fileAdditionMod = originalOffset == 0;
+
+                            mod = new Mod()
+                            {
+                                name = json.Name,
+                                category = json.Category,
+                                datFile = df.GetDataFileName(),
+                                source = _source,
+                                fullPath = file,
+                                data = new Data()
+                            };
+
+                            mod.data.modOffset = longOffset;
+                            mod.data.originalOffset = (fileAdditionMod ? longOffset : longOriginal);
+                            mod.data.dataType = fileType;
+                            mod.enabled = true;
+                            mod.modPack = modPack;
+                            modList.Mods.Add(mod);
+
+                            modList.modCount += 1;
+                        }
+                        else
+                        {
+                            mod.data.modOffset = longOffset;
+                            mod.enabled = true;
+                            mod.modPack = modPack;
+                            mod.data.dataType = fileType;
+                            mod.name = json.Name;
+                            mod.category = json.Category;
+                            mod.source = _source;
+                        }
+                    }
+                    await _modding.SaveModListAsync(modList);
+
+                    // ModList is update now.  TIme to expand the Metadata files.
+                    foreach(var file in filePaths)
+                    {
+                        var longOffset = ((long)DatOffsets[file]) * 8L;
+                        var ext = Path.GetExtension(file);
+                        if (ext == ".meta")
+                        {
+                            var df = IOUtil.GetDataFileFromPath(file);
+                            var metaRaw = await dat.GetType2Data(longOffset, df);
+                            var meta = await ItemMetadata.Deserialize(metaRaw);
+
+                            meta.Validate(file);
+
+                            await ItemMetadata.ApplyMetadata(meta);
+                        }
+                    }
+
+                    // Metadata files expanded, last thing is to queue everthing up for the Cache.
                     var files = modsJson.Select(x => x.FullPath).ToList();
                     try
                     {
                         XivCache.QueueDependencyUpdate(files);
-                    } catch(Exception ex)
+                    }
+                    catch (Exception ex)
                     {
                         throw new Exception("An error occured while trying to update the Cache.\n\n" + ex.Message + "\n\nThe mods were still imported successfully, however, the Cache should be rebuilt.");
                     }
+                });
 
-                }
+
             } finally
             {
                 XivCache.CacheWorkerEnabled = workerEnabled;
