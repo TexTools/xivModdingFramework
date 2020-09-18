@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Ionic.Zip;
 using Newtonsoft.Json;
 using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -168,15 +168,16 @@ namespace xivModdingFramework.Mods.FileTypes
                     File.Delete(modPackPath);
                 }
 
-                using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
+                var zf = new ZipFile();
+                zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
+                zf.AddFile(_tempMPL, "TTMPL.mpl");
+                zf.AddFile(_tempMPD, "TTMPD.mpd");
+                foreach (var image in imageList)
                 {
-                    zip.CreateEntryFromFile(_tempMPL, "TTMPL.mpl");
-                    zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
-                    foreach (var image in imageList)
-                    {
-                        zip.CreateEntryFromFile(image.Value, image.Key);
-                    }
+                    zf.AddFile(image.Value, image.Key);
                 }
+                zf.Save(modPackPath);
+
 
                 File.Delete(_tempMPD);
                 File.Delete(_tempMPL);
@@ -199,8 +200,16 @@ namespace xivModdingFramework.Mods.FileTypes
             var processCount = await Task.Run<int>(() =>
             {
                 var dat = new Dat(gameDirectory);
-                _tempMPD = Path.GetTempFileName();
-                _tempMPL = Path.GetTempFileName();
+
+                var guid = Guid.NewGuid();
+
+                var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
+                Directory.CreateDirectory(dir);
+
+
+                _tempMPD = Path.Combine(dir, "TTMPD.mpd");
+                _tempMPL = Path.Combine(dir, "TTMPL.mpl");
+
                 var modCount = 0;
 
                 var modPackJson = new ModPackJson
@@ -217,7 +226,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 try
                 {
-                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Open)))
+                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Create)))
                     {
                         foreach (var simpleModData in modPackData.SimpleModDataList)
                         {
@@ -280,16 +289,15 @@ namespace xivModdingFramework.Mods.FileTypes
                         File.Delete(modPackPath);
                     }
 
-                    using (var zip = ZipFile.Open(modPackPath, ZipArchiveMode.Create))
-                    {
-                        zip.CreateEntryFromFile(_tempMPL, "TTMPL.mpl");
-                        zip.CreateEntryFromFile(_tempMPD, "TTMPD.mpd");
-                    }
+                    var zf = new ZipFile();
+                    zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
+                    zf.AddFile(_tempMPL);
+                    zf.AddFile(_tempMPD);
+                    zf.Save(modPackPath);
                 }
                 finally
                 {
-                    File.Delete(_tempMPD);
-                    File.Delete(_tempMPL);
+                    Directory.Delete(dir, true);
                 }
 
                 return modCount;
@@ -310,24 +318,24 @@ namespace xivModdingFramework.Mods.FileTypes
                 ModPackJson modPackJson = null;
                 var imageDictionary = new Dictionary<string, Image>();
 
-                using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+
+
+
+                using (var zf = ZipFile.Read(modPackDirectory.FullName))
                 {
-                    foreach (var entry in archive.Entries)
+                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png"));
+                    var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
+
+                    using (var streamReader = new StreamReader(mpl.OpenReader()))
                     {
-                        if (entry.FullName.EndsWith(".mpl"))
-                        {
-                            using (var streamReader = new StreamReader(entry.Open()))
-                            {
-                                var jsonString = streamReader.ReadToEnd();
+                        var jsonString = streamReader.ReadToEnd();
 
-                                modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
-                            }
-                        }
+                        modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                    }
 
-                        if (entry.FullName.EndsWith(".png"))
-                        {
-                            imageDictionary.Add(entry.FullName, Image.Load(entry.Open()));
-                        }
+                    foreach(var imgEntry in images)
+                    {
+                        imageDictionary.Add(imgEntry.FileName, Image.Load(imgEntry.OpenReader()));
                     }
                 }
 
@@ -346,7 +354,7 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 var modPackJsonList = new List<OriginalModPackJson>();
 
-                using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+                using (var archive = System.IO.Compression.ZipFile.OpenRead(modPackDirectory.FullName))
                 {
                     foreach (var entry in archive.Entries)
                     {
@@ -390,7 +398,7 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             ModPackJson modPackJson = null;
 
-            using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+            using (var archive = System.IO.Compression.ZipFile.OpenRead(modPackDirectory.FullName))
             {
                 foreach (var entry in archive.Entries)
                 {
@@ -425,8 +433,6 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var dat = new Dat(gameDirectory);
             var modding = new Modding(gameDirectory);
-            var modListFullPaths = new List<string>();
-            var modList = modding.GetModList();
             var importErrors = "";
             var eCount = 0;
 
@@ -455,18 +461,10 @@ namespace xivModdingFramework.Mods.FileTypes
             }
             modsJson = newList;
 
-            var importCount = 0;
+            var totalFiles = filePaths.Count;
 
             try
             {
-                foreach (var modListMod in modList.Mods)
-                {
-                    if (!string.IsNullOrEmpty(modListMod.fullPath))
-                    {
-                        modListFullPaths.Add(modListMod.fullPath);
-                    }
-                }
-
                 await Task.Run(async () =>
                 {
 
@@ -486,68 +484,76 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<string, int> FileTypes = new Dictionary<string, int>();
 
                     // 1 - Copy all the mod data to the DAT files.
-                    using (var archive = ZipFile.OpenRead(modPackDirectory.FullName))
+
+                    using(var zf = ZipFile.Read(modPackDirectory.FullName))
                     {
-                        foreach (var zipEntry in archive.Entries)
+                        progress.Report((0, 0, "Unzipping TTMP File..."));
+                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
+                        var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
+
+                        _tempMPD = Path.GetTempFileName();
+                        _tempMPL = Path.GetTempFileName();
+
+                        using (var fs = new FileStream(_tempMPL, FileMode.Open))
                         {
-                            if (zipEntry.FullName.EndsWith(".mpd"))
-                            {
-                                _tempMPD = Path.GetTempFileName();
+                            mpl.Extract(fs);
+                        }
 
-                                using (var zipStream = zipEntry.Open())
-                                {
-                                    using (var fileStream = new FileStream(_tempMPD, FileMode.OpenOrCreate))
-                                    {
-                                        progress?.Report((0, modsJson.Count, GeneralStrings.TTMP_ReadingContent));
-                                        await zipStream.CopyToAsync(fileStream);
-                                        progress?.Report((0, modsJson.Count, GeneralStrings.TTMP_StartImport));
-
-                                        using (var binaryReader = new BinaryReader(fileStream))
-                                        {
-                                            foreach (var modJson in modsJson)
-                                            {
-                                                try
-                                                {
-                                                    binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
-                                                    var data = binaryReader.ReadBytes(modJson.ModSize);
-                                                    var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
-                                                    var offset = await dat.WriteToDat(data, df);
-                                                    DatOffsets.Add(modJson.FullPath, offset);
-
-                                                    var dataType = BitConverter.ToInt32(data, 4);
-                                                    FileTypes.Add(modJson.FullPath, dataType);
-
-                                                    if(!FilesPerDf.ContainsKey(df))
-                                                    {
-                                                        FilesPerDf.Add(df, new List<string>());
-                                                    }
-
-                                                    FilesPerDf[df].Add(modJson.FullPath);
-                                                }
-                                                catch (Exception ex)
-                                                {
-                                                    ErroneousFiles.Add(modJson.FullPath);
-                                                    importErrors +=
-                                                        $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
-                                                }
-
-                                            }
-                                        }
-                                    }
-                                }
-
-                                File.Delete(_tempMPD);
-
-                                break;
-                            }
+                        using (var fs = new FileStream(_tempMPD, FileMode.Open))
+                        {
+                            mpd.Extract(fs);
                         }
                     }
+
+                    var count = 0;
+                    progress.Report((0, 0, "Writing new mod data to DAT files..."));
+                    using (var binaryReader = new BinaryReader(new FileStream(_tempMPD, FileMode.Open)))
+                    {
+                        foreach (var modJson in modsJson)
+                        {
+                            try
+                            {
+                                binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
+                                var data = binaryReader.ReadBytes(modJson.ModSize);
+                                var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
+                                var offset = await dat.WriteToDat(data, df);
+                                DatOffsets.Add(modJson.FullPath, offset);
+
+                                var dataType = BitConverter.ToInt32(data, 4);
+                                FileTypes.Add(modJson.FullPath, dataType);
+
+                                if (!FilesPerDf.ContainsKey(df))
+                                {
+                                    FilesPerDf.Add(df, new List<string>());
+                                }
+
+                                FilesPerDf[df].Add(modJson.FullPath);
+                            }
+                            catch (Exception ex)
+                            {
+                                ErroneousFiles.Add(modJson.FullPath);
+                                importErrors +=
+                                    $"Name: {modJson.Name}\nPath: {modJson.FullPath}\nOffset: {modJson.ModOffset}\nError: {ex.Message}\n\n";
+                            }
+
+                            count++;
+                            progress.Report((count, totalFiles, "Writing new mod data to DAT files..."));
+                        }
+                    }
+
+
+                    File.Delete(_tempMPL);
+                    File.Delete(_tempMPD);
+
+                    count = 0;
+                    progress.Report((count, totalFiles, "Updating Index file references..."));
 
                     // We've now copied the data into the game files, we now need to update the indices.
                     var _index = new Index(XivCache.GameInfo.GameDirectory);
                     Dictionary<string, uint> OriginalOffsets = new Dictionary<string, uint>();
                     foreach(var kv in FilesPerDf)
                     {
+
                         // Load each index file and update all the files within it as needed.
                         var df = kv.Key;
                         var index = await _index.GetIndexFile(df);
@@ -559,9 +565,15 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
 
                         await _index.SaveIndexFile(index);
+
+                        count++;
+                        progress.Report((count, totalFiles, "Updating Index file references..."));
                     }
 
                     // Dat files and indices are updated, time to update the modlist.
+
+                    count = 0;
+                    progress.Report((count, totalFiles, "Updating Mod List file..."));
 
                     // Update the Mod List file.
                     var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -613,6 +625,13 @@ namespace xivModdingFramework.Mods.FileTypes
                         else
                         {
                             mod.data.modOffset = longOffset;
+
+                            var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
+                            if (fileAdditionMod)
+                            {
+                                mod.data.originalOffset = longOffset;
+                            }
+
                             mod.enabled = true;
                             mod.modPack = modPack;
                             mod.data.dataType = fileType;
@@ -620,11 +639,19 @@ namespace xivModdingFramework.Mods.FileTypes
                             mod.category = json.Category;
                             mod.source = _source;
                         }
+
+                        count++;
+                        progress.Report((count, totalFiles, "Updating Mod List file..."));
                     }
                     await _modding.SaveModListAsync(modList);
 
+
+                    var totalMetadataEntries = filePaths.Count(x => x.EndsWith(".meta"));
+                    count = 0;
+                    progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
+
                     // ModList is update now.  TIme to expand the Metadata files.
-                    foreach(var file in filePaths)
+                    foreach (var file in filePaths)
                     {
                         var longOffset = ((long)DatOffsets[file]) * 8L;
                         var ext = Path.GetExtension(file);
@@ -637,14 +664,22 @@ namespace xivModdingFramework.Mods.FileTypes
                             meta.Validate(file);
 
                             await ItemMetadata.ApplyMetadata(meta);
+
+                            count++;
+                            progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
                         }
                     }
 
+
+                    count = 0;
+                    progress.Report((count, totalFiles, "Queuing Cache Updates..."));
                     // Metadata files expanded, last thing is to queue everthing up for the Cache.
                     var files = modsJson.Select(x => x.FullPath).ToList();
                     try
                     {
                         XivCache.QueueDependencyUpdate(files);
+
+                        progress.Report((totalFiles, totalFiles, "Queuing Cache Updates..."));
                     }
                     catch (Exception ex)
                     {
@@ -652,13 +687,13 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                 });
 
-
+                progress.Report((totalFiles, totalFiles, "Job Done."));
             } finally
             {
                 XivCache.CacheWorkerEnabled = workerEnabled;
             }
 
-            return (importCount, eCount, importErrors);
+            return (0, eCount, importErrors);
         }
 
         /// <summary>
