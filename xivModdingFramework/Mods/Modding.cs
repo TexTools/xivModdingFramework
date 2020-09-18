@@ -107,7 +107,7 @@ namespace xivModdingFramework.Mods
         }
         public async Task SaveModListAsync(ModList ml)
         {
-            _modlistSemaphore.WaitAsync();
+            await _modlistSemaphore.WaitAsync();
             File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
             _modlistSemaphore.Release();
         }
