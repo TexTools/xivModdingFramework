@@ -682,7 +682,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // ModList is updated now.  Time to expand the Metadata files.
                     Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
-                    Dictionary<XivDataFile, List<ItemMetadata>> metadataEntries = new Dictionary<XivDataFile, List<ItemMetadata>>;
+                    Dictionary<XivDataFile, List<ItemMetadata>> metadataEntries = new Dictionary<XivDataFile, List<ItemMetadata>>();
                     foreach (var file in filePaths)
                     {
                         if (ErroneousFiles.Contains(file)) continue;
@@ -717,10 +717,16 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
 
-                    foreach(var ifKv in indexFiles)
+                    try
                     {
-                        await ItemMetadata.ApplyMetadataBatched(metadataEntries[ifKv.Key], ifKv.Value, modList);
+                        foreach (var ifKv in indexFiles)
+                        {
+                            await ItemMetadata.ApplyMetadataBatched(metadataEntries[ifKv.Key], ifKv.Value, modList);
 
+                        }
+                    } catch(Exception Ex)
+                    {
+                        throw new Exception("An error occured when attempting to expand the metadata entries.\n\nError:" + Ex.Message);
                     }
 
                     foreach(var kv in indexFiles)
