@@ -434,10 +434,12 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
         /// <returns>The number of total mods imported</returns>
-        public async Task<(int ImportCount, int ErrorCount, string Errors)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
+        public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
         {
-            if (modsJson == null || modsJson.Count == 0) return (0, 0, "");
+            if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
+
+            var startTime = DateTime.Now.Ticks;
 
             var dat = new Dat(gameDirectory);
             var modding = new Modding(gameDirectory);
@@ -742,7 +744,15 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var errorCount = ErroneousFiles.Count;
             var count = totalFiles - errorCount;
-            return (count, errorCount, importErrors);
+
+            var endtime = DateTime.Now.Ticks;
+
+            // Duration in ms
+            var duration = (endtime - startTime) / 10000;
+
+            float seconds = duration / 1000f;
+
+            return (count, errorCount, importErrors, seconds);
         }
 
         /// <summary>
