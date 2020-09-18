@@ -1607,13 +1607,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                 modList.modCount += 1;
             } else
             {
-                mod.data.modOffset = retOffset;
                 var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                 if (fileAdditionMod)
                 {
                     mod.data.originalOffset = retOffset;
                 }
 
+                mod.data.modOffset = retOffset;
                 mod.enabled = true;
                 mod.modPack = null;
                 mod.data.dataType = fileType;

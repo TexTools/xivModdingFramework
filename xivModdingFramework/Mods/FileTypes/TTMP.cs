@@ -645,7 +645,6 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                             else
                             {
-                                mod.data.modOffset = longOffset;
 
                                 var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                                 if (fileAdditionMod)
@@ -653,6 +652,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     mod.data.originalOffset = longOffset;
                                 }
 
+                                mod.data.modOffset = longOffset;
                                 mod.enabled = true;
                                 mod.modPack = modPack;
                                 mod.data.dataType = fileType;
@@ -721,14 +721,12 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                     count = 0;
-                    progress.Report((count, totalFiles, "Queuing Cache Updates..."));
+                    progress.Report((0, 0, "Queuing Cache Updates..."));
                     // Metadata files expanded, last thing is to queue everthing up for the Cache.
                     var files = modsJson.Select(x => x.FullPath).ToList();
                     try
                     {
                         XivCache.QueueDependencyUpdate(files);
-
-                        progress.Report((totalFiles, totalFiles, "Queuing Cache Updates..."));
                     }
                     catch (Exception ex)
                     {

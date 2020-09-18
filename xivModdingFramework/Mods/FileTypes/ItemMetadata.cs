@@ -288,10 +288,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// Restores the original SE metadata for this root.
         /// This should only be called by Index.DeleteFileDescriptor().
         /// </summary>
-        public static async Task RestoreDefaultMetadata(XivDependencyRoot root)
+        public static async Task RestoreDefaultMetadata(XivDependencyRoot root, IndexFile index = null, ModList modlist = null)
         {
             var original = await ItemMetadata.CreateFromRaw(root, true);
-            await ApplyMetadata(original);
+            await ApplyMetadata(original, index, modlist);
         }
 
 

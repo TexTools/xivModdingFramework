@@ -363,51 +363,39 @@ namespace xivModdingFramework.Mods
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            if (mod.IsCustomFile())
+            // Added file.
+            if (enable && !mod.enabled)
             {
-                // Added file.
-                if (enable && !mod.enabled)
+                await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, updateCache);
+                mod.enabled = true;
+
+                // Check if we're re-enabling a metadata mod.
+                var ext = Path.GetExtension(mod.fullPath);
+                if (ext == ".meta")
                 {
-                    await index.AddFileDescriptor(mod.fullPath, mod.data.modOffset, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
-                    mod.enabled = true;
+                    // Retreive the uncompressed meta entry we just enabled.
+                    var data = await dat.GetType2Data(mod.fullPath, false);
+                    var meta = await ItemMetadata.Deserialize(data);
 
-                    // Check if we're re-enabling a metadata mod.
-                    var ext = Path.GetExtension(mod.fullPath);
-                    if (ext == ".meta")
-                    {
-                        // Retreive the uncompressed meta entry we just enabled.
-                        var data = await dat.GetType2Data(mod.fullPath, false);
-                        var meta = await ItemMetadata.Deserialize(data);
+                    meta.Validate(mod.fullPath);
 
-                        meta.Validate(mod.fullPath);
-
-                        // And write that metadata to the actual constituent files.
-                        await ItemMetadata.ApplyMetadata(meta);
-                    }
+                    // And write that metadata to the actual constituent files.
+                    await ItemMetadata.ApplyMetadata(meta);
                 }
-                else if (!enable && mod.enabled)
+            }
+            else if (!enable && mod.enabled)
+            {
+                if (mod.IsCustomFile())
                 {
-
                     // Delete file descriptor handles removing metadata as needed on its own.
                     await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
-                    mod.enabled = false;
-                }
-                
-            }
-            else
-            {
-                // Standard mod.
-                if (enable && !mod.enabled)
-                {
-                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, updateCache);
-                    mod.enabled = true;
-                }
-                else if (!enable && mod.enabled)
+                } else
                 {
                     await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, updateCache);
-                    mod.enabled = false;
                 }
+                mod.enabled = false;
             }
+                
             return true;
         }
 

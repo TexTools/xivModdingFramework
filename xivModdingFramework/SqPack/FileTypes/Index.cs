@@ -808,7 +808,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<uint> UpdateDataOffset(long offset, string fullPath, bool updateCache = true, bool allowDeletion = false)
         {
 
-            if(offset <= 0 && allowDeletion)
+            if(offset <= 0 && !allowDeletion)
             {
                 throw new InvalidDataException("Cannot delete file descriptor without delete flag set.");
             }
