@@ -705,7 +705,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), item.Name, xivMtrl.MTRLPath, item.SecondaryCategory, source);
+                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item);
 
                 // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
                 var mapInfoList = xivMtrl.GetAllMapInfos(false);

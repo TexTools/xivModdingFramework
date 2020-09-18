@@ -19,6 +19,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Resources;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,6 +31,7 @@ using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -520,22 +522,22 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string itemName, string internalPath,
-            string category, string source)
+        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
-            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), itemName, internalPath, category, source);
+            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, cachedIndexFile, cachedModList);
         }
 
         /// <summary>
-        /// Imports any Type 2 data
+        /// Imports type 2 data.
         /// </summary>
-        /// <param name="dataToImport">Bytes to import.</param>
-        /// <param name="itemName">The name of the item being imported.</param>
-        /// <param name="internalPath">The internal file path of the item.</param>
-        /// <param name="category">The items category.</param>
-        /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<long> ImportType2Data(byte[] dataToImport, string itemName, string internalPath,
-            string category, string source)
+        /// <param name="dataToImport">Raw data to import</param>
+        /// <param name="internalPath">Internal path to update index for.</param>
+        /// <param name="source">Source application making the changes/</param>
+        /// <param name="referenceItem">Item to reference for name/category information, etc.</param>
+        /// <param name="cachedIndexFile">Cached index file, if available</param>
+        /// <param name="cachedModList">Cached modlist file, if available</param>
+        /// <returns></returns>
+        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var dataFile = GetDataFileFromPath(internalPath);
             var modding = new Modding(_gameDirectory);
@@ -543,7 +545,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var modEntry = await modding.TryGetModEntry(internalPath);
             var newData = (await CreateType2Data(dataToImport));
 
-            var newOffset = await WriteModFile(newData, internalPath, source);
+            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList);
 
             if (newOffset == 0)
             {
@@ -553,80 +555,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             return newOffset;
         }
 
-
-        public async Task<long> BinaryEditType2Data(string internalPath, int byteOffset, byte[] bytes)
-        {
-            int bitOffset = byteOffset * 8;
-            BitArray bits = new BitArray(bytes);
-            return await BinaryEditType2Data(internalPath, bitOffset, bits);
-        }
-
-        /// <summary>
-        /// Alters the data of the given type 2 file, applying the modifications to the existing
-        /// internal modification to the file as needed.
-        /// </summary>
-        /// <param name="internalPath"></param>
-        /// <param name="bitOffset"></param>
-        /// <param name="bits"></param>
-        /// <returns></returns>
-        public async Task<long> BinaryEditType2Data(string internalPath, int bitOffset, BitArray bits)
-        {
-            var _modding = new Modding(_gameDirectory);
-            var _index = new Index(_gameDirectory);
-            var modEntry = await _modding.TryGetModEntry(internalPath);
-            long offset = 0;
-
-            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
-
-            if(modEntry != null)
-            {
-                offset = modEntry.data.modOffset;
-            } else
-            {
-                // This file hasn't been modified yet.  Create a clone of it first.
-                offset = await _index.GetDataOffset(internalPath);
-                var originalData = await GetType2Data(offset, dataFile);
-
-                // Binary edit files are written to the modlist with our specific internal flag as the source and category.
-                offset = await ImportType2Data(originalData, Path.GetFileName(internalPath), internalPath, Constants.InternalModSourceName, Constants.InternalModSourceName);
-                modEntry = await _modding.TryGetModEntry(internalPath);
-            }
-
-            if(modEntry == null)
-            {
-                throw new Exception("Unable to generate or access mod entry for binary file: " + internalPath);
-            }
-
-            // Retrieve the binary data.
-            var data = await GetType2Data(offset, dataFile);
-
-            // Convert it to a bit array.
-            var bitData = new BitArray(data);
-
-            // Write in the new bits.
-            var sourceIdx = 0;
-            for(int i = bitOffset; i < bitOffset + bits.Count; i++)
-            {
-                bitData[i] = bits[sourceIdx];
-                sourceIdx++;
-            }
-
-            // Write the modified bits back to the main byte array.
-            bitData.CopyTo(data, 0);
-
-            // Convert the data back into the Type 2 Data format SE expects.
-            var type2Data = (await CreateType2Data(data));
-
-            var newOffset = await WriteModFile(type2Data, internalPath, Constants.InternalModSourceName);
-
-            if(offset != newOffset)
-            {
-                // TODO - FIXFIX - Validate that we're writing back to the same DAT entry location every time, and not generating new mod entries.
-                throw new Exception("DEBUGGING ERROR - Dat Drift Detected.");
-            }
-
-            return offset;
-        }
 
         /// <summary>
         /// Create any Type 2 data
@@ -1577,17 +1505,30 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Writes a given block of data to the DAT files, updates the index to point to it for the given file path,
         /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
+        /// 
+        /// NOTE -- If the Index File and ModList are provided, the steps SAVING those entires are SKIPPED for performance.
+        /// It is assumed if they are provided, that the calling function will handle saving them once it is done manipulating them.
         /// </summary>
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null)
+        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, IndexFile index = null, ModList modList = null)
         {
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
 
+            if((index == null && modList != null ) || (index != null && modList == null))
+            {
+                throw new InvalidDataException("Index and Modlist must both be null or both be non-null.");
+            }
+
+            var doSave = false;
+            if(index == null || modList == null)
+            {
+                doSave = true;
+            }
 
             string itemName = "Unknown";
             string category = "Unknown";
@@ -1621,14 +1562,24 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Update the Index files.
             var retOffset = ((long)rawOffset) * 8L;
-            var originalOffset = await _index.UpdateDataOffset(retOffset, internalFilePath, true);
+            uint originalOffset = 0;
+            if (doSave)
+            {
+                originalOffset = await _index.UpdateDataOffset(retOffset, internalFilePath, true);
+            } else
+            {
+                originalOffset = index.SetDataOffset(internalFilePath, retOffset);
+            }
             var longOriginal = ((long)originalOffset) * 8L;
 
 
             var fileType = BitConverter.ToInt32(fileData, 4);
 
             // Update the Mod List file.
-            var modList = _modding.GetModList();
+            if (doSave)
+            {
+                modList = _modding.GetModList();
+            }
             var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
 
@@ -1671,22 +1622,23 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.source = sourceApplication;
             }
 
-            await _modding.SaveModListAsync(modList);
+            if (doSave) {
+                await _modding.SaveModListAsync(modList);
+                
+                // Perform metadata expansion if needed.
+                var ext = Path.GetExtension(internalFilePath);
+                if(ext == ".meta")
+                {
+                    var metaRaw = await GetType2Data(retOffset, df);
+                    var meta = await ItemMetadata.Deserialize(metaRaw);
 
-            // Perform metadata expansion if needed.
-            var ext = Path.GetExtension(internalFilePath);
-            if(ext == ".meta")
-            {
-                var metaRaw = await GetType2Data(retOffset, df);
-                var meta = await ItemMetadata.Deserialize(metaRaw);
+                    meta.Validate(internalFilePath);
 
-                meta.Validate(internalFilePath);
+                    await ItemMetadata.ApplyMetadata(meta);
+                }
 
-                await ItemMetadata.ApplyMetadata(meta);
+                XivCache.QueueDependencyUpdate(internalFilePath);
             }
-
-            // Queue cache update.
-            XivCache.QueueDependencyUpdate(internalFilePath);
 
             // Job done.
             return retOffset;

@@ -29,6 +29,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes
@@ -659,7 +660,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     count = 0;
                     progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
 
-                    // ModList is update now.  TIme to expand the Metadata files.
+                    // ModList is update now.  Time to expand the Metadata files.
+                    Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
                     foreach (var file in filePaths)
                     {
                         var longOffset = ((long)DatOffsets[file]) * 8L;
@@ -667,17 +669,28 @@ namespace xivModdingFramework.Mods.FileTypes
                         if (ext == ".meta")
                         {
                             var df = IOUtil.GetDataFileFromPath(file);
+                            if (!indexFiles.ContainsKey(df))
+                            {
+                                indexFiles.Add(df, await _index.GetIndexFile(df));
+                            }
+
                             var metaRaw = await dat.GetType2Data(longOffset, df);
                             var meta = await ItemMetadata.Deserialize(metaRaw);
 
                             meta.Validate(file);
 
-                            await ItemMetadata.ApplyMetadata(meta);
+                            await ItemMetadata.ApplyMetadata(meta, indexFiles[df], modList);
 
                             count++;
                             progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
                         }
                     }
+
+                    foreach(var kv in indexFiles)
+                    {
+                        await _index.SaveIndexFile(kv.Value);
+                    }
+                    await _modding.SaveModListAsync(modList);
 
 
                     count = 0;

@@ -26,6 +26,8 @@ using xivModdingFramework.Items;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 
@@ -233,7 +235,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="path"></param>
         /// <param name="entries"></param>
         /// <returns></returns>
-        internal async Task SaveEntries(string path, string slot, List<XivImc> entries)
+        internal async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
@@ -290,7 +292,7 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             // Save the modified info.
-            await SaveFullImcInfo(info, path, Path.GetFileName(path), Constants.InternalModSourceName, Constants.InternalModSourceName);
+            await SaveFullImcInfo(info, path, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
 
         public static byte[] SerializeEntry(XivImc entry)
@@ -446,45 +448,8 @@ namespace xivModdingFramework.Variants.FileTypes
             });
         }
 
-        public async Task SaveImcInfo(XivImc info, IItemModel item)
-        {
-            var full = await GetFullImcInfo(item);
-            full.SetEntry(info, item.ModelInfo.ImcSubsetID, item.GetItemSlotAbbreviation());
-            await SaveFullImcInfo(full, item);
-        }
 
-        public async Task SaveImcInfo(XivImc info, string path, int subsetId = -1, string slot = "")
-        {
-            var full = await GetFullImcInfo(path);
-            full.SetEntry(info, subsetId, slot);
-            await SaveFullImcInfo(full, path);
-        }
-
-        public async Task SaveFullImcInfo(FullImcInfo info, IItemModel item)
-        {
-            try
-            {
-                var imcPath = GetImcPath(item);
-                var path = imcPath.Folder + "/" + imcPath.File;
-                await SaveFullImcInfo(info, path);
-            }
-            catch
-            {
-                // Some dual wield items don't have a second IMC, and just default to the first.
-                var gear = (XivGear)item;
-                if (gear != null && gear.PairedItem != null)
-                {
-                    var pair = gear.PairedItem;
-                    var imcPath = GetImcPath(pair);
-                    var path = imcPath.Folder + "/" + imcPath.File;
-                    await (SaveFullImcInfo(info, path));
-                }
-            }
-            return;
-
-        }
-
-        public async Task SaveFullImcInfo(FullImcInfo info, string path, string itemName = null, string category = null, string source = null)
+        public async Task SaveFullImcInfo(FullImcInfo info, string path, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             if (info == null || info.TypeIdentifier != ImcType.Set && info.TypeIdentifier != ImcType.NonSet)
             {
@@ -516,12 +481,9 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             // That's it.
-
-            itemName ??= Path.GetFileName(path);
-            category ??= "Meta";
             source ??= "Unknown";
 
-            await dat.ImportType2Data(data.ToArray(), itemName, path, category, source);
+            await dat.ImportType2Data(data.ToArray(), path, source, referenceItem, cachedIndexFile, cachedModList);
         }
 
         /// <summary>
