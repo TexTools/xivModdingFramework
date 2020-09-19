@@ -227,6 +227,19 @@ namespace xivModdingFramework.Items.Categories
                             secondaryItem.SecondaryCategory = XivStrings.Dual_Wield;
                         }
 
+                        // Rings
+                        if(slotNum == 12)
+                        {
+                            // Make this the Right ring, and create the Left Ring entry.
+                            secondaryItem = (XivGear)xivGear.Clone();
+
+                            xivGear.Name += " - " + XivStrings.Right;
+                            secondaryItem.Name += " - " + XivStrings.Left;
+
+                            xivGear.PairedItem = secondaryItem;
+                            secondaryItem.PairedItem = xivGear;
+                        }
+
                         lock (_gearLock)
                         {
                             xivGearList.Add(xivGear);
