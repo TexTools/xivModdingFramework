@@ -355,18 +355,21 @@ namespace xivModdingFramework.Mods
                 }
 
                 // Poke through the variants and adjust any that point to null Material Sets to instead use a valid one.
-                var valid = newMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
-                if(valid <= 0)
+                if (newMetadata.ImcEntries.Count > 0 && originalMetadata.ImcEntries.Count > 0)
                 {
-                    valid = originalMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
-                }
-
-                for(int i = 0; i < newMetadata.ImcEntries.Count; i++)
-                {
-                    var entry = newMetadata.ImcEntries[i];
-                    if (entry.MaterialSet == 0)
+                    var valid = newMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
+                    if (valid <= 0)
                     {
-                        entry.MaterialSet = valid;
+                        valid = originalMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
+                    }
+
+                    for (int i = 0; i < newMetadata.ImcEntries.Count; i++)
+                    {
+                        var entry = newMetadata.ImcEntries[i];
+                        if (entry.MaterialSet == 0)
+                        {
+                            entry.MaterialSet = valid;
+                        }
                     }
                 }
 
