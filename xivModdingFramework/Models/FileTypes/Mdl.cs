@@ -2160,7 +2160,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (!rawDataOnly)
                 {
                     loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                    await dat.WriteModFile(bytes, filePath, source);
+                    await dat.WriteModFile(bytes, filePath, source, item);
                 }
 
                 loggingFunction(false, "Job done!");
