@@ -1447,6 +1447,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Left.
+        /// </summary>
+        internal static string Left {
+            get {
+                return ResourceManager.GetString("Left", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Left Ring.
         /// </summary>
         internal static string LeftRing {
@@ -1974,6 +1983,15 @@ namespace xivModdingFramework.Resources {
         internal static string Ramuh_Egi {
             get {
                 return ResourceManager.GetString("Ramuh_Egi", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Right.
+        /// </summary>
+        internal static string Right {
+            get {
+                return ResourceManager.GetString("Right", resourceCulture);
             }
         }
         

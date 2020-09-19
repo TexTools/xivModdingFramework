@@ -894,4 +894,10 @@
   <data name="HUD" xml:space="preserve">
     <value>HUD</value>
   </data>
+  <data name="Left" xml:space="preserve">
+    <value>Left</value>
+  </data>
+  <data name="Right" xml:space="preserve">
+    <value>Right</value>
+  </data>
 </root>
