@@ -255,7 +255,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem);
                 }
 
 
@@ -308,7 +308,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem);
                 }
 
                 if (ProgressReporter != null)
@@ -415,7 +415,7 @@ namespace xivModdingFramework.Mods
                             if (existentCopy == null) continue;
 
                             // Copy the material over.
-                            await _dat.CopyFile(existentCopy, destPath, iCat, iName, ApplicationSource, true);
+                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem);
                         }
                     }
                 }

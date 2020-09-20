@@ -16,20 +16,27 @@
 
 using Newtonsoft.Json;
 using SharpDX.Text;
+using SharpDX.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.Enums;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Variants.DataContainers;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Mods
 {
@@ -594,5 +601,335 @@ namespace xivModdingFramework.Mods
                 XivCache.CacheWorkerEnabled = cacheState;
             }
         }
+
+
+        /// <summary>
+        /// Cleans up the Modlist file, performing the following operations.
+        /// 
+        /// 1.  Fix up the Item Names and Categories of all mods to be consistent.
+        /// 2.  Remove all empty mod slots.
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        {
+            progressReporter?.Report((0, 0, "Loading Modlist file..."));
+            var modlist = await GetModListAsync();
+
+            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+
+            // IMC entries cache so we're not having to constantly re-load the IMC data.
+            Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
+
+            var totalMods = modlist.Mods.Count;
+
+
+            var count = 0;
+            List<Mod> toRemove = new List<Mod>();
+            foreach(var mod in modlist.Mods)
+            {
+                progressReporter?.Report((count, totalMods, "Fixing up item names..."));
+                count++;
+
+                if (String.IsNullOrWhiteSpace(mod.fullPath)) {
+                    toRemove.Add(mod);
+                    continue;
+                }
+
+                if (mod.IsInternal()) continue;
+
+                XivDependencyRoot root = null;
+                try
+                {
+                    root = await XivCache.GetFirstRoot(mod.fullPath);
+                    if(root == null)
+                    {
+                        mod.name = Path.GetFileName(mod.fullPath);
+                        mod.category = "Raw Files";
+                        continue;
+                    }
+
+                    var ext = Path.GetExtension(mod.fullPath);
+                    IItem item = null;
+                    if (Imc.UsesImc(root) && ext == ".mtrl")
+                    {
+                        var data = await ResolveMtrlModInfo(_imc, mod.fullPath, root, ImcEntriesCache);
+                        mod.name = data.Name;
+                        mod.category = data.Category;
+
+                    } else if(Imc.UsesImc(root) && ext == ".tex")
+                    {
+                        // For textures, get the first material using them, and list them under that material's item.
+                        var parents = await XivCache.GetParentFiles(mod.fullPath);
+                        if(parents.Count == 0)
+                        {
+                            item = root.GetFirstItem();
+                            mod.name = item.GetModlistItemName();
+                            mod.category = item.GetModlistItemCategory();
+                            continue;
+                        }
+
+                        var parent = parents[0];
+
+                        var data = await ResolveMtrlModInfo(_imc, parent, root, ImcEntriesCache);
+                        mod.name = data.Name;
+                        mod.category = data.Category;
+                    }
+                    else
+                    {
+                        item = root.GetFirstItem();
+                        mod.name = item.GetModlistItemName();
+                        mod.category = item.GetModlistItemCategory();
+                        continue;
+                    }
+                } catch
+                {
+                    mod.name = Path.GetFileName(mod.fullPath);
+                    mod.category = "Raw Files";
+                    continue;
+                }
+            }
+
+
+            progressReporter?.Report((0,0, "Removing empty mod slots..."));
+
+            // Remove all empty mod frames.
+            foreach (var mod in toRemove)
+            {
+                modlist.Mods.Remove(mod);
+            }
+
+            progressReporter?.Report((0, 0, "Saving Modlist file..."));
+
+            await SaveModListAsync(modlist);
+        }
+        private async Task<(string Name, string Category)> ResolveMtrlModInfo(Imc _imc, string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache)
+        {
+            IItem item;
+            var mSetRegex = new Regex("/v([0-9]{4})/");
+            var match = mSetRegex.Match(path);
+            if (match.Success)
+            {
+                // MTRL files should probably listed under one of the variant items as appropriate.
+                List<XivImc> imcEntries = null;
+                if (ImcEntriesCache.ContainsKey(root))
+                {
+                    imcEntries = ImcEntriesCache[root];
+                }
+                else
+                {
+                    imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
+                    ImcEntriesCache.Add(root, imcEntries);
+                }
+                var mSetId = Int32.Parse(match.Groups[1].Value);
+
+                // The list from this function is already sorted.
+                var allItems = await root.GetAllItems();
+
+
+                var variantItem = allItems.FirstOrDefault(x =>
+                {
+                    var variantId = x.ModelInfo.ImcSubsetID;
+                    if (imcEntries.Count <= variantId) return false;
+
+                    return imcEntries[variantId].MaterialSet == mSetId;
+                });
+
+                item = variantItem == null ? allItems[0] : variantItem;
+
+                return (item.GetModlistItemName(), item.GetModlistItemCategory());
+            }
+            else
+            {
+                // Invalid Material Path for this item.
+                item = root.GetFirstItem();
+                return (item.GetModlistItemName(), item.GetModlistItemCategory());
+            }
+        }
+
+
+        /// <summary>
+        /// Gets the sum total size in bytes of all modded dats.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<long> GetTotalModDataSize()
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            long size = 0;
+            foreach(var df in dataFiles)
+            {
+                var moddedDats = await _dat.GetModdedDatList(df);
+                foreach(var dat in moddedDats)
+                {
+                    var finfo = new FileInfo(dat);
+                    size += finfo.Length;
+                }
+            }
+
+            return size;
+        }
+
+        /// <summary>
+        /// This function will rewrite all the mod files to new DAT entries, replacing the existing modded DAT files with new, defragmented ones.
+        /// Returns the total amount of bytes recovered.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        {
+            var modlist = await GetModListAsync();
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+
+            var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
+
+            modlist.Mods.RemoveAll(x => String.IsNullOrWhiteSpace(x.fullPath));
+
+            var modsByDf = modlist.Mods.GroupBy(x => XivDataFiles.GetXivDataFile(x.datFile));
+            var indexFiles = new Dictionary<XivDataFile, IndexFile>();
+
+            var count = 0;
+            var total = modlist.Mods.Count();
+
+            var originalSize = await GetTotalModDataSize();
+
+            var workerStatus = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
+            try
+            {
+                // Copy files over into contiguous data blocks in the new dat files.
+                foreach (var dKv in modsByDf)
+                {
+                    var df = dKv.Key;
+                    indexFiles.Add(df, await _index.GetIndexFile(df));
+
+                    foreach (var mod in dKv)
+                    {
+                        progressReporter?.Report((count, total, "Writing mod data to temporary DAT files..."));
+
+                        try
+                        {
+                            var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+
+                            if (size % 256 != 0) throw new Exception("Dicks");
+
+                            var data = _dat.GetRawData(mod.data.modOffset, df, size);
+                            var newOffset = await WriteToTempDat(_dat, data, df);
+
+                            if (mod.IsCustomFile())
+                            {
+                                mod.data.originalOffset = newOffset;
+                            }
+                            mod.data.modOffset = newOffset;
+                            indexFiles[df].SetDataOffset(mod.fullPath, newOffset);
+                        }
+                        catch (Exception except)
+                        {
+                            throw;
+                        }
+
+                        count++;
+                    }
+                }
+
+                progressReporter?.Report((0, 0, "Removing old modded DAT files..."));
+                foreach (var dKv in modsByDf)
+                {
+                    // Now we need to delete the current modded dat files.
+                    var moddedDats = await _dat.GetModdedDatList(dKv.Key);
+                    foreach (var file in moddedDats)
+                    {
+                        File.Delete(file);
+                    }
+                }
+
+                // Now we need to rename our temp files.
+                progressReporter?.Report((0, 0, "Renaming temporary DAT files..."));
+                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
+                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
+                foreach (var temp in temps)
+                {
+                    var oldName = temp.FullName;
+                    var newName = temp.FullName.Substring(0, oldName.Length - 4);
+                    System.IO.File.Move(oldName, newName);
+                }
+
+                progressReporter?.Report((0, 0, "Saving updated Index Files..."));
+
+                foreach (var dKv in modsByDf)
+                {
+                    await _index.SaveIndexFile(indexFiles[dKv.Key]);
+                }
+
+                progressReporter?.Report((0, 0, "Saving updated Modlist..."));
+
+                // Save modList
+                await SaveModListAsync(modlist);
+
+
+                var finalSize = await GetTotalModDataSize();
+
+                return originalSize - finalSize;
+            } finally
+            {
+                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
+                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
+                foreach(var temp in temps)
+                {
+                    temp.Delete();
+                }
+
+                XivCache.CacheWorkerEnabled = workerStatus;
+            }
+
+        }
+
+        private async Task<long> WriteToTempDat(Dat _dat, byte[] data, XivDataFile df)
+        {
+            var moddedDats = await _dat.GetModdedDatList(df);
+            var tempDats = moddedDats.Select(x => x + ".temp");
+            var maxSize = Dat.GetMaximumDatSize();
+
+            string targetDatFile = null;
+            foreach(var file in tempDats)
+            {
+                if(!File.Exists(file))
+                {
+                    using (var stream = new BinaryWriter(File.Create(file)))
+                    {
+                        stream.Write(Dat.MakeSqPackHeader());
+                        stream.Write(Dat.MakeDatHeader());
+                    }
+                    targetDatFile = file;
+                    break;
+                }
+
+                var finfo = new FileInfo(file);
+                if(finfo.Length + data.Length < maxSize)
+                {
+                    targetDatFile = file;
+                }
+            }
+
+            if (targetDatFile == null) throw new Exception("Unable to find open temp dat to write to.");
+
+            var rex = new Regex("([0-9])\\.temp$");
+            var match = rex.Match(targetDatFile);
+            uint datNum = UInt32.Parse(match.Groups[1].Value);
+
+
+            long baseOffset = 0;
+            using(var stream = new BinaryWriter(File.Open(targetDatFile, FileMode.Append)))
+            {   
+                baseOffset = stream.BaseStream.Position;
+                stream.Write(data);
+            }
+
+            long offset = ((baseOffset / 8) | (datNum * 2)) * 8;
+
+            return offset;
+        }
     }
+
 }

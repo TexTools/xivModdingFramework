@@ -26,6 +26,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
@@ -319,7 +320,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the SqPack portion of the dat file. 
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        private static byte[] MakeSqPackHeader()
+        internal static byte[] MakeSqPackHeader()
         {
             var header = new byte[1024];
 
@@ -346,7 +347,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        private static byte[] MakeDatHeader()
+        internal static byte[] MakeDatHeader()
         {
             var header = new byte[1024];
 
@@ -1396,7 +1397,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null)
         {
             var _index = new Index(_gameDirectory);
             var offset = await _index.GetDataOffset(sourcePath);
@@ -1406,7 +1407,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, category, itemName, source, overwrite);
+            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem);
         }
 
         /// <summary>
@@ -1419,7 +1420,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null)
         {
             var _modding = new Modding(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -1433,7 +1434,42 @@ namespace xivModdingFramework.SqPack.FileTypes
             var size = await GetCompressedFileSize(originalOffset, originalDataFile);
             var data = GetRawData(originalOffset, originalDataFile, size);
 
-            return await WriteModFile(data, targetPath, source);
+
+            XivDependencyRoot root = null;
+
+            if (referenceItem == null)
+            {
+                try
+                {
+                    root = await XivCache.GetFirstRoot(targetPath);
+                    if (root != null)
+                    {
+                        var item = root.GetFirstItem();
+
+                        referenceItem = item;
+                    }
+                    else
+                    {
+                        referenceItem = new XivGenericItemModel()
+                        {
+                            Name = Path.GetFileName(targetPath),
+                            SecondaryCategory = "Raw File Copy"
+                        };
+                    }
+                }
+                catch
+                {
+                    referenceItem = new XivGenericItemModel()
+                    {
+                        Name = Path.GetFileName(targetPath),
+                        SecondaryCategory = "Raw File Copy"
+                    };
+                }
+            }
+
+
+
+            return await WriteModFile(data, targetPath, source, referenceItem);
         }
 
 
@@ -1542,18 +1578,19 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var item = root.GetFirstItem();
 
                         referenceItem = item;
-                        itemName = referenceItem.Name;
-                        category = referenceItem.SecondaryCategory;
+                        itemName = referenceItem.GetModlistItemName();
+                        category = referenceItem.GetModlistItemCategory();
                     }
                 }
                 catch
                 {
                     itemName = Path.GetFileName(internalFilePath);
+                    category = "Raw File";
                 }
             } else
             {
-                itemName = referenceItem.Name;
-                category = referenceItem.SecondaryCategory;
+                itemName = referenceItem.GetModlistItemName();
+                category = referenceItem.GetModlistItemCategory();
             }
 
             // Update the DAT files.

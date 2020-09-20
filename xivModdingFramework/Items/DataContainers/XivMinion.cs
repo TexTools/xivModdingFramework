@@ -17,6 +17,7 @@
 using System;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -67,6 +68,23 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
 
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown Minion";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory != null ? SecondaryCategory : XivStrings.Minions;
+        }
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivMinion)obj).Name, StringComparison.Ordinal);

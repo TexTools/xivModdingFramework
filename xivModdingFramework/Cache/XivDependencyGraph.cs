@@ -132,9 +132,6 @@ namespace xivModdingFramework.Cache
         invalid,
         root,
         meta,
-        eqp,
-        eqdp,
-        imc,
         mdl,
         mtrl,
         tex
@@ -787,16 +784,6 @@ namespace xivModdingFramework.Cache
             return imcEntries;
         }
 
-        private static readonly Dictionary<XivItemType, string> EqdpFolder= new Dictionary<XivItemType, string>()
-        {
-            { XivItemType.equipment, "chara/xls/charadb/equipmentdeformerparameter/" },
-            { XivItemType.accessory, "chara/xls/charadb/accessorydeformerparameter/" }
-        };
-
-        private static readonly Dictionary<XivItemType, string> EqpPaths = new Dictionary<XivItemType, string>()
-        {
-            { XivItemType.equipment, "chara/xls/equipmentparameter/equipmentparameter.eqp" }
-        };
 
 
 
@@ -1010,7 +997,7 @@ namespace xivModdingFramework.Cache
          *  
          * 
          * ROOT     - [SET AND SLOT] - Theoretical/Just a number/prefix, no associated file.
-         * META     - [EQP/EQDP/IMC] - Binary entries. - Not all of these entries are available for all types, but at least one always is.
+         * META     - [META] - Binary entries.
          * MODEL    - [MDL] - Files for each racial model.
          * MATERIAL - [MTRL] - Files for each Racial Model x Material Variant, roughly.
          * TEXTURE  - [TEX] - Files For each Material. May be used by multiple.
@@ -1044,7 +1031,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         public static readonly Dictionary<XivDependencyLevel, List<XivDependencyFileType>> DependencyLevelGroups = new Dictionary<XivDependencyLevel, List<XivDependencyFileType>>()
         {
-            { XivDependencyLevel.Root, new List<XivDependencyFileType>() { XivDependencyFileType.root, XivDependencyFileType.meta, XivDependencyFileType.eqp, XivDependencyFileType.eqdp, XivDependencyFileType.imc } },
+            { XivDependencyLevel.Root, new List<XivDependencyFileType>() { XivDependencyFileType.root, XivDependencyFileType.meta } },
             { XivDependencyLevel.Model, new List<XivDependencyFileType>() { XivDependencyFileType.mdl } },
             { XivDependencyLevel.Material, new List<XivDependencyFileType>() { XivDependencyFileType.mtrl } },
             { XivDependencyLevel.Texture, new List<XivDependencyFileType>() { XivDependencyFileType.tex} },
@@ -1070,12 +1057,6 @@ namespace xivModdingFramework.Cache
 
         // Captures the binary offset of a file.
         private static readonly Regex _binaryOffsetRegex = new Regex(Constants.BinaryOffsetMarker + "([0-9]+)$");
-
-        // Regex for identifying EQP files and extracting the offset.
-        private static readonly Regex EqpRegex = new Regex("^chara\\/xls\\/equipmentparameter\\/equipmentparameter\\.eqp" + Constants.BinaryOffsetMarker + "([0-9]+)$");
-
-        // Regex for identifying EQDP files and extracting the type and offset.
-        private static readonly Regex EqdpRegex = new Regex("^chara\\/xls\\/charadb\\/(equipment|accessory)deformerparameter\\/c[0-9]{4}\\.eqdp" + Constants.BinaryOffsetMarker + "([0-9]+)$");
 
         private static readonly Regex MtrlRegex = new Regex("^.*\\.mtrl$");
 
@@ -1303,19 +1284,6 @@ namespace xivModdingFramework.Cache
                     return XivDependencyFileType.root;
                 case "meta":
                     return XivDependencyFileType.meta;
-                case "imc":
-                    // Do not allow dependency crawling for meta files that do not have proper binary offsets.
-                    if (!internalFilePath.Contains(Constants.BinaryOffsetMarker))
-                        return XivDependencyFileType.invalid;
-                    return XivDependencyFileType.imc;
-                case "eqp":
-                    if (!internalFilePath.Contains(Constants.BinaryOffsetMarker))
-                        return XivDependencyFileType.invalid;
-                    return XivDependencyFileType.eqp;
-                case "eqdp":
-                    if (!internalFilePath.Contains(Constants.BinaryOffsetMarker))
-                        return XivDependencyFileType.invalid;
-                    return XivDependencyFileType.eqdp;
                 case "mdl":
                     return XivDependencyFileType.mdl;
                 case "mtrl":
@@ -1559,24 +1527,8 @@ namespace xivModdingFramework.Cache
         {
             var roots = new HashSet<XivDependencyRoot>();
 
-            // Tex files require special handling, because they can be referenced by modded items
-            // outside of their own dependency chain potentially.
-            var match = _extensionRegex.Match(internalFilePath);
-            var suffix = "";
-            if(match.Success)
-            {
-                suffix = match.Groups[1].Value;
-            }
-            if(suffix == "tex")
-            {
-                // Oh boy.  Here we have to scrape the cache to find any custom modded roots(plural) we may have.
-                var customRoots = await GetModdedRoots(internalFilePath);
-                foreach(var r in customRoots)
-                {
-                    roots.Add(r);
-                }
-            }
 
+            // First root should always be the path-extracted root.
             var info = ExtractRootInfo(internalFilePath);
             var root = CreateDependencyRoot(info);
             if(root != null)
@@ -1584,81 +1536,24 @@ namespace xivModdingFramework.Cache
                 roots.Add(root);
             }
 
-
-            if(roots.Count == 0)
+            // Tex files require special handling, because they can be referenced by modded items
+            // outside of their own dependency chain potentially.
+            var match = _extensionRegex.Match(internalFilePath);
+            var suffix = "";
+            if (match.Success)
             {
-                // See if this is a binary offset file.
-                match = _binaryOffsetRegex.Match(internalFilePath);
-                if(match.Success)
+                suffix = match.Groups[1].Value;
+            }
+            if (suffix == "tex")
+            {
+                // Oh boy.  Here we have to scrape the cache to find any custom modded roots(plural) we may have.
+                var customRoots = await GetModdedRoots(internalFilePath);
+                foreach (var r in customRoots)
                 {
-                    long offset = Int64.Parse(match.Groups[1].Value);
-
-                    if (suffix == "imc")
-                    {
-                        // IMCs mostly parse out correctly above, but need to have slot information pulled from their binary offset.
-                        const int ImcHeaderSize = 4;
-                        const int ImcSubEntrySize = 6;
-                        const int IMcFullEntrySize = 30;
-
-                        offset /= 8;
-                        offset -= ImcHeaderSize;
-                        offset = offset % IMcFullEntrySize;
-                        var index = offset / ImcSubEntrySize;
-                        if (info.PrimaryType == XivItemType.equipment || info.PrimaryType == XivItemType.demihuman)
-                        {
-                            info.Slot = Imc.EquipmentSlotOffsetDictionary.First(x => x.Value == index).Key;
-                        }
-                        else  // accesory
-                        {
-                            info.Slot = Imc.AccessorySlotOffsetDictionary.First(x => x.Value == index).Key;
-                        }
-
-                        root = CreateDependencyRoot(info);
-                        if (root != null)
-                        {
-                            roots.Add(root);
-                        }
-                    }
-                    else if (suffix == "eqp")
-                    {
-                        var entrySize = Eqp.EquipmentParameterEntrySize * 8;
-                        var setId = (int)(offset / entrySize);
-
-                        var subOffset = (offset % entrySize) / 8;
-                        var slot = EquipmentParameterSet.EntryOffsets.First(x => x.Value == subOffset).Key;
-
-                        root = CreateDependencyRoot(XivItemType.equipment, setId, null, null, slot);
-                        if (root != null)
-                        {
-                            roots.Add(root);
-                        }
-
-                    } else if(suffix == "eqdp")
-                    {
-                        // For EQDPs, this is 16 bits per set, then within that, we can determine the slot based on the offset internally within the full set.
-                        match = EqdpRegex.Match(internalFilePath);
-                        if (match.Success)
-                        {
-                            var type = (XivItemType)Enum.Parse(typeof(XivItemType), match.Groups[1].Value);
-                            var entrySize = Eqp.EquipmentDeformerParameterEntrySize * 8;
-                            var setId = (int)(offset / entrySize);
-
-
-                            var slotOffset = offset % entrySize;
-                            var slotIndex = (int)(slotOffset / 2); // 2 Bits per slot.
-
-                            var slots = EquipmentDeformationParameterSet.SlotsAsList(type == XivItemType.accessory);
-                            var slot = slots[slotIndex];
-
-                            // Ok, now we have everything we need to create the root object.
-                            return new List<XivDependencyRoot>() { CreateDependencyRoot(type, setId, null, null, slot) };
-
-                        }
-
-                    }
-
+                    roots.Add(r);
                 }
             }
+
 
             return roots.ToList();
         }
