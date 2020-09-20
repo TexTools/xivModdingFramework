@@ -24,6 +24,11 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public class IndexFile
     {
+        public bool ReadOnlyMode
+        {
+            get; private set;
+        }
+
         // Header bytes (1024 in length usually)
         private byte[] Index1Header;
 
@@ -71,12 +76,23 @@ namespace xivModdingFramework.SqPack.DataContainers
             DataFile = dataFile;
 
             ReadIndex1File(index1Stream);
-            ReadIndex2File(index2Stream);
+
+            if (index2Stream != null)
+            {
+                ReadIndex2File(index2Stream);
+                ReadOnlyMode = false;
+            } else
+            {
+                ReadOnlyMode = true;
+            }
 
             if(disposeStreams)
             {
                 index1Stream.Dispose();
-                index2Stream.Dispose();
+                if (index2Stream != null)
+                {
+                    index2Stream.Dispose();
+                }
             }
         }
 
