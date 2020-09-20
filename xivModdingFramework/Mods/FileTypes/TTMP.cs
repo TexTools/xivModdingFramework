@@ -494,8 +494,11 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<string, int> FileTypes = new Dictionary<string, int>();
 
 
+                    var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+                    var modList = _modding.GetModList();
+
                     // 0 - Extract the MPD file.
-                    using(var zf = ZipFile.Read(modPackDirectory.FullName))
+                    using (var zf = ZipFile.Read(modPackDirectory.FullName))
                     {
                         progress.Report((0, 0, "Unzipping TTMP File..."));
                         var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
@@ -515,6 +518,16 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
 
+                    Dictionary<string, Mod> modsByFile = new Dictionary<string, Mod>();
+
+                    foreach (var mod in modList.Mods)
+                    {
+                        if (!modsByFile.ContainsKey(mod.fullPath))
+                        {
+                            modsByFile.Add(mod.fullPath, mod);
+                        }
+                    }
+
                     // 1 - Copy all the mod data to the DAT files.
                     var count = 0;
                     progress.Report((0, 0, "Writing new mod data to DAT files..."));
@@ -527,7 +540,28 @@ namespace xivModdingFramework.Mods.FileTypes
                                 binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
                                 var data = binaryReader.ReadBytes(modJson.ModSize);
                                 var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
-                                var offset = await dat.WriteToDat(data, df);
+
+                                var size = data.Length;
+                                if (size % 256 != 0)
+                                {
+                                    size += (256 - (size % 256));
+                                }
+
+                                Mod mod = null;
+                                if (modsByFile.ContainsKey(modJson.FullPath))
+                                {
+                                    mod= modsByFile[modJson.FullPath];
+                                }
+
+                                uint offset = 0;
+
+                                if(mod != null && mod.data.modSize >= size)
+                                {
+                                    offset = await dat.WriteToDat(data, df, mod.data.modOffset);
+                                } else
+                                {
+                                    offset = await dat.WriteToDat(data, df);
+                                }
                                 DatOffsets.Add(modJson.FullPath, offset);
 
                                 var dataType = BitConverter.ToInt32(data, 4);
@@ -596,8 +630,6 @@ namespace xivModdingFramework.Mods.FileTypes
                     progress.Report((count, totalFiles, "Updating Mod List file..."));
 
                     // Update the Mod List file.
-                    var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-                    var modList = _modding.GetModList();
 
                     // TODO - Probably need to look at keying this off more than just the name.
                     var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
@@ -621,6 +653,13 @@ namespace xivModdingFramework.Mods.FileTypes
                             var fileType = FileTypes[file];
                             var df = IOUtil.GetDataFileFromPath(file);
 
+
+                            var size = json.ModSize;
+                            if (size % 256 != 0)
+                            {
+                                size += 256 - (size % 256);
+                            }
+
                             if (mod == null)
                             {
                                 // Determine if this is an original game file or not.
@@ -636,7 +675,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     data = new Data()
                                 };
 
-                                mod.data.modSize = json.ModSize;
+                                mod.data.modSize = size;
                                 mod.data.modOffset = longOffset;
                                 mod.data.originalOffset = (fileAdditionMod ? longOffset : longOriginal);
                                 mod.data.dataType = fileType;
@@ -654,7 +693,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     mod.data.originalOffset = longOffset;
                                 }
 
-                                mod.data.modSize = json.ModSize;
+                                mod.data.modSize = size;
                                 mod.data.modOffset = longOffset;
                                 mod.enabled = true;
                                 mod.modPack = modPack;
