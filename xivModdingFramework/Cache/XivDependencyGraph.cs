@@ -1523,7 +1523,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath)
+        public static async Task<List<XivDependencyRoot>> GetDependencyRoots(string internalFilePath, bool firstOnly = false)
         {
             var roots = new HashSet<XivDependencyRoot>();
 
@@ -1534,6 +1534,11 @@ namespace xivModdingFramework.Cache
             if(root != null)
             {
                 roots.Add(root);
+            }
+
+            if(firstOnly && roots.Count > 0)
+            {
+                return roots.ToList();
             }
 
             // Tex files require special handling, because they can be referenced by modded items

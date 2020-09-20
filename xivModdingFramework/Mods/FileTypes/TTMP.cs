@@ -644,7 +644,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                 mod.modPack = modPack;
                                 modList.Mods.Add(mod);
 
-                                modList.modCount += 1;
                             }
                             else
                             {

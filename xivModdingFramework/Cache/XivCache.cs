@@ -1585,7 +1585,7 @@ namespace xivModdingFramework.Cache
 
         public static async Task<XivDependencyRoot> GetFirstRoot(string internalPath)
         {
-            var roots = await XivDependencyGraph.GetDependencyRoots(internalPath);
+            var roots = await XivDependencyGraph.GetDependencyRoots(internalPath, true);
             if(roots.Count > 0)
             {
                 return roots[0];
