@@ -98,8 +98,11 @@ namespace xivModdingFramework.SqPack.DataContainers
 
         public void Save(BinaryWriter index1Stream, BinaryWriter index2Stream, bool disposeStreams = false)
         {
+            if (ReadOnlyMode) throw new InvalidDataException("Index Files loaded in Read Only Mode cannot be saved to file.");
+
             WriteIndex1File(index1Stream);
             WriteIndex2File(index2Stream);
+
             if (disposeStreams)
             {
                 index1Stream.Dispose();
