@@ -1637,8 +1637,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.enabled = true;
                 mod.modPack = null;
                 modList.Mods.Add(mod);
-
-                modList.modCount += 1;
             } else
             {
                 var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();

@@ -201,7 +201,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<long> GetDataOffset(string fullPath)
         {
             var dataFile = IOUtil.GetDataFileFromPath(fullPath);
-            var index = await GetIndexFile(dataFile);
+            var index = await GetIndexFile(dataFile, false, true);
             return index.Get8xDataOffset(fullPath);
         }
 
@@ -565,8 +565,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<List<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile)
         {
             var ret = new List<int>();
-            var index = await GetIndexFile(dataFile);
-            foreach(var hashKv in hashNumDictionary)
+            var index = await GetIndexFile(dataFile, false, true);
+            foreach (var hashKv in hashNumDictionary)
             {
                 if (index.FolderExists((uint) hashKv.Key)) {
                     ret.Add(hashKv.Value);
@@ -610,7 +610,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if it exists, False otherwise</returns>
         public async Task<bool> FileExists(string filePath, XivDataFile dataFile)
         {
-            var index = await GetIndexFile(dataFile);
+            var index = await GetIndexFile(dataFile, false, true);
             return index.FileExists(filePath);
         }
 
@@ -622,7 +622,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if it exists, False otherwise</returns>
         public async Task<bool> FolderExists(string folder, XivDataFile dataFile)
         {
-            var index = await GetIndexFile(dataFile);
+            var index = await GetIndexFile(dataFile, false, true);
             return index.FolderExists(folder);
         }
 
@@ -634,7 +634,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>A list of all of the offsets in the given folder</returns>
         public async Task<List<long>> GetAllFileOffsetsInFolder(int hashedFolder, XivDataFile dataFile)
         {
-            var index = await GetIndexFile(dataFile);
+            var index = await GetIndexFile(dataFile, false, true);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
 
             var hashes = entries.Select(x => ((long)x.RawOffset) * 8L);
@@ -649,7 +649,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>A list containing the hashed values of the files in the given folder</returns>
         public async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile)
         {
-            var index = await GetIndexFile(dataFile);
+            var index = await GetIndexFile(dataFile, false, true);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
 
             var hashes = entries.Select(x => (int)x.FileNameHash);
@@ -661,7 +661,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         public async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile)
         {
-            var index = await GetIndexFile(dataFile);
+            var index = await GetIndexFile(dataFile, false, true);
             return index.GetAllHashes();
         }
 
@@ -696,12 +696,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static Dictionary<XivDataFile, long> _IndexLastModifiedTime = new Dictionary<XivDataFile, long>();
         private static Dictionary<XivDataFile, IndexFile> _CachedIndexFiles = new Dictionary<XivDataFile, IndexFile>();
 
+        private static Dictionary<XivDataFile, long> _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
+        private static Dictionary<XivDataFile, IndexFile> _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
         /// <summary>
         /// Creates an Index File object from the game index files.
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        public async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false)
+        public async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool allowReadOnly = false)
         {
             var index1Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
             var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
@@ -725,9 +727,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If we don't have the file cached or the write time doesn't match exactly.
                 if (!_IndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _IndexLastModifiedTime[dataFile] || lastTime == creationTime || lastTime == 0)
                 {
-                    using (var index1Stream = new BinaryReader(File.Open(index1Path, FileMode.Open)))
+                    using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
                     {
-                        using (var index2Stream = new BinaryReader(File.Open(index2Path, FileMode.Open)))
+                        using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
                         {
                             index = new IndexFile(dataFile, index1Stream, index2Stream);
                         }
@@ -735,8 +737,34 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     _IndexLastModifiedTime[dataFile] = lastTime;
                     _CachedIndexFiles[dataFile] = index;
+                    _ReadOnlyIndexLastModifiedTime[dataFile] = lastTime;
+                    _CachedReadOnlyIndexFiles[dataFile] = index;
                     return index;
                 }
+            }
+            catch(Exception ex)
+            {
+                // The index2 file may be read/write locked.
+                if (!allowReadOnly) throw;
+                var lastTime = File.GetLastWriteTimeUtc(index1Path).Ticks;
+                var creationTime = File.GetCreationTimeUtc(index1Path).Ticks;
+
+                // If we don't have the file cached or the write time doesn't match exactly.
+                if (!_IndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _ReadOnlyIndexLastModifiedTime[dataFile] || lastTime == creationTime || lastTime == 0)
+                {
+                    using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
+                    {
+                            index = new IndexFile(dataFile, index1Stream, null);
+                    }
+
+                    _ReadOnlyIndexLastModifiedTime[dataFile] = lastTime;
+                    _CachedReadOnlyIndexFiles[dataFile] = index;
+                    return index;
+                } else
+                {
+                    return _CachedReadOnlyIndexFiles[dataFile];
+                }
+
             }
             finally
             {

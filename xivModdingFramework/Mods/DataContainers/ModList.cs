@@ -32,21 +32,6 @@ namespace xivModdingFramework.Mods.DataContainers
         public string version { get; set; }
 
         /// <summary>
-        /// The number of mods in the modlist
-        /// </summary>
-        public int modCount { get; set; }
-
-        /// <summary>
-        /// The number of modpacks currently installed
-        /// </summary>
-        public int modPackCount { get; set; }
-
-        /// <summary>
-        /// The number of empty spaces available that a mod can fill
-        /// </summary>
-        public int emptyCount { get; set; }
-
-        /// <summary>
         /// The list of ModPacks currently installed
         /// </summary>
         public List<ModPack> ModPacks { get; set; }
@@ -65,8 +50,6 @@ namespace xivModdingFramework.Mods.DataContainers
             // slightly less safe in the event any of the classes ever get extended.
             return JsonConvert.DeserializeObject<ModList>(JsonConvert.SerializeObject(this));
         }
-
-
     }
 
     public class Mod

@@ -446,7 +446,6 @@ namespace xivModdingFramework.Mods
                 }
 
                 modlist.ModPacks.Add(modPack);
-                modlist.modPackCount++;
 
                 _modding.SaveModList(modlist);
 

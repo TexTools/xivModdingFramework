@@ -24,6 +24,11 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public class IndexFile
     {
+        public bool ReadOnlyMode
+        {
+            get; private set;
+        }
+
         // Header bytes (1024 in length usually)
         private byte[] Index1Header;
 
@@ -71,19 +76,33 @@ namespace xivModdingFramework.SqPack.DataContainers
             DataFile = dataFile;
 
             ReadIndex1File(index1Stream);
-            ReadIndex2File(index2Stream);
+
+            if (index2Stream != null)
+            {
+                ReadIndex2File(index2Stream);
+                ReadOnlyMode = false;
+            } else
+            {
+                ReadOnlyMode = true;
+            }
 
             if(disposeStreams)
             {
                 index1Stream.Dispose();
-                index2Stream.Dispose();
+                if (index2Stream != null)
+                {
+                    index2Stream.Dispose();
+                }
             }
         }
 
         public void Save(BinaryWriter index1Stream, BinaryWriter index2Stream, bool disposeStreams = false)
         {
+            if (ReadOnlyMode) throw new InvalidDataException("Index Files loaded in Read Only Mode cannot be saved to file.");
+
             WriteIndex1File(index1Stream);
             WriteIndex2File(index2Stream);
+
             if (disposeStreams)
             {
                 index1Stream.Dispose();
@@ -514,11 +533,36 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
         /// <summary>
-        /// Gets the data offset in the form of (datNumber, offset Within File)
+        /// Gets the Index2 data offset in the form of (datNumber, offset Within File)
         /// Or (0, 0) if the file does not exist.
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
+        public uint GetRawDataOffsetIndex2(string filePath)
+        {
+
+            var fullHash = (uint)HashGenerator.GetHash(filePath);
+
+            if (Index2Entries.ContainsKey(fullHash))
+            {
+                var entry = Index2Entries[fullHash];
+                return entry.RawFileOffset;
+            }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Gets the 8x multiplied Index2 data offset from the index file, with DatNumber embeded.
+        /// Or 0 if the file does not exist.  
+        /// This is primarily useful for legacy functionality.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public long Get8xDataOffsetIndex2(string filePath)
+        {
+            return ((long)GetRawDataOffsetIndex2(filePath)) * 8L;
+        }
         public (uint DatNumber, long DataOffset) GetDataOffsetComplete(string filePath)
         {
             var raw = GetRawDataOffset(filePath);
