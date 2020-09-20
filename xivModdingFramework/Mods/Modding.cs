@@ -341,11 +341,14 @@ namespace xivModdingFramework.Mods
         /// Performs the most low-level mod enable/disable functions, without saving the modlist,
         /// ergo this should only be called by functions which will handle saving the modlist after
         /// they're done performing all modlist operations.
+        /// 
+        /// If the Index and modlist are provided, the actions are only applied to those cached entries, rather
+        /// than to the live files.
         /// </summary>
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache)
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, IndexFile cachedIndex = null, ModList cachedModlist = null)
         {
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
@@ -373,21 +376,32 @@ namespace xivModdingFramework.Mods
             // Added file.
             if (enable && !mod.enabled)
             {
-                await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, updateCache);
+                if (cachedIndex != null)
+                {
+                    cachedIndex.SetDataOffset(mod.fullPath, mod.data.modOffset);
+                }
+                else
+                {
+                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, false);
+                }
                 mod.enabled = true;
 
-                // Check if we're re-enabling a metadata mod.
-                var ext = Path.GetExtension(mod.fullPath);
-                if (ext == ".meta")
+                if (cachedIndex == null)
                 {
-                    // Retreive the uncompressed meta entry we just enabled.
-                    var data = await dat.GetType2Data(mod.fullPath, false);
-                    var meta = await ItemMetadata.Deserialize(data);
+                    // Check if we're re-enabling a metadata mod.
+                    var ext = Path.GetExtension(mod.fullPath);
+                    if (ext == ".meta")
+                    {
+                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
+                        // Retreive the uncompressed meta entry we just enabled.
+                        var data = await dat.GetType2Data(mod.data.modOffset, df);
+                        var meta = await ItemMetadata.Deserialize(data);
 
-                    meta.Validate(mod.fullPath);
+                        meta.Validate(mod.fullPath);
 
-                    // And write that metadata to the actual constituent files.
-                    await ItemMetadata.ApplyMetadata(meta);
+                        // And write that metadata to the actual constituent files.
+                        await ItemMetadata.ApplyMetadata(meta, cachedIndex, cachedModlist);
+                    }
                 }
             }
             else if (!enable && mod.enabled)
@@ -395,14 +409,33 @@ namespace xivModdingFramework.Mods
                 if (mod.IsCustomFile())
                 {
                     // Delete file descriptor handles removing metadata as needed on its own.
-                    await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
+                    if (cachedIndex != null)
+                    {
+                        cachedIndex.SetDataOffset(mod.fullPath, 0);
+                    }
+                    else
+                    {
+                        await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                    }
                 } else
                 {
-                    await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, updateCache);
+                    if (cachedIndex != null)
+                    {
+                        cachedIndex.SetDataOffset(mod.fullPath, mod.data.originalOffset);
+                    }
+                    else
+                    {
+                        await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, false);
+                    }
                 }
                 mod.enabled = false;
             }
-                
+
+            if (updateCache)
+            {
+                XivCache.QueueDependencyUpdate(mod.fullPath);
+            }
+
             return true;
         }
 
@@ -422,40 +455,76 @@ namespace xivModdingFramework.Mods
             // potentially pollute our index backups.
             bool includeInternal = enable == false;
 
+            Dictionary<XivDataFile, IndexFile> indexFiles  = new Dictionary<XivDataFile, IndexFile>();
+
 
             var modNum = 0;
-            foreach (var modEntry in modList.Mods)
+            var mods = modList.Mods.ToList();
+            foreach (var modEntry in mods)
             {
                 // Save disabling these for last.
                 if (modEntry.IsInternal()) continue;
 
-                await ToggleModUnsafe(enable, modEntry, false, false);
+                var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
+                if(!indexFiles.ContainsKey(df))
+                {
+                    indexFiles.Add(df, await index.GetIndexFile(df));
+                }
+
+
+                await ToggleModUnsafe(enable, modEntry, false, false, indexFiles[df], modList);
                 progress?.Report((++modNum, modList.Mods.Count, string.Empty));
             }
 
-            if (includeInternal && !enable)
+            if (!enable)
             {
                 // Disable these last.
-                var internalEntries = modList.Mods.Where(x => x.IsInternal());
+                var internalEntries = modList.Mods.Where(x => x.IsInternal()).ToList();
                 foreach (var modEntry in internalEntries)
                 {
-                    await ToggleModUnsafe(enable, modEntry, true, false);
+                    var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
+                    await ToggleModUnsafe(enable, modEntry, true, false, indexFiles[df], modList);
+                    modList.Mods.Remove(modEntry);
+                }
+            } else
+            {
+                progress?.Report((0, 0, "Expanding Metadata Entries..."));
+
+                // Batch and group apply the metadata entries.
+                var metadataEntries = modList.Mods.Where(x => x.fullPath.EndsWith(".meta")).ToList();
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+                Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
+                foreach(var mod in metadataEntries)
+                {
+                    var df = IOUtil.GetDataFileFromPath(mod.fullPath);
+                    var data = await _dat.GetType2Data(mod.data.modOffset, df);
+                    var meta = await ItemMetadata.Deserialize(data);
+
+                    meta.Validate(mod.fullPath);
+
+                    if(!metadata.ContainsKey(df))
+                    {
+                        metadata.Add(df, new List<ItemMetadata>());
+                    }
+                    metadata[df].Add(meta);
+                }
+
+
+                foreach(var dkv in metadata)
+                {
+                    var df = dkv.Key;
+                    await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
                 }
             }
 
+            foreach (var kv in indexFiles)
+            {
+                await index.SaveIndexFile(kv.Value);
+            }
 
             SaveModList(modList);
 
-            if (includeInternal && !enable)
-            {
-                // Now go ahead and delete the internal files, to prevent them
-                // being accidentally re-enabled (They should be re-built by the metadata file imports)
-                var internalEntries = modList.Mods.Where(x => x.IsInternal());
-                foreach (var modEntry in internalEntries)
-                {
-                    await DeleteMod(modEntry.fullPath, true);
-                }
-            }
 
 
             // Do these as a batch query at the end.
