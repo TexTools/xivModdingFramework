@@ -902,8 +902,9 @@ namespace xivModdingFramework.Mods
 
 
                 var finalSize = await GetTotalModDataSize();
-
-                return originalSize - finalSize;
+                var saved = originalSize - finalSize;
+                saved = saved > 0 ? saved : 0;
+                return saved;
             } finally
             {
                 var finfos = XivCache.GameInfo.GameDirectory.GetFiles();

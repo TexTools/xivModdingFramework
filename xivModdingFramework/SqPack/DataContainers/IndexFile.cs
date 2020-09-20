@@ -533,11 +533,36 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
         /// <summary>
-        /// Gets the data offset in the form of (datNumber, offset Within File)
+        /// Gets the Index2 data offset in the form of (datNumber, offset Within File)
         /// Or (0, 0) if the file does not exist.
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
+        public uint GetRawDataOffsetIndex2(string filePath)
+        {
+
+            var fullHash = (uint)HashGenerator.GetHash(filePath);
+
+            if (Index2Entries.ContainsKey(fullHash))
+            {
+                var entry = Index2Entries[fullHash];
+                return entry.RawFileOffset;
+            }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Gets the 8x multiplied Index2 data offset from the index file, with DatNumber embeded.
+        /// Or 0 if the file does not exist.  
+        /// This is primarily useful for legacy functionality.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public long Get8xDataOffsetIndex2(string filePath)
+        {
+            return ((long)GetRawDataOffsetIndex2(filePath)) * 8L;
+        }
         public (uint DatNumber, long DataOffset) GetDataOffsetComplete(string filePath)
         {
             var raw = GetRawDataOffset(filePath);
