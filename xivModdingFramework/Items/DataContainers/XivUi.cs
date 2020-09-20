@@ -78,6 +78,23 @@ namespace xivModdingFramework.Items.DataContainers
         public int IconNumber { get; set; }
 
 
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown UI Element";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory != null ? SecondaryCategory : XivStrings.UI;
+        }
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivUi)obj).Name, StringComparison.Ordinal);

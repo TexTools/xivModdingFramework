@@ -57,6 +57,23 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
 
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown Item";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory != null ? SecondaryCategory : "Unknown";
+        }
         internal static IItemModel FromDependencyRoot(XivDependencyRoot root, int imcSubset)
         {
             var item = new XivGenericItemModel();

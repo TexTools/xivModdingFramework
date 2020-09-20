@@ -87,6 +87,24 @@ namespace xivModdingFramework.Items.DataContainers
             return item;
         }
 
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown Furniture";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory != null ? SecondaryCategory : XivStrings.Housing;
+        }
+
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivFurniture)obj).Name, StringComparison.Ordinal);

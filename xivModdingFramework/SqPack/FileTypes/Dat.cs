@@ -26,6 +26,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
@@ -85,14 +86,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                 case "FAT32":
                     return 4294967296;
                 case "NTFS":
-                    // This isn't the actual NTFS limit, but is a safety limit for now while we test higher DAT sizes. (8GB)
-                    // Theoretical offset-addressable maximum is 2^35 for DX11, NTFS DAT files.  (28 Shift 7)
-                    return 8589934592;
+                    // 2 ^35 is the maximum addressable size in the Index files. (28 precision bits, left-shifted 7 bits (increments of 128)
+                    return 34359738368;
                 case "exFAT":
-                    // exFAT devices are supposed to be able to take larger sizes, and it works for FFXIV
-                    // But in practice, TexTools can't access file pointers above 2GB on exFAT devices.
-                    // .NET thing probably.
-                    return 8589934592;
+                    return 34359738368;
                 default:
                     // Unknown HDD Format, default to the basic limit.
                     return 2000000000;
@@ -319,7 +316,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the SqPack portion of the dat file. 
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        private static byte[] MakeSqPackHeader()
+        internal static byte[] MakeSqPackHeader()
         {
             var header = new byte[1024];
 
@@ -346,7 +343,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        private static byte[] MakeDatHeader()
+        internal static byte[] MakeDatHeader()
         {
             var header = new byte[1024];
 
@@ -1396,7 +1393,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null)
         {
             var _index = new Index(_gameDirectory);
             var offset = await _index.GetDataOffset(sourcePath);
@@ -1406,7 +1403,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, category, itemName, source, overwrite);
+            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem);
         }
 
         /// <summary>
@@ -1419,7 +1416,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string category = "Unknown", string itemName = "Unknown", string source = "Unknown", bool overwrite = false)
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null)
         {
             var _modding = new Modding(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -1433,7 +1430,42 @@ namespace xivModdingFramework.SqPack.FileTypes
             var size = await GetCompressedFileSize(originalOffset, originalDataFile);
             var data = GetRawData(originalOffset, originalDataFile, size);
 
-            return await WriteModFile(data, targetPath, source);
+
+            XivDependencyRoot root = null;
+
+            if (referenceItem == null)
+            {
+                try
+                {
+                    root = await XivCache.GetFirstRoot(targetPath);
+                    if (root != null)
+                    {
+                        var item = root.GetFirstItem();
+
+                        referenceItem = item;
+                    }
+                    else
+                    {
+                        referenceItem = new XivGenericItemModel()
+                        {
+                            Name = Path.GetFileName(targetPath),
+                            SecondaryCategory = "Raw File Copy"
+                        };
+                    }
+                }
+                catch
+                {
+                    referenceItem = new XivGenericItemModel()
+                    {
+                        Name = Path.GetFileName(targetPath),
+                        SecondaryCategory = "Raw File Copy"
+                    };
+                }
+            }
+
+
+
+            return await WriteModFile(data, targetPath, source, referenceItem);
         }
 
 
@@ -1542,18 +1574,19 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var item = root.GetFirstItem();
 
                         referenceItem = item;
-                        itemName = referenceItem.Name;
-                        category = referenceItem.SecondaryCategory;
+                        itemName = referenceItem.GetModlistItemName();
+                        category = referenceItem.GetModlistItemCategory();
                     }
                 }
                 catch
                 {
                     itemName = Path.GetFileName(internalFilePath);
+                    category = "Raw File";
                 }
             } else
             {
-                itemName = referenceItem.Name;
-                category = referenceItem.SecondaryCategory;
+                itemName = referenceItem.GetModlistItemName();
+                category = referenceItem.GetModlistItemCategory();
             }
 
             // Update the DAT files.
@@ -1599,6 +1632,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 };
                 mod.data.modOffset = retOffset;
                 mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
+                mod.data.modSize = fileData.Length;
                 mod.data.dataType = fileType;
                 mod.enabled = true;
                 mod.modPack = null;
@@ -1616,6 +1650,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.data.modOffset = retOffset;
                 mod.enabled = true;
                 mod.modPack = null;
+                mod.data.modSize = fileData.Length;
                 mod.data.dataType = fileType;
                 mod.name = itemName;
                 mod.category = category;
