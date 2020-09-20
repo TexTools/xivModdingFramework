@@ -86,14 +86,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                 case "FAT32":
                     return 4294967296;
                 case "NTFS":
-                    // This isn't the actual NTFS limit, but is a safety limit for now while we test higher DAT sizes. (8GB)
-                    // Theoretical offset-addressable maximum is 2^35 for DX11, NTFS DAT files.  (28 Shift 7)
-                    return 8589934592;
+                    // 2 ^35 is the maximum addressable size in the Index files. (28 precision bits, left-shifted 7 bits (increments of 128)
+                    return 34359738368;
                 case "exFAT":
-                    // exFAT devices are supposed to be able to take larger sizes, and it works for FFXIV
-                    // But in practice, TexTools can't access file pointers above 2GB on exFAT devices.
-                    // .NET thing probably.
-                    return 8589934592;
+                    return 34359738368;
                 default:
                     // Unknown HDD Format, default to the basic limit.
                     return 2000000000;
