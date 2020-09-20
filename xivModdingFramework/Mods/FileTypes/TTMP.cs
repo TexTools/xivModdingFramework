@@ -636,6 +636,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     data = new Data()
                                 };
 
+                                mod.data.modSize = json.ModSize;
                                 mod.data.modOffset = longOffset;
                                 mod.data.originalOffset = (fileAdditionMod ? longOffset : longOriginal);
                                 mod.data.dataType = fileType;
@@ -654,6 +655,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     mod.data.originalOffset = longOffset;
                                 }
 
+                                mod.data.modSize = json.ModSize;
                                 mod.data.modOffset = longOffset;
                                 mod.enabled = true;
                                 mod.modPack = modPack;

@@ -1632,6 +1632,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 };
                 mod.data.modOffset = retOffset;
                 mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
+                mod.data.modSize = fileData.Length;
                 mod.data.dataType = fileType;
                 mod.enabled = true;
                 mod.modPack = null;
@@ -1649,6 +1650,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.data.modOffset = retOffset;
                 mod.enabled = true;
                 mod.modPack = null;
+                mod.data.modSize = fileData.Length;
                 mod.data.dataType = fileType;
                 mod.name = itemName;
                 mod.category = category;
