@@ -159,6 +159,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                         {
                             Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
                         }
+                    }
                 } else if(segmentId == 1 || segmentId == 2)
                 {
                     // Segment 4 is regenerated when writing, so we don't need to store it.
