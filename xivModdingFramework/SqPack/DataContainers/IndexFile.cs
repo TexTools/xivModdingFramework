@@ -158,6 +158,9 @@ namespace xivModdingFramework.SqPack.DataContainers
                         if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
                         {
                             Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
+                        } else
+                        {
+                            var z = "z";
                         }
                     }
                 } else if(segmentId == 1 || segmentId == 2)

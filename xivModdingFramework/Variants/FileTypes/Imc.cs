@@ -179,11 +179,9 @@ namespace xivModdingFramework.Variants.FileTypes
         public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false)
         {
             var entries = new List<XivImc>();
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var lastPath = "";
-            long imcOffset = 0;
             byte[] imcByteData = new byte[0];
 
             foreach (var combinedPath in pathsWithOffsets)

@@ -407,12 +407,13 @@ namespace xivModdingFramework.Models.FileTypes
 
         /// <summary>
         /// Retrieves the raw XivMdl file at a given internal file path.
+        /// 
+        /// If it an explicit offset is provided, it will be used over path or mod offset resolution.
         /// </summary>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
+        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false, long offset = 0)
         {
 
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
             var mod = await modding.TryGetModEntry(mdlPath);
@@ -420,16 +421,21 @@ namespace xivModdingFramework.Models.FileTypes
             var getShapeData = true;
 
 
-            long offset = await index.GetDataOffset(mdlPath);
-
-            if (getOriginal)
+            if (offset == 0)
             {
-                if (modded)
+                var index = new Index(_gameDirectory);
+                offset = await index.GetDataOffset(mdlPath);
+
+                if (getOriginal)
                 {
-                    offset = mod.data.originalOffset;
-                    modded = false;
+                    if (modded)
+                    {
+                        offset = mod.data.originalOffset;
+                        modded = false;
+                    }
                 }
             }
+
 
             if (offset == 0)
             {
