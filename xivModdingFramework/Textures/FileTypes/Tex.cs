@@ -33,7 +33,9 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Mods;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -837,7 +839,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source)
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             long offset = 0;
             var path = internalPath;
@@ -845,11 +847,18 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var data = await MakeTexData(path, externalPath);
             var modding = new Modding(_gameDirectory);
-            var entry = await modding.TryGetModEntry(path);
+            Mod entry = null;
+            if(cachedModList != null) 
+            {
+                entry = cachedModList.Mods.FirstOrDefault(x => x.fullPath == path);
+            } else
+            {
+                entry = await modding.TryGetModEntry(path);
+            }
 
             var type = Path.GetExtension(path) == ".atex" ? 2 : 4;
 
-            offset = await _dat.WriteModFile(data, path, source, item);
+            offset = await _dat.WriteModFile(data, path, source, item, cachedIndexFile, cachedModList);
             return offset;
         }
 

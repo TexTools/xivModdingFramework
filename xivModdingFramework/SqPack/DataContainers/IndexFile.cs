@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 
@@ -154,7 +155,13 @@ namespace xivModdingFramework.SqPack.DataContainers
                         {
                             Index1Entries.Add(entry.FolderPathHash, new Dictionary<uint, FileIndexEntry>());
                         }
-                        Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
+                        if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
+                        {
+                            Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
+                        } else
+                        {
+                            var z = "z";
+                        }
                     }
                 } else if(segmentId == 1 || segmentId == 2)
                 {
@@ -208,12 +215,16 @@ namespace xivModdingFramework.SqPack.DataContainers
 
                         var bytes = stream.ReadBytes(8);
                         entry.SetBytes(bytes);
-                        Index2Entries.Add(entry.FullPathHash, entry);
+
+                        if (!Index2Entries.ContainsKey(entry.FullPathHash))
+                        {
+                            Index2Entries.Add(entry.FullPathHash, entry);
+                        }
                     }
                 }
                 else if (segmentId == 1 || segmentId == 2 || segmentId == 3)
                 {
-                    Index2ExtraSegments.Add(stream.ReadBytes(segmentSize));
+                       Index2ExtraSegments.Add(stream.ReadBytes(segmentSize));
                 }
             }
 
@@ -253,6 +264,10 @@ namespace xivModdingFramework.SqPack.DataContainers
                     }
 
                     folderListing[folderKey].FileCount++;
+                    if (entry.FileNameHash != fileKey || entry.FolderPathHash != folderKey)
+                    {
+                        throw new Exception("Attempted to save Index file with invalid structure.");
+                    }
                     fileListing.Add(entry);
 
                     currentFileOffset += 16;
@@ -668,7 +683,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                 if (newRawOffsetWithDatNumEmbed != 0)
                 {
                     var entry = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
-                    Index1Entries[folderHash].Add(newRawOffsetWithDatNumEmbed, entry);
+                    Index1Entries[folderHash].Add(fileHash, entry);
                 }
             } else
             {

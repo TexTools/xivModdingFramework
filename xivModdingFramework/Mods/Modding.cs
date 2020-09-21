@@ -569,9 +569,16 @@ namespace xivModdingFramework.Mods
         /// Deletes a mod from the modlist
         /// </summary>
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
-        public async Task DeleteMod(string modItemPath, bool allowInternal = false)
+        public async Task DeleteMod(string modItemPath, bool allowInternal = false, IndexFile index = null, ModList modList = null)
         {
-            var modList = GetModList();
+            var doSave = false;
+            var _index = new Index(_gameDirectory);
+            if (modList == null)
+            {
+                doSave = true;
+                modList = GetModList();
+                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(modItemPath));
+            }
 
             var modToRemove = (from mod in modList.Mods
                 where mod.fullPath.Equals(modItemPath)
@@ -585,19 +592,14 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot delete internal data without explicit toggle.");
             }
 
-            if (modToRemove.IsCustomFile())
-            {
-                var index = new Index(_gameDirectory);
-                await index.DeleteFileDescriptor(modItemPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-            }
-            if (modToRemove.enabled)
-            {
-                await ToggleModStatus(modItemPath, false);
-            }
-
+            await ToggleModUnsafe(false, modToRemove, allowInternal, true, index, modList);
             modList.Mods.Remove(modToRemove);
 
-            SaveModList(modList);
+            if (doSave)
+            {
+                await _index.SaveIndexFile(index);
+                await SaveModListAsync(modList);
+            }
         }
 
         /// <summary>

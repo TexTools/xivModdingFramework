@@ -433,11 +433,17 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
+        /// <param name="RootConversions">Roots to convert during import, if any conversions are required.</param>
         /// <returns>The number of total mods imported</returns>
         public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
-            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
+            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, Dictionary<XivDependencyRoot, XivDependencyRoot> RootConversions = null)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
+
+            if(RootConversions == null)
+            {
+                RootConversions = new Dictionary<XivDependencyRoot, XivDependencyRoot>();
+            }
 
             var startTime = DateTime.Now.Ticks;
 
@@ -553,15 +559,9 @@ namespace xivModdingFramework.Mods.FileTypes
                                     mod= modsByFile[modJson.FullPath];
                                 }
 
-                                uint offset = 0;
-
-                                if(mod != null && mod.data.modSize >= size)
-                                {
-                                    offset = await dat.WriteToDat(data, df, mod.data.modOffset);
-                                } else
-                                {
-                                    offset = await dat.WriteToDat(data, df);
-                                }
+                                // Always write data to end of file during modpack imports in case we need
+                                // to roll back the import.
+                                uint offset = await dat.WriteToDat(data, df);
                                 DatOffsets.Add(modJson.FullPath, offset);
 
                                 var dataType = BitConverter.ToInt32(data, 4);

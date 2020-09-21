@@ -144,7 +144,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="root"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root)
+        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceDefault = false)
         {
             if(root == null)
             {
@@ -164,11 +164,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 // Run it through the binary deserializer and we're good.
                 //return await Deserialize(data);
-                return await CreateFromRaw(root);
+                return await CreateFromRaw(root, forceDefault);
             } else
             {
                 // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.
-                return await CreateFromRaw(root);
+                return await CreateFromRaw(root, forceDefault);
             }
         }
 
@@ -211,7 +211,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="meta"></param>
         /// <returns></returns>
-        public static async Task SaveMetadata(ItemMetadata meta, string source)
+        public static async Task SaveMetadata(ItemMetadata meta, string source, IndexFile index = null, ModList modlist = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -219,9 +219,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            var entry = await _modding.TryGetModEntry(path);
-
-            await _dat.ImportType2Data(await Serialize(meta), path, source, item);
+            await _dat.ImportType2Data(await Serialize(meta), path, source, item, index, modlist);
         }
 
         /// <summary>
@@ -231,7 +229,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist)
+        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist, bool save = true)
         {
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -306,8 +304,11 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
             }
 
-            await _index.SaveIndexFile(index);
-            await _modding.SaveModListAsync(modlist);
+            if (save)
+            {
+                await _index.SaveIndexFile(index);
+                await _modding.SaveModListAsync(modlist);
+            }
         }
 
         /// <summary>

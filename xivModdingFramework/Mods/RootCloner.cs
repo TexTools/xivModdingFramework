@@ -15,6 +15,7 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
@@ -30,8 +31,8 @@ namespace xivModdingFramework.Mods
         /// <param name="Source">Original Root to copy from.</param>
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
-        /// <returns></returns>
-        public static async Task CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null)
+        /// <returns>Returns a Dictionary of all the file conversion</returns>
+        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null)
         {
 
             if (ProgressReporter != null)
@@ -51,6 +52,14 @@ namespace xivModdingFramework.Mods
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, df, XivCache.GameInfo.GameLanguage);
                 var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
+                var doSave = false;
+                if (index == null)
+                {
+                    doSave = true;
+                    index = await _index.GetIndexFile(df);
+                    modlist = await _modding.GetModListAsync();
+                }
+
 
                 bool locked = _index.IsIndexLocked(df);
                 if(locked)
@@ -63,8 +72,11 @@ namespace xivModdingFramework.Mods
                 {
                     ProgressReporter.Report("Analyzing items and variants...");
                 }
+
                 // First, try to get everything, to ensure it's all valid.
-                var originalMetadata = await ItemMetadata.GetMetadata(Source);
+                ItemMetadata originalMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
+
+
                 var originalModelPaths = await Source.GetModelFiles();
                 var originalMaterialPaths = await Source.GetMaterialFiles();
                 var originalTexturePaths = await Source.GetTextureFiles();
@@ -89,12 +101,12 @@ namespace xivModdingFramework.Mods
                 // Time to start editing things.
 
                 // First, get a new, clean copy of the metadata, pointed at the new root.
-                var newMetadata = await ItemMetadata.GetMetadata(Source);
+                var newMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
                 newMetadata.Root = Destination.Info.ToFullRoot();
                 ItemMetadata originalDestinationMetadata = null;
                 try
                 {
-                    originalDestinationMetadata = await ItemMetadata.GetMetadata(Destination);
+                    originalDestinationMetadata = await GetCachedMetadata(index, modlist, Destination, df, _dat);
                 } catch
                 {
                     originalDestinationMetadata = new ItemMetadata(Destination);
@@ -104,7 +116,7 @@ namespace xivModdingFramework.Mods
                 if(Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
                 {
                     var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
-                    var set1Metadata = await ItemMetadata.GetMetadata(set1Root);
+                    var set1Metadata = await GetCachedMetadata(index, modlist, set1Root, df, _dat);
 
                     newMetadata.EqpEntry = set1Metadata.EqpEntry;
 
@@ -182,7 +194,6 @@ namespace xivModdingFramework.Mods
                 {
                     ProgressReporter.Report("Getting modlist...");
                 }
-                var modlist = await _modding.GetModListAsync();
 
                 if (ProgressReporter != null)
                 {
@@ -192,20 +203,21 @@ namespace xivModdingFramework.Mods
                 if (Destination != Source)
                 {
                     var dPath = Destination.Info.GetRootFolder();
-                    foreach (var mod in modlist.Mods)
+                    var allMods = modlist.Mods.ToList();
+                    foreach (var mod in allMods)
                     {
                         if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
                         {
                             if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
                             {
                                 // If this is a slotless root, purge everything.
-                                await _modding.DeleteMod(mod.fullPath, false);
+                                await _modding.DeleteMod(mod.fullPath, false, index, modlist);
                             }
                             else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.GetBaseFileName(true)))
                             {
                                 // Otherwise, only purge the files we're replacing, and anything else that
                                 // contains our slot name.
-                                await _modding.DeleteMod(mod.fullPath, false);
+                                await _modding.DeleteMod(mod.fullPath, false, index, modlist);
                             }
                         }
                     }
@@ -221,7 +233,8 @@ namespace xivModdingFramework.Mods
                 {
                     var src = kv.Key;
                     var dst = kv.Value;
-                    var xmdl = await _mdl.GetRawMdlData(src);
+                    var offset = index.Get8xDataOffset(src);
+                    var xmdl = await _mdl.GetRawMdlData(src, false, offset);
                     var tmdl = TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
@@ -241,7 +254,7 @@ namespace xivModdingFramework.Mods
 
                     // Save new Model.
                     var bytes = await _mdl.MakeNewMdlFile(tmdl, xmdl, null);
-                    await _dat.WriteModFile(bytes, dst, ApplicationSource);
+                    await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, index, modlist);
                 }
 
                 if (ProgressReporter != null)
@@ -255,7 +268,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, index, modlist);
                 }
 
 
@@ -271,7 +284,7 @@ namespace xivModdingFramework.Mods
                     var dst = kv.Value;
                     try
                     {
-                        var offset = await _index.GetDataOffset(src);
+                        var offset = index.Get8xDataOffset(src);
                         if (offset == 0) continue;
                         var xivMtrl = await _mtrl.GetMtrlData(offset, src, 11);
                         xivMtrl.MTRLPath = dst;
@@ -284,17 +297,12 @@ namespace xivModdingFramework.Mods
                             }
                         }
 
-                        await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource);
+                        await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, index, modlist);
                         CopiedMaterials.Add(dst);
                     }
                     catch (Exception ex)
                     {
-                        // Clear out the mtrl and let the functions later handle it.
-                        bool original = await _index.IsDefaultFilePath(dst);
-                        if (!original)
-                        {
-                            await _index.DeleteFileDescriptor(dst, df, false);
-                        }
+                        // Let functions later handle this mtrl then.
                     }
                 }
 
@@ -308,7 +316,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, index, modlist);
                 }
 
                 if (ProgressReporter != null)
@@ -373,8 +381,12 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                // Save the new Metadata file.
-                await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource);
+                await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource, index, modlist);
+
+                // Save the new Metadata file via the batch function so that it's only written to the memory cache for now.
+                await ItemMetadata.ApplyMetadataBatched(new List<ItemMetadata>() { newMetadata }, index, modlist, false);
+
+                
 
 
 
@@ -415,7 +427,7 @@ namespace xivModdingFramework.Mods
                             if (existentCopy == null) continue;
 
                             // Copy the material over.
-                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem);
+                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, index, modlist);
                         }
                     }
                 }
@@ -424,10 +436,6 @@ namespace xivModdingFramework.Mods
                 {
                     ProgressReporter.Report("Updating modlist...");
                 }
-
-                // Here we're going to go through and edit all the modded items to be joined together in a modpack for convenience.
-                modlist = await _modding.GetModListAsync();
-
 
                 var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
                 List<Mod> mods = new List<Mod>();
@@ -447,7 +455,12 @@ namespace xivModdingFramework.Mods
 
                 modlist.ModPacks.Add(modPack);
 
-                _modding.SaveModList(modlist);
+                if(doSave)
+                {
+                    // Save everything.
+                    await _index.SaveIndexFile(index);
+                    await _modding.SaveModListAsync(modlist);
+                }
 
                 if(saveDirectory != null)
                 {
@@ -486,14 +499,39 @@ namespace xivModdingFramework.Mods
                     await _ttmp.CreateSimpleModPack(smpd, XivCache.GameInfo.GameDirectory, null, true);
                 }
 
+
+
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Root copy complete.");
                 }
+
+                // Return the final file conversion listing.
+                var ret = newModelPaths.Union(newMaterialPaths).Union(newAvfxPaths).Union(newTexturePaths);
+                var dict = ret.ToDictionary(x => x.Key, x => x.Value);
+                dict.Add(Source.Info.GetRootFile(), Destination.Info.GetRootFile());
+                return dict;
+
             } finally
             {
                 XivCache.CacheWorkerEnabled = workerStatus;
             }
+        }
+
+        private static async Task<ItemMetadata> GetCachedMetadata(IndexFile index, ModList modlist, XivDependencyRoot root, XivDataFile df, Dat _dat)
+        {
+            var originalMetadataOffset = index.Get8xDataOffset(root.Info.GetRootFile());
+            ItemMetadata originalMetadata = null;
+            if (originalMetadataOffset == 0)
+            {
+                originalMetadata = await ItemMetadata.GetMetadata(root);
+            }
+            else
+            {
+                var data = await _dat.GetType2Data(originalMetadataOffset, df);
+                originalMetadata = await ItemMetadata.Deserialize(data);
+            }
+            return originalMetadata;
         }
 
         const string CommonPath = "chara/common/";

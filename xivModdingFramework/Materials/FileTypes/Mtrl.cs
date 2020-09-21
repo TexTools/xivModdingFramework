@@ -29,7 +29,9 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -697,7 +699,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source)
+        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             try
             {
@@ -705,7 +707,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item);
+                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList);
 
                 // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
                 var mapInfoList = xivMtrl.GetAllMapInfos(false);
@@ -714,7 +716,15 @@ namespace xivModdingFramework.Materials.FileTypes
                 foreach (var mapInfo in mapInfoList)
                 {
                     var path = mapInfo.Path;
-                    var exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
+                    bool exists = false;
+                    if (cachedIndexFile != null)
+                    {
+                        exists = cachedIndexFile.FileExists(mapInfo.Path);
+                    }
+                    else
+                    {
+                        exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
+                    }
 
                     if(exists)
                     {
@@ -732,7 +742,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     var di = Tex.GetDefaultTexturePath(mapInfo.Usage);
 
-                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source);
+                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList);
 
                 }
 
