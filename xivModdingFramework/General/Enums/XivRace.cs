@@ -26,6 +26,39 @@ using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.General.Enums
 {
+
+    public enum XivBaseRace : byte
+    {
+        Hyur = 1,
+        Elezen = 2,
+        Lalafell = 3,
+        Miqote = 4,
+        Roegadyn = 5,
+        AuRa = 6,
+        Hrothgar = 7,
+        Viera = 8
+    };
+
+    public enum XivSubRace : byte
+    {
+        Hyur_Midlander = 1,
+        Hyur_Highlander,
+        Elezen_Wildwood,
+        Elezen_Duskwright,
+        Lalafell_Plainsfolk,
+        Lalafell_Dunesfolk,
+        Miqote_Seeker,
+        Miqote_Keeper,
+        Roegadyn_SeaWolf,
+        Roegadyn_Hellsguard,
+        AuRa_Raen,
+        AuRa_Xaela,
+        Hrothgar_Hellion,
+        Hrothgar_Lost,
+        Viera_Rava,
+        Viera_Veena
+    };
+
     /// <summary>
     /// Enum containing all known races
     /// </summary>
@@ -81,7 +114,7 @@ namespace xivModdingFramework.General.Enums
         public bool HasSkin = false;
     }
 
-    public static class XivRaceTree 
+    public static class XivRaceTree
     {
         private static XivRaceNode tree;
         private static Dictionary<XivRace, XivRaceNode> dict;
@@ -351,7 +384,7 @@ namespace xivModdingFramework.General.Enums
         public static bool IsChildOf(this XivRace possibleChild, XivRace possibleParent, bool allowSame = true)
         {
             CheckTree();
-            if(possibleChild == possibleParent && allowSame)
+            if (possibleChild == possibleParent && allowSame)
             {
                 return true;
             }
@@ -369,7 +402,7 @@ namespace xivModdingFramework.General.Enums
         public static bool IsParentOf(this XivRace possibleParent, XivRace possibleChild, bool allowSame = true)
         {
             CheckTree();
-            if(possibleChild == possibleParent && allowSame)
+            if (possibleChild == possibleParent && allowSame)
             {
                 return true;
             }
@@ -450,7 +483,7 @@ namespace xivModdingFramework.General.Enums
 
             // Recursion for children.
             var children = new List<XivRace>();
-            foreach(var c in node.Children)
+            foreach (var c in node.Children)
             {
                 children.AddRange(GetChildren(c.Race, includeNPCs));
             }
@@ -467,17 +500,17 @@ namespace xivModdingFramework.General.Enums
         public static XivRace GetSkinRace(this XivRace race)
         {
             var node = GetNode(race);
-            if(node == null)
+            if (node == null)
             {
                 return XivRace.Hyur_Midlander_Male;
             }
 
-            if(node.HasSkin)
+            if (node.HasSkin)
             {
                 return node.Race;
             }
 
-            while(node.Parent != null)
+            while (node.Parent != null)
             {
                 node = node.Parent;
                 if (node.HasSkin)
@@ -485,6 +518,77 @@ namespace xivModdingFramework.General.Enums
             }
 
             return XivRace.Hyur_Midlander_Male;
+        }
+
+
+        /// <summary>
+        /// Retrieves the subrace offset for this race.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <returns></returns>
+        public static int GetSubRaceId(this XivSubRace subrace)
+        {
+            return (int)subrace % 2 == 1 ? 0 : 1;
+        }
+        public static XivBaseRace GetBaseRace(this XivSubRace subrace)
+        {
+            byte rId = (byte) ((((byte)subrace) - 1) / 2);
+            return (XivBaseRace) rId;
+        }
+
+        /// <summary>
+        /// Retrieves the base race enum value for this race/clan/gender race.
+        /// Used for CMP files and a few other things.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <returns></returns>
+        public static XivBaseRace GetBaseRace(this XivRace race)
+        {
+            switch(race)
+            {
+                case XivRace.Hyur_Midlander_Male:
+                case XivRace.Hyur_Midlander_Female:
+                case XivRace.Hyur_Midlander_Male_NPC:
+                case XivRace.Hyur_Midlander_Female_NPC:
+                case XivRace.Hyur_Highlander_Male:
+                case XivRace.Hyur_Highlander_Female:
+                case XivRace.Hyur_Highlander_Male_NPC:
+                case XivRace.Hyur_Highlander_Female_NPC:
+                    return XivBaseRace.Hyur;
+                case XivRace.Elezen_Male:
+                case XivRace.Elezen_Female:
+                case XivRace.Elezen_Male_NPC:
+                case XivRace.Elezen_Female_NPC:
+                    return XivBaseRace.Elezen;
+                case XivRace.Lalafell_Male:
+                case XivRace.Lalafell_Female:
+                case XivRace.Lalafell_Male_NPC:
+                case XivRace.Lalafell_Female_NPC:
+                    return XivBaseRace.Lalafell;
+                case XivRace.Miqote_Male:
+                case XivRace.Miqote_Female:
+                case XivRace.Miqote_Male_NPC:
+                case XivRace.Miqote_Female_NPC:
+                    return XivBaseRace.Miqote;
+                case XivRace.Roegadyn_Male:
+                case XivRace.Roegadyn_Female:
+                case XivRace.Roegadyn_Male_NPC:
+                case XivRace.Roegadyn_Female_NPC:
+                    return XivBaseRace.Roegadyn;
+                case XivRace.AuRa_Male:
+                case XivRace.AuRa_Female:
+                case XivRace.AuRa_Male_NPC:
+                case XivRace.AuRa_Female_NPC:
+                    return XivBaseRace.AuRa;
+                case XivRace.Viera:
+                case XivRace.Viera_NPC:
+                    return XivBaseRace.Viera;
+                case XivRace.Hrothgar:
+                case XivRace.Hrothgar_NPC:
+                    return XivBaseRace.Hrothgar;
+                default:
+                    return XivBaseRace.Hyur;
+            }
         }
 
         /// <summary>

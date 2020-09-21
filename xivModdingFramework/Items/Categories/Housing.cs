@@ -612,7 +612,7 @@ namespace xivModdingFramework.Items.Categories
                 folder = $"bgcommon/hou/indoor/general/{id}/material";
             }
 
-            if (await index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
+            if (await index.FolderExists(folder, XivDataFile._01_Bgcommon))
             {
                 var searchResults = new SearchResults
                 {
@@ -626,7 +626,7 @@ namespace xivModdingFramework.Items.Categories
 
             folder = $"bgcommon/hou/outdoor/general/{id}/material";
 
-            if (await index.FolderExists(HashGenerator.GetHash(folder), XivDataFile._01_Bgcommon))
+            if (await index.FolderExists(folder, XivDataFile._01_Bgcommon))
             {
                 var searchResults = new SearchResults
                 {

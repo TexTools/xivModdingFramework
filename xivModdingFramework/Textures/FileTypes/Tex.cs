@@ -52,8 +52,6 @@ namespace xivModdingFramework.Textures.FileTypes
         private readonly Index _index;
         private readonly Dat _dat;
         private readonly XivDataFile _dataFile;
-        private Dictionary<string, long> _indexFileDictionary;
-        private readonly object texLock = new object();
 
         /// <summary>
         /// Gets the path to the default blank texture for a given texture format.
@@ -117,11 +115,8 @@ namespace xivModdingFramework.Textures.FileTypes
             var hashedfolder = 0;
             var hashedfile = 0;
 
-            lock (texLock)
-            {
-                hashedfolder = HashGenerator.GetHash(folder);
-                hashedfile = HashGenerator.GetHash(file);
-            }
+            hashedfolder = HashGenerator.GetHash(folder);
+            hashedfile = HashGenerator.GetHash(file);
             var df = IOUtil.GetDataFileFromPath(path);
 
             offset = await _index.GetDataOffset(hashedfolder, hashedfile, df);
@@ -193,8 +188,8 @@ namespace xivModdingFramework.Textures.FileTypes
             var iconHQFolder = $"{iconFolder}/hq";
             var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
 
-            if (await _index.FileExists(HashGenerator.GetHash(iconFile), HashGenerator.GetHash(iconFolder),
-                XivDataFile._06_Ui))
+            var path = iconFolder + "/" + iconFile;
+            if (await _index.FileExists(path, XivDataFile._06_Ui))
             {
                 ttpList.Add(new TexTypePath
                 {
@@ -206,8 +201,8 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
 
-            if (await _index.FileExists(HashGenerator.GetHash(iconFile), HashGenerator.GetHash(iconHQFolder),
-                XivDataFile._06_Ui))
+            path = iconHQFolder + "/" + iconFile;
+            if (await _index.FileExists(path, XivDataFile._06_Ui))
             {
                 ttpList.Add(new TexTypePath
                 {
@@ -224,15 +219,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public async Task<XivTex> GetTexDataPreFetchedIndex(TexTypePath ttp)
         {
-            var folder = Path.GetDirectoryName(ttp.Path);
-            folder = folder.Replace("\\", "/");
-            var file = Path.GetFileName(ttp.Path);
-            long offset = 0;
-
-            lock (texLock)
-            {
-                offset = _indexFileDictionary[$"{HashGenerator.GetHash(file)}{HashGenerator.GetHash(folder)}"];
-            }
+            var offset = await _index.GetDataOffset(ttp.Path);
 
             if (offset == 0)
             {
@@ -590,11 +577,6 @@ namespace xivModdingFramework.Textures.FileTypes
             return convertedBytes.ToArray();
         }
 
-        public async Task GetIndexFileDictionary()
-        {
-            _indexFileDictionary = await _index.GetFileDictionary(_dataFile);
-        }
-
         /// <summary>
         /// Creates bitmap from decompressed Linear texture data.
         /// </summary>
@@ -867,8 +849,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var type = Path.GetExtension(path) == ".atex" ? 2 : 4;
 
-            offset = await _dat.WriteToDat(data.ToList(), entry, path,
-                item.SecondaryCategory, item.Name, df, source, type);
+            offset = await _dat.WriteModFile(data, path, source, item);
             return offset;
         }
 

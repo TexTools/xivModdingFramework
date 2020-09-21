@@ -12,6 +12,8 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Models.FileTypes
@@ -165,7 +167,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="type"></param>
         /// <param name="modifiedEntries"></param>
         /// <returns></returns>
-        public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries)
+        public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var entries = await GetEstFile(type, false);
 
@@ -195,7 +197,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Save file.
-            await SaveEstFile(type, entries);
+            await SaveEstFile(type, entries, referenceItem, cachedIndexFile, cachedModList);
         }
 
         public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(IItem item, bool forceDefault = false)
@@ -341,7 +343,7 @@ namespace xivModdingFramework.Models.FileTypes
             return entries;
         }
 
-        private static async Task SaveEstFile(EstType type, Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>> entries)
+        private static async Task SaveEstFile(EstType type, Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var count = entries.Select(x => x.Value.Count).Aggregate((x, y) => x + y);
 
@@ -367,7 +369,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             var _dat = new Dat(_gameDirectory);
-            await _dat.ImportType2Data(data, "_EST_INTERNAL_", EstFiles[type], Constants.InternalModSourceName, Constants.InternalModSourceName);
+            await _dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
 
     }

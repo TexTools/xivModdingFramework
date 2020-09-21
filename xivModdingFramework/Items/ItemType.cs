@@ -182,6 +182,19 @@ namespace xivModdingFramework.Items
                 }
             }
 
+            if(item.SecondaryCategory == XivStrings.Rings)
+            {
+                // Rings contain both left and right rings.
+                if (item.Name.EndsWith(XivStrings.Left))
+                {
+                    return "ril";
+                }
+                else if (item.Name.EndsWith(XivStrings.Right))
+                {
+                    return "rir";
+                }
+            }
+
             if(item.GetType() == typeof(XivMount))
             {
                 var m = (XivMount)item;

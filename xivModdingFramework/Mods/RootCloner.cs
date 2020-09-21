@@ -241,7 +241,7 @@ namespace xivModdingFramework.Mods
 
                     // Save new Model.
                     var bytes = await _mdl.MakeNewMdlFile(tmdl, xmdl, null);
-                    await _dat.WriteToDat(bytes.ToList(), null, dst, iCat, iName, df, ApplicationSource, 3);
+                    await _dat.WriteModFile(bytes, dst, ApplicationSource);
                 }
 
                 if (ProgressReporter != null)
@@ -255,7 +255,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem);
                 }
 
 
@@ -308,7 +308,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, iCat, iName, ApplicationSource, true);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem);
                 }
 
                 if (ProgressReporter != null)
@@ -355,18 +355,21 @@ namespace xivModdingFramework.Mods
                 }
 
                 // Poke through the variants and adjust any that point to null Material Sets to instead use a valid one.
-                var valid = newMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
-                if(valid <= 0)
+                if (newMetadata.ImcEntries.Count > 0 && originalMetadata.ImcEntries.Count > 0)
                 {
-                    valid = originalMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
-                }
-
-                for(int i = 0; i < newMetadata.ImcEntries.Count; i++)
-                {
-                    var entry = newMetadata.ImcEntries[i];
-                    if (entry.MaterialSet == 0)
+                    var valid = newMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
+                    if (valid <= 0)
                     {
-                        entry.MaterialSet = valid;
+                        valid = originalMetadata.ImcEntries.FirstOrDefault(x => x.MaterialSet != 0).MaterialSet;
+                    }
+
+                    for (int i = 0; i < newMetadata.ImcEntries.Count; i++)
+                    {
+                        var entry = newMetadata.ImcEntries[i];
+                        if (entry.MaterialSet == 0)
+                        {
+                            entry.MaterialSet = valid;
+                        }
                     }
                 }
 
@@ -412,7 +415,7 @@ namespace xivModdingFramework.Mods
                             if (existentCopy == null) continue;
 
                             // Copy the material over.
-                            await _dat.CopyFile(existentCopy, destPath, iCat, iName, ApplicationSource, true);
+                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem);
                         }
                     }
                 }
@@ -443,7 +446,6 @@ namespace xivModdingFramework.Mods
                 }
 
                 modlist.ModPacks.Add(modPack);
-                modlist.modPackCount++;
 
                 _modding.SaveModList(modlist);
 

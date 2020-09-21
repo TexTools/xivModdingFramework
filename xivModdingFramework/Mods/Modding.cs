@@ -16,20 +16,27 @@
 
 using Newtonsoft.Json;
 using SharpDX.Text;
+using SharpDX.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.Enums;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Variants.DataContainers;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Mods
 {
@@ -105,9 +112,9 @@ namespace xivModdingFramework.Mods
             File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
             _modlistSemaphore.Release();
         }
-        public void SaveModListAsync(ModList ml)
+        public async Task SaveModListAsync(ModList ml)
         {
-            _modlistSemaphore.WaitAsync();
+            await _modlistSemaphore.WaitAsync();
             File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
             _modlistSemaphore.Release();
         }
@@ -144,9 +151,6 @@ namespace xivModdingFramework.Mods
             var modList = new ModList
             {
                 version = _modlistVersion.ToString(),
-                modCount = 0,
-                modPackCount = 0,
-                emptyCount = 0,
                 ModPacks = new List<ModPack>(),
                 Mods = new List<Mod>()
             };
@@ -290,55 +294,44 @@ namespace xivModdingFramework.Mods
         {
             var index = new Index(_gameDirectory);
 
-            var workerState = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
-            try
+            var modList = GetModList();
+            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+            List<Mod> mods = null;
+
+            if (modPackName.Equals("Standalone (Non-ModPack)"))
             {
-                var modList = GetModList();
-                var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-                List<Mod> mods = null;
-
-                if (modPackName.Equals("Standalone (Non-ModPack)"))
-                {
-                    mods = (from mod in modList.Mods
-                            where mod.modPack == null
-                            select mod).ToList();
-                }
-                else
-                {
-                    mods = (from mod in modList.Mods
-                            where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                            select mod).ToList();
-                }
-
-
-                if (mods == null)
-                {
-                    throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
-                }
-
-                foreach (var modEntry in mods)
-                {
-                    await ToggleModUnsafe(enable, modEntry, false, true);
-                }
-
-                SaveModList(modList);
+                mods = (from mod in modList.Mods
+                        where mod.modPack == null
+                        select mod).ToList();
             }
-            finally
+            else
             {
-                XivCache.CacheWorkerEnabled = workerState;
+                mods = (from mod in modList.Mods
+                        where mod.modPack != null && mod.modPack.name.Equals(modPackName)
+                        select mod).ToList();
             }
+
+
+            if (mods == null)
+            {
+                throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
+            }
+
+            await ToggleMods(enable, mods.Select(x => x.fullPath));
         }
 
         /// <summary>
         /// Performs the most low-level mod enable/disable functions, without saving the modlist,
         /// ergo this should only be called by functions which will handle saving the modlist after
         /// they're done performing all modlist operations.
+        /// 
+        /// If the Index and modlist are provided, the actions are only applied to those cached entries, rather
+        /// than to the live files.
         /// </summary>
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache)
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, IndexFile cachedIndex = null, ModList cachedModlist = null)
         {
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
@@ -363,51 +356,69 @@ namespace xivModdingFramework.Mods
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            if (mod.IsCustomFile())
+            // Added file.
+            if (enable)
             {
-                // Added file.
-                if (enable && !mod.enabled)
+                if (cachedIndex != null)
                 {
-                    await index.AddFileDescriptor(mod.fullPath, mod.data.modOffset, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
-                    mod.enabled = true;
+                    cachedIndex.SetDataOffset(mod.fullPath, mod.data.modOffset);
+                }
+                else
+                {
+                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, false);
+                }
+                mod.enabled = true;
 
+                if (cachedIndex == null)
+                {
                     // Check if we're re-enabling a metadata mod.
                     var ext = Path.GetExtension(mod.fullPath);
                     if (ext == ".meta")
                     {
+                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
                         // Retreive the uncompressed meta entry we just enabled.
-                        var data = await dat.GetType2Data(mod.fullPath, false);
+                        var data = await dat.GetType2Data(mod.data.modOffset, df);
                         var meta = await ItemMetadata.Deserialize(data);
 
                         meta.Validate(mod.fullPath);
 
                         // And write that metadata to the actual constituent files.
-                        await ItemMetadata.ApplyMetadata(meta);
+                        await ItemMetadata.ApplyMetadata(meta, cachedIndex, cachedModlist);
                     }
                 }
-                else if (!enable && mod.enabled)
-                {
-
-                    // Delete file descriptor handles removing metadata as needed on its own.
-                    await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), updateCache);
-                    mod.enabled = false;
-                }
-                
             }
-            else
+            else if (!enable)
             {
-                // Standard mod.
-                if (enable && !mod.enabled)
+                if (mod.IsCustomFile())
                 {
-                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, updateCache);
-                    mod.enabled = true;
-                }
-                else if (!enable && mod.enabled)
+                    // Delete file descriptor handles removing metadata as needed on its own.
+                    if (cachedIndex != null)
+                    {
+                        cachedIndex.SetDataOffset(mod.fullPath, 0);
+                    }
+                    else
+                    {
+                        await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                    }
+                } else
                 {
-                    await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, updateCache);
-                    mod.enabled = false;
+                    if (cachedIndex != null)
+                    {
+                        cachedIndex.SetDataOffset(mod.fullPath, mod.data.originalOffset);
+                    }
+                    else
+                    {
+                        await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, false);
+                    }
                 }
+                mod.enabled = false;
             }
+
+            if (updateCache)
+            {
+                XivCache.QueueDependencyUpdate(mod.fullPath);
+            }
+
             return true;
         }
 
@@ -417,56 +428,117 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
         public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null)
         {
+            var modList = await GetModListAsync();
+            await ToggleMods(enable, modList.Mods.Select(x => x.fullPath), progress);
+        }
+
+        public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null)
+        {
             var index = new Index(_gameDirectory);
 
-            var modList = GetModList();
+            var modList = await GetModListAsync();
 
-            if (modList == null || modList.modCount == 0) return;
+            if (modList == null || modList.Mods.Count == 0) return;
 
-            // If we're doing a full disable, remove even internal subfiles so we don't 
-            // potentially pollute our index backups.
-            bool includeInternal = enable == false;
+            // Convert to hash set for speed when matching so we're not doing an O(n^2) check.
+            var files = new HashSet<string>();
+            foreach(var f in filePaths)
+            {
+                files.Add(f);
+            }
 
+            Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
 
             var modNum = 0;
-            foreach (var modEntry in modList.Mods)
-            {
-                // Save disabling these for last.
-                if (modEntry.IsInternal()) continue;
+            var mods = modList.Mods.Where(x => files.Contains(x.fullPath) && !String.IsNullOrWhiteSpace(x.fullPath)).ToList();
 
-                await ToggleModUnsafe(enable, modEntry, false, false);
-                progress?.Report((++modNum, modList.Mods.Count, string.Empty));
-            }
+            if (mods.Count == 0) return;
 
-            if (includeInternal && !enable)
+            // If we're disabling all of our standard files, then this is a full toggle.
+            var fullToggle = mods.Count >= modList.Mods.Count(x => !String.IsNullOrWhiteSpace(x.fullPath) && !x.IsInternal());
+
+            // Pause cache worker
+            var workerState = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
+
+            try
             {
-                // Disable these last.
-                var internalEntries = modList.Mods.Where(x => x.IsInternal());
-                foreach (var modEntry in internalEntries)
+                foreach (var modEntry in mods)
                 {
-                    await ToggleModUnsafe(enable, modEntry, true, false);
+                    // Save disabling these for last.
+                    if (modEntry.IsInternal()) continue;
+
+                    var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
+                    if (!indexFiles.ContainsKey(df))
+                    {
+                        indexFiles.Add(df, await index.GetIndexFile(df));
+                    }
+
+
+                    await ToggleModUnsafe(enable, modEntry, false, false, indexFiles[df], modList);
+                    progress?.Report((++modNum, modList.Mods.Count, string.Empty));
                 }
-            }
 
-
-            SaveModList(modList);
-
-            if (includeInternal && !enable)
-            {
-                // Now go ahead and delete the internal files, to prevent them
-                // being accidentally re-enabled (They should be re-built by the metadata file imports)
-                var internalEntries = modList.Mods.Where(x => x.IsInternal());
-                foreach (var modEntry in internalEntries)
+                if (fullToggle && !enable)
                 {
-                    await DeleteMod(modEntry.fullPath, true);
+                    // If we're doing a full mod toggle, we should purge our internal files as well.
+                    var internalEntries = modList.Mods.Where(x => x.IsInternal()).ToList();
+                    foreach (var modEntry in internalEntries)
+                    {
+                        var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
+                        await ToggleModUnsafe(enable, modEntry, true, false, indexFiles[df], modList);
+                        modList.Mods.Remove(modEntry);
+                    }
                 }
+                else
+                {
+                    progress?.Report((0, 0, "Expanding Metadata Entries..."));
+
+                    // Batch and group apply the metadata entries.
+                    var metadataEntries = mods.Where(x => x.fullPath.EndsWith(".meta")).ToList();
+                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+                    Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
+                    foreach (var mod in metadataEntries)
+                    {
+                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
+                        var data = await _dat.GetType2Data(mod.data.modOffset, df);
+                        var meta = await ItemMetadata.Deserialize(data);
+
+                        meta.Validate(mod.fullPath);
+
+                        if (!metadata.ContainsKey(df))
+                        {
+                            metadata.Add(df, new List<ItemMetadata>());
+                        }
+                        metadata[df].Add(meta);
+                    }
+
+
+                    foreach (var dkv in metadata)
+                    {
+                        var df = dkv.Key;
+                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
+                    }
+                }
+
+                foreach (var kv in indexFiles)
+                {
+                    await index.SaveIndexFile(kv.Value);
+                }
+
+                SaveModList(modList);
+
+                // Do these as a batch query at the end.
+                progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
+                var allPaths = mods.Select(x => x.fullPath).ToList();
+                XivCache.QueueDependencyUpdate(allPaths);
+            } finally
+            {
+                XivCache.CacheWorkerEnabled = workerState;
             }
 
 
-            // Do these as a batch query at the end.
-            progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
-            var allPaths = modList.Mods.Select(x => x.fullPath).Where(x => !String.IsNullOrEmpty(x)).ToList();
-            XivCache.QueueDependencyUpdate(allPaths);
         }
 
         /// <summary>
@@ -523,26 +595,7 @@ namespace xivModdingFramework.Mods
                 await ToggleModStatus(modItemPath, false);
             }
 
-            modToRemove.name = string.Empty;
-            modToRemove.category = string.Empty;
-            modToRemove.fullPath = string.Empty;
-            modToRemove.source = string.Empty;
-            modToRemove.modPack = null;
-            modToRemove.enabled = false;
-            modToRemove.data.originalOffset = 0;
-            modToRemove.data.dataType = 0;
-
-            modList.modCount -= 1;
-
-            if(modToRemove.data.modOffset <= 0)
-            {
-                // Something was wrong with this mod frame.  Purge the entire thing from the list.
-                modList.Mods.Remove(modToRemove);
-            } else
-            {
-                modList.emptyCount += 1;
-            }
-
+            modList.Mods.Remove(modToRemove);
 
             SaveModList(modList);
         }
@@ -562,49 +615,362 @@ namespace xivModdingFramework.Mods
             // Modpack doesn't exist in the modlist.
             if (modPackItem == null) return;
 
-            var cacheState = XivCache.CacheWorkerEnabled;
+            modList.ModPacks.Remove(modPackItem);
+
+            var modsToRemove = (from mod in modList.Mods
+                                where mod.modPack != null && mod.modPack.name.Equals(modPackName)
+                                select mod).ToList();
+
+            var modRemoveCount = modsToRemove.Count;
+
+            // Disable all the mods.
+            await ToggleMods(false, modsToRemove.Select(x => x.fullPath));
+
+            // Then remove them from the modlist.
+            foreach(var mod in modsToRemove)
+            {
+                modList.Mods.Remove(mod);
+            }
+
+            SaveModList(modList);
+        }
+
+
+        /// <summary>
+        /// Cleans up the Modlist file, performing the following operations.
+        /// 
+        /// 1.  Fix up the Item Names and Categories of all mods to be consistent.
+        /// 2.  Remove all empty mod slots.
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        {
+            progressReporter?.Report((0, 0, "Loading Modlist file..."));
+            var modlist = await GetModListAsync();
+
+            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+
+            // IMC entries cache so we're not having to constantly re-load the IMC data.
+            Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
+
+            var totalMods = modlist.Mods.Count;
+
+
+            var count = 0;
+            List<Mod> toRemove = new List<Mod>();
+            foreach(var mod in modlist.Mods)
+            {
+                progressReporter?.Report((count, totalMods, "Fixing up item names..."));
+                count++;
+
+                if (String.IsNullOrWhiteSpace(mod.fullPath)) {
+                    toRemove.Add(mod);
+                    continue;
+                }
+
+                if (mod.IsInternal()) continue;
+
+                XivDependencyRoot root = null;
+                try
+                {
+                    root = await XivCache.GetFirstRoot(mod.fullPath);
+                    if(root == null)
+                    {
+                        mod.name = Path.GetFileName(mod.fullPath);
+                        mod.category = "Raw Files";
+                        continue;
+                    }
+
+                    var ext = Path.GetExtension(mod.fullPath);
+                    IItem item = null;
+                    if (Imc.UsesImc(root) && ext == ".mtrl")
+                    {
+                        var data = await ResolveMtrlModInfo(_imc, mod.fullPath, root, ImcEntriesCache);
+                        mod.name = data.Name;
+                        mod.category = data.Category;
+
+                    } else if(Imc.UsesImc(root) && ext == ".tex")
+                    {
+                        // For textures, get the first material using them, and list them under that material's item.
+                        var parents = await XivCache.GetParentFiles(mod.fullPath);
+                        if(parents.Count == 0)
+                        {
+                            item = root.GetFirstItem();
+                            mod.name = item.GetModlistItemName();
+                            mod.category = item.GetModlistItemCategory();
+                            continue;
+                        }
+
+                        var parent = parents[0];
+
+                        var data = await ResolveMtrlModInfo(_imc, parent, root, ImcEntriesCache);
+                        mod.name = data.Name;
+                        mod.category = data.Category;
+                    }
+                    else
+                    {
+                        item = root.GetFirstItem();
+                        mod.name = item.GetModlistItemName();
+                        mod.category = item.GetModlistItemCategory();
+                        continue;
+                    }
+                } catch
+                {
+                    mod.name = Path.GetFileName(mod.fullPath);
+                    mod.category = "Raw Files";
+                    continue;
+                }
+            }
+
+
+            progressReporter?.Report((0,0, "Removing empty mod slots..."));
+
+            // Remove all empty mod frames.
+            foreach (var mod in toRemove)
+            {
+                modlist.Mods.Remove(mod);
+            }
+
+            progressReporter?.Report((0, 0, "Removing empty modpacks..."));
+
+            modlist.ModPacks.RemoveAll(modpack => {
+                var anyMods = modlist.Mods.Any(mod => mod.modPack != null && mod.modPack.name == modpack.name);
+                return !anyMods;
+            });
+
+            progressReporter?.Report((0, 0, "Saving Modlist file..."));
+
+            await SaveModListAsync(modlist);
+        }
+        private async Task<(string Name, string Category)> ResolveMtrlModInfo(Imc _imc, string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache)
+        {
+            IItem item;
+            var mSetRegex = new Regex("/v([0-9]{4})/");
+            var match = mSetRegex.Match(path);
+            if (match.Success)
+            {
+                // MTRL files should probably listed under one of the variant items as appropriate.
+                List<XivImc> imcEntries = null;
+                if (ImcEntriesCache.ContainsKey(root))
+                {
+                    imcEntries = ImcEntriesCache[root];
+                }
+                else
+                {
+                    imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
+                    ImcEntriesCache.Add(root, imcEntries);
+                }
+                var mSetId = Int32.Parse(match.Groups[1].Value);
+
+                // The list from this function is already sorted.
+                var allItems = await root.GetAllItems();
+
+
+                var variantItem = allItems.FirstOrDefault(x =>
+                {
+                    var variantId = x.ModelInfo.ImcSubsetID;
+                    if (imcEntries.Count <= variantId) return false;
+
+                    return imcEntries[variantId].MaterialSet == mSetId;
+                });
+
+                item = variantItem == null ? allItems[0] : variantItem;
+
+                return (item.GetModlistItemName(), item.GetModlistItemCategory());
+            }
+            else
+            {
+                // Invalid Material Path for this item.
+                item = root.GetFirstItem();
+                return (item.GetModlistItemName(), item.GetModlistItemCategory());
+            }
+        }
+
+
+        /// <summary>
+        /// Gets the sum total size in bytes of all modded dats.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<long> GetTotalModDataSize()
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            long size = 0;
+            foreach(var df in dataFiles)
+            {
+                var moddedDats = await _dat.GetModdedDatList(df);
+                foreach(var dat in moddedDats)
+                {
+                    var finfo = new FileInfo(dat);
+                    size += finfo.Length;
+                }
+            }
+
+            return size;
+        }
+
+        /// <summary>
+        /// This function will rewrite all the mod files to new DAT entries, replacing the existing modded DAT files with new, defragmented ones.
+        /// Returns the total amount of bytes recovered.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        {
+            var modlist = await GetModListAsync();
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+
+            var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
+
+            modlist.Mods.RemoveAll(x => String.IsNullOrWhiteSpace(x.fullPath));
+
+            var modsByDf = modlist.Mods.GroupBy(x => XivDataFiles.GetXivDataFile(x.datFile));
+            var indexFiles = new Dictionary<XivDataFile, IndexFile>();
+
+            var count = 0;
+            var total = modlist.Mods.Count();
+
+            var originalSize = await GetTotalModDataSize();
+
+            var workerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
             try
             {
-                modList.ModPacks.Remove(modPackItem);
-
-                var modsToRemove = (from mod in modList.Mods
-                                    where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                                    select mod).ToList();
-
-                var modRemoveCount = modsToRemove.Count;
-
-                foreach (var modToRemove in modsToRemove)
+                // Copy files over into contiguous data blocks in the new dat files.
+                foreach (var dKv in modsByDf)
                 {
-                    if (modToRemove.data.originalOffset == modToRemove.data.modOffset)
-                    {
-                        var index = new Index(_gameDirectory);
-                        await index.DeleteFileDescriptor(modToRemove.fullPath, XivDataFiles.GetXivDataFile(modToRemove.datFile));
-                    }
-                    if (modToRemove.enabled)
-                    {
-                        await ToggleModStatus(modToRemove.fullPath, false);
-                    }
+                    var df = dKv.Key;
+                    indexFiles.Add(df, await _index.GetIndexFile(df));
 
-                    modToRemove.name = string.Empty;
-                    modToRemove.category = string.Empty;
-                    modToRemove.fullPath = string.Empty;
-                    modToRemove.source = string.Empty;
-                    modToRemove.modPack = null;
-                    modToRemove.enabled = false;
-                    modToRemove.data.originalOffset = 0;
-                    modToRemove.data.dataType = 0;
+                    foreach (var mod in dKv)
+                    {
+                        progressReporter?.Report((count, total, "Writing mod data to temporary DAT files..."));
+
+                        try
+                        {
+                            var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+
+                            if (size % 256 != 0) throw new Exception("Dicks");
+
+                            var data = _dat.GetRawData(mod.data.modOffset, df, size);
+                            var newOffset = await WriteToTempDat(_dat, data, df);
+
+                            if (mod.IsCustomFile())
+                            {
+                                mod.data.originalOffset = newOffset;
+                            }
+                            mod.data.modOffset = newOffset;
+                            indexFiles[df].SetDataOffset(mod.fullPath, newOffset);
+                        }
+                        catch (Exception except)
+                        {
+                            throw;
+                        }
+
+                        count++;
+                    }
                 }
 
-                modList.emptyCount += modRemoveCount;
-                modList.modCount -= modRemoveCount;
-                modList.modPackCount -= 1;
+                progressReporter?.Report((0, 0, "Removing old modded DAT files..."));
+                foreach (var dKv in modsByDf)
+                {
+                    // Now we need to delete the current modded dat files.
+                    var moddedDats = await _dat.GetModdedDatList(dKv.Key);
+                    foreach (var file in moddedDats)
+                    {
+                        File.Delete(file);
+                    }
+                }
 
-                SaveModList(modList);
+                // Now we need to rename our temp files.
+                progressReporter?.Report((0, 0, "Renaming temporary DAT files..."));
+                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
+                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
+                foreach (var temp in temps)
+                {
+                    var oldName = temp.FullName;
+                    var newName = temp.FullName.Substring(0, oldName.Length - 4);
+                    System.IO.File.Move(oldName, newName);
+                }
+
+                progressReporter?.Report((0, 0, "Saving updated Index Files..."));
+
+                foreach (var dKv in modsByDf)
+                {
+                    await _index.SaveIndexFile(indexFiles[dKv.Key]);
+                }
+
+                progressReporter?.Report((0, 0, "Saving updated Modlist..."));
+
+                // Save modList
+                await SaveModListAsync(modlist);
+
+
+                var finalSize = await GetTotalModDataSize();
+                var saved = originalSize - finalSize;
+                saved = saved > 0 ? saved : 0;
+                return saved;
             } finally
             {
-                XivCache.CacheWorkerEnabled = cacheState;
+                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
+                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
+                foreach(var temp in temps)
+                {
+                    temp.Delete();
+                }
+
+                XivCache.CacheWorkerEnabled = workerStatus;
             }
+
+        }
+
+        private async Task<long> WriteToTempDat(Dat _dat, byte[] data, XivDataFile df)
+        {
+            var moddedDats = await _dat.GetModdedDatList(df);
+            var tempDats = moddedDats.Select(x => x + ".temp");
+            var maxSize = Dat.GetMaximumDatSize();
+
+            string targetDatFile = null;
+            foreach(var file in tempDats)
+            {
+                if(!File.Exists(file))
+                {
+                    using (var stream = new BinaryWriter(File.Create(file)))
+                    {
+                        stream.Write(Dat.MakeSqPackHeader());
+                        stream.Write(Dat.MakeDatHeader());
+                    }
+                    targetDatFile = file;
+                    break;
+                }
+
+                var finfo = new FileInfo(file);
+                if(finfo.Length + data.Length < maxSize)
+                {
+                    targetDatFile = file;
+                }
+            }
+
+            if (targetDatFile == null) throw new Exception("Unable to find open temp dat to write to.");
+
+            var rex = new Regex("([0-9])\\.temp$");
+            var match = rex.Match(targetDatFile);
+            uint datNum = UInt32.Parse(match.Groups[1].Value);
+
+
+            long baseOffset = 0;
+            using(var stream = new BinaryWriter(File.Open(targetDatFile, FileMode.Append)))
+            {   
+                baseOffset = stream.BaseStream.Position;
+                stream.Write(data);
+            }
+
+            long offset = ((baseOffset / 8) | (datNum * 2)) * 8;
+
+            return offset;
         }
     }
+
 }

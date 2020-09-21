@@ -94,6 +94,23 @@ namespace xivModdingFramework.Items.DataContainers
             return item;
         }
 
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return SecondaryCategory != null ? SecondaryCategory : "Unknown";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return XivStrings.Character;
+        }
 
         public int CompareTo(object obj)
         {
