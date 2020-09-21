@@ -1472,11 +1472,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Writes a new block of data to the given data file, without changing 
         /// the indexes.  Returns the raw-index-style offset to the new data.
+        /// 
+        /// A target offset of 0 or negative will append to the end of the first data file with space.
         /// </summary>
         /// <param name="importData"></param>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        public async Task<uint> WriteToDat(byte[] importData, XivDataFile dataFile)
+        public async Task<uint> WriteToDat(byte[] importData, XivDataFile dataFile, long targetOffset = 0)
         {
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
@@ -1490,18 +1492,54 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Attempted to write Invalid data to DAT files.");
             }
 
+            long seekPointer = 0;
+            if(targetOffset >= 2048)
+            {
+                seekPointer = (targetOffset >> 7) << 7;
+
+                // If the space we're told to write to would require modification,
+                // don't allow writing to it, because we might potentially write 
+                // past the end of this safe slot.
+                if(seekPointer % 256 != 0)
+                {
+                    seekPointer = 0;
+                    targetOffset = 0;
+                }
+            }
+
             long filePointer = 0;
             await _lock.WaitAsync();
             try
             {
                 // This finds the first dat with space, OR creates one if needed.
-                var datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
+                var datNum = 0;
+                if (targetOffset >= 2048)
+                {
+                    datNum = (int)(((targetOffset / 8) & 0xF) >> 1);
+                    var defaultDats = (await GetUnmoddedDatList(dataFile, true)).Count;
+
+                    if(datNum < defaultDats)
+                    {
+                        // Safety check.  No writing to default dats, even with an explicit offset.
+                        datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
+                        targetOffset = 0;
+                    }
+                } else
+                {
+                    datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
+                }
+
                 var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
                 // Copy the data into the file.
                 using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
                 {
-                    bw.BaseStream.Seek(0, SeekOrigin.End);
+                    if(targetOffset >= 2048) {
+                        bw.BaseStream.Seek(seekPointer, SeekOrigin.Begin);
+                    } else
+                    {
+                        bw.BaseStream.Seek(0, SeekOrigin.End);
+                    }
 
                     // Make sure we're starting on an actual accessible interval.
                     while ((bw.BaseStream.Position % 256) != 0)
@@ -1557,10 +1595,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var doSave = false;
-            if(index == null || modList == null)
+            if (index == null || modList == null)
             {
                 doSave = true;
             }
+
+
+            if (doSave)
+            {
+                modList = _modding.GetModList();
+            }
+            var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
+
 
             string itemName = "Unknown";
             string category = "Unknown";
@@ -1589,8 +1635,41 @@ namespace xivModdingFramework.SqPack.FileTypes
                 category = referenceItem.GetModlistItemCategory();
             }
 
+            var size = fileData.Length;
+            if(size % 256 != 0)
+            {
+                size += 256 - (size % 256);
+            }
+
             // Update the DAT files.
-            var rawOffset = await WriteToDat(fileData, df);
+            uint rawOffset = 0;
+
+            if (mod != null && mod.data.modSize >= size)
+            {
+                // If our existing mod slot is large enough to hold us, keep using it.
+                rawOffset = await WriteToDat(fileData, df, mod.data.modOffset);
+
+            } else if (index == null)
+            {
+                // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
+
+                var slots = await Dat.ComputeOpenSlots(df);
+                var slot = slots.FirstOrDefault(x => x.Value >= size);
+
+                if (slot.Key >= 2048)
+                {
+                    rawOffset = await WriteToDat(fileData, df, slot.Key);
+                }
+                else
+                {
+                    rawOffset = await WriteToDat(fileData, df);
+                }
+            }
+            else
+            {
+                // If we're doing a batch update, just write to the end of the file.
+                rawOffset = await WriteToDat(fileData, df);
+            }
 
 
             // Update the Index files.
@@ -1608,13 +1687,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var fileType = BitConverter.ToInt32(fileData, 4);
 
-            // Update the Mod List file.
-            if (doSave)
-            {
-                modList = _modding.GetModList();
-            }
-            var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
+            // Update the Mod List file.
 
             if (mod == null)
             {
@@ -1632,7 +1706,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 };
                 mod.data.modOffset = retOffset;
                 mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
-                mod.data.modSize = fileData.Length;
+                mod.data.modSize = size;
                 mod.data.dataType = fileType;
                 mod.enabled = true;
                 mod.modPack = null;
@@ -1648,7 +1722,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.data.modOffset = retOffset;
                 mod.enabled = true;
                 mod.modPack = null;
-                mod.data.modSize = fileData.Length;
+                mod.data.modSize = size;
                 mod.data.dataType = fileType;
                 mod.name = itemName;
                 mod.category = category;
@@ -1713,6 +1787,68 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var ret = offset - (16 * datNum);
             return ret;
+        }
+        
+        /// <summary>
+        /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only).
+        /// </summary>
+        /// <param name="df"></param>
+        /// <returns></returns>
+        public static async Task<Dictionary<long, long>> ComputeOpenSlots(XivDataFile df)
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+
+            var moddedDats = await _dat.GetModdedDatList(df);
+
+            var slots = new Dictionary<long, long>();
+            var modlist = await _modding.GetModListAsync();
+
+            var modsByFile = modlist.Mods.Where(x => !String.IsNullOrWhiteSpace(x.fullPath)).GroupBy(x => {
+                long offset = x.data.modOffset;
+                var rawOffset = offset / 8;
+                var datNum = (rawOffset & 0xF) >> 1;
+                return (int)datNum;
+            });
+
+            foreach(var kv in modsByFile)
+            {
+                var file = kv.Key;
+                long fileOffsetKey = file << 4;
+
+                // Order by their offset, ascending.
+                var ordered = kv.OrderBy(x => x.data.modOffset);
+
+
+                // Scan through each mod, and any time there's a gap, add it to the listing.
+                long lastEndPoint = 2048;
+                foreach (var mod in ordered) {
+                    var fileOffset = (mod.data.modOffset >> 7) << 7;
+
+                    var size = mod.data.modSize;
+                    if(size <= 0)
+                    {
+                        size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+                    }
+
+                    if(size % 256 != 0)
+                    {
+                        size += (256 - (size % 256));
+                    }
+
+                    var slotSize = fileOffset - lastEndPoint;
+                    if (slotSize > 256)
+                    {
+                        var mergedStart = lastEndPoint | fileOffsetKey;
+                        slots.Add(mergedStart, slotSize);
+                    }
+
+                    lastEndPoint = fileOffset + size;
+                }
+            }
+
+
+            return slots;
         }
     }
 }

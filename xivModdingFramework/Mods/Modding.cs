@@ -732,6 +732,13 @@ namespace xivModdingFramework.Mods
                 modlist.Mods.Remove(mod);
             }
 
+            progressReporter?.Report((0, 0, "Removing empty modpacks..."));
+
+            modlist.ModPacks.RemoveAll(modpack => {
+                var anyMods = modlist.Mods.Any(mod => mod.modPack != null && mod.modPack.name == modpack.name);
+                return !anyMods;
+            });
+
             progressReporter?.Report((0, 0, "Saving Modlist file..."));
 
             await SaveModListAsync(modlist);
