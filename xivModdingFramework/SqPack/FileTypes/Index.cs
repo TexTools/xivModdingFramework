@@ -51,7 +51,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to update the index for.</param>
         /// <param name="datNum">The dat number to update to.</param>
-        public void UpdateIndexDatCount(XivDataFile dataFile, int datNum)
+        public void UpdateIndexDatCount(XivDataFile dataFile, int datNum, bool alreadySemaphoreLocked = false)
         {
             var datCount = (byte)(datNum + 1);
 
@@ -63,7 +63,10 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             foreach (var indexPath in indexPaths)
             {
-                _semaphoreSlim.Wait();
+                if (!alreadySemaphoreLocked)
+                {
+                    _semaphoreSlim.Wait();
+                }
                 try
                 {
                     using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
@@ -74,7 +77,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 finally
                 {
-                    _semaphoreSlim.Release();
+                    if (!alreadySemaphoreLocked)
+                    {
+                        _semaphoreSlim.Release();
+                    }
                 }
             }
         }
@@ -790,6 +796,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
 
+
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+                var largestDatNum = _dat.GetLargestDatNumber(index.DataFile);
+                UpdateIndexDatCount(index.DataFile, largestDatNum, true);
             }
             finally
             {
@@ -798,10 +808,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     _semaphoreSlim.Release();
                 }
             }
-
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var largestDatNum = _dat.GetLargestDatNumber(index.DataFile);
-            UpdateIndexDatCount(index.DataFile, largestDatNum);
         }
 
 
