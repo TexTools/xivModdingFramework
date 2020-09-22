@@ -172,6 +172,36 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
+        /// <summary>
+        /// Retrieves the item metadata from a cached index setup (or raw)
+        /// </summary>
+        /// <param name="root"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        public static async Task<ItemMetadata> GetFromCachedIndex(XivDependencyRoot root, IndexFile index)
+        {
+
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var df = IOUtil.GetDataFileFromPath(root.Info.GetRootFile());
+
+            long offset = 0;
+            if (index != null)
+            {
+                offset = index.Get8xDataOffset(root.Info.GetRootFile());
+            }
+
+            ItemMetadata mData = null;
+            if (offset == 0)
+            {
+                mData = await ItemMetadata.GetMetadata(root);
+            }
+            else
+            {
+                var data = await _dat.GetType2Data(offset, df);
+                mData = await ItemMetadata.Deserialize(data);
+            }
+            return mData;
+        }
 
         /// <summary>
         /// Creates a new ItemMetaData entry from the constituent files around the FFXIV file system.

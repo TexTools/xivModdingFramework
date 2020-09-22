@@ -77,9 +77,9 @@ namespace xivModdingFramework.Mods
                 ItemMetadata originalMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
 
 
-                var originalModelPaths = await Source.GetModelFiles();
-                var originalMaterialPaths = await Source.GetMaterialFiles();
-                var originalTexturePaths = await Source.GetTextureFiles();
+                var originalModelPaths = await Source.GetModelFiles(index, modlist);
+                var originalMaterialPaths = await Source.GetMaterialFiles(-1, index, modlist);
+                var originalTexturePaths = await Source.GetTextureFiles(-1, index, modlist);
 
                 var originalVfxPaths = new HashSet<string>();
                 if (Imc.UsesImc(Source))

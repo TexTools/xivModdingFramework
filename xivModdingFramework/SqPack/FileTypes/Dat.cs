@@ -403,13 +403,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 var _index = new Index(_gameDirectory);
-                var _modding = new Modding(_gameDirectory);
                 index = await _index.GetIndexFile(dataFile, false, true);
-                modlist = await _modding.GetModListAsync();
             }
 
             if (forceOriginal)
             {
+                var _modding = new Modding(_gameDirectory);
+                modlist = await _modding.GetModListAsync();
                 // Checks if the item being imported already exists in the modlist
                 var modEntry = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
 

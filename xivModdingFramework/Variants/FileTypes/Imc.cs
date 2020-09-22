@@ -137,14 +137,14 @@ namespace xivModdingFramework.Variants.FileTypes
             return result;
         }
 
-        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item)
+        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item, IndexFile index = null, ModList modlist = null)
         {
             FullImcInfo info = null;
             try
             {
                 var imcPath = GetImcPath(item);
                 var path = imcPath.Folder + "/" + imcPath.File;
-                info = await GetFullImcInfo(path);
+                info = await GetFullImcInfo(path, index, modlist);
             } catch
             {
                 // Some dual wield items don't have a second IMC, and just default to the first.
@@ -156,7 +156,7 @@ namespace xivModdingFramework.Variants.FileTypes
                         var pair = gear.PairedItem;
                         var imcPath = GetImcPath(pair);
                         var path = imcPath.Folder + "/" + imcPath.File;
-                        return await (GetFullImcInfo(path));
+                        return await (GetFullImcInfo(path, index, modlist));
                     }
                 } else
                 {
@@ -334,13 +334,18 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item"></param>
         /// <param name="useSecondary">Determines if the SecondaryModelInfo should be used instead.(XivGear only)</param>
         /// <returns>The ImcData data</returns>
-        public async Task<FullImcInfo> GetFullImcInfo(string path)
+        public async Task<FullImcInfo> GetFullImcInfo(string path, IndexFile index = null, ModList modlist = null)
         {
-            var index = new Index(_gameDirectory);
+
+            if (index == null)
+            {
+                var _index = new Index(_gameDirectory);
+                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(path), false, true);
+            }
             var dat = new Dat(_gameDirectory);
 
 
-            var imcOffset = await index.GetDataOffset(path);
+            var imcOffset = index.Get8xDataOffset(path);
 
             if (imcOffset == 0)
             {
