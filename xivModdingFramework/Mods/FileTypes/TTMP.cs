@@ -642,6 +642,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
                         try
                         {
+                            progress.Report((count, totalFiles, "Waiting on Destination Item Selection..."));
                             rootConversions = await GetRootConversionsFunction(filePaths, modifiedIndexFiles, modList);
                         } catch(OperationCanceledException ex)
                         {
@@ -656,7 +657,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                         if (rootConversions != null && rootConversions.Count > 0)
                         {
-                            progress.Report((count, totalFiles, "Updating Destination Items..."));
+                            progress.Report((0, 0, "Updating Destination Items..."));
                             // If we have roots to convert, we get to do some extra work here.
 
                             // We currently have all the files loaded into our in-memory indices in their default locations.
