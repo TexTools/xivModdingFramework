@@ -4431,8 +4431,14 @@ namespace xivModdingFramework.Models.FileTypes
             var xMdl = await GetRawMdlData(originalPath, false, offset);
             var model = TTModel.FromRaw(xMdl);
 
+            if (model == null)
+            {
+                throw new InvalidDataException("Source model file does not exist.");
+            }
+
             var originalRace = IOUtil.GetRaceFromPath(originalPath);
             var newRace = IOUtil.GetRaceFromPath(newPath);
+
 
             if(originalRace != newRace)
             {

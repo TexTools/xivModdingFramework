@@ -71,13 +71,14 @@ namespace xivModdingFramework.Mods.FileTypes
                 var imageList = new HashSet<string>();
                 var pageCount = 1;
 
+                Version version = modPackData.Version == null ? new Version(1, 0, 0, 0) : modPackData.Version;
                 var modPackJson = new ModPackJson
                 {
                     TTMPVersion = _currentWizardTTMPVersion,
                     MinimumFrameworkVersion = _minimumAssembly,
                     Name = modPackData.Name,
                     Author = modPackData.Author,
-                    Version = modPackData.Version.ToString(),
+                    Version = version.ToString(),
                     Description = modPackData.Description,
                     Url = modPackData.Url,
                     ModPackPages = new List<ModPackPageJson>()
@@ -117,11 +118,12 @@ namespace xivModdingFramework.Mods.FileTypes
                                     imageList.Add(imageFileName);
                                 }
 
+                                var fn = imageFileName == "" ? "" : "images/" + Path.GetFileName(imageFileName);
                                 var modOptionJson = new ModOptionJson
                                 {
                                     Name = modOption.Name,
                                     Description = modOption.Description,
-                                    ImagePath = "images/" + Path.GetFileName(imageFileName),
+                                    ImagePath = fn,
                                     GroupName = modOption.GroupName,
                                     SelectionType = modOption.SelectionType,
                                     IsChecked=modOption.IsChecked,
