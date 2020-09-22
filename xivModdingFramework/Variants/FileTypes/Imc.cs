@@ -176,13 +176,14 @@ namespace xivModdingFramework.Variants.FileTypes
         /// </summary>
         /// <param name="pathsWithOffsets"></param>
         /// <returns></returns>
-        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false)
+        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false, IndexFile index = null, ModList modlist = null)
         {
             var entries = new List<XivImc>();
             var dat = new Dat(_gameDirectory);
 
             var lastPath = "";
             byte[] imcByteData = new byte[0];
+
 
             foreach (var combinedPath in pathsWithOffsets)
             {
@@ -198,7 +199,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 // Only reload this data if we need to.
                 if (path != lastPath)
                 {
-                    imcByteData = await dat.GetType2Data(path, forceDefault);
+                    imcByteData = await dat.GetType2Data(path, forceDefault, index, modlist);
                 }
                 lastPath = path;
 

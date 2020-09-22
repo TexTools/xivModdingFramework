@@ -25,6 +25,16 @@ namespace xivModdingFramework.Mods
 {
     public static class RootCloner
     {
+
+        public static bool IsSupported(XivDependencyRoot root)
+        {
+            if (root.Info.PrimaryType == XivItemType.equipment) return true;
+            if (root.Info.PrimaryType == XivItemType.accessory) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.hair) return true;
+
+            return false;
+        }
+
         /// <summary>
         /// Copies the entirety of a given root to a new root.  
         /// </summary>
@@ -34,6 +44,11 @@ namespace xivModdingFramework.Mods
         /// <returns>Returns a Dictionary of all the file conversion</returns>
         public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null, ModPack modPack = null)
         {
+            if(!IsSupported(Source) || !IsSupported(Destination))
+            {
+                throw new InvalidDataException("Cannot clone unsupported root.");
+            }
+
 
             if (ProgressReporter != null)
             {
@@ -544,7 +559,7 @@ namespace xivModdingFramework.Mods
         const string CommonPath = "chara/common/";
         private static readonly Regex RemoveRootPathRegex = new Regex("chara\\/[a-z]+\\/[a-z][0-9]{4}(?:\\/obj\\/[a-z]+\\/[a-z][0-9]{4})?\\/(.+)");
 
-        private static string UpdatePath(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
+        internal static string UpdatePath(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
             // For common path items, copy them to our own personal mimic of the path.
             if (path.StartsWith(CommonPath))

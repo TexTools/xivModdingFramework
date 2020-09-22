@@ -65,11 +65,10 @@ namespace xivModdingFramework.Mods.FileTypes
                 var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
                 Directory.CreateDirectory(dir);
 
-
                 _tempMPD = Path.Combine(dir, "TTMPD.mpd");
                 _tempMPL = Path.Combine(dir, "TTMPL.mpl");
 
-                var imageList = new Dictionary<string, string>();
+                var imageList = new HashSet<string>();
                 var pageCount = 1;
 
                 var modPackJson = new ModPackJson
@@ -109,19 +108,20 @@ namespace xivModdingFramework.Mods.FileTypes
 
                             foreach (var modOption in modGroup.OptionList)
                             {
-                                var randomFileName = "";
-
+                                var imageFileName = "";
                                 if (modOption.Image != null)
                                 {
-                                    randomFileName = $"{Path.GetRandomFileName()}.png";                                    
-                                    imageList.Add(randomFileName, modOption.ImageFileName);
+                                    var fname = Path.GetFileName(modOption.ImageFileName);
+                                    imageFileName = Path.Combine(dir, fname);
+                                    File.Copy(modOption.ImageFileName, imageFileName);
+                                    imageList.Add(imageFileName);
                                 }
 
                                 var modOptionJson = new ModOptionJson
                                 {
                                     Name = modOption.Name,
                                     Description = modOption.Description,
-                                    ImagePath = randomFileName,
+                                    ImagePath = "images/" + Path.GetFileName(imageFileName),
                                     GroupName = modOption.GroupName,
                                     SelectionType = modOption.SelectionType,
                                     IsChecked=modOption.IsChecked,
@@ -179,11 +179,13 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 var zf = new ZipFile();
                 zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
-                zf.AddFile(_tempMPL, "TTMPL.mpl");
-                zf.AddFile(_tempMPD, "TTMPD.mpd");
+                zf.AddFile(_tempMPL, "");
+                zf.AddFile(_tempMPD, "");
+                zf.Save(modPackPath);
+
                 foreach (var image in imageList)
                 {
-                    zf.AddFile(image.Value, image.Key);
+                    zf.AddFile(image, "images");
                 }
                 zf.Save(modPackPath);
 
@@ -300,8 +302,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     var zf = new ZipFile();
                     zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
-                    zf.AddFile(_tempMPL);
-                    zf.AddFile(_tempMPD);
+                    zf.AddFile(_tempMPL, "");
+                    zf.AddFile(_tempMPD, "");
                     zf.Save(modPackPath);
                 }
                 finally
@@ -332,7 +334,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 using (var zf = ZipFile.Read(modPackDirectory.FullName))
                 {
-                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png"));
+                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.StartsWith("images/"));
                     var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
 
                     using (var streamReader = new StreamReader(mpl.OpenReader()))
