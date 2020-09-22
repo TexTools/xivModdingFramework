@@ -32,7 +32,7 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns>Returns a Dictionary of all the file conversion</returns>
-        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null)
+        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null, ModPack modPack = null)
         {
 
             if (ProgressReporter != null)
@@ -437,7 +437,11 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Updating modlist...");
                 }
 
-                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+                if (modPack == null)
+                {
+                    modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+                }
+
                 List<Mod> mods = new List<Mod>();
                 foreach (var mod in modlist.Mods)
                 {
@@ -453,7 +457,10 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                modlist.ModPacks.Add(modPack);
+                if (!modlist.ModPacks.Any(x => x.name == modPack.name))
+                {
+                    modlist.ModPacks.Add(modPack);
+                }
 
                 if(doSave)
                 {

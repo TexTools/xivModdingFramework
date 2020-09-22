@@ -25,6 +25,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
@@ -433,17 +434,12 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
-        /// <param name="RootConversions">Roots to convert during import, if any conversions are required.</param>
+        /// <param name="GetRootConversionsFunction">Function called part-way through import to resolve rood conversions, if any are desired.  Function takes a List of files, the in-progress modified index and modlist files, and returns a dictionary of conversion data.  If this function throws and OperationCancelledException, the import is cancelled.</param>
         /// <returns>The number of total mods imported</returns>
         public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
-            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, Dictionary<XivDependencyRoot, XivDependencyRoot> RootConversions = null)
+            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null )
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
-
-            if(RootConversions == null)
-            {
-                RootConversions = new Dictionary<XivDependencyRoot, XivDependencyRoot>();
-            }
 
             var startTime = DateTime.Now.Ticks;
 
@@ -636,49 +632,69 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                     var modPack = modList.ModPacks.First(x => x.name == modsJson[0].ModPackEntry.name);
 
-                    if (RootConversions.Count > 0)
+                    if (GetRootConversionsFunction != null)
                     {
-                        // If we have roots to convert, we get to do some extra work here.
 
-                        // We currently have all the files loaded into our in-memory indices in their default locations.
-                        var conversionsByDf = RootConversions.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
-
-                        HashSet<string> filesToReset = new HashSet<string>();
-                        foreach(var dfe in conversionsByDf)
+                        Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
+                        try
                         {
-                            var df = dfe.Key;
-                            foreach(var conversion in dfe)
+                            rootConversions = await GetRootConversionsFunction(filePaths, modifiedIndexFiles, modList);
+                        } catch(OperationCanceledException ex)
+                        {
+                            // User cancelled the function or otherwise a critical error happened in the conversion function.
+                            // Cancell the import without saving anything.
+                            ErroneousFiles.Add("n/a");
+                            totalFiles = 0;
+                            importErrors = "User Cancelled Import Process.";
+                            progress.Report((0, 0, "User Cancelled Import Process."));
+                            return;
+                        }
+
+                        if (rootConversions != null && rootConversions.Count > 0)
+                        {
+                            progress.Report((count, totalFiles, "Updating Destination Items..."));
+                            // If we have roots to convert, we get to do some extra work here.
+
+                            // We currently have all the files loaded into our in-memory indices in their default locations.
+                            var conversionsByDf = rootConversions.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
+
+                            HashSet<string> filesToReset = new HashSet<string>();
+                            foreach (var dfe in conversionsByDf)
                             {
-                                var source = conversion.Key;
-                                var destination = conversion.Value;
-
-                                var variant = -1;
-                                var convertedFiles = await RootCloner.CloneRoot(source, destination, _source, variant, null, null, modifiedIndexFiles[df], modList);
-
-                                // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
-                                foreach(var fileKv in convertedFiles)
+                                var df = dfe.Key;
+                                foreach (var conversion in dfe)
                                 {
-                                    // Remove the file from our json list, the conversion already handled everything we needed to do with it.
-                                    var json = modsJson.RemoveAll(x => x.FullPath == fileKv.Key);
+                                    var source = conversion.Key;
+                                    var destination = conversion.Value.Root;
+                                    var variant = conversion.Value.Variant;
 
-                                    if (fileKv.Key != fileKv.Value)
+                                    var convertedFiles = await RootCloner.CloneRoot(source, destination, _source, variant, null, null, modifiedIndexFiles[df], modList, modPack);
+
+                                    // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
+                                    foreach (var fileKv in convertedFiles)
                                     {
-                                        filesToReset.Add(fileKv.Key);
+                                        // Remove the file from our json list, the conversion already handled everything we needed to do with it.
+                                        var json = modsJson.RemoveAll(x => x.FullPath == fileKv.Key);
 
+                                        if (fileKv.Key != fileKv.Value)
+                                        {
+                                            filesToReset.Add(fileKv.Key);
+
+                                        }
+
+                                        var mod = modList.Mods.First(x => x.fullPath == fileKv.Value);
+                                        mod.modPack = modPack;
+                                        filePaths.Remove(fileKv.Key);
                                     }
-
-                                    var mod = modList.Mods.First(x => x.fullPath == fileKv.Value);
-                                    mod.modPack = modPack;
-                                    filePaths.Remove(fileKv.Key);
                                 }
-                            }
 
-                            // Reset the index pointers back to previous.
-                            foreach (var file in filesToReset)
-                            {
-                                var oldOffset = originalIndexFiles[df].Get8xDataOffset(file);
-                                modifiedIndexFiles[df].SetDataOffset(file, oldOffset);
+                                // Reset the index pointers back to previous.
+                                foreach (var file in filesToReset)
+                                {
+                                    var oldOffset = originalIndexFiles[df].Get8xDataOffset(file);
+                                    modifiedIndexFiles[df].SetDataOffset(file, oldOffset);
 
+                                }
                             }
                         }
                     }
