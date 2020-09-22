@@ -629,7 +629,10 @@ namespace xivModdingFramework.Cache
                             mdlMats = await XivCache.GetChildFiles(model);
                         } else
                         {
-                            mdlMats = await _mdl.GetReferencedMaterialPaths(model, -1, false, false, index, modlist);
+                            if (index.Get8xDataOffset(model) != 0)
+                            {
+                                mdlMats = await _mdl.GetReferencedMaterialPaths(model, -1, false, false, index, modlist);
+                            }
                         }
 
                         if (materialVariant <= 0)
@@ -718,15 +721,19 @@ namespace xivModdingFramework.Cache
             {
                 foreach (var mat in materials)
                 {
-                    List<string> mtrlTexs = null;
+                    List<string> mtrlTexs = new List<string>();
                     if (index == null)
                     {
                         mtrlTexs = await XivCache.GetChildFiles(mat);
                     } else
                     {
                         var dataFile = IOUtil.GetDataFileFromPath(mat);
-                        var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
-                        mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, index, modlist);
+
+                        if (index.Get8xDataOffset(mat) != 0)
+                        {
+                            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
+                            mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, index, modlist);
+                        }
                     }
 
                     foreach (var tex in mtrlTexs)
