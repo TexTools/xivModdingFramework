@@ -51,7 +51,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to update the index for.</param>
         /// <param name="datNum">The dat number to update to.</param>
-        public void UpdateIndexDatCount(XivDataFile dataFile, int datNum)
+        public void UpdateIndexDatCount(XivDataFile dataFile, int datNum, bool alreadySemaphoreLocked = false)
         {
             var datCount = (byte)(datNum + 1);
 
@@ -63,7 +63,10 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             foreach (var indexPath in indexPaths)
             {
-                _semaphoreSlim.Wait();
+                if (!alreadySemaphoreLocked)
+                {
+                    _semaphoreSlim.Wait();
+                }
                 try
                 {
                     using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
@@ -74,7 +77,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 finally
                 {
-                    _semaphoreSlim.Release();
+                    if (!alreadySemaphoreLocked)
+                    {
+                        _semaphoreSlim.Release();
+                    }
                 }
             }
         }
@@ -693,11 +699,15 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        private static Dictionary<XivDataFile, long> _IndexLastModifiedTime = new Dictionary<XivDataFile, long>();
-        private static Dictionary<XivDataFile, IndexFile> _CachedIndexFiles = new Dictionary<XivDataFile, IndexFile>();
-
         private static Dictionary<XivDataFile, long> _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
         private static Dictionary<XivDataFile, IndexFile> _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
+
+        public async Task ClearIndexCache()
+        {
+            _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
+            _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
+        }
+
         /// <summary>
         /// Creates an Index File object from the game index files.
         /// </summary>
@@ -712,21 +722,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 await _semaphoreSlim.WaitAsync();
             }
+            try { 
 
             IndexFile index;
-            try
-            {
-                // Compare the current modified time and the creation time as well.
-                // This is a safety measure for an unusual case where the user's system has
-                // File modified times completely turned off on their HDD, or cases where
-                // we attempt to access the file in the middle of the file being written, which
-                // for some reason, on Window Vista and above returns the file creation time (???)
-                var lastTime = File.GetLastWriteTimeUtc(index1Path).Ticks;
-                var creationTime = File.GetCreationTimeUtc(index1Path).Ticks;
 
-                // If we don't have the file cached or the write time doesn't match exactly.
-                if (!_IndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _IndexLastModifiedTime[dataFile] || lastTime == creationTime || lastTime == 0)
+                if (!allowReadOnly)
                 {
+                    // If we're getting a writeable index, we need to get a fresh copy to avoid polluting the cache.
                     using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
                     {
                         using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
@@ -734,36 +736,30 @@ namespace xivModdingFramework.SqPack.FileTypes
                             index = new IndexFile(dataFile, index1Stream, index2Stream);
                         }
                     }
-
-                    _IndexLastModifiedTime[dataFile] = lastTime;
-                    _CachedIndexFiles[dataFile] = index;
-                    _ReadOnlyIndexLastModifiedTime[dataFile] = lastTime;
-                    _CachedReadOnlyIndexFiles[dataFile] = index;
-                    return index;
-                }
-            }
-            catch(Exception ex)
-            {
-                // The index2 file may be read/write locked.
-                if (!allowReadOnly) throw;
-                var lastTime = File.GetLastWriteTimeUtc(index1Path).Ticks;
-                var creationTime = File.GetCreationTimeUtc(index1Path).Ticks;
-
-                // If we don't have the file cached or the write time doesn't match exactly.
-                if (!_IndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _ReadOnlyIndexLastModifiedTime[dataFile] || lastTime == creationTime || lastTime == 0)
-                {
-                    using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
-                    {
-                            index = new IndexFile(dataFile, index1Stream, null);
-                    }
-
-                    _ReadOnlyIndexLastModifiedTime[dataFile] = lastTime;
-                    _CachedReadOnlyIndexFiles[dataFile] = index;
                     return index;
                 } else
                 {
-                    return _CachedReadOnlyIndexFiles[dataFile];
+                    var lastTime = File.GetLastWriteTimeUtc(index1Path).Ticks;
+                    var creationTime = File.GetCreationTimeUtc(index1Path).Ticks;
+
+                    // If we don't have the file cached or the write time doesn't match exactly.
+                    if (!_ReadOnlyIndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _ReadOnlyIndexLastModifiedTime[dataFile] || lastTime == creationTime || lastTime == 0)
+                    {
+                        using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
+                        {
+                            index = new IndexFile(dataFile, index1Stream, null);
+                        }
+
+                        _ReadOnlyIndexLastModifiedTime[dataFile] = lastTime;
+                        _CachedReadOnlyIndexFiles[dataFile] = index;
+                        return index;
+                    }
+                    else
+                    {
+                        return _CachedReadOnlyIndexFiles[dataFile];
+                    }
                 }
+
 
             }
             finally
@@ -774,7 +770,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
 
-            return _CachedIndexFiles[dataFile];
         }
 
         public async Task SaveIndexFile(IndexFile index, bool alreadySemaphoreLocked = false)
@@ -800,6 +795,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                         index.Save(index1Stream, index2Stream);
                     }
                 }
+
+
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+                var largestDatNum = _dat.GetLargestDatNumber(index.DataFile);
+                UpdateIndexDatCount(index.DataFile, largestDatNum, true);
             }
             finally
             {

@@ -17,7 +17,10 @@ using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 using static xivModdingFramework.Cache.XivCache;
@@ -492,14 +495,25 @@ namespace xivModdingFramework.Cache
         /// Gets all the model files in this dependency chain.
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetModelFiles()
+        public async Task<List<string>> GetModelFiles(IndexFile index = null, ModList modlist = null)
         {
             // Some chains have no meta entries, and jump straight to models.
             // Try to resolve Meta files first.
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
                 var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-                var races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true);
+
+                List<XivRace> races = null;
+                if (index != null)
+                {
+                    var metadata = await ItemMetadata.GetFromCachedIndex(this, index);
+                    races = metadata.EqdpEntries.Where(x => x.Value.bit1).Select(x => x.Key).ToList();
+                }
+                else
+                {
+                    races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true);
+                }
+
                 var models = new List<string>();
                 foreach(var race in races)
                 {
@@ -523,8 +537,13 @@ namespace xivModdingFramework.Cache
                 if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair && Info.SecondaryId / 100 >= 1)
                 {
                     // For human types, if their model is missing, the version 00xx is used instead.
-                    var index = new Index(XivCache.GameInfo.GameDirectory);
-                    if(!(await index.FileExists(modelPath)))
+                    if(index == null)
+                    {
+                        var _index = new Index(XivCache.GameInfo.GameDirectory);
+                        index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(modelPath), false, true);
+                    }
+
+                    if(!(index.FileExists(modelPath)))
                     {
                         var replacementNumber = (Info.SecondaryId % 100);
                         var alteredRoot = new XivDependencyRoot(Info.PrimaryType, Info.PrimaryId, Info.SecondaryType, replacementNumber, Info.Slot);
@@ -546,8 +565,9 @@ namespace xivModdingFramework.Cache
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1)
+        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1, IndexFile index = null, ModList modlist = null)
         {
+            var useCache = index == null;
 
             var materials = new HashSet<string>();
             if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
@@ -560,8 +580,13 @@ namespace xivModdingFramework.Cache
                 var path= $"chara/human/c{primary}/obj/body/b{body}/material/v0001/mt_c{primary}b{body}_a.mtrl";
 
                 // Just validate it exists and call it a day.
-                var index = new Index(XivCache.GameInfo.GameDirectory);
-                var exists = await index.FileExists(path);
+                if (index == null)
+                {
+                    var _index = new Index(XivCache.GameInfo.GameDirectory);
+                    index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(path), false, true);
+                }
+
+                var exists = index.FileExists(path);
                 if(exists)
                 {
                     materials.Add(path);
@@ -582,7 +607,7 @@ namespace xivModdingFramework.Cache
             }
             else
             {
-                var models = await GetModelFiles();
+                var models = await GetModelFiles(index, modlist);
                 if (models != null && models.Count > 0)
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(models[0]);
@@ -598,7 +623,15 @@ namespace xivModdingFramework.Cache
 
                     foreach (var model in models)
                     {
-                        var mdlMats = await XivCache.GetChildFiles(model);
+                        List<string> mdlMats = null;
+                        if (useCache)
+                        {
+                            mdlMats = await XivCache.GetChildFiles(model);
+                        } else
+                        {
+                            mdlMats = await _mdl.GetReferencedMaterialPaths(model, -1, false, false, index, modlist);
+                        }
+
                         if (materialVariant <= 0)
                         {
                             foreach (var mat in mdlMats)
@@ -638,11 +671,15 @@ namespace xivModdingFramework.Cache
             }
 
             // Here we get to get a little fancy.
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var modList = _modding.GetModList();
+            if (modlist == null)
+            {
+                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+                modlist = _modding.GetModList();
+            }
+
             var rootFolder = Info.GetRootFolder();
             var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
-            foreach (var mod in modList.Mods)
+            foreach (var mod in modlist.Mods)
             {
                 if (!mod.enabled) continue;
 
@@ -673,15 +710,25 @@ namespace xivModdingFramework.Cache
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetTextureFiles(int materialVariant = -1)
+        public async Task<List<string>> GetTextureFiles(int materialVariant = -1, IndexFile index = null, ModList modlist = null)
         {
-            var materials = await GetMaterialFiles(materialVariant);
+            var materials = await GetMaterialFiles(materialVariant, index, modlist);
             var textures = new HashSet<string>();
             if (materials != null && materials.Count > 0)
             {
                 foreach (var mat in materials)
                 {
-                    var mtrlTexs = await XivCache.GetChildFiles(mat);
+                    List<string> mtrlTexs = null;
+                    if (index == null)
+                    {
+                        mtrlTexs = await XivCache.GetChildFiles(mat);
+                    } else
+                    {
+                        var dataFile = IOUtil.GetDataFileFromPath(mat);
+                        var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
+                        mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, index, modlist);
+                    }
+
                     foreach (var tex in mtrlTexs)
                     {
                         textures.Add(tex);

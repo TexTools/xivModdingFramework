@@ -395,17 +395,23 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> GetType2Data(string internalPath, bool forceOriginal)
+        public async Task<byte[]> GetType2Data(string internalPath, bool forceOriginal, IndexFile index = null, ModList modlist = null)
         {
-            var index = new Index(_gameDirectory);
-            var modding = new Modding(_gameDirectory);
+            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
 
-            var dataFile = GetDataFileFromPath(internalPath);
+            if (index == null)
+            {
+
+                var _index = new Index(_gameDirectory);
+                index = await _index.GetIndexFile(dataFile, false, true);
+            }
 
             if (forceOriginal)
             {
+                var _modding = new Modding(_gameDirectory);
+                modlist = await _modding.GetModListAsync();
                 // Checks if the item being imported already exists in the modlist
-                var modEntry = await modding.TryGetModEntry(internalPath);
+                var modEntry = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
 
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
@@ -416,12 +422,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // If it doesn't exist in the modlist(the item is not modded) or force original is false,
             // grab the data directly from them index file. 
-            var folder = Path.GetDirectoryName(internalPath);
-            folder = folder.Replace("\\", "/");
-            var file = Path.GetFileName(internalPath);
-
-            var offset = await index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
-                dataFile);
+            
+            var offset = index.Get8xDataOffset(internalPath);
 
             if (offset == 0)
             {
@@ -1393,30 +1395,39 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null)
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null)
         {
             var _index = new Index(_gameDirectory);
-            var offset = await _index.GetDataOffset(sourcePath);
+            long offset = 0;
+            if (cachedIndexFile != null)
+            {
+                offset = cachedIndexFile.Get8xDataOffset(sourcePath);
+            }
+            else
+            {
+                offset = await _index.GetDataOffset(sourcePath);
+            }
             if(offset == 0)
             {
                 return 0;
             }
 
             var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem);
+            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem, cachedIndexFile, cachedModlist);
         }
 
         /// <summary>
         /// Copies a file from a given offset to a new path in the game files.
+        /// 
+        /// If the Index File and Modlist are provided, the actions will only be wrtiten to memory,
+        /// and not to the live Index Files/ModList.
         /// </summary>
         /// <param name="originalOffset"></param>
         /// <param name="originalDataFile"></param>
         /// <param name="targetPath"></param>
-        /// <param name="category"></param>
-        /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null)
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null)
         {
             var _modding = new Modding(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -1424,7 +1435,16 @@ namespace xivModdingFramework.SqPack.FileTypes
             var exists = await _index.FileExists(targetPath);
             if(exists && !overwrite)
             {
-                return await _index.GetDataOffset(targetPath);
+                long offset = 0;
+                if (cachedIndexFile != null)
+                {
+                    offset = cachedIndexFile.Get8xDataOffset(targetPath);
+                }
+                else
+                {
+                    offset = await _index.GetDataOffset(targetPath);
+                }
+                return offset;
             }
 
             var size = await GetCompressedFileSize(originalOffset, originalDataFile);
@@ -1465,7 +1485,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
 
-            return await WriteModFile(data, targetPath, source, referenceItem);
+            return await WriteModFile(data, targetPath, source, referenceItem, cachedIndexFile, cachedModlist);
         }
 
 
@@ -1644,12 +1664,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Update the DAT files.
             uint rawOffset = 0;
 
-            if (mod != null && mod.data.modSize >= size)
+            if (mod != null && mod.data.modSize >= size && doSave)
             {
                 // If our existing mod slot is large enough to hold us, keep using it.
+                // *only* if we're going to immediately save the modlist though.
+                // Otherwise it's possible this index update may get rolled back, so it would be unsafe
+                // to overwrite any data.
                 rawOffset = await WriteToDat(fileData, df, mod.data.modOffset);
 
-            } else if (index == null)
+            } else if (index == null && doSave)
             {
                 // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
 
@@ -1667,7 +1690,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             else
             {
-                // If we're doing a batch update, just write to the end of the file.
+                // If we're doing a batch update, or a transaction type update, just write to the end of the file.
                 rawOffset = await WriteToDat(fileData, df);
             }
 

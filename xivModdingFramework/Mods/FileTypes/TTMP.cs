@@ -433,11 +433,17 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
+        /// <param name="RootConversions">Roots to convert during import, if any conversions are required.</param>
         /// <returns>The number of total mods imported</returns>
         public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
-            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress)
+            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, Dictionary<XivDependencyRoot, XivDependencyRoot> RootConversions = null)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
+
+            if(RootConversions == null)
+            {
+                RootConversions = new Dictionary<XivDependencyRoot, XivDependencyRoot>();
+            }
 
             var startTime = DateTime.Now.Ticks;
 
@@ -553,15 +559,9 @@ namespace xivModdingFramework.Mods.FileTypes
                                     mod= modsByFile[modJson.FullPath];
                                 }
 
-                                uint offset = 0;
-
-                                if(mod != null && mod.data.modSize >= size)
-                                {
-                                    offset = await dat.WriteToDat(data, df, mod.data.modOffset);
-                                } else
-                                {
-                                    offset = await dat.WriteToDat(data, df);
-                                }
+                                // Always write data to end of file during modpack imports in case we need
+                                // to roll back the import.
+                                uint offset = await dat.WriteToDat(data, df);
                                 DatOffsets.Add(modJson.FullPath, offset);
 
                                 var dataType = BitConverter.ToInt32(data, 4);
@@ -596,11 +596,15 @@ namespace xivModdingFramework.Mods.FileTypes
                     // We've now copied the data into the game files, we now need to update the indices.
                     var _index = new Index(XivCache.GameInfo.GameDirectory);
                     Dictionary<string, uint> OriginalOffsets = new Dictionary<string, uint>();
-                    foreach(var kv in FilesPerDf)
+                    Dictionary<XivDataFile, IndexFile> modifiedIndexFiles = new Dictionary<XivDataFile, IndexFile>();
+                    Dictionary<XivDataFile, IndexFile> originalIndexFiles = new Dictionary<XivDataFile, IndexFile>();
+                    foreach (var kv in FilesPerDf)
                     {
                         // Load each index file and update all the files within it as needed.
                         var df = kv.Key;
-                        var index = await _index.GetIndexFile(df);
+                        modifiedIndexFiles.Add(df, await _index.GetIndexFile(df));
+                        originalIndexFiles.Add(df, await _index.GetIndexFile(df, false, true));
+                        var index = modifiedIndexFiles[df];
 
                         foreach (var file in kv.Value)
                         {
@@ -618,10 +622,71 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                         }
 
-                        await _index.SaveIndexFile(index);
 
                         count++;
                         progress.Report((count, totalFiles, "Updating Index file references..."));
+                    }
+
+
+                    var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
+
+                    if (!modPackExists)
+                    {
+                        modList.ModPacks.Add(modsJson[0].ModPackEntry);
+                    }
+                    var modPack = modList.ModPacks.First(x => x.name == modsJson[0].ModPackEntry.name);
+
+                    if (RootConversions.Count > 0)
+                    {
+                        // If we have roots to convert, we get to do some extra work here.
+
+                        // We currently have all the files loaded into our in-memory indices in their default locations.
+                        var conversionsByDf = RootConversions.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
+
+                        HashSet<string> filesToReset = new HashSet<string>();
+                        foreach(var dfe in conversionsByDf)
+                        {
+                            var df = dfe.Key;
+                            foreach(var conversion in dfe)
+                            {
+                                var source = conversion.Key;
+                                var destination = conversion.Value;
+
+                                var variant = -1;
+                                var convertedFiles = await RootCloner.CloneRoot(source, destination, _source, variant, null, null, modifiedIndexFiles[df], modList);
+
+                                // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
+                                foreach(var fileKv in convertedFiles)
+                                {
+                                    // Remove the file from our json list, the conversion already handled everything we needed to do with it.
+                                    var json = modsJson.RemoveAll(x => x.FullPath == fileKv.Key);
+
+                                    if (fileKv.Key != fileKv.Value)
+                                    {
+                                        filesToReset.Add(fileKv.Key);
+
+                                    }
+
+                                    var mod = modList.Mods.First(x => x.fullPath == fileKv.Value);
+                                    mod.modPack = modPack;
+                                    filePaths.Remove(fileKv.Key);
+                                }
+                            }
+
+                            // Reset the index pointers back to previous.
+                            foreach (var file in filesToReset)
+                            {
+                                var oldOffset = originalIndexFiles[df].Get8xDataOffset(file);
+                                modifiedIndexFiles[df].SetDataOffset(file, oldOffset);
+
+                            }
+                        }
+                    }
+
+                    // Save the modified files.
+                    foreach(var dkv in modifiedIndexFiles)
+                    {
+                        await _index.SaveIndexFile(dkv.Value);
                     }
 
                     // Dat files and indices are updated, time to update the modlist.
@@ -631,22 +696,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // Update the Mod List file.
 
-                    // TODO - Probably need to look at keying this off more than just the name.
-                    var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
-
-                    if (!modPackExists)
-                    {
-                        modList.ModPacks.Add(modsJson[0].ModPackEntry);
-                    }
-                    var modPack = modList.ModPacks.First(x => x.name == modsJson[0].ModPackEntry.name);
 
                     foreach (var file in filePaths)
                     {
                         if (ErroneousFiles.Contains(file)) continue;
                         try
                         {
+                            var json = modsJson.FirstOrDefault(x => x.FullPath == file);
+                            if (json == null) continue;
+
                             var mod = modList.Mods.FirstOrDefault(x => x.fullPath == file);
-                            var json = modsJson.First(x => x.FullPath == file);
                             var longOffset = ((long)DatOffsets[file]) * 8L;
                             var originalOffset = OriginalOffsets[file];
                             var longOriginal = ((long)originalOffset) * 8L;

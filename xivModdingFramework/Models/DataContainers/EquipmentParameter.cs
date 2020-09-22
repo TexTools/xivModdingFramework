@@ -169,6 +169,8 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public enum EquipmentParameterFlag
     {
+        // Default flag set is 0x 3F E0 00 70 60 3F 00
+
         // For FULL GEAR PIECES, they're always marked as TRUE = Show
         // For PARTIAL GEAR PIECES, they're marked as TRUE = HIDE
 
@@ -197,7 +199,7 @@ namespace xivModdingFramework.Models.DataContainers
         LegHideKneePads = 17,           // atr_lpd
         LegHideShortBoot = 18,          // atr_leg
         LegHideHalfBoot = 19,           // atr_leg
-        Bit20 = 20,
+        LegBootUnknown = 20,
         LegShowFoot = 21,
         Bit22 = 22,
         Bit23 = 23,
@@ -243,8 +245,8 @@ namespace xivModdingFramework.Models.DataContainers
         HeadUnknownHelmet2 = 55,      // Usually set on for helmets, in place of 48/49
 
         // Byte 7 - Shadowbringers Race Settings
-        EnableShbFlags = 56,
-        ShbShowHead = 57,
+        HeadShowHrothgarHat = 56,
+        HeadShowVieraHat = 57,
         Bit58 = 58,
         Bit59 = 59,
         Bit60 = 60,

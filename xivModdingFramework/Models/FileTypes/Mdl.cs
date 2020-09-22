@@ -56,6 +56,8 @@ using System.Data;
 using System.Text.RegularExpressions;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Cache;
+using xivModdingFramework.SqPack.DataContainers;
+using xivModdingFramework.Mods.DataContainers;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -407,12 +409,13 @@ namespace xivModdingFramework.Models.FileTypes
 
         /// <summary>
         /// Retrieves the raw XivMdl file at a given internal file path.
+        /// 
+        /// If it an explicit offset is provided, it will be used over path or mod offset resolution.
         /// </summary>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
+        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false, long offset = 0)
         {
 
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
             var mod = await modding.TryGetModEntry(mdlPath);
@@ -420,16 +423,21 @@ namespace xivModdingFramework.Models.FileTypes
             var getShapeData = true;
 
 
-            long offset = await index.GetDataOffset(mdlPath);
-
-            if (getOriginal)
+            if (offset == 0)
             {
-                if (modded)
+                var index = new Index(_gameDirectory);
+                offset = await index.GetDataOffset(mdlPath);
+
+                if (getOriginal)
                 {
-                    offset = mod.data.originalOffset;
-                    modded = false;
+                    if (modded)
+                    {
+                        offset = mod.data.originalOffset;
+                        modded = false;
+                    }
                 }
             }
+
 
             if (offset == 0)
             {
@@ -1685,18 +1693,24 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true)
+        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, IndexFile index = null, ModList modlist = null)
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(_gameDirectory, dataFile, XivLanguage.None);
             var _imc = new Imc(_gameDirectory);
-            var _index = new Index(_gameDirectory);
+            if (index == null)
+            {
+                var _index = new Index(_gameDirectory);
+                var _modding = new Modding(_gameDirectory);
+                index = await _index.GetIndexFile(dataFile, false, true);
+                modlist = await _modding.GetModListAsync();
+            }
 
             var materials = new List<string>();
 
             // Read the raw Material names from the file.
-            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal);
+            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, index, modlist);
             if(materialNames.Count == 0)
             {
                 return materials;
@@ -1723,7 +1737,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
                     try
                     {
-                        var info = await _imc.GetFullImcInfo(imcPath);
+                        var info = await _imc.GetFullImcInfo(imcPath, index, modlist);
                         var slotRegex = new Regex("_([a-z]{3}).mdl$");
                         var slot = "";
                         var m = slotRegex.Match(mdlPath);
@@ -1796,19 +1810,30 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false)
+        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, IndexFile index = null, ModList modlist = null)
         {
             var materials = new List<string>();
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
-            var mod = await modding.TryGetModEntry(mdlPath);
-            var offset = await index.GetDataOffset(mdlPath);
 
-            var modded = mod != null && mod.enabled;
+
+            if (index == null)
+            {
+                var _index = new Index(_gameDirectory);
+                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath), false, true);
+                
+            }
+
+            var offset = index.Get8xDataOffset(mdlPath);
             if (getOriginal)
             {
-                if (modded)
+                if(modlist == null)
+                {
+                    modlist = await modding.GetModListAsync();
+                }
+
+                var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == mdlPath);
+                if(mod != null)
                 {
                     offset = mod.data.originalOffset;
                 }
