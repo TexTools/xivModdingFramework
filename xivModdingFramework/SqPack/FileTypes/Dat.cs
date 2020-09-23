@@ -24,6 +24,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
@@ -1752,12 +1753,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.source = sourceApplication;
             }
 
+
             if (doSave) {
                 await _modding.SaveModListAsync(modList);
                 
                 // Perform metadata expansion if needed.
                 var ext = Path.GetExtension(internalFilePath);
-                if(ext == ".meta")
+                if (ext == ".meta")
                 {
                     var metaRaw = await GetType2Data(retOffset, df);
                     var meta = await ItemMetadata.Deserialize(metaRaw);
@@ -1765,6 +1767,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                     meta.Validate(internalFilePath);
 
                     await ItemMetadata.ApplyMetadata(meta);
+                }
+                else if (ext == ".rgsp")
+                {
+                    // Expand the racial scaling file.
+                    await CMP.ApplyRgspFile(internalFilePath);
                 }
 
                 XivCache.QueueDependencyUpdate(internalFilePath);

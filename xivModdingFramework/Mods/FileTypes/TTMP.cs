@@ -26,6 +26,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.FileTypes;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
@@ -37,9 +38,17 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class TTMP
     {
-        private readonly string _currentWizardTTMPVersion = "1.1w";
-        private readonly string _currentSimpleTTMPVersion = "1.1s";
-        private const string _minimumAssembly = "1.1.0.0";
+        // These file types are forbidden from being included in Modpacks or being imported via modpacks.
+        // This is because these file types are re-built from constituent smaller files, and thus importing
+        // a complete file would bash the user's current file state in unpredictable ways.
+        public static readonly HashSet<string> ForbiddenModTypes = new HashSet<string>()
+        {
+            ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
+        };
+
+        private readonly string _currentWizardTTMPVersion = "1.2w";
+        private readonly string _currentSimpleTTMPVersion = "1.2s";
+        private const string _minimumAssembly = "1.2.0.0";
 
         private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;
@@ -136,6 +145,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 {
                                     var dataFile = GetDataFileFromPath(modOptionMod.Key);
 
+                                    if (ForbiddenModTypes.Contains(Path.GetExtension(modOptionMod.Key))) continue;
                                     var modsJson = new ModsJson
                                     {
                                         Name = modOptionMod.Value.Name,
@@ -243,6 +253,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         foreach (var simpleModData in modPackData.SimpleModDataList)
                         {
+                            if (ForbiddenModTypes.Contains(Path.GetExtension(simpleModData.FullPath))) continue;
+
                             var modsJson = new ModsJson
                             {
                                 Name = simpleModData.Name,
@@ -471,10 +483,18 @@ namespace xivModdingFramework.Mods.FileTypes
                     continue;
                 }
 
+                // Don't allow importing forbidden mod types.
+                if (ForbiddenModTypes.Contains(Path.GetExtension(mj.FullPath))) continue;
+
                 filePaths.Add(mj.FullPath);
                 newList.Add(mj);
             }
             modsJson = newList;
+
+            if(modsJson.Count == 0)
+            {
+                return (0, 0, "", 0);
+            }
 
             var totalFiles = filePaths.Count;
 
@@ -834,6 +854,14 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                             count++;
                             progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
+                        } else if(ext == ".rgsp")
+                        {
+                            if (!indexFiles.ContainsKey(XivDataFile._04_Chara))
+                            {
+                                indexFiles.Add(XivDataFile._04_Chara, await _index.GetIndexFile(XivDataFile._04_Chara));
+                            }
+                            // Expand the racial scaling files
+                            await CMP.ApplyRgspFile(file, indexFiles[XivDataFile._04_Chara], modList);
                         }
                     }
 
@@ -841,7 +869,10 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         foreach (var ifKv in indexFiles)
                         {
-                            await ItemMetadata.ApplyMetadataBatched(metadataEntries[ifKv.Key], ifKv.Value, modList);
+                            if (metadataEntries.ContainsKey(ifKv.Key))
+                            {
+                                await ItemMetadata.ApplyMetadataBatched(metadataEntries[ifKv.Key], ifKv.Value, modList);
+                            }
 
                         }
                     } catch(Exception Ex)

@@ -24,6 +24,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.FileTypes;
@@ -687,6 +688,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 var root = await XivCache.GetFirstRoot(fullPath);
                 await ItemMetadata.RestoreDefaultMetadata(root);
+            }
+
+            if (fullPath.EndsWith(".rgsp"))
+            {
+                await CMP.RestoreDefaultScaling(fullPath);
             }
 
             if (updateCache)
