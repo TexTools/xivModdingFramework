@@ -151,10 +151,10 @@
     <value>ALL</value>
   </data>
   <data name="AuRa_Raen" xml:space="preserve">
-    <value>Au Ra Raen</value>
+    <value>Au Ra - Raen</value>
   </data>
   <data name="AuRa_Xaela" xml:space="preserve">
-    <value>Au Ra Xaela</value>
+    <value>Au Ra - Xaela</value>
   </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>Au Ra</value>
@@ -899,5 +899,47 @@
   </data>
   <data name="Right" xml:space="preserve">
     <value>Right</value>
+  </data>
+  <data name="Elezen_Duskwright" xml:space="preserve">
+    <value>Elezen - Duskwright</value>
+  </data>
+  <data name="Elezen_Wildwood" xml:space="preserve">
+    <value>Elezen - Wildwood</value>
+  </data>
+  <data name="Hrothgar_Hellion" xml:space="preserve">
+    <value>Hrothgar - Hellion</value>
+  </data>
+  <data name="Hrothgar_Lost" xml:space="preserve">
+    <value>Hrothgar - Lost</value>
+  </data>
+  <data name="Hyur_Highlander" xml:space="preserve">
+    <value>Hyur - Highlander</value>
+  </data>
+  <data name="Hyur_Midlander" xml:space="preserve">
+    <value>Hyur - Midlander</value>
+  </data>
+  <data name="Lalafell_Dunesfolk" xml:space="preserve">
+    <value>Lalafell - Dunesfolk</value>
+  </data>
+  <data name="Lalafell_Plainsfolk" xml:space="preserve">
+    <value>Lalafell - Plainsfolk</value>
+  </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>Miqo'te - Keeper</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>Miqo'te - Seeker</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>Roegadyn - Hellsguard</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>Roegadyn - Sea Wolf</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>Viera - Rava</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>Viera - Veena</value>
   </data>
 </root>

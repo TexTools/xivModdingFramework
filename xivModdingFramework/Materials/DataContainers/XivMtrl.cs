@@ -374,8 +374,12 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     info.Preset = MtrlShaderPreset.Face;
                 }
-                
-                if(ShaderParameterList.Any(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial))
+
+                if(GetTextureUsage(XivTexType.Skin) != null && GetTextureUsage(XivTexType.Skin).Unknown == 1476344676)
+                {
+                    info.Preset = MtrlShaderPreset.BodyWithHair;
+                }
+                else if(ShaderParameterList.Any(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial))
                 {
                     var param = ShaderParameterList.First(x => x.ParameterID == MtrlShaderParameterId.SkinTileMaterial);
                     if(param.Args[0] == 0)
@@ -820,7 +824,10 @@ namespace xivModdingFramework.Materials.DataContainers
                     SetTextureUsage(XivTexType.Decal);
                     SetTextureUsage(XivTexType.Specular);
                 }
-                else
+                else if(info.Preset == MtrlShaderPreset.BodyWithHair)
+                {
+                    SetTextureUsage(XivTexType.Skin, 1476344676);
+                } else 
                 {
                     // Non-Face Skin textures use a single custom usage value.
                     SetTextureUsage(XivTexType.Skin);
@@ -1486,6 +1493,7 @@ namespace xivModdingFramework.Materials.DataContainers
         DiffuseMulti,    
         DiffuseSpecular,
         BodyNoPores,
+        BodyWithHair,
         Face,
         FaceNoPores,
         FaceBright,
@@ -1652,6 +1660,7 @@ namespace xivModdingFramework.Materials.DataContainers
             } else if(shader == MtrlShader.Skin)
             {
                 presets.Add(MtrlShaderPreset.BodyNoPores);
+                presets.Add(MtrlShaderPreset.BodyWithHair);
                 presets.Add(MtrlShaderPreset.Face);
                 presets.Add(MtrlShaderPreset.FaceNoPores);
             } else if(shader == MtrlShader.Hair)

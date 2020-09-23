@@ -261,6 +261,8 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist, bool save = true)
         {
+            if (data == null || data.Count == 0) return;
+
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);

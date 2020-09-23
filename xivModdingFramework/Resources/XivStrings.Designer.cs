@@ -214,7 +214,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Au Ra Raen.
+        ///   Looks up a localized string similar to Au Ra - Raen.
         /// </summary>
         internal static string AuRa_Raen {
             get {
@@ -223,7 +223,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Au Ra Xaela.
+        ///   Looks up a localized string similar to Au Ra - Xaela.
         /// </summary>
         internal static string AuRa_Xaela {
             get {
@@ -646,6 +646,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Elezen - Duskwright.
+        /// </summary>
+        internal static string Elezen_Duskwright {
+            get {
+                return ResourceManager.GetString("Elezen_Duskwright", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Elezen Female.
         /// </summary>
         internal static string Elezen_Female {
@@ -678,6 +687,15 @@ namespace xivModdingFramework.Resources {
         internal static string Elezen_Male_NPC {
             get {
                 return ResourceManager.GetString("Elezen_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Elezen - Wildwood.
+        /// </summary>
+        internal static string Elezen_Wildwood {
+            get {
+                return ResourceManager.GetString("Elezen_Wildwood", resourceCulture);
             }
         }
         
@@ -1159,6 +1177,24 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Hrothgar - Hellion.
+        /// </summary>
+        internal static string Hrothgar_Hellion {
+            get {
+                return ResourceManager.GetString("Hrothgar_Hellion", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar - Lost.
+        /// </summary>
+        internal static string Hrothgar_Lost {
+            get {
+                return ResourceManager.GetString("Hrothgar_Lost", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Hrothgar NPC.
         /// </summary>
         internal static string Hrothgar_NPC {
@@ -1191,6 +1227,15 @@ namespace xivModdingFramework.Resources {
         internal static string Hyur_H {
             get {
                 return ResourceManager.GetString("Hyur_H", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur - Highlander.
+        /// </summary>
+        internal static string Hyur_Highlander {
+            get {
+                return ResourceManager.GetString("Hyur_Highlander", resourceCulture);
             }
         }
         
@@ -1236,6 +1281,15 @@ namespace xivModdingFramework.Resources {
         internal static string Hyur_M {
             get {
                 return ResourceManager.GetString("Hyur_M", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hyur - Midlander.
+        /// </summary>
+        internal static string Hyur_Midlander {
+            get {
+                return ResourceManager.GetString("Hyur_Midlander", resourceCulture);
             }
         }
         
@@ -1384,6 +1438,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Lalafell - Dunesfolk.
+        /// </summary>
+        internal static string Lalafell_Dunesfolk {
+            get {
+                return ResourceManager.GetString("Lalafell_Dunesfolk", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Lalafell Female.
         /// </summary>
         internal static string Lalafell_Female {
@@ -1416,6 +1479,15 @@ namespace xivModdingFramework.Resources {
         internal static string Lalafell_Male_NPC {
             get {
                 return ResourceManager.GetString("Lalafell_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Lalafell - Plainsfolk.
+        /// </summary>
+        internal static string Lalafell_Plainsfolk {
+            get {
+                return ResourceManager.GetString("Lalafell_Plainsfolk", resourceCulture);
             }
         }
         
@@ -1672,6 +1744,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Miqo&apos;te - Keeper.
+        /// </summary>
+        internal static string Miqote_Keeper {
+            get {
+                return ResourceManager.GetString("Miqote_Keeper", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Miqote Male.
         /// </summary>
         internal static string Miqote_Male {
@@ -1686,6 +1767,15 @@ namespace xivModdingFramework.Resources {
         internal static string Miqote_Male_NPC {
             get {
                 return ResourceManager.GetString("Miqote_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Miqo&apos;te - Seeker.
+        /// </summary>
+        internal static string Miqote_Seeker {
+            get {
+                return ResourceManager.GetString("Miqote_Seeker", resourceCulture);
             }
         }
         
@@ -2032,6 +2122,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Roegadyn - Hellsguard.
+        /// </summary>
+        internal static string Roegadyn_Hellsguard {
+            get {
+                return ResourceManager.GetString("Roegadyn_Hellsguard", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Roegadyn Male.
         /// </summary>
         internal static string Roegadyn_Male {
@@ -2046,6 +2145,15 @@ namespace xivModdingFramework.Resources {
         internal static string Roegadyn_Male_NPC {
             get {
                 return ResourceManager.GetString("Roegadyn_Male_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Roegadyn - Sea Wolf.
+        /// </summary>
+        internal static string Roegadyn_SeaWolf {
+            get {
+                return ResourceManager.GetString("Roegadyn_SeaWolf", resourceCulture);
             }
         }
         
@@ -2271,6 +2379,24 @@ namespace xivModdingFramework.Resources {
         internal static string Viera_NPC {
             get {
                 return ResourceManager.GetString("Viera_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera - Rava.
+        /// </summary>
+        internal static string Viera_Rava {
+            get {
+                return ResourceManager.GetString("Viera_Rava", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera - Veena.
+        /// </summary>
+        internal static string Viera_Veena {
+            get {
+                return ResourceManager.GetString("Viera_Veena", resourceCulture);
             }
         }
         

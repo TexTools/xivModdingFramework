@@ -26,6 +26,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
@@ -514,11 +515,16 @@ namespace xivModdingFramework.Mods
                         metadata[df].Add(meta);
                     }
 
-
                     foreach (var dkv in metadata)
                     {
                         var df = dkv.Key;
                         await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
+                    }
+
+                    var rgspEntries = mods.Where(x => x.fullPath.EndsWith(".rgsp")).ToList();
+                    foreach (var mod in rgspEntries)
+                    {
+                        await CMP.ApplyRgspFile(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
                     }
                 }
 
