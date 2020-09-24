@@ -238,6 +238,7 @@ namespace xivModdingFramework.General.DataContainers
     /// </summary>
     public class RacialGenderScalingParameter
     {
+        private const ushort Version = 2;
         public XivSubRace Race { get; private set; }
         public XivGender Gender { get; private set; }
 
@@ -288,10 +289,25 @@ namespace xivModdingFramework.General.DataContainers
         public RacialGenderScalingParameter(byte[] data)
         {
             var offset = 0;
-            Race = (XivSubRace) data[0];
-            Gender = (XivGender) data[1];
+            var byte0 = data[offset];
 
-            offset = 2;
+            ushort version = 0;
+            if(byte0 != 255)
+            {
+                version = 1;
+            } else
+            {
+                offset++;
+
+                version = BitConverter.ToUInt16(data, offset);
+                offset += 2;
+            }
+
+            Race = (XivSubRace) data[offset];
+            offset++;
+            Gender = (XivGender) data[offset];
+            offset++;
+
             MinSize = BitConverter.ToSingle(data, offset);
             offset += 4;
             MaxSize = BitConverter.ToSingle(data, offset);
@@ -320,6 +336,9 @@ namespace xivModdingFramework.General.DataContainers
         public byte[] GetBytes()
         {
             List<byte> data = new List<byte>();
+
+            data.Add((byte)255);
+            data.AddRange(BitConverter.GetBytes(Version));
 
             data.Add((byte)Race);
             data.Add((byte)Gender);
