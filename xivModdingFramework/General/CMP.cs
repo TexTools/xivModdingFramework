@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Dynamic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -44,6 +45,31 @@ namespace xivModdingFramework.General
             await SetScalingParameter(rgsp, index, modlist);
         }
 
+        /// <summary>
+        /// Disables the .rgsp file for this race, if it exists, and restores the .cmp file for the race back to default.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <param name="gender"></param>
+        /// <returns></returns>
+        public static async Task DisableRgspMod(XivSubRace race, XivGender gender)
+        {
+            var path = GetRgspPath(race, gender);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+
+
+            var modlist = await _modding.GetModListAsync();
+            var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == path);
+            if (mod != null && mod.enabled)
+            {
+                await _modding.ToggleModStatus(path, false);
+            } else
+            {
+                var def = await GetScalingParameter(race, gender, true);
+                await SetScalingParameter(def);
+            }
+
+        }
+
         internal static async Task RestoreDefaultScaling(string rgspPath, IndexFile index = null, ModList modlist = null)
         {
             var match = RgspPathExtractFormat.Match(rgspPath);
@@ -53,6 +79,14 @@ namespace xivModdingFramework.General
             var gender = (XivGender) Int32.Parse(match.Groups[2].Value);
 
             await RestoreDefaultScaling(race, gender, index, modlist);
+        }
+
+        public static string GetRgspPath(XivSubRace race, XivGender gender)
+        {
+            var subraceId = (int)race;
+            var genderId = (int)gender;
+            var rgspFilePath = String.Format(RgspPathFormat, subraceId, genderId);
+            return rgspFilePath;
         }
 
         /// <summary>
@@ -78,11 +112,9 @@ namespace xivModdingFramework.General
         /// <returns></returns>
         public static async Task SaveScalingParameter(RacialGenderScalingParameter rgsp, string sourceApplication, IndexFile index = null, ModList modlist = null)
         {
-            var subraceId = (int) rgsp.Race;
-            var genderId = (int)rgsp.Gender;
 
             // Write the .rgsp file and let the DAT functions handle applying it.
-            var rgspFilePath = String.Format(RgspPathFormat, subraceId, genderId);
+            var rgspFilePath = GetRgspPath(rgsp.Race, rgsp.Gender);
 
             var bytes = rgsp.GetBytes();
 
@@ -104,6 +136,13 @@ namespace xivModdingFramework.General
             return cmp.GetScalingParameter(race, gender);
         }
 
+        /// <summary>
+        /// Performs the base level alteration to the CMP file, without going through .rgsp files.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="index"></param>
+        /// <param name="modlist"></param>
+        /// <returns></returns>
         private static async Task SetScalingParameter(RacialGenderScalingParameter data, IndexFile index = null, ModList modlist = null)
         {
             var cmp = await GetCharaMakeParameterSet(false, index, modlist);
