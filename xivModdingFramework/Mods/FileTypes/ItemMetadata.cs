@@ -122,9 +122,9 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(IItem item)
+        public static async Task<ItemMetadata> GetMetadata(IItem item, bool forceDefault = false)
         {
-            return await GetMetadata(item.GetRoot());
+            return await GetMetadata(item.GetRoot(), forceDefault);
         }
 
         /// <summary>
@@ -133,10 +133,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(string internalFilePath)
+        public static async Task<ItemMetadata> GetMetadata(string internalFilePath, bool forceDefault = false )
         {
             var root = await XivCache.GetFirstRoot(internalFilePath);
-            return await GetMetadata(root);
+            return await GetMetadata(root, forceDefault);
         }
 
         /// <summary>
@@ -151,14 +151,17 @@ namespace xivModdingFramework.Mods.FileTypes
                 return null;
             }
 
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            Mod mod = null;
             var filePath = root.Info.GetRootFile();
-
-            var mod = await _modding.TryGetModEntry(filePath);
+            if (!forceDefault)
+            {
+                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+                mod = await _modding.TryGetModEntry(filePath);
+            }
 
             if(mod != null && mod.enabled)
             {
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 // We have modded metadata stored in the .meta file in the DAT we can use.
                 var data = await _dat.GetType2Data(filePath, false);
 

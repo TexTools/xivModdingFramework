@@ -399,18 +399,6 @@ namespace xivModdingFramework.Mods
                     if (cachedIndex != null)
                     {
                         cachedIndex.SetDataOffset(mod.fullPath, 0);
-
-                        // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
-                        if (mod.fullPath.EndsWith(".meta"))
-                        {
-                            var root = await XivCache.GetFirstRoot(mod.fullPath);
-                            await ItemMetadata.RestoreDefaultMetadata(root, cachedIndex, cachedModlist);
-                        }
-
-                        if (mod.fullPath.EndsWith(".rgsp"))
-                        {
-                            await CMP.RestoreDefaultScaling(mod.fullPath, cachedIndex, cachedModlist);
-                        }
                     }
                     else
                     {
@@ -450,7 +438,7 @@ namespace xivModdingFramework.Mods
 
         public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null)
         {
-            var index = new Index(_gameDirectory);
+            var _index = new Index(_gameDirectory);
 
             var modList = await GetModListAsync();
 
@@ -487,7 +475,7 @@ namespace xivModdingFramework.Mods
                     var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
                     if (!indexFiles.ContainsKey(df))
                     {
-                        indexFiles.Add(df, await index.GetIndexFile(df));
+                        indexFiles.Add(df, await _index.GetIndexFile(df));
                     }
 
 
@@ -506,7 +494,7 @@ namespace xivModdingFramework.Mods
                         modList.Mods.Remove(modEntry);
                     }
                 }
-                else
+                else if(enable)
                 {
                     progress?.Report((0, 0, "Expanding Metadata Entries..."));
 
@@ -541,11 +529,42 @@ namespace xivModdingFramework.Mods
                     {
                         await CMP.ApplyRgspFile(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
                     }
+                } else
+                {
+                    progress?.Report((0, 0, "Restoring Metadata Entries..."));
+                    var metadataEntries = mods.Where(x => x.fullPath.EndsWith(".meta")).ToList();
+                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+                    Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
+                    foreach (var mod in metadataEntries)
+                    {
+                        var root = await XivCache.GetFirstRoot(mod.fullPath);
+                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
+                        var meta = await ItemMetadata.GetMetadata(root, true);
+                        if (!metadata.ContainsKey(df))
+                        {
+                            metadata.Add(df, new List<ItemMetadata>());
+                        }
+                        metadata[df].Add(meta);
+                    }
+
+                    foreach (var dkv in metadata)
+                    {
+                        var df = dkv.Key;
+                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
+                    }
+
+                    var rgspEntries = mods.Where(x => x.fullPath.EndsWith(".rgsp")).ToList();
+                    foreach (var mod in rgspEntries)
+                    {
+                        await CMP.RestoreDefaultScaling(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
+                    }
+
                 }
 
                 foreach (var kv in indexFiles)
                 {
-                    await index.SaveIndexFile(kv.Value);
+                    await _index.SaveIndexFile(kv.Value);
                 }
 
                 SaveModList(modList);
@@ -614,6 +633,20 @@ namespace xivModdingFramework.Mods
             }
 
             await ToggleModUnsafe(false, modToRemove, allowInternal, true, index, modList);
+
+
+            // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
+            if (modToRemove.fullPath.EndsWith(".meta"))
+            {
+                var root = await XivCache.GetFirstRoot(modToRemove.fullPath);
+                await ItemMetadata.RestoreDefaultMetadata(root, index, modList);
+            }
+
+            if (modToRemove.fullPath.EndsWith(".rgsp"))
+            {
+                await CMP.RestoreDefaultScaling(modToRemove.fullPath, index, modList);
+            }
+
             modList.Mods.Remove(modToRemove);
 
             if (doSave)
@@ -705,6 +738,11 @@ namespace xivModdingFramework.Mods
                         {
                             mod.name = cmpName;
                             mod.category = "Racial Scaling";
+                        }
+                        else if (mod.fullPath.StartsWith("ui/"))
+                        {
+                            mod.name = Path.GetFileName(mod.fullPath);
+                            mod.category = "UI";
                         }
                         else
                         {
