@@ -859,6 +859,7 @@ namespace xivModdingFramework.Mods.FileTypes
                             if (!indexFiles.ContainsKey(XivDataFile._04_Chara))
                             {
                                 indexFiles.Add(XivDataFile._04_Chara, await _index.GetIndexFile(XivDataFile._04_Chara));
+                                metadataEntries.Add(XivDataFile._04_Chara, new List<ItemMetadata>());
                             }
                             // Expand the racial scaling files
                             await CMP.ApplyRgspFile(file, indexFiles[XivDataFile._04_Chara], modList);
