@@ -700,8 +700,17 @@ namespace xivModdingFramework.Mods
                     root = await XivCache.GetFirstRoot(mod.fullPath);
                     if(root == null)
                     {
-                        mod.name = Path.GetFileName(mod.fullPath);
-                        mod.category = "Raw Files";
+                        var cmpName = CMP.GetModFileNameFromRgspPath(mod.fullPath);
+                        if (cmpName != null)
+                        {
+                            mod.name = cmpName;
+                            mod.category = "Racial Scaling";
+                        }
+                        else
+                        {
+                            mod.name = Path.GetFileName(mod.fullPath);
+                            mod.category = "Raw Files";
+                        }
                         continue;
                     }
 

@@ -81,6 +81,18 @@ namespace xivModdingFramework.General
             await RestoreDefaultScaling(race, gender, index, modlist);
         }
 
+        internal static string GetModFileNameFromRgspPath(string path)
+        {
+            var match = RgspPathExtractFormat.Match(path);
+            if (!match.Success) return null;
+
+            var race = (XivSubRace)Int32.Parse(match.Groups[1].Value);
+            var gender = (XivGender)Int32.Parse(match.Groups[2].Value);
+
+            var name = race.GetDisplayName() + " - " + gender.ToString();
+            return name;
+        }
+
         public static string GetRgspPath(XivSubRace race, XivGender gender)
         {
             var subraceId = (int)race;
