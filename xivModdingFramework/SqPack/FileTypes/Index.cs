@@ -794,12 +794,33 @@ namespace xivModdingFramework.SqPack.FileTypes
                     throw new Exception("Cannot write index files; files current in use.");
                 }
 
-                using (var index1Stream = new BinaryWriter(File.OpenWrite(index1Path)))
+                BinaryWriter index1Stream = null;
+                BinaryWriter index2Stream = null;
+                try
                 {
-                    using (var index2Stream = new BinaryWriter(File.OpenWrite(index2Path)))
+                    try
                     {
-                        index.Save(index1Stream, index2Stream);
+                        index1Stream = new BinaryWriter(File.OpenWrite(index1Path));
+                        index2Stream = new BinaryWriter(File.OpenWrite(index2Path));
                     }
+                    catch
+                    {
+                        index1Stream?.Dispose();
+                        index2Stream?.Dispose();
+
+                        // Set a minor delay and try again, in case the user has some sort of locking issue.
+                        await Task.Delay(200);
+
+                        index1Stream = new BinaryWriter(File.OpenWrite(index1Path));
+                        index2Stream = new BinaryWriter(File.OpenWrite(index2Path));
+                    }
+
+                    index.Save(index1Stream, index2Stream);
+                }
+                finally
+                {
+                    index1Stream?.Dispose();
+                    index2Stream?.Dispose();
                 }
 
 

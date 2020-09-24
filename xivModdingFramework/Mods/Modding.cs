@@ -385,6 +385,9 @@ namespace xivModdingFramework.Mods
 
                         // And write that metadata to the actual constituent files.
                         await ItemMetadata.ApplyMetadata(meta, cachedIndex, cachedModlist);
+                    } else if(ext == ".rgsp")
+                    {
+                        await CMP.ApplyRgspFile(mod.fullPath, cachedIndex, cachedModlist);
                     }
                 }
             }
@@ -396,6 +399,18 @@ namespace xivModdingFramework.Mods
                     if (cachedIndex != null)
                     {
                         cachedIndex.SetDataOffset(mod.fullPath, 0);
+
+                        // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
+                        if (mod.fullPath.EndsWith(".meta"))
+                        {
+                            var root = await XivCache.GetFirstRoot(mod.fullPath);
+                            await ItemMetadata.RestoreDefaultMetadata(root, cachedIndex, cachedModlist);
+                        }
+
+                        if (mod.fullPath.EndsWith(".rgsp"))
+                        {
+                            await CMP.RestoreDefaultScaling(mod.fullPath, cachedIndex, cachedModlist);
+                        }
                     }
                     else
                     {
