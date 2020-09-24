@@ -706,6 +706,11 @@ namespace xivModdingFramework.Mods
                             mod.name = cmpName;
                             mod.category = "Racial Scaling";
                         }
+                        else if (mod.fullPath.StartsWith("ui/"))
+                        {
+                            mod.name = Path.GetFileName(mod.fullPath);
+                            mod.category = "UI";
+                        }
                         else
                         {
                             mod.name = Path.GetFileName(mod.fullPath);
