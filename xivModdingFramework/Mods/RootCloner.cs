@@ -106,7 +106,7 @@ namespace xivModdingFramework.Mods
                         if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
 
                         var path = avfxStuff.Folder + "/" + avfxStuff.File;
-                        if (await _index.FileExists(path))
+                        if (index.FileExists(path))
                         {
                             originalVfxPaths.Add(path);
                         }

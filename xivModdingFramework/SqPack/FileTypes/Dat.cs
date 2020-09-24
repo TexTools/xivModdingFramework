@@ -1553,11 +1553,31 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
                 // Copy the data into the file.
-                using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
+                BinaryWriter bw = null;
+
+                try
                 {
-                    if(targetOffset >= 2048) {
+                    try
+                    {
+                        bw = new BinaryWriter(File.OpenWrite(datPath));
+                    }
+                    catch
+                    {
+                        if(bw != null)
+                        {
+                            bw.Dispose();
+                        }
+
+                        // Wait just a bit and try again.
+                        await Task.Delay(100);
+                        bw = new BinaryWriter(File.OpenWrite(datPath));
+                    }
+
+                    if (targetOffset >= 2048)
+                    {
                         bw.BaseStream.Seek(seekPointer, SeekOrigin.Begin);
-                    } else
+                    }
+                    else
                     {
                         bw.BaseStream.Seek(0, SeekOrigin.End);
                     }
@@ -1577,6 +1597,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     while ((bw.BaseStream.Position % 256) != 0)
                     {
                         bw.Write((byte)0);
+                    }
+                }
+                finally
+                {
+                    if (bw != null)
+                    {
+                        bw.Dispose();
                     }
                 }
 
