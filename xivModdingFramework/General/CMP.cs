@@ -120,7 +120,7 @@ namespace xivModdingFramework.General
 
 
             var dummyItem = new XivGenericItemModel();
-            dummyItem.Name = rgsp.Race.GetDisplayName();
+            dummyItem.Name = rgsp.Race.GetDisplayName() + " - " + rgsp.Gender.ToString();
             dummyItem.SecondaryCategory = "Racial Scaling";
 
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
