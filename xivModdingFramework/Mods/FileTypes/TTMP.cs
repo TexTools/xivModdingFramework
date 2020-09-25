@@ -190,6 +190,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 var zf = new ZipFile();
+                zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
                 zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
                 zf.AddFile(_tempMPL, "");
                 zf.AddFile(_tempMPD, "");
@@ -315,6 +316,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     var zf = new ZipFile();
+                    zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
                     zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
                     zf.AddFile(_tempMPL, "");
                     zf.AddFile(_tempMPD, "");
