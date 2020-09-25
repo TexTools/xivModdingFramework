@@ -882,7 +882,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetExtraData = colorSetExtraData;
+            xivMtrl.ColorSetDyeData = colorSetExtraData;
             if (xivMtrl.Unknown2.Length > 0)
             {
                 // This byte enables the dye set if it's not already enabled.
@@ -994,7 +994,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetExtraData = colorSetExtraData;
+            xivMtrl.ColorSetDyeData = colorSetExtraData;
 
             if (xivMtrl.Unknown2.Length > 0)
             {

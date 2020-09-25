@@ -40,6 +40,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static async Task SaveStainingTemplateFile(StainingTemplateFile file, string applicationSource, IndexFile index = null, ModList modlist = null)
         {
+            throw new NotImplementedException();
             var data = new byte[0];//file.GetBytes();
 
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
@@ -64,19 +65,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
     public class StainingTemplateEntry
     {
-        public int Size
-        {
-            get
-            {
-                return 0;
-            }
-        }
-
-        List<Half[]> DiffuseEntries = new List<Half[]>();
-        List<Half[]> SpecularEntries = new List<Half[]>();
-        List<Half[]> EmissiveEntries = new List<Half[]>();
-        List<Half> TileMaterialEntries = new List<Half>();
-        List<Half> GlossEntries = new List<Half>();
+        public readonly List<Half[]> DiffuseEntries = new List<Half[]>();
+        public readonly List<Half[]> SpecularEntries = new List<Half[]>();
+        public readonly List<Half[]> EmissiveEntries = new List<Half[]>();
+        public readonly List<Half> TileMaterialEntries = new List<Half>();
+        public readonly List<Half> GlossEntries = new List<Half>();
 
         public StainingTemplateEntry(byte[] data, int offset)
         {
@@ -243,7 +236,11 @@ namespace xivModdingFramework.Materials.FileTypes
         }
         public StainingTemplateEntry GetTemplate(ushort key)
         {
-            return Templates[key];
+            if (Templates.ContainsKey(key))
+            {
+                return Templates[key];
+            }
+            return null;
         }
         public StainingTemplateFile(byte[] data)
         {
