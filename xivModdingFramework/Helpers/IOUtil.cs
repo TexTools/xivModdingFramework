@@ -74,6 +74,7 @@ namespace xivModdingFramework.Helpers
                     while ((bytesRead = await ds.ReadAsync(decompressedBytes, offset, uncompressedSize - offset)) > 0)
                     {
                         offset += bytesRead;  // offset in buffer for results of next reading
+                        if (bytesRead == uncompressedSize) break;
                     }
                 }
             }

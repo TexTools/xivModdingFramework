@@ -635,38 +635,41 @@ namespace xivModdingFramework.Cache
                             }
                         }
 
-                        if (materialVariant <= 0)
+                        if (mdlMats != null)
                         {
-                            foreach (var mat in mdlMats)
+                            if (materialVariant <= 0)
                             {
-                                var m = mat;
-
-                                // Human types have their material ID automatically changed over.
-                                if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                                foreach (var mat in mdlMats)
                                 {
-                                    m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                                    var m = mat;
+
+                                    // Human types have their material ID automatically changed over.
+                                    if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                                    {
+                                        m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                                    }
+                                    materials.Add(m);
                                 }
-                                materials.Add(m);
                             }
-                        }
-                        else
-                        {
-                            var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
-                            foreach (var mat in mdlMats)
+                            else
                             {
-                                // Replace any material set references with the new one.
-                                // The hash set will scrub us down to just a single copy.
-                                // This is faster than re-scanning the MDL file.
-                                // And a little more thorough than simply skipping over non-matching refs.
-                                // Since some materials may not have variant references.
-                                var m = _materialSetRegex.Replace(mat, replacement);
-
-                                // Human types have their material ID automatically fixed to match.
-                                if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                                var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
+                                foreach (var mat in mdlMats)
                                 {
-                                    m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                                    // Replace any material set references with the new one.
+                                    // The hash set will scrub us down to just a single copy.
+                                    // This is faster than re-scanning the MDL file.
+                                    // And a little more thorough than simply skipping over non-matching refs.
+                                    // Since some materials may not have variant references.
+                                    var m = _materialSetRegex.Replace(mat, replacement);
+
+                                    // Human types have their material ID automatically fixed to match.
+                                    if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                                    {
+                                        m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                                    }
+                                    materials.Add(m);
                                 }
-                                materials.Add(m);
                             }
                         }
                     }
