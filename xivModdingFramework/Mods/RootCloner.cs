@@ -25,6 +25,16 @@ namespace xivModdingFramework.Mods
 {
     public static class RootCloner
     {
+
+        public static bool IsSupported(XivDependencyRoot root)
+        {
+            if (root.Info.PrimaryType == XivItemType.equipment) return true;
+            if (root.Info.PrimaryType == XivItemType.accessory) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.hair) return true;
+
+            return false;
+        }
+
         /// <summary>
         /// Copies the entirety of a given root to a new root.  
         /// </summary>
@@ -32,8 +42,13 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns>Returns a Dictionary of all the file conversion</returns>
-        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null)
+        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null, ModPack modPack = null)
         {
+            if(!IsSupported(Source) || !IsSupported(Destination))
+            {
+                throw new InvalidDataException("Cannot clone unsupported root.");
+            }
+
 
             if (ProgressReporter != null)
             {
@@ -77,9 +92,9 @@ namespace xivModdingFramework.Mods
                 ItemMetadata originalMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
 
 
-                var originalModelPaths = await Source.GetModelFiles();
-                var originalMaterialPaths = await Source.GetMaterialFiles();
-                var originalTexturePaths = await Source.GetTextureFiles();
+                var originalModelPaths = await Source.GetModelFiles(index, modlist);
+                var originalMaterialPaths = await Source.GetMaterialFiles(-1, index, modlist);
+                var originalTexturePaths = await Source.GetTextureFiles(-1, index, modlist);
 
                 var originalVfxPaths = new HashSet<string>();
                 if (Imc.UsesImc(Source))
@@ -91,7 +106,7 @@ namespace xivModdingFramework.Mods
                         if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
 
                         var path = avfxStuff.Folder + "/" + avfxStuff.File;
-                        if (await _index.FileExists(path))
+                        if (index.FileExists(path))
                         {
                             originalVfxPaths.Add(path);
                         }
@@ -437,7 +452,11 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Updating modlist...");
                 }
 
-                var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+                if (modPack == null)
+                {
+                    modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+                }
+
                 List<Mod> mods = new List<Mod>();
                 foreach (var mod in modlist.Mods)
                 {
@@ -453,7 +472,10 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                modlist.ModPacks.Add(modPack);
+                if (!modlist.ModPacks.Any(x => x.name == modPack.name))
+                {
+                    modlist.ModPacks.Add(modPack);
+                }
 
                 if(doSave)
                 {
@@ -537,7 +559,7 @@ namespace xivModdingFramework.Mods
         const string CommonPath = "chara/common/";
         private static readonly Regex RemoveRootPathRegex = new Regex("chara\\/[a-z]+\\/[a-z][0-9]{4}(?:\\/obj\\/[a-z]+\\/[a-z][0-9]{4})?\\/(.+)");
 
-        private static string UpdatePath(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
+        internal static string UpdatePath(XivDependencyRoot Source, XivDependencyRoot Destination, string path)
         {
             // For common path items, copy them to our own personal mimic of the path.
             if (path.StartsWith(CommonPath))

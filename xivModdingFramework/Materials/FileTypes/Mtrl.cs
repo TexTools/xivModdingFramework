@@ -295,10 +295,10 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="mtrlPath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false)
+        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, IndexFile index = null, ModList modlist = null)
         {
             var dat = new Dat(_gameDirectory);
-            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal);
+            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal, index, modlist);
             var uniqueTextures = new HashSet<string>();
             var texRegex = new Regex(".*\\.tex$");
 

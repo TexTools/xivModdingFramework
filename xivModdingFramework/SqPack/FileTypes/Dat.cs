@@ -24,6 +24,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
@@ -403,13 +404,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
 
                 var _index = new Index(_gameDirectory);
-                var _modding = new Modding(_gameDirectory);
                 index = await _index.GetIndexFile(dataFile, false, true);
-                modlist = await _modding.GetModListAsync();
             }
 
             if (forceOriginal)
             {
+                var _modding = new Modding(_gameDirectory);
+                modlist = await _modding.GetModListAsync();
                 // Checks if the item being imported already exists in the modlist
                 var modEntry = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
 
@@ -1552,11 +1553,31 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
                 // Copy the data into the file.
-                using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
+                BinaryWriter bw = null;
+
+                try
                 {
-                    if(targetOffset >= 2048) {
+                    try
+                    {
+                        bw = new BinaryWriter(File.OpenWrite(datPath));
+                    }
+                    catch
+                    {
+                        if(bw != null)
+                        {
+                            bw.Dispose();
+                        }
+
+                        // Wait just a bit and try again.
+                        await Task.Delay(100);
+                        bw = new BinaryWriter(File.OpenWrite(datPath));
+                    }
+
+                    if (targetOffset >= 2048)
+                    {
                         bw.BaseStream.Seek(seekPointer, SeekOrigin.Begin);
-                    } else
+                    }
+                    else
                     {
                         bw.BaseStream.Seek(0, SeekOrigin.End);
                     }
@@ -1576,6 +1597,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     while ((bw.BaseStream.Position % 256) != 0)
                     {
                         bw.Write((byte)0);
+                    }
+                }
+                finally
+                {
+                    if (bw != null)
+                    {
+                        bw.Dispose();
                     }
                 }
 
@@ -1752,12 +1780,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.source = sourceApplication;
             }
 
+
             if (doSave) {
                 await _modding.SaveModListAsync(modList);
                 
                 // Perform metadata expansion if needed.
                 var ext = Path.GetExtension(internalFilePath);
-                if(ext == ".meta")
+                if (ext == ".meta")
                 {
                     var metaRaw = await GetType2Data(retOffset, df);
                     var meta = await ItemMetadata.Deserialize(metaRaw);
@@ -1765,6 +1794,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                     meta.Validate(internalFilePath);
 
                     await ItemMetadata.ApplyMetadata(meta);
+                }
+                else if (ext == ".rgsp")
+                {
+                    // Expand the racial scaling file.
+                    await CMP.ApplyRgspFile(internalFilePath);
                 }
 
                 XivCache.QueueDependencyUpdate(internalFilePath);

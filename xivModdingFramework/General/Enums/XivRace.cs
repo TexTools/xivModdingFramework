@@ -29,19 +29,19 @@ namespace xivModdingFramework.General.Enums
 
     public enum XivBaseRace : byte
     {
-        Hyur = 1,
-        Elezen = 2,
-        Lalafell = 3,
-        Miqote = 4,
-        Roegadyn = 5,
-        AuRa = 6,
-        Hrothgar = 7,
-        Viera = 8
+        Hyur = 0,
+        Elezen = 1,
+        Lalafell = 2,
+        Miqote = 3,
+        Roegadyn = 4,
+        AuRa = 5,
+        Hrothgar = 6,
+        Viera = 7
     };
 
     public enum XivSubRace : byte
     {
-        Hyur_Midlander = 1,
+        Hyur_Midlander = 0,
         Hyur_Highlander,
         Elezen_Wildwood,
         Elezen_Duskwright,
@@ -57,6 +57,11 @@ namespace xivModdingFramework.General.Enums
         Hrothgar_Lost,
         Viera_Rava,
         Viera_Veena
+    };
+    public enum XivGender : byte
+    {
+        Male = 0,
+        Female = 1
     };
 
     /// <summary>
@@ -528,12 +533,19 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static int GetSubRaceId(this XivSubRace subrace)
         {
-            return (int)subrace % 2 == 1 ? 0 : 1;
+            return (int)subrace % 2;
         }
         public static XivBaseRace GetBaseRace(this XivSubRace subrace)
         {
-            byte rId = (byte) ((((byte)subrace) - 1) / 2);
+            byte rId = (byte) ((byte)subrace / 2);
             return (XivBaseRace) rId;
+        }
+
+        public static string GetDisplayName(this XivSubRace subrace)
+        {
+            var rm = new ResourceManager(typeof(XivStrings));
+            var displayName = rm.GetString(subrace.ToString());
+            return displayName;
         }
 
         /// <summary>

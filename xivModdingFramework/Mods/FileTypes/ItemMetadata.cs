@@ -122,9 +122,9 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(IItem item)
+        public static async Task<ItemMetadata> GetMetadata(IItem item, bool forceDefault = false)
         {
-            return await GetMetadata(item.GetRoot());
+            return await GetMetadata(item.GetRoot(), forceDefault);
         }
 
         /// <summary>
@@ -133,10 +133,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(string internalFilePath)
+        public static async Task<ItemMetadata> GetMetadata(string internalFilePath, bool forceDefault = false )
         {
             var root = await XivCache.GetFirstRoot(internalFilePath);
-            return await GetMetadata(root);
+            return await GetMetadata(root, forceDefault);
         }
 
         /// <summary>
@@ -151,14 +151,17 @@ namespace xivModdingFramework.Mods.FileTypes
                 return null;
             }
 
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            Mod mod = null;
             var filePath = root.Info.GetRootFile();
-
-            var mod = await _modding.TryGetModEntry(filePath);
+            if (!forceDefault)
+            {
+                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+                mod = await _modding.TryGetModEntry(filePath);
+            }
 
             if(mod != null && mod.enabled)
             {
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 // We have modded metadata stored in the .meta file in the DAT we can use.
                 var data = await _dat.GetType2Data(filePath, false);
 
@@ -172,6 +175,36 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
+        /// <summary>
+        /// Retrieves the item metadata from a cached index setup (or raw)
+        /// </summary>
+        /// <param name="root"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        public static async Task<ItemMetadata> GetFromCachedIndex(XivDependencyRoot root, IndexFile index)
+        {
+
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var df = IOUtil.GetDataFileFromPath(root.Info.GetRootFile());
+
+            long offset = 0;
+            if (index != null)
+            {
+                offset = index.Get8xDataOffset(root.Info.GetRootFile());
+            }
+
+            ItemMetadata mData = null;
+            if (offset == 0)
+            {
+                mData = await ItemMetadata.GetMetadata(root);
+            }
+            else
+            {
+                var data = await _dat.GetType2Data(offset, df);
+                mData = await ItemMetadata.Deserialize(data);
+            }
+            return mData;
+        }
 
         /// <summary>
         /// Creates a new ItemMetaData entry from the constituent files around the FFXIV file system.
@@ -231,6 +264,8 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist, bool save = true)
         {
+            if (data == null || data.Count == 0) return;
+
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
