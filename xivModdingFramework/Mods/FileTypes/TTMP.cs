@@ -123,7 +123,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 {
                                     var fname = Path.GetFileName(modOption.ImageFileName);
                                     imageFileName = Path.Combine(dir, fname);
-                                    File.Copy(modOption.ImageFileName, imageFileName);
+                                    File.Copy(modOption.ImageFileName, imageFileName, true);
                                     imageList.Add(imageFileName);
                                 }
 
