@@ -738,18 +738,41 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach(var p in m.Parts)
                 {
-                    foreach(var v in p.Vertices)
+                    bool anyNegativeX = p.Vertices.Any(x => x.UV1.X < 0);
+                    bool anyPositiveY = p.Vertices.Any(x => x.UV1.Y > 0);
+                    foreach (var v in p.Vertices)
                     {
 
-                        v.UV1.X = (v.UV1.X % 1);
-                        v.UV1.Y = (v.UV1.Y % 1);
+                        // Edge case to prevent shoving things at exactly 1.0 to 0.0
+                        if (Math.Abs(v.UV1.X) != 1)
+                        {
+                            v.UV1.X = (v.UV1.X % 1);
+                        }
 
-                        if (v.UV1.X < 0)
+                        if (Math.Abs(v.UV1.Y) != 1)
+                        {
+                            v.UV1.Y = (v.UV1.Y % 1);
+                        }
+
+                        // The extra [anyPositive/negative] values check is to avoid potentially
+                        // shifting values at exactly 0 if 0 is effectively the "top" of the
+                        // used UV space.
+                        
+                        // The goal here is to allow the user to have used any exact quadrant in the [-1 - 1, -1 - 1] range
+                        // and maintain the UV correctly, even if they used exactly [1,1] as a coordinate, for example.
+
+                        // If the user has the UV's arbitrarily split over multiple quadrants, though, then
+                        // the exact points [1,1] for example, become unstable, and end up forced to [0,0]
+                        // No particularly sane way around that though without doing really invasive math to compare connected UVs, etc.
+
+                        // Shove things over into positive quadrant.
+                        if (v.UV1.X <= 0 && anyNegativeX)
                         {
                             v.UV1.X += 1;
                         }
 
-                        if (v.UV1.Y > 0)
+                        // Shove things over into negative quadrant.
+                        if (v.UV1.Y >= 0 && anyPositiveY)
                         {
                             v.UV1.Y -= 1;
                         }

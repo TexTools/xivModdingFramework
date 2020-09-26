@@ -28,6 +28,7 @@ namespace xivModdingFramework.Mods
 
         public static bool IsSupported(XivDependencyRoot root)
         {
+            if (root.Info.PrimaryType == XivItemType.weapon) return true;
             if (root.Info.PrimaryType == XivItemType.equipment) return true;
             if (root.Info.PrimaryType == XivItemType.accessory) return true;
             if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.hair) return true;
