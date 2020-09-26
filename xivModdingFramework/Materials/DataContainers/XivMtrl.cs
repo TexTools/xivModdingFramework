@@ -62,7 +62,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </remarks>
         public ushort ColorSetDataSize { get {
             var size = ColorSetData.Count * 2;
-            size += ColorSetExtraData == null ? 0 : ColorSetExtraData.Length;
+            size += ColorSetDyeData == null ? 0 : ColorSetDyeData.Length;
             return (ushort) size;
         } }
 
@@ -168,7 +168,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The byte array containing the extra ColorSet data
         /// </summary>
-        public byte[] ColorSetExtraData { get; set; }
+        public byte[] ColorSetDyeData { get; set; }
 
         /// <summary>
         /// The size of the additional MTRL Data
@@ -534,7 +534,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 // ColorSetCount seems to always be 1, even when the data is empty.
                 ColorSetCount = 1;
                 ColorSetData = new List<Half>();
-                ColorSetExtraData = null;
+                ColorSetDyeData = null;
             } else
             {
                 if(ColorSetCount == 0 || ColorSetData == null || ColorSetData.Count != 256)
@@ -542,9 +542,9 @@ namespace xivModdingFramework.Materials.DataContainers
                     // Get default Colorset Data.
                     ColorSetData = Tex.GetColorsetDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
                 }
-                if(ColorSetExtraData == null || ColorSetExtraData.Length != 32)
+                if(ColorSetDyeData == null || ColorSetDyeData.Length != 32)
                 {
-                    ColorSetExtraData = Tex.GetColorsetExtraDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
+                    ColorSetDyeData = Tex.GetColorsetExtraDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
                 }
             }
 

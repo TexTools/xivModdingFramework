@@ -415,7 +415,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="xivTex">The texture data</param>
         /// <returns>A byte array with the image data</returns>
-        public Task<byte[]> GetImageData(XivTex xivTex)
+        public Task<byte[]> GetImageData(XivTex xivTex, int layer = -1)
         {
             return Task.Run(async () =>
             {
@@ -424,26 +424,26 @@ namespace xivModdingFramework.Textures.FileTypes
                 switch (xivTex.TextureFormat)
                 {
                     case XivTexFormat.DXT1:
-                        imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.DXT3:
-                        imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.DXT5:
-                        imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.A4R4G4B4:
-                        imageData = await Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = await Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.A1R5G5B5:
-                        imageData = await Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = await Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.A8R8G8B8:
-                        imageData = await SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = await SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.L8:
                     case XivTexFormat.A8:
-                        imageData = await Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Height);
+                        imageData = await Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
                         break;
                     case XivTexFormat.X8R8G8B8:
                     case XivTexFormat.R32F:
@@ -455,6 +455,17 @@ namespace xivModdingFramework.Textures.FileTypes
                     default:
                         imageData = xivTex.TexData;
                         break;
+                }
+
+                if(layer >= 0)
+                {
+                    var bytesPerLayer = imageData.Length / xivTex.Layers;
+                    var offset = bytesPerLayer * layer;
+
+                    byte[] nData = new byte[bytesPerLayer];
+                    Array.Copy(imageData, offset, nData, 0, bytesPerLayer);
+
+                    imageData = nData;
                 }
 
                 return imageData;
@@ -882,7 +893,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetExtraData = colorSetExtraData;
+            xivMtrl.ColorSetDyeData = colorSetExtraData;
             if (xivMtrl.Unknown2.Length > 0)
             {
                 // This byte enables the dye set if it's not already enabled.
@@ -994,7 +1005,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetExtraData = colorSetExtraData;
+            xivMtrl.ColorSetDyeData = colorSetExtraData;
 
             if (xivMtrl.Unknown2.Length > 0)
             {

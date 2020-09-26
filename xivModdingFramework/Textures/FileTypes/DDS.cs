@@ -54,11 +54,35 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexType.Icon:
                 default:
                     DDS.AddRange(CreateDDSHeader(xivTex));
-                    DDS.AddRange(xivTex.TexData);
+
+                    var data = xivTex.TexData;
+                    if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8 && xivTex.Layers > 1)
+                    {
+                        data = ShiftLayers(data);
+                    }
+                    DDS.AddRange(data);
                     break;
             }
 
             File.WriteAllBytes(savePath, DDS.ToArray());
+        }
+
+        // This is a simple shift of the layers around in order to convert ARGB to RGBA
+        private static byte[] ShiftLayers(byte[] data)
+        {
+            for(int i = 0; i < data.Length; i += 4)
+            {
+                var alpha = data[i];
+                var red = data[i + 1];
+                var green  = data[i + 2];
+                var blue = data[i + 3];
+
+                data[i] = red;
+                data[i + 1] = green;
+                data[i + 2] = blue;
+                data[i + 3] = alpha;
+            }
+            return data;
         }
 
         /// <summary>
@@ -80,7 +104,11 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(dwSize));
 
             // Flags to indicate which members contain valid data.
-            const uint dwFlags = 528391;
+            uint dwFlags = 528391;
+            if(xivTex.Layers > 1)
+            {
+                dwFlags = 0x00000004;
+            }
             header.AddRange(BitConverter.GetBytes(dwFlags));
 
             // Surface height (in pixels).
@@ -175,6 +203,13 @@ namespace xivModdingFramework.Textures.FileTypes
                 default:
                     return null;
             }
+
+            if(xivTex.Layers > 1)
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes("DX10");
+                dwFourCC = BitConverter.ToUInt32(bytes, 0);
+            }
+
             header.AddRange(BitConverter.GetBytes(dwFourCC));
 
             switch (xivTex.TextureFormat)
@@ -324,6 +359,35 @@ namespace xivModdingFramework.Textures.FileTypes
                         header.AddRange(blank1);
                         break;
                     }
+            }
+
+            // Need to write DX10 header here.
+            if(xivTex.Layers > 1)
+            {
+                // DXGI_FORMAT dxgiFormat
+                uint dxgiFormat = 0;
+                if (xivTex.TextureFormat == XivTexFormat.DXT1) {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM;
+                } else if (xivTex.TextureFormat == XivTexFormat.DXT5)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
+                } else {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
+                }
+                header.AddRange(BitConverter.GetBytes(dxgiFormat));
+
+                // D3D10_RESOURCE_DIMENSION resourceDimension
+                header.AddRange(BitConverter.GetBytes((int)3));
+
+
+                // UINT miscFlag
+                header.AddRange(BitConverter.GetBytes((int)0));
+
+                // UINT arraySize
+                header.AddRange(BitConverter.GetBytes(xivTex.Layers));
+
+                // UINT miscFlags2
+                header.AddRange(BitConverter.GetBytes((int)0));
             }
 
             return header.ToArray();
@@ -542,5 +606,131 @@ namespace xivModdingFramework.Textures.FileTypes
 
             return (compressedDDS, mipPartOffsets, mipPartCount);
         }
+
+        public enum DXGI_FORMAT : uint
+        {
+            DXGI_FORMAT_UNKNOWN,
+            DXGI_FORMAT_R32G32B32A32_TYPELESS,
+            DXGI_FORMAT_R32G32B32A32_FLOAT,
+            DXGI_FORMAT_R32G32B32A32_UINT,
+            DXGI_FORMAT_R32G32B32A32_SINT,
+            DXGI_FORMAT_R32G32B32_TYPELESS,
+            DXGI_FORMAT_R32G32B32_FLOAT,
+            DXGI_FORMAT_R32G32B32_UINT,
+            DXGI_FORMAT_R32G32B32_SINT,
+            DXGI_FORMAT_R16G16B16A16_TYPELESS,
+            DXGI_FORMAT_R16G16B16A16_FLOAT,
+            DXGI_FORMAT_R16G16B16A16_UNORM,
+            DXGI_FORMAT_R16G16B16A16_UINT,
+            DXGI_FORMAT_R16G16B16A16_SNORM,
+            DXGI_FORMAT_R16G16B16A16_SINT,
+            DXGI_FORMAT_R32G32_TYPELESS,
+            DXGI_FORMAT_R32G32_FLOAT,
+            DXGI_FORMAT_R32G32_UINT,
+            DXGI_FORMAT_R32G32_SINT,
+            DXGI_FORMAT_R32G8X24_TYPELESS,
+            DXGI_FORMAT_D32_FLOAT_S8X24_UINT,
+            DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS,
+            DXGI_FORMAT_X32_TYPELESS_G8X24_UINT,
+            DXGI_FORMAT_R10G10B10A2_TYPELESS,
+            DXGI_FORMAT_R10G10B10A2_UNORM,
+            DXGI_FORMAT_R10G10B10A2_UINT,
+            DXGI_FORMAT_R11G11B10_FLOAT,
+            DXGI_FORMAT_R8G8B8A8_TYPELESS,
+            DXGI_FORMAT_R8G8B8A8_UNORM,
+            DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+            DXGI_FORMAT_R8G8B8A8_UINT,
+            DXGI_FORMAT_R8G8B8A8_SNORM,
+            DXGI_FORMAT_R8G8B8A8_SINT,
+            DXGI_FORMAT_R16G16_TYPELESS,
+            DXGI_FORMAT_R16G16_FLOAT,
+            DXGI_FORMAT_R16G16_UNORM,
+            DXGI_FORMAT_R16G16_UINT,
+            DXGI_FORMAT_R16G16_SNORM,
+            DXGI_FORMAT_R16G16_SINT,
+            DXGI_FORMAT_R32_TYPELESS,
+            DXGI_FORMAT_D32_FLOAT,
+            DXGI_FORMAT_R32_FLOAT,
+            DXGI_FORMAT_R32_UINT,
+            DXGI_FORMAT_R32_SINT,
+            DXGI_FORMAT_R24G8_TYPELESS,
+            DXGI_FORMAT_D24_UNORM_S8_UINT,
+            DXGI_FORMAT_R24_UNORM_X8_TYPELESS,
+            DXGI_FORMAT_X24_TYPELESS_G8_UINT,
+            DXGI_FORMAT_R8G8_TYPELESS,
+            DXGI_FORMAT_R8G8_UNORM,
+            DXGI_FORMAT_R8G8_UINT,
+            DXGI_FORMAT_R8G8_SNORM,
+            DXGI_FORMAT_R8G8_SINT,
+            DXGI_FORMAT_R16_TYPELESS,
+            DXGI_FORMAT_R16_FLOAT,
+            DXGI_FORMAT_D16_UNORM,
+            DXGI_FORMAT_R16_UNORM,
+            DXGI_FORMAT_R16_UINT,
+            DXGI_FORMAT_R16_SNORM,
+            DXGI_FORMAT_R16_SINT,
+            DXGI_FORMAT_R8_TYPELESS,
+            DXGI_FORMAT_R8_UNORM,
+            DXGI_FORMAT_R8_UINT,
+            DXGI_FORMAT_R8_SNORM,
+            DXGI_FORMAT_R8_SINT,
+            DXGI_FORMAT_A8_UNORM,
+            DXGI_FORMAT_R1_UNORM,
+            DXGI_FORMAT_R9G9B9E5_SHAREDEXP,
+            DXGI_FORMAT_R8G8_B8G8_UNORM,
+            DXGI_FORMAT_G8R8_G8B8_UNORM,
+            DXGI_FORMAT_BC1_TYPELESS,
+            DXGI_FORMAT_BC1_UNORM,
+            DXGI_FORMAT_BC1_UNORM_SRGB,
+            DXGI_FORMAT_BC2_TYPELESS,
+            DXGI_FORMAT_BC2_UNORM,
+            DXGI_FORMAT_BC2_UNORM_SRGB,
+            DXGI_FORMAT_BC3_TYPELESS,
+            DXGI_FORMAT_BC3_UNORM,
+            DXGI_FORMAT_BC3_UNORM_SRGB,
+            DXGI_FORMAT_BC4_TYPELESS,
+            DXGI_FORMAT_BC4_UNORM,
+            DXGI_FORMAT_BC4_SNORM,
+            DXGI_FORMAT_BC5_TYPELESS,
+            DXGI_FORMAT_BC5_UNORM,
+            DXGI_FORMAT_BC5_SNORM,
+            DXGI_FORMAT_B5G6R5_UNORM,
+            DXGI_FORMAT_B5G5R5A1_UNORM,
+            DXGI_FORMAT_B8G8R8A8_UNORM,
+            DXGI_FORMAT_B8G8R8X8_UNORM,
+            DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM,
+            DXGI_FORMAT_B8G8R8A8_TYPELESS,
+            DXGI_FORMAT_B8G8R8A8_UNORM_SRGB,
+            DXGI_FORMAT_B8G8R8X8_TYPELESS,
+            DXGI_FORMAT_B8G8R8X8_UNORM_SRGB,
+            DXGI_FORMAT_BC6H_TYPELESS,
+            DXGI_FORMAT_BC6H_UF16,
+            DXGI_FORMAT_BC6H_SF16,
+            DXGI_FORMAT_BC7_TYPELESS,
+            DXGI_FORMAT_BC7_UNORM,
+            DXGI_FORMAT_BC7_UNORM_SRGB,
+            DXGI_FORMAT_AYUV,
+            DXGI_FORMAT_Y410,
+            DXGI_FORMAT_Y416,
+            DXGI_FORMAT_NV12,
+            DXGI_FORMAT_P010,
+            DXGI_FORMAT_P016,
+            DXGI_FORMAT_420_OPAQUE,
+            DXGI_FORMAT_YUY2,
+            DXGI_FORMAT_Y210,
+            DXGI_FORMAT_Y216,
+            DXGI_FORMAT_NV11,
+            DXGI_FORMAT_AI44,
+            DXGI_FORMAT_IA44,
+            DXGI_FORMAT_P8,
+            DXGI_FORMAT_A8P8,
+            DXGI_FORMAT_B4G4R4A4_UNORM,
+            DXGI_FORMAT_P208,
+            DXGI_FORMAT_V208,
+            DXGI_FORMAT_V408,
+            DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE,
+            DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE,
+            DXGI_FORMAT_FORCE_UINT
+        };
     }
 }
