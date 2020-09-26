@@ -542,7 +542,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
                         xivMtrl.ColorSetData = new List<Half>();
-                        xivMtrl.ColorSetExtraData = null;
+                        xivMtrl.ColorSetDyeData = null;
                         if (colorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
@@ -556,7 +556,7 @@ namespace xivModdingFramework.Materials.FileTypes
                             // If the color set is 544 in length, it has an extra 32 bytes at the end
                             if (colorSetDataSize == 544)
                             {
-                                xivMtrl.ColorSetExtraData = br.ReadBytes(32);
+                                xivMtrl.ColorSetDyeData = br.ReadBytes(32);
                             }
                         }
 
@@ -681,7 +681,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The selected race for the item</param>
         public void SaveColorSetExtraData(IItem item, XivMtrl xivMtrl, DirectoryInfo saveDirectory, XivRace race)
         {
-            var toWrite = xivMtrl.ColorSetExtraData != null ? xivMtrl.ColorSetExtraData : new byte[32];
+            var toWrite = xivMtrl.ColorSetDyeData != null ? xivMtrl.ColorSetDyeData : new byte[32];
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
 
             Directory.CreateDirectory(path);
@@ -868,7 +868,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (xivMtrl.ColorSetDataSize == 544)
             {
-                mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
+                mtrlBytes.AddRange(xivMtrl.ColorSetDyeData);
             }
 
 
