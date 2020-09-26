@@ -1052,7 +1052,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var headerLength = br.ReadInt32();
                         var fileType = br.ReadInt32();
                         var uncompressedFileSize = br.ReadInt32();
-                        br.ReadBytes(8);
+                        var ikd1 = br.ReadInt32();
+                        var ikd2 = br.ReadInt32();
                         xivTex.MipMapCount = br.ReadInt32();
 
                         var endOfHeader = offset + headerLength;
@@ -1063,6 +1064,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                         xivTex.TextureFormat = TextureTypeDictionary[br.ReadInt32()];
                         xivTex.Width = br.ReadInt16();
                         xivTex.Height = br.ReadInt16();
+                        var pos = br.BaseStream.Position;
+                        xivTex.Layers = br.ReadInt16();
+                        var imageCount2 = br.ReadInt16();
 
                         for (int i = 0, j = 0; i < xivTex.MipMapCount; i++)
                         {
