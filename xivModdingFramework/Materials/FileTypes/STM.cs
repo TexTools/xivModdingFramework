@@ -8,6 +8,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.Exd.Enums;
+using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
@@ -53,6 +55,40 @@ namespace xivModdingFramework.Materials.FileTypes
 
             await _dat.ImportType2Data(data, GearStainingTemplatePath, applicationSource, null, index, modlist);
 
+        }
+        public static async Task<Dictionary<int, string>> GetDyeNames()
+        {
+
+            var lang = XivCache.GameInfo.GameLanguage;
+            if (lang == General.Enums.XivLanguage.None)
+            {
+                lang = General.Enums.XivLanguage.English;
+            }
+
+            Dictionary<int, string> Dyes = new Dictionary<int, string>();
+
+            var ex = new Ex(XivCache.GameInfo.GameDirectory, lang);
+            var exData = await ex.ReadExData(XivEx.stain);
+
+
+            var dataLength = exData[0].Length - 2;
+
+            foreach (var kv in exData)
+            {
+                if (kv.Key == 0) continue;
+
+                var size = kv.Value.Length - dataLength;
+                var name = Encoding.UTF8.GetString(kv.Value, dataLength, size).Replace("\0", "");
+                var dyeId = kv.Key - 1;
+                if (String.IsNullOrEmpty(name)) {
+                    name = "Dye " + dyeId.ToString();
+                }
+
+                Dyes.Add(dyeId, name);
+            }
+
+
+            return Dyes;
         }
     }
 
@@ -133,7 +169,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     Half[] halfs = new Half[3];
 
-                    var elementStart = offsetStart + (i * 2);
+                    var elementStart = offsetStart + ((i * 2) * elementSize);
 
                     var reversed = new byte[] { data[elementStart + 1], data[elementStart] };
                     var test = new Half(BitConverter.ToUInt16(reversed, 0));
@@ -165,7 +201,18 @@ namespace xivModdingFramework.Materials.FileTypes
                             nArray.Add(new Half[] { new Half(), new Half(), new Half() });
                             continue;
                         }
-                        nArray.Add(halfData[index - 1]);
+
+                        // Seriously, wtf SE?
+                        if(x == 1 && index == 1 && (i <= 110 && i != 91))
+                        {
+                            index = 0;
+                        }
+
+                        if(index >= halfData.Count)
+                        {
+                            index = 0;
+                        }
+                        nArray.Add(halfData[index]);
                     }
 
                     halfData = nArray;
@@ -278,6 +325,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 idx++;
             }
         }
+
 
 
     }
