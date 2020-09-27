@@ -507,6 +507,8 @@ namespace xivModdingFramework.Materials.FileTypes
                                 .Replace("\0", "");
                             var dx11FileName = Path.GetFileName(texturePath).Insert(0, "--");
 
+                            if (String.IsNullOrEmpty(texturePath)) continue;
+
                             if (await index.FileExists(Path.GetDirectoryName(texturePath).Replace("\\", "/") + "/" + dx11FileName,
                                 DataFile))
                             {
