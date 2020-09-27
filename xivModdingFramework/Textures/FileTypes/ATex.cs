@@ -107,6 +107,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var atexData = await dat.GetType2Data(offset, _dataFile);
 
             var xivTex = new XivTex();
+            xivTex.Layers = 1;
 
             using (var br = new BinaryReader(new MemoryStream(atexData)))
             {
