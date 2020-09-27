@@ -68,7 +68,7 @@ namespace xivModdingFramework.Materials.FileTypes
         public readonly List<Half[]> DiffuseEntries = new List<Half[]>();
         public readonly List<Half[]> SpecularEntries = new List<Half[]>();
         public readonly List<Half[]> EmissiveEntries = new List<Half[]>();
-        public readonly List<Half> TileMaterialEntries = new List<Half>();
+        public readonly List<Half> DiffuseSecondaryEntries = new List<Half>();
         public readonly List<Half> GlossEntries = new List<Half>();
 
         public StainingTemplateEntry(byte[] data, int offset)
@@ -197,11 +197,11 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (x == 3)
                     {
-                        TileMaterialEntries.Add(arr[0]);
+                        GlossEntries.Add(arr[0]);
                     }
                     else if (x == 4)
                     {
-                        GlossEntries.Add(arr[0]);
+                        DiffuseSecondaryEntries.Add(arr[0]);
                     }
                 }
 
