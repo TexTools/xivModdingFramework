@@ -421,29 +421,35 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 byte[] imageData = null;
 
+                var layers = xivTex.Layers;
+                if(layers == 0)
+                {
+                    layers = 1;
+                }
+
                 switch (xivTex.TextureFormat)
                 {
                     case XivTexFormat.DXT1:
-                        imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.DXT3:
-                        imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.DXT5:
-                        imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.A4R4G4B4:
-                        imageData = await Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = await Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.A1R5G5B5:
-                        imageData = await Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = await Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.A8R8G8B8:
-                        imageData = await SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = await SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.L8:
                     case XivTexFormat.A8:
-                        imageData = await Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Height * xivTex.Layers);
+                        imageData = await Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
                     case XivTexFormat.X8R8G8B8:
                     case XivTexFormat.R32F:
