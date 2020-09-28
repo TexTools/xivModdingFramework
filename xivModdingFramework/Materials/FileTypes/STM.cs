@@ -186,33 +186,32 @@ namespace xivModdingFramework.Materials.FileTypes
                 if(type == StainingTemplateArrayType.Indexed)
                 {
                     var nArray = new List<Half[]>();
+                    var indexes = new byte[128];
                     for (int i = 0; i < 128; i++)
                     {
-                        var index = data[indexStart + i];
-                        var entry = new Half[3];
-                        if (index == 255)
+                        try
                         {
-                            nArray.Add(new Half[] { new Half(), new Half(), new Half() } );
-                            continue;
-                        }
+                            var index = data[indexStart + i + 1];
+                            var entry = new Half[3];
+                            if (index > halfData.Count)
+                            {
+                                nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                continue;
+                            }
 
-                        if(index == 0)
-                        {
-                            nArray.Add(new Half[] { new Half(), new Half(), new Half() });
-                            continue;
-                        }
+                            if (index == 0)
+                            {
+                                nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                continue;
+                            }
 
-                        // Seriously, wtf SE?
-                        if(x == 1 && index == 1 && (i <= 110 && i != 91))
-                        {
-                            index = 0;
-                        }
+                            index -= 1;
 
-                        if(index >= halfData.Count)
+                            nArray.Add(halfData[index]);
+                        } catch(Exception ex)
                         {
-                            index = 0;
+                            throw;
                         }
-                        nArray.Add(halfData[index]);
                     }
 
                     halfData = nArray;
