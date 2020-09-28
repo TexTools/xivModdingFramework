@@ -64,16 +64,18 @@ CREATE TABLE "vertices" (
 	PRIMARY KEY("mesh","part","vertex_id")
 );
 
-CREATE TABLE "shape_verts" (
-	"model" INTEGER NOT NULL,
+CREATE TABLE "shape_vertices" (
+	"shape" TEXT NOT NULL,
+	"mesh" INTEGER NOT NULL,
 	"part" INTEGER NOT NULL,
-	"shape_id" TEXT NOT NULL,
 	"vertex_id" INTEGER NOT NULL,
 	
 	-- Position
 	"position_x"	REAL NOT NULL,
 	"position_y"	REAL NOT NULL,
-	"position_z"	REAL NOT NULL
+	"position_z"	REAL NOT NULL,
+
+	PRIMARY KEY("shape", "mesh", "part", "vertex_id")
 );
 
 -- Models

@@ -746,12 +746,49 @@ namespace xivModdingFramework.Models.DataContainers
 
                         var shp = p.ShapeParts[shpName];
 
+                        if (mIdx == 0 && pIdx == 2 && shp.Name == "shp_brw_c")
+                        {
+                            if (defaultBaseVerts.Count == 0)
+                            {
+                                foreach (var kv in shp.VertexReplacements)
+                                {
+                                    var originalVertex = p.Vertices[kv.Key];
+                                    var newVertex = shp.Vertices[kv.Value];
+                                    defaultBaseVerts.Add(originalVertex);
+                                    defaultShapeVerts.Add(newVertex);
+                                }
+                            }
+                            else
+                            {
+                                var vIdx = 0;
+                                foreach (var kv in shp.VertexReplacements)
+                                {
+                                    var baseVertex = p.Vertices[kv.Key];
+                                    var shapeVertex = shp.Vertices[kv.Value];
+                                    var originalBaseVertex = defaultBaseVerts[vIdx];
+                                    var originalShapeVertex = defaultShapeVerts[vIdx];
+
+                                    var dot = Vector3.Dot(baseVertex.Binormal, originalBaseVertex.Binormal);
+
+                                    vIdx++;
+                                }
+                            }
+                        }
+
                         // Here we have to convert every vertex into a list of original
                         // indices that reference it.
-                        foreach(var kv in shp.VertexReplacements)
+                        foreach (var kv in shp.VertexReplacements)
                         {
                             var partRelevantOriginalVertexId = kv.Key;
                             var shapeRelevantReplacementVertexId = kv.Value;
+                            var originalVertex = p.Vertices[partRelevantOriginalVertexId];
+                            var newVertex = shp.Vertices[shapeRelevantReplacementVertexId];
+
+                            if(originalVertex.Tangent != newVertex.Tangent || originalVertex.Normal != newVertex.Normal || originalVertex.UV1 != newVertex.UV1 || originalVertex.Binormal != newVertex.Binormal)
+                            {
+                                throw new Exception("???");
+                            }
+
 
                             
                             // Clone the reference to an array.
@@ -780,6 +817,9 @@ namespace xivModdingFramework.Models.DataContainers
 
             return ret;
         }
+
+        private static List<TTVertex> defaultBaseVerts = new List<TTVertex>();
+        private static List<TTVertex> defaultShapeVerts = new List<TTVertex>();
 
         /// <summary>
         /// Whether or not this Model actually has animation/weight data.
@@ -997,6 +1037,7 @@ namespace xivModdingFramework.Models.DataContainers
                     }
                 }
 
+
                 // Load Bones
                 query = "select * from bones where mesh >= 0 order by mesh asc, bone_id asc;";
                 using (var cmd = new SQLiteCommand(query, db))
@@ -1086,6 +1127,45 @@ namespace xivModdingFramework.Models.DataContainers
                     }).GetAwaiter().GetResult();
                 }
             }
+
+            // Spawn a DB connection to do the raw queries.
+            using (var db = new SQLiteConnection(connectionString))
+            {
+                db.Open();
+                // Load Shape Verts
+                var query = "select * from shape_vertices order by shape asc, mesh asc, part asc, vertex_id asc;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    using (var reader = new CacheReader(cmd.ExecuteReader()))
+                    {
+                        while (reader.NextRow())
+                        {
+                            var shapeName = reader.GetString("shape");
+                            var meshNum = reader.GetInt32("mesh");
+                            var partNum = reader.GetInt32("part");
+                            var vertexId = reader.GetInt32("vertex_id");
+
+                            var part = model.MeshGroups[meshNum].Parts[partNum];
+                            // Copy the original vertex and update position.
+                            TTVertex vertex = (TTVertex)part.Vertices[vertexId].Clone();
+                            vertex.Position.X = reader.GetFloat("position_x");
+                            vertex.Position.Y = reader.GetFloat("position_y");
+                            vertex.Position.Z = reader.GetFloat("position_z");
+
+                            if (!part.ShapeParts.ContainsKey(shapeName))
+                            {
+                                var shpPt = new TTShapePart();
+                                shpPt.Name = shapeName;
+                                part.ShapeParts.Add(shapeName, shpPt);
+                            }
+                            part.ShapeParts[shapeName].VertexReplacements.Add(vertexId, part.ShapeParts[shapeName].Vertices.Count);
+                            part.ShapeParts[shapeName].Vertices.Add(vertex);
+
+                        }
+                    }
+                }
+            }
+
 
 
             // Convert the model to FFXIV's internal weirdness.
@@ -1354,12 +1434,40 @@ namespace xivModdingFramework.Models.DataContainers
                                     }
                                 }
 
+
+
+                                // Shape Parts
+                                foreach(var shpKv in p.ShapeParts)
+                                {
+                                    if (!shpKv.Key.StartsWith("shp_")) continue;
+                                    var shp = shpKv.Value;
+
+                                    query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
+                                                                   values($mesh, $part, $shape, $vertex_id, $position_x, $position_y, $position_z);";
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        foreach (var vKv in shp.VertexReplacements)
+                                        {
+                                        var v = shp.Vertices[vKv.Value];
+                                            cmd.Parameters.AddWithValue("part", partIdx);
+                                            cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                            cmd.Parameters.AddWithValue("shape", shpKv.Key);
+                                            cmd.Parameters.AddWithValue("vertex_id", vKv.Key);
+
+                                            cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                            cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                            cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+
+                                            cmd.ExecuteScalar();
+                                            vIdx++;
+                                        }
+                                    }
+                                }
+
                                 partIdx++;
                             }
 
-
-                            // Shape Parts
-                            // TODO -- FIXFIX -- Write data to SQL files
 
 
                             meshIdx++;

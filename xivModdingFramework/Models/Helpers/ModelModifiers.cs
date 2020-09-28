@@ -28,7 +28,7 @@ namespace xivModdingFramework.Models.Helpers
     {
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
-        public bool EnableShapeData { get; set; }
+        public bool UseOriginalShapeData { get; set; }
         public bool ForceUVQuadrant { get; set; }
         public bool ClearUV2 { get; set; }
         public bool CloneUV2 { get; set; }
@@ -45,7 +45,7 @@ namespace xivModdingFramework.Models.Helpers
         {
             CopyAttributes = true;
             CopyMaterials = true;
-            EnableShapeData = false;
+            UseOriginalShapeData = false;
             ForceUVQuadrant = false;
             ClearUV2 = false;
             CloneUV2 = false;
@@ -126,23 +126,14 @@ namespace xivModdingFramework.Models.Helpers
             }
 
             // We need to load the original unmodified model to get the shape data.
-            if (EnableShapeData)
+            if (UseOriginalShapeData)
             {
-                if (ttModel.HasShapeData)
+                if (originalMdl == null)
                 {
-                    // We already have shape data, nothing to do here.
+                    throw new Exception("Cannot copy settings from null MDL.");
                 }
-                else
-                {
-                    if (originalMdl == null)
-                    {
-                        throw new Exception("Cannot copy settings from null MDL.");
-                    }
-                    ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
-                }
-            } else
-            {
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
+                ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
             }
 
             if(AutoScale)
@@ -1330,6 +1321,16 @@ namespace xivModdingFramework.Models.Helpers
                     {
                         loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
                     }
+
+                    foreach(var shpKv in p.ShapeParts)
+                    {
+                        foreach(var v in shpKv.Value.Vertices)
+                        {
+                            v.UV1[1] *= -1;
+                            v.UV2[1] *= -1;
+                        }
+                    }
+
                     pIdx++;
                 }
                 mIdx++;
@@ -1360,6 +1361,14 @@ namespace xivModdingFramework.Models.Helpers
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
                     }
+                    foreach (var shpKv in p.ShapeParts)
+                    {
+                        foreach (var v in shpKv.Value.Vertices)
+                        {
+                            v.UV1[1] *= -1;
+                            v.UV2[1] *= -1;
+                        }
+                    }
                 }
             }
         }
@@ -1386,10 +1395,18 @@ namespace xivModdingFramework.Models.Helpers
                 return;
             }
 
+            var resetShapes = new List<string>();
+            if(model.ActiveShapes.Count != 0)
+            {
+                resetShapes = model.ActiveShapes.ToList();
+            }
+            ModelModifiers.ApplyShapes(model, new List<string>(), true, loggingFunction);
+
             // If we already have binormal data, we can just use the cheaper function.
             if (hasBinormals && !forceRecalculation)
             {
                 CalculateTangentsFromBinormals(model, loggingFunction);
+                CopyShapeTangents(model, loggingFunction);
                 return;
             }
 
@@ -1492,6 +1509,39 @@ namespace xivModdingFramework.Models.Helpers
 
                         // FFXIV actually tracks BINORMAL handedness, not TANGENT handeness, so we have to reverse this.
                         vertex.Handedness = !vertex.Handedness;
+                    }
+                }
+            }
+
+            CopyShapeTangents(model, loggingFunction);
+
+            if(resetShapes.Count > 0)
+            {
+                ModelModifiers.ApplyShapes(model, resetShapes, true, loggingFunction);
+            }
+        }
+
+        private static void CopyShapeTangents(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+            loggingFunction(false, "Copying Tangent information to shape data vertices...");
+
+            foreach (var m in model.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    foreach(var shpKv in p.ShapeParts)
+                    {
+                        foreach(var vKv in shpKv.Value.VertexReplacements)
+                        {
+                            var shpVertex = shpKv.Value.Vertices[vKv.Value];
+                            var pVertex = p.Vertices[vKv.Key];
+                            shpVertex.Tangent = pVertex.Tangent;
+                            shpVertex.Binormal = pVertex.Binormal;
+                        }
                     }
                 }
             }
@@ -1688,8 +1738,6 @@ namespace xivModdingFramework.Models.Helpers
                 if (shape == "original") continue;
                 model.ActiveShapes.Add(shape);
             }
-
-            ModelModifiers.CalculateTangents(model, loggingFunction, true);
         }
 
         /// <summary>
