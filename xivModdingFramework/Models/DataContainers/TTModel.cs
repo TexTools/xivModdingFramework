@@ -14,6 +14,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Textures.Enums;
@@ -102,6 +103,8 @@ namespace xivModdingFramework.Models.DataContainers
         // List of Attributes attached to this part.
         public HashSet<string> Attributes = new HashSet<string>();
 
+        public Dictionary<string, TTShapePart> ShapeParts = new Dictionary<string, TTShapePart>();
+
     }
 
     /// <summary>
@@ -122,9 +125,9 @@ namespace xivModdingFramework.Models.DataContainers
         public List<TTVertex> Vertices = new List<TTVertex>();
 
         /// <summary>
-        /// Dictionary of [Mesh Level Index #] => [Shape Part Vertex # to replace that Index's Value with] 
+        /// Dictionary of [Part Level Vertex #] => [Shape Part Level Vertex #] to replace it with.
         /// </summary>
-        public Dictionary<int, int> Replacements = new Dictionary<int, int>();
+        public Dictionary<int, int> VertexReplacements = new Dictionary<int, int>(); 
     }
 
     /// <summary>
@@ -153,8 +156,154 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public List<string> Bones = new List<string>();
 
+        public int GetVertexCount()
+        {
+            int count = 0;
+            foreach(var p in Parts)
+            {
+                count += p.Vertices.Count;
+            }
+            return count;
+        }
 
-        public List<TTShapePart> ShapeParts = new List<TTShapePart>();
+        public int GetIndexCount()
+        {
+            int count = 0;
+            foreach (var p in Parts)
+            {
+                count += p.TriangleIndices.Count;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Set an index by its MESH RELEVANT index ID and vertex ID.
+        /// </summary>
+        /// <param name="indexId"></param>
+        /// <param name="vertexIdToSet"></param>
+        public void SetIndexAt(int indexId, int vertexIdToSet)
+        {
+            int verticesSoFar = 0;
+            int indicesSoFar = 0;
+
+            foreach(var p in Parts)
+            {
+                if(indexId >= indicesSoFar + p.TriangleIndices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    indicesSoFar += p.TriangleIndices.Count;
+                    continue;
+                }
+                // Okay, we've found the part containing our index.
+                var relevantIndex = indexId - indicesSoFar;
+                var relevantVertex = vertexIdToSet - verticesSoFar;
+                if(relevantVertex < 0 || relevantVertex >= p.Vertices.Count)
+                {
+                    throw new InvalidDataException("Cannot set triangle index to vertex which is not contained by the same mesh part.");
+                }
+
+                p.TriangleIndices[relevantIndex] = relevantVertex;
+            }
+        }
+
+        /// <summary>
+        /// Set a vertex by its MESH RELEVANT vertex id.
+        /// </summary>
+        /// <param name="vertex"></param>
+        public void SetVertexAt(int vertexId, TTVertex vertex)
+        {
+            int verticesSoFar = 0;
+
+            foreach (var p in Parts)
+            {
+                if (vertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    continue;
+                }
+
+                var relevantVertex = vertexId - verticesSoFar;
+                p.Vertices[relevantVertex] = vertex;
+            }
+        }
+
+
+        /// <summary>
+        /// Retrieves all the part information for a given Mesh-Relevant vertex Id.
+        /// </summary>
+        /// <param name="vertexId"></param>
+        /// <returns></returns>
+        public (int PartId, int PartReleventOffset) GetPartRelevantVertexInformation(int vertexId)
+        {
+            int verticesSoFar = 0;
+
+            var pIdx = 0;
+            foreach (var p in Parts)
+            {
+                if (vertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    pIdx++;
+                    continue;
+                }
+
+                var relevantVertex = vertexId - verticesSoFar;
+                return (pIdx, relevantVertex);
+            }
+
+            return (-1, -1);
+        }
+
+        /// <summary>
+        /// Gets the part id of the part which owns a given triangle index.
+        /// </summary>
+        /// <param name="meshRelevantTriangleIndex"></param>
+        /// <returns></returns>
+        public int GetOwningPartIdByIndex(int meshRelevantTriangleIndex)
+        {
+            int indicesSoFar = 0;
+
+            var idx = 0;
+            foreach (var p in Parts)
+            {
+                if (meshRelevantTriangleIndex >= indicesSoFar + p.TriangleIndices.Count)
+                {
+                    // Need to keep looping.
+                    indicesSoFar += p.TriangleIndices.Count;
+                    idx++;
+                    continue;
+                }
+                return idx;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets the part id of the part which owns a given vertex.
+        /// </summary>
+        /// <param name="meshRelevantTriangleIndex"></param>
+        /// <returns></returns>
+        public int GetOwningPartIdByVertex(int meshRelevantVertexId)
+        {
+            int verticesSoFar = 0;
+
+            var idx = 0;
+            foreach (var p in Parts)
+            {
+                if (meshRelevantVertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    idx++;
+                    continue;
+                }
+                return idx;
+            }
+            return -1;
+        }
 
         /// <summary>
         /// Accessor for the full unified MeshGroup level Vertex list.
@@ -389,7 +538,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshGroups.Any(x => x.ShapeParts.Count > 0);
+                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count > 0 ));
             }
         }
         
@@ -403,9 +552,12 @@ namespace xivModdingFramework.Models.DataContainers
                 var shapes = new SortedSet<string>();
                 foreach(var m in MeshGroups)
                 {
-                    foreach(var p in m.ShapeParts)
+                    foreach(var p in m.Parts)
                     {
-                        shapes.Add(p.Name);
+                        foreach (var shp in p.ShapeParts)
+                        {
+                            shapes.Add(shp.Key);
+                        }
                     }
                 }
                 return shapes.ToList();
@@ -422,7 +574,15 @@ namespace xivModdingFramework.Models.DataContainers
                 short sum = 0;
                 foreach(var m in MeshGroups)
                 {
-                    sum += (short) m.ShapeParts.Count;
+                    HashSet<string> shapeNames = new HashSet<string>();
+                    foreach (var p in m.Parts)
+                    {
+                        foreach(var shp in p.ShapeParts)
+                        {
+                            shapeNames.Add(shp.Key);
+                        }
+                    }
+                    sum += (short)shapeNames.Count;
                 }
                 return sum;
             }
@@ -436,11 +596,23 @@ namespace xivModdingFramework.Models.DataContainers
             get
             {
                 short sum = 0;
+                // This one is a little more complex.
                 foreach (var m in MeshGroups)
                 {
-                    foreach(var p in m.ShapeParts)
+                    foreach(var p in m.Parts)
                     {
-                        sum += (short)p.Replacements.Count;
+                        foreach(var index in p.TriangleIndices)
+                        {
+                            // For every index.
+                            foreach(var shp in p.ShapeParts)
+                            {
+                                // There is an entry for every shape it shows up in.
+                                if(shp.Value.VertexReplacements.ContainsKey(index))
+                                {
+                                    sum++;
+                                }
+                            }
+                        }
                     }
                 }
                 return sum;
@@ -456,14 +628,20 @@ namespace xivModdingFramework.Models.DataContainers
             get
             {
                 var counts = new List<short>(new short[ShapeNames.Count]);
+                var shapeNames = ShapeNames;
 
-                foreach (var m in MeshGroups)
+                var shapes = new SortedSet<string>();
+                var shpIdx = 0;
+                foreach (var shpNm in shapeNames)
                 {
-                    foreach (var p in m.ShapeParts)
+                    foreach (var m in MeshGroups)
                     {
-                        var idx = ShapeNames.IndexOf(p.Name);
-                        counts[idx]++;
+                        if (m.Parts.Any(x => x.ShapeParts.ContainsKey(shpNm)))
+                        {
+                            counts[shpIdx]++;
+                        }
                     }
+                    shpIdx++;
                 }
                 return counts;
             }
@@ -477,28 +655,8 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                var byShape = new Dictionary<string, List<(TTShapePart Part, int MeshId)>>();
-
-                var mIdx = 0;
-                foreach (var m in MeshGroups)
-                {
-                    foreach (var p in m.ShapeParts)
-                    {
-                        if(!byShape.ContainsKey(p.Name))
-                        {
-                            byShape.Add(p.Name, new List<(TTShapePart Part, int MeshId)>());
-                        }
-                        byShape[p.Name].Add((p, mIdx));
-                    }
-                    mIdx++;
-                }
-
-                var ret = new List<(TTShapePart Part, int MeshId)>();
-                foreach(var name in ShapeNames)
-                {
-                    ret.AddRange(byShape[name]);
-                }
-                return ret;
+                throw new NotImplementedException("beep boop fuck the turret.");
+                return null;
             }
         }
 
@@ -1078,9 +1236,12 @@ namespace xivModdingFramework.Models.DataContainers
                                 partIdx++;
                             }
 
+
+                            // Shape Parts
+                            // TODO -- FIXFIX 
+
+
                             meshIdx++;
-
-
                         }
                         transaction.Commit();
                     }

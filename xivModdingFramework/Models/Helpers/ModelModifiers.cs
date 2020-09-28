@@ -588,9 +588,14 @@ namespace xivModdingFramework.Models.Helpers
                         {
                             break;
                         }
+
+                        if (ttModel.MeshGroups.Count <= mIdx) break;
+
                         var ogGroup = ogMdl.LoDList[lIdx].MeshDataList[mIdx];
                         var newGroup = ttModel.MeshGroups[mIdx];
                         var newBoneSet = newGroup.Bones;
+
+                        var ttMesh = ttModel.MeshGroups[mIdx];
 
                         // Have to convert the raw bone set to a useable format...
                         var oldBoneSetRaw = ogMdl.MeshBoneSets[ogGroup.MeshInfo.BoneSetIndex];
@@ -604,17 +609,17 @@ namespace xivModdingFramework.Models.Helpers
                         if (mIdx >= ogMdl.LoDList[lIdx].MeshDataList.Count) return;
 
                         // Get all the parts for this mesh.
-                        var parts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).OrderBy(x => x.ShapeName).ToList();
+                        var shpParts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).OrderBy(x => x.ShapeName).ToList();
 
                         // If we have any, we need to create entries for them.
-                        if (parts.Count > 0)
+                        if (shpParts.Count > 0)
                         {
-                            foreach (var p in parts)
+                            foreach (var shp in shpParts)
                             {
                                 var ttPart = new TTShapePart();
                                 ttPart.Name = name;
 
-                                var data = baseShapeData.GetShapeData(p);
+                                var data = baseShapeData.GetShapeData(shp);
 
 
                                 // That's the easy part...
@@ -625,9 +630,24 @@ namespace xivModdingFramework.Models.Helpers
                                 // This matches old vertex ID(old MeshGroup level) to new vertex ID(new shape part level).
                                 var vertexDictionary = new Dictionary<int, int>();
 
+                                var baseVertexToShapeVertex = new Dictionary<int, int>();
+
+
                                 var uniqueVertexIds = new SortedSet<int>();
                                 foreach (var d in data)
                                 {
+                                    var originalVertex = ogGroup.VertexData.Indices[d.BaseIndex];
+                                    if (!baseVertexToShapeVertex.ContainsKey(originalVertex))
+                                    {
+                                        baseVertexToShapeVertex.Add(originalVertex, d.ShapeVertex);
+                                    } else
+                                    {
+                                        if(baseVertexToShapeVertex[originalVertex] != d.ShapeVertex)
+                                        {
+                                            throw new Exception("Unable to load invalid shape data.");
+                                        }
+                                    }
+
                                     uniqueVertexIds.Add(d.ShapeVertex);
                                 }
 
@@ -674,34 +694,14 @@ namespace xivModdingFramework.Models.Helpers
                                     ttPart.Vertices.Add(vert);
                                     vertexDictionary.Add(vId, ttPart.Vertices.Count - 1);
                                 }
+                                //newGroup.ShapeParts.Add(ttPart);
 
-                                // Okay, we now have fully qualified vertex data, but we need to carry over the index
-                                // edits, and modify the vertex #'s to point to the new vertex list.
-                                //   ( That way this part's vertex offsets aren't dependent on the rest of the model maintaining the same structure )
-                                foreach (var d in data)
-                                {
-                                    var vertexId = vertexDictionary[d.ShapeVertex];
 
-                                    // This line is where shape data gets F*cked by changes to the base model.
-                                    // Because we're using the index offset that's relative to the original model's mesh group index list.
-                                    var indexId = d.BaseIndex;
 
-                                    if (!ttPart.Replacements.ContainsKey(indexId))
-                                    {
-                                        ttPart.Replacements.Add(indexId, vertexId);
-                                    }
-                                }
-                                newGroup.ShapeParts.Add(ttPart);
                             }
                         }
                     }
                 }
-
-                foreach (var m in ttModel.MeshGroups)
-                {
-                    m.ShapeParts = m.ShapeParts.OrderBy(x => x.Name).ToList();
-                }
-
             }
             catch (Exception ex)
             {
@@ -720,7 +720,7 @@ namespace xivModdingFramework.Models.Helpers
 
             loggingFunction(false, "Clearing Shape Data...");
 
-            ttModel.MeshGroups.ForEach(x => x.ShapeParts.Clear());
+            ttModel.MeshGroups.ForEach(x => x.Parts.ForEach(z => z.ShapeParts.Clear()));
         }
 
         // Forces all UV Coordinates in UV1 Layer to [1,1] (pre-flip) Quadrant.
@@ -1118,48 +1118,49 @@ namespace xivModdingFramework.Models.Helpers
                             v.Binormal = binormal;
                             v.Tangent = tangent;
                         }
-                    }
 
-                    // Same thing, but for the Shape Data parts.
-                    foreach(var p in m.ShapeParts)
-                    {
-                        foreach(var v in p.Vertices)
+                        // Same thing, but for the Shape Data parts.
+                        foreach (var shp in p.ShapeParts)
                         {
-                            Vector3 position = Vector3.Zero;
-                            Vector3 normal = Vector3.Zero;
-                            Vector3 binormal = Vector3.Zero;
-                            Vector3 tangent = Vector3.Zero;
-
-                            // And each bone in that vertex.
-                            for (var b = 0; b < 4; b++)
+                            foreach (var v in shp.Value.Vertices)
                             {
-                                if (v.Weights[b] == 0) continue;
-                                var boneName = m.Bones[v.BoneIds[b]];
-                                var boneWeight = (v.Weights[b]) / 255f;
+                                Vector3 position = Vector3.Zero;
+                                Vector3 normal = Vector3.Zero;
+                                Vector3 binormal = Vector3.Zero;
+                                Vector3 tangent = Vector3.Zero;
 
-                                var matrix = Matrix.Identity;
-                                var normalMatrix = Matrix.Identity;
-                                matrix = deformations[boneName];
-                                normalMatrix = normalmatrixes[boneName];
-
-                                if (invert)
+                                // And each bone in that vertex.
+                                for (var b = 0; b < 4; b++)
                                 {
-                                    matrix = inverted[boneName];
-                                    normalMatrix = invertednormalmatrixes[boneName];
+                                    if (v.Weights[b] == 0) continue;
+                                    var boneName = m.Bones[v.BoneIds[b]];
+                                    var boneWeight = (v.Weights[b]) / 255f;
+
+                                    var matrix = Matrix.Identity;
+                                    var normalMatrix = Matrix.Identity;
+                                    matrix = deformations[boneName];
+                                    normalMatrix = normalmatrixes[boneName];
+
+                                    if (invert)
+                                    {
+                                        matrix = inverted[boneName];
+                                        normalMatrix = invertednormalmatrixes[boneName];
+                                    }
+
+
+                                    position += MatrixTransform(v.Position, matrix) * boneWeight;
+                                    normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
+                                    binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
+                                    tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
                                 }
 
-
-                                position += MatrixTransform(v.Position, matrix) * boneWeight;
-                                normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
-                                binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
-                                tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
+                                v.Position = position;
+                                v.Normal = normal;
+                                v.Binormal = binormal;
+                                v.Tangent = tangent;
                             }
-
-                            v.Position = position;
-                            v.Normal = normal;
-                            v.Binormal = binormal;
-                            v.Tangent = tangent;
                         }
+
                     }
                 }
             }

@@ -2673,9 +2673,12 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             // These are effectively orphaned vertices until the shape
                             // data kicks in and rewrites the triangle index list.
-                            foreach (var shapePart in ttMeshGroup.ShapeParts)
+                            foreach (var part in ttMeshGroup.Parts)
                             {
-                                vertexCount += shapePart.Vertices.Count;
+                                foreach (var shapePart in part.ShapeParts)
+                                {
+                                    vertexCount += shapePart.Value.Vertices.Count;
+                                }
                             }
                         }
 
@@ -3011,6 +3014,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                     int sum = 0;
 
+                    /*
+                     * TODO -- FIXFIX
                     foreach (var pair in parts)
                     {
                         shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[pair.MeshId]));
@@ -3019,6 +3024,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         sum += pair.Part.Replacements.Count;
                     }
+                    */
 
                     FullShapeDataBlock.AddRange(shapePartsDataBlock);
 
@@ -3053,6 +3059,9 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 var meshNum = p.MeshId;
                                 var baseVertexCount = ttModel.MeshGroups[meshNum].VertexCount + newVertsSoFar[meshNum];
+                                /*
+                                 * 
+                                 * TODO -- FIXFIX 
                                 foreach (var r in p.Part.Replacements)
                                 {
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
@@ -3063,7 +3072,7 @@ namespace xivModdingFramework.Models.FileTypes
                                     vertexId += baseVertexCount;
 
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)vertexId));
-                                }
+                                }*/
 
                                 newVertsSoFar[meshNum] += (uint)p.Part.Vertices.Count;
                             }
@@ -3279,9 +3288,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 var group = ttModel.MeshGroups[importData.Key];
                                 var sum = 0;
-                                foreach (var p in group.ShapeParts)
+                                foreach (var p in group.Parts)
                                 {
-                                    sum += p.Vertices.Count;
+                                    foreach(var shp in p.ShapeParts)
+                                    {
+                                        sum += shp.Value.Vertices.Count;
+                                    }
                                 }
                                 shapeDataCount = sum * entrySizeSum;
                             }
