@@ -29,7 +29,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// so none of them can be separated from the others without creating
     /// an entirely new vertex.
     /// </summary>
-    public class TTVertex {
+    public class TTVertex : ICloneable {
         public Vector3 Position = new Vector3(0,0,0);
 
         public Vector3 Normal = new Vector3(0, 0, 0);
@@ -81,6 +81,21 @@ namespace xivModdingFramework.Models.DataContainers
             if (obj.GetType() != typeof(TTVertex)) return false;
             var b = (TTVertex)obj;
             return b == this;
+        }
+
+        public object Clone()
+        {
+            var clone = (TTVertex) this.MemberwiseClone();
+
+            clone.VertexColor = new byte[4];
+            clone.BoneIds = new byte[4];
+            clone.Weights = new byte[4];
+
+            Array.Copy(this.BoneIds, 0, clone.BoneIds, 0, 4);
+            Array.Copy(this.Weights, 0, clone.Weights, 0, 4);
+            Array.Copy(this.VertexColor, 0, clone.VertexColor, 0, 4);
+
+            return clone;
         }
     }
 
@@ -453,6 +468,8 @@ namespace xivModdingFramework.Models.DataContainers
         /// The Mesh groups and parts of this mesh.
         /// </summary>
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
+
+        public HashSet<string> ActiveShapes = new HashSet<string>();
 
 
         #region Calculated Properties
