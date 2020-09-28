@@ -2589,6 +2589,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                var rawShapeData = ttModel.GetRawShapeParts();
 
                 // Mesh Data
                 #region Mesh Data Block
@@ -2677,7 +2678,10 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 foreach (var shapePart in part.ShapeParts)
                                 {
-                                    vertexCount += shapePart.Value.Vertices.Count;
+                                    if (shapePart.Key.StartsWith("shp_"))
+                                    {
+                                        vertexCount += shapePart.Value.Vertices.Count;
+                                    }
                                 }
                             }
                         }
@@ -3010,21 +3014,16 @@ namespace xivModdingFramework.Models.FileTypes
                     #region Shape Parts Data Block
 
                     var shapePartsDataBlock = new List<byte>();
-                    var parts = ttModel.ShapeParts;
-
                     int sum = 0;
 
-                    /*
-                     * TODO -- FIXFIX
-                    foreach (var pair in parts)
+                    foreach (var shapePart in rawShapeData)
                     {
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[pair.MeshId]));
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(pair.Part.Replacements.Count));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[shapePart.MeshId]));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(shapePart.IndexReplacements.Count));
                         shapePartsDataBlock.AddRange(BitConverter.GetBytes(sum));
 
-                        sum += pair.Part.Replacements.Count;
+                        sum += shapePart.IndexReplacements.Count;
                     }
-                    */
 
                     FullShapeDataBlock.AddRange(shapePartsDataBlock);
 
@@ -3049,32 +3048,18 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
 
-                        var shapeParts = ttModel.ShapeParts;
 
                         // We only store the shape info for LoD 0.
                         if (lodNumber == 0)
                         {
-                            var newVertsSoFar = new List<uint>(new uint[ttModel.MeshGroups.Count]);
-                            foreach (var p in shapeParts)
+                            foreach (var p in rawShapeData)
                             {
                                 var meshNum = p.MeshId;
-                                var baseVertexCount = ttModel.MeshGroups[meshNum].VertexCount + newVertsSoFar[meshNum];
-                                /*
-                                 * 
-                                 * TODO -- FIXFIX 
-                                foreach (var r in p.Part.Replacements)
+                                foreach (var r in p.IndexReplacements)
                                 {
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
-
-                                    // Shift these forward to be relative to the full mesh group, rather than
-                                    // just the shape part.
-                                    var vertexId = (uint)r.Value;
-                                    vertexId += baseVertexCount;
-
-                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)vertexId));
-                                }*/
-
-                                newVertsSoFar[meshNum] += (uint)p.Part.Vertices.Count;
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
+                                }
                             }
                         }
 
@@ -3292,7 +3277,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     foreach(var shp in p.ShapeParts)
                                     {
-                                        sum += shp.Value.Vertices.Count;
+                                        if (shp.Key.StartsWith("shp_"))
+                                        {
+                                            sum += shp.Value.Vertices.Count;
+                                        }
                                     }
                                 }
                                 shapeDataCount = sum * entrySizeSum;
@@ -3462,13 +3450,13 @@ namespace xivModdingFramework.Models.FileTypes
                 if (ttModel.HasShapeData)
                 {
                     // Shape parts need to be rewitten in specific order.
-                    var parts = ttModel.ShapeParts;
+                    var parts = rawShapeData;
                     foreach (var p in parts)
                     {
                         // Because our imported data does not include mesh shape data, we must include it manually
                         var group = ttModel.MeshGroups[p.MeshId];
                         var importData = importDataDictionary[p.MeshId];
-                        foreach (var v in p.Part.Vertices)
+                        foreach (var v in p.Vertices)
                         {
                             WriteVertex(importData, vertexInfoDict, ttModel, v);
                         }

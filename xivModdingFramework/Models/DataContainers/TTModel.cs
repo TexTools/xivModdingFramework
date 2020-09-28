@@ -1,5 +1,6 @@
 ﻿using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Animations;
+using HelixToolkit.SharpDX.Core.Core;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using Newtonsoft.Json;
 using SharpDX;
@@ -555,7 +556,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count > 0 ));
+                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count(x => x.Key.StartsWith("shp_")) > 0 ));
             }
         }
         
@@ -573,6 +574,7 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         foreach (var shp in p.ShapeParts)
                         {
+                            if (!shp.Key.StartsWith("shp_")) continue;
                             shapes.Add(shp.Key);
                         }
                     }
@@ -596,6 +598,7 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         foreach(var shp in p.ShapeParts)
                         {
+                            if (!shp.Key.StartsWith("shp_")) continue;
                             shapeNames.Add(shp.Key);
                         }
                     }
@@ -623,8 +626,9 @@ namespace xivModdingFramework.Models.DataContainers
                             // For every index.
                             foreach(var shp in p.ShapeParts)
                             {
+                                if (!shp.Key.StartsWith("shp_")) continue;
                                 // There is an entry for every shape it shows up in.
-                                if(shp.Value.VertexReplacements.ContainsKey(index))
+                                if (shp.Value.VertexReplacements.ContainsKey(index))
                                 {
                                     sum++;
                                 }
@@ -651,6 +655,7 @@ namespace xivModdingFramework.Models.DataContainers
                 var shpIdx = 0;
                 foreach (var shpNm in shapeNames)
                 {
+                    if (!shpNm.StartsWith("shp_")) continue;
                     foreach (var m in MeshGroups)
                     {
                         if (m.Parts.Any(x => x.ShapeParts.ContainsKey(shpNm)))
@@ -665,16 +670,115 @@ namespace xivModdingFramework.Models.DataContainers
         }
 
         /// <summary>
-        /// List of all the Shape Parts in the mesh, grouped by Shape Name order.
-        /// (Matches up with ShapePartCounts)
+        /// Gets all the raw shape data of the mesh for use with importing the data back into FFXIV's file system.
+        /// Calling/building this data is somewhat expensive, and should only be done
+        /// if actually needed in this specified format.
         /// </summary>
-        public List<(TTShapePart Part, int MeshId)> ShapeParts
+        internal List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)> GetRawShapeParts()
         {
-            get
+            var ret = new List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)>();
+
+            var shapeNames = ShapeNames;
+            shapeNames.Sort();
+
+            // This is a key of [Mesh] [Part] [Vertex Id] => List of referencing indices
+            var partRelevantVertexIdToReferringIndices = new Dictionary<int, Dictionary<int, Dictionary<int, List<int>>>>();
+            var meshVertexOffsets = new Dictionary<int, int>();
+
+            var idx = 0;
+            foreach(var m in MeshGroups)
             {
-                throw new NotImplementedException("beep boop fuck the turret.");
-                return null;
+                meshVertexOffsets.Add(idx, (int) m.VertexCount);
+                idx++;
             }
+
+            foreach (var shpName in shapeNames)
+            {
+                var mIdx = 0;
+                foreach (var m in MeshGroups)
+                {
+                    if (!m.Parts.Any(x => x.ShapeParts.Any(y => y.Key == shpName)))
+                    {
+                        mIdx++;
+                        continue;
+                    }
+
+                    // Generate key if needed.
+                    if(!partRelevantVertexIdToReferringIndices.ContainsKey(mIdx))
+                    {
+                        partRelevantVertexIdToReferringIndices.Add(mIdx, new Dictionary<int, Dictionary<int, List<int>>>());
+                    }
+
+                    Dictionary<int, int> replacements = new Dictionary<int, int>();
+                    List<TTVertex> vertices = new List<TTVertex>();
+
+
+                    var baseIndexOffset = m.IndexCount;
+
+                    var partVertexOffset = 0;
+                    var partIndexOffset = 0;
+                    var pIdx = 0;
+                    foreach(var p in m.Parts)
+                    {
+                        // Build index reference table if needed.
+                        if (!partRelevantVertexIdToReferringIndices[mIdx].ContainsKey(pIdx))
+                        {
+                            partRelevantVertexIdToReferringIndices[mIdx].Add(pIdx, new Dictionary<int, List<int>>());
+
+                            for(int i = 0; i < p.TriangleIndices.Count; i++)
+                            {
+                                var vertexId = p.TriangleIndices[i];
+                                if (!partRelevantVertexIdToReferringIndices[mIdx][pIdx].ContainsKey(vertexId))
+                                {
+                                    partRelevantVertexIdToReferringIndices[mIdx][pIdx].Add(vertexId, new List<int>());
+                                }
+                                partRelevantVertexIdToReferringIndices[mIdx][pIdx][vertexId].Add(i);
+                            }
+                        }
+
+                        if (!p.ShapeParts.ContainsKey(shpName))
+                        {
+                            partVertexOffset += p.Vertices.Count;
+                            partIndexOffset += p.TriangleIndices.Count;
+                            pIdx++;
+                            continue;
+                        }
+
+                        var shp = p.ShapeParts[shpName];
+
+                        // Here we have to convert every vertex into a list of original
+                        // indices that reference it.
+                        foreach(var kv in shp.VertexReplacements)
+                        {
+                            var partRelevantOriginalVertexId = kv.Key;
+                            var shapeRelevantReplacementVertexId = kv.Value;
+
+                            
+                            // Clone the reference to an array.
+                            var originalReferencingIndices = partRelevantVertexIdToReferringIndices[mIdx][pIdx][partRelevantOriginalVertexId].ToArray();
+
+                            for(int i =0; i < originalReferencingIndices.Length; i++)
+                            {
+                                replacements.Add(originalReferencingIndices[i] + partIndexOffset, shapeRelevantReplacementVertexId + meshVertexOffsets[mIdx] + vertices.Count);
+                            }
+                        }
+
+                        vertices.AddRange(shp.Vertices);
+
+                        partIndexOffset += p.TriangleIndices.Count;
+                        partVertexOffset += p.Vertices.Count;
+                        pIdx++;
+                    }
+
+
+
+                    meshVertexOffsets[mIdx] += vertices.Count;
+                    ret.Add((shpName, mIdx, replacements, vertices));
+                    mIdx++;
+                }
+            }
+
+            return ret;
         }
 
         /// <summary>
@@ -1255,7 +1359,7 @@ namespace xivModdingFramework.Models.DataContainers
 
 
                             // Shape Parts
-                            // TODO -- FIXFIX 
+                            // TODO -- FIXFIX -- Write data to SQL files
 
 
                             meshIdx++;

@@ -73,8 +73,8 @@ CREATE TABLE "shape_verts" (
 	-- Position
 	"position_x"	REAL NOT NULL,
 	"position_y"	REAL NOT NULL,
-	"position_z"	REAL NOT NULL,
-)
+	"position_z"	REAL NOT NULL
+);
 
 -- Models
 CREATE TABLE "models" (
