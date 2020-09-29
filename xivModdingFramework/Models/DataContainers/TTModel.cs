@@ -768,7 +768,7 @@ namespace xivModdingFramework.Models.DataContainers
                                     var originalBaseVertex = defaultBaseVerts[vIdx];
                                     var originalShapeVertex = defaultShapeVerts[vIdx];
 
-                                    var dot = Vector3.Dot(baseVertex.Binormal, originalBaseVertex.Binormal);
+                                    var dot = Vector3.Dot(shapeVertex.Binormal, originalShapeVertex.Binormal);
 
                                     vIdx++;
                                 }
@@ -786,7 +786,7 @@ namespace xivModdingFramework.Models.DataContainers
 
                             if(originalVertex.Tangent != newVertex.Tangent || originalVertex.Normal != newVertex.Normal || originalVertex.UV1 != newVertex.UV1 || originalVertex.Binormal != newVertex.Binormal)
                             {
-                                throw new Exception("???");
+                                //throw new Exception("???");
                             }
 
 

@@ -734,7 +734,7 @@ namespace xivModdingFramework.Cache
 
                         if (index.Get8xDataOffset(mat) != 0)
                         {
-                            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
+                            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
                             mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, index, modlist);
                         }
                     }
@@ -1302,7 +1302,7 @@ namespace xivModdingFramework.Cache
                 try
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
-                    var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, dataFile, XivCache.GameInfo.GameLanguage);
+                    var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
                     var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false, false);
                     return mtrlChildren;
                 } catch
