@@ -754,13 +754,6 @@ namespace xivModdingFramework.Models.DataContainers
                             var shapeRelevantReplacementVertexId = kv.Value;
                             var originalVertex = p.Vertices[partRelevantOriginalVertexId];
                             var newVertex = shp.Vertices[shapeRelevantReplacementVertexId];
-
-                            if(originalVertex.Tangent != newVertex.Tangent || originalVertex.Normal != newVertex.Normal || originalVertex.UV1 != newVertex.UV1 || originalVertex.Binormal != newVertex.Binormal)
-                            {
-                                //throw new Exception("???");
-                            }
-
-
                             
                             // Clone the reference to an array.
                             var originalReferencingIndices = partRelevantVertexIdToReferringIndices[mIdx][pIdx][partRelevantOriginalVertexId].ToArray();
