@@ -746,35 +746,6 @@ namespace xivModdingFramework.Models.DataContainers
 
                         var shp = p.ShapeParts[shpName];
 
-                        if (mIdx == 0 && pIdx == 2 && shp.Name == "shp_brw_c")
-                        {
-                            if (defaultBaseVerts.Count == 0)
-                            {
-                                foreach (var kv in shp.VertexReplacements)
-                                {
-                                    var originalVertex = p.Vertices[kv.Key];
-                                    var newVertex = shp.Vertices[kv.Value];
-                                    defaultBaseVerts.Add(originalVertex);
-                                    defaultShapeVerts.Add(newVertex);
-                                }
-                            }
-                            else
-                            {
-                                var vIdx = 0;
-                                foreach (var kv in shp.VertexReplacements)
-                                {
-                                    var baseVertex = p.Vertices[kv.Key];
-                                    var shapeVertex = shp.Vertices[kv.Value];
-                                    var originalBaseVertex = defaultBaseVerts[vIdx];
-                                    var originalShapeVertex = defaultShapeVerts[vIdx];
-
-                                    var dot = Vector3.Dot(shapeVertex.Binormal, originalShapeVertex.Binormal);
-
-                                    vIdx++;
-                                }
-                            }
-                        }
-
                         // Here we have to convert every vertex into a list of original
                         // indices that reference it.
                         foreach (var kv in shp.VertexReplacements)

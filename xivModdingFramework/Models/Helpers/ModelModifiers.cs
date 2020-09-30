@@ -1541,6 +1541,7 @@ namespace xivModdingFramework.Models.Helpers
                             var pVertex = p.Vertices[vKv.Key];
                             shpVertex.Tangent = pVertex.Tangent;
                             shpVertex.Binormal = pVertex.Binormal;
+                            shpVertex.Handedness = pVertex.Handedness;
                         }
                     }
                 }
