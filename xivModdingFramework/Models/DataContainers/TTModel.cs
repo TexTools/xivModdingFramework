@@ -121,6 +121,36 @@ namespace xivModdingFramework.Models.DataContainers
 
         public Dictionary<string, TTShapePart> ShapeParts = new Dictionary<string, TTShapePart>();
 
+
+        /// <summary>
+        /// Updates all shapes in this part to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach(var shpKv in ShapeParts)
+            {
+                var shp = shpKv.Value;
+
+                foreach(var rKv in shp.VertexReplacements)
+                {
+                    var baseVert = Vertices[rKv.Key];
+                    var shapeVert = shp.Vertices[rKv.Value];
+
+                    shapeVert.Normal = baseVert.Normal;
+                    shapeVert.Tangent = baseVert.Tangent;
+                    shapeVert.Binormal = baseVert.Binormal;
+                    shapeVert.Handedness = baseVert.Handedness;
+                    shapeVert.UV1 = baseVert.UV1;
+                    shapeVert.UV2 = baseVert.UV2;
+
+                    Array.Copy(baseVert.VertexColor, shapeVert.VertexColor, 4);
+                    Array.Copy(baseVert.BoneIds, shapeVert.BoneIds, 4);
+                    Array.Copy(baseVert.Weights, shapeVert.Weights, 4);
+
+                }
+            }
+        }
+
     }
 
     /// <summary>
@@ -383,6 +413,17 @@ namespace xivModdingFramework.Models.DataContainers
             var modifiedVertexId = realVertexId + offsets[partId];
             return modifiedVertexId;
 
+        }
+
+        /// <summary>
+        /// Updates all shapes in this mesh group to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach (var p in Parts)
+            {
+                p.UpdateShapeData();
+            }
         }
 
         /// <summary>
@@ -1943,6 +1984,18 @@ namespace xivModdingFramework.Models.DataContainers
             ttModel.Source = rawMdl.MdlPath;
 
             return ttModel;
+        }
+
+
+        /// <summary>
+        /// Updates all shapes in this model to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach(var m in MeshGroups)
+            {
+                m.UpdateShapeData();
+            }
         }
 
         #endregion

@@ -134,6 +134,9 @@ namespace xivModdingFramework.Models.Helpers
                 }
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
                 ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
+
+                // Let's at least update the base shape data to match our base model.
+                ttModel.UpdateShapeData();
             }
 
             if(AutoScale)
