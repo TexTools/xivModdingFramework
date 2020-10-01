@@ -47,21 +47,11 @@ namespace xivModdingFramework.Materials.FileTypes
     {
         private const string MtrlExtension = ".mtrl";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _language;
-        private XivDataFile _dataFile;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
-        public Mtrl(DirectoryInfo gameDirectory, XivDataFile dataFile, XivLanguage lang)
+        public Mtrl(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _language = lang;
-            DataFile = dataFile;
-        }
-
-        public XivDataFile DataFile
-        {
-            get => _dataFile;
-            set => _dataFile = value;
         }
 
 
@@ -405,13 +395,10 @@ namespace xivModdingFramework.Materials.FileTypes
             var index = new Index(_gameDirectory);
 
             // Get uncompressed mtrl data
-            var mtrlData = await dat.GetType2Data(mtrlOffset, DataFile);
+            var df = IOUtil.GetDataFileFromPath(mtrlPath);
+            var mtrlData = await dat.GetType2Data(mtrlOffset, df);
 
             XivMtrl xivMtrl = null;
-
-            // Why is there a semaphore here to read an in memory byte block?
-            await _semaphoreSlim.WaitAsync();
-
             try
             {
                 await Task.Run((Func<Task>)(async () =>
@@ -510,7 +497,7 @@ namespace xivModdingFramework.Materials.FileTypes
                             if (String.IsNullOrEmpty(texturePath)) continue;
 
                             if (await index.FileExists(Path.GetDirectoryName(texturePath).Replace("\\", "/") + "/" + dx11FileName,
-                                DataFile))
+                                df))
                             {
                                 texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
                             }
@@ -638,7 +625,6 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             finally
             {
-                _semaphoreSlim.Release();
             }
 
             return xivMtrl;
@@ -1183,7 +1169,6 @@ namespace xivModdingFramework.Materials.FileTypes
         }
         public void Dipose()
         {
-            _semaphoreSlim?.Dispose();
         }
 
         /// <summary>

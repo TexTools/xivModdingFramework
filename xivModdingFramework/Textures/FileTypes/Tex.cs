@@ -906,8 +906,8 @@ namespace xivModdingFramework.Textures.FileTypes
                 xivMtrl.Unknown2[0] = 12;
             }
 
-            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
-            return await mtrl.ImportMtrl(xivMtrl, item, source);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+            return await _mtrl.ImportMtrl(xivMtrl, item, source);
         }
 
 
@@ -1019,8 +1019,8 @@ namespace xivModdingFramework.Textures.FileTypes
                 xivMtrl.Unknown2[0] = 12;
             }
 
-            var mtrl = new Mtrl(_gameDirectory, xivMtrl.TextureTypePathList[0].DataFile, lang);
-            return mtrl.CreateMtrlFile(xivMtrl, item);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+            return _mtrl.CreateMtrlFile(xivMtrl, item);
         }
 
         /// <summary>

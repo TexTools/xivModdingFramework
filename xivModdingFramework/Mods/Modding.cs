@@ -110,14 +110,26 @@ namespace xivModdingFramework.Mods
         public void SaveModList(ModList ml)
         {
             _modlistSemaphore.Wait();
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
-            _modlistSemaphore.Release();
+            try
+            {
+                File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
         }
         public async Task SaveModListAsync(ModList ml)
         {
             await _modlistSemaphore.WaitAsync();
-            File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
-            _modlistSemaphore.Release();
+            try
+            {
+                File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
         }
 
         public async Task DeleteAllFilesAddedByTexTools()
