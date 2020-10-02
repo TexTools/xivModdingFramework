@@ -481,7 +481,7 @@ namespace xivModdingFramework.Models.FileTypes
                     BoneListCount = br.ReadInt16(),
                     ShapeCount = br.ReadInt16(),
                     ShapePartCount = br.ReadInt16(),
-                    ShapeDataCount = br.ReadInt16(),
+                    ShapeDataCount = br.ReadUInt16(),
                     Unknown1 = br.ReadInt16(),
                     Unknown2 = br.ReadInt16(),
                     Unknown3 = br.ReadInt16(),
@@ -2518,7 +2518,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeDataCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
