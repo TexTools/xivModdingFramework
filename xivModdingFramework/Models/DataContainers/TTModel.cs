@@ -136,17 +136,8 @@ namespace xivModdingFramework.Models.DataContainers
                     var baseVert = Vertices[rKv.Key];
                     var shapeVert = shp.Vertices[rKv.Value];
 
-                    shapeVert.Normal = baseVert.Normal;
-                    shapeVert.Tangent = baseVert.Tangent;
-                    shapeVert.Binormal = baseVert.Binormal;
-                    shapeVert.Handedness = baseVert.Handedness;
-                    shapeVert.UV1 = baseVert.UV1;
-                    shapeVert.UV2 = baseVert.UV2;
-
-                    Array.Copy(baseVert.VertexColor, shapeVert.VertexColor, 4);
-                    Array.Copy(baseVert.BoneIds, shapeVert.BoneIds, 4);
-                    Array.Copy(baseVert.Weights, shapeVert.Weights, 4);
-
+                    shp.Vertices[rKv.Value] = (TTVertex)baseVert.Clone();
+                    shp.Vertices[rKv.Value].Position = shapeVert.Position;
                 }
             }
         }
@@ -652,11 +643,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Total Shape Data (Index) Entries
         /// </summary>
-        public short ShapeDataCount
+        public ushort ShapeDataCount
         {
             get
             {
-                short sum = 0;
+                uint sum = 0;
                 // This one is a little more complex.
                 foreach (var m in MeshGroups)
                 {
@@ -677,7 +668,13 @@ namespace xivModdingFramework.Models.DataContainers
                         }
                     }
                 }
-                return sum;
+                
+                if(sum > ushort.MaxValue)
+                {
+                    throw new Exception($"Model exceeds the maximum possible shape data indices.\n\nCurrent: {sum.ToString()}\nMaximum: {ushort.MaxValue.ToString()}");
+                }
+
+                return (ushort) sum;
             }
         }
 
@@ -1157,12 +1154,21 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.Position.Y = reader.GetFloat("position_y");
                             vertex.Position.Z = reader.GetFloat("position_z");
 
+                            var repVert = part.Vertices[vertexId];
+                            if (repVert.Position.Equals(vertex.Position))
+                            {
+                                // Skip morphology which doesn't actually change anything.
+                                continue;
+                            }
+
                             if (!part.ShapeParts.ContainsKey(shapeName))
                             {
                                 var shpPt = new TTShapePart();
                                 shpPt.Name = shapeName;
                                 part.ShapeParts.Add(shapeName, shpPt);
                             }
+
+
                             part.ShapeParts[shapeName].VertexReplacements.Add(vertexId, part.ShapeParts[shapeName].Vertices.Count);
                             part.ShapeParts[shapeName].Vertices.Add(vertex);
 
