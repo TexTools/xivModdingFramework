@@ -129,9 +129,11 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Resolve offsets, expanding on the first pass.
             // (GMP files use an identical file structure to EQP files)
+
             while (!clean)
             {
                 clean = true;
+                offsets.Clear();
                 foreach (var tuple in entries)
                 {
                     var offset = ResolveEqpEntryOffset(file, (int)tuple.PrimaryId);
@@ -281,9 +283,10 @@ namespace xivModdingFramework.Models.FileTypes
             var clean = false;
 
             // Resolve offsets, expanding on the first pass.
-            while(!clean)
+            while (!clean)
             {
                 clean = true;
+                offsets.Clear();
                 foreach (var tuple in entries)
                 {
                     var offset = ResolveEqpEntryOffset(file, (int)tuple.PrimaryId);
@@ -310,7 +313,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            foreach(var tuple in entries)
+            foreach (var tuple in entries)
             {
                 var offset = offsets[tuple.PrimaryId];
                 var slotOffset = EquipmentParameterSet.EntryOffsets[tuple.EqpData.Slot];
@@ -582,7 +585,7 @@ namespace xivModdingFramework.Models.FileTypes
             var baseOffset = uncompressedBlocks * blockSize;
 
             // Total Size of the data.
-            var totalDataSize = (totalUncompressedBlocks * blockSize * EquipmentParameterEntrySize);
+            var totalDataSize = ((totalUncompressedBlocks + 1) * blockSize * EquipmentParameterEntrySize);
 
             // Pad out to nearest 512 bytes.
             var padding = totalDataSize % 512 == 0 ? 0 : 512 - (totalDataSize % 512);
@@ -597,12 +600,12 @@ namespace xivModdingFramework.Models.FileTypes
             // Copy the first half of the data in, then a blank block, then the second half of the data.
             Array.Copy(eqpData, 0, newData, 0, newDataByteOffset);
             var rem = eqpData.Length - newDataByteOffset;
-            var rem2 = newData.Length - newDataByteOffset - (blockSize * EquipmentDeformerParameterEntrySize);
+            var rem2 = newData.Length - newDataByteOffset - (blockSize * EquipmentParameterEntrySize);
 
             // Don't let us try to write padding data off the end of the file.
             rem = rem > rem2 ? rem2 : rem;
 
-            Array.Copy(eqpData, newDataByteOffset, newData, newDataByteOffset + (blockSize * EquipmentDeformerParameterEntrySize), rem);
+            Array.Copy(eqpData, newDataByteOffset, newData, newDataByteOffset + (blockSize * EquipmentParameterEntrySize), rem);
 
             // Return new array.
             return newData;
