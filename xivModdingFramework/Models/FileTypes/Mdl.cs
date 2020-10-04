@@ -3254,7 +3254,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             var shapeDataCount = 0;
                             // Write the shape data if it exists.
-                            if (ttModel.HasShapeData && !addedMesh && lodNum == 0)
+                            if (ttModel.HasShapeData && lodNum == 0)
                             {
                                 var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                                 if (!isAlreadyModified)
@@ -3835,7 +3835,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 

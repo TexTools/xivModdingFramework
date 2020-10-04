@@ -1869,6 +1869,35 @@ namespace xivModdingFramework.Models.DataContainers
                                         }
                                     }
 
+                                    // Shape Parts
+                                    foreach (var shpKv in p.ShapeParts)
+                                    {
+                                        if (!shpKv.Key.StartsWith("shp_")) continue;
+                                        var shp = shpKv.Value;
+
+                                        query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
+                                                                   values($mesh, $part, $shape, $vertex_id, $position_x, $position_y, $position_z);";
+                                        using (var cmd = new SQLiteCommand(query, db))
+                                        {
+                                            foreach (var vKv in shp.VertexReplacements)
+                                            {
+                                                var v = shp.Vertices[vKv.Value];
+                                                cmd.Parameters.AddWithValue("part", partIdx);
+                                                cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                                cmd.Parameters.AddWithValue("shape", shpKv.Key);
+                                                cmd.Parameters.AddWithValue("vertex_id", vKv.Key);
+
+                                                cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                                cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                                cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+
+                                                cmd.ExecuteScalar();
+                                                vIdx++;
+                                            }
+                                        }
+                                    }
+
                                     partIdx++;
                                 }
 
@@ -1986,7 +2015,14 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MergeGeometryData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeAttributeData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeMaterialData(ttModel, rawMdl, loggingFunction);
-            ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+            try
+            {
+                ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+            } catch(Exception ex)
+            {
+                loggingFunction(true, "Unable to load shape data: " + ex.Message);
+                ModelModifiers.ClearShapeData(ttModel, loggingFunction);
+            }
             ttModel.Source = rawMdl.MdlPath;
 
             return ttModel;
