@@ -15,6 +15,8 @@ using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using HelixToolkit.SharpDX.Core;
 using System.Runtime.CompilerServices;
+using HelixToolkit.SharpDX.Core.ShaderManager;
+using System.Globalization;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -26,7 +28,7 @@ namespace xivModdingFramework.Models.Helpers
     {
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
-        public bool EnableShapeData { get; set; }
+        public bool UseOriginalShapeData { get; set; }
         public bool ForceUVQuadrant { get; set; }
         public bool ClearUV2 { get; set; }
         public bool CloneUV2 { get; set; }
@@ -43,7 +45,7 @@ namespace xivModdingFramework.Models.Helpers
         {
             CopyAttributes = true;
             CopyMaterials = true;
-            EnableShapeData = false;
+            UseOriginalShapeData = false;
             ForceUVQuadrant = false;
             ClearUV2 = false;
             CloneUV2 = false;
@@ -124,23 +126,17 @@ namespace xivModdingFramework.Models.Helpers
             }
 
             // We need to load the original unmodified model to get the shape data.
-            if (EnableShapeData)
+            if (UseOriginalShapeData)
             {
-                if (ttModel.HasShapeData)
+                if (originalMdl == null)
                 {
-                    // We already have shape data, nothing to do here.
+                    throw new Exception("Cannot copy settings from null MDL.");
                 }
-                else
-                {
-                    if (originalMdl == null)
-                    {
-                        throw new Exception("Cannot copy settings from null MDL.");
-                    }
-                    ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
-                }
-            } else
-            {
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
+                ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
+
+                // Let's at least update the base shape data to match our base model.
+                ttModel.UpdateShapeData();
             }
 
             if(AutoScale)
@@ -588,9 +584,14 @@ namespace xivModdingFramework.Models.Helpers
                         {
                             break;
                         }
+
+                        if (ttModel.MeshGroups.Count <= mIdx) break;
+
                         var ogGroup = ogMdl.LoDList[lIdx].MeshDataList[mIdx];
                         var newGroup = ttModel.MeshGroups[mIdx];
                         var newBoneSet = newGroup.Bones;
+
+                        var ttMesh = ttModel.MeshGroups[mIdx];
 
                         // Have to convert the raw bone set to a useable format...
                         var oldBoneSetRaw = ogMdl.MeshBoneSets[ogGroup.MeshInfo.BoneSetIndex];
@@ -604,38 +605,31 @@ namespace xivModdingFramework.Models.Helpers
                         if (mIdx >= ogMdl.LoDList[lIdx].MeshDataList.Count) return;
 
                         // Get all the parts for this mesh.
-                        var parts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).OrderBy(x => x.ShapeName).ToList();
+                        var shpParts = baseShapeData.ShapeParts.Where(x => x.ShapeName == name && x.MeshNumber == mIdx && x.LodLevel == lIdx).OrderBy(x => x.ShapeName).ToList();
 
                         // If we have any, we need to create entries for them.
-                        if (parts.Count > 0)
+                        if (shpParts.Count > 0)
                         {
-                            foreach (var p in parts)
+                            foreach (var shp in shpParts)
                             {
-                                var ttPart = new TTShapePart();
-                                ttPart.Name = name;
 
-                                var data = baseShapeData.GetShapeData(p);
+                                var data = baseShapeData.GetShapeData(shp);
 
 
                                 // That's the easy part...
 
-                                // Now we have to build the Vertex List for this part.
-                                // First we need a set of all the unique vertex IDs in the the data.
+                                var newvCount = 0;
 
-                                // This matches old vertex ID(old MeshGroup level) to new vertex ID(new shape part level).
-                                var vertexDictionary = new Dictionary<int, int>();
-
-                                var uniqueVertexIds = new SortedSet<int>();
+                                // Now, scan through the data and build our new fully qualified shape vertices.
+                                Dictionary<int, TTVertex> vertices = new Dictionary<int, TTVertex>();
+                                Dictionary<int, int> vertexReplacements = new Dictionary<int, int>();
                                 foreach (var d in data)
                                 {
-                                    uniqueVertexIds.Add(d.ShapeVertex);
-                                }
+                                    var vId = d.ShapeVertex;
+                                    if (vertices.ContainsKey(vId)) continue;
 
-                                // Now we need to use these to reference the original vertex list for the mesh
-                                // to create our new TTVertexes.
-                                var oldVertexIds = uniqueVertexIds.ToList();
-                                foreach (var vId in oldVertexIds)
-                                {
+                                    vertexReplacements.Add(ogGroup.VertexData.Indices[d.BaseIndex], vId);
+
                                     var vert = new TTVertex();
                                     vert.Position = ogGroup.VertexData.Positions.Count > vId ? ogGroup.VertexData.Positions[vId] : new Vector3();
                                     vert.Normal = ogGroup.VertexData.Normals.Count > vId ? ogGroup.VertexData.Normals[vId] : new Vector3();
@@ -671,37 +665,55 @@ namespace xivModdingFramework.Models.Helpers
                                     }
 
                                     // We can now add our new fully qualified vertex.
-                                    ttPart.Vertices.Add(vert);
-                                    vertexDictionary.Add(vId, ttPart.Vertices.Count - 1);
+                                    vertices.Add(vId, vert);
                                 }
 
-                                // Okay, we now have fully qualified vertex data, but we need to carry over the index
-                                // edits, and modify the vertex #'s to point to the new vertex list.
-                                //   ( That way this part's vertex offsets aren't dependent on the rest of the model maintaining the same structure )
-                                foreach (var d in data)
+
+                                // Now we need to go through and create the shape part objects for each part.
+                                Dictionary<int, TTShapePart> shapeParts = new Dictionary<int, TTShapePart>();
+                                foreach(var kv in vertexReplacements)
                                 {
-                                    var vertexId = vertexDictionary[d.ShapeVertex];
-
-                                    // This line is where shape data gets F*cked by changes to the base model.
-                                    // Because we're using the index offset that's relative to the original model's mesh group index list.
-                                    var indexId = d.BaseIndex;
-
-                                    if (!ttPart.Replacements.ContainsKey(indexId))
+                                    // For every vertex which was replaced, we need to identify what part owned it.
+                                    var info = ttMesh.GetPartRelevantVertexInformation(kv.Key);
+                                    if(!shapeParts.ContainsKey(info.PartId))
                                     {
-                                        ttPart.Replacements.Add(indexId, vertexId);
+                                        var tempShp = new TTShapePart();
+                                        tempShp.Name = shp.ShapeName;
+                                        shapeParts.Add(info.PartId, tempShp);
                                     }
+
+                                    // Now we need to add the new shape and replacement info to the part.
+                                    var ttShp = shapeParts[info.PartId];
+                                    var newShapeVertexId = ttShp.Vertices.Count;
+
+                                    ttShp.VertexReplacements.Add(info.PartReleventOffset, newShapeVertexId);
+                                    ttShp.Vertices.Add(vertices[kv.Value]);
                                 }
-                                newGroup.ShapeParts.Add(ttPart);
+
+                                // Now just add the shapes to the associated TTParts
+                                foreach(var kv in shapeParts)
+                                {
+                                    if (kv.Key == -1) continue;
+                                    if(ttMesh.Parts[kv.Key].ShapeParts.Count == 0)
+                                    {
+                                        // Pretty janky, but a simple enough way to guarantee we can always
+                                        // restore back to the original shape.
+                                        var pt = ttMesh.Parts[kv.Key];
+                                        var originalShape = new TTShapePart();
+                                        originalShape.Name = "original";
+                                        for (int i = 0; i < pt.Vertices.Count; i++) {
+                                            originalShape.Vertices.Add((TTVertex)pt.Vertices[i].Clone());
+                                            originalShape.VertexReplacements.Add(i, i);
+                                        }
+                                        pt.ShapeParts.Add("original", originalShape);
+                                    }
+                                    ttMesh.Parts[kv.Key].ShapeParts.Add(kv.Value.Name, kv.Value);
+                                }
+
                             }
                         }
                     }
                 }
-
-                foreach (var m in ttModel.MeshGroups)
-                {
-                    m.ShapeParts = m.ShapeParts.OrderBy(x => x.Name).ToList();
-                }
-
             }
             catch (Exception ex)
             {
@@ -720,7 +732,7 @@ namespace xivModdingFramework.Models.Helpers
 
             loggingFunction(false, "Clearing Shape Data...");
 
-            ttModel.MeshGroups.ForEach(x => x.ShapeParts.Clear());
+            ttModel.MeshGroups.ForEach(x => x.Parts.ForEach(z => z.ShapeParts.Clear()));
         }
 
         // Forces all UV Coordinates in UV1 Layer to [1,1] (pre-flip) Quadrant.
@@ -738,18 +750,41 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach(var p in m.Parts)
                 {
-                    foreach(var v in p.Vertices)
+                    bool anyNegativeX = p.Vertices.Any(x => x.UV1.X < 0);
+                    bool anyPositiveY = p.Vertices.Any(x => x.UV1.Y > 0);
+                    foreach (var v in p.Vertices)
                     {
 
-                        v.UV1.X = (v.UV1.X % 1);
-                        v.UV1.Y = (v.UV1.Y % 1);
+                        // Edge case to prevent shoving things at exactly 1.0 to 0.0
+                        if (Math.Abs(v.UV1.X) != 1)
+                        {
+                            v.UV1.X = (v.UV1.X % 1);
+                        }
 
-                        if (v.UV1.X < 0)
+                        if (Math.Abs(v.UV1.Y) != 1)
+                        {
+                            v.UV1.Y = (v.UV1.Y % 1);
+                        }
+
+                        // The extra [anyPositive/negative] values check is to avoid potentially
+                        // shifting values at exactly 0 if 0 is effectively the "top" of the
+                        // used UV space.
+                        
+                        // The goal here is to allow the user to have used any exact quadrant in the [-1 - 1, -1 - 1] range
+                        // and maintain the UV correctly, even if they used exactly [1,1] as a coordinate, for example.
+
+                        // If the user has the UV's arbitrarily split over multiple quadrants, though, then
+                        // the exact points [1,1] for example, become unstable, and end up forced to [0,0]
+                        // No particularly sane way around that though without doing really invasive math to compare connected UVs, etc.
+
+                        // Shove things over into positive quadrant.
+                        if (v.UV1.X <= 0 && anyNegativeX)
                         {
                             v.UV1.X += 1;
                         }
 
-                        if (v.UV1.Y > 0)
+                        // Shove things over into negative quadrant.
+                        if (v.UV1.Y >= 0 && anyPositiveY)
                         {
                             v.UV1.Y -= 1;
                         }
@@ -1095,48 +1130,49 @@ namespace xivModdingFramework.Models.Helpers
                             v.Binormal = binormal;
                             v.Tangent = tangent;
                         }
-                    }
 
-                    // Same thing, but for the Shape Data parts.
-                    foreach(var p in m.ShapeParts)
-                    {
-                        foreach(var v in p.Vertices)
+                        // Same thing, but for the Shape Data parts.
+                        foreach (var shp in p.ShapeParts)
                         {
-                            Vector3 position = Vector3.Zero;
-                            Vector3 normal = Vector3.Zero;
-                            Vector3 binormal = Vector3.Zero;
-                            Vector3 tangent = Vector3.Zero;
-
-                            // And each bone in that vertex.
-                            for (var b = 0; b < 4; b++)
+                            foreach (var v in shp.Value.Vertices)
                             {
-                                if (v.Weights[b] == 0) continue;
-                                var boneName = m.Bones[v.BoneIds[b]];
-                                var boneWeight = (v.Weights[b]) / 255f;
+                                Vector3 position = Vector3.Zero;
+                                Vector3 normal = Vector3.Zero;
+                                Vector3 binormal = Vector3.Zero;
+                                Vector3 tangent = Vector3.Zero;
 
-                                var matrix = Matrix.Identity;
-                                var normalMatrix = Matrix.Identity;
-                                matrix = deformations[boneName];
-                                normalMatrix = normalmatrixes[boneName];
-
-                                if (invert)
+                                // And each bone in that vertex.
+                                for (var b = 0; b < 4; b++)
                                 {
-                                    matrix = inverted[boneName];
-                                    normalMatrix = invertednormalmatrixes[boneName];
+                                    if (v.Weights[b] == 0) continue;
+                                    var boneName = m.Bones[v.BoneIds[b]];
+                                    var boneWeight = (v.Weights[b]) / 255f;
+
+                                    var matrix = Matrix.Identity;
+                                    var normalMatrix = Matrix.Identity;
+                                    matrix = deformations[boneName];
+                                    normalMatrix = normalmatrixes[boneName];
+
+                                    if (invert)
+                                    {
+                                        matrix = inverted[boneName];
+                                        normalMatrix = invertednormalmatrixes[boneName];
+                                    }
+
+
+                                    position += MatrixTransform(v.Position, matrix) * boneWeight;
+                                    normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
+                                    binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
+                                    tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
                                 }
 
-
-                                position += MatrixTransform(v.Position, matrix) * boneWeight;
-                                normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
-                                binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
-                                tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
+                                v.Position = position;
+                                v.Normal = normal;
+                                v.Binormal = binormal;
+                                v.Tangent = tangent;
                             }
-
-                            v.Position = position;
-                            v.Normal = normal;
-                            v.Binormal = binormal;
-                            v.Tangent = tangent;
                         }
+
                     }
                 }
             }
@@ -1288,6 +1324,16 @@ namespace xivModdingFramework.Models.Helpers
                     {
                         loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
                     }
+
+                    foreach(var shpKv in p.ShapeParts)
+                    {
+                        foreach(var v in shpKv.Value.Vertices)
+                        {
+                            v.UV1[1] *= -1;
+                            v.UV2[1] *= -1;
+                        }
+                    }
+
                     pIdx++;
                 }
                 mIdx++;
@@ -1318,6 +1364,14 @@ namespace xivModdingFramework.Models.Helpers
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
                     }
+                    foreach (var shpKv in p.ShapeParts)
+                    {
+                        foreach (var v in shpKv.Value.Vertices)
+                        {
+                            v.UV1[1] *= -1;
+                            v.UV2[1] *= -1;
+                        }
+                    }
                 }
             }
         }
@@ -1326,7 +1380,7 @@ namespace xivModdingFramework.Models.Helpers
         /// Convenience function for calculating tangent data for a TTModel.
         /// </summary>
         /// <param name="model"></param>
-        public static void CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null)
+        public static void CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null, bool forceRecalculation = false)
         {
             if(loggingFunction == null)
             {
@@ -1338,16 +1392,24 @@ namespace xivModdingFramework.Models.Helpers
             var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
             var hasBinormals = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Binormal != Vector3.Zero)));
 
-            if(hasTangents && hasBinormals)
+            if(hasTangents && hasBinormals && !forceRecalculation)
             {
                 // Why are we here?  Go away.
                 return;
             }
 
+            var resetShapes = new List<string>();
+            if(model.ActiveShapes.Count != 0)
+            {
+                resetShapes = model.ActiveShapes.ToList();
+            }
+            ModelModifiers.ApplyShapes(model, new List<string>(), true, loggingFunction);
+
             // If we already have binormal data, we can just use the cheaper function.
-            if (hasBinormals)
+            if (hasBinormals && !forceRecalculation)
             {
                 CalculateTangentsFromBinormals(model, loggingFunction);
+                CopyShapeTangents(model, loggingFunction);
                 return;
             }
 
@@ -1450,6 +1512,40 @@ namespace xivModdingFramework.Models.Helpers
 
                         // FFXIV actually tracks BINORMAL handedness, not TANGENT handeness, so we have to reverse this.
                         vertex.Handedness = !vertex.Handedness;
+                    }
+                }
+            }
+
+            CopyShapeTangents(model, loggingFunction);
+
+            if(resetShapes.Count > 0)
+            {
+                ModelModifiers.ApplyShapes(model, resetShapes, true, loggingFunction);
+            }
+        }
+
+        private static void CopyShapeTangents(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+            loggingFunction(false, "Copying Tangent information to shape data vertices...");
+
+            foreach (var m in model.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    foreach(var shpKv in p.ShapeParts)
+                    {
+                        foreach(var vKv in shpKv.Value.VertexReplacements)
+                        {
+                            var shpVertex = shpKv.Value.Vertices[vKv.Value];
+                            var pVertex = p.Vertices[vKv.Key];
+                            shpVertex.Tangent = pVertex.Tangent;
+                            shpVertex.Binormal = pVertex.Binormal;
+                            shpVertex.Handedness = pVertex.Handedness;
+                        }
                     }
                 }
             }
@@ -1570,6 +1666,82 @@ namespace xivModdingFramework.Models.Helpers
                 }
             }
 
+        }
+
+
+        /// <summary>
+        /// Applies a given set of shapes in order to the model.
+        /// Starting clean will start from the original base model.  Setting startClean to false will continue
+        /// applying shapes to the current already shape-deformed model.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="shapes"></param>
+        public static void ApplyShapes(TTModel model, List<string> shapes, bool startClean = true, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+
+            bool needUpdate = false;
+            if(startClean)
+            {
+                // If we have any applied shapes we wanted to remove, we have to update.
+                if (model.ActiveShapes.Any(x => !shapes.Contains(x)))
+                {
+                    needUpdate = true;
+                }
+
+                // If we are missing any shapes we wanted to apply, we have to update.
+                if (shapes.Any(x => !model.ActiveShapes.Contains(x)))
+                {
+                    needUpdate = true;
+                }
+            } else
+            {
+                needUpdate = true;
+            }
+
+            if (!needUpdate) return;
+
+
+            if (startClean)
+            {
+                List<string> shapesWithOriginal = new List<string>() { "original" };
+                shapesWithOriginal.AddRange(shapes);
+                shapes = shapesWithOriginal;
+            }
+
+            foreach (var shapeName in shapes)
+            {
+                if (model.ActiveShapes.Contains(shapeName)) continue;
+
+                foreach(var m in model.MeshGroups)
+                {
+                    foreach( var p in m.Parts)
+                    {
+                        if (!p.ShapeParts.ContainsKey(shapeName)) continue;
+                        var shp = p.ShapeParts[shapeName];
+
+                        foreach(var kv in shp.VertexReplacements)
+                        {
+                            p.Vertices[kv.Key] = (TTVertex) shp.Vertices[kv.Value].Clone();
+                        }
+                    }
+                }
+            }
+
+            if (startClean)
+            {
+                model.ActiveShapes.Clear();
+            }
+
+            foreach(var shape in shapes)
+            {
+                if (shape == "original") continue;
+                model.ActiveShapes.Add(shape);
+            }
         }
 
         /// <summary>

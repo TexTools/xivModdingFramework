@@ -78,7 +78,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The total number of indices that the mesh shapes uses
         /// </summary>
-        public short ShapeDataCount { get; set; }
+        public ushort ShapeDataCount { get; set; }
 
         /// <summary>
         /// Unknown Usage

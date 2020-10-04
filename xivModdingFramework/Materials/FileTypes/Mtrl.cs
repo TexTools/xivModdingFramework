@@ -47,21 +47,11 @@ namespace xivModdingFramework.Materials.FileTypes
     {
         private const string MtrlExtension = ".mtrl";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _language;
-        private XivDataFile _dataFile;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
-        public Mtrl(DirectoryInfo gameDirectory, XivDataFile dataFile, XivLanguage lang)
+        public Mtrl(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _language = lang;
-            DataFile = dataFile;
-        }
-
-        public XivDataFile DataFile
-        {
-            get => _dataFile;
-            set => _dataFile = value;
         }
 
 
@@ -405,13 +395,10 @@ namespace xivModdingFramework.Materials.FileTypes
             var index = new Index(_gameDirectory);
 
             // Get uncompressed mtrl data
-            var mtrlData = await dat.GetType2Data(mtrlOffset, DataFile);
+            var df = IOUtil.GetDataFileFromPath(mtrlPath);
+            var mtrlData = await dat.GetType2Data(mtrlOffset, df);
 
             XivMtrl xivMtrl = null;
-
-            // Why is there a semaphore here to read an in memory byte block?
-            await _semaphoreSlim.WaitAsync();
-
             try
             {
                 await Task.Run((Func<Task>)(async () =>
@@ -507,8 +494,10 @@ namespace xivModdingFramework.Materials.FileTypes
                                 .Replace("\0", "");
                             var dx11FileName = Path.GetFileName(texturePath).Insert(0, "--");
 
+                            if (String.IsNullOrEmpty(texturePath)) continue;
+
                             if (await index.FileExists(Path.GetDirectoryName(texturePath).Replace("\\", "/") + "/" + dx11FileName,
-                                DataFile))
+                                df))
                             {
                                 texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
                             }
@@ -542,7 +531,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
                         xivMtrl.ColorSetData = new List<Half>();
-                        xivMtrl.ColorSetExtraData = null;
+                        xivMtrl.ColorSetDyeData = null;
                         if (colorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
@@ -556,7 +545,7 @@ namespace xivModdingFramework.Materials.FileTypes
                             // If the color set is 544 in length, it has an extra 32 bytes at the end
                             if (colorSetDataSize == 544)
                             {
-                                xivMtrl.ColorSetExtraData = br.ReadBytes(32);
+                                xivMtrl.ColorSetDyeData = br.ReadBytes(32);
                             }
                         }
 
@@ -636,7 +625,6 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             finally
             {
-                _semaphoreSlim.Release();
             }
 
             return xivMtrl;
@@ -681,7 +669,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The selected race for the item</param>
         public void SaveColorSetExtraData(IItem item, XivMtrl xivMtrl, DirectoryInfo saveDirectory, XivRace race)
         {
-            var toWrite = xivMtrl.ColorSetExtraData != null ? xivMtrl.ColorSetExtraData : new byte[32];
+            var toWrite = xivMtrl.ColorSetDyeData != null ? xivMtrl.ColorSetDyeData : new byte[32];
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
 
             Directory.CreateDirectory(path);
@@ -868,7 +856,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if (xivMtrl.ColorSetDataSize == 544)
             {
-                mtrlBytes.AddRange(xivMtrl.ColorSetExtraData);
+                mtrlBytes.AddRange(xivMtrl.ColorSetDyeData);
             }
 
 
@@ -1181,7 +1169,6 @@ namespace xivModdingFramework.Materials.FileTypes
         }
         public void Dipose()
         {
-            _semaphoreSlim?.Dispose();
         }
 
         /// <summary>

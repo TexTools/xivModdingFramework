@@ -8,6 +8,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.Exd.Enums;
+using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
@@ -40,6 +42,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static async Task SaveStainingTemplateFile(StainingTemplateFile file, string applicationSource, IndexFile index = null, ModList modlist = null)
         {
+            throw new NotImplementedException();
             var data = new byte[0];//file.GetBytes();
 
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
@@ -53,6 +56,40 @@ namespace xivModdingFramework.Materials.FileTypes
             await _dat.ImportType2Data(data, GearStainingTemplatePath, applicationSource, null, index, modlist);
 
         }
+        public static async Task<Dictionary<int, string>> GetDyeNames()
+        {
+
+            var lang = XivCache.GameInfo.GameLanguage;
+            if (lang == General.Enums.XivLanguage.None)
+            {
+                lang = General.Enums.XivLanguage.English;
+            }
+
+            Dictionary<int, string> Dyes = new Dictionary<int, string>();
+
+            var ex = new Ex(XivCache.GameInfo.GameDirectory, lang);
+            var exData = await ex.ReadExData(XivEx.stain);
+
+
+            var dataLength = exData[0].Length - 2;
+
+            foreach (var kv in exData)
+            {
+                if (kv.Key == 0) continue;
+
+                var size = kv.Value.Length - dataLength;
+                var name = Encoding.UTF8.GetString(kv.Value, dataLength, size).Replace("\0", "");
+                var dyeId = kv.Key - 1;
+                if (String.IsNullOrEmpty(name)) {
+                    name = "Dye " + dyeId.ToString();
+                }
+
+                Dyes.Add(dyeId, name);
+            }
+
+
+            return Dyes;
+        }
     }
 
     public enum StainingTemplateArrayType
@@ -64,19 +101,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
     public class StainingTemplateEntry
     {
-        public int Size
-        {
-            get
-            {
-                return 0;
-            }
-        }
-
-        List<Half[]> DiffuseEntries = new List<Half[]>();
-        List<Half[]> SpecularEntries = new List<Half[]>();
-        List<Half[]> EmissiveEntries = new List<Half[]>();
-        List<Half> TileMaterialEntries = new List<Half>();
-        List<Half> GlossEntries = new List<Half>();
+        public readonly List<Half[]> DiffuseEntries = new List<Half[]>();
+        public readonly List<Half[]> SpecularEntries = new List<Half[]>();
+        public readonly List<Half[]> EmissiveEntries = new List<Half[]>();
+        public readonly List<Half> SpecularPowerEntries = new List<Half>();
+        public readonly List<Half> GlossEntries = new List<Half>();
 
         public StainingTemplateEntry(byte[] data, int offset)
         {
@@ -140,7 +169,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     Half[] halfs = new Half[3];
 
-                    var elementStart = offsetStart + (i * 2);
+                    var elementStart = offsetStart + ((i * 2) * elementSize);
 
                     var reversed = new byte[] { data[elementStart + 1], data[elementStart] };
                     var test = new Half(BitConverter.ToUInt16(reversed, 0));
@@ -157,22 +186,32 @@ namespace xivModdingFramework.Materials.FileTypes
                 if(type == StainingTemplateArrayType.Indexed)
                 {
                     var nArray = new List<Half[]>();
+                    var indexes = new byte[128];
                     for (int i = 0; i < 128; i++)
                     {
-                        var index = data[indexStart + i];
-                        var entry = new Half[3];
-                        if (index == 255)
+                        try
                         {
-                            nArray.Add(new Half[] { new Half(), new Half(), new Half() } );
-                            continue;
-                        }
+                            var index = data[indexStart + i + 1];
+                            var entry = new Half[3];
+                            if (index > halfData.Count)
+                            {
+                                nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                continue;
+                            }
 
-                        if(index == 0)
+                            if (index == 0)
+                            {
+                                nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                continue;
+                            }
+
+                            index -= 1;
+
+                            nArray.Add(halfData[index]);
+                        } catch(Exception ex)
                         {
-                            nArray.Add(new Half[] { new Half(), new Half(), new Half() });
-                            continue;
+                            throw;
                         }
-                        nArray.Add(halfData[index - 1]);
                     }
 
                     halfData = nArray;
@@ -204,11 +243,11 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                     else if (x == 3)
                     {
-                        TileMaterialEntries.Add(arr[0]);
+                        GlossEntries.Add(arr[0]);
                     }
                     else if (x == 4)
                     {
-                        GlossEntries.Add(arr[0]);
+                        SpecularPowerEntries.Add(arr[0]);
                     }
                 }
 
@@ -243,7 +282,11 @@ namespace xivModdingFramework.Materials.FileTypes
         }
         public StainingTemplateEntry GetTemplate(ushort key)
         {
-            return Templates[key];
+            if (Templates.ContainsKey(key))
+            {
+                return Templates[key];
+            }
+            return null;
         }
         public StainingTemplateFile(byte[] data)
         {
@@ -281,6 +324,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 idx++;
             }
         }
+
 
 
     }

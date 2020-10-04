@@ -1,5 +1,6 @@
 ﻿using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Animations;
+using HelixToolkit.SharpDX.Core.Core;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using Newtonsoft.Json;
 using SharpDX;
@@ -14,6 +15,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Textures.Enums;
@@ -28,7 +30,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// so none of them can be separated from the others without creating
     /// an entirely new vertex.
     /// </summary>
-    public class TTVertex {
+    public class TTVertex : ICloneable {
         public Vector3 Position = new Vector3(0,0,0);
 
         public Vector3 Normal = new Vector3(0, 0, 0);
@@ -81,6 +83,21 @@ namespace xivModdingFramework.Models.DataContainers
             var b = (TTVertex)obj;
             return b == this;
         }
+
+        public object Clone()
+        {
+            var clone = (TTVertex) this.MemberwiseClone();
+
+            clone.VertexColor = new byte[4];
+            clone.BoneIds = new byte[4];
+            clone.Weights = new byte[4];
+
+            Array.Copy(this.BoneIds, 0, clone.BoneIds, 0, 4);
+            Array.Copy(this.Weights, 0, clone.Weights, 0, 4);
+            Array.Copy(this.VertexColor, 0, clone.VertexColor, 0, 4);
+
+            return clone;
+        }
     }
 
 
@@ -102,6 +119,29 @@ namespace xivModdingFramework.Models.DataContainers
         // List of Attributes attached to this part.
         public HashSet<string> Attributes = new HashSet<string>();
 
+        public Dictionary<string, TTShapePart> ShapeParts = new Dictionary<string, TTShapePart>();
+
+
+        /// <summary>
+        /// Updates all shapes in this part to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach(var shpKv in ShapeParts)
+            {
+                var shp = shpKv.Value;
+
+                foreach(var rKv in shp.VertexReplacements)
+                {
+                    var baseVert = Vertices[rKv.Key];
+                    var shapeVert = shp.Vertices[rKv.Value];
+
+                    shp.Vertices[rKv.Value] = (TTVertex)baseVert.Clone();
+                    shp.Vertices[rKv.Value].Position = shapeVert.Position;
+                }
+            }
+        }
+
     }
 
     /// <summary>
@@ -122,9 +162,9 @@ namespace xivModdingFramework.Models.DataContainers
         public List<TTVertex> Vertices = new List<TTVertex>();
 
         /// <summary>
-        /// Dictionary of [Mesh Level Index #] => [Shape Part Vertex # to replace that Index's Value with] 
+        /// Dictionary of [Part Level Vertex #] => [Shape Part Level Vertex #] to replace it with.
         /// </summary>
-        public Dictionary<int, int> Replacements = new Dictionary<int, int>();
+        public Dictionary<int, int> VertexReplacements = new Dictionary<int, int>(); 
     }
 
     /// <summary>
@@ -153,8 +193,154 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public List<string> Bones = new List<string>();
 
+        public int GetVertexCount()
+        {
+            int count = 0;
+            foreach(var p in Parts)
+            {
+                count += p.Vertices.Count;
+            }
+            return count;
+        }
 
-        public List<TTShapePart> ShapeParts = new List<TTShapePart>();
+        public int GetIndexCount()
+        {
+            int count = 0;
+            foreach (var p in Parts)
+            {
+                count += p.TriangleIndices.Count;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Set an index by its MESH RELEVANT index ID and vertex ID.
+        /// </summary>
+        /// <param name="indexId"></param>
+        /// <param name="vertexIdToSet"></param>
+        public void SetIndexAt(int indexId, int vertexIdToSet)
+        {
+            int verticesSoFar = 0;
+            int indicesSoFar = 0;
+
+            foreach(var p in Parts)
+            {
+                if(indexId >= indicesSoFar + p.TriangleIndices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    indicesSoFar += p.TriangleIndices.Count;
+                    continue;
+                }
+                // Okay, we've found the part containing our index.
+                var relevantIndex = indexId - indicesSoFar;
+                var relevantVertex = vertexIdToSet - verticesSoFar;
+                if(relevantVertex < 0 || relevantVertex >= p.Vertices.Count)
+                {
+                    throw new InvalidDataException("Cannot set triangle index to vertex which is not contained by the same mesh part.");
+                }
+
+                p.TriangleIndices[relevantIndex] = relevantVertex;
+            }
+        }
+
+        /// <summary>
+        /// Set a vertex by its MESH RELEVANT vertex id.
+        /// </summary>
+        /// <param name="vertex"></param>
+        public void SetVertexAt(int vertexId, TTVertex vertex)
+        {
+            int verticesSoFar = 0;
+
+            foreach (var p in Parts)
+            {
+                if (vertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    continue;
+                }
+
+                var relevantVertex = vertexId - verticesSoFar;
+                p.Vertices[relevantVertex] = vertex;
+            }
+        }
+
+
+        /// <summary>
+        /// Retrieves all the part information for a given Mesh-Relevant vertex Id.
+        /// </summary>
+        /// <param name="vertexId"></param>
+        /// <returns></returns>
+        public (int PartId, int PartReleventOffset) GetPartRelevantVertexInformation(int vertexId)
+        {
+            int verticesSoFar = 0;
+
+            var pIdx = 0;
+            foreach (var p in Parts)
+            {
+                if (vertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    pIdx++;
+                    continue;
+                }
+
+                var relevantVertex = vertexId - verticesSoFar;
+                return (pIdx, relevantVertex);
+            }
+
+            return (-1, -1);
+        }
+
+        /// <summary>
+        /// Gets the part id of the part which owns a given triangle index.
+        /// </summary>
+        /// <param name="meshRelevantTriangleIndex"></param>
+        /// <returns></returns>
+        public int GetOwningPartIdByIndex(int meshRelevantTriangleIndex)
+        {
+            int indicesSoFar = 0;
+
+            var idx = 0;
+            foreach (var p in Parts)
+            {
+                if (meshRelevantTriangleIndex >= indicesSoFar + p.TriangleIndices.Count)
+                {
+                    // Need to keep looping.
+                    indicesSoFar += p.TriangleIndices.Count;
+                    idx++;
+                    continue;
+                }
+                return idx;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets the part id of the part which owns a given vertex.
+        /// </summary>
+        /// <param name="meshRelevantTriangleIndex"></param>
+        /// <returns></returns>
+        public int GetOwningPartIdByVertex(int meshRelevantVertexId)
+        {
+            int verticesSoFar = 0;
+
+            var idx = 0;
+            foreach (var p in Parts)
+            {
+                if (meshRelevantVertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    idx++;
+                    continue;
+                }
+                return idx;
+            }
+            return -1;
+        }
 
         /// <summary>
         /// Accessor for the full unified MeshGroup level Vertex list.
@@ -218,6 +404,17 @@ namespace xivModdingFramework.Models.DataContainers
             var modifiedVertexId = realVertexId + offsets[partId];
             return modifiedVertexId;
 
+        }
+
+        /// <summary>
+        /// Updates all shapes in this mesh group to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach (var p in Parts)
+            {
+                p.UpdateShapeData();
+            }
         }
 
         /// <summary>
@@ -305,6 +502,8 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
 
+        public HashSet<string> ActiveShapes = new HashSet<string>();
+
 
         #region Calculated Properties
 
@@ -389,7 +588,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshGroups.Any(x => x.ShapeParts.Count > 0);
+                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count(x => x.Key.StartsWith("shp_")) > 0 ));
             }
         }
         
@@ -403,9 +602,13 @@ namespace xivModdingFramework.Models.DataContainers
                 var shapes = new SortedSet<string>();
                 foreach(var m in MeshGroups)
                 {
-                    foreach(var p in m.ShapeParts)
+                    foreach(var p in m.Parts)
                     {
-                        shapes.Add(p.Name);
+                        foreach (var shp in p.ShapeParts)
+                        {
+                            if (!shp.Key.StartsWith("shp_")) continue;
+                            shapes.Add(shp.Key);
+                        }
                     }
                 }
                 return shapes.ToList();
@@ -422,7 +625,16 @@ namespace xivModdingFramework.Models.DataContainers
                 short sum = 0;
                 foreach(var m in MeshGroups)
                 {
-                    sum += (short) m.ShapeParts.Count;
+                    HashSet<string> shapeNames = new HashSet<string>();
+                    foreach (var p in m.Parts)
+                    {
+                        foreach(var shp in p.ShapeParts)
+                        {
+                            if (!shp.Key.StartsWith("shp_")) continue;
+                            shapeNames.Add(shp.Key);
+                        }
+                    }
+                    sum += (short)shapeNames.Count;
                 }
                 return sum;
             }
@@ -431,19 +643,38 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Total Shape Data (Index) Entries
         /// </summary>
-        public short ShapeDataCount
+        public ushort ShapeDataCount
         {
             get
             {
-                short sum = 0;
+                uint sum = 0;
+                // This one is a little more complex.
                 foreach (var m in MeshGroups)
                 {
-                    foreach(var p in m.ShapeParts)
+                    foreach(var p in m.Parts)
                     {
-                        sum += (short)p.Replacements.Count;
+                        foreach(var index in p.TriangleIndices)
+                        {
+                            // For every index.
+                            foreach(var shp in p.ShapeParts)
+                            {
+                                if (!shp.Key.StartsWith("shp_")) continue;
+                                // There is an entry for every shape it shows up in.
+                                if (shp.Value.VertexReplacements.ContainsKey(index))
+                                {
+                                    sum++;
+                                }
+                            }
+                        }
                     }
                 }
-                return sum;
+                
+                if(sum > ushort.MaxValue)
+                {
+                    throw new Exception($"Model exceeds the maximum possible shape data indices.\n\nCurrent: {sum.ToString()}\nMaximum: {ushort.MaxValue.ToString()}");
+                }
+
+                return (ushort) sum;
             }
         }
 
@@ -456,51 +687,141 @@ namespace xivModdingFramework.Models.DataContainers
             get
             {
                 var counts = new List<short>(new short[ShapeNames.Count]);
+                var shapeNames = ShapeNames;
 
-                foreach (var m in MeshGroups)
+                var shapes = new SortedSet<string>();
+                var shpIdx = 0;
+                foreach (var shpNm in shapeNames)
                 {
-                    foreach (var p in m.ShapeParts)
+                    if (!shpNm.StartsWith("shp_")) continue;
+                    foreach (var m in MeshGroups)
                     {
-                        var idx = ShapeNames.IndexOf(p.Name);
-                        counts[idx]++;
+                        if (m.Parts.Any(x => x.ShapeParts.ContainsKey(shpNm)))
+                        {
+                            counts[shpIdx]++;
+                        }
                     }
+                    shpIdx++;
                 }
                 return counts;
             }
         }
 
         /// <summary>
-        /// List of all the Shape Parts in the mesh, grouped by Shape Name order.
-        /// (Matches up with ShapePartCounts)
+        /// Gets all the raw shape data of the mesh for use with importing the data back into FFXIV's file system.
+        /// Calling/building this data is somewhat expensive, and should only be done
+        /// if actually needed in this specified format.
         /// </summary>
-        public List<(TTShapePart Part, int MeshId)> ShapeParts
+        internal List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)> GetRawShapeParts()
         {
-            get
-            {
-                var byShape = new Dictionary<string, List<(TTShapePart Part, int MeshId)>>();
+            var ret = new List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)>();
 
+            var shapeNames = ShapeNames;
+            shapeNames.Sort();
+
+            // This is a key of [Mesh] [Part] [Vertex Id] => List of referencing indices
+            var partRelevantVertexIdToReferringIndices = new Dictionary<int, Dictionary<int, Dictionary<int, List<int>>>>();
+            var meshVertexOffsets = new Dictionary<int, int>();
+
+            var idx = 0;
+            foreach(var m in MeshGroups)
+            {
+                meshVertexOffsets.Add(idx, (int) m.VertexCount);
+                idx++;
+            }
+
+            foreach (var shpName in shapeNames)
+            {
                 var mIdx = 0;
                 foreach (var m in MeshGroups)
                 {
-                    foreach (var p in m.ShapeParts)
+                    if (!m.Parts.Any(x => x.ShapeParts.Any(y => y.Key == shpName)))
                     {
-                        if(!byShape.ContainsKey(p.Name))
-                        {
-                            byShape.Add(p.Name, new List<(TTShapePart Part, int MeshId)>());
-                        }
-                        byShape[p.Name].Add((p, mIdx));
+                        mIdx++;
+                        continue;
                     }
+
+                    // Generate key if needed.
+                    if(!partRelevantVertexIdToReferringIndices.ContainsKey(mIdx))
+                    {
+                        partRelevantVertexIdToReferringIndices.Add(mIdx, new Dictionary<int, Dictionary<int, List<int>>>());
+                    }
+
+                    Dictionary<int, int> replacements = new Dictionary<int, int>();
+                    List<TTVertex> vertices = new List<TTVertex>();
+
+
+                    var baseIndexOffset = m.IndexCount;
+
+                    var partVertexOffset = 0;
+                    var partIndexOffset = 0;
+                    var pIdx = 0;
+                    foreach(var p in m.Parts)
+                    {
+                        // Build index reference table if needed.
+                        if (!partRelevantVertexIdToReferringIndices[mIdx].ContainsKey(pIdx))
+                        {
+                            partRelevantVertexIdToReferringIndices[mIdx].Add(pIdx, new Dictionary<int, List<int>>());
+
+                            for(int i = 0; i < p.TriangleIndices.Count; i++)
+                            {
+                                var vertexId = p.TriangleIndices[i];
+                                if (!partRelevantVertexIdToReferringIndices[mIdx][pIdx].ContainsKey(vertexId))
+                                {
+                                    partRelevantVertexIdToReferringIndices[mIdx][pIdx].Add(vertexId, new List<int>());
+                                }
+                                partRelevantVertexIdToReferringIndices[mIdx][pIdx][vertexId].Add(i);
+                            }
+                        }
+
+                        if (!p.ShapeParts.ContainsKey(shpName))
+                        {
+                            partVertexOffset += p.Vertices.Count;
+                            partIndexOffset += p.TriangleIndices.Count;
+                            pIdx++;
+                            continue;
+                        }
+
+                        var shp = p.ShapeParts[shpName];
+
+                        // Here we have to convert every vertex into a list of original
+                        // indices that reference it.
+                        foreach (var kv in shp.VertexReplacements)
+                        {
+                            var partRelevantOriginalVertexId = kv.Key;
+                            var shapeRelevantReplacementVertexId = kv.Value;
+                            var originalVertex = p.Vertices[partRelevantOriginalVertexId];
+                            var newVertex = shp.Vertices[shapeRelevantReplacementVertexId];
+                            
+                            // Clone the reference to an array.
+                            var originalReferencingIndices = partRelevantVertexIdToReferringIndices[mIdx][pIdx][partRelevantOriginalVertexId].ToArray();
+
+                            for(int i =0; i < originalReferencingIndices.Length; i++)
+                            {
+                                replacements.Add(originalReferencingIndices[i] + partIndexOffset, shapeRelevantReplacementVertexId + meshVertexOffsets[mIdx] + vertices.Count);
+                            }
+                        }
+
+                        vertices.AddRange(shp.Vertices);
+
+                        partIndexOffset += p.TriangleIndices.Count;
+                        partVertexOffset += p.Vertices.Count;
+                        pIdx++;
+                    }
+
+
+
+                    meshVertexOffsets[mIdx] += vertices.Count;
+                    ret.Add((shpName, mIdx, replacements, vertices));
                     mIdx++;
                 }
-
-                var ret = new List<(TTShapePart Part, int MeshId)>();
-                foreach(var name in ShapeNames)
-                {
-                    ret.AddRange(byShape[name]);
-                }
-                return ret;
             }
+
+            return ret;
         }
+
+        private static List<TTVertex> defaultBaseVerts = new List<TTVertex>();
+        private static List<TTVertex> defaultShapeVerts = new List<TTVertex>();
 
         /// <summary>
         /// Whether or not this Model actually has animation/weight data.
@@ -718,6 +1039,7 @@ namespace xivModdingFramework.Models.DataContainers
                     }
                 }
 
+
                 // Load Bones
                 query = "select * from bones where mesh >= 0 order by mesh asc, bone_id asc;";
                 using (var cmd = new SQLiteCommand(query, db))
@@ -807,6 +1129,54 @@ namespace xivModdingFramework.Models.DataContainers
                     }).GetAwaiter().GetResult();
                 }
             }
+
+            // Spawn a DB connection to do the raw queries.
+            using (var db = new SQLiteConnection(connectionString))
+            {
+                db.Open();
+                // Load Shape Verts
+                var query = "select * from shape_vertices order by shape asc, mesh asc, part asc, vertex_id asc;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    using (var reader = new CacheReader(cmd.ExecuteReader()))
+                    {
+                        while (reader.NextRow())
+                        {
+                            var shapeName = reader.GetString("shape");
+                            var meshNum = reader.GetInt32("mesh");
+                            var partNum = reader.GetInt32("part");
+                            var vertexId = reader.GetInt32("vertex_id");
+
+                            var part = model.MeshGroups[meshNum].Parts[partNum];
+                            // Copy the original vertex and update position.
+                            TTVertex vertex = (TTVertex)part.Vertices[vertexId].Clone();
+                            vertex.Position.X = reader.GetFloat("position_x");
+                            vertex.Position.Y = reader.GetFloat("position_y");
+                            vertex.Position.Z = reader.GetFloat("position_z");
+
+                            var repVert = part.Vertices[vertexId];
+                            if (repVert.Position.Equals(vertex.Position))
+                            {
+                                // Skip morphology which doesn't actually change anything.
+                                continue;
+                            }
+
+                            if (!part.ShapeParts.ContainsKey(shapeName))
+                            {
+                                var shpPt = new TTShapePart();
+                                shpPt.Name = shapeName;
+                                part.ShapeParts.Add(shapeName, shpPt);
+                            }
+
+
+                            part.ShapeParts[shapeName].VertexReplacements.Add(vertexId, part.ShapeParts[shapeName].Vertices.Count);
+                            part.ShapeParts[shapeName].Vertices.Add(vertex);
+
+                        }
+                    }
+                }
+            }
+
 
 
             // Convert the model to FFXIV's internal weirdness.
@@ -1075,12 +1445,43 @@ namespace xivModdingFramework.Models.DataContainers
                                     }
                                 }
 
+
+
+                                // Shape Parts
+                                foreach(var shpKv in p.ShapeParts)
+                                {
+                                    if (!shpKv.Key.StartsWith("shp_")) continue;
+                                    var shp = shpKv.Value;
+
+                                    query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
+                                                                   values($mesh, $part, $shape, $vertex_id, $position_x, $position_y, $position_z);";
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        foreach (var vKv in shp.VertexReplacements)
+                                        {
+                                        var v = shp.Vertices[vKv.Value];
+                                            cmd.Parameters.AddWithValue("part", partIdx);
+                                            cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                            cmd.Parameters.AddWithValue("shape", shpKv.Key);
+                                            cmd.Parameters.AddWithValue("vertex_id", vKv.Key);
+
+                                            cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                            cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                            cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+
+                                            cmd.ExecuteScalar();
+                                            vIdx++;
+                                        }
+                                    }
+                                }
+
                                 partIdx++;
                             }
 
+
+
                             meshIdx++;
-
-
                         }
                         transaction.Commit();
                     }
@@ -1468,6 +1869,35 @@ namespace xivModdingFramework.Models.DataContainers
                                         }
                                     }
 
+                                    // Shape Parts
+                                    foreach (var shpKv in p.ShapeParts)
+                                    {
+                                        if (!shpKv.Key.StartsWith("shp_")) continue;
+                                        var shp = shpKv.Value;
+
+                                        query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
+                                                                   values($mesh, $part, $shape, $vertex_id, $position_x, $position_y, $position_z);";
+                                        using (var cmd = new SQLiteCommand(query, db))
+                                        {
+                                            foreach (var vKv in shp.VertexReplacements)
+                                            {
+                                                var v = shp.Vertices[vKv.Value];
+                                                cmd.Parameters.AddWithValue("part", partIdx);
+                                                cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                                cmd.Parameters.AddWithValue("shape", shpKv.Key);
+                                                cmd.Parameters.AddWithValue("vertex_id", vKv.Key);
+
+                                                cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                                cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                                cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+
+                                                cmd.ExecuteScalar();
+                                                vIdx++;
+                                            }
+                                        }
+                                    }
+
                                     partIdx++;
                                 }
 
@@ -1585,10 +2015,29 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MergeGeometryData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeAttributeData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeMaterialData(ttModel, rawMdl, loggingFunction);
-            ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+            try
+            {
+                ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+            } catch(Exception ex)
+            {
+                loggingFunction(true, "Unable to load shape data: " + ex.Message);
+                ModelModifiers.ClearShapeData(ttModel, loggingFunction);
+            }
             ttModel.Source = rawMdl.MdlPath;
 
             return ttModel;
+        }
+
+
+        /// <summary>
+        /// Updates all shapes in this model to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach(var m in MeshGroups)
+            {
+                m.UpdateShapeData();
+            }
         }
 
         #endregion

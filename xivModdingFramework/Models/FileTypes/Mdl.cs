@@ -273,7 +273,7 @@ namespace xivModdingFramework.Models.FileTypes
             var directory = Path.GetDirectoryName(outputFilePath);
 
             // Language doesn't actually matter here.
-            var _mtrl = new Mtrl(gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(gameDirectory);
             var _index = new Index(gameDirectory);
             var materialIdx = 0;
@@ -481,7 +481,7 @@ namespace xivModdingFramework.Models.FileTypes
                     BoneListCount = br.ReadInt16(),
                     ShapeCount = br.ReadInt16(),
                     ShapePartCount = br.ReadInt16(),
-                    ShapeDataCount = br.ReadInt16(),
+                    ShapeDataCount = br.ReadUInt16(),
                     Unknown1 = br.ReadInt16(),
                     Unknown2 = br.ReadInt16(),
                     Unknown3 = br.ReadInt16(),
@@ -1697,7 +1697,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
-            var _mtrl = new Mtrl(_gameDirectory, dataFile, XivLanguage.None);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(_gameDirectory);
             if (index == null)
             {
@@ -2518,7 +2518,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeDataCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
@@ -2589,6 +2589,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                var rawShapeData = ttModel.GetRawShapeParts();
 
                 // Mesh Data
                 #region Mesh Data Block
@@ -2673,9 +2674,15 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             // These are effectively orphaned vertices until the shape
                             // data kicks in and rewrites the triangle index list.
-                            foreach (var shapePart in ttMeshGroup.ShapeParts)
+                            foreach (var part in ttMeshGroup.Parts)
                             {
-                                vertexCount += shapePart.Vertices.Count;
+                                foreach (var shapePart in part.ShapeParts)
+                                {
+                                    if (shapePart.Key.StartsWith("shp_"))
+                                    {
+                                        vertexCount += shapePart.Value.Vertices.Count;
+                                    }
+                                }
                             }
                         }
 
@@ -3007,17 +3014,15 @@ namespace xivModdingFramework.Models.FileTypes
                     #region Shape Parts Data Block
 
                     var shapePartsDataBlock = new List<byte>();
-                    var parts = ttModel.ShapeParts;
-
                     int sum = 0;
 
-                    foreach (var pair in parts)
+                    foreach (var shapePart in rawShapeData)
                     {
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[pair.MeshId]));
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(pair.Part.Replacements.Count));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[shapePart.MeshId]));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(shapePart.IndexReplacements.Count));
                         shapePartsDataBlock.AddRange(BitConverter.GetBytes(sum));
 
-                        sum += pair.Part.Replacements.Count;
+                        sum += shapePart.IndexReplacements.Count;
                     }
 
                     FullShapeDataBlock.AddRange(shapePartsDataBlock);
@@ -3043,29 +3048,18 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
 
-                        var shapeParts = ttModel.ShapeParts;
 
                         // We only store the shape info for LoD 0.
                         if (lodNumber == 0)
                         {
-                            var newVertsSoFar = new List<uint>(new uint[ttModel.MeshGroups.Count]);
-                            foreach (var p in shapeParts)
+                            foreach (var p in rawShapeData)
                             {
                                 var meshNum = p.MeshId;
-                                var baseVertexCount = ttModel.MeshGroups[meshNum].VertexCount + newVertsSoFar[meshNum];
-                                foreach (var r in p.Part.Replacements)
+                                foreach (var r in p.IndexReplacements)
                                 {
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
-
-                                    // Shift these forward to be relative to the full mesh group, rather than
-                                    // just the shape part.
-                                    var vertexId = (uint)r.Value;
-                                    vertexId += baseVertexCount;
-
-                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)vertexId));
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
                                 }
-
-                                newVertsSoFar[meshNum] += (uint)p.Part.Vertices.Count;
                             }
                         }
 
@@ -3260,7 +3254,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             var shapeDataCount = 0;
                             // Write the shape data if it exists.
-                            if (ttModel.HasShapeData && !addedMesh && lodNum == 0)
+                            if (ttModel.HasShapeData && lodNum == 0)
                             {
                                 var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                                 if (!isAlreadyModified)
@@ -3279,9 +3273,15 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 var group = ttModel.MeshGroups[importData.Key];
                                 var sum = 0;
-                                foreach (var p in group.ShapeParts)
+                                foreach (var p in group.Parts)
                                 {
-                                    sum += p.Vertices.Count;
+                                    foreach(var shp in p.ShapeParts)
+                                    {
+                                        if (shp.Key.StartsWith("shp_"))
+                                        {
+                                            sum += shp.Value.Vertices.Count;
+                                        }
+                                    }
                                 }
                                 shapeDataCount = sum * entrySizeSum;
                             }
@@ -3450,13 +3450,13 @@ namespace xivModdingFramework.Models.FileTypes
                 if (ttModel.HasShapeData)
                 {
                     // Shape parts need to be rewitten in specific order.
-                    var parts = ttModel.ShapeParts;
+                    var parts = rawShapeData;
                     foreach (var p in parts)
                     {
                         // Because our imported data does not include mesh shape data, we must include it manually
                         var group = ttModel.MeshGroups[p.MeshId];
                         var importData = importDataDictionary[p.MeshId];
-                        foreach (var v in p.Part.Vertices)
+                        foreach (var v in p.Vertices)
                         {
                             WriteVertex(importData, vertexInfoDict, ttModel, v);
                         }
@@ -3835,7 +3835,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 
@@ -4431,10 +4431,12 @@ namespace xivModdingFramework.Models.FileTypes
             var xMdl = await GetRawMdlData(originalPath, false, offset);
             var model = TTModel.FromRaw(xMdl);
 
+
             if (model == null)
             {
                 throw new InvalidDataException("Source model file does not exist.");
             }
+            var allFiles = new HashSet<string>() { newPath };
 
             var originalRace = IOUtil.GetRaceFromPath(originalPath);
             var newRace = IOUtil.GetRaceFromPath(newPath);
@@ -4448,7 +4450,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Language is irrelevant here.
-            var _mtrl = new Mtrl(_gameDirectory, IOUtil.GetDataFileFromPath(newPath), XivLanguage.None);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
             // Get all variant materials.
             var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false, index, modlist);
@@ -4498,11 +4500,13 @@ namespace xivModdingFramework.Models.FileTypes
 
                             mtrl.TexturePathList[i] = ntex;
 
+                            allFiles.Add(ntex);
                             await _dat.CopyFile(tex, ntex, source, true, item, index, modlist);
                         }
                     }
 
                     mtrl.MTRLPath = path;
+                    allFiles.Add(mtrl.MTRLPath);
                     await _mtrl.ImportMtrl(mtrl, item, source, index, modlist);
 
                     if(!validNewMaterials.ContainsKey(newMatName))
@@ -4553,6 +4557,7 @@ namespace xivModdingFramework.Models.FileTypes
                             // Missing a material set, copy in the known valid material.
                             if(!copied)
                             {
+                                allFiles.Add(testPath);
                                 await _dat.CopyFile(validPath, testPath, source, true, item, index, modlist);
                             }
                         }
@@ -4567,6 +4572,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             await _index.SaveIndexFile(index);
             await _modding.SaveModListAsync(modlist);
+            XivCache.QueueDependencyUpdate(allFiles.ToList());
 
             return offset;
         }

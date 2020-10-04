@@ -65,7 +65,7 @@ namespace xivModdingFramework.Mods
                 var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, df);
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 var _index = new Index(XivCache.GameInfo.GameDirectory);
-                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory, df, XivCache.GameInfo.GameLanguage);
+                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
                 var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
                 var doSave = false;
@@ -484,6 +484,8 @@ namespace xivModdingFramework.Mods
                     await _index.SaveIndexFile(index);
                     await _modding.SaveModListAsync(modlist);
                 }
+
+                XivCache.QueueDependencyUpdate(allFiles.ToList());
 
                 if(saveDirectory != null)
                 {
