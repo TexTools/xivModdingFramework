@@ -444,7 +444,7 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
-            var mdlData = await dat.GetType3Data(offset, _dataFile);
+            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(mdlPath));
 
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
