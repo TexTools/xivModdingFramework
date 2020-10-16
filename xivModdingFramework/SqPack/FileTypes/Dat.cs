@@ -129,7 +129,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var index = new Index(_gameDirectory);
-            index.UpdateIndexDatCount(dataFile, nextDatNumber);
+            index.UpdateIndexDatCount(dataFile, nextDatNumber, alreadyLocked);
 
             return nextDatNumber;
         }
@@ -1377,7 +1377,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 targetDat = i;
                 break;
             }
-
+            //sound/battle/enpc/se_enpc_alchemist_goblin_a.scd
             // Didn't find a DAT file with space, gotta create a new one.
             if (targetDat < 0)
             {
@@ -1865,7 +1865,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var slots = new Dictionary<long, long>();
             var modlist = await _modding.GetModListAsync();
 
-            var modsByFile = modlist.Mods.Where(x => !String.IsNullOrWhiteSpace(x.fullPath)).GroupBy(x => {
+            var modsByFile = modlist.Mods.Where(x => !String.IsNullOrWhiteSpace(x.fullPath) && x.datFile == df.GetDataFileName()).GroupBy(x => {
                 long offset = x.data.modOffset;
                 var rawOffset = offset / 8;
                 var datNum = (rawOffset & 0xF) >> 1;

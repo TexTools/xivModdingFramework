@@ -62,13 +62,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}")
             };
 
-            foreach (var indexPath in indexPaths)
+            if (!alreadySemaphoreLocked)
             {
-                if (!alreadySemaphoreLocked)
-                {
-                    _semaphoreSlim.Wait();
-                }
-                try
+                _semaphoreSlim.Wait();
+            }
+            try
+            {
+                foreach (var indexPath in indexPaths)
                 {
                     using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
                     {
@@ -76,12 +76,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                         bw.Write(datCount);
                     }
                 }
-                finally
+            }
+            finally
+            {
+                if (!alreadySemaphoreLocked)
                 {
-                    if (!alreadySemaphoreLocked)
-                    {
-                        _semaphoreSlim.Release();
-                    }
+                    _semaphoreSlim.Release();
                 }
             }
         }
