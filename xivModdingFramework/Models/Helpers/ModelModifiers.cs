@@ -598,7 +598,8 @@ namespace xivModdingFramework.Models.Helpers
                         var oldBoneSet = new List<string>();
                         for (int bi = 0; bi < oldBoneSetRaw.BoneIndexCount; bi++)
                         {
-                            oldBoneSet.Add(ogMdl.PathData.BoneList[bi]);
+                            var bbi = oldBoneSetRaw.BoneIndices[bi];
+                            oldBoneSet.Add(ogMdl.PathData.BoneList[bbi]);
                         }
 
                         // No shape data for groups that don't exist in the old model.

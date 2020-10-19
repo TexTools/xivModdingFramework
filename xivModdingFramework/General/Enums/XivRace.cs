@@ -510,6 +510,13 @@ namespace xivModdingFramework.General.Enums
                 return XivRace.Hyur_Midlander_Male;
             }
 
+            // Roe F is very weird and uses Highlander F's skin materials,
+            // but Midlander F's models.  Blame SE hard-coding shit.
+            if(node.Race == XivRace.Roegadyn_Female)
+            {
+                return XivRace.Hyur_Highlander_Female;
+            }
+
             if (node.HasSkin)
             {
                 return node.Race;
