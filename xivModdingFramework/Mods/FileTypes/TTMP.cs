@@ -708,12 +708,15 @@ namespace xivModdingFramework.Mods.FileTypes
                                         if (fileKv.Key != fileKv.Value)
                                         {
                                             filesToReset.Add(fileKv.Key);
-
                                         }
 
-                                        var mod = modList.Mods.First(x => x.fullPath == fileKv.Value);
-                                        mod.modPack = modPack;
                                         filePaths.Remove(fileKv.Key);
+
+                                        var mod = modList.Mods.FirstOrDefault(x => x.fullPath == fileKv.Value);
+                                        if (mod != null)
+                                        {
+                                            mod.modPack = modPack;
+                                        }
                                     }
                                 }
 
