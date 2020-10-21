@@ -58,6 +58,7 @@ using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Cache;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -1699,8 +1700,10 @@ namespace xivModdingFramework.Models.FileTypes
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(_gameDirectory);
+            var useCached = true;
             if (index == null)
             {
+                useCached = false;
                 var _index = new Index(_gameDirectory);
                 var _modding = new Modding(_gameDirectory);
                 index = await _index.GetIndexFile(dataFile, false, true);
@@ -1711,6 +1714,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Read the raw Material names from the file.
             var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, index, modlist);
+            var root = await XivCache.GetFirstRoot(mdlPath);
             if(materialNames.Count == 0)
             {
                 return materials;
@@ -1722,7 +1726,17 @@ namespace xivModdingFramework.Models.FileTypes
                 // If we had a specific variant to get, just use that.
                 materialVariants.Add(materialVariant);
 
-            } else { 
+            }
+            else if(useCached && root != null)
+            {
+                var metadata = await ItemMetadata.GetFromCachedIndex(root, index);
+                foreach (var entry in metadata.ImcEntries)
+                {
+                    materialVariants.Add(entry.MaterialSet);
+                }
+            }
+            else
+            {
 
                 // Otherwise, we have to resolve all possible variants.
                 var imcPath = ItemType.GetIMCPathFromChildPath(mdlPath);
