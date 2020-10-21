@@ -22,6 +22,7 @@ using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 using static xivModdingFramework.Cache.XivCache;
 
@@ -490,6 +491,76 @@ namespace xivModdingFramework.Cache
             return Info.ToString().GetHashCode();
         }
 
+        /// <summary>
+        /// Retrieves ALL files used by this root.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="modlist"></param>
+        /// <returns></returns>
+        public async Task<SortedSet<string>> GetAllFiles(IndexFile index = null, ModList modlist = null)
+        {
+
+            var df = IOUtil.GetDataFileFromPath(Info.GetRootFile());
+
+            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, df);
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var _atex = new ATex(XivCache.GameInfo.GameDirectory, df);
+
+            var files = new HashSet<string>();
+
+            if (index == null)
+            {
+                index = await _index.GetIndexFile(df);
+                modlist = await _modding.GetModListAsync();
+            }
+
+            ItemMetadata originalMetadata = await ItemMetadata.GetFromCachedIndex(this, index);
+
+            var originalModelPaths = await GetModelFiles(index, modlist);
+            var originalMaterialPaths = await GetMaterialFiles(-1, index, modlist);
+            var originalTexturePaths = await GetTextureFiles(-1, index, modlist);
+
+            var originalVfxPaths = new HashSet<string>();
+            if (Imc.UsesImc(this))
+            {
+                var avfxSets = originalMetadata.ImcEntries.Select(x => x.Vfx).Distinct();
+                foreach (var avfx in avfxSets)
+                {
+                    var avfxStuff = await ATex.GetVfxPath(Info, avfx);
+                    if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
+
+                    var path = avfxStuff.Folder + "/" + avfxStuff.File;
+                    if (index.FileExists(path))
+                    {
+                        originalVfxPaths.Add(path);
+                        var ttpaths = await _atex.GetAtexPaths(path);
+                        foreach (var ttp in ttpaths)
+                        {
+                            originalVfxPaths.Add(ttp.Path);
+                        }
+                    }
+                }
+            }
+
+            var af = originalModelPaths.Select(x => x).Union(
+                originalMaterialPaths.Select(x => x)).Union(
+                originalTexturePaths.Select(x => x)).Union(
+                originalVfxPaths.Select(x => x));
+
+            var allFiles = new SortedSet<string>();
+            foreach (var f in af)
+            {
+                allFiles.Add(f);
+            }
+
+            allFiles.Add(Info.GetRootFile());
+
+            return allFiles;
+        }
 
         /// <summary>
         /// Gets all the model files in this dependency chain.
