@@ -3071,6 +3071,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 var meshNum = p.MeshId;
                                 foreach (var r in p.IndexReplacements)
                                 {
+                                    if(r.Value > ushort.MaxValue)
+                                    {
+                                        throw new InvalidDataException("Mesh Group " + meshNum + " has too many total vertices/triangle indices.\nRemove some vertices/faces/shapes or split them across multiple mesh groups.");
+                                    }
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
                                 }

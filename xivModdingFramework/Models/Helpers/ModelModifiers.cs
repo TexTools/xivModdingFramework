@@ -134,12 +134,9 @@ namespace xivModdingFramework.Models.Helpers
                 }
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
                 ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
-
-                // Let's at least update the base shape data to match our base model.
-                ttModel.UpdateShapeData();
             }
 
-            if(AutoScale)
+            if (AutoScale)
             {
                 if (originalMdl == null)
                 {
@@ -149,6 +146,9 @@ namespace xivModdingFramework.Models.Helpers
                 var oldModel = TTModel.FromRaw(originalMdl);
                 ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, loggingFunction);
             }
+
+            // Ensure shape data is updated with our various changes.
+            ttModel.UpdateShapeData();
         }
     }
 
@@ -1325,22 +1325,14 @@ namespace xivModdingFramework.Models.Helpers
                     {
                         loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
                     }
-
-                    foreach(var shpKv in p.ShapeParts)
-                    {
-                        foreach(var v in shpKv.Value.Vertices)
-                        {
-                            v.UV1[1] *= -1;
-                            v.UV2[1] *= -1;
-                        }
-                    }
-
                     pIdx++;
                 }
                 mIdx++;
             }
 
 
+            // Update the base shape data to match our base model.
+            model.UpdateShapeData();
         }
 
         /// <summary>
@@ -1365,16 +1357,11 @@ namespace xivModdingFramework.Models.Helpers
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
                     }
-                    foreach (var shpKv in p.ShapeParts)
-                    {
-                        foreach (var v in shpKv.Value.Vertices)
-                        {
-                            v.UV1[1] *= -1;
-                            v.UV2[1] *= -1;
-                        }
-                    }
                 }
             }
+
+            // Update the base shape data to match our base model.
+            model.UpdateShapeData();
         }
 
         /// <summary>
