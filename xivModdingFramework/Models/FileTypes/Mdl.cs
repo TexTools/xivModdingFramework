@@ -1730,9 +1730,16 @@ namespace xivModdingFramework.Models.FileTypes
             else if(useCached && root != null)
             {
                 var metadata = await ItemMetadata.GetFromCachedIndex(root, index);
-                foreach (var entry in metadata.ImcEntries)
+                if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
                 {
-                    materialVariants.Add(entry.MaterialSet);
+                    materialVariants.Add(1);
+                }
+                else
+                {
+                    foreach (var entry in metadata.ImcEntries)
+                    {
+                        materialVariants.Add(entry.MaterialSet);
+                    }
                 }
             }
             else
