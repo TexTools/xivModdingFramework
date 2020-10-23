@@ -1730,9 +1730,16 @@ namespace xivModdingFramework.Models.FileTypes
             else if(useCached && root != null)
             {
                 var metadata = await ItemMetadata.GetFromCachedIndex(root, index);
-                foreach (var entry in metadata.ImcEntries)
+                if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
                 {
-                    materialVariants.Add(entry.MaterialSet);
+                    materialVariants.Add(1);
+                }
+                else
+                {
+                    foreach (var entry in metadata.ImcEntries)
+                    {
+                        materialVariants.Add(entry.MaterialSet);
+                    }
                 }
             }
             else
@@ -3071,6 +3078,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 var meshNum = p.MeshId;
                                 foreach (var r in p.IndexReplacements)
                                 {
+                                    if(r.Value > ushort.MaxValue)
+                                    {
+                                        throw new InvalidDataException("Mesh Group " + meshNum + " has too many total vertices/triangle indices.\nRemove some vertices/faces/shapes or split them across multiple mesh groups.");
+                                    }
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
                                 }
