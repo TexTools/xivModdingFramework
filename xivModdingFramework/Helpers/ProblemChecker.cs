@@ -333,6 +333,7 @@ namespace xivModdingFramework.Helpers
                     }
                 }
 
+                var _index = new Index(_gameDirectory);
                 // Make sure backups exist and are up to date unless called with forceRestore true
                 if (backupFiles.Length != 0 && !outdated)
                 {
@@ -344,6 +345,9 @@ namespace xivModdingFramework.Helpers
                             File.Copy(backupFile, $"{_gameDirectory}/{Path.GetFileName(backupFile)}", true);
                         }
                     }
+
+                    // Update all the index counts to be safe, in case the user's index backups were generated when some mod dats existed.
+                    _index.UpdateAllIndexDatCounts();
                     return true;
                 }
                 return false;
