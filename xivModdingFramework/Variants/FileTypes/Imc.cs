@@ -243,7 +243,7 @@ namespace xivModdingFramework.Variants.FileTypes
             FullImcInfo info;
             if(exists)
             {
-                info = await GetFullImcInfo(path);
+                info = await GetFullImcInfo(path, cachedIndexFile, cachedModList);
             } else
             {
                 var ri = XivDependencyGraph.ExtractRootInfo(path);

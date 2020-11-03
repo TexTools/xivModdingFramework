@@ -47,6 +47,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             _gameDirectory = gameDirectory;
         }
 
+        public void UpdateAllIndexDatCounts()
+        {
+            var dataFiles = (XivDataFile[])Enum.GetValues(typeof(XivDataFile));
+
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            foreach(var df in dataFiles)
+            {
+                var datNumber = _dat.GetLargestDatNumber(df);
+                UpdateIndexDatCount(df, datNumber);
+            }
+        }
+
         /// <summary>
         /// Update the dat count within the index files.
         /// </summary>
