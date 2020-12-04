@@ -92,9 +92,12 @@ namespace xivModdingFramework.Items.Categories
             int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
-            if(_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if(_xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 168;
+            } else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                itemDataLength = 160;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -185,9 +188,13 @@ namespace xivModdingFramework.Items.Categories
             var pictureDictionary = await ex.ReadExData(XivEx.picture);
             var itemDictionary = await ex.ReadExData(XivEx.item);
 
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if (_xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 168;
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                itemDataLength = 160;
             }
 
 
@@ -259,9 +266,13 @@ namespace xivModdingFramework.Items.Categories
             int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if ( _xivLanguage == XivLanguage.Korean)
             {
                 itemDataLength = 168;
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                itemDataLength = 160;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);

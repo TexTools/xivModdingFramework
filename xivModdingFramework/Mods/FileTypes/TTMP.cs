@@ -462,6 +462,9 @@ namespace xivModdingFramework.Mods.FileTypes
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
             var startTime = DateTime.Now.Ticks;
+            long endTime = 0;
+            long part1Duration = 0;
+            long part2Duration = 0;
 
             var dat = new Dat(gameDirectory);
             var modding = new Modding(gameDirectory);
@@ -667,6 +670,13 @@ namespace xivModdingFramework.Mods.FileTypes
                         try
                         {
                             progress.Report((count, totalFiles, "Waiting on Destination Item Selection..."));
+
+                            endTime = DateTime.Now.Ticks;
+
+                            // Duration in ms
+                            part1Duration = (endTime - startTime) / 10000;
+
+
                             rootConversions = await GetRootConversionsFunction(filePaths, modifiedIndexFiles, modList);
                         } catch(OperationCanceledException ex)
                         {
@@ -678,6 +688,8 @@ namespace xivModdingFramework.Mods.FileTypes
                             progress.Report((0, 0, "User Cancelled Import Process."));
                             return;
                         }
+
+                        startTime = DateTime.Now.Ticks;
 
                         if (rootConversions != null && rootConversions.Count > 0)
                         {
@@ -716,6 +728,19 @@ namespace xivModdingFramework.Mods.FileTypes
                                         if (mod != null)
                                         {
                                             mod.modPack = modPack;
+                                        }
+                                    }
+
+                                    // Remove any remaining lingering files which belong to this root.
+                                    // Ex. Extraneous unused files in the modpack.  This helps keep
+                                    // any unnecessary files from poluting the original destination item post conversion.
+                                    foreach(var file in filePaths.ToList())
+                                    {
+                                        var root = XivDependencyGraph.ExtractRootInfo(file);
+                                        if(root == source.Info)
+                                        {
+                                            filePaths.Remove(file);
+                                            filesToReset.Add(file);
                                         }
                                     }
                                 }
@@ -918,12 +943,12 @@ namespace xivModdingFramework.Mods.FileTypes
             var errorCount = ErroneousFiles.Count;
             var count = totalFiles - errorCount;
 
-            var endtime = DateTime.Now.Ticks;
+            endTime = DateTime.Now.Ticks;
 
             // Duration in ms
-            var duration = (endtime - startTime) / 10000;
+            part2Duration = (endTime - startTime) / 10000;
 
-            float seconds = duration / 1000f;
+            float seconds = (part1Duration + part2Duration) / 1000f;
 
             return (count, errorCount, importErrors, seconds);
         }
