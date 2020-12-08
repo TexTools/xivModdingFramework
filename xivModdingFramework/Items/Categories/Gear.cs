@@ -70,13 +70,17 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int modelDataCheckOffset = 30;
-            int dataLength = 168;
+            int dataLength = 160;
             const int nameDataOffset = 14;
             const int modelDataOffset = 24;
             const int iconDataOffset = 136;
-            int slotDataOffset = 156;
+            int slotDataOffset = 154;
 
-            if(_xivLanguage == XivLanguage.Korean)
+            if( _xivLanguage == XivLanguage.Korean)
+            {
+                dataLength = 168;
+                slotDataOffset = 156;
+            } else if (_xivLanguage == XivLanguage.Chinese)
             {
                 dataLength = 160;
                 slotDataOffset = 154;
@@ -94,145 +98,164 @@ namespace xivModdingFramework.Items.Categories
             // Item_0, Item_500, Item_1000, etc.
             await Task.Run(() => Parallel.ForEach(itemDictionary, (item) =>
             {
-                // This checks whether there is any model data present in the current item
-                if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) return;
-
-                var primaryMi = new XivGearModelInfo();
-                var secondaryMi = new XivGearModelInfo();
-                var hasSecondary = false;
-
-                var xivGear = new XivGear
+                try
                 {
-                    ExdID = item.Key,
-                    PrimaryCategory = XivStrings.Gear,
-                    ModelInfo = primaryMi,
-                };
+                    // This checks whether there is any model data present in the current item
+                    if (item.Value[modelDataCheckOffset] <= 0 && item.Value[modelDataCheckOffset + 1] <= 0) return;
 
-                /* Used to determine if the given model is a weapon
-                 * This is important because the data is formatted differently
-                 * The model data is a 16 byte section separated into two 8 byte parts (primary model, secondary model)
-                 * Format is 8 bytes in length with 2 bytes per data point [short, short, short, short]
-                 * Gear: primary model [blank, blank, variant, ID] nothing in secondary model
-                 * Weapon: primary model [blank, variant, body, ID] secondary model [blank, variant, body, ID]
-                */
-                var isWeapon = false;
+                    var primaryMi = new XivGearModelInfo();
+                    var secondaryMi = new XivGearModelInfo();
+                    var hasSecondary = false;
 
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(item.Value)))
-                {
-                    br.BaseStream.Seek(nameDataOffset, SeekOrigin.Begin);
-                    var nameOffset = br.ReadInt16();
-
-                    // Model Data
-                    br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
-
-                    // Primary Model Key
-                    primaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
-                    br.BaseStream.Seek(-8, SeekOrigin.Current);
-
-                    // Primary Blank
-                    var unused = br.ReadInt16();
-
-                    // Primary Variant for weapon, blank otherwise
-                    var weaponVariant = br.ReadInt16();
-
-                    if (weaponVariant != 0)
+                    var xivGear = new XivGear
                     {
-                        primaryMi.ImcSubsetID = weaponVariant;
-                        primaryMi.IsWeapon = true;
-                        isWeapon = true;
-                    }
+                        ExdID = item.Key,
+                        PrimaryCategory = XivStrings.Gear,
+                        ModelInfo = primaryMi,
+                    };
 
-                    // Primary Body if weapon, Variant otherwise
-                    if (isWeapon)
+                    /* Used to determine if the given model is a weapon
+                     * This is important because the data is formatted differently
+                     * The model data is a 16 byte section separated into two 8 byte parts (primary model, secondary model)
+                     * Format is 8 bytes in length with 2 bytes per data point [short, short, short, short]
+                     * Gear: primary model [blank, blank, variant, ID] nothing in secondary model
+                     * Weapon: primary model [blank, variant, body, ID] secondary model [blank, variant, body, ID]
+                    */
+                    var isWeapon = false;
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(item.Value)))
                     {
-                        primaryMi.SecondaryID = br.ReadInt16();
-                    }
-                    else
-                    {
-                        primaryMi.ImcSubsetID = br.ReadInt16();
-                    }
+                        br.BaseStream.Seek(nameDataOffset, SeekOrigin.Begin);
+                        var nameOffset = br.ReadInt16();
 
-                    // Primary Model ID
-                    primaryMi.PrimaryID = br.ReadInt16();
+                        // Model Data
+                        br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
 
-                    // Secondary Model Key
-                    isWeapon = false;
-                    secondaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
-                    br.BaseStream.Seek(-8, SeekOrigin.Current);
+                        // Primary Model Key
+                        primaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
+                        br.BaseStream.Seek(-8, SeekOrigin.Current);
 
-                    // Secondary Blank
-                    var unused2 = br.ReadInt16();
+                        // Primary Blank
+                        var unused = br.ReadInt16();
 
-                    // Secondary Variant for weapon, blank otherwise
-                    weaponVariant = br.ReadInt16();
+                        // Primary Variant for weapon, blank otherwise
+                        var weaponVariant = br.ReadInt16();
 
-                    if (weaponVariant != 0)
-                    {
-                        secondaryMi.ImcSubsetID = weaponVariant;
-                        secondaryMi.IsWeapon = true;
-                        isWeapon = true;
-                    }
-
-                    // Secondary Body if weapon, Variant otherwise
-                    if (isWeapon)
-                    {
-                        secondaryMi.SecondaryID = br.ReadInt16();
-                    }
-                    else
-                    {
-                        secondaryMi.ImcSubsetID = br.ReadInt16();
-                    }
-
-                    // Secondary Model ID
-                    secondaryMi.PrimaryID = br.ReadInt16();
-
-                    // Icon
-                    br.BaseStream.Seek(iconDataOffset, SeekOrigin.Begin);
-                    xivGear.IconNumber = br.ReadUInt16();
-
-                    // Gear Slot/Category
-                    br.BaseStream.Seek(slotDataOffset, SeekOrigin.Begin);
-                    int slotNum = br.ReadByte();
-
-                    // Waist items do not have texture or model data
-                    if (slotNum == 6) return;
-
-                    xivGear.EquipSlotCategory = slotNum;
-                    xivGear.SecondaryCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
-
-                    // Gear Name
-                    var gearNameOffset = dataLength + nameOffset;
-                    var gearNameLength = item.Value.Length - gearNameOffset;
-                    br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                    var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
-                    xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-                    xivGear.Name = xivGear.Name.Trim();
-
-                    // If we have a secondary model
-
-                    XivGear secondaryItem = null;
-                    if(secondaryMi.PrimaryID != 0)
-                    {
-                        // Make a new item for it.
-                        secondaryItem = (XivGear)xivGear.Clone();
-                        secondaryItem.ModelInfo = secondaryMi;
-                        xivGear.Name += " - " + XivStrings.Main_Hand;
-                        secondaryItem.Name += " - " + XivStrings.Off_Hand;
-                        xivGear.PairedItem = secondaryItem;
-                        secondaryItem.PairedItem = xivGear;
-                        xivGear.SecondaryCategory = XivStrings.Dual_Wield;
-                        secondaryItem.SecondaryCategory = XivStrings.Dual_Wield;
-                    }
-
-                    lock (_gearLock)
-                    {
-                        xivGearList.Add(xivGear);
-                        if(secondaryItem != null)
+                        if (weaponVariant != 0)
                         {
-                            xivGearList.Add(secondaryItem);
+                            primaryMi.ImcSubsetID = weaponVariant;
+                            primaryMi.IsWeapon = true;
+                            isWeapon = true;
+                        }
+
+                        // Primary Body if weapon, Variant otherwise
+                        if (isWeapon)
+                        {
+                            primaryMi.SecondaryID = br.ReadInt16();
+                        }
+                        else
+                        {
+                            primaryMi.ImcSubsetID = br.ReadInt16();
+                        }
+
+                        // Primary Model ID
+                        primaryMi.PrimaryID = br.ReadInt16();
+
+                        // Secondary Model Key
+                        isWeapon = false;
+                        secondaryMi.ModelKey = Quad.Read(br.ReadBytes(8), 0);
+                        br.BaseStream.Seek(-8, SeekOrigin.Current);
+
+                        // Secondary Blank
+                        var unused2 = br.ReadInt16();
+
+                        // Secondary Variant for weapon, blank otherwise
+                        weaponVariant = br.ReadInt16();
+
+                        if (weaponVariant != 0)
+                        {
+                            secondaryMi.ImcSubsetID = weaponVariant;
+                            secondaryMi.IsWeapon = true;
+                            isWeapon = true;
+                        }
+
+                        // Secondary Body if weapon, Variant otherwise
+                        if (isWeapon)
+                        {
+                            secondaryMi.SecondaryID = br.ReadInt16();
+                        }
+                        else
+                        {
+                            secondaryMi.ImcSubsetID = br.ReadInt16();
+                        }
+
+                        // Secondary Model ID
+                        secondaryMi.PrimaryID = br.ReadInt16();
+
+                        // Icon
+                        br.BaseStream.Seek(iconDataOffset, SeekOrigin.Begin);
+                        xivGear.IconNumber = br.ReadUInt16();
+
+                        // Gear Slot/Category
+                        br.BaseStream.Seek(slotDataOffset, SeekOrigin.Begin);
+                        int slotNum = br.ReadByte();
+
+                        // Waist items do not have texture or model data
+                        if (slotNum == 6) return;
+
+                        xivGear.EquipSlotCategory = slotNum;
+                        xivGear.SecondaryCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
+
+                        // Gear Name
+                        var gearNameOffset = dataLength + nameOffset;
+                        var gearNameLength = item.Value.Length - gearNameOffset;
+                        br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
+                        var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
+                        xivGear.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
+                        xivGear.Name = xivGear.Name.Trim();
+
+                        // If we have a secondary model
+
+                        XivGear secondaryItem = null;
+                        if (secondaryMi.PrimaryID != 0)
+                        {
+                            // Make a new item for it.
+                            secondaryItem = (XivGear)xivGear.Clone();
+                            secondaryItem.ModelInfo = secondaryMi;
+                            xivGear.Name += " - " + XivStrings.Main_Hand;
+                            secondaryItem.Name += " - " + XivStrings.Off_Hand;
+                            xivGear.PairedItem = secondaryItem;
+                            secondaryItem.PairedItem = xivGear;
+                            xivGear.SecondaryCategory = XivStrings.Dual_Wield;
+                            secondaryItem.SecondaryCategory = XivStrings.Dual_Wield;
+                        }
+
+                        // Rings
+                        if(slotNum == 12)
+                        {
+                            // Make this the Right ring, and create the Left Ring entry.
+                            secondaryItem = (XivGear)xivGear.Clone();
+
+                            xivGear.Name += " - " + XivStrings.Right;
+                            secondaryItem.Name += " - " + XivStrings.Left;
+
+                            xivGear.PairedItem = secondaryItem;
+                            secondaryItem.PairedItem = xivGear;
+                        }
+
+                        lock (_gearLock)
+                        {
+                            xivGearList.Add(xivGear);
+                            if (secondaryItem != null)
+                            {
+                                xivGearList.Add(secondaryItem);
+                            }
                         }
                     }
+                } catch(Exception ex)
+                {
+                    throw;
                 }
             }));
 
@@ -356,7 +379,7 @@ namespace xivModdingFramework.Items.Categories
         {
             // Get the material version for the item from the imc file
             var imc = new Imc(_gameDirectory);
-            var gearVersion = (await imc.GetImcInfo(xivGear)).Variant.ToString().PadLeft(4, '0');
+            var gearVersion = (await imc.GetImcInfo(xivGear)).MaterialSet.ToString().PadLeft(4, '0');
 
             var modelID = xivGear.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
 
@@ -502,198 +525,6 @@ namespace xivModdingFramework.Items.Categories
             return raceList;
         }
 
-        /// <summary>
-        /// Searches for items given a model ID and item type
-        /// </summary>
-        /// <param name="modelID"> The model id used for searching</param>
-        /// <param name="type">The type of item</param>
-        /// <returns>A list of SearchResults objects</returns>
-        public async Task<List<SearchResults>> SearchGearByModelID(int modelID, string type)
-        {
-            var searchLock = new object();
-            var searchLock1 = new object();
-            var searchResultsList = new List<SearchResults>();
-            var resultCheckList = new List<string>();
-
-            var equipmentSlots = new string[] { "met", "glv", "dwn", "sho", "top", };
-            var accessorySlots = new string[] { "ear", "nek", "rir", "ril", "wrs" };
-            var parts = new string[] { "a", "b", "c", "d", "e", "f" };
-
-            var id = modelID.ToString().PadLeft(4, '0');
-            var folder = "";
-
-            if (type.Equals("Equipment"))
-            {
-                folder = $"chara/equipment/e{id}/material/v";
-            }
-            else if (type.Equals("Accessory"))
-            {
-                folder = $"chara/accessory/a{id}/material/v";
-            }
-            else if (type.Equals("Weapon"))
-            {
-                folder = $"chara/weapon/w{id}/obj/body/b";
-            }
-
-            var bodyVariantDictionary = new Dictionary<int, List<int>>();
-            List<int> variantList = null;
-
-            if (type.Equals("Weapon"))
-            {
-                await Task.Run(() => Parallel.For(1, 200, (i) =>
-                {
-                    var folderHashDictionary = new Dictionary<int, int>();
-
-                    var wFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
-
-                    Parallel.For(1, 200, (j) =>
-                    {
-                        lock (searchLock)
-                        {
-                            folderHashDictionary.Add(HashGenerator.GetHash($"{wFolder}{j.ToString().PadLeft(4, '0')}"), j);
-                        }
-                    });
-
-                    variantList = _index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
-
-                    if (variantList.Count > 0)
-                    {
-                        variantList.Sort();
-
-                        lock (searchLock1)
-                        {
-                            bodyVariantDictionary.Add(i, variantList);
-                        }
-                    }
-                }));
-            }
-            else
-            {
-                var folderHashDictionary = new Dictionary<int, int>();
-
-                await Task.Run(() => Parallel.For(1, 200, (i) =>
-                {
-                    lock (searchLock)
-                    {
-                        folderHashDictionary.Add(HashGenerator.GetHash($"{folder}{i.ToString().PadLeft(4, '0')}"), i);
-                    }
-                }));
-
-                variantList = _index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
-            }
-
-            if (!type.Equals("Weapon"))
-            {
-                foreach (var variant in variantList)
-                {
-                    var mtrlFolder = $"{folder}{variant.ToString().PadLeft(4, '0')}";
-                    var mtrlFile = "";
-
-                    var mtrlFolderHashes =
-                        await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
-
-                    foreach (var race in IDRaceDictionary.Keys)
-                    {
-                        string[] slots = null;
-
-                        if (type.Equals("Equipment"))
-                        {
-                            slots = equipmentSlots;
-                        }
-                        else if (type.Equals("Accessory"))
-                        {
-                            slots = accessorySlots;
-                        }
-
-                        foreach (var slot in slots)
-                        {
-                            foreach (var part in parts)
-                            {
-                                if (type.Equals("Equipment"))
-                                {
-                                    mtrlFile = $"mt_c{race}e{id}_{slot}_{part}.mtrl";
-                                }
-                                else if (type.Equals("Accessory"))
-                                {
-                                    mtrlFile = $"mt_c{race}a{id}_{slot}_{part}.mtrl";
-                                }
-
-                                if (mtrlFolderHashes.Contains(HashGenerator.GetHash(mtrlFile)))
-                                {
-                                    var abbrSlot = AbbreviationSlotDictionary[slot];
-                                    if (!resultCheckList.Contains($"{abbrSlot}{variant.ToString()}"))
-                                    {
-                                        searchResultsList.Add(new SearchResults { Body = "-", Slot = abbrSlot, Variant = variant });
-                                        resultCheckList.Add($"{abbrSlot}{variant.ToString()}");
-                                    }
-
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                foreach (var bodyVariant in bodyVariantDictionary)
-                {
-                    foreach (var variant in bodyVariant.Value)
-                    {
-                        searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Main_Hand, Variant = variant });
-                    }
-                }
-            }
-
-            searchResultsList.Sort();
-
-
-            return searchResultsList;
-        }
-
-        /// <summary>
-        /// Gets the Icon info for a specific gear item
-        /// </summary>
-        /// <param name="gearItem">The gear item</param>
-        /// <returns>A list of TexTypePath containing Icon Info</returns>
-        public async Task<List<TexTypePath>> GetIconInfo(XivGear gearItem)
-        {
-            var ttpList = new List<TexTypePath>();
-
-            var iconString = gearItem.IconNumber.ToString();
-
-            var iconBaseNum = iconString.Substring(0, 2).PadRight(iconString.Length, '0');
-            var iconFolder = $"ui/icon/{iconBaseNum.PadLeft(6, '0')}";
-            var iconHQFolder = $"{iconFolder}/hq";
-            var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
-
-            if (await _index.FileExists(HashGenerator.GetHash(iconFile), HashGenerator.GetHash(iconFolder),
-                XivDataFile._06_Ui))
-            {
-                ttpList.Add(new TexTypePath
-                {
-                    Name = "Icon",
-                    Path = $"{iconFolder}/{iconFile}",
-                    Type = XivTexType.Icon,
-                    DataFile = XivDataFile._06_Ui
-                });
-            }
-
-
-            if (await _index.FileExists(HashGenerator.GetHash(iconFile), HashGenerator.GetHash(iconHQFolder),
-                XivDataFile._06_Ui))
-            {
-                ttpList.Add(new TexTypePath
-                {
-                    Name = "HQ Icon",
-                    Path = $"{iconHQFolder}/{iconFile}",
-                    Type = XivTexType.Icon,
-                    DataFile = XivDataFile._06_Ui
-                });
-            }
-
-            return ttpList;
-        }
-
 
 
         // A dictionary containg <Slot ID, Gear Category>
@@ -783,7 +614,7 @@ namespace xivModdingFramework.Items.Categories
             {XivStrings.Body_Hands_Legs, "top"},
             {XivStrings.Body_Legs_Feet, "top"},
             {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "top"},
+            {XivStrings.Legs_Feet, "dwn"},
             {XivStrings.All, "top"},
             {XivStrings.Face, "fac"},
             {XivStrings.Iris, "iri"},

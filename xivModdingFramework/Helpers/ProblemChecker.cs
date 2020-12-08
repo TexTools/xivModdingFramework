@@ -285,14 +285,16 @@ namespace xivModdingFramework.Helpers
                         "Please check For problems by selecting Help -> Check For Problems");
                 }
 
-                foreach (var xivDataFile in indexFiles)
+
+                var originalFiles = Directory.GetFiles(_gameDirectory.FullName);
+                foreach (var originalFile in originalFiles)
                 {
                     try
                     {
-                        File.Copy($"{_gameDirectory.FullName}\\{xivDataFile.GetDataFileName()}.win32.index",
-                            $"{backupsDirectory}\\{xivDataFile.GetDataFileName()}.win32.index", true);
-                        File.Copy($"{_gameDirectory.FullName}\\{xivDataFile.GetDataFileName()}.win32.index2",
-                            $"{backupsDirectory}\\{xivDataFile.GetDataFileName()}.win32.index2", true);
+                        if (originalFile.Contains(".win32.index"))
+                        {
+                            File.Copy(originalFile, $"{backupsDirectory}/{Path.GetFileName(originalFile)}", true);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -331,6 +333,7 @@ namespace xivModdingFramework.Helpers
                     }
                 }
 
+                var _index = new Index(_gameDirectory);
                 // Make sure backups exist and are up to date unless called with forceRestore true
                 if (backupFiles.Length != 0 && !outdated)
                 {
@@ -342,6 +345,9 @@ namespace xivModdingFramework.Helpers
                             File.Copy(backupFile, $"{_gameDirectory}/{Path.GetFileName(backupFile)}", true);
                         }
                     }
+
+                    // Update all the index counts to be safe, in case the user's index backups were generated when some mod dats existed.
+                    _index.UpdateAllIndexDatCounts();
                     return true;
                 }
                 return false;

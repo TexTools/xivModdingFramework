@@ -26,17 +26,17 @@ namespace xivModdingFramework.Variants.DataContainers
     /// <summary>
     /// The IMC information for a Specific Variant of a Specific Slot in a Gear Set.
     /// </summary>
-    public class XivImc
+    public class XivImc : ICloneable
     {
         /// <summary>
         /// The Material Set / Variant #
         /// </summary>
-        public byte Variant { get; set; }
+        public byte MaterialSet { get; set; }
 
         /// <summary>
         /// Unknown byte next to the Variant
         /// </summary>
-        public byte Unknown { get; set; }
+        public byte Decal { get; set; }
 
         /// <summary>
         /// The IMC mask data
@@ -54,7 +54,12 @@ namespace xivModdingFramework.Variants.DataContainers
         /// Only a few items have VFX data associated with them
         /// Some examples would be any of the Lux weapons
         /// </remarks>
-        public ushort Vfx { get; set; }
+        public byte Vfx { get; set; }
+
+        /// <summary>
+        /// Material animation byte
+        /// </summary>
+        public byte Animation { get; set; }
 
         /// <summary>
         /// Returns the raw bytes that make up this IMC entry.
@@ -63,19 +68,11 @@ namespace xivModdingFramework.Variants.DataContainers
         public byte[] GetBytes(ImcType type)
         {
             var bytes = new List<byte>();
-            bytes.AddRange(BitConverter.GetBytes(Variant));
+            bytes.Add(MaterialSet);
+            bytes.Add(Decal);
             bytes.AddRange(BitConverter.GetBytes(Mask));
-            if (type == ImcType.NonSet)
-            {
-                // Always 0 for non-set entries, their VFX number is the
-                // same as their Material Variant #.
-                bytes.AddRange(BitConverter.GetBytes(((ushort)0)));
-            }
-            else
-            {
-                // Actual VFX number.
-                bytes.AddRange(BitConverter.GetBytes(Vfx));
-            }
+            bytes.Add(Vfx);
+            bytes.Add(Animation);
             return bytes.ToArray();
         }
 
@@ -120,6 +117,11 @@ namespace xivModdingFramework.Variants.DataContainers
 
             Mask = (ushort)(Mask & (~bit));
 
+        }
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
         }
 
     }

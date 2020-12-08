@@ -7,6 +7,15 @@ CREATE TABLE "meta" (
 );
 
 -- All Equipment, Accessory, and Human type entries.
+CREATE TABLE "characters" (
+	"name"	TEXT NOT NULL,
+	"primary_id"	INTEGER NOT NULL,
+	"slot"		TEXT,
+	"slot_full"	TEXT NOT NULL,
+	"root"		TEXT
+);
+
+-- All Equipment, Accessory, and Human type entries.
 CREATE TABLE "items" (
 	"exd_id"	INTEGER NOT NULL,
 	"name"	TEXT NOT NULL,
@@ -42,7 +51,7 @@ CREATE TABLE "furniture" (
 	"icon_id"	INTEGER NOT NULL,
 	"root"		TEXT,
 	
-	PRIMARY KEY("category", "name")
+	PRIMARY KEY("category", "name", "primary_id")
 );
 
 

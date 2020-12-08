@@ -56,6 +56,9 @@ using System.Data;
 using System.Text.RegularExpressions;
 using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Cache;
+using xivModdingFramework.SqPack.DataContainers;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -103,7 +106,7 @@ namespace xivModdingFramework.Models.FileTypes
             try
             {
                 var _imc = new Imc(_gameDirectory);
-                mtrlVariant = (await _imc.GetImcInfo(item)).Variant;
+                mtrlVariant = (await _imc.GetImcInfo(item)).MaterialSet;
             }
             catch (Exception ex)
             {
@@ -141,37 +144,14 @@ namespace xivModdingFramework.Models.FileTypes
                 System.IO.Directory.CreateDirectory(dir);
             }
 
-
-            if (fileFormat == "dae")
-            {
-                // Validate the skeleton.
-                var sklb = new Sklb(_gameDirectory);
-                var skel = await sklb.CreateParsedSkelFile(mdlPath);
-
-                // If we have weights, but can't find a skel, bad times.
-                if (skel == null)
-                {
-                    throw new InvalidDataException("Unable to resolve model skeleton.");
-                }
-
-                // Special DAE snowflake.
-                var mdl = await GetRawMdlData(mdlPath, getOriginal);
-                var _dae = new Dae(_gameDirectory, IOUtil.GetDataFileFromPath(mdlPath));
-                await _dae.MakeDaeFileFromModel(mdl, outputFilePath, Path.GetFileNameWithoutExtension(skel));
-
-            }
-            else
-            {
-                var imc = new Imc(_gameDirectory);
-                var model = await GetModel(mdlPath);
-                await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
-            }
+            var imc = new Imc(_gameDirectory);
+            var model = await GetModel(mdlPath);
+            await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
         }
 
 
         /// <summary>
         /// Exports a TTModel file to the given output path.
-        /// DOES NOT SUPPORT DAE EXPORT.
         /// </summary>
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
@@ -224,23 +204,6 @@ namespace xivModdingFramework.Models.FileTypes
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
                 await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
-            }
-
-            // Validate the skeleton.
-            if (model.HasWeights)
-            {
-                // The TTModel.SaveToFile function will re-resolve this var using a more
-                // speedy, synchronous function, so we don't need to hang onto it.
-                // We just need to call this here to ensure the .skel file is
-                // created, if needed.
-                var sklb = new Sklb(_gameDirectory);
-                var skel = await sklb.CreateParsedSkelFile(model.Source);
-
-                // If we have weights, but can't find a skel, bad times.
-                if (skel == null)
-                {
-                    throw new InvalidDataException("Unable to resolve model skeleton.");
-                }
             }
 
 
@@ -311,7 +274,7 @@ namespace xivModdingFramework.Models.FileTypes
             var directory = Path.GetDirectoryName(outputFilePath);
 
             // Language doesn't actually matter here.
-            var _mtrl = new Mtrl(gameDirectory, IOUtil.GetDataFileFromPath(model.Source), XivLanguage.None);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(gameDirectory);
             var _index = new Index(gameDirectory);
             var materialIdx = 0;
@@ -328,6 +291,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var bodyRegex = new Regex("(b[0-9]{4})");
                         var faceRegex = new Regex("(f[0-9]{4})");
+                        var tailRegex = new Regex("(t[0-9]{4})");
 
                         if (bodyRegex.Match(materialName).Success)
                         {
@@ -341,6 +305,14 @@ namespace xivModdingFramework.Models.FileTypes
                             var mdlFace = faceRegex.Match(model.Source).Value;
 
                             mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
+                        }
+
+                        var tailMatch = tailRegex.Match(materialName);
+                        if (tailMatch.Success)
+                        {
+                            var mdlTail = tailRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlTail, tailMatch.Value);
                         }
                     }
 
@@ -438,12 +410,13 @@ namespace xivModdingFramework.Models.FileTypes
 
         /// <summary>
         /// Retrieves the raw XivMdl file at a given internal file path.
+        /// 
+        /// If it an explicit offset is provided, it will be used over path or mod offset resolution.
         /// </summary>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false)
+        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false, long offset = 0)
         {
 
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
             var mod = await modding.TryGetModEntry(mdlPath);
@@ -451,23 +424,28 @@ namespace xivModdingFramework.Models.FileTypes
             var getShapeData = true;
 
 
-            var offset = await index.GetDataOffset(mdlPath);
-
-            if (getOriginal)
+            if (offset == 0)
             {
-                if (modded)
+                var index = new Index(_gameDirectory);
+                offset = await index.GetDataOffset(mdlPath);
+
+                if (getOriginal)
                 {
-                    offset = mod.data.originalOffset;
-                    modded = false;
+                    if (modded)
+                    {
+                        offset = mod.data.originalOffset;
+                        modded = false;
+                    }
                 }
             }
 
+
             if (offset == 0)
             {
-                throw new Exception($"Could not find offset for {mdlPath}");
+                return null;
             }
 
-            var mdlData = await dat.GetType3Data(offset, _dataFile);
+            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(mdlPath));
 
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
@@ -504,7 +482,7 @@ namespace xivModdingFramework.Models.FileTypes
                     BoneListCount = br.ReadInt16(),
                     ShapeCount = br.ReadInt16(),
                     ShapePartCount = br.ReadInt16(),
-                    ShapeDataCount = br.ReadInt16(),
+                    ShapeDataCount = br.ReadUInt16(),
                     Unknown1 = br.ReadInt16(),
                     Unknown2 = br.ReadInt16(),
                     Unknown3 = br.ReadInt16(),
@@ -1716,18 +1694,27 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true)
+        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, IndexFile index = null, ModList modlist = null)
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
-            var _mtrl = new Mtrl(_gameDirectory, dataFile, XivLanguage.None);
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(_gameDirectory);
-            var _index = new Index(_gameDirectory);
+            var useCached = true;
+            if (index == null)
+            {
+                useCached = false;
+                var _index = new Index(_gameDirectory);
+                var _modding = new Modding(_gameDirectory);
+                index = await _index.GetIndexFile(dataFile, false, true);
+                modlist = await _modding.GetModListAsync();
+            }
 
             var materials = new List<string>();
 
             // Read the raw Material names from the file.
-            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal);
+            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, index, modlist);
+            var root = await XivCache.GetFirstRoot(mdlPath);
             if(materialNames.Count == 0)
             {
                 return materials;
@@ -1739,7 +1726,24 @@ namespace xivModdingFramework.Models.FileTypes
                 // If we had a specific variant to get, just use that.
                 materialVariants.Add(materialVariant);
 
-            } else { 
+            }
+            else if(useCached && root != null)
+            {
+                var metadata = await ItemMetadata.GetFromCachedIndex(root, index);
+                if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
+                {
+                    materialVariants.Add(1);
+                }
+                else
+                {
+                    foreach (var entry in metadata.ImcEntries)
+                    {
+                        materialVariants.Add(entry.MaterialSet);
+                    }
+                }
+            }
+            else
+            {
 
                 // Otherwise, we have to resolve all possible variants.
                 var imcPath = ItemType.GetIMCPathFromChildPath(mdlPath);
@@ -1754,7 +1758,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
                     try
                     {
-                        var info = await _imc.GetFullImcInfo(imcPath);
+                        var info = await _imc.GetFullImcInfo(imcPath, index, modlist);
                         var slotRegex = new Regex("_([a-z]{3}).mdl$");
                         var slot = "";
                         var m = slotRegex.Match(mdlPath);
@@ -1764,10 +1768,13 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // We have to get all of the material variants used for this item now.
-                        var imcInfos = info.GetAllEntries(slot);
+                        var imcInfos = info.GetAllEntries(slot, true);
                         foreach (var i in imcInfos)
                         {
-                            materialVariants.Add(i.Variant);
+                            if (i.MaterialSet != 0)
+                            {
+                                materialVariants.Add(i.MaterialSet);
+                            }
                         }
                     }
                     catch
@@ -1824,19 +1831,30 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false)
+        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, IndexFile index = null, ModList modlist = null)
         {
             var materials = new List<string>();
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
-            var mod = await modding.TryGetModEntry(mdlPath);
-            var offset = await index.GetDataOffset(mdlPath);
 
-            var modded = mod != null && mod.enabled;
+
+            if (index == null)
+            {
+                var _index = new Index(_gameDirectory);
+                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath), false, true);
+                
+            }
+
+            var offset = index.Get8xDataOffset(mdlPath);
             if (getOriginal)
             {
-                if (modded)
+                if(modlist == null)
+                {
+                    modlist = await modding.GetModListAsync();
+                }
+
+                var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == mdlPath);
+                if(mod != null)
                 {
                     offset = mod.data.originalOffset;
                 }
@@ -1894,7 +1912,6 @@ namespace xivModdingFramework.Models.FileTypes
             cwd = cwd.Replace("\\", "/");
             string importerPath = cwd + "/converters/";
             var ret = new List<string>();
-            ret.Add("dae"); // DAE handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
             var directories = Directory.GetDirectories(importerPath);
@@ -1919,7 +1936,6 @@ namespace xivModdingFramework.Models.FileTypes
             cwd = cwd.Replace("\\", "/");
             string importerPath = cwd + "/converters/";
             var ret = new List<string>();
-            ret.Add("dae"); // DAE handler is internal.
             ret.Add("obj"); // OBJ handler is internal.
             ret.Add("db");  // Raw already-parsed DB files are fine.
 
@@ -2010,7 +2026,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="item">The current item being imported</param>
         /// <param name="race">The racial model to replace of the item</param>
-        /// <param name="path">The location of the dae file to import</param>
+        /// <param name="path">The location of the file to import</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
         ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
@@ -2103,15 +2119,6 @@ namespace xivModdingFramework.Models.FileTypes
                     // If we were given no path, load the current model.
                     ttModel = await GetModel(item, race, submeshId);
                 }
-                else if (suffix == "dae")
-                {
-                    // Dae handling is a special snowflake.
-                    var dae = new Dae(_gameDirectory, _dataFile);
-                    loggingFunction(false, "Loading DAE file...");
-                    var fileLocation = new DirectoryInfo(path);
-                    ttModel = dae.ReadColladaFile(fileLocation, loggingFunction);
-                    loggingFunction(false, "DAE File loaded successfully.");
-                }
                 else if (suffix == "db")
                 {
                     loggingFunction(false, "Loading intermediate file...");
@@ -2139,7 +2146,6 @@ namespace xivModdingFramework.Models.FileTypes
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
 
-                loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 XivMdl ogMdl = null;
 
@@ -2154,6 +2160,8 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     ogMdl = currentMdl;
                 }
+
+                loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 // Apply our Model Modifier options to the model.
                 options.Apply(ttModel, currentMdl, ogMdl, loggingFunction);
@@ -2179,6 +2187,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Doesn't really matter as these get auto-resolved in game no matter what race they point to.
                 ModelModifiers.FixUpSkinReferences(ttModel, filePath, loggingFunction);
 
+                // Check for common user errors.
+                TTModel.CheckCommonUserErrors(ttModel, loggingFunction);
+
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");
                 var bytes = await MakeNewMdlFile(ttModel, currentMdl, loggingFunction);
@@ -2195,7 +2206,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (!rawDataOnly)
                 {
                     loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                    await dat.WriteToDat(bytes.ToList(), modEntry, filePath, item.SecondaryCategory, item.Name, _dataFile, source, 3);
+                    await dat.WriteModFile(bytes, filePath, source, item);
                 }
 
                 loggingFunction(false, "Job done!");
@@ -2209,7 +2220,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        private async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        internal async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -2510,9 +2521,6 @@ namespace xivModdingFramework.Models.FileTypes
                 short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].ExtraMeshCount);
                 short higherLodMeshCount = 0;
                 meshCount += higherLodMeshCount;
-                // Update the total mesh count only if there are more meshes than the original
-                // We do not remove mesh if they are missing from the DAE, we just set the mesh metadata to 0
-
                 ogModelData.MeshCount = meshCount;
                 // Recalculate total number of parts.
                 short partCOunt  = 0;
@@ -2531,7 +2539,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeDataCount : (short)0));
+                modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
@@ -2602,6 +2610,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                var rawShapeData = ttModel.GetRawShapeParts();
 
                 // Mesh Data
                 #region Mesh Data Block
@@ -2686,9 +2695,15 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             // These are effectively orphaned vertices until the shape
                             // data kicks in and rewrites the triangle index list.
-                            foreach (var shapePart in ttMeshGroup.ShapeParts)
+                            foreach (var part in ttMeshGroup.Parts)
                             {
-                                vertexCount += shapePart.Vertices.Count;
+                                foreach (var shapePart in part.ShapeParts)
+                                {
+                                    if (shapePart.Key.StartsWith("shp_"))
+                                    {
+                                        vertexCount += shapePart.Value.Vertices.Count;
+                                    }
+                                }
                             }
                         }
 
@@ -3020,17 +3035,15 @@ namespace xivModdingFramework.Models.FileTypes
                     #region Shape Parts Data Block
 
                     var shapePartsDataBlock = new List<byte>();
-                    var parts = ttModel.ShapeParts;
-
                     int sum = 0;
 
-                    foreach (var pair in parts)
+                    foreach (var shapePart in rawShapeData)
                     {
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[pair.MeshId]));
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(pair.Part.Replacements.Count));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[shapePart.MeshId]));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(shapePart.IndexReplacements.Count));
                         shapePartsDataBlock.AddRange(BitConverter.GetBytes(sum));
 
-                        sum += pair.Part.Replacements.Count;
+                        sum += shapePart.IndexReplacements.Count;
                     }
 
                     FullShapeDataBlock.AddRange(shapePartsDataBlock);
@@ -3056,29 +3069,22 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
 
-                        var shapeParts = ttModel.ShapeParts;
 
                         // We only store the shape info for LoD 0.
                         if (lodNumber == 0)
                         {
-                            var newVertsSoFar = new List<uint>(new uint[ttModel.MeshGroups.Count]);
-                            foreach (var p in shapeParts)
+                            foreach (var p in rawShapeData)
                             {
                                 var meshNum = p.MeshId;
-                                var baseVertexCount = ttModel.MeshGroups[meshNum].VertexCount + newVertsSoFar[meshNum];
-                                foreach (var r in p.Part.Replacements)
+                                foreach (var r in p.IndexReplacements)
                                 {
+                                    if(r.Value > ushort.MaxValue)
+                                    {
+                                        throw new InvalidDataException("Mesh Group " + meshNum + " has too many total vertices/triangle indices.\nRemove some vertices/faces/shapes or split them across multiple mesh groups.");
+                                    }
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
-
-                                    // Shift these forward to be relative to the full mesh group, rather than
-                                    // just the shape part.
-                                    var vertexId = (uint)r.Value;
-                                    vertexId += baseVertexCount;
-
-                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)vertexId));
+                                    meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
                                 }
-
-                                newVertsSoFar[meshNum] += (uint)p.Part.Vertices.Count;
                             }
                         }
 
@@ -3273,7 +3279,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             var shapeDataCount = 0;
                             // Write the shape data if it exists.
-                            if (ttModel.HasShapeData && !addedMesh && lodNum == 0)
+                            if (ttModel.HasShapeData && lodNum == 0)
                             {
                                 var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
                                 if (!isAlreadyModified)
@@ -3292,9 +3298,15 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 var group = ttModel.MeshGroups[importData.Key];
                                 var sum = 0;
-                                foreach (var p in group.ShapeParts)
+                                foreach (var p in group.Parts)
                                 {
-                                    sum += p.Vertices.Count;
+                                    foreach(var shp in p.ShapeParts)
+                                    {
+                                        if (shp.Key.StartsWith("shp_"))
+                                        {
+                                            sum += shp.Value.Vertices.Count;
+                                        }
+                                    }
                                 }
                                 shapeDataCount = sum * entrySizeSum;
                             }
@@ -3463,13 +3475,13 @@ namespace xivModdingFramework.Models.FileTypes
                 if (ttModel.HasShapeData)
                 {
                     // Shape parts need to be rewitten in specific order.
-                    var parts = ttModel.ShapeParts;
+                    var parts = rawShapeData;
                     foreach (var p in parts)
                     {
                         // Because our imported data does not include mesh shape data, we must include it manually
                         var group = ttModel.MeshGroups[p.MeshId];
                         var importData = importDataDictionary[p.MeshId];
-                        foreach (var v in p.Part.Vertices)
+                        foreach (var v in p.Vertices)
                         {
                             WriteVertex(importData, vertexInfoDict, ttModel, v);
                         }
@@ -3848,7 +3860,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 
@@ -4209,9 +4221,6 @@ namespace xivModdingFramework.Models.FileTypes
             public float[] Matrix = new float[16];
         }
 
-        private static Dictionary<string, Matrix> baseDeformationMatrix;
-        private static Dictionary<string, Matrix> recalculatedDeformationMatrix;
-        private static Dictionary<string, Matrix> decomposedDeformationMatrix;
 
         /// <summary>
         /// Loads the deformation files for attempting racial deformation
@@ -4219,13 +4228,13 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="race"></param>
         /// <param name="deformations"></param>
-        /// <param name="decomposed"></param>
         /// <param name="recalculated"></param>
-        public static void GetDeformationMatrices(XivRace race, out Dictionary<string, Matrix> deformations, out Dictionary<string, Matrix> decomposed, out Dictionary<string, Matrix> recalculated)
+        public static void GetDeformationMatrices(XivRace race, out Dictionary<string, Matrix> deformations, out Dictionary<string, Matrix> invertedDeformations, out Dictionary<string, Matrix> normalDeformations, out Dictionary<string, Matrix> invertedNormalDeformations)
         {
-            baseDeformationMatrix = new Dictionary<string, Matrix>();
-            recalculatedDeformationMatrix = new Dictionary<string, Matrix>();
-            decomposedDeformationMatrix = new Dictionary<string, Matrix>();
+            deformations = new Dictionary<string, Matrix>();
+            invertedDeformations = new Dictionary<string, Matrix>();
+            normalDeformations = new Dictionary<string, Matrix>();
+            invertedNormalDeformations = new Dictionary<string, Matrix>();
 
 
             var deformFile = "Skeletons/c" + race.GetRaceCode() + "_deform.json";
@@ -4234,14 +4243,26 @@ namespace xivModdingFramework.Models.FileTypes
             var deformationData = JsonConvert.DeserializeObject<DeformationBoneSet>(deformationJson);
             foreach (var set in deformationData.Data)
             {
-                baseDeformationMatrix.Add(set.Name, new Matrix(set.Matrix));
+                deformations.Add(set.Name, new Matrix(set.Matrix));
             }
-
-            var skelDict = new Dictionary<string, SkeletonData>();
 
             var skelName = "c" + race.GetRaceCode();
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
+            var skeletonFile = cwd + "/Skeletons/" + skelName + "b0001.skel";
+
+            if (!File.Exists(skeletonFile))
+            {
+                // Need to extract the Skel file real quick like.
+                var tempRoot = new XivDependencyRootInfo();
+                tempRoot.PrimaryType = XivItemType.equipment;
+                tempRoot.PrimaryId = 0;
+                tempRoot.Slot = "top";
+                Task.Run(async () =>
+                {
+                    await Sklb.GetBaseSkeletonFile(tempRoot, race);
+                }).Wait();
+            }
+
             var skeletonData = File.ReadAllLines(skeletonFile);
             var FullSkel = new Dictionary<string, SkeletonData>();
             var FullSkelNum = new Dictionary<int, SkeletonData>();
@@ -4258,50 +4279,327 @@ namespace xivModdingFramework.Models.FileTypes
 
             var root = FullSkel["n_root"];
 
-            BuildNewTransfromMatrices(root, FullSkel);
-
-
-            deformations = baseDeformationMatrix;
-            decomposed = decomposedDeformationMatrix;
-            recalculated = recalculatedDeformationMatrix;
+            BuildNewTransfromMatrices(root, FullSkel, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
         }
-        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData)
+        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, Dictionary<string, Matrix> deformations, Dictionary<string, Matrix> invertedDeformations, Dictionary<string, Matrix> normalDeformations, Dictionary<string, Matrix> invertedNormalDeformations)
         {
             if (node.BoneParent == -1)
             {
-                recalculatedDeformationMatrix.Add(node.BoneName, baseDeformationMatrix[node.BoneName]);
-                decomposedDeformationMatrix.Add(node.BoneName, baseDeformationMatrix[node.BoneName]);
-                //decomposedDeformationMatrix.Add(node.BoneName, Matrix.Scaling(3.0f,1.0f,1.0f));
-                //recalculatedDeformationMatrix.Add(node.BoneName, Matrix.Scaling(3.0f, 1.0f, 1.0f));
+                if (!deformations.ContainsKey(node.BoneName))
+                {
+                    deformations.Add(node.BoneName, Matrix.Identity);
+                }
+                invertedDeformations.Add(node.BoneName, Matrix.Identity);
+                normalDeformations.Add(node.BoneName, Matrix.Identity);
+                invertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
             }
             else
             {
-                try
+                if (deformations.ContainsKey(node.BoneName))
                 {
-                    if (baseDeformationMatrix.ContainsKey(node.BoneName))
+                    invertedDeformations.Add(node.BoneName, deformations[node.BoneName].Inverted());
+
+                    var normalMatrix = deformations[node.BoneName].Inverted();
+                    normalMatrix.Transpose();
+                    normalDeformations.Add(node.BoneName, normalMatrix);
+
+                    var invertexNormalMatrix = deformations[node.BoneName].Inverted();
+                    normalMatrix.Transpose();
+                    invertexNormalMatrix.Invert();
+                    invertedNormalDeformations.Add(node.BoneName, invertexNormalMatrix);
+
+                }
+                else
+                {
+                    if (!skeletonData.ContainsKey(node.BoneName))
                     {
-                        var parent = skeletonData.First(x => x.Value.BoneNumber == node.BoneParent);
-                        var decomposed = baseDeformationMatrix[parent.Value.BoneName].Inverted() * baseDeformationMatrix[node.BoneName];
-                        //decomposed = Matrix.Identity;
-                        var recomposed = recalculatedDeformationMatrix[parent.Value.BoneName] * decomposed;
-                        decomposedDeformationMatrix.Add(node.BoneName, decomposed);
-                        recalculatedDeformationMatrix.Add(node.BoneName, recomposed);
+                        deformations[node.BoneName] = Matrix.Identity;
+                        invertedDeformations[node.BoneName] = Matrix.Identity;
+                        normalDeformations[node.BoneName] = Matrix.Identity;
+                        invertedNormalDeformations[node.BoneName] = Matrix.Identity;
                     }
                     else
                     {
-                        recalculatedDeformationMatrix.Add(node.BoneName, Matrix.Identity);
+                        var skelEntry = skeletonData[node.BoneName];
+                        while (skelEntry != null)
+                        {
+                            if (deformations.ContainsKey(skelEntry.BoneName))
+                            {
+                                // This parent has a deform.
+                                deformations[node.BoneName] = deformations[skelEntry.BoneName];
+                                invertedDeformations[node.BoneName] = invertedDeformations[skelEntry.BoneName];
+                                normalDeformations[node.BoneName] = normalDeformations[skelEntry.BoneName];
+                                invertedNormalDeformations[node.BoneName] = invertedNormalDeformations[skelEntry.BoneName];
+                                break;
+                            }
+
+                            // Seek our next parent.
+                            skelEntry = skeletonData.FirstOrDefault(x => x.Value.BoneNumber == skelEntry.BoneParent).Value;
+                        }
+
+                        if (skelEntry == null)
+                        {
+                            deformations[node.BoneName] = Matrix.Identity;
+                            invertedDeformations[node.BoneName] = Matrix.Identity;
+                            normalDeformations[node.BoneName] = Matrix.Identity;
+                            invertedNormalDeformations[node.BoneName] = Matrix.Identity;
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    var b = "d";
                 }
             }
             var children = skeletonData.Where(x => x.Value.BoneParent == node.BoneNumber);
             foreach (var c in children)
             {
-                BuildNewTransfromMatrices(c.Value, skeletonData);
+                BuildNewTransfromMatrices(c.Value, skeletonData, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
             }
+        }
+
+        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
+        private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+
+        /// <summary>
+        /// Creates a new racial model for a given set/slot by copying from already existing racial models.
+        /// </summary>
+        /// <param name="setId"></param>
+        /// <param name="slot"></param>
+        /// <param name="newRace"></param>
+        /// <returns></returns>
+        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source)
+        {
+
+            var _index = new Index(_gameDirectory);
+            var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+
+            if (!isAccessory)
+            {
+                var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
+                if (!slotOk)
+                {
+                    throw new InvalidDataException("Attempted to get racial models for invalid slot.");
+                }
+            }
+
+            // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
+            var format = "";
+            if (!isAccessory)
+            {
+                format = _EquipmentModelPathFormat;
+            }
+            else
+            {
+                format = _AccessoryModelPathFormat;
+            }
+
+            var path = String.Format(format, setId.ToString().PadLeft(4, '0'), newRace.GetRaceCode(), slot);
+
+            // File already exists, no adjustments needed.
+            if ((await _index.FileExists(path))) return;
+
+            var _eqp = new Eqp(_gameDirectory);
+            var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
+            var baseModelOrder = newRace.GetModelPriorityList();
+
+            // Ok, we need to find which racial model to use as our base now...
+            var baseRace = XivRace.All_Races;
+            var originalPath = "";
+            foreach (var targetRace in baseModelOrder)
+            {
+                if (availableModels.Contains(targetRace))
+                {
+                    originalPath = String.Format(format, setId.ToString().PadLeft(4, '0'), targetRace.GetRaceCode(), slot);
+                    var exists = await _index.FileExists(originalPath);
+                    if (exists)
+                    {
+                        baseRace = targetRace;
+                        break;
+                    } else
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
+
+            // Create the new model.
+            await CopyModel(originalPath, path, source);
+        }
+
+        /// <summary>
+        /// Copies a given model from a previous path to a new path, including copying the materials and other down-chain items.
+        /// 
+        /// </summary>
+        /// <param name="originalPath"></param>
+        /// <param name="newPath"></param>
+        /// <returns></returns>
+        public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false)
+        {
+            var _dat = new Dat(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+            var _modding = new Modding(_gameDirectory);
+
+            var fromRoot = await XivCache.GetFirstRoot(originalPath);
+            var toRoot = await XivCache.GetFirstRoot(newPath);
+
+            IItem item = null;
+            if (toRoot != null)
+            {
+                item = toRoot.GetFirstItem();
+            }
+
+            var df = IOUtil.GetDataFileFromPath(originalPath);
+
+            var index = await _index.GetIndexFile(df);
+            var modlist = await _modding.GetModListAsync();
+
+            var offset = index.Get8xDataOffset(originalPath);
+            var xMdl = await GetRawMdlData(originalPath, false, offset);
+            var model = TTModel.FromRaw(xMdl);
+
+
+            if (model == null)
+            {
+                throw new InvalidDataException("Source model file does not exist.");
+            }
+            var allFiles = new HashSet<string>() { newPath };
+
+            var originalRace = IOUtil.GetRaceFromPath(originalPath);
+            var newRace = IOUtil.GetRaceFromPath(newPath);
+
+
+            if(originalRace != newRace)
+            {
+                // Convert the model to the new race.
+                ModelModifiers.RaceConvert(model, originalRace, newPath);
+                ModelModifiers.FixUpSkinReferences(model, newPath);
+            }
+
+            // Language is irrelevant here.
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+
+            // Get all variant materials.
+            var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false, index, modlist);
+
+            
+            var _raceRegex = new Regex("c[0-9]{4}");
+
+            Dictionary<string, string> validNewMaterials = new Dictionary<string, string>();
+            HashSet<string> copiedPaths = new HashSet<string>();
+            // Update Material References and clone materials.
+            foreach (var material in materialPaths)
+            {
+
+                // Get the new path.
+                var path = RootCloner.UpdatePath(fromRoot, toRoot, material);
+
+                // Adjust race code entries if needed.
+                if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
+                {
+                    path = _raceRegex.Replace(path, "c" + newRace.GetRaceCode());
+                }
+
+                // Get file names.
+                var io = material.LastIndexOf("/", StringComparison.Ordinal);
+                var originalMatName = material.Substring(io, material.Length - io);
+
+                io = path.LastIndexOf("/", StringComparison.Ordinal);
+                var newMatName = path.Substring(io, path.Length - io);
+
+
+                // Time to copy the materials!
+                try
+                {
+                    offset = index.Get8xDataOffset(material);
+                    var mtrl = await _mtrl.GetMtrlData(offset, material, 11);
+
+                    if (copyTextures)
+                    {
+                        for(int i = 0; i < mtrl.TexturePathList.Count; i++)
+                        {
+                            var tex = mtrl.TexturePathList[i];
+                            var ntex = RootCloner.UpdatePath(fromRoot, toRoot, tex);
+                            if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
+                            {
+                                ntex = _raceRegex.Replace(ntex, "c" + newRace.GetRaceCode());
+                            }
+
+                            mtrl.TexturePathList[i] = ntex;
+
+                            allFiles.Add(ntex);
+                            await _dat.CopyFile(tex, ntex, source, true, item, index, modlist);
+                        }
+                    }
+
+                    mtrl.MTRLPath = path;
+                    allFiles.Add(mtrl.MTRLPath);
+                    await _mtrl.ImportMtrl(mtrl, item, source, index, modlist);
+
+                    if(!validNewMaterials.ContainsKey(newMatName))
+                    {
+                        validNewMaterials.Add(newMatName, path);
+                    }
+                    copiedPaths.Add(path);
+
+
+                    // Switch out any material references to the material in the model file.
+                    foreach (var m in model.MeshGroups)
+                    {
+                        if(m.Material == originalMatName)
+                        {
+                            m.Material = newMatName;
+                        }
+                    }
+
+                } catch(Exception ex)
+                {
+                    // Hmmm.  The original material didn't exist.   This is pretty not awesome, but I guess a non-critical error...?
+                }
+            }
+
+            if (Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
+            {
+                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+
+                var toEntries = await _imc.GetEntries(await toRoot.GetImcEntryPaths(), false, index, modlist);
+                var fromEntries = await _imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, index, modlist);
+
+                var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
+                var fromSets = fromEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
+
+                if(fromSets.Count > 0 && toSets.Count > 0)
+                {
+                    var vReplace = new Regex("/v[0-9]{4}/");
+
+                    // Validate that sufficient material sets have been created at the destination root.
+                    foreach(var mkv in validNewMaterials)
+                    {
+                        var validPath = mkv.Value;
+                        foreach(var msetId in toSets)
+                        {
+                            var testPath = vReplace.Replace(validPath, "/v" + msetId.ToString().PadLeft(4, '0') + "/");
+                            var copied = copiedPaths.Contains(testPath);
+
+                            // Missing a material set, copy in the known valid material.
+                            if(!copied)
+                            {
+                                allFiles.Add(testPath);
+                                await _dat.CopyFile(validPath, testPath, source, true, item, index, modlist);
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            // Save the final modified mdl.
+            var data = await MakeNewMdlFile(model, xMdl);
+            offset = await _dat.WriteModFile(data, newPath, source, item, index, modlist);
+
+            await _index.SaveIndexFile(index);
+            await _modding.SaveModListAsync(modlist);
+            XivCache.QueueDependencyUpdate(allFiles.ToList());
+
+            return offset;
         }
 
         /// <summary>
@@ -4419,7 +4717,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Head_Body, "top"},
             {XivStrings.Body_Hands, "top"},
             {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "top"},
+            {XivStrings.Body_Legs_Feet, "dwn"},
             {XivStrings.Body_Hands_Legs_Feet, "top"},
             {XivStrings.Legs_Feet, "top"},
             {XivStrings.All, "top"},

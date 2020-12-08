@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -12,6 +13,7 @@ using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -27,21 +29,23 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.1.2");
+        public static readonly Version CacheVersion = new Version("1.0.2.1");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
-        internal static string CacheConnectionString { get
+        internal static string CacheConnectionString
+        {
+            get
             {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
         internal static string RootsCacheConnectionString
         {
             get
             {
-                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100;";
+                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
 
@@ -63,6 +67,14 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public static bool Initialized
+        {
+            get
+            {
+                return _gameInfo != null;
+            }
+        }
+
         public static bool CacheWorkerEnabled
         {
             get
@@ -76,7 +88,7 @@ namespace xivModdingFramework.Cache
                 // better to be safe.
                 if (_REBUILDING) return;
 
-                if (value  && _cacheWorker == null)
+                if (value && _cacheWorker == null)
                 {
 
                     _cacheWorker = new BackgroundWorker
@@ -87,18 +99,41 @@ namespace xivModdingFramework.Cache
                     _cacheWorker.DoWork += ProcessDependencyQueue;
                     _cacheWorker.RunWorkerAsync();
                 }
-                else if(value == false && _cacheWorker != null) 
+                else if (value == false && _cacheWorker != null)
                 {
                     // Sleep until the cache worker actually stops.
                     _cacheWorker.CancelAsync();
-                    while(_cacheWorker != null)
+                    var duration = 0;
+                    while (_cacheWorker != null)
                     {
                         Thread.Sleep(10);
+                        duration += 10;
+
+                        if (duration >= 3000)
+                        {
+                            // Something went wrong with the shutdown of the cache worker thread.
+                            // Hopefully whatever went wrong fully crashed the thread.
+                            _cacheWorker = null;
+                            break;
+                        }
                     }
                 }
             }
         }
 
+        public enum CacheRebuildReason
+        {
+            CacheOK,
+            NoCache,
+            CacheVersionUpdate,
+            FFXIVUpdate,
+            LanguageChanged,
+            RebuildFlag,
+            ManualRequest,
+            InvalidData
+        }
+
+        public static event EventHandler<CacheRebuildReason> CacheRebuilding;
 
         private static BackgroundWorker _cacheWorker;
 
@@ -110,16 +145,21 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool validateCache = true)
+        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, int dxMode = 11, bool validateCache = true, bool enableCacheWorker = true)
         {
-            var gi = new GameInfo(gameDirectory, language);
-            SetGameInfo(gi);
+            var gi = new GameInfo(gameDirectory, language, dxMode);
+            SetGameInfo(gi, enableCacheWorker);
         }
-        public static void SetGameInfo(GameInfo gameInfo = null)
+        public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
         {
             // We need to either have a valid game directory reference in the static already or need one in the constructor.
             if (_gameInfo == null && (gameInfo == null || gameInfo.GameDirectory == null)) {
                 throw new Exception("First call to cache must include a valid game directoy.");
+            }
+
+            if (gameInfo != null && !gameInfo.GameDirectory.Exists)
+            {
+                throw new Exception("Provided Game Directory does not exist.");
             }
 
             // Sleep and lock this thread until rebuild is done.
@@ -128,7 +168,7 @@ namespace xivModdingFramework.Cache
                 Thread.Sleep(10);
             }
 
-            if (_gameInfo == null)
+            if (gameInfo != null)
             {
                 _gameInfo = gameInfo;
             }
@@ -141,39 +181,53 @@ namespace xivModdingFramework.Cache
             if (!_REBUILDING)
             {
 
-                if (CacheNeedsRebuild() && !_REBUILDING)
+                var reason = CacheNeedsRebuild();
+                if (reason != CacheRebuildReason.CacheOK && !_REBUILDING)
                 {
-                    RebuildCache();
+                    RebuildCache(reason);
                 }
             }
 
-            CacheWorkerEnabled = true;
+            if (enableCacheWorker)
+            {
+                CacheWorkerEnabled = true;
+            } else
+            {
+                // Explicitly shut down the cache worker if not allowed.
+                // This is potentially necessary if a cache rebuild automatically started it.
+                CacheWorkerEnabled = false;
+            }
 
         }
 
         /// <summary>
         /// Tests if the cache needs to be rebuilt (and starts the process if it does.)
         /// </summary>
-        private static bool CacheNeedsRebuild()
+        private static CacheRebuildReason CacheNeedsRebuild()
         {
-            Func<bool> checkValidation = () =>
+            Func<CacheRebuildReason> checkValidation = () =>
             {
                 try
                 {
-                    // Cache structure updated?
-                    var val = GetMetaValue("cache_version");
-                    var version = new Version(val);
-                    if (version != CacheVersion)
+                    if (!File.Exists(_dbPath.FullName))
                     {
-                        return true;
+                        return CacheRebuildReason.NoCache;
                     }
 
-                    // FFXIV Updated?
-                    val = GetMetaValue("ffxiv_version");
-                    version = new Version(val);
+                    // FFXIV Updated?  This one always gets highest priority for reason.
+                    var val = GetMetaValue("ffxiv_version");
+                    var version = new Version(val);
                     if (version != _gameInfo.GameVersion)
                     {
-                        return true;
+                        return CacheRebuildReason.FFXIVUpdate;
+                    }
+
+                    // Cache structure updated?
+                    val = GetMetaValue("cache_version");
+                    version = new Version(val);
+                    if (version != CacheVersion)
+                    {
+                        return CacheRebuildReason.CacheVersionUpdate;
                     }
 
                     if (_gameInfo.GameLanguage != XivLanguage.None)
@@ -182,7 +236,7 @@ namespace xivModdingFramework.Cache
                         val = GetMetaValue("language");
                         if (val != _gameInfo.GameLanguage.ToString())
                         {
-                            return true;
+                            return CacheRebuildReason.LanguageChanged;
                         }
                     }
 
@@ -190,19 +244,19 @@ namespace xivModdingFramework.Cache
                     val = GetMetaValue("needs_rebuild");
                     if (val != null)
                     {
-                        return true;
+                        return CacheRebuildReason.RebuildFlag;
                     }
 
-                    return false;
+                    return CacheRebuildReason.CacheOK;
                 }
                 catch (Exception Ex)
                 {
-                    return true;
+                    return CacheRebuildReason.InvalidData;
                 }
             };
 
             var result = checkValidation();
-            if (result)
+            if (result != CacheRebuildReason.CacheOK)
             {
                 // Ensure we cleaned up after ourselves
                 // in preprartion for calling rebuild.
@@ -220,10 +274,16 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache()
+        public static void RebuildCache(CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
         {
             CacheWorkerEnabled = false;
             _REBUILDING = true;
+
+            if (CacheRebuilding != null)
+            {
+                // If there are any event listeners, invoke them.
+                CacheRebuilding.Invoke(null, reason);
+            }
 
             Task.Run(async () =>
             {
@@ -240,6 +300,7 @@ namespace xivModdingFramework.Cache
 
                     var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
                     tasks.Add(RebuildItemsCache());
+                    tasks.Add(RebuildCharactersCache());
                     tasks.Add(RebuildMonstersCache());
                     tasks.Add(RebuildUiCache());
                     tasks.Add(RebuildFurnitureCache());
@@ -260,6 +321,13 @@ namespace xivModdingFramework.Cache
                 {
                     try
                     {
+                        // If we failed an update due to a post-patch error, keep us stuck in that state
+                        // until a TexTools update and a proper completed rebuild.
+                        if (reason == CacheRebuildReason.FFXIVUpdate)
+                        {
+                            SetMetaValue("ffxiv_version", new Version(0, 0, 0, 0).ToString());
+                        }
+
                         SetMetaValue("needs_rebuild", "1");
                     }
                     catch {
@@ -298,7 +366,6 @@ namespace xivModdingFramework.Cache
             SQLiteConnection.ClearAllPools();
             GC.WaitForPendingFinalizers();
 
-
             try
             {
                 File.Delete(_dbPath.FullName);
@@ -314,10 +381,12 @@ namespace xivModdingFramework.Cache
                 File.Delete(_dbPath.FullName);
             }
 
+
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
-                var lines = File.ReadAllLines("Resources\\SQL\\" + creationScript);
+                var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", creationScript));
                 var sqlCmd = String.Join("\n", lines);
 
                 using (var cmd = new SQLiteCommand(sqlCmd, db))
@@ -326,8 +395,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var backupFile = cwd + "\\Resources\\DB\\" + rootCacheFileName;
+            var backupFile = Path.Combine(cwd, "Resources", "DB", rootCacheFileName);
 
             if (!File.Exists(_rootCachePath.FullName))
             {
@@ -349,7 +417,7 @@ namespace xivModdingFramework.Cache
                     using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
                         db.Open();
-                        var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
+                        var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                         var sqlCmd = String.Join("\n", lines);
 
                         using (var cmd = new SQLiteCommand(sqlCmd, db))
@@ -359,13 +427,13 @@ namespace xivModdingFramework.Cache
                     }
                 }
             }
-            else if(File.Exists(backupFile))
+            else if (File.Exists(backupFile))
             {
                 // If we have both a backup and current file, see if the current is out of date.
                 // (If we just updated textools and the download came with a new file)
                 var backupDate = File.GetLastWriteTime(backupFile);
                 var currentDate = File.GetLastWriteTime(_rootCachePath.FullName);
-                if(backupDate > currentDate)
+                if (backupDate > currentDate)
                 {
                     // Our backup is newer, copy it through.
                     try
@@ -468,7 +536,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
-                            if(root.IsValid())
+                            if (root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
                             } else
@@ -648,12 +716,57 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        private static async Task RebuildCharactersCache()
+        {
+            var _character = new Character(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+            var items = await _character.GetUnCachedCharacterList();
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+                using (var transaction = db.BeginTransaction())
+                {
+                    foreach (var item in items)
+                    {
+                        var query = @"insert into characters ( primary_id, slot, slot_full, name, root) 
+                                                  values    ( $primary_id,$slot,$slot_full,$name,$root)";
+                        var root = item.GetRootInfo();
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            if (item.ModelInfo != null)
+                            {
+                                cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                            } else
+                            {
+                                cmd.Parameters.AddWithValue("primary_id", 0);
+                            }
+                            cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
+                            cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
+                            cmd.Parameters.AddWithValue("name", item.Name);
+                            if (root.IsValid())
+                            {
+                                cmd.Parameters.AddWithValue("root", root.ToString());
+                            }
+                            else
+                            {
+                                cmd.Parameters.AddWithValue("root", null);
+                            }
+                            cmd.ExecuteScalar();
+                        }
+                    }
+                    transaction.Commit();
+                }
+            }
+        }
+        private static async Task RebuildItemsCache()
+        {
+            await RebuildGearCache();
+        }
 
         /// <summary>
         /// Populate the items table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildItemsCache()
+        private static async Task RebuildGearCache()
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -721,7 +834,7 @@ namespace xivModdingFramework.Cache
                     throw;
                 }
             }
-            await QueueDependencyUpdate(paths);
+            QueueDependencyUpdate(paths);
         }
 
         #endregion
@@ -896,6 +1009,28 @@ namespace xivModdingFramework.Cache
                 throw;
             }
         }
+        internal static async Task<List<XivCharacter>> GetCachedCharacterList(string substring = null)
+        {
+            WhereClause where = null;
+
+            if (substring != null)
+            {
+                where.Comparer = WhereClause.ComparisonType.Like;
+                where.Join = WhereClause.JoinType.And;
+                where.Column = "name";
+                where.Value = "%" + substring + "%";
+            }
+
+            List<XivCharacter> mainHands = new List<XivCharacter>();
+            var list = await BuildListFromTable("characters", where, async (reader) =>
+            {
+                var item = MakeCharacter(reader);
+
+                return item;
+            });
+
+            return list;
+        }
 
         /// <summary>
         /// Get the gear entries list, optionally with a substring filter.
@@ -905,13 +1040,15 @@ namespace xivModdingFramework.Cache
         internal static async Task<List<XivGear>> GetCachedGearList(string substring = null)
         {
             WhereClause where = null;
+
             if (substring != null)
             {
-                where = new WhereClause();
                 where.Comparer = WhereClause.ComparisonType.Like;
+                where.Join = WhereClause.JoinType.And;
                 where.Column = "name";
                 where.Value = "%" + substring + "%";
             }
+
 
             List<XivGear> mainHands = new List<XivGear>();
             List<XivGear> offHands = new List<XivGear>();
@@ -1006,6 +1143,23 @@ namespace xivModdingFramework.Cache
             return item;
         }
         
+        internal static XivCharacter MakeCharacter(CacheReader reader)
+        {
+            var mi = new XivModelInfo();
+
+            var item = new XivCharacter
+            {
+                PrimaryCategory = XivStrings.Character,
+                SecondaryCategory = reader.GetString("slot_full"),
+                ModelInfo = mi,
+            };
+
+            item.Name = reader.GetString("name");
+            mi.PrimaryID = reader.GetInt32("primary_id");
+            mi.SecondaryID = 0;
+            return item;
+        }
+
         /// <summary>
         /// Creates a XivGear entry from a database row.
         /// </summary>
@@ -1107,7 +1261,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        public static void SetMetaValue(string key, string value = null)
+        public static void SetMetaValue(string key, string value)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -1120,6 +1274,20 @@ namespace xivModdingFramework.Cache
                     cmd.ExecuteScalar();
                 }
             }
+        }
+        public static void SetMetaValue(string key, bool value)
+        {
+            SetMetaValue(key, value ? "True" : "False");
+        }
+        public static bool GetMetaValueBoolean(string key)
+        {
+            var st = GetMetaValue(key);
+
+            bool result = false;
+            bool success = Boolean.TryParse(st, out result);
+
+            if (!success) return false;
+            return result;
         }
 
         /// <summary>
@@ -1417,7 +1585,7 @@ namespace xivModdingFramework.Cache
 
         public static async Task<XivDependencyRoot> GetFirstRoot(string internalPath)
         {
-            var roots = await XivDependencyGraph.GetDependencyRoots(internalPath);
+            var roots = await XivDependencyGraph.GetDependencyRoots(internalPath, true);
             if(roots.Count > 0)
             {
                 return roots[0];
@@ -1434,6 +1602,7 @@ namespace xivModdingFramework.Cache
 
         public static void ResetRootCache()
         {
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
 
             SQLiteConnection.ClearAllPools();
             GC.WaitForPendingFinalizers();
@@ -1442,7 +1611,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
             {
                 db.Open();
-                var lines = File.ReadAllLines("Resources\\SQL\\" + rootCacheCreationScript);
+                var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                 var sqlCmd = String.Join("\n", lines);
 
                 using (var cmd = new SQLiteCommand(sqlCmd, db))
@@ -1598,6 +1767,41 @@ namespace xivModdingFramework.Cache
         {
             await XivDependencyGraph.CacheAllRealRoots();
         }
+
+        /// <summary>
+        /// Pretty basic recursive function that returns a hashset of all the child files,
+        /// including the original caller.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public static async Task<HashSet<string>> GetChildrenRecursive(string file)
+        {
+            var files = new HashSet<string>();
+            files.Add(file);
+
+            var baseChildren = await XivCache.GetChildFiles(file);
+            if (baseChildren == null || baseChildren.Count == 0)
+            {
+                // No children, just us.
+                return files;
+            }
+            else
+            {
+                // We have child files.
+                foreach (var child in baseChildren)
+                {
+                    // Recursively get their children.
+                    var children = await GetChildrenRecursive(child);
+                    foreach (var subchild in children)
+                    {
+                        // Add the results to the list.
+                        files.Add(subchild);
+                    }
+                }
+            }
+            return files;
+        }
+
 
 
         /// <summary>
@@ -1785,9 +1989,9 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="files"></param>
         /// <returns></returns>
-        public static Task QueueDependencyUpdate(string file)
+        public static void QueueDependencyUpdate(string file)
         {
-            return QueueDependencyUpdate(new List<string>() { file });
+            QueueDependencyUpdate(new List<string>() { file });
         }
 
         /// <summary>
@@ -1795,89 +1999,86 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="files"></param>
         /// <returns></returns>
-        public static Task QueueDependencyUpdate(List<string> files) {
+        public static void QueueDependencyUpdate(List<string> files) {
 
-            return Task.Run(async () =>
+            // We need to...
+            // 1. Purge and requeue the parent calculation for all files we had listed as children previously.
+            // 2. Purge our own child file references.
+            // 3. Add this file to both dependency queues.
+            // 4. Add our affected children to the parent queue.
+
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
-                // We need to...
-                // 1. Purge and requeue the parent calculation for all files we had listed as children previously.
-                // 2. Purge our own child file references.
-                // 3. Add this file to both dependency queues.
-                // 4. Add our affected children to the parent queue.
-
-                using (var db = new SQLiteConnection(CacheConnectionString))
+                db.Open();
+                using (var transaction = db.BeginTransaction())
                 {
-                    db.Open();
-                    using (var transaction = db.BeginTransaction())
+                    foreach (var file in files)
                     {
-                        foreach (var file in files)
+
+                        var oldCacheChildren = new List<string>();
+
+                        // Clear out our old children.
+                        var query = "delete from dependencies_children where parent = $parent";
+                        using (var cmd = new SQLiteCommand(query, db))
                         {
+                            cmd.Parameters.AddWithValue("parent", file);
+                            cmd.ExecuteScalar();
+                        }
 
-                            var oldCacheChildren = new List<string>();
-
-                            // Clear out our old children.
-                            var query = "delete from dependencies_children where parent = $parent";
-                            using (var cmd = new SQLiteCommand(query, db))
+                        // Find all the files that currently point to us as a parent in the cache.
+                        query = "select child from dependencies_parents where parent = $parent";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            cmd.Parameters.AddWithValue("parent", file);
+                            using (var reader = new CacheReader(cmd.ExecuteReader()))
                             {
-                                cmd.Parameters.AddWithValue("parent", file);
-                                cmd.ExecuteScalar();
-                            }
-
-                            // Find all the files that currently point to us as a parent in the cache.
-                            query = "select child from dependencies_parents where parent = $parent";
-                            using (var cmd = new SQLiteCommand(query, db))
-                            {
-                                cmd.Parameters.AddWithValue("parent", file);
-                                using (var reader = new CacheReader(cmd.ExecuteReader()))
+                                while (reader.NextRow())
                                 {
-                                    while (reader.NextRow())
-                                    {
-                                        oldCacheChildren.Add(reader.GetString("child"));
-                                    }
+                                    oldCacheChildren.Add(reader.GetString("child"));
                                 }
                             }
+                        }
 
-                            // And purge all of those cached file's parents.
-                            query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
-                            using (var cmd = new SQLiteCommand(query, db))
-                            {
-                                cmd.Parameters.AddWithValue("parent", file);
-                                cmd.ExecuteScalar();
-                            }
+                        // And purge all of those cached file's parents.
+                        query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            cmd.Parameters.AddWithValue("parent", file);
+                            cmd.ExecuteScalar();
+                        }
 
-                            // Now add us to both queues.
-                            query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
-                            using (var insertCmd = new SQLiteCommand(query, db))
-                            {
-                                insertCmd.Parameters.AddWithValue("file", file);
-                                insertCmd.ExecuteScalar();
-                            }
+                        // Now add us to both queues.
+                        query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
+                        using (var insertCmd = new SQLiteCommand(query, db))
+                        {
+                            insertCmd.Parameters.AddWithValue("file", file);
+                            insertCmd.ExecuteScalar();
+                        }
+
+                        query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
+                        using (var insertCmd = new SQLiteCommand(query, db))
+                        {
+                            insertCmd.Parameters.AddWithValue("file", file);
+                            insertCmd.ExecuteScalar();
+                        }
+
+                        // Queue up all the files that we parent-purged into the parent queue.
+                        foreach (var c in oldCacheChildren)
+                        {
+                            if (c == null) continue;
 
                             query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
                             using (var insertCmd = new SQLiteCommand(query, db))
                             {
-                                insertCmd.Parameters.AddWithValue("file", file);
+                                insertCmd.Parameters.AddWithValue("file", c);
                                 insertCmd.ExecuteScalar();
                             }
-
-                            // Queue up all the files that we parent-purged into the parent queue.
-                            foreach (var c in oldCacheChildren)
-                            {
-                                if (c == null) continue;
-
-                                query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
-                                using (var insertCmd = new SQLiteCommand(query, db))
-                                {
-                                    insertCmd.Parameters.AddWithValue("file", c);
-                                    insertCmd.ExecuteScalar();
-                                }
-                            }
-
                         }
-                        transaction.Commit();
+
                     }
+                    transaction.Commit();
                 }
-            });
+            }
         }
 
         private static string PopChildQueue()
@@ -1888,39 +2089,40 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                using (var transaction = db.BeginTransaction())
+                var query = "select position, file from dependencies_children_queue";
+                using (var selectCmd = new SQLiteCommand(query, db))
                 {
-                    // First, clear out all the old data.  This is the most important point.
-                    var query = "select position, file from dependencies_children_queue";
-                    using (var selectCmd = new SQLiteCommand(query, db))
+                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
                     {
-                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        if (!reader.NextRow())
                         {
-                            if (!reader.NextRow())
-                            {
-                                // No entries left.  Signal the cache worker to shut down gracefully.
-                                return null;
-                            }
-                            // Got the new item.
-                            file = reader.GetString("file");
-                            position = reader.GetInt32("position");
+                            // No entries left.
+                            return null;
                         }
+                        // Got the new item.
+                        file = reader.GetString("file");
+                        position = reader.GetInt32("position");
                     }
-
-                    // Delete the row we took and all others that match the filename.
-                    query = "delete from dependencies_children_queue where file = $file";
-                    using (var deleteCmd = new SQLiteCommand(query, db))
-                    {
-                        deleteCmd.Parameters.AddWithValue("file", file);
-                        deleteCmd.ExecuteScalar();
-                    }
-
-                    transaction.Commit();
                 }
             }
             return file;
         }
 
+        public static void RemoveFromChildQueue(string file)
+        {
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+
+                // Delete the row we took and all others that match the filename.
+                var query = "delete from dependencies_children_queue where file = $file";
+                using (var deleteCmd = new SQLiteCommand(query, db))
+                {
+                    deleteCmd.Parameters.AddWithValue("file", file);
+                    deleteCmd.ExecuteScalar();
+                }
+            }
+        }
 
         private static string PopParentQueue()
         {
@@ -1930,37 +2132,38 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                using (var transaction = db.BeginTransaction())
+                var query = "select position, file from dependencies_parents_queue";
+                using (var selectCmd = new SQLiteCommand(query, db))
                 {
-                    // First, clear out all the old data.  This is the most important point.
-                    var query = "select position, file from dependencies_parents_queue";
-                    using (var selectCmd = new SQLiteCommand(query, db))
+                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
                     {
-                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        if (!reader.NextRow())
                         {
-                            if (!reader.NextRow())
-                            {
-                                // No entries left.  Signal the cache worker to shut down gracefully.
-                                return null;
-                            }
-                            // Got the new item.
-                            file = reader.GetString("file");
-                            position = reader.GetInt32("position");
+                            // No entries left.
+                            return null;
                         }
+                        // Got the new item.
+                        file = reader.GetString("file");
+                        position = reader.GetInt32("position");
                     }
-
-                    // Delete the row we took and all others that match the filename.
-                    query = "delete from dependencies_parents_queue where file = $file";
-                    using (var deleteCmd = new SQLiteCommand(query, db))
-                    {
-                        deleteCmd.Parameters.AddWithValue("file", file);
-                        deleteCmd.ExecuteScalar();
-                    }
-
-                    transaction.Commit();
                 }
             }
             return file;
+        }
+        public static void RemoveFromParentQueue(string file)
+        {
+            using (var db = new SQLiteConnection(CacheConnectionString))
+            {
+                db.Open();
+
+                // Delete the row we took and all others that match the filename.
+                var query = "delete from dependencies_parents_queue where file = $file";
+                using (var deleteCmd = new SQLiteCommand(query, db))
+                {
+                    deleteCmd.Parameters.AddWithValue("file", file);
+                    deleteCmd.ExecuteScalar();
+                }
+            }
         }
 
 
@@ -1986,11 +2189,24 @@ namespace xivModdingFramework.Cache
                     if (file != null)
                     {
                         level = XivDependencyGraph.GetDependencyLevel(file);
-                        if (level == XivDependencyLevel.Invalid) continue;
+                        if (level == XivDependencyLevel.Invalid)
+                        {
+                            RemoveFromChildQueue(file);
+                            continue;
+                        }
 
-                        // The get call will automatically cache the data, if it needs updating.
-                        var task = GetChildFiles(file, false);
-                        task.Wait();
+                        try
+                        {
+                            // The get call will automatically cache the data, if it needs updating.
+                            var task = GetChildFiles(file, false);
+
+                            // Set a safety timeout here.
+                            task.Wait(3000);
+                        }
+                        finally
+                        {
+                            RemoveFromChildQueue(file);
+                        }
                         continue;
 
                     }
@@ -2009,12 +2225,24 @@ namespace xivModdingFramework.Cache
                         else
                         {
                             level = XivDependencyGraph.GetDependencyLevel(file);
-                            if (level == XivDependencyLevel.Invalid) continue;
+                            if (level == XivDependencyLevel.Invalid)
+                            {
+                                RemoveFromParentQueue(file);
+                                continue;
+                            }
 
-                            // The get call will automatically cache the data, if it needs updating.
-                            var task = GetParentFiles(file, false);
-                            task.Wait();
-                            var parents = task.Result;
+                            try
+                            {
+                                // The get call will automatically cache the data, if it needs updating.
+                                var task = GetParentFiles(file, false);
+
+                                // Set a safety timeout here.
+                                task.Wait(3000);
+                            } finally
+                            {
+                                RemoveFromParentQueue(file);
+                            }
+                            continue;
                         }
                     }
                 } catch( Exception ex)
@@ -2078,7 +2306,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                // First, clear out all the old data.  This is the most important point.
                 var query = "select count(file) as cnt from dependencies_parents_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
                 {
@@ -2090,7 +2317,6 @@ namespace xivModdingFramework.Cache
                     }
                 }
 
-                // First, clear out all the old data.  This is the most important point.
                 query = "select count(file) as cnt from dependencies_children_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
                 {
@@ -2188,6 +2414,7 @@ namespace xivModdingFramework.Cache
             public enum ComparisonType
             {
                 Equal,
+                NotEqual,
                 Like
             }
             public enum JoinType
@@ -2278,7 +2505,10 @@ namespace xivModdingFramework.Cache
                     {
                         result += " = ";
                     }
-                    else
+                    else if(Comparer == ComparisonType.NotEqual)
+                    {
+                        result += " != ";
+                    } else
                     {
                         result += " like ";
                     }

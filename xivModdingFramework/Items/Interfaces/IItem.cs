@@ -64,6 +64,18 @@ namespace xivModdingFramework.Items.Interfaces
         /// This would change depending on the data file the data is to be pulled from
         /// </remarks>
         XivDataFile DataFile { get; }
+
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName();
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory();
     }
 
 

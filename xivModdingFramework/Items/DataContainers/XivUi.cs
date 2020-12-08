@@ -15,8 +15,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Resources;
+using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -73,9 +78,48 @@ namespace xivModdingFramework.Items.DataContainers
         public int IconNumber { get; set; }
 
 
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown UI Element";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory != null ? SecondaryCategory : XivStrings.UI;
+        }
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivUi)obj).Name, StringComparison.Ordinal);
+        }
+
+
+        public async Task<Dictionary<string, string>> GetTexPaths()
+        {
+            if(SecondaryCategory == XivStrings.Maps)
+            {
+                var _tex = new Tex(XivCache.GameInfo.GameDirectory);
+
+                var mapNamePaths = await _tex.GetMapAvailableTex(UiPath);
+                return mapNamePaths;
+            } else if(SecondaryCategory == XivStrings.HUD)
+            {
+                //ui/uld/aozactionlearned.tex
+                return new Dictionary<string, string>() { { Name, "ui/uld/" + Name.ToLower() + ".tex" } };
+            }
+            else
+            {
+                var block = ((IconNumber / 1000) * 1000).ToString().PadLeft(6,'0');
+                var icon = IconNumber.ToString().PadLeft(6, '0');
+                return new Dictionary<string, string>() { { Name, "ui/icon/" + block + '/' + icon + ".tex" } };
+            }
         }
     }
 }

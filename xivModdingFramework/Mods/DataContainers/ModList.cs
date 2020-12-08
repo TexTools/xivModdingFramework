@@ -14,35 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Security.Cryptography;
 using System.Text;
+using xivModdingFramework.Helpers;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
-    public class ModList
+    public class ModList : ICloneable 
     {
         /// <summary>
         /// The ModList Version
         /// </summary>
         public string version { get; set; }
-
-        /// <summary>
-        /// The number of mods in the modlist
-        /// </summary>
-        public int modCount { get; set; }
-
-        /// <summary>
-        /// The number of modpacks currently installed
-        /// </summary>
-        public int modPackCount { get; set; }
-
-        /// <summary>
-        /// The number of empty spaces available that a mod can fill
-        /// </summary>
-        public int emptyCount { get; set; }
 
         /// <summary>
         /// The list of ModPacks currently installed
@@ -54,7 +41,15 @@ namespace xivModdingFramework.Mods.DataContainers
         /// </summary>
         public List<Mod> Mods { get; set; }
 
+        public object Clone()
+        {
+            // Since reflection methods have proven slightly unstable for this purpose, the safest
+            // method is to simply serialize and deserialize us into a new object.
 
+            // If perf is too bad, we can also introduce a full clone down the chain, but that's
+            // slightly less safe in the event any of the classes ever get extended.
+            return JsonConvert.DeserializeObject<ModList>(JsonConvert.SerializeObject(this));
+        }
     }
 
     public class Mod
@@ -109,6 +104,16 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The mod data including offsets
         /// </summary>
         public Data data { get; set; }
+
+        public bool IsInternal()
+        {
+            return source == Constants.InternalModSourceName;
+        }
+
+        public bool IsCustomFile()
+        {
+            return data.modOffset == data.originalOffset;
+        }
     }
 
     public class Data
@@ -127,12 +132,12 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <remarks>
         /// Used to revert to the items original texture
         /// </remarks>
-        public int originalOffset { get; set; }
+        public long originalOffset { get; set; }
 
         /// <summary>
         /// The modified offset of the modified item
         /// </summary>
-        public int modOffset { get; set; }
+        public long modOffset { get; set; }
 
         /// <summary>
         /// The size of the modified items data

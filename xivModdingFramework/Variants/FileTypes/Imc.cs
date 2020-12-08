@@ -19,12 +19,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 
@@ -49,6 +52,76 @@ namespace xivModdingFramework.Variants.FileTypes
             _gameDirectory = gameDirectory;
         }
 
+        public static bool UsesImc(IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root == null) return false;
+            return UsesImc(root);
+
+        }
+        public static bool UsesImc(XivDependencyRoot root)
+        {
+            if (root == null) return false;
+            return UsesImc(root.Info);
+        }
+        public static bool UsesImc(XivDependencyRootInfo root)
+        {
+
+            if (root.PrimaryType == XivItemType.human)
+            {
+                return false;
+            }
+            else if (root.PrimaryType == XivItemType.indoor || root.PrimaryType == XivItemType.outdoor)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// A simple function that retrieves the material set ID of an item,
+        /// whether via IMC or default value.
+        /// 
+        /// A value of -1 indicates that material sets are not used at all on this item.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public async Task<int> GetMaterialSetId(IItemModel item)
+        {
+            var root = item.GetRoot();
+            if (root == null) return -1;
+
+            if(root.Info.PrimaryType == XivItemType.human)
+            {
+                if(root.Info.SecondaryType == XivItemType.hair
+                    || root.Info.SecondaryType == XivItemType.tail
+                    || root.Info.SecondaryType == XivItemType.body)
+                {
+                    // These use material sets (always set 1), but have no IMC file.
+                    return 1;
+                } else
+                {
+                    return -1;
+                }
+            } else if(root.Info.PrimaryType == XivItemType.indoor || root.Info.PrimaryType == XivItemType.outdoor)
+            {
+                return -1;
+            } else
+            {
+                try
+                {
+                    var entry = await GetImcInfo(item);
+                    return entry.MaterialSet;
+                } catch
+                {
+                    return -1;
+                }
+            }
+        }
+
         /// <summary>
         /// Gets the relevant IMC information for a given item
         /// </summary>
@@ -64,24 +137,30 @@ namespace xivModdingFramework.Variants.FileTypes
             return result;
         }
 
-        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item)
+        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item, IndexFile index = null, ModList modlist = null)
         {
             FullImcInfo info = null;
             try
             {
                 var imcPath = GetImcPath(item);
                 var path = imcPath.Folder + "/" + imcPath.File;
-                info = await GetFullImcInfo(path);
+                info = await GetFullImcInfo(path, index, modlist);
             } catch
             {
                 // Some dual wield items don't have a second IMC, and just default to the first.
-                var gear = (XivGear)item;
-                if (gear != null && gear.PairedItem != null)
+                if (typeof(XivGear) == item.GetType())
                 {
-                    var pair = gear.PairedItem;
-                    var imcPath = GetImcPath(pair);
-                    var path = imcPath.Folder + "/" + imcPath.File;
-                    return await (GetFullImcInfo(path));
+                    var gear = (XivGear)item;
+                    if (gear != null && gear.PairedItem != null)
+                    {
+                        var pair = gear.PairedItem;
+                        var imcPath = GetImcPath(pair);
+                        var path = imcPath.Folder + "/" + imcPath.File;
+                        return await (GetFullImcInfo(path, index, modlist));
+                    }
+                } else
+                {
+                    throw new InvalidDataException("Unable to get IMC data for item: " + item.Name);
                 }
             }
 
@@ -97,15 +176,14 @@ namespace xivModdingFramework.Variants.FileTypes
         /// </summary>
         /// <param name="pathsWithOffsets"></param>
         /// <returns></returns>
-        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets)
+        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false, IndexFile index = null, ModList modlist = null)
         {
             var entries = new List<XivImc>();
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
             var lastPath = "";
-            int imcOffset = 0;
             byte[] imcByteData = new byte[0];
+
 
             foreach (var combinedPath in pathsWithOffsets)
             {
@@ -121,8 +199,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 // Only reload this data if we need to.
                 if (path != lastPath)
                 {
-                    imcOffset = await index.GetDataOffset(path);
-                    imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(path));
+                    imcByteData = await dat.GetType2Data(path, forceDefault, index, modlist);
                 }
                 lastPath = path;
 
@@ -139,15 +216,116 @@ namespace xivModdingFramework.Variants.FileTypes
                     br.BaseStream.Seek(offset, SeekOrigin.Begin);
                     entries.Add(new XivImc
                     {
-                        Variant = br.ReadByte(),
-                        Unknown = br.ReadByte(),
+                        MaterialSet = br.ReadByte(),
+                        Decal = br.ReadByte(),
                         Mask = br.ReadUInt16(),
-                        Vfx = br.ReadUInt16()
+                        Vfx = br.ReadByte(),
+                        Animation = br.ReadByte()
                     });
                 }
 
             }
             return entries;
+        }
+
+        /// <summary>
+        /// Saves a set of IMC entries to file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="entries"></param>
+        /// <returns></returns>
+        internal async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        {
+            var dat = new Dat(_gameDirectory);
+            var index = new Index(_gameDirectory);
+
+            var exists = await index.FileExists(path);
+            FullImcInfo info;
+            if(exists)
+            {
+                info = await GetFullImcInfo(path, cachedIndexFile, cachedModList);
+            } else
+            {
+                var ri = XivDependencyGraph.ExtractRootInfo(path);
+                if (ri.SecondaryType == null)
+                {
+                    info = new FullImcInfo()
+                    {
+                        DefaultSubset = new List<XivImc>() { new XivImc(), new XivImc(), new XivImc(), new XivImc(), new XivImc() },
+                        SubsetList = new List<List<XivImc>>(),
+                        TypeIdentifier = ImcType.Set
+                    };
+                } else
+                {
+                    info = new FullImcInfo()
+                    {
+                        DefaultSubset = new List<XivImc>() { new XivImc() },
+                        SubsetList = new List<List<XivImc>>(),
+                        TypeIdentifier = ImcType.NonSet
+                    };
+                }
+            }
+
+
+            for(int i = 0; i < entries.Count; i++)
+            {
+                XivImc e;
+                if (i >= info.SubsetCount + 1)
+                {
+                    e = new XivImc();
+                }
+                else
+                {
+                    e = info.GetEntry(i, slot);
+                }
+                e.Mask = entries[i].Mask;
+                e.Decal = entries[i].Decal;
+                e.Vfx = entries[i].Vfx;
+                e.Animation = entries[i].Animation;
+                e.MaterialSet = entries[i].MaterialSet;
+
+                if (i >= info.SubsetCount + 1)
+                {
+                    info.SetEntry(e, i, slot, true);
+                }
+            }
+
+            // Save the modified info.
+            await SaveFullImcInfo(info, path, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+        }
+
+        public static byte[] SerializeEntry(XivImc entry)
+        {
+
+            List<byte> bytes = new List<byte>(6);
+            bytes.Add((byte)entry.MaterialSet);
+            bytes.Add((byte)entry.Decal);
+            bytes.AddRange(BitConverter.GetBytes((ushort)entry.Mask));
+            bytes.Add((byte)entry.Vfx);
+            bytes.Add((byte)entry.Animation);
+            return bytes.ToArray();
+        }
+
+        public static XivImc DeserializeEntry(byte[] data)
+        {
+
+            using (var br = new BinaryReader(new MemoryStream(data)))
+            {
+                byte variant = br.ReadByte();
+                byte unknown = br.ReadByte();
+                ushort mask = br.ReadUInt16();
+                byte vfx = br.ReadByte();
+                byte anim = br.ReadByte();
+                return new XivImc
+                {
+                    MaterialSet = variant,
+                    Decal = unknown,
+                    Mask = mask,
+                    Vfx = vfx,
+                    Animation = anim
+                };
+
+            }
         }
 
 
@@ -157,13 +335,18 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item"></param>
         /// <param name="useSecondary">Determines if the SecondaryModelInfo should be used instead.(XivGear only)</param>
         /// <returns>The ImcData data</returns>
-        public async Task<FullImcInfo> GetFullImcInfo(string path)
+        public async Task<FullImcInfo> GetFullImcInfo(string path, IndexFile index = null, ModList modlist = null)
         {
-            var index = new Index(_gameDirectory);
+
+            if (index == null)
+            {
+                var _index = new Index(_gameDirectory);
+                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(path), false, true);
+            }
             var dat = new Dat(_gameDirectory);
 
 
-            var imcOffset = await index.GetDataOffset(path);
+            var imcOffset = index.Get8xDataOffset(path);
 
             if (imcOffset == 0)
             {
@@ -192,14 +375,16 @@ namespace xivModdingFramework.Variants.FileTypes
                         byte variant = br.ReadByte();
                         byte unknown = br.ReadByte();
                         ushort mask = br.ReadUInt16();
-                        ushort vfx = br.ReadUInt16();
+                        byte vfx = br.ReadByte();
+                        byte anim = br.ReadByte();
 
                         imcData.DefaultSubset.Add(new XivImc
                         {
-                            Variant = variant,
-                            Unknown = unknown,
+                            MaterialSet = variant,
+                            Decal = unknown,
                             Mask = mask,
-                            Vfx = variant
+                            Vfx = variant,
+                            Animation = anim
                         });
 
                         for (var i = 0; i < subsetCount; i++)
@@ -207,14 +392,16 @@ namespace xivModdingFramework.Variants.FileTypes
                             variant = br.ReadByte();
                             unknown = br.ReadByte();
                             mask = br.ReadUInt16();
-                            vfx = br.ReadUInt16();
+                            vfx = br.ReadByte();
+                            anim = br.ReadByte();
 
                             var newEntry = new XivImc
                             {
-                                Variant = variant,
-                                Unknown = unknown,
+                                MaterialSet = variant,
+                                Decal = unknown,
                                 Mask = mask,
-                                Vfx = vfx
+                                Vfx = vfx,
+                                Animation = anim
                             };
                             var subset = new List<XivImc>() { newEntry };
                             imcData.SubsetList.Add(subset);
@@ -226,15 +413,15 @@ namespace xivModdingFramework.Variants.FileTypes
                         imcData.DefaultSubset = new List<XivImc>()
                         {
                             new XivImc
-                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             new XivImc
-                                {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                         };
 
                         for (var i = 0; i < subsetCount; i++)
@@ -243,15 +430,15 @@ namespace xivModdingFramework.Variants.FileTypes
                             var imcGear = new List<XivImc>()
                             {
                                 new XivImc
-                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                                 new XivImc
-                                    {Variant = br.ReadByte(), Unknown = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadUInt16()},
+                                {MaterialSet = br.ReadByte(), Decal = br.ReadByte(), Mask = br.ReadUInt16(), Vfx = br.ReadByte(), Animation = br.ReadByte()},
                             };
                             imcData.SubsetList.Add(imcGear);
                         }
@@ -265,59 +452,19 @@ namespace xivModdingFramework.Variants.FileTypes
             });
         }
 
-        public async Task SaveImcInfo(XivImc info, IItemModel item)
-        {
-            var full = await GetFullImcInfo(item);
-            full.SetEntry(info, item.ModelInfo.ImcSubsetID, item.GetItemSlotAbbreviation());
-            await SaveFullImcInfo(full, item);
-        }
 
-        public async Task SaveImcInfo(XivImc info, string path, int subsetId = -1, string slot = "")
+        public async Task SaveFullImcInfo(FullImcInfo info, string path, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
-            var full = await GetFullImcInfo(path);
-            full.SetEntry(info, subsetId, slot);
-            await SaveFullImcInfo(full, path);
-        }
-
-        public async Task SaveFullImcInfo(FullImcInfo info, IItemModel item)
-        {
-            try
+            if (info == null || info.TypeIdentifier != ImcType.Set && info.TypeIdentifier != ImcType.NonSet)
             {
-                var imcPath = GetImcPath(item);
-                var path = imcPath.Folder + "/" + imcPath.File;
-                await SaveFullImcInfo(info, path);
+                throw new InvalidDataException("Cannot save invalid IMC file.");
             }
-            catch
-            {
-                // Some dual wield items don't have a second IMC, and just default to the first.
-                var gear = (XivGear)item;
-                if (gear != null && gear.PairedItem != null)
-                {
-                    var pair = gear.PairedItem;
-                    var imcPath = GetImcPath(pair);
-                    var path = imcPath.Folder + "/" + imcPath.File;
-                    await (SaveFullImcInfo(info, path));
-                }
-            }
-            return;
 
-        }
-
-        public async Task SaveFullImcInfo(FullImcInfo info, string path, string itemName = null, string category = null, string source = null)
-        {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-
-            var imcOffset = await index.GetDataOffset(path);
-
-            // No writing new IMC files.
-            if (imcOffset == 0)
-            {
-                throw new InvalidDataException($"Could not find offset for {path}");
-            }
-
             var data = new List<byte>();
+
 
             // 4 Header bytes.
             data.AddRange(BitConverter.GetBytes((short) info.SubsetCount));
@@ -338,12 +485,9 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             // That's it.
+            source ??= "Unknown";
 
-            itemName ??= Path.GetFileName(path);
-            category ??= "Meta";
-            source ??= "Internal";
-
-            await dat.ImportType2Data(data.ToArray(), itemName, path, category, source);
+            await dat.ImportType2Data(data.ToArray(), path, source, referenceItem, cachedIndexFile, cachedModList);
         }
 
         /// <summary>
@@ -435,9 +579,9 @@ namespace xivModdingFramework.Variants.FileTypes
             /// Get the number of subsets.
             ///  -NOT- the same as number of material variants.
             /// </summary>
-            public int SubsetCount { get
+            public short SubsetCount { get
                 {
-                    return SubsetList.Count;
+                    return (short)SubsetList.Count;
                 }
                 set {
                     throw new NotSupportedException("Attempted to directly set SubsetCount.");
@@ -477,18 +621,30 @@ namespace xivModdingFramework.Variants.FileTypes
             public List<XivImc> DefaultSubset { get; set; }
 
             // Gets all (non-default) IMC entries for a given slot.
-            public List<XivImc> GetAllEntries(string slot = "")
+            public List<XivImc> GetAllEntries(string slot = "", bool includeDefault = true)
             {
                 var ret = new List<XivImc>(SubsetList.Count);
-                for(int i = 0; i < SubsetList.Count; i++)
+                if (includeDefault)
                 {
-                    ret.Add(GetEntry(i+1, slot));
+                    for (int i = 0; i <= SubsetList.Count; i++)
+                    {
+                        ret.Add(GetEntry(i, slot));
+                    }
                 }
+                else
+                {
+                    for (int i = 1; i <= SubsetList.Count; i++)
+                    {
+                        ret.Add(GetEntry(i, slot));
+                    }
+                }
+
+
                 return ret;
             }
 
             /// <summary>
-            /// Retrieve a given IMC info. Negative values retrieve the default set.
+            /// Retrieve a given IMC info. Zero or Negative values retrieve the default set.
             /// </summary>
             /// <param name="index">IMC Variant/Subset ID</param>
             /// <param name="slot">Slot Abbreviation</param>
@@ -513,7 +669,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if(SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
+                if(slot != null && SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
                     idx = SlotOffsetDictionary[slot];
                 }
@@ -521,13 +677,13 @@ namespace xivModdingFramework.Variants.FileTypes
                 return subset[idx];
             }
 
-            public void SetEntry(XivImc info, int subsetID = -1, string slot = "")
+            public void SetEntry(XivImc info, int subsetID = -1, string slot = "", bool allowNew = false)
             {
                 // Variant IDs are 1 based, not 0 based.
                 var index = subsetID - 1;
 
                 // Invalid Index, return default.
-                if (index >= SubsetCount || index < 0)
+                if ((index >= SubsetCount && !allowNew) || index < 0)
                 {
                     index = -1;
                 }
@@ -536,12 +692,33 @@ namespace xivModdingFramework.Variants.FileTypes
                 var subset = DefaultSubset;
                 if (index >= 0)
                 {
-                    subset = SubsetList[index];
+                    if (index >= SubsetCount)
+                    {
+                        subset = new List<XivImc>();
+                        if(TypeIdentifier == ImcType.Set)
+                        {
+                            // Five entries for set types.
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                            subset.Add(new XivImc());
+                        } else
+                        {
+                            // One entry for nonset types.
+                            subset.Add(info);
+                        }
+                        SubsetList.Add(subset);
+                    }
+                    else
+                    {
+                        subset = SubsetList[index];
+                    }
                 }
 
                 // Get which offset the slot uses.
                 var idx = 0;
-                if (SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
+                if (slot != null && SlotOffsetDictionary.ContainsKey(slot) && SlotOffsetDictionary[slot] < subset.Count)
                 {
                     idx = SlotOffsetDictionary[slot];
                 }

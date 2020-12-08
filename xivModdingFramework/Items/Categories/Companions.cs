@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
@@ -370,7 +371,7 @@ namespace xivModdingFramework.Items.Categories
 
             var index = new Index(_gameDirectory);
             var imc = new Imc(_gameDirectory);
-            var version = (await imc.GetImcInfo(itemModel)).Variant.ToString().PadLeft(4, '0');
+            var version = (await imc.GetImcInfo(itemModel)).MaterialSet.ToString().PadLeft(4, '0');
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
@@ -404,116 +405,36 @@ namespace xivModdingFramework.Items.Categories
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var root = itemModel.GetRoot();
+
 
             var mdlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/model";
 
             var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara);
 
-            foreach (var slotAbr in SlotAbbreviationDictionary)
+            if (root == null || root.Info.Slot == null)
             {
-                var mdlFile = $"d{id}e{bodyVer}_{slotAbr.Value}.mdl";
-
-                if (files.Contains(HashGenerator.GetHash(mdlFile)))
+                foreach (var slotAbr in SlotAbbreviationDictionary)
                 {
-                    equipPartList.Add(slotAbr.Key);
+                    var mdlFile = $"d{id}e{bodyVer}_{slotAbr.Value}.mdl";
+
+                    if (files.Contains(HashGenerator.GetHash(mdlFile)))
+                    {
+                        equipPartList.Add(slotAbr.Key);
+                    }
+                }
+            } else
+            {
+                var niceSlotName = SlotAbbreviationDictionary.FirstOrDefault(x => x.Value == root.Info.Slot).Key;
+                if (!string.IsNullOrEmpty(niceSlotName))
+                {
+                    equipPartList.Add(niceSlotName);
                 }
             }
 
             return equipPartList;
         }
 
-        /// <summary>
-        /// Searches for monsters with the given model ID
-        /// </summary>
-        /// <param name="modelID">The ID of the monster model</param>
-        /// <param name="type">The type of monster to look for</param>
-        /// <returns>A list of Search Results</returns>
-        public async Task<List<SearchResults>> SearchMonstersByModelID(int modelID, XivItemType type)
-        {
-            var monsterSearchLock = new object();
-            var monsterSearchLock1 = new object();
-            var searchResultsList = new List<SearchResults>();
-            var index = new Index(_gameDirectory);
-            var id = modelID.ToString().PadLeft(4, '0');
-
-            var bodyVariantDictionary = new Dictionary<int, List<int>>();
-
-            if (type == XivItemType.monster)
-            {
-                var folder = $"chara/monster/m{id}/obj/body/b";
-
-                await Task.Run(() => Parallel.For(0, 100, (i) =>
-                {
-                    var folderHashDictionary = new Dictionary<int, int>();
-
-                    var mtrlFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
-
-                    for (var j = 1; j < 100; j++)
-                    {
-                        lock (monsterSearchLock)
-                        {
-                            folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"),
-                                j);
-                        }
-                    }
-
-                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
-
-                    if (variantList.Count > 0)
-                    {
-                        lock (monsterSearchLock1)
-                        {
-                            variantList.Sort();
-                            bodyVariantDictionary.Add(i, variantList);
-                        }
-
-                    }
-                }));
-            }
-            else if (type == XivItemType.demihuman)
-            {
-                var folder = $"chara/demihuman/d{id}/obj/equipment/e";
-
-                await Task.Run(() => Parallel.For(0, 100, (i) =>
-                {
-                    var folderHashDictionary = new Dictionary<int, int>();
-
-                    var mtrlFolder = $"{folder}{i.ToString().PadLeft(4, '0')}/material/v";
-
-                    for (var j = 1; j < 100; j++)
-                    {
-                        lock (monsterSearchLock)
-                        {
-                            folderHashDictionary.Add(HashGenerator.GetHash($"{mtrlFolder}{j.ToString().PadLeft(4, '0')}"),
-                                j);
-                        }
-                    }
-
-                    var variantList = index.GetFolderExistsList(folderHashDictionary, XivDataFile._04_Chara).Result;
-
-                    if (variantList.Count > 0)
-                    {
-                        lock (monsterSearchLock1)
-                        {
-                            variantList.Sort();
-                            bodyVariantDictionary.Add(i, variantList);
-                        }
-                    }
-                }));
-            }
-
-            foreach (var bodyVariant in bodyVariantDictionary)
-            {
-                foreach (var variant in bodyVariant.Value)
-                {
-                    searchResultsList.Add(new SearchResults { Body = bodyVariant.Key.ToString(), Slot = XivStrings.Monster, Variant = variant });
-                }
-            }
-
-            searchResultsList.Sort();
-
-            return searchResultsList;
-        }
 
         /// <summary>
         /// A dictionary containing the slot abbreviations in the format [equipment slot, slot abbreviation]

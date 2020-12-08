@@ -73,7 +73,7 @@ namespace xivModdingFramework.Items.Categories
                 {
                     Name = Path.GetFileNameWithoutExtension(uldPath),
                     PrimaryCategory = "UI",
-                    SecondaryCategory = "HUD",
+                    SecondaryCategory = XivStrings.HUD,
                     UiPath = "ui/uld"
                 };
 

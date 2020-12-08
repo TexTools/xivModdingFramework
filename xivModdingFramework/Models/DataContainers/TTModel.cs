@@ -1,4 +1,6 @@
 ﻿using HelixToolkit.SharpDX.Core;
+using HelixToolkit.SharpDX.Core.Animations;
+using HelixToolkit.SharpDX.Core.Core;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using Newtonsoft.Json;
 using SharpDX;
@@ -12,6 +14,8 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Textures.Enums;
@@ -26,7 +30,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// so none of them can be separated from the others without creating
     /// an entirely new vertex.
     /// </summary>
-    public class TTVertex {
+    public class TTVertex : ICloneable {
         public Vector3 Position = new Vector3(0,0,0);
 
         public Vector3 Normal = new Vector3(0, 0, 0);
@@ -79,6 +83,21 @@ namespace xivModdingFramework.Models.DataContainers
             var b = (TTVertex)obj;
             return b == this;
         }
+
+        public object Clone()
+        {
+            var clone = (TTVertex) this.MemberwiseClone();
+
+            clone.VertexColor = new byte[4];
+            clone.BoneIds = new byte[4];
+            clone.Weights = new byte[4];
+
+            Array.Copy(this.BoneIds, 0, clone.BoneIds, 0, 4);
+            Array.Copy(this.Weights, 0, clone.Weights, 0, 4);
+            Array.Copy(this.VertexColor, 0, clone.VertexColor, 0, 4);
+
+            return clone;
+        }
     }
 
 
@@ -100,6 +119,29 @@ namespace xivModdingFramework.Models.DataContainers
         // List of Attributes attached to this part.
         public HashSet<string> Attributes = new HashSet<string>();
 
+        public Dictionary<string, TTShapePart> ShapeParts = new Dictionary<string, TTShapePart>();
+
+
+        /// <summary>
+        /// Updates all shapes in this part to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach(var shpKv in ShapeParts)
+            {
+                var shp = shpKv.Value;
+
+                foreach(var rKv in shp.VertexReplacements)
+                {
+                    var baseVert = Vertices[rKv.Key];
+                    var shapeVert = shp.Vertices[rKv.Value];
+
+                    shp.Vertices[rKv.Value] = (TTVertex)baseVert.Clone();
+                    shp.Vertices[rKv.Value].Position = shapeVert.Position;
+                }
+            }
+        }
+
     }
 
     /// <summary>
@@ -120,9 +162,9 @@ namespace xivModdingFramework.Models.DataContainers
         public List<TTVertex> Vertices = new List<TTVertex>();
 
         /// <summary>
-        /// Dictionary of [Mesh Level Index #] => [Shape Part Vertex # to replace that Index's Value with] 
+        /// Dictionary of [Part Level Vertex #] => [Shape Part Level Vertex #] to replace it with.
         /// </summary>
-        public Dictionary<int, int> Replacements = new Dictionary<int, int>();
+        public Dictionary<int, int> VertexReplacements = new Dictionary<int, int>(); 
     }
 
     /// <summary>
@@ -151,8 +193,154 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public List<string> Bones = new List<string>();
 
+        public int GetVertexCount()
+        {
+            int count = 0;
+            foreach(var p in Parts)
+            {
+                count += p.Vertices.Count;
+            }
+            return count;
+        }
 
-        public List<TTShapePart> ShapeParts = new List<TTShapePart>();
+        public int GetIndexCount()
+        {
+            int count = 0;
+            foreach (var p in Parts)
+            {
+                count += p.TriangleIndices.Count;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Set an index by its MESH RELEVANT index ID and vertex ID.
+        /// </summary>
+        /// <param name="indexId"></param>
+        /// <param name="vertexIdToSet"></param>
+        public void SetIndexAt(int indexId, int vertexIdToSet)
+        {
+            int verticesSoFar = 0;
+            int indicesSoFar = 0;
+
+            foreach(var p in Parts)
+            {
+                if(indexId >= indicesSoFar + p.TriangleIndices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    indicesSoFar += p.TriangleIndices.Count;
+                    continue;
+                }
+                // Okay, we've found the part containing our index.
+                var relevantIndex = indexId - indicesSoFar;
+                var relevantVertex = vertexIdToSet - verticesSoFar;
+                if(relevantVertex < 0 || relevantVertex >= p.Vertices.Count)
+                {
+                    throw new InvalidDataException("Cannot set triangle index to vertex which is not contained by the same mesh part.");
+                }
+
+                p.TriangleIndices[relevantIndex] = relevantVertex;
+            }
+        }
+
+        /// <summary>
+        /// Set a vertex by its MESH RELEVANT vertex id.
+        /// </summary>
+        /// <param name="vertex"></param>
+        public void SetVertexAt(int vertexId, TTVertex vertex)
+        {
+            int verticesSoFar = 0;
+
+            foreach (var p in Parts)
+            {
+                if (vertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    continue;
+                }
+
+                var relevantVertex = vertexId - verticesSoFar;
+                p.Vertices[relevantVertex] = vertex;
+            }
+        }
+
+
+        /// <summary>
+        /// Retrieves all the part information for a given Mesh-Relevant vertex Id.
+        /// </summary>
+        /// <param name="vertexId"></param>
+        /// <returns></returns>
+        public (int PartId, int PartReleventOffset) GetPartRelevantVertexInformation(int vertexId)
+        {
+            int verticesSoFar = 0;
+
+            var pIdx = 0;
+            foreach (var p in Parts)
+            {
+                if (vertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    pIdx++;
+                    continue;
+                }
+
+                var relevantVertex = vertexId - verticesSoFar;
+                return (pIdx, relevantVertex);
+            }
+
+            return (-1, -1);
+        }
+
+        /// <summary>
+        /// Gets the part id of the part which owns a given triangle index.
+        /// </summary>
+        /// <param name="meshRelevantTriangleIndex"></param>
+        /// <returns></returns>
+        public int GetOwningPartIdByIndex(int meshRelevantTriangleIndex)
+        {
+            int indicesSoFar = 0;
+
+            var idx = 0;
+            foreach (var p in Parts)
+            {
+                if (meshRelevantTriangleIndex >= indicesSoFar + p.TriangleIndices.Count)
+                {
+                    // Need to keep looping.
+                    indicesSoFar += p.TriangleIndices.Count;
+                    idx++;
+                    continue;
+                }
+                return idx;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets the part id of the part which owns a given vertex.
+        /// </summary>
+        /// <param name="meshRelevantTriangleIndex"></param>
+        /// <returns></returns>
+        public int GetOwningPartIdByVertex(int meshRelevantVertexId)
+        {
+            int verticesSoFar = 0;
+
+            var idx = 0;
+            foreach (var p in Parts)
+            {
+                if (meshRelevantVertexId >= verticesSoFar + p.Vertices.Count)
+                {
+                    // Need to keep looping.
+                    verticesSoFar += p.Vertices.Count;
+                    idx++;
+                    continue;
+                }
+                return idx;
+            }
+            return -1;
+        }
 
         /// <summary>
         /// Accessor for the full unified MeshGroup level Vertex list.
@@ -216,6 +404,17 @@ namespace xivModdingFramework.Models.DataContainers
             var modifiedVertexId = realVertexId + offsets[partId];
             return modifiedVertexId;
 
+        }
+
+        /// <summary>
+        /// Updates all shapes in this mesh group to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach (var p in Parts)
+            {
+                p.UpdateShapeData();
+            }
         }
 
         /// <summary>
@@ -291,6 +490,8 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class TTModel
     {
+        public static string _SETTINGS_KEY_EXPORT_ALL_BONES = "setting_export_all_bones";
+
         /// <summary>
         /// The internal or external file path where this TTModel originated from.
         /// </summary>
@@ -300,6 +501,8 @@ namespace xivModdingFramework.Models.DataContainers
         /// The Mesh groups and parts of this mesh.
         /// </summary>
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
+
+        public HashSet<string> ActiveShapes = new HashSet<string>();
 
 
         #region Calculated Properties
@@ -385,7 +588,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshGroups.Any(x => x.ShapeParts.Count > 0);
+                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count(x => x.Key.StartsWith("shp_")) > 0 ));
             }
         }
         
@@ -399,9 +602,13 @@ namespace xivModdingFramework.Models.DataContainers
                 var shapes = new SortedSet<string>();
                 foreach(var m in MeshGroups)
                 {
-                    foreach(var p in m.ShapeParts)
+                    foreach(var p in m.Parts)
                     {
-                        shapes.Add(p.Name);
+                        foreach (var shp in p.ShapeParts)
+                        {
+                            if (!shp.Key.StartsWith("shp_")) continue;
+                            shapes.Add(shp.Key);
+                        }
                     }
                 }
                 return shapes.ToList();
@@ -418,7 +625,16 @@ namespace xivModdingFramework.Models.DataContainers
                 short sum = 0;
                 foreach(var m in MeshGroups)
                 {
-                    sum += (short) m.ShapeParts.Count;
+                    HashSet<string> shapeNames = new HashSet<string>();
+                    foreach (var p in m.Parts)
+                    {
+                        foreach(var shp in p.ShapeParts)
+                        {
+                            if (!shp.Key.StartsWith("shp_")) continue;
+                            shapeNames.Add(shp.Key);
+                        }
+                    }
+                    sum += (short)shapeNames.Count;
                 }
                 return sum;
             }
@@ -427,19 +643,38 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Total Shape Data (Index) Entries
         /// </summary>
-        public short ShapeDataCount
+        public ushort ShapeDataCount
         {
             get
             {
-                short sum = 0;
+                uint sum = 0;
+                // This one is a little more complex.
                 foreach (var m in MeshGroups)
                 {
-                    foreach(var p in m.ShapeParts)
+                    foreach(var p in m.Parts)
                     {
-                        sum += (short)p.Replacements.Count;
+                        foreach(var index in p.TriangleIndices)
+                        {
+                            // For every index.
+                            foreach(var shp in p.ShapeParts)
+                            {
+                                if (!shp.Key.StartsWith("shp_")) continue;
+                                // There is an entry for every shape it shows up in.
+                                if (shp.Value.VertexReplacements.ContainsKey(index))
+                                {
+                                    sum++;
+                                }
+                            }
+                        }
                     }
                 }
-                return sum;
+                
+                if(sum > ushort.MaxValue)
+                {
+                    throw new Exception($"Model exceeds the maximum possible shape data indices.\n\nCurrent: {sum.ToString()}\nMaximum: {ushort.MaxValue.ToString()}");
+                }
+
+                return (ushort) sum;
             }
         }
 
@@ -452,51 +687,141 @@ namespace xivModdingFramework.Models.DataContainers
             get
             {
                 var counts = new List<short>(new short[ShapeNames.Count]);
+                var shapeNames = ShapeNames;
 
-                foreach (var m in MeshGroups)
+                var shapes = new SortedSet<string>();
+                var shpIdx = 0;
+                foreach (var shpNm in shapeNames)
                 {
-                    foreach (var p in m.ShapeParts)
+                    if (!shpNm.StartsWith("shp_")) continue;
+                    foreach (var m in MeshGroups)
                     {
-                        var idx = ShapeNames.IndexOf(p.Name);
-                        counts[idx]++;
+                        if (m.Parts.Any(x => x.ShapeParts.ContainsKey(shpNm)))
+                        {
+                            counts[shpIdx]++;
+                        }
                     }
+                    shpIdx++;
                 }
                 return counts;
             }
         }
 
         /// <summary>
-        /// List of all the Shape Parts in the mesh, grouped by Shape Name order.
-        /// (Matches up with ShapePartCounts)
+        /// Gets all the raw shape data of the mesh for use with importing the data back into FFXIV's file system.
+        /// Calling/building this data is somewhat expensive, and should only be done
+        /// if actually needed in this specified format.
         /// </summary>
-        public List<(TTShapePart Part, int MeshId)> ShapeParts
+        internal List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)> GetRawShapeParts()
         {
-            get
-            {
-                var byShape = new Dictionary<string, List<(TTShapePart Part, int MeshId)>>();
+            var ret = new List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)>();
 
+            var shapeNames = ShapeNames;
+            shapeNames.Sort();
+
+            // This is a key of [Mesh] [Part] [Vertex Id] => List of referencing indices
+            var partRelevantVertexIdToReferringIndices = new Dictionary<int, Dictionary<int, Dictionary<int, List<int>>>>();
+            var meshVertexOffsets = new Dictionary<int, int>();
+
+            var idx = 0;
+            foreach(var m in MeshGroups)
+            {
+                meshVertexOffsets.Add(idx, (int) m.VertexCount);
+                idx++;
+            }
+
+            foreach (var shpName in shapeNames)
+            {
                 var mIdx = 0;
                 foreach (var m in MeshGroups)
                 {
-                    foreach (var p in m.ShapeParts)
+                    if (!m.Parts.Any(x => x.ShapeParts.Any(y => y.Key == shpName)))
                     {
-                        if(!byShape.ContainsKey(p.Name))
-                        {
-                            byShape.Add(p.Name, new List<(TTShapePart Part, int MeshId)>());
-                        }
-                        byShape[p.Name].Add((p, mIdx));
+                        mIdx++;
+                        continue;
                     }
+
+                    // Generate key if needed.
+                    if(!partRelevantVertexIdToReferringIndices.ContainsKey(mIdx))
+                    {
+                        partRelevantVertexIdToReferringIndices.Add(mIdx, new Dictionary<int, Dictionary<int, List<int>>>());
+                    }
+
+                    Dictionary<int, int> replacements = new Dictionary<int, int>();
+                    List<TTVertex> vertices = new List<TTVertex>();
+
+
+                    var baseIndexOffset = m.IndexCount;
+
+                    var partVertexOffset = 0;
+                    var partIndexOffset = 0;
+                    var pIdx = 0;
+                    foreach(var p in m.Parts)
+                    {
+                        // Build index reference table if needed.
+                        if (!partRelevantVertexIdToReferringIndices[mIdx].ContainsKey(pIdx))
+                        {
+                            partRelevantVertexIdToReferringIndices[mIdx].Add(pIdx, new Dictionary<int, List<int>>());
+
+                            for(int i = 0; i < p.TriangleIndices.Count; i++)
+                            {
+                                var vertexId = p.TriangleIndices[i];
+                                if (!partRelevantVertexIdToReferringIndices[mIdx][pIdx].ContainsKey(vertexId))
+                                {
+                                    partRelevantVertexIdToReferringIndices[mIdx][pIdx].Add(vertexId, new List<int>());
+                                }
+                                partRelevantVertexIdToReferringIndices[mIdx][pIdx][vertexId].Add(i);
+                            }
+                        }
+
+                        if (!p.ShapeParts.ContainsKey(shpName))
+                        {
+                            partVertexOffset += p.Vertices.Count;
+                            partIndexOffset += p.TriangleIndices.Count;
+                            pIdx++;
+                            continue;
+                        }
+
+                        var shp = p.ShapeParts[shpName];
+
+                        // Here we have to convert every vertex into a list of original
+                        // indices that reference it.
+                        foreach (var kv in shp.VertexReplacements)
+                        {
+                            var partRelevantOriginalVertexId = kv.Key;
+                            var shapeRelevantReplacementVertexId = kv.Value;
+                            var originalVertex = p.Vertices[partRelevantOriginalVertexId];
+                            var newVertex = shp.Vertices[shapeRelevantReplacementVertexId];
+                            
+                            // Clone the reference to an array.
+                            var originalReferencingIndices = partRelevantVertexIdToReferringIndices[mIdx][pIdx][partRelevantOriginalVertexId].ToArray();
+
+                            for(int i =0; i < originalReferencingIndices.Length; i++)
+                            {
+                                replacements.Add(originalReferencingIndices[i] + partIndexOffset, shapeRelevantReplacementVertexId + meshVertexOffsets[mIdx] + vertices.Count);
+                            }
+                        }
+
+                        vertices.AddRange(shp.Vertices);
+
+                        partIndexOffset += p.TriangleIndices.Count;
+                        partVertexOffset += p.Vertices.Count;
+                        pIdx++;
+                    }
+
+
+
+                    meshVertexOffsets[mIdx] += vertices.Count;
+                    ret.Add((shpName, mIdx, replacements, vertices));
                     mIdx++;
                 }
-
-                var ret = new List<(TTShapePart Part, int MeshId)>();
-                foreach(var name in ShapeNames)
-                {
-                    ret.AddRange(byShape[name]);
-                }
-                return ret;
             }
+
+            return ret;
         }
+
+        private static List<TTVertex> defaultBaseVerts = new List<TTVertex>();
+        private static List<TTVertex> defaultShapeVerts = new List<TTVertex>();
 
         /// <summary>
         /// Whether or not this Model actually has animation/weight data.
@@ -714,6 +1039,7 @@ namespace xivModdingFramework.Models.DataContainers
                     }
                 }
 
+
                 // Load Bones
                 query = "select * from bones where mesh >= 0 order by mesh asc, bone_id asc;";
                 using (var cmd = new SQLiteCommand(query, db))
@@ -804,6 +1130,54 @@ namespace xivModdingFramework.Models.DataContainers
                 }
             }
 
+            // Spawn a DB connection to do the raw queries.
+            using (var db = new SQLiteConnection(connectionString))
+            {
+                db.Open();
+                // Load Shape Verts
+                var query = "select * from shape_vertices order by shape asc, mesh asc, part asc, vertex_id asc;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    using (var reader = new CacheReader(cmd.ExecuteReader()))
+                    {
+                        while (reader.NextRow())
+                        {
+                            var shapeName = reader.GetString("shape");
+                            var meshNum = reader.GetInt32("mesh");
+                            var partNum = reader.GetInt32("part");
+                            var vertexId = reader.GetInt32("vertex_id");
+
+                            var part = model.MeshGroups[meshNum].Parts[partNum];
+                            // Copy the original vertex and update position.
+                            TTVertex vertex = (TTVertex)part.Vertices[vertexId].Clone();
+                            vertex.Position.X = reader.GetFloat("position_x");
+                            vertex.Position.Y = reader.GetFloat("position_y");
+                            vertex.Position.Z = reader.GetFloat("position_z");
+
+                            var repVert = part.Vertices[vertexId];
+                            if (repVert.Position.Equals(vertex.Position))
+                            {
+                                // Skip morphology which doesn't actually change anything.
+                                continue;
+                            }
+
+                            if (!part.ShapeParts.ContainsKey(shapeName))
+                            {
+                                var shpPt = new TTShapePart();
+                                shpPt.Name = shapeName;
+                                part.ShapeParts.Add(shapeName, shpPt);
+                            }
+
+
+                            part.ShapeParts[shapeName].VertexReplacements.Add(vertexId, part.ShapeParts[shapeName].Vertices.Count);
+                            part.ShapeParts[shapeName].Vertices.Add(vertex);
+
+                        }
+                    }
+                }
+            }
+
+
 
             // Convert the model to FFXIV's internal weirdness.
             ModelModifiers.MakeImportReady(model, loggingFunction);
@@ -830,7 +1204,10 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             try
             {
-                var boneDict = ResolveBoneHeirarchy(loggingFunction);
+                var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
+                var bones = useAllBones ? null : Bones;
+
+                var boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
 
                 const string creationScript = "CreateImportDB.sql";
                 // Spawn a DB connection to do the raw queries.
@@ -1068,12 +1445,43 @@ namespace xivModdingFramework.Models.DataContainers
                                     }
                                 }
 
+
+
+                                // Shape Parts
+                                foreach(var shpKv in p.ShapeParts)
+                                {
+                                    if (!shpKv.Key.StartsWith("shp_")) continue;
+                                    var shp = shpKv.Value;
+
+                                    query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
+                                                                   values($mesh, $part, $shape, $vertex_id, $position_x, $position_y, $position_z);";
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        foreach (var vKv in shp.VertexReplacements)
+                                        {
+                                        var v = shp.Vertices[vKv.Value];
+                                            cmd.Parameters.AddWithValue("part", partIdx);
+                                            cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                            cmd.Parameters.AddWithValue("shape", shpKv.Key);
+                                            cmd.Parameters.AddWithValue("vertex_id", vKv.Key);
+
+                                            cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                            cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                            cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+
+                                            cmd.ExecuteScalar();
+                                            vIdx++;
+                                        }
+                                    }
+                                }
+
                                 partIdx++;
                             }
 
+
+
                             meshIdx++;
-
-
                         }
                         transaction.Commit();
                     }
@@ -1081,11 +1489,112 @@ namespace xivModdingFramework.Models.DataContainers
             } catch(Exception Ex)
             {
                 ModelModifiers.MakeImportReady(this, loggingFunction);
-                throw Ex;
+                throw;
             }
 
             // Undo the export ready at the start.
             ModelModifiers.MakeImportReady(this, loggingFunction);
+        }
+
+        public static Dictionary<string, SkeletonData> ResolveFullBoneHeirarchy(XivRace race, List<string> models, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
+
+            // First thing we need to do here is scrap through the groups to
+            // pull back out the extra skeletons of the constituent models.
+            var _metRegex = new Regex("e([0-9]{4})_met");
+            var _topRegex = new Regex("e([0-9]{4})_top");
+            var _faceRegex = new Regex("f([0-9]{4})");
+            var _hairRegex = new Regex("h([0-9]{4})");
+
+            int topNum = -1;
+            int metNum = -1;
+            int faceNum = -1;
+            int hairNum = -1;
+
+            foreach (var m in models)
+            {
+                var metMatch = _metRegex.Match(m);
+                var topMatch = _topRegex.Match(m);
+                var faceMatch = _faceRegex.Match(m);
+                var hairMatch = _hairRegex.Match(m);
+
+                if (metMatch.Success)
+                {
+                    metNum = Int32.Parse(metMatch.Groups[1].Value);
+                }
+                else if (topMatch.Success)
+                {
+                    topNum = Int32.Parse(topMatch.Groups[1].Value);
+
+                }
+                else if (faceMatch.Success)
+                {
+                    faceNum = Int32.Parse(faceMatch.Groups[1].Value);
+                }
+                else if (hairMatch.Success)
+                {
+                    hairNum = Int32.Parse(hairMatch.Groups[1].Value);
+                }
+            }
+
+            // This is a list of the roots we'll need to pull extra skeleton data for.
+            List<XivDependencyRootInfo> rootsToResolve = new List<XivDependencyRootInfo>();
+
+            if (metNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.equipment;
+                root.PrimaryId = metNum;
+                root.Slot = "met";
+
+                rootsToResolve.Add(root);
+            }
+            if (topNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.equipment;
+                root.PrimaryId = topNum;
+                root.Slot = "top";
+                rootsToResolve.Add(root);
+            }
+            if (faceNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.human;
+                root.PrimaryId = XivRaces.GetRaceCodeInt(race);
+                root.SecondaryType = XivItemType.face;
+                root.SecondaryId = faceNum;
+                root.Slot = "fac";
+                rootsToResolve.Add(root);
+            }
+            if (hairNum >= 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.human;
+                root.PrimaryId = XivRaces.GetRaceCodeInt(race);
+                root.SecondaryType = XivItemType.hair;
+                root.SecondaryId = hairNum;
+                root.Slot = "hir";
+                rootsToResolve.Add(root);
+            }
+
+            // No extra skeletons using slots were used, just add the base root so we get the race's standard skeleton at least.
+            if (rootsToResolve.Count == 0)
+            {
+                var root = new XivDependencyRootInfo();
+                root.PrimaryType = XivItemType.equipment;
+                root.PrimaryId = 0;
+                root.Slot = "top";
+                rootsToResolve.Add(root);
+            }
+
+            var boneDict = TTModel.ResolveBoneHeirarchyRaw(rootsToResolve, race, null, loggingFunction);
+            return boneDict;
         }
 
         /// <summary>
@@ -1093,7 +1602,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public void SaveFullToFile(string filePath, string raceId, Action<bool, string> loggingFunction = null)
+        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -1102,273 +1611,313 @@ namespace xivModdingFramework.Models.DataContainers
 
             var directory = Path.GetDirectoryName(filePath);
 
-            ModelModifiers.MakeExportReady(this, loggingFunction);
+            var paths = new List<string>();
+            foreach(var m in models)
+            {
+                paths.Add(m.Source);
+            }
+
+            var boneDict = ResolveFullBoneHeirarchy(race, paths, loggingFunction);
+
+
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
-            try
+            foreach (var model in models)
             {
-                var boneDict = ResolveBoneHeirarchy(loggingFunction, raceId);
-
-                // Spawn a DB connection to do the raw queries.
-                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
-                using (var db = new SQLiteConnection(connectionString))
+                try
                 {
-                    db.Open();
+                    ModelModifiers.MakeExportReady(model, loggingFunction);
 
-                    // Write the Data.
-                    using (var transaction = db.BeginTransaction())
+
+                    // Spawn a DB connection to do the raw queries.
+                    // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+                    using (var db = new SQLiteConnection(connectionString))
                     {
-                        // Get the model Ids already in the DB
-                        var modelList = new List<int>();
-                        var getModelQuery = "SELECT model FROM models";
-                        using (var cmd = new SQLiteCommand(getModelQuery, db))
-                        {
-                            var sqReader = cmd.ExecuteReader();
+                        db.Open();
 
-                            while (sqReader.Read())
+                        // Write the Data.
+                        using (var transaction = db.BeginTransaction())
+                        {
+                            // Get the model Ids already in the DB
+                            var modelList = new List<int>();
+                            var getModelQuery = "SELECT model FROM models";
+                            using (var cmd = new SQLiteCommand(getModelQuery, db))
                             {
-                                modelList.Add(sqReader.GetInt32(0));
+                                var sqReader = cmd.ExecuteReader();
+
+                                while (sqReader.Read())
+                                {
+                                    modelList.Add(sqReader.GetInt32(0));
+                                }
                             }
-                        }
 
-                        var modelIdx = modelList.Any() ? modelList.Max() + 1 : 0;
-                        var modelName = Path.GetFileNameWithoutExtension(Source);
+                            var modelIdx = modelList.Any() ? modelList.Max() + 1 : 0;
+                            var modelName = Path.GetFileNameWithoutExtension(model.Source);
 
-                        //Models
-                        var query = @"insert into models (model, name) values ($model, $name);";
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            cmd.Parameters.AddWithValue("model", modelIdx);
-                            cmd.Parameters.AddWithValue("name", modelName);
-
-                            cmd.ExecuteScalar();
-                        }
-
-                        // Get the skeleton names already in the DB
-                        var skelList = new List<string>();
-                        var getSkelQuery = "SELECT name FROM skeleton";
-                        using (var cmd = new SQLiteCommand(getSkelQuery, db))
-                        {
-                            var sqReader = cmd.ExecuteReader();
-
-                            while (sqReader.Read())
+                            //Models
+                            var query = @"insert into models (model, name) values ($model, $name);";
+                            using (var cmd = new SQLiteCommand(query, db))
                             {
-                                skelList.Add(sqReader.GetString(0));
-                            }
-                        }
+                                cmd.Parameters.AddWithValue("model", modelIdx);
+                                cmd.Parameters.AddWithValue("name", modelName);
 
-                        // Skeleton
-                        query = @"insert into skeleton (name, parent, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
+                                cmd.ExecuteScalar();
+                            }
+
+                            // Get the skeleton names already in the DB
+                            var skelList = new List<string>();
+                            var getSkelQuery = "SELECT name FROM skeleton";
+                            using (var cmd = new SQLiteCommand(getSkelQuery, db))
+                            {
+                                var sqReader = cmd.ExecuteReader();
+
+                                while (sqReader.Read())
+                                {
+                                    skelList.Add(sqReader.GetString(0));
+                                }
+                            }
+
+                            // Skeleton
+                            query = @"insert into skeleton (name, parent, matrix_0, matrix_1, matrix_2, matrix_3, matrix_4, matrix_5, matrix_6, matrix_7, matrix_8, matrix_9, matrix_10, matrix_11, matrix_12, matrix_13, matrix_14, matrix_15) 
                                              values ($name, $parent, $matrix_0, $matrix_1, $matrix_2, $matrix_3, $matrix_4, $matrix_5, $matrix_6, $matrix_7, $matrix_8, $matrix_9, $matrix_10, $matrix_11, $matrix_12, $matrix_13, $matrix_14, $matrix_15);";
 
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            foreach (var b in boneDict)
-                            {
-                                // Skip the bone if it's already in the DB
-                                if (skelList.Contains(b.Value.BoneName)) continue;
-
-                                var parent = boneDict.FirstOrDefault(x => x.Value.BoneNumber == b.Value.BoneParent);
-                                var parentName = parent.Key == null ? null : parent.Key;
-                                cmd.Parameters.AddWithValue("name", b.Value.BoneName);
-                                cmd.Parameters.AddWithValue("parent", parentName);
-
-                                for (int i = 0; i < 16; i++)
-                                {
-                                    cmd.Parameters.AddWithValue("matrix_" + i.ToString(), b.Value.PoseMatrix[i]);
-                                }
-
-                                cmd.ExecuteScalar();
-                            }
-                        }
-
-                        // Get the material ids already in the DB
-                        var matIdList = new List<int>();
-                        var getMatIdQuery = "SELECT material_id FROM materials";
-                        using (var cmd = new SQLiteCommand(getMatIdQuery, db))
-                        {
-                            var sqReader = cmd.ExecuteReader();
-
-                            while (sqReader.Read())
-                            {
-                                matIdList.Add(sqReader.GetInt32(0));
-                            }
-                        }
-
-                        // Start from the last material ID in the DB
-                        var matIdx = matIdList.Any() ? matIdList.Max() + 1 : 0; 
-                        var tempMatDict = new Dictionary<string, int>();
-                        foreach (var material in Materials)
-                        {
-                            // Materials
-                            query = @"insert into materials (material_id, name, diffuse, normal, specular, opacity, emissive) values ($material_id, $name, $diffuse, $normal, $specular, $opacity, $emissive);";
                             using (var cmd = new SQLiteCommand(query, db))
                             {
-                                var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
-                                var mtrl_suffix = ".png";
-                                var name = material;
-                                try
+                                foreach (var b in boneDict)
                                 {
-                                    name = Path.GetFileNameWithoutExtension(material);
-                                }
-                                catch
-                                {
+                                    // Skip the bone if it's already in the DB
+                                    if (skelList.Contains(b.Value.BoneName)) continue;
 
-                                }
-                                cmd.Parameters.AddWithValue("material_id", matIdx);
-                                cmd.Parameters.AddWithValue("name", name);
-                                cmd.Parameters.AddWithValue("diffuse", mtrl_prefix + "d" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("normal", mtrl_prefix + "n" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("specular", mtrl_prefix + "s" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("emissive", mtrl_prefix + "e" + mtrl_suffix);
-                                cmd.Parameters.AddWithValue("opacity", mtrl_prefix + "o" + mtrl_suffix);
-                                cmd.ExecuteScalar();
-                            }
-                            tempMatDict.Add(Path.GetFileNameWithoutExtension(material), matIdx);
-                            matIdx++;
-                        }
+                                    var parent = boneDict.FirstOrDefault(x => x.Value.BoneNumber == b.Value.BoneParent);
+                                    var parentName = parent.Key == null ? null : parent.Key;
+                                    cmd.Parameters.AddWithValue("name", b.Value.BoneName);
+                                    cmd.Parameters.AddWithValue("parent", parentName);
 
-                        // Get the mesh ids already in the DB for Bones
-                        var meshIdList = new List<int>();
-                        var getMeshIdQuery = "SELECT mesh FROM bones";
-                        using (var cmd = new SQLiteCommand(getMeshIdQuery, db))
-                        {
-                            var sqReader = cmd.ExecuteReader();
+                                    for (int i = 0; i < 16; i++)
+                                    {
+                                        cmd.Parameters.AddWithValue("matrix_" + i.ToString(), b.Value.PoseMatrix[i]);
+                                    }
 
-                            while (sqReader.Read())
-                            {
-                                meshIdList.Add(sqReader.GetInt32(0));
-                            }
-                        }
-
-                        // Start from the last mesh ID in the DB
-                        var meshIdx = meshIdList.Any() ? meshIdList.Max() + 1 : 0;
-                        foreach (var m in MeshGroups)
-                        {
-                            // Bones
-                            query = @"insert into bones (mesh, bone_id, name) values ($mesh, $bone_id, $name);";
-                            var bIdx = 0;
-                            foreach (var b in m.Bones)
-                            {
-                                using (var cmd = new SQLiteCommand(query, db))
-                                {
-                                    cmd.Parameters.AddWithValue("name", b);
-                                    cmd.Parameters.AddWithValue("bone_id", bIdx);
-                                    cmd.Parameters.AddWithValue("parent_id", null);
-                                    cmd.Parameters.AddWithValue("mesh", meshIdx);
                                     cmd.ExecuteScalar();
                                 }
-                                bIdx++;
                             }
 
-                            // Meshes
-                            query = @"insert into meshes (mesh, model, name, material_id) values ($mesh, $model, $name, $material_id);";
-                            using (var cmd = new SQLiteCommand(query, db))
+                            // Get the material ids already in the DB
+                            var matIdList = new List<int>();
+                            var getMatIdQuery = "SELECT material_id FROM materials";
+                            using (var cmd = new SQLiteCommand(getMatIdQuery, db))
                             {
-                                cmd.Parameters.AddWithValue("name", m.Name);
-                                cmd.Parameters.AddWithValue("model", modelIdx);
-                                cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                cmd.Parameters.AddWithValue("material_id", tempMatDict[Path.GetFileNameWithoutExtension(m.Material)]);
-                                cmd.ExecuteScalar();
+                                var sqReader = cmd.ExecuteReader();
+
+                                while (sqReader.Read())
+                                {
+                                    matIdList.Add(sqReader.GetInt32(0));
+                                }
                             }
 
-
-                            // Parts
-                            var partIdx = 0;
-                            foreach (var p in m.Parts)
+                            // Start from the last material ID in the DB
+                            var matIdx = matIdList.Any() ? matIdList.Max() + 1 : 0;
+                            var tempMatDict = new Dictionary<string, int>();
+                            foreach (var material in model.Materials)
                             {
+                                // Materials
+                                query = @"insert into materials (material_id, name, diffuse, normal, specular, opacity, emissive) values ($material_id, $name, $diffuse, $normal, $specular, $opacity, $emissive);";
+                                using (var cmd = new SQLiteCommand(query, db))
+                                {
+                                    var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
+                                    var mtrl_suffix = ".png";
+                                    var name = material;
+                                    try
+                                    {
+                                        name = Path.GetFileNameWithoutExtension(material);
+                                    }
+                                    catch
+                                    {
+
+                                    }
+                                    cmd.Parameters.AddWithValue("material_id", matIdx);
+                                    cmd.Parameters.AddWithValue("name", name);
+                                    cmd.Parameters.AddWithValue("diffuse", mtrl_prefix + "d" + mtrl_suffix);
+                                    cmd.Parameters.AddWithValue("normal", mtrl_prefix + "n" + mtrl_suffix);
+                                    cmd.Parameters.AddWithValue("specular", mtrl_prefix + "s" + mtrl_suffix);
+                                    cmd.Parameters.AddWithValue("emissive", mtrl_prefix + "e" + mtrl_suffix);
+                                    cmd.Parameters.AddWithValue("opacity", mtrl_prefix + "o" + mtrl_suffix);
+                                    cmd.ExecuteScalar();
+                                }
+                                tempMatDict.Add(Path.GetFileNameWithoutExtension(material), matIdx);
+                                matIdx++;
+                            }
+
+                            // Get the mesh ids already in the DB for Bones
+                            var meshIdList = new List<int>();
+                            var getMeshIdQuery = "SELECT mesh FROM bones";
+                            using (var cmd = new SQLiteCommand(getMeshIdQuery, db))
+                            {
+                                var sqReader = cmd.ExecuteReader();
+
+                                while (sqReader.Read())
+                                {
+                                    meshIdList.Add(sqReader.GetInt32(0));
+                                }
+                            }
+
+                            // Start from the last mesh ID in the DB
+                            var meshIdx = meshIdList.Any() ? meshIdList.Max() + 1 : 0;
+                            foreach (var m in model.MeshGroups)
+                            {
+                                // Bones
+                                query = @"insert into bones (mesh, bone_id, name) values ($mesh, $bone_id, $name);";
+                                var bIdx = 0;
+                                foreach (var b in m.Bones)
+                                {
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        cmd.Parameters.AddWithValue("name", b);
+                                        cmd.Parameters.AddWithValue("bone_id", bIdx);
+                                        cmd.Parameters.AddWithValue("parent_id", null);
+                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                        cmd.ExecuteScalar();
+                                    }
+                                    bIdx++;
+                                }
+
+                                // Meshes
+                                query = @"insert into meshes (mesh, model, name, material_id) values ($mesh, $model, $name, $material_id);";
+                                using (var cmd = new SQLiteCommand(query, db))
+                                {
+                                    cmd.Parameters.AddWithValue("name", m.Name);
+                                    cmd.Parameters.AddWithValue("model", modelIdx);
+                                    cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                    cmd.Parameters.AddWithValue("material_id", tempMatDict[Path.GetFileNameWithoutExtension(m.Material)]);
+                                    cmd.ExecuteScalar();
+                                }
+
+
                                 // Parts
-                                query = @"insert into parts (mesh, part, name) values ($mesh, $part, $name);";
-                                using (var cmd = new SQLiteCommand(query, db))
+                                var partIdx = 0;
+                                foreach (var p in m.Parts)
                                 {
-                                    cmd.Parameters.AddWithValue("name", p.Name);
-                                    cmd.Parameters.AddWithValue("part", partIdx);
-                                    cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                    cmd.ExecuteScalar();
-                                }
+                                    // Parts
+                                    query = @"insert into parts (mesh, part, name) values ($mesh, $part, $name);";
+                                    using (var cmd = new SQLiteCommand(query, db))
+                                    {
+                                        cmd.Parameters.AddWithValue("name", p.Name);
+                                        cmd.Parameters.AddWithValue("part", partIdx);
+                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                        cmd.ExecuteScalar();
+                                    }
 
-                                // Vertices
-                                var vIdx = 0;
-                                foreach (var v in p.Vertices)
-                                {
-                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
+                                    // Vertices
+                                    var vIdx = 0;
+                                    foreach (var v in p.Vertices)
+                                    {
+                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
                                                         values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
-                                    using (var cmd = new SQLiteCommand(query, db))
-                                    {
-                                        cmd.Parameters.AddWithValue("part", partIdx);
-                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                        cmd.Parameters.AddWithValue("vertex_id", vIdx);
+                                        using (var cmd = new SQLiteCommand(query, db))
+                                        {
+                                            cmd.Parameters.AddWithValue("part", partIdx);
+                                            cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                            cmd.Parameters.AddWithValue("vertex_id", vIdx);
 
-                                        cmd.Parameters.AddWithValue("position_x", v.Position.X);
-                                        cmd.Parameters.AddWithValue("position_y", v.Position.Y);
-                                        cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+                                            cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                            cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                            cmd.Parameters.AddWithValue("position_z", v.Position.Z);
 
-                                        cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
-                                        cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
-                                        cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
+                                            cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
+                                            cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
+                                            cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
 
-                                        cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
-                                        cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
-                                        cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
-                                        cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
+                                            cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
+                                            cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
+                                            cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
+                                            cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
 
-                                        cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
-                                        cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
-                                        cmd.Parameters.AddWithValue("uv_2_u", v.UV2.X);
-                                        cmd.Parameters.AddWithValue("uv_2_v", v.UV2.Y);
+                                            cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
+                                            cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
+                                            cmd.Parameters.AddWithValue("uv_2_u", v.UV2.X);
+                                            cmd.Parameters.AddWithValue("uv_2_v", v.UV2.Y);
 
 
-                                        cmd.Parameters.AddWithValue("bone_1_id", v.BoneIds[0]);
-                                        cmd.Parameters.AddWithValue("bone_1_weight", v.Weights[0] / 255f);
+                                            cmd.Parameters.AddWithValue("bone_1_id", v.BoneIds[0]);
+                                            cmd.Parameters.AddWithValue("bone_1_weight", v.Weights[0] / 255f);
 
-                                        cmd.Parameters.AddWithValue("bone_2_id", v.BoneIds[1]);
-                                        cmd.Parameters.AddWithValue("bone_2_weight", v.Weights[1] / 255f);
+                                            cmd.Parameters.AddWithValue("bone_2_id", v.BoneIds[1]);
+                                            cmd.Parameters.AddWithValue("bone_2_weight", v.Weights[1] / 255f);
 
-                                        cmd.Parameters.AddWithValue("bone_3_id", v.BoneIds[2]);
-                                        cmd.Parameters.AddWithValue("bone_3_weight", v.Weights[2] / 255f);
+                                            cmd.Parameters.AddWithValue("bone_3_id", v.BoneIds[2]);
+                                            cmd.Parameters.AddWithValue("bone_3_weight", v.Weights[2] / 255f);
 
-                                        cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
-                                        cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
+                                            cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
+                                            cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
 
-                                        cmd.ExecuteScalar();
-                                        vIdx++;
+                                            cmd.ExecuteScalar();
+                                            vIdx++;
+                                        }
                                     }
+
+                                    // Indices
+                                    for (var i = 0; i < p.TriangleIndices.Count; i++)
+                                    {
+                                        query = @"insert into indices (mesh, part, index_id, vertex_id) values ($mesh, $part, $index_id, $vertex_id);";
+                                        using (var cmd = new SQLiteCommand(query, db))
+                                        {
+                                            cmd.Parameters.AddWithValue("part", partIdx);
+                                            cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                            cmd.Parameters.AddWithValue("index_id", i);
+                                            cmd.Parameters.AddWithValue("vertex_id", p.TriangleIndices[i]);
+                                            cmd.ExecuteScalar();
+                                        }
+                                    }
+
+                                    // Shape Parts
+                                    foreach (var shpKv in p.ShapeParts)
+                                    {
+                                        if (!shpKv.Key.StartsWith("shp_")) continue;
+                                        var shp = shpKv.Value;
+
+                                        query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
+                                                                   values($mesh, $part, $shape, $vertex_id, $position_x, $position_y, $position_z);";
+                                        using (var cmd = new SQLiteCommand(query, db))
+                                        {
+                                            foreach (var vKv in shp.VertexReplacements)
+                                            {
+                                                var v = shp.Vertices[vKv.Value];
+                                                cmd.Parameters.AddWithValue("part", partIdx);
+                                                cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                                cmd.Parameters.AddWithValue("shape", shpKv.Key);
+                                                cmd.Parameters.AddWithValue("vertex_id", vKv.Key);
+
+                                                cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                                                cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                                                cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+
+                                                cmd.ExecuteScalar();
+                                                vIdx++;
+                                            }
+                                        }
+                                    }
+
+                                    partIdx++;
                                 }
 
-                                // Indices
-                                for (var i = 0; i < p.TriangleIndices.Count; i++)
-                                {
-                                    query = @"insert into indices (mesh, part, index_id, vertex_id) values ($mesh, $part, $index_id, $vertex_id);";
-                                    using (var cmd = new SQLiteCommand(query, db))
-                                    {
-                                        cmd.Parameters.AddWithValue("part", partIdx);
-                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                        cmd.Parameters.AddWithValue("index_id", i);
-                                        cmd.Parameters.AddWithValue("vertex_id", p.TriangleIndices[i]);
-                                        cmd.ExecuteScalar();
-                                    }
-                                }
+                                meshIdx++;
 
-                                partIdx++;
+
                             }
-
-                            meshIdx++;
-
-
+                            transaction.Commit();
                         }
-                        transaction.Commit();
                     }
                 }
+                catch (Exception Ex)
+                {
+                    ModelModifiers.MakeImportReady(model, loggingFunction);
+                    throw Ex;
+                }
+                ModelModifiers.MakeImportReady(model, loggingFunction);
             }
-            catch (Exception Ex)
-            {
-                ModelModifiers.MakeImportReady(this, loggingFunction);
-                throw Ex;
-            }
-
-            // Undo the export ready at the start.
-            ModelModifiers.MakeImportReady(this, loggingFunction);
         }
+
 
         /// <summary>
         /// Create the DB and set the Meta Data for the full model
@@ -1452,6 +2001,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// <returns></returns>
         public static TTModel FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
         {
+            if(rawMdl == null)
+            {
+                return null;
+            }
+
             if (loggingFunction == null)
             {
                 loggingFunction = ModelModifiers.NoOp;
@@ -1461,17 +2015,36 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MergeGeometryData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeAttributeData(ttModel, rawMdl, loggingFunction);
             ModelModifiers.MergeMaterialData(ttModel, rawMdl, loggingFunction);
-            ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+            try
+            {
+                ModelModifiers.MergeShapeData(ttModel, rawMdl, loggingFunction);
+            } catch(Exception ex)
+            {
+                loggingFunction(true, "Unable to load shape data: " + ex.Message);
+                ModelModifiers.ClearShapeData(ttModel, loggingFunction);
+            }
             ttModel.Source = rawMdl.MdlPath;
 
             return ttModel;
+        }
+
+
+        /// <summary>
+        /// Updates all shapes in this model to any updated UV/Normal/etc. data from the base model.
+        /// </summary>
+        public void UpdateShapeData()
+        {
+            foreach(var m in MeshGroups)
+            {
+                m.UpdateShapeData();
+            }
         }
 
         #endregion
 
         #region  Internal Helper Functions
 
-        private float[] NewIdentityMatrix()
+        private static float[] NewIdentityMatrix()
         {
             var arr = new float [16];
             arr[0] = 1f;
@@ -1496,12 +2069,37 @@ namespace xivModdingFramework.Models.DataContainers
             return arr;
         }
 
+        public Dictionary<string, SkeletonData> ResolveBoneHeirarchy(List<XivDependencyRootInfo> roots = null, XivRace race = XivRace.All_Races, List<string> bones = null, Action<bool, string> loggingFunction = null)
+        {
+            if (roots == null || roots.Count == 0)
+            {
+                if (!IsInternal)
+                {
+                    throw new Exception("Cannot dynamically resolve bone heirarchy for external model.");
+                }
+
+
+                // We can use the raw function here since we know this is a valid internal model file.
+                XivDependencyRootInfo root = XivDependencyGraph.ExtractRootInfo(Source);
+
+                if (race == XivRace.All_Races)
+                {
+                    race = IOUtil.GetRaceFromPath(Source);
+                }
+
+
+                // Just our one dynamically found root.
+                roots = new List<XivDependencyRootInfo>() { root };
+            }
+
+            return TTModel.ResolveBoneHeirarchyRaw(roots, race, bones, loggingFunction);
+        }
         /// <summary>
         /// Resolves the full bone heirarchy necessary to animate this TTModel.
         /// Used when saving the file to DB.  (Or potentially animating it)
         /// </summary>
         /// <returns></returns>
-        private Dictionary<string, SkeletonData> ResolveBoneHeirarchy(Action<bool, string> loggingFunction = null, string raceId = "")
+        public static Dictionary<string, SkeletonData> ResolveBoneHeirarchyRaw(List<XivDependencyRootInfo> roots, XivRace race, List<string> bones = null, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -1511,32 +2109,113 @@ namespace xivModdingFramework.Models.DataContainers
             var fullSkel = new Dictionary<string, SkeletonData>();
             var skelDict = new Dictionary<string, SkeletonData>();
 
-            var skelName = raceId;
 
-            if (string.IsNullOrEmpty(raceId))
+
+            Task.Run(async () =>
             {
-                skelName = Sklb.GetParsedSkelFilename(Source);
-                if (skelName == null)
+                bool parsedBase = false;
+                var baseSkeletonPath = "";
+                var extraSkeletonPath = "";
+
+                foreach (var root in roots)
                 {
-                    return skelDict;
+                    // Do we need to get the base skel still?
+                    string[] skeletonData;
+                    if (!parsedBase)
+                    {
+                        try
+                        {
+                            baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race);
+                            skeletonData = File.ReadAllLines(baseSkeletonPath);
+
+                            // Parse both skeleton files, starting with the base file.
+                            foreach (var b in skeletonData)
+                            {
+                                if (b == "") continue;
+                                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+                                fullSkel.Add(j.BoneName, j);
+                            }
+
+                        } catch(Exception ex)
+                        {
+                            // If we failed to resolve the bones for some reason, log the error message and use a blank skel.
+                            loggingFunction(true, "Error Parsing Skeleton ("+ baseSkeletonPath.ToString() +"):" + ex.Message);
+                        }
+                        parsedBase = true;
+                    }
+
+
+                    extraSkeletonPath = await Sklb.GetExtraSkeletonFile(root, race);
+                    // Did this root have an extra skeleton in use?
+                    if (!String.IsNullOrEmpty(extraSkeletonPath))
+                    {
+                        try
+                        {
+                            // If it did, add its bones to the resulting skeleton.
+                            Dictionary<int, int> exTranslationTable = new Dictionary<int, int>();
+                            skeletonData = File.ReadAllLines(extraSkeletonPath);
+                            foreach (var b in skeletonData)
+                            {
+                                if (b == "") continue;
+                                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+
+                                if (fullSkel.ContainsKey(j.BoneName))
+                                {
+                                    // This is a parent level reference to a base bone.
+                                    exTranslationTable.Add(j.BoneNumber, fullSkel[j.BoneName].BoneNumber);
+                                } 
+                                else if (exTranslationTable.ContainsKey(j.BoneParent))
+                                {
+                                    // Run it through the translation to match up with the base skeleton.
+                                    j.BoneParent = exTranslationTable[j.BoneParent];
+
+                                    // And generate its own new bone number
+                                    var originalNumber = j.BoneNumber;
+                                    j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                                    fullSkel.Add(j.BoneName, j);
+                                    exTranslationTable.Add(originalNumber, j.BoneNumber);
+                                } else
+                                {
+                                    // This is a root bone in the EX skeleton that has no parent element in the base skeleton.
+                                    // Just stick it onto the root bone.
+                                    j.BoneParent = fullSkel["n_root"].BoneNumber;
+
+                                    // And generate its own new bone number
+                                    var originalNumber = j.BoneNumber;
+                                    j.BoneNumber = fullSkel.Select(x => x.Value.BoneNumber).Max() + 1;
+
+                                    fullSkel.Add(j.BoneName, j);
+                                    exTranslationTable.Add(originalNumber, j.BoneNumber);
+
+                                }
+                            }
+                        } catch(Exception ex)
+                        {
+                            // If we failed to resolve the bones for some reason, log the error message and use a blank skel.
+                            loggingFunction(true, "Error Parsing Extra Skeleton (" + extraSkeletonPath.ToString() + "):" + ex.Message);
+                        }
+                    }
                 }
-            }
+            }).Wait();
 
-            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var skeletonFile = cwd + "/Skeletons/" + skelName + ".skel";
-            var skeletonData = File.ReadAllLines(skeletonFile);
-            var badBoneId = 900;
-
-            // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
-            foreach (var b in skeletonData)
+            // If no bones were specified, include all of them.
+            if(bones == null)
             {
-                if (b == "") continue;
-                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-                fullSkel.Add(j.BoneName, j);
+                bones = new List<string>();
+                foreach(var e in fullSkel)
+                {
+                    bones.Add(e.Value.BoneName);
+                }
+
+                bones = bones.Distinct().ToList();
             }
 
-            foreach (var s in Bones)
+
+            var badBoneId = 900;
+            foreach (var s in bones)
             {
                 var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);
 
@@ -1575,7 +2254,7 @@ namespace xivModdingFramework.Models.DataContainers
                     skel.PoseMatrix = NewIdentityMatrix();
 
                     skelDict.Add(s, skel);
-                    loggingFunction(true, $"The skeleton file {skeletonFile} did not contain bone {s}. It has been parented to the root bone.");
+                    loggingFunction(true, $"The base game skeleton did not contain bone {s}. It has been parented to the root bone.");
                 }
             }
 
@@ -1597,22 +2276,112 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 loggingFunction = ModelModifiers.NoOp;
             }
+            loggingFunction(false, "Validating model sanity...");
 
-            if(model.MeshGroups.Count == 0)
+            bool hasWeights = model.HasWeights;
+
+            if (model.MeshGroups.Count == 0)
             {
                 loggingFunction(true, "Model has no data. - Model must have at least one valid Mesh Group.");
                 return false;
             }
 
-
-            var Group0Valid = model.MeshGroups[0].Parts.Any(x => x.Vertices.Count > 0);
-            if(!Group0Valid)
+            var mIdx = 0;
+            foreach(var m in model.MeshGroups)
             {
-                loggingFunction(true, "Mesh Group 0 has no valid parts - Model must have at least one vertex in Mesh Group 0.");
-                return false;
+                if(m.Parts.Count == 0)
+                {
+                    var part = new TTMeshPart();
+                    part.Name = "Part 0";
+                    m.Parts.Add(part);
+                }
+
+                // Meshes in animated models must have at least one bone in their bone set in order to not generate a crash.
+                if(hasWeights && m.Bones.Count == 0)
+                {
+                    m.Bones.Add("n_root");
+                }
+                mIdx++;
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Checks the model for common valid-but-unusual states that users often end up in by accident, providing 
+        /// a warning message for each one, if the conditions are met.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="loggingFunction"></param>
+        public static void CheckCommonUserErrors(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+            loggingFunction(false, "Checking for unusual data...");
+
+            if (model.Materials.Count > 4)
+            {
+                loggingFunction(true, "Model has more than four active materials.  The following materials will be ignored in game: ");
+                var idx = 0;
+                foreach (var m in model.Materials)
+                {
+                    if (idx >= 4)
+                    {
+                        loggingFunction(true, "Material: " + m);
+                    }
+                    idx++;
+                }
+            }
+
+            int mIdx = 0;
+            foreach (var m in model.MeshGroups)
+            {
+                int pIdx = 0;
+                foreach (var p in m.Parts)
+                {
+
+                    if (p.Vertices.Count == 0) continue;
+
+                    bool anyAlpha = false;
+                    bool anyColor = false;
+                    bool anyWeirdUV1s = false;
+                    bool anyWeirdUV2s = false;
+
+                    foreach (var v in p.Vertices)
+                    {
+                        anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
+                        anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
+                        anyWeirdUV1s = anyWeirdUV1s || (v.UV1.X > 2 || v.UV1.X < -2 || v.UV1.Y > 2 || v.UV1.Y < -2);
+                        anyWeirdUV2s = anyWeirdUV2s || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
+                    }
+
+                    if (!anyAlpha)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Alpha channel.  This will render the part invisible in-game.  Was this intended?");
+                    }
+
+                    if (!anyColor)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
+                    }
+
+                    if (anyWeirdUV1s)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV1 data.  This can have unexpected results on texture placement.  Was this inteneded?");
+                    }
+
+                    if (anyWeirdUV2s)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this inteneded?");
+                    }
+
+                    pIdx++;
+                }
+                mIdx++;
+            }
+
         }
 
         #endregion

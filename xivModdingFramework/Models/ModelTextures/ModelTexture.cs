@@ -56,6 +56,8 @@ namespace xivModdingFramework.Models.ModelTextures
         // Optional values.
         public Color? HairHighlightColor;
 
+        public bool InvertNormalGreen = false;
+
 
 
         // One for each colorset row.  Null for undyed.
@@ -75,6 +77,7 @@ namespace xivModdingFramework.Models.ModelTextures
             FurnitureColor = new Color(141, 60, 204, 255);
 
             HairHighlightColor = new Color(77, 126, 240, 255);
+            InvertNormalGreen = false;
 
             DyeColors = new List<Color?>(16);
             for(int i = 0; i < 16; i++)
@@ -113,17 +116,17 @@ namespace xivModdingFramework.Models.ModelTextures
         /// <param name="mtrl"></param>
         /// <param name="colors"></param>
         /// <returns></returns>
-        public static async Task<ModelTextureData> GetModelMaps(DirectoryInfo gameDirectory, XivMtrl mtrl, CustomModelColors colors = null)
+        public static async Task<ModelTextureData> GetModelMaps(DirectoryInfo gameDirectory, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1)
         {
             var tex = new Tex(gameDirectory);
-            return await GetModelMaps(tex, mtrl);
+            return await GetModelMaps(tex, mtrl, colors, highlightedRow);
         }
 
         /// <summary>
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public static async Task<ModelTextureData> GetModelMaps(Tex tex, XivMtrl mtrl, CustomModelColors colors = null)
+        public static async Task<ModelTextureData> GetModelMaps(Tex tex, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1)
         {
 
             // Use static values as needed.
@@ -211,6 +214,11 @@ namespace xivModdingFramework.Models.ModelTextures
                         baseSpecularColor = new Color(specularPixels[i - 3], specularPixels[i - 2], specularPixels[i - 1], specularPixels[i]);
                     }
 
+                    if(colors != null && colors.InvertNormalGreen)
+                    {
+                        baseNormalColor[1] = (byte)(255 - baseNormalColor[1]);
+                    }
+
                     byte colorsetValue = baseNormalColor.A;
 
                     // Calculate real colors from the inputs and shader.
@@ -225,7 +233,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         var cs = texMapData.ColorSet.Data;
                         Color finalDiffuseColor, finalSpecularColor;
-                        ComputeColorsetBlending(mtrl, colorsetValue, cs, diffuseColor, specularColor, out finalDiffuseColor, out finalSpecularColor, out emissiveColor);
+                        ComputeColorsetBlending(mtrl, colorsetValue, cs, diffuseColor, specularColor, out finalDiffuseColor, out finalSpecularColor, out emissiveColor, highlightedRow);
                         diffuseColor = finalDiffuseColor;
                         specularColor = finalSpecularColor;
                     }
@@ -461,6 +469,7 @@ namespace xivModdingFramework.Models.ModelTextures
             newDiffuse = baseDiffuse;
             newSpecular = baseSpecular;
 
+
             // This var is technically defined in the Shaders parameters.
             // But we can use a constant copy of it for now, since it's largely non-changeable.
             const float PlayerColorMultiplier = 1.4f;
@@ -479,13 +488,13 @@ namespace xivModdingFramework.Models.ModelTextures
                     // Has a raw specular.
                     newSpecular = baseSpecular;
 
-                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti)
+                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti || info.Preset == MtrlShaderPreset.Monster)
                 {
                     // Has a raw diffuse.
                     newDiffuse = baseDiffuse;
 
                     // But we also have to modulate that diffuse color by the multi red channel.
-                    newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
+                    //newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
 
                     newDiffuse.A = baseNormal.B;
 
@@ -571,6 +580,10 @@ namespace xivModdingFramework.Models.ModelTextures
                 newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
                 opacity = baseNormal.A;
 
+                // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                // tones down the specularity here, but without it the skin is hyper reflective.
+                newSpecular = MultiplyColor(newSpecular, 0.25f);
+
                 // The influence here determines which base color we use.
                 float influenceStrength = ByteToFloat(baseSpecular.A);
 
@@ -579,6 +592,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 // Hair highlight color if available.
                 var targetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
+
 
                 // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
                 if (info.Preset == MtrlShaderPreset.Face)
@@ -630,7 +644,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
         }
 
-        private static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color baseDiffuse, Color baseSpecular, out Color newDiffuse, out Color newSpecular, out Color emissiveColor)
+        private static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color baseDiffuse, Color baseSpecular, out Color newDiffuse, out Color newSpecular, out Color emissiveColor, int highlightRow = -1)
         {
             int rowNumber = colorsetByte / 17;
             int nextRow = rowNumber >= 15 ? 15 : rowNumber + 1;
@@ -645,14 +659,52 @@ namespace xivModdingFramework.Models.ModelTextures
             var row1Offset = Clamp(rowNumber * 16);
             var row2Offset = Clamp(nextRow * 16);
 
-            diffuse1 = new Color(colorSetData[row1Offset + 0], colorSetData[row1Offset + 1], colorSetData[row1Offset + 2], (byte)255);
-            diffuse2 = new Color(colorSetData[row2Offset + 0], colorSetData[row2Offset + 1], colorSetData[row2Offset + 2], (byte)255);
+            if (highlightRow >= 0)
+            {
+                if (rowNumber == highlightRow)
+                {
+                    diffuse1 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                    diffuse2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
 
-            spec1 = new Color(colorSetData[row1Offset + 4], colorSetData[row1Offset + 5], colorSetData[row1Offset + 6], (byte)255);
-            spec2 = new Color(colorSetData[row2Offset + 4], colorSetData[row2Offset + 5], colorSetData[row2Offset + 6], (byte)255);
+                    spec1 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                    spec2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
 
-            emiss1 = new Color(colorSetData[row1Offset + 8], colorSetData[row1Offset + 9], colorSetData[row1Offset + 10], (byte)255);
-            emiss2 = new Color(colorSetData[row2Offset + 8], colorSetData[row2Offset + 9], colorSetData[row2Offset + 10], (byte)255);
+                    emiss1 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                    emiss2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                }
+                else if (nextRow == highlightRow)
+                {
+                    diffuse1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    diffuse2 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+
+                    spec1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    spec2 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+
+                    emiss1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    emiss2 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                } else
+                {
+                    diffuse1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    diffuse2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+
+                    spec1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    spec2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+
+                    emiss1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    emiss2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                }
+            }
+            else
+            {
+                diffuse1 = new Color(colorSetData[row1Offset + 0], colorSetData[row1Offset + 1], colorSetData[row1Offset + 2], (byte)255);
+                diffuse2 = new Color(colorSetData[row2Offset + 0], colorSetData[row2Offset + 1], colorSetData[row2Offset + 2], (byte)255);
+
+                spec1 = new Color(colorSetData[row1Offset + 4], colorSetData[row1Offset + 5], colorSetData[row1Offset + 6], (byte)255);
+                spec2 = new Color(colorSetData[row2Offset + 4], colorSetData[row2Offset + 5], colorSetData[row2Offset + 6], (byte)255);
+
+                emiss1 = new Color(colorSetData[row1Offset + 8], colorSetData[row1Offset + 9], colorSetData[row1Offset + 10], (byte)255);
+                emiss2 = new Color(colorSetData[row2Offset + 8], colorSetData[row2Offset + 9], colorSetData[row2Offset + 10], (byte)255);
+            }
 
 
             // These are now our base values to multiply the base values by.

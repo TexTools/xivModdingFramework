@@ -15,10 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -72,6 +74,7 @@ namespace xivModdingFramework.Helpers
                     while ((bytesRead = await ds.ReadAsync(decompressedBytes, offset, uncompressedSize - offset)) > 0)
                     {
                         offset += bytesRead;  // offset in buffer for results of next reading
+                        if (bytesRead == uncompressedSize) break;
                     }
                 }
             }
@@ -85,7 +88,7 @@ namespace xivModdingFramework.Helpers
         /// <param name="item">The item to be saved</param>
         /// <param name="saveDirectory">The base directory to save to</param>
         /// <returns>A string containing the full save path for the given item</returns>
-        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
+        public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races, int primaryNumber = -1)
         {
             string path, validItemName;
 
@@ -121,9 +124,12 @@ namespace xivModdingFramework.Helpers
                 {
                     path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{validItemName}";
                 }
-                else
+                else if(primaryNumber >= 0)
                 {
-                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{validItemName}/{race}/{((IItemModel)item).ModelInfo.SecondaryID}";
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{item.SecondaryCategory}/{race}/{primaryNumber}";
+                } else
+                {
+                    path = $"{saveDirectory.FullName}/{item.PrimaryCategory}/{item.SecondaryCategory}/{race}/{((IItemModel)item).ModelInfo.SecondaryID}";
                 }
             }
             else
@@ -227,6 +233,19 @@ namespace xivModdingFramework.Helpers
                 original[index + i] = toInject[i];
             };
         }
+        /// <summary>
+        /// Replaces the bytes in a given byte array with the bytes from another array, starting at the given index of the original array.
+        /// </summary>
+        /// <param name="original"></param>
+        /// <param name="toInject"></param>
+        /// <param name="index"></param>
+        public static void ReplaceBytesAt(byte[] original, byte[] toInject, int index)
+        {
+            for (var i = 0; i < toInject.Length; i++)
+            {
+                original[index + i] = toInject[i];
+            };
+        }
 
 
 
@@ -292,6 +311,5 @@ namespace xivModdingFramework.Helpers
             }
             return null;
         }
-
     }
 }
