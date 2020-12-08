@@ -120,7 +120,7 @@ namespace xivModdingFramework.Items.Categories
                     using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
                     {
                         br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                        var itemIndex = br.ReadUInt16();
+                        var itemIndex = br.ReadInt16();
 
                         br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
                         item.ModelInfo.PrimaryID = br.ReadInt16();
