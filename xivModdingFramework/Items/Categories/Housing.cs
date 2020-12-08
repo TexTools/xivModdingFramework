@@ -89,7 +89,7 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 14;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 160;
+            int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             if(_xivLanguage == XivLanguage.Korean)
@@ -120,7 +120,7 @@ namespace xivModdingFramework.Items.Categories
                     using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
                     {
                         br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                        var itemIndex = br.ReadInt16();
+                        var itemIndex = br.ReadUInt16();
 
                         br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
                         item.ModelInfo.PrimaryID = br.ReadInt16();
@@ -181,7 +181,7 @@ namespace xivModdingFramework.Items.Categories
 
             const int itemNameDataOffset = 14;
             const int housingIndexOffset = 112;
-            int itemDataLength = 160;
+            int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -263,7 +263,7 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 13;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 160;
+            int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             if ( _xivLanguage == XivLanguage.Korean)
