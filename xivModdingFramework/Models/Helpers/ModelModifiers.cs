@@ -133,7 +133,14 @@ namespace xivModdingFramework.Models.Helpers
                     throw new Exception("Cannot copy settings from null MDL.");
                 }
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
-                ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
+                try
+                {
+                    ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
+                }
+                catch
+                {
+                    throw new Exception("Failed to apply the original shape data.\nThis is likely due to changes to the original model without preserving the vertices' order.");
+                }
             }
 
             if (AutoScale)
