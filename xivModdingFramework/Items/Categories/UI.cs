@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Linq;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
@@ -190,7 +191,6 @@ namespace xivModdingFramework.Items.Categories
             var actionCategoryExData = await _ex.ReadExData(XivEx.actioncategory);
 
             var actionList = new List<XivUi>();
-
             var actionNames = new List<string>();
 
             await Task.Run(() => Parallel.ForEach(actionExData.Values, (action) =>
@@ -225,7 +225,8 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (xivUi.Name.Equals(string.Empty)) return;
+                // The Cure icon is used as a placeholder so filter out all actions that aren't Cure but are using its icon as a placeholder
+                if (xivUi.Name.Equals(string.Empty) || (!xivUi.Name.Equals("Cure") && xivUi.IconNumber == 405)) return;
                 if (actionNames.Contains(xivUi.Name)) return;
 
                 var actionCategoryData = actionCategoryExData[actionCategory];
@@ -278,7 +279,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
 
@@ -287,6 +289,8 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.Name = name;
                     xivUi.IconNumber = iconNumber;
                 }
+
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -318,7 +322,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
 
@@ -328,7 +333,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -360,7 +365,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
 
@@ -370,7 +376,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -402,7 +408,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(60, SeekOrigin.Begin);
 
@@ -412,7 +419,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -440,7 +447,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(16, SeekOrigin.Begin);
 
@@ -452,7 +460,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -480,7 +488,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(40, SeekOrigin.Begin);
 
@@ -493,7 +502,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -521,7 +530,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     var nameLength = action.Length - 6;
 
@@ -531,7 +541,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -559,7 +569,8 @@ namespace xivModdingFramework.Items.Categories
 
                     var iconNumber = br.ReadUInt16();
 
-                    if (iconNumber == 0) return;
+                    // Filter out any actions using placeholder icons
+                    if (iconNumber == 0 || iconNumber == 405) return;
 
                     br.BaseStream.Seek(12, SeekOrigin.Begin);
 
@@ -571,7 +582,7 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.IconNumber = iconNumber;
                 }
 
-                if (actionNames.Contains(xivUi.Name)) return;
+                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (actionLock)
                 {
@@ -580,6 +591,8 @@ namespace xivModdingFramework.Items.Categories
                 }
             }));
 
+            // Remove any duplicates and return the sorted the list
+            actionList = actionList.Distinct().ToList();
             actionList.Sort();
 
             return actionList;
@@ -656,6 +669,8 @@ namespace xivModdingFramework.Items.Categories
                 }
             }));
 
+            // Remove any duplicates and return the sorted the list
+            statusList = statusList.Distinct().ToList();
             statusList.Sort();
 
             return statusList;
