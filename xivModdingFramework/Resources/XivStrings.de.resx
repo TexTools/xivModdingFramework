@@ -171,6 +171,9 @@
   <data name="Craft" xml:space="preserve">
     <value>Synthese</value>
   </data>
+  <data name="Cure" xml:space="preserve">
+    <value>Vita</value>
+  </data>
   <data name="Detrimental" xml:space="preserve">
     <value>Schwächung</value>
   </data>

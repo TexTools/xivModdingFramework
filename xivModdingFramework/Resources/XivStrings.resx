@@ -942,4 +942,7 @@
   <data name="Viera_Veena" xml:space="preserve">
     <value>Viera - Veena</value>
   </data>
+  <data name="Cure" xml:space="preserve">
+    <value>Cure</value>
+  </data>
 </root>
