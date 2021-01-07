@@ -95,9 +95,28 @@ namespace xivModdingFramework.Items.DataContainers
         {
             return SecondaryCategory != null ? SecondaryCategory : XivStrings.UI;
         }
+
         public int CompareTo(object obj)
         {
             return string.Compare(Name, ((XivUi)obj).Name, StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            try
+            {
+                XivUi other = (XivUi)obj;
+                return (this.Name == other.Name && this.IconNumber == other.IconNumber);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public override int GetHashCode()
+        {
+            return this.Name.GetHashCode() ^ this.IconNumber.GetHashCode();
         }
 
 
