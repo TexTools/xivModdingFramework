@@ -448,6 +448,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Cure.
+        /// </summary>
+        internal static string Cure {
+            get {
+                return ResourceManager.GetString("Cure", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Decal.
         /// </summary>
         internal static string Decal {

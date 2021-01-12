@@ -242,8 +242,18 @@ namespace xivModdingFramework.SqPack.FileTypes
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
                                 binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
-                                var b = binaryReader.ReadByte();
-                                if (b != 0)
+                                bool anyNonZero = false;
+                                for (int byteIdx = 0; byteIdx < 8; byteIdx++)
+                                {
+                                    if (binaryReader.ReadByte() != 0)
+                                    {
+                                        anyNonZero = true;
+                                        break;
+                                    }
+                                }
+
+                                // If there is any data in these bytes, it is an original dat.
+                                if (anyNonZero)
                                 {
                                     datList.Add(datFilePath);
                                 }
@@ -293,8 +303,18 @@ namespace xivModdingFramework.SqPack.FileTypes
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
                                 binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+                                bool anyNonZero = false;
+                                for (int byteIdx = 0; byteIdx < 8; byteIdx++)
+                                {
+                                    if (binaryReader.ReadByte() != 0)
+                                    {
+                                        anyNonZero = true;
+                                        break;
+                                    }
+                                }
 
-                                if (binaryReader.ReadByte() == 0)
+                                // If it's all zeros, this is a custom modded dat.
+                                if(!anyNonZero)
                                 {
                                     datList.Add(datFilePath);
                                 }
