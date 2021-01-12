@@ -78,8 +78,8 @@ namespace xivModdingFramework.Items.Categories
 
             if( _xivLanguage == XivLanguage.Korean)
             {
-                dataLength = 168;
-                slotDataOffset = 156;
+                dataLength = 160;
+                slotDataOffset = 154;
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
                 dataLength = 160;
