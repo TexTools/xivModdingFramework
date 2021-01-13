@@ -171,6 +171,9 @@
   <data name="Craft" xml:space="preserve">
     <value>製作</value>
   </data>
+  <data name="Cure" xml:space="preserve">
+    <value>ケアル</value>
+  </data>
   <data name="Detrimental" xml:space="preserve">
     <value>弱体</value>
   </data>
