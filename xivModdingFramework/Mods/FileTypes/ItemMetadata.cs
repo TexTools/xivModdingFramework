@@ -314,16 +314,20 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
             }
 
-            // Batch install functions for these three.
-            await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
-            await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
-            await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
 
-            // The EST function already does batch applications by nature of how it works,
-            // so just call it once for each of the four EST types represented.
-            foreach (var kv in estEntries)
+            if (index.DataFile == XivDataFile._04_Chara)
             {
-                await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
+                // Batch install functions for these three.
+                await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
+                await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
+                await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
+
+                // The EST function already does batch applications by nature of how it works,
+                // so just call it once for each of the four EST types represented.
+                foreach (var kv in estEntries)
+                {
+                    await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
+                }
             }
 
 
