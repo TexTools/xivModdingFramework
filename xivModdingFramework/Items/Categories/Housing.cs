@@ -94,7 +94,7 @@ namespace xivModdingFramework.Items.Categories
 
             if(_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 168;
+                itemDataLength = 160;
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
                 itemDataLength = 160;
@@ -190,7 +190,7 @@ namespace xivModdingFramework.Items.Categories
 
             if (_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 168;
+                itemDataLength = 160;
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
@@ -268,7 +268,7 @@ namespace xivModdingFramework.Items.Categories
 
             if ( _xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 168;
+                itemDataLength = 160;
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
