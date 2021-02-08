@@ -523,7 +523,7 @@ namespace xivModdingFramework.Items.Categories
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            foreach (var additionalAsset in assets.AdditionalAssetList)
+            foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
             {
                 var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
                 var assetFile = Path.GetFileName(additionalAsset);
