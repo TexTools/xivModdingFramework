@@ -25,6 +25,8 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.SqPack.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.HUD.FileTypes
 {
     /// <summary>
