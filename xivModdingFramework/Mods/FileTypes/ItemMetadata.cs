@@ -408,7 +408,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist, doLumina, luminaOutDir);
             }
 
-            if (doSave)
+            if (doSave && !doLumina)
             {
                 await _index.SaveIndexFile(index);
                 await _modding.SaveModListAsync(modlist);
