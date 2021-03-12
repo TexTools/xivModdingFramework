@@ -1653,6 +1653,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// 
         /// NOTE -- If the Index File and ModList are provided, the steps SAVING those entires are SKIPPED for performance.
         /// It is assumed if they are provided, that the calling function will handle saving them once it is done manipulating them.
+        /// 
+        /// LUMINA - If Lumina writing is enabled, the indexes/modlist/dats will NEVER be modified by this function, making it
+        /// functionally a NoOp() as far as the internal TexTools system state is concerned.  This means if another function
+        /// relies upon the DATs/Indexes/Modlist to be altered coming out of this function, the calling function needs to
+        /// assert() that Lumina writing is disabled.
         /// </summary>
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
