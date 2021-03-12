@@ -38,6 +38,8 @@ using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Materials.FileTypes
 {
     /// <summary>
@@ -687,7 +689,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
         {
             try
             {
@@ -695,7 +697,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList);
+                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
 
                 // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
                 var mapInfoList = xivMtrl.GetAllMapInfos(false);
@@ -714,7 +716,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
                     }
 
-                    if(exists)
+                    if(exists && !doLumina)
                     {
                         continue;
                     }
@@ -730,7 +732,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     var di = Tex.GetDefaultTexturePath(mapInfo.Usage);
 
-                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList);
+                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
 
                 }
 

@@ -21,6 +21,8 @@ using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Mods
 {
     public static class RootCloner

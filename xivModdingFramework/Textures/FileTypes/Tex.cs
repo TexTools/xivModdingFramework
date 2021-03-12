@@ -40,7 +40,9 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Variants.FileTypes;
+
 using Surface = TeximpNet.Surface;
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -856,7 +858,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
         {
             long offset = 0;
             var path = internalPath;
@@ -875,7 +877,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var type = Path.GetExtension(path) == ".atex" ? 2 : 4;
 
-            offset = await _dat.WriteModFile(data, path, source, item, cachedIndexFile, cachedModList);
+            offset = await _dat.WriteModFile(data, path, source, item, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
             return offset;
         }
 
@@ -888,7 +890,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item</param>
         /// <param name="source">The source importing the file</param>
         /// <returns>The new offset</returns>
-        public async Task<long> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang)
+        public async Task<long> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang, bool doLumina = false, DirectoryInfo luminaOutDir = null)
         {
             var colorSetData = new List<Half>();
             byte[] colorSetExtraData = null;
@@ -907,7 +909,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            return await _mtrl.ImportMtrl(xivMtrl, item, source);
+            return await _mtrl.ImportMtrl(xivMtrl, item, source, doLumina: doLumina, luminaOutDir: luminaOutDir);
         }
 
 

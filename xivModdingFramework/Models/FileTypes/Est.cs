@@ -167,7 +167,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="type"></param>
         /// <param name="modifiedEntries"></param>
         /// <returns></returns>
-        public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
         {
             var entries = await GetEstFile(type, false);
 
@@ -197,7 +197,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Save file.
-            await SaveEstFile(type, entries, referenceItem, cachedIndexFile, cachedModList);
+            await SaveEstFile(type, entries, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
         }
 
         public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(IItem item, bool forceDefault = false)
@@ -343,7 +343,7 @@ namespace xivModdingFramework.Models.FileTypes
             return entries;
         }
 
-        private static async Task SaveEstFile(EstType type, Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        private static async Task SaveEstFile(EstType type, Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
         {
             var count = entries.Select(x => x.Value.Count).Aggregate((x, y) => x + y);
 
@@ -369,7 +369,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             var _dat = new Dat(_gameDirectory);
-            await _dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            await _dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
         }
 
     }

@@ -26,6 +26,8 @@ using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 using static xivModdingFramework.Cache.XivCache;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Cache
 {
 
