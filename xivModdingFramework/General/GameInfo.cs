@@ -29,8 +29,18 @@ namespace xivModdingFramework
         /// </summary>
         public DirectoryInfo GameDirectory { get; }
 
+
+        // These Lumina settings live here mostly for convenience, as they also should not be highly changeable data.
+        // In the future, it may make sense to move them into the SQL metadata cache, but for now this is a more known-stable place to keep them.
+
+        /// <summary>
+        /// Lumina output directory.
+        /// </summary>
         public DirectoryInfo LuminaDirectory { get; }
 
+        /// <summary>
+        /// Should mod output be redirected to Lumina?
+        /// </summary>
         public bool UseLumina { get; }
 
 
