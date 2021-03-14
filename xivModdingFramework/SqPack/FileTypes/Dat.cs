@@ -544,9 +544,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
-            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, cachedIndexFile, cachedModList);
         }
 
         /// <summary>
@@ -559,7 +559,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="cachedIndexFile">Cached index file, if available</param>
         /// <param name="cachedModList">Cached modlist file, if available</param>
         /// <returns></returns>
-        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var dataFile = GetDataFileFromPath(internalPath);
             var modding = new Modding(_gameDirectory);
@@ -567,7 +567,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var modEntry = await modding.TryGetModEntry(internalPath);
             var newData = (await CreateType2Data(dataToImport));
 
-            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList);
 
             // This can be -1 after Lumina imports
             if (newOffset == 0)
@@ -1423,7 +1423,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null)
         {
             var _index = new Index(_gameDirectory);
             long offset = 0;
@@ -1441,7 +1441,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem, cachedIndexFile, cachedModlist, doLumina, luminaOutDir);
+            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem, cachedIndexFile, cachedModlist);
         }
 
         /// <summary>
@@ -1455,7 +1455,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="targetPath"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null)
         {
             var _modding = new Modding(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -1513,7 +1513,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
 
-            return await WriteModFile(data, targetPath, source, referenceItem, cachedIndexFile, cachedModlist, doLumina, luminaOutDir);
+            return await WriteModFile(data, targetPath, source, referenceItem, cachedIndexFile, cachedModlist);
         }
 
 
@@ -1663,11 +1663,17 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalFilePath"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, IndexFile index = null, ModList modList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, IndexFile index = null, ModList modList = null)
         {
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
+            var doLumina = XivCache.GameInfo.UseLumina;
+            var luminaOutDir = XivCache.GameInfo.LuminaDirectory;
+            if (doLumina && luminaOutDir == null)
+            {
+                throw new InvalidDataException("Cannot perform Lumina imports without valid Lumina directory.");
+            }
 
             if (doLumina && (luminaOutDir == null || !luminaOutDir.Exists))
                 throw new ArgumentException("No valid lumina output path was specified.", nameof(luminaOutDir));
@@ -1826,7 +1832,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             if (doDatSave) {
-                await _modding.SaveModListAsync(modList);
+                if (!doLumina)
+                {
+                    await _modding.SaveModListAsync(modList);
+                }
                 
                 // Perform metadata expansion if needed.
                 var ext = Path.GetExtension(internalFilePath);
@@ -1842,7 +1851,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     meta.Validate(internalFilePath);
 
-                    await ItemMetadata.ApplyMetadata(meta, doLumina: doLumina, luminaOutDir: luminaOutDir);
+                    await ItemMetadata.ApplyMetadata(meta);
                 }
                 else if (ext == ".rgsp")
                 {
@@ -1853,7 +1862,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         rgspRaw = ReadWithLumina(fileData);
 
                     // Expand the racial scaling file.
-                    await CMP.ApplyRgspFile(rgspRaw, doLumina: doLumina, luminaOutDir: luminaOutDir);
+                    await CMP.ApplyRgspFile(rgspRaw);
                 }
 
                 XivCache.QueueDependencyUpdate(internalFilePath);

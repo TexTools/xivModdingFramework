@@ -35,12 +35,12 @@ namespace xivModdingFramework.General
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        internal static async Task ApplyRgspFile(string filePath, IndexFile index = null, ModList modlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        internal static async Task ApplyRgspFile(string filePath, IndexFile index = null, ModList modlist = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var rgspData = await _dat.GetType2Data(filePath, false, index, modlist);
 
-            await ApplyRgspFile(rgspData, doLumina: doLumina, luminaOutDir: luminaOutDir);
+            await ApplyRgspFile(rgspData);
         }
 
         /// <summary>
@@ -50,11 +50,11 @@ namespace xivModdingFramework.General
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        internal static async Task ApplyRgspFile(byte[] data, IndexFile index = null, ModList modlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        internal static async Task ApplyRgspFile(byte[] data, IndexFile index = null, ModList modlist = null)
         {
             var rgsp = new RacialGenderScalingParameter(data);
 
-            await SetScalingParameter(rgsp, index, modlist, doLumina, luminaOutDir);
+            await SetScalingParameter(rgsp, index, modlist);
         }
 
         /// <summary>
@@ -167,11 +167,11 @@ namespace xivModdingFramework.General
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        private static async Task SetScalingParameter(RacialGenderScalingParameter data, IndexFile index = null, ModList modlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        private static async Task SetScalingParameter(RacialGenderScalingParameter data, IndexFile index = null, ModList modlist = null)
         {
             var cmp = await GetCharaMakeParameterSet(false, index, modlist);
             cmp.SetScalingParameter(data);
-            await SaveCharaMakeParameterSet(cmp, index, modlist, doLumina, luminaOutDir);
+            await SaveCharaMakeParameterSet(cmp, index, modlist);
         }
 
         private static async Task<CharaMakeParameterSet> GetCharaMakeParameterSet(bool forceOriginal = false, IndexFile index = null, ModList modlist = null)
@@ -185,14 +185,14 @@ namespace xivModdingFramework.General
             return cmp;
         }
 
-        private static async Task SaveCharaMakeParameterSet(CharaMakeParameterSet cmp, IndexFile index = null, ModList modlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        private static async Task SaveCharaMakeParameterSet(CharaMakeParameterSet cmp, IndexFile index = null, ModList modlist = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var dummyItem = new XivGenericItemModel();
             dummyItem.Name = "human.cmp";
             dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
-            await _dat.ImportType2Data(cmp.GetBytes(), HumanCmpPath, Constants.InternalModSourceName, dummyItem, index, modlist, doLumina, luminaOutDir);
+            await _dat.ImportType2Data(cmp.GetBytes(), HumanCmpPath, Constants.InternalModSourceName, dummyItem, index, modlist);
         }
 
     }

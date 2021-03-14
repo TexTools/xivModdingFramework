@@ -236,7 +236,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="path"></param>
         /// <param name="entries"></param>
         /// <returns></returns>
-        internal async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        internal async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
@@ -293,7 +293,7 @@ namespace xivModdingFramework.Variants.FileTypes
             }
 
             // Save the modified info.
-            await SaveFullImcInfo(info, path, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            await SaveFullImcInfo(info, path, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
 
         public static byte[] SerializeEntry(XivImc entry)
@@ -455,7 +455,7 @@ namespace xivModdingFramework.Variants.FileTypes
         }
 
 
-        public async Task SaveFullImcInfo(FullImcInfo info, string path, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task SaveFullImcInfo(FullImcInfo info, string path, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             if (info == null || info.TypeIdentifier != ImcType.Set && info.TypeIdentifier != ImcType.NonSet)
             {
@@ -489,7 +489,7 @@ namespace xivModdingFramework.Variants.FileTypes
             // That's it.
             source ??= "Unknown";
 
-            await dat.ImportType2Data(data.ToArray(), path, source, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            await dat.ImportType2Data(data.ToArray(), path, source, referenceItem, cachedIndexFile, cachedModList);
         }
 
         /// <summary>

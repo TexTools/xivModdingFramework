@@ -169,7 +169,7 @@ namespace xivModdingFramework.Models.FileTypes
 
         }
 
-        public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             if (equipmentId == 0)
             {
@@ -195,7 +195,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(data, param.GetBytes(), offset);
 
-            await SaveGimmickParameterFile(data, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            await SaveGimmickParameterFile(data, referenceItem, cachedIndexFile, cachedModList);
         }
 
         public async Task<GimmickParameter> GetGimmickParameter(IItem item, bool forceDefault = false)
@@ -251,9 +251,9 @@ namespace xivModdingFramework.Models.FileTypes
             return param;
         }
 
-        private async Task SaveGimmickParameterFile(byte[] bytes, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        private async Task SaveGimmickParameterFile(byte[] bytes, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
-            await _dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            await _dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
         private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false)
         {
@@ -334,7 +334,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task SaveEqpEntry(int equipmentId, EquipmentParameter data, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task SaveEqpEntry(int equipmentId, EquipmentParameter data, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             if (equipmentId < 0)
             {
@@ -371,7 +371,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(file, bytes, offset);
 
-            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
 
 
@@ -678,7 +678,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="cachedIndexFile"></param>
         /// <param name="cachedModList"></param>
         /// <returns></returns>
-        public async Task SaveEqdpEntries(Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task SaveEqdpEntries(Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
         {
             // Group entries into Accessories and Non-Accessories.
             var accessories = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
@@ -792,7 +792,7 @@ namespace xivModdingFramework.Models.FileTypes
                     data[offset + byteOffset] = byteToModify;
                 }
 
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
             }
 
             // Loop Accessories
@@ -865,14 +865,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                     data[offset + byteOffset] = byteToModify;
                 }
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
 
             }
 
 
         }
 
-        public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
             var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
 
@@ -950,7 +950,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 data[offset + byteOffset] = byteToModify;
 
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList, doLumina, luminaOutDir);
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
             }
         }
 

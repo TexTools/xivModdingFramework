@@ -2040,7 +2040,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
         {
 
             #region Setup and Validation
@@ -2208,7 +2208,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (!rawDataOnly)
                 {
                     loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                    await dat.WriteModFile(bytes, filePath, source, item, doLumina: doLumina, luminaOutDir: luminaOutDir);
+                    await dat.WriteModFile(bytes, filePath, source, item);
                 }
 
                 loggingFunction(false, "Job done!");
@@ -4366,7 +4366,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="slot"></param>
         /// <param name="newRace"></param>
         /// <returns></returns>
-        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source)
         {
 
             var _index = new Index(_gameDirectory);
@@ -4424,7 +4424,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
 
             // Create the new model.
-            await CopyModel(originalPath, path, source, doLumina: doLumina, luminaOutDir: luminaOutDir);
+            await CopyModel(originalPath, path, source);
         }
 
         /// <summary>
@@ -4434,7 +4434,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="originalPath"></param>
         /// <param name="newPath"></param>
         /// <returns></returns>
-        public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false)
         {
             var _dat = new Dat(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -4528,13 +4528,13 @@ namespace xivModdingFramework.Models.FileTypes
                             mtrl.TexturePathList[i] = ntex;
 
                             allFiles.Add(ntex);
-                            await _dat.CopyFile(tex, ntex, source, true, item, index, modlist, doLumina, luminaOutDir);
+                            await _dat.CopyFile(tex, ntex, source, true, item, index, modlist);
                         }
                     }
 
                     mtrl.MTRLPath = path;
                     allFiles.Add(mtrl.MTRLPath);
-                    await _mtrl.ImportMtrl(mtrl, item, source, index, modlist, doLumina, luminaOutDir);
+                    await _mtrl.ImportMtrl(mtrl, item, source, index, modlist);
 
                     if(!validNewMaterials.ContainsKey(newMatName))
                     {
@@ -4585,7 +4585,7 @@ namespace xivModdingFramework.Models.FileTypes
                             if(!copied)
                             {
                                 allFiles.Add(testPath);
-                                await _dat.CopyFile(validPath, testPath, source, true, item, index, modlist, doLumina, luminaOutDir);
+                                await _dat.CopyFile(validPath, testPath, source, true, item, index, modlist);
                             }
                         }
                     }
@@ -4595,7 +4595,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Save the final modified mdl.
             var data = await MakeNewMdlFile(model, xMdl);
-            offset = await _dat.WriteModFile(data, newPath, source, item, index, modlist, doLumina, luminaOutDir);
+            offset = await _dat.WriteModFile(data, newPath, source, item, index, modlist);
 
             await _index.SaveIndexFile(index);
             await _modding.SaveModListAsync(modlist);

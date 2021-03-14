@@ -246,7 +246,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="meta"></param>
         /// <returns></returns>
-        public static async Task SaveMetadata(ItemMetadata meta, string source, IndexFile index = null, ModList modlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        public static async Task SaveMetadata(ItemMetadata meta, string source, IndexFile index = null, ModList modlist = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -254,7 +254,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            await _dat.ImportType2Data(await Serialize(meta), path, source, item, index, modlist, doLumina, luminaOutDir);
+            await _dat.ImportType2Data(await Serialize(meta), path, source, item, index, modlist);
         }
 
         /// <summary>
@@ -356,7 +356,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// Applies this Metadata object to the FFXIV file system.
         /// This should only called by Dat.WriteToDat() / RestoreDefaultMetadata()
         /// </summary>
-        internal static async Task ApplyMetadata(ItemMetadata meta, IndexFile index = null, ModList modlist = null, bool doLumina = false, DirectoryInfo luminaOutDir = null)
+        internal static async Task ApplyMetadata(ItemMetadata meta, IndexFile index = null, ModList modlist = null)
         {
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -382,33 +382,33 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var imcPath = meta.Root.GetRawImcFilePath();
-                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, index, modlist, doLumina, luminaOutDir);
+                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, index, modlist);
             }
 
             // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
             if(meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
             {
-                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, index, modlist, doLumina, luminaOutDir);
+                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, index, modlist);
             }
 
             if(meta.EqdpEntries.Count > 0)
             {
-                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, index, modlist, doLumina, luminaOutDir);
+                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, index, modlist);
             }
 
             if (meta.EstEntries.Count > 0)
             {
                 var type = Est.GetEstType(meta.Root);
                 var entries = meta.EstEntries.Values.ToList();
-                await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, index, modlist, doLumina, luminaOutDir);
+                await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, index, modlist);
             }
 
             if(meta.GmpEntry != null)
             {
-                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist, doLumina, luminaOutDir);
+                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist);
             }
 
-            if (doSave && !doLumina)
+            if (doSave && !XivCache.GameInfo.UseLumina)
             {
                 await _index.SaveIndexFile(index);
                 await _modding.SaveModListAsync(modlist);
