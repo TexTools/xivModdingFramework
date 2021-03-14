@@ -58,6 +58,9 @@ using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Cache;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
+
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -444,7 +447,7 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
-            var mdlData = await dat.GetType3Data(offset, _dataFile);
+            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(mdlPath));
 
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
@@ -1699,8 +1702,10 @@ namespace xivModdingFramework.Models.FileTypes
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(_gameDirectory);
+            var useCached = true;
             if (index == null)
             {
+                useCached = false;
                 var _index = new Index(_gameDirectory);
                 var _modding = new Modding(_gameDirectory);
                 index = await _index.GetIndexFile(dataFile, false, true);
@@ -1711,6 +1716,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Read the raw Material names from the file.
             var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, index, modlist);
+            var root = await XivCache.GetFirstRoot(mdlPath);
             if(materialNames.Count == 0)
             {
                 return materials;
@@ -1722,7 +1728,24 @@ namespace xivModdingFramework.Models.FileTypes
                 // If we had a specific variant to get, just use that.
                 materialVariants.Add(materialVariant);
 
-            } else { 
+            }
+            else if(useCached && root != null)
+            {
+                var metadata = await ItemMetadata.GetFromCachedIndex(root, index);
+                if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
+                {
+                    materialVariants.Add(1);
+                }
+                else
+                {
+                    foreach (var entry in metadata.ImcEntries)
+                    {
+                        materialVariants.Add(entry.MaterialSet);
+                    }
+                }
+            }
+            else
+            {
 
                 // Otherwise, we have to resolve all possible variants.
                 var imcPath = ItemType.GetIMCPathFromChildPath(mdlPath);
@@ -3057,6 +3080,10 @@ namespace xivModdingFramework.Models.FileTypes
                                 var meshNum = p.MeshId;
                                 foreach (var r in p.IndexReplacements)
                                 {
+                                    if(r.Value > ushort.MaxValue)
+                                    {
+                                        throw new InvalidDataException("Mesh Group " + meshNum + " has too many total vertices/triangle indices.\nRemove some vertices/faces/shapes or split them across multiple mesh groups.");
+                                    }
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
                                     meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
                                 }
@@ -4692,7 +4719,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Head_Body, "top"},
             {XivStrings.Body_Hands, "top"},
             {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "dwn"},
+            {XivStrings.Body_Legs_Feet, "top"},
             {XivStrings.Body_Hands_Legs_Feet, "top"},
             {XivStrings.Legs_Feet, "top"},
             {XivStrings.All, "top"},

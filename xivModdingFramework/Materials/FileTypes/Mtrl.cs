@@ -38,6 +38,8 @@ using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Materials.FileTypes
 {
     /// <summary>
@@ -714,7 +716,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
                     }
 
-                    if(exists)
+                    if(exists && !XivCache.GameInfo.UseLumina)
                     {
                         continue;
                     }

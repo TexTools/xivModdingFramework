@@ -40,7 +40,19 @@ namespace xivModdingFramework.General
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var rgspData = await _dat.GetType2Data(filePath, false, index, modlist);
 
-            var rgsp = new RacialGenderScalingParameter(rgspData);
+            await ApplyRgspFile(rgspData);
+        }
+
+        /// <summary>
+        /// Applies a custom .rgsp file to the main Human.CMP file.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="index"></param>
+        /// <param name="modlist"></param>
+        /// <returns></returns>
+        internal static async Task ApplyRgspFile(byte[] data, IndexFile index = null, ModList modlist = null)
+        {
+            var rgsp = new RacialGenderScalingParameter(data);
 
             await SetScalingParameter(rgsp, index, modlist);
         }

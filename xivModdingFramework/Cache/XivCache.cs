@@ -18,6 +18,8 @@ using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Cache
 {
 
@@ -145,9 +147,10 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, int dxMode = 11, bool validateCache = true, bool enableCacheWorker = true)
+        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, int dxMode = 11, bool validateCache = true, bool enableCacheWorker = true,
+            DirectoryInfo luminaDirectory = null, bool useLumina = false)
         {
-            var gi = new GameInfo(gameDirectory, language, dxMode);
+            var gi = new GameInfo(gameDirectory, language, dxMode, luminaDirectory, useLumina);
             SetGameInfo(gi, enableCacheWorker);
         }
         public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)

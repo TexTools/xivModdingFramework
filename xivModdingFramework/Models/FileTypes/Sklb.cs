@@ -38,6 +38,8 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Models.FileTypes
 {
     /// <summary>

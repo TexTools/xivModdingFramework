@@ -47,6 +47,18 @@ namespace xivModdingFramework.SqPack.FileTypes
             _gameDirectory = gameDirectory;
         }
 
+        public void UpdateAllIndexDatCounts()
+        {
+            var dataFiles = (XivDataFile[])Enum.GetValues(typeof(XivDataFile));
+
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            foreach(var df in dataFiles)
+            {
+                var datNumber = _dat.GetLargestDatNumber(df);
+                UpdateIndexDatCount(df, datNumber);
+            }
+        }
+
         /// <summary>
         /// Update the dat count within the index files.
         /// </summary>
@@ -62,13 +74,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}")
             };
 
-            foreach (var indexPath in indexPaths)
+            if (!alreadySemaphoreLocked)
             {
-                if (!alreadySemaphoreLocked)
-                {
-                    _semaphoreSlim.Wait();
-                }
-                try
+                _semaphoreSlim.Wait();
+            }
+            try
+            {
+                foreach (var indexPath in indexPaths)
                 {
                     using (var bw = new BinaryWriter(File.OpenWrite(indexPath)))
                     {
@@ -76,12 +88,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                         bw.Write(datCount);
                     }
                 }
-                finally
+            }
+            finally
+            {
+                if (!alreadySemaphoreLocked)
                 {
-                    if (!alreadySemaphoreLocked)
-                    {
-                        _semaphoreSlim.Release();
-                    }
+                    _semaphoreSlim.Release();
                 }
             }
         }

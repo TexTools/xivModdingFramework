@@ -31,6 +31,8 @@ using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Variants.FileTypes
 {
     public enum ImcType : short {
@@ -243,7 +245,7 @@ namespace xivModdingFramework.Variants.FileTypes
             FullImcInfo info;
             if(exists)
             {
-                info = await GetFullImcInfo(path);
+                info = await GetFullImcInfo(path, cachedIndexFile, cachedModList);
             } else
             {
                 var ri = XivDependencyGraph.ExtractRootInfo(path);

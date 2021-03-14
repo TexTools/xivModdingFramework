@@ -20,6 +20,8 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Mods.FileTypes
 {
     /// <summary>
@@ -314,16 +316,20 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
             }
 
-            // Batch install functions for these three.
-            await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
-            await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
-            await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
 
-            // The EST function already does batch applications by nature of how it works,
-            // so just call it once for each of the four EST types represented.
-            foreach (var kv in estEntries)
+            if (index.DataFile == XivDataFile._04_Chara)
             {
-                await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
+                // Batch install functions for these three.
+                await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
+                await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
+                await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
+
+                // The EST function already does batch applications by nature of how it works,
+                // so just call it once for each of the four EST types represented.
+                foreach (var kv in estEntries)
+                {
+                    await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
+                }
             }
 
 
@@ -402,7 +408,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist);
             }
 
-            if (doSave)
+            if (doSave && !XivCache.GameInfo.UseLumina)
             {
                 await _index.SaveIndexFile(index);
                 await _modding.SaveModListAsync(modlist);

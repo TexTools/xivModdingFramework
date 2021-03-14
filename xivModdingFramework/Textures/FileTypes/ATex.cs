@@ -30,6 +30,8 @@ using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 using xivModdingFramework.VFX.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Textures.FileTypes
 {
     public class ATex
@@ -53,17 +55,22 @@ namespace xivModdingFramework.Textures.FileTypes
             // Gear is the only type we know how to retrieve atex information for.
             if (itemModel.GetType() != typeof(XivGear)) return new List<TexTypePath>();
 
-            var atexTexTypePathList = new List<TexTypePath>();
 
-            var index = new Index(_gameDirectory);
-            var avfx = new Avfx(_gameDirectory, _dataFile);
 
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             var vfxPath = await GetVfxPath(itemModel);
+            return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File);
+        }
+        public async Task<List<TexTypePath>> GetAtexPaths(string vfxPath)
+        {
+            var index = new Index(_gameDirectory);
+            var avfx = new Avfx(_gameDirectory, _dataFile);
 
-            var vfxOffset = await index.GetDataOffset(HashGenerator.GetHash(vfxPath.Folder), HashGenerator.GetHash(vfxPath.File),
-                _dataFile);
+            var folder = vfxPath.Substring(0, vfxPath.LastIndexOf("/"));
+            var file = Path.GetFileName(vfxPath);
+            var vfxOffset = await index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file), _dataFile);
+            var atexTexTypePathList = new List<TexTypePath>();
 
             if (vfxOffset <= 0)
             {

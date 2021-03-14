@@ -588,7 +588,7 @@ namespace xivModdingFramework.Items.Categories
 
                 for (int i = 0; i < decalMax; i++)
                 {
-                    var file = string.Format(XivStrings.EquipDecalFile, i);
+                    var file = string.Format(XivStrings.EquipDecalFile, i.ToString().PadLeft(3, '0'));
 
                     if (fileList.Contains(HashGenerator.GetHash(file)))
                     {

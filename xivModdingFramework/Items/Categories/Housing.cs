@@ -33,6 +33,8 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Items.Categories
 {
     public class Housing
@@ -89,12 +91,15 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 14;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 160;
+            int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
-            if(_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if(_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 168;
+                itemDataLength = 160;
+            } else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                itemDataLength = 160;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -117,7 +122,7 @@ namespace xivModdingFramework.Items.Categories
                     using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
                     {
                         br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                        var itemIndex = br.ReadInt16();
+                        var itemIndex = br.ReadUInt16();
 
                         br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
                         item.ModelInfo.PrimaryID = br.ReadInt16();
@@ -178,16 +183,20 @@ namespace xivModdingFramework.Items.Categories
 
             const int itemNameDataOffset = 14;
             const int housingIndexOffset = 112;
-            int itemDataLength = 160;
+            int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
             var pictureDictionary = await ex.ReadExData(XivEx.picture);
             var itemDictionary = await ex.ReadExData(XivEx.item);
 
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if (_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 168;
+                itemDataLength = 160;
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                itemDataLength = 160;
             }
 
 
@@ -256,12 +265,16 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 13;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 160;
+            int itemDataLength = 168;
             const int itemIconDataOffset = 136;
 
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
+            if ( _xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 168;
+                itemDataLength = 160;
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                itemDataLength = 160;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -282,7 +295,7 @@ namespace xivModdingFramework.Items.Categories
                 using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
                 {
                     br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                    var itemIndex = br.ReadInt16();
+                    var itemIndex = br.ReadUInt16();
 
                     br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
                     item.ModelInfo.PrimaryID = br.ReadByte();
@@ -512,7 +525,7 @@ namespace xivModdingFramework.Items.Categories
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
 
-            foreach (var additionalAsset in assets.AdditionalAssetList)
+            foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
             {
                 var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
                 var assetFile = Path.GetFileName(additionalAsset);
