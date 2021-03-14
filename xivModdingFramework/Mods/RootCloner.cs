@@ -52,6 +52,15 @@ namespace xivModdingFramework.Mods
                 throw new InvalidDataException("Cannot clone unsupported root.");
             }
 
+            if(XivCache.GameInfo.UseLumina)
+            {
+                // Using the root cloner with Lumina import mode enabled is unstable/not safe.
+                // ( The state of the game files in the TT system may not match the state of the 
+                // Lumina mod setup, and the modlist/etc. can get bashed as this function directly
+                // modifies the modlist during the cloning process. )
+                throw new Exception("Item Conversion cannot be used with Lumina import mode.");
+            }
+
 
             if (ProgressReporter != null)
             {
