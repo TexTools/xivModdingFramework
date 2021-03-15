@@ -716,7 +716,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
                     }
 
-                    if(exists && !XivCache.GameInfo.UseLumina)
+                    if(exists)
                     {
                         continue;
                     }
