@@ -99,7 +99,7 @@ namespace xivModdingFramework.Items.Categories
                 itemDataLength = 160;
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = 160;
+                itemDataLength = 168;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -196,7 +196,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = 160;
+                itemDataLength = 168;
             }
 
 
@@ -274,7 +274,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = 160;
+                itemDataLength = 168;
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
