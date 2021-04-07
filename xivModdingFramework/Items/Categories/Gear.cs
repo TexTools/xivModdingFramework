@@ -82,8 +82,8 @@ namespace xivModdingFramework.Items.Categories
                 slotDataOffset = 154;
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
-                dataLength = 160;
-                slotDataOffset = 154;
+                dataLength = 168;
+                slotDataOffset = 156;
             }
 
             var xivGearList = new List<XivGear>();
