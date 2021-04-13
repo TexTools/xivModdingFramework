@@ -91,7 +91,7 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 14;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 168;
+            int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
             if(_xivLanguage == XivLanguage.Korean)
@@ -183,7 +183,7 @@ namespace xivModdingFramework.Items.Categories
 
             const int itemNameDataOffset = 14;
             const int housingIndexOffset = 112;
-            int itemDataLength = 168;
+            int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -265,7 +265,7 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 13;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 168;
+            int itemDataLength = 160;
             const int itemIconDataOffset = 136;
 
             if ( _xivLanguage == XivLanguage.Korean)
