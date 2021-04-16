@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Helpers;
@@ -98,11 +99,25 @@ namespace xivModdingFramework.General
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int modelDataOffset = 4;
+            int startOffset = 4;
+            int modelDataOffset = 8;
+            if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Chinese)
+            {
+                startOffset = 0;
+                modelDataOffset = 4;
+
+            } else if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Korean)
+            { 
+                startOffset = 0;
+                modelDataOffset = 4;
+            }
 
             // Big Endian Byte Order 
             using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
             {
+
+
+                br.BaseStream.Seek(startOffset, SeekOrigin.Begin);
                 xivModelInfo.PrimaryID = br.ReadInt16();
 
                 br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);

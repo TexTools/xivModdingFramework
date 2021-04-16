@@ -20,6 +20,8 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Mods.FileTypes
 {
     /// <summary>
@@ -406,7 +408,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist);
             }
 
-            if (doSave)
+            if (doSave && !XivCache.GameInfo.UseLumina)
             {
                 await _index.SaveIndexFile(index);
                 await _modding.SaveModListAsync(modlist);

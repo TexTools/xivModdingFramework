@@ -39,6 +39,8 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Mods
 {
     /// <summary>
@@ -274,6 +276,11 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status of the mod</param>
         public async Task<bool> ToggleModStatus(string internalFilePath, bool enable)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             var index = new Index(_gameDirectory);
 
             if (string.IsNullOrEmpty(internalFilePath))
@@ -305,6 +312,11 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status of the mod</param>
         public async Task ToggleModPackStatus(string modPackName, bool enable)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             var index = new Index(_gameDirectory);
 
             var modList = GetModList();
@@ -346,6 +358,11 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, IndexFile cachedIndex = null, ModList cachedModlist = null)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
             if (string.IsNullOrEmpty(mod.fullPath)) return false;
@@ -444,12 +461,21 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
         public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null)
         {
+            if(XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
+            }
             var modList = await GetModListAsync();
             await ToggleMods(enable, modList.Mods.Select(x => x.fullPath), progress);
         }
 
         public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
+            }
+
             var _index = new Index(_gameDirectory);
 
             var modList = await GetModListAsync();
@@ -623,6 +649,11 @@ namespace xivModdingFramework.Mods
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
         public async Task DeleteMod(string modItemPath, bool allowInternal = false, IndexFile index = null, ModList modList = null)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             var doSave = false;
             var _index = new Index(_gameDirectory);
             if (modList == null)
@@ -674,6 +705,11 @@ namespace xivModdingFramework.Mods
         /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
         public async Task DeleteModPack(string modPackName)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             var modList = GetModList();
 
             var modPackItem = (from modPack in modList.ModPacks
@@ -714,6 +750,11 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             progressReporter?.Report((0, 0, "Loading Modlist file..."));
             var modlist = await GetModListAsync();
 
@@ -900,6 +941,11 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)
         {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+
             var modlist = await GetModListAsync();
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);

@@ -40,7 +40,9 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Variants.FileTypes;
+
 using Surface = TeximpNet.Surface;
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Textures.FileTypes
 {

@@ -30,6 +30,8 @@ using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 using xivModdingFramework.VFX.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Textures.FileTypes
 {
     public class ATex

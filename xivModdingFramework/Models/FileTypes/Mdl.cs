@@ -60,6 +60,8 @@ using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Models.FileTypes
 {
     public class Mdl

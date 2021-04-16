@@ -25,6 +25,8 @@ using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Cache;
 
+using Index = xivModdingFramework.SqPack.FileTypes.Index;
+
 namespace xivModdingFramework.Helpers
 {
     public class ProblemChecker
