@@ -77,6 +77,10 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public int IconNumber { get; set; }
 
+        /// <summary>
+        /// Whether or not this file has a hi-res equivalent
+        /// </summary>
+        public bool HasHiRes { get; private set; }
 
         /// <summary>
         /// Gets the item's name as it should be written to the modlist/modpack files.
@@ -119,9 +123,12 @@ namespace xivModdingFramework.Items.DataContainers
             return this.Name.GetHashCode() ^ this.IconNumber.GetHashCode();
         }
 
+        private const string HiResUiExt = "_hr1";
 
-        public async Task<Dictionary<string, string>> GetTexPaths()
+        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes, bool addHiRes)
         {
+            var resPaths = new Dictionary<string, string>();
+
             if(SecondaryCategory == XivStrings.Maps)
             {
                 var _tex = new Tex(XivCache.GameInfo.GameDirectory);
@@ -131,14 +138,29 @@ namespace xivModdingFramework.Items.DataContainers
             } else if(SecondaryCategory == XivStrings.HUD)
             {
                 //ui/uld/aozactionlearned.tex
-                return new Dictionary<string, string>() { { Name, "ui/uld/" + Name.ToLower() + ".tex" } };
+                HasHiRes = true;
+
+                if (addLowRes)
+                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + ".tex");
+
+                if (addHiRes)
+                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
             }
             else
             {
+                HasHiRes = true;
+
                 var block = ((IconNumber / 1000) * 1000).ToString().PadLeft(6,'0');
                 var icon = IconNumber.ToString().PadLeft(6, '0');
-                return new Dictionary<string, string>() { { Name, "ui/icon/" + block + '/' + icon + ".tex" } };
+
+                if (addLowRes)
+                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + ".tex");
+
+                if (addHiRes)
+                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
             }
+
+            return resPaths;
         }
     }
 }
