@@ -156,7 +156,7 @@ namespace xivModdingFramework.Items.DataContainers
                 if (addLowRes)
                     resPaths.Add(Name, "ui/icon/" + block + '/' + icon + ".tex");
 
-                if (addLowRes)
+                if (addHiRes)
                     resPaths.Add(Name, "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
             }
 
