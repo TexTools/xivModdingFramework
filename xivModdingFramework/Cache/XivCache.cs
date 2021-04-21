@@ -481,13 +481,15 @@ namespace xivModdingFramework.Cache
 		            int uncompressedSize = -1;
                     long seekTo = Dat.OffsetCorrection(datNum, mod.data.modOffset) + 8;
 
-                    // Seek to and read the uncompressed texture size
+                    // Seek to and read the uncompressed texture size catching any exceptions
+                    // because we handle further processing with the initial value of -1
+                    try
                     {
 	                    using var reader = new BinaryReader(File.OpenRead(datPath));
 	                    reader.BaseStream.Position = seekTo;
 
 	                    uncompressedSize = reader.ReadInt32();
-                    }
+                    } catch (Exception) {}
                     
                     // If we read an uncompressed size, seek to the same position and write the fixed uncompressed texture size
                     if (uncompressedSize != -1)
