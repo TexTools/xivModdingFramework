@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SQLite;
@@ -15,6 +15,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -31,7 +32,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.2.1");
+        public static readonly Version CacheVersion = new Version("1.0.2.2");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -187,7 +188,11 @@ namespace xivModdingFramework.Cache
                 var reason = CacheNeedsRebuild();
                 if (reason != CacheRebuildReason.CacheOK && !_REBUILDING)
                 {
-                    RebuildCache(reason);
+					var ver = 
+						reason == CacheRebuildReason.CacheVersionUpdate 
+							? new Version(GetMetaValue("cache_version")) : CacheVersion;
+
+					RebuildCache(ver, reason);
                 }
             }
 
@@ -277,7 +282,7 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache(CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
+        public static void RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
         {
             CacheWorkerEnabled = false;
             _REBUILDING = true;
@@ -309,7 +314,13 @@ namespace xivModdingFramework.Cache
                     tasks.Add(RebuildFurnitureCache());
                     tasks.Add(BuildModdedItemDependencies());
 
-                    await Task.WhenAll(tasks);
+                    // This was originally running only if the reason was cache update,
+                    // but if the cache gets messed up in one way or another, and has to
+                    // rebuild on a new TT version for any reason other than CacheUpdate
+                    // or whatever, it will prevent the migration from occurring properly
+	                tasks.Add(MigrateCache(previousVersion));
+
+	                await Task.WhenAll(tasks);
 
                     var post = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
 
@@ -451,7 +462,45 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        private static async Task MigrateCache(Version lastCacheVersion) {
 
+            // Tex file fix migration
+            // This technically has nothing to do with the cache version,
+            // but I think this is one of the only places that this can go
+            if (lastCacheVersion < new Version(1, 0, 2, 2)) {
+	            var m = new Modding(_gameInfo.GameDirectory);
+	            var modList = m.GetModList();
+	            foreach (var mod in modList.Mods) {
+		            if (mod.data.dataType != 4) continue;
+
+		            var datNum = (int)((mod.data.modOffset / 8) & 0x0F) / 2;
+		            var dat = XivDataFiles.GetXivDataFile(mod.datFile);
+
+		            var datPath = $"{_gameInfo.GameDirectory}/{dat.GetDataFileName()}{Dat.DatExtension}{datNum}";
+
+		            int uncompressedSize = -1;
+                    long seekTo = Dat.OffsetCorrection(datNum, mod.data.modOffset) + 8;
+
+                    // Seek to and read the uncompressed texture size
+                    {
+	                    using var reader = new BinaryReader(File.OpenRead(datPath));
+	                    reader.BaseStream.Position = seekTo;
+
+	                    uncompressedSize = reader.ReadInt32();
+                    }
+                    
+                    // If we read an uncompressed size, seek to the same position and write the fixed uncompressed texture size
+                    if (uncompressedSize != -1)
+                    {
+	                    using var writer = new BinaryWriter(File.OpenWrite(datPath));
+	                    writer.BaseStream.Position = seekTo;
+
+	                    var tmp = BitConverter.GetBytes(uncompressedSize + 80);
+                        writer.Write(tmp);
+                    }
+	            }
+            }
+        }
 
         /// <summary>
         /// Populate the ui table.
