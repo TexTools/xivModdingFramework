@@ -461,6 +461,11 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
+            if(XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("Cannot import modpacks via TexTools in Lumina mode.");
+            }
+
             var startTime = DateTime.Now.Ticks;
             long endTime = 0;
             long part1Duration = 0;
