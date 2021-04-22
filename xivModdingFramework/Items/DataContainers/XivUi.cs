@@ -125,7 +125,15 @@ namespace xivModdingFramework.Items.DataContainers
 
         private const string HiResUiExt = "_hr1";
 
-        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes, bool addHiRes)
+        /// <summary>
+        /// Retrieve texture paths.  
+        /// If both low and high res are false, low res is still returned.
+        /// Maps only have a single resolution.
+        /// </summary>
+        /// <param name="addLowRes"></param>
+        /// <param name="addHiRes"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes = true, bool addHiRes = false)
         {
             var resPaths = new Dictionary<string, string>();
 
@@ -140,11 +148,17 @@ namespace xivModdingFramework.Items.DataContainers
                 //ui/uld/aozactionlearned.tex
                 HasHiRes = true;
 
-                if (addLowRes)
-                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + ".tex");
-
-                if (addHiRes)
+                if (addHiRes && !addLowRes)
+                {
                     resPaths.Add(Name, "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
+                } else if(addHiRes && addLowRes)
+                {
+                    resPaths.Add(Name + "SD", "ui/uld/" + Name.ToLower() + ".tex");
+                    resPaths.Add(Name + "HD", "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
+                } else
+                {
+                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + ".tex");
+                }
             }
             else
             {
@@ -153,11 +167,18 @@ namespace xivModdingFramework.Items.DataContainers
                 var block = ((IconNumber / 1000) * 1000).ToString().PadLeft(6,'0');
                 var icon = IconNumber.ToString().PadLeft(6, '0');
 
-                if (addLowRes)
-                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + ".tex");
-
-                if (addHiRes)
+                if (addHiRes && !addLowRes)
+                {
                     resPaths.Add(Name, "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
+                }
+                else if (addHiRes && addLowRes)
+                {
+                    resPaths.Add(Name + "SD", "ui/icon/" + block + '/' + icon + ".tex");
+                    resPaths.Add(Name + "HD", "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
+                } else
+                {
+                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + ".tex");
+                }
             }
 
             return resPaths;
