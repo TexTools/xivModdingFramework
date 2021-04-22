@@ -40,7 +40,7 @@ namespace xivModdingFramework.General
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var rgspData = await _dat.GetType2Data(filePath, false, index, modlist);
 
-            await ApplyRgspFile(rgspData);
+            await ApplyRgspFile(rgspData, index, modlist);
         }
 
         /// <summary>

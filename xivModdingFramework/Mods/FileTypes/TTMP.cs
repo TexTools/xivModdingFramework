@@ -1,4 +1,4 @@
-﻿// xivModdingFramework
+// xivModdingFramework
 // Copyright © 2018 Rafael Gonzalez - All Rights Reserved
 // 
 // This program is free software: you can redistribute it and/or modify
@@ -48,9 +48,9 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
-        private readonly string _currentWizardTTMPVersion = "1.2w";
-        private readonly string _currentSimpleTTMPVersion = "1.2s";
-        private const string _minimumAssembly = "1.2.0.0";
+        private readonly string _currentWizardTTMPVersion = "1.3w";
+        private readonly string _currentSimpleTTMPVersion = "1.3s";
+        private const string _minimumAssembly = "1.3.0.0";
 
         private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;
@@ -423,7 +423,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The mod pack directory</param>
         /// <returns>The version of the mod pack as a string</returns>
-        public string GetVersion(DirectoryInfo modPackDirectory)
+        public static string GetVersion(DirectoryInfo modPackDirectory)
         {
             ModPackJson modPackJson = null;
 
@@ -460,6 +460,11 @@ namespace xivModdingFramework.Mods.FileTypes
             DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null )
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
+
+            if(XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("Cannot import modpacks via TexTools in Lumina mode.");
+            }
 
             var startTime = DateTime.Now.Ticks;
             long endTime = 0;
@@ -529,6 +534,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     var _modding = new Modding(XivCache.GameInfo.GameDirectory);
                     var modList = _modding.GetModList();
+                    var needsTexFix = DoesTexNeedFixing(modPackDirectory);
 
                     // 0 - Extract the MPD file.
                     using (var zf = ZipFile.Read(modPackDirectory.FullName))
@@ -572,6 +578,10 @@ namespace xivModdingFramework.Mods.FileTypes
                             {
                                 binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
                                 var data = binaryReader.ReadBytes(modJson.ModSize);
+
+                                if (modJson.FullPath.EndsWith(".tex") && needsTexFix)
+	                                FixupTextoolsTex(data);
+
                                 var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
 
                                 var size = data.Length;
@@ -951,6 +961,46 @@ namespace xivModdingFramework.Mods.FileTypes
             float seconds = (part1Duration + part2Duration) / 1000f;
 
             return (count, errorCount, importErrors, seconds);
+        }
+
+        /// <summary>
+        /// Parse the version out of this modpack to determine whether or not we need
+        /// to add 80 to the uncompressed size of the Tex files contained within.
+        /// </summary>
+        /// <param name="mpd">The path to the modpack.</param>
+        /// <returns>True if we must modify tex header uncompressed sizes, false otherwise.</returns>
+        private static bool DoesTexNeedFixing(DirectoryInfo mpd) {
+
+	        var ver = GetVersion(mpd);
+	        if (string.IsNullOrEmpty(ver))
+		        return true;
+
+	        var newVer = ver;
+
+	        var lastChar = ver.Substring(ver.Length - 1)[0];
+	        if (char.IsLetter(lastChar))
+		        newVer = ver.Substring(0, ver.Length - 1);
+
+	        double.TryParse(newVer, out var verDouble);
+
+	        return verDouble < 1.3;
+        }
+
+        /// <summary>
+        /// Fix xivModdingFramework TEX quirks.
+        /// </summary>
+        /// <param name="tex">The TEX data to be fixed up.</param>
+        public static void FixupTextoolsTex(byte[] tex) {
+
+	        // Read the uncompressed size from the file
+	        var size = BitConverter.ToInt32(tex, 8);
+	        var newSize = size + 80;
+	        
+	        byte[] buffer = BitConverter.GetBytes(newSize);
+	        tex[8] = buffer[0];
+	        tex[9] = buffer[1];
+	        tex[10] = buffer[2];
+	        tex[11] = buffer[3];
         }
 
         /// <summary>
