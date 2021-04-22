@@ -258,7 +258,7 @@ namespace xivModdingFramework.Helpers
 
                     await Task.Run(async () =>
                     {
-                        XivCache.RebuildCache();
+                        XivCache.RebuildCache(XivCache.CacheVersion);
                     });
                 }
             });

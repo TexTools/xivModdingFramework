@@ -1,4 +1,4 @@
-﻿// xivModdingFramework
+// xivModdingFramework
 // Copyright © 2018 Rafael Gonzalez - All Rights Reserved
 // 
 // This program is free software: you can redistribute it and/or modify
@@ -1266,7 +1266,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             headerData.AddRange(BitConverter.GetBytes(headerSize + headerPadding));
             headerData.AddRange(BitConverter.GetBytes(4));
-            headerData.AddRange(BitConverter.GetBytes(uncompressedLength));
+            headerData.AddRange(BitConverter.GetBytes(uncompressedLength + 80));
             headerData.AddRange(BitConverter.GetBytes(0));
             headerData.AddRange(BitConverter.GetBytes(0));
             headerData.AddRange(BitConverter.GetBytes(newMipCount));
