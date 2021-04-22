@@ -847,6 +847,47 @@ namespace xivModdingFramework.SqPack.FileTypes
             return (meshCount, materialCount, byteList.ToArray());
         }
 
+        public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offsetWithDatNumber)
+        {
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
+
+            var offset = OffsetCorrection(datNum, offsetWithDatNumber);
+
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{df.GetDataFileName()}{DatExtension}{datNum}");
+
+            return await Task.Run(async () =>
+            {
+                using (var br = new BinaryReader(File.OpenRead(datPath)))
+                {
+                    br.BaseStream.Seek(offset+8, SeekOrigin.Begin);
+
+                    var size = br.ReadUInt32();
+                    return size;
+                }
+            });
+        }
+
+        public async Task UpdateType4UncompressedSize(XivDataFile df, long offsetWithDatNumber, uint correctedFileSize)
+        {
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
+
+            var offset = OffsetCorrection(datNum, offsetWithDatNumber);
+
+            var datPath = Path.Combine(_gameDirectory.FullName, $"{df.GetDataFileName()}{DatExtension}{datNum}");
+
+            await Task.Run(async () =>
+            {
+                using (var br = new BinaryWriter(File.OpenWrite(datPath)))
+                {
+                    br.BaseStream.Seek(offset + 8, SeekOrigin.Begin);
+                    br.Write(correctedFileSize);
+                }
+            });
+        }
+
+
         /// <summary>
         /// Gets the original or modded data for type 4 files based on the path specified.
         /// </summary>
