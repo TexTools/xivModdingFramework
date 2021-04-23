@@ -436,8 +436,13 @@ namespace xivModdingFramework.Mods.FileTypes
                         using (var streamReader = new StreamReader(entry.Open()))
                         {
                             var jsonString = streamReader.ReadToEnd();
-
-                            modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                            try
+                            {
+                                modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                            } catch(Exception ex)
+                            {
+                                return "1.0";
+                            }
                         }
                     }
                 }
