@@ -201,7 +201,7 @@ namespace xivModdingFramework.Models.DataContainers
         LegHideHalfBoot = 19,           // atr_leg
         LegBootUnknown = 20,
         LegShowFoot = 21,
-        Bit22 = 22,
+        LegShowTail = 22,
         Bit23 = 23,
 
         // Byte 3 - Hand
