@@ -77,33 +77,40 @@ namespace xivModdingFramework.Materials.FileTypes
         };
 
         // MtrlParam constants for file compressions/formats.
-        public static Dictionary<MtrlTextureDescriptorFormat, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureDescriptorFormat, short>()
+        
+        // This data has something to with how the channels of the texture are consumed.
+        // My current running theory is one of the following options:
+        // - 8 Bits - Some kind of metadata
+        // - 4 x 6 bits - 6 bits per channel of channel usage information.
+        // === OR ===
+        // - 8 bits per channel
+        public static Dictionary<MtrlTextureSamplerFlagSets, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureSamplerFlagSets, short>()
         {
-            { MtrlTextureDescriptorFormat.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
-            { MtrlTextureDescriptorFormat.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
-            // Non-normal maps are always [WithoutAlpha].  Normal maps are always [WithAlpha], 
+            { MtrlTextureSamplerFlagSets.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { MtrlTextureSamplerFlagSets.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
+            // Non-normal maps are always [NoColorset].  Normal maps are always [UsesColorset], 
             // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
 
-            // In the case of faces, the first bit is also flipped to 0 for the normal maps.  Unknown why.
+            // In the case of faces, the first bit is also flipped to 0 for the normal maps.  Unknown why/what it does.
         };
 
 
         // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
         // The exact order of these structs does not seem to be important, only the data in question.
         // It may be viable (though inefficient) to simply include all of them.
-        public static Dictionary<XivTexType, TextureUsageStruct> TextureUsageValues = new Dictionary<XivTexType, TextureUsageStruct>()
+        public static Dictionary<MtrlInputId, MaterialInput> MaterialInputDefaults = new Dictionary<MtrlInputId, MaterialInput>()
         {
-            { XivTexType.Normal, new TextureUsageStruct() { TextureType = 4113354501, Unknown = 2815623008 } },
-            { XivTexType.Decal, new TextureUsageStruct() { TextureType = 3531043187, Unknown = 4083110193 } },
-            { XivTexType.Diffuse, new TextureUsageStruct() { TextureType = 3054951514, Unknown = 1611594207 } },
-            { XivTexType.Specular, new TextureUsageStruct() { TextureType = 3367837167, Unknown = 2687453224 } },
-            { XivTexType.Skin, new TextureUsageStruct() { TextureType = 940355280, Unknown = 735790577 } },
-            { XivTexType.Other, new TextureUsageStruct() { TextureType = 612525193, Unknown = 1851494160 } },
+            { MtrlInputId.Common, new MaterialInput() { InputId = MtrlInputId.Common, InputModifier = 2815623008 } },
+            { MtrlInputId.Decal, new MaterialInput() { InputId = MtrlInputId.Decal, InputModifier = 4083110193 } },
+            { MtrlInputId.Diffuse, new MaterialInput() { InputId = MtrlInputId.Diffuse, InputModifier = 1611594207 } },
+            { MtrlInputId.SpecToMulti, new MaterialInput() { InputId = MtrlInputId.SpecToMulti, InputModifier = 2687453224 } },
+            { MtrlInputId.Skin, new MaterialInput() { InputId = MtrlInputId.Skin, InputModifier = 735790577 } },
+            { MtrlInputId.HighlightsToTattoo, new MaterialInput() { InputId = MtrlInputId.HighlightsToTattoo, InputModifier = 1851494160 } },
         };  // Probably want to key this off a custom enum soon if we keep finding additional texture usage values.
 
 
         // Shader Parameter defaults.  For most of them they seem to be used as multipliers.
-        public static Dictionary<MtrlShaderParameterId, List<float>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<float>>() {
+        public static Dictionary<MtrlShaderParameterId, List<float>> ShaderParameterDefaults = new Dictionary<MtrlShaderParameterId, List<float>>() {
             { MtrlShaderParameterId.AlphaLimiter, new List<float>(){ 0.5f } },
             { MtrlShaderParameterId.Occlusion, new List<float>(){ 1f } },
             { MtrlShaderParameterId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
@@ -553,7 +560,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         var originalShaderParameterDataSize = br.ReadUInt16();
 
-                        var originalTextureUsageCount = br.ReadUInt16();
+                        var originalMaterialInputCount = br.ReadUInt16();
 
                         var originalShaderParameterCount = br.ReadUInt16();
 
@@ -563,31 +570,31 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         xivMtrl.Unknown3 = br.ReadUInt16();
 
-                        xivMtrl.TextureUsageList = new List<TextureUsageStruct>((int)originalTextureUsageCount);
-                        for (var i = 0; i < originalTextureUsageCount; i++)
+                        xivMtrl.MaterialInputList = new List<MaterialInput>((int)originalMaterialInputCount);
+                        for (var i = 0; i < originalMaterialInputCount; i++)
                         {
-                            xivMtrl.TextureUsageList.Add(new TextureUsageStruct
+                            xivMtrl.MaterialInputList.Add(new MaterialInput
                             {
-                                TextureType = br.ReadUInt32(), Unknown = br.ReadUInt32()});
+                                InputId = br.ReadUInt32(), InputModifier = br.ReadUInt32()});
                         }
 
-                        xivMtrl.ShaderParameterList = new List<ShaderParameterStruct>(originalShaderParameterCount);
+                        xivMtrl.ShaderParameterList = new List<ShaderParameter>(originalShaderParameterCount);
                         for (var i = 0; i < originalShaderParameterCount; i++)
                         {
-                            xivMtrl.ShaderParameterList.Add(new ShaderParameterStruct
+                            xivMtrl.ShaderParameterList.Add(new ShaderParameter
                             {
-                                ParameterID = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
+                                ParameterId = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
                             });
                         }
 
-                        xivMtrl.TextureDescriptorList = new List<TextureDescriptorStruct>(originalTextureDescriptorCount);
+                        xivMtrl.TextureSamplerList = new List<TextureSampler>(originalTextureDescriptorCount);
                         for (var i = 0; i < originalTextureDescriptorCount; i++)
                         {
-                            xivMtrl.TextureDescriptorList.Add(new TextureDescriptorStruct
+                            xivMtrl.TextureSamplerList.Add(new TextureSampler
                             {
-                                TextureType = br.ReadUInt32(),
-                                FileFormat = br.ReadInt16(),
-                                Unknown = br.ReadInt16(),
+                                SamplerId = br.ReadUInt32(),
+                                Flags1 = br.ReadInt16(),
+                                Flags2 = br.ReadInt16(),
                                 TextureIndex = br.ReadUInt32()
                             });
                         }
@@ -870,10 +877,10 @@ namespace xivModdingFramework.Materials.FileTypes
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
 
-            foreach (var dataStruct1 in xivMtrl.TextureUsageList)
+            foreach (var dataStruct1 in xivMtrl.MaterialInputList)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.TextureType));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.InputId));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.InputModifier));
             }
 
             var offset = 0;
@@ -885,16 +892,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 offset += parameter.Size * 4;
                 short byteSize = (short)(parameter.Size * 4);
 
-                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ParameterID));
+                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ParameterId));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameter.Offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(byteSize));
             }
 
-            foreach (var parameterStruct in xivMtrl.TextureDescriptorList)
+            foreach (var parameterStruct in xivMtrl.TextureSamplerList)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureType));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.FileFormat));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.SamplerId));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Flags1));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Flags2));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
             }
 
