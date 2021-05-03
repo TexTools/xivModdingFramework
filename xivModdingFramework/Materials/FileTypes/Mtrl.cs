@@ -57,15 +57,6 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
-        // MtrlParam constants for texture types.
-        public static Dictionary<XivTexType, uint> TextureDescriptorValues = new Dictionary<XivTexType, uint>()
-        {
-            { XivTexType.Normal, 207536625 },
-            { XivTexType.Diffuse, 290653886 },
-            { XivTexType.Specular, 731504677 },
-            { XivTexType.Multi, 2320401078 },
-            { XivTexType.Reflection, 4271961042 }   // Used for the Catchlight texture in Iris Materials.
-        };
 
         public static Dictionary<XivTexType, uint> FurnitureTextureDescriptorValues = new Dictionary<XivTexType, uint>()
         {
@@ -84,10 +75,10 @@ namespace xivModdingFramework.Materials.FileTypes
         // - 4 x 6 bits - 6 bits per channel of channel usage information.
         // === OR ===
         // - 8 bits per channel
-        public static Dictionary<MtrlTextureSamplerFlagSets, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureSamplerFlagSets, short>()
+        public static Dictionary<TextureSamplerSettingsPresets, short> SamplerSettingsPresets = new Dictionary<TextureSamplerSettingsPresets, short>()
         {
-            { MtrlTextureSamplerFlagSets.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
-            { MtrlTextureSamplerFlagSets.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
+            { TextureSamplerSettingsPresets.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { TextureSamplerSettingsPresets.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
             // Non-normal maps are always [NoColorset].  Normal maps are always [UsesColorset], 
             // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
 
@@ -98,48 +89,48 @@ namespace xivModdingFramework.Materials.FileTypes
         // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
         // The exact order of these structs does not seem to be important, only the data in question.
         // It may be viable (though inefficient) to simply include all of them.
-        public static Dictionary<MtrlInputId, MaterialInput> MaterialInputDefaults = new Dictionary<MtrlInputId, MaterialInput>()
+        public static Dictionary<ShaderTechniqueId, ShaderTechniques> ShaderTechniqueDefaults = new Dictionary<ShaderTechniqueId, ShaderTechniques>()
         {
-            { MtrlInputId.Common, new MaterialInput() { InputId = MtrlInputId.Common, InputModifier = 2815623008 } },
-            { MtrlInputId.Decal, new MaterialInput() { InputId = MtrlInputId.Decal, InputModifier = 4083110193 } },
-            { MtrlInputId.Diffuse, new MaterialInput() { InputId = MtrlInputId.Diffuse, InputModifier = 1611594207 } },
-            { MtrlInputId.SpecToMulti, new MaterialInput() { InputId = MtrlInputId.SpecToMulti, InputModifier = 2687453224 } },
-            { MtrlInputId.Skin, new MaterialInput() { InputId = MtrlInputId.Skin, InputModifier = 735790577 } },
-            { MtrlInputId.HighlightsToTattoo, new MaterialInput() { InputId = MtrlInputId.HighlightsToTattoo, InputModifier = 1851494160 } },
+            { ShaderTechniqueId.Common, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Common, Value = 2815623008 } },
+            { ShaderTechniqueId.Decal, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Decal, Value = 4083110193 } },
+            { ShaderTechniqueId.Diffuse, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Diffuse, Value = 1611594207 } },
+            { ShaderTechniqueId.SpecToMulti, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.SpecToMulti, Value = 2687453224 } },
+            { ShaderTechniqueId.Skin, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Skin, Value = 735790577 } },
+            { ShaderTechniqueId.HighlightsToTattoo, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.HighlightsToTattoo, Value = 1851494160 } },
         };  // Probably want to key this off a custom enum soon if we keep finding additional texture usage values.
 
 
         // Shader Parameter defaults.  For most of them they seem to be used as multipliers.
-        public static Dictionary<MtrlShaderParameterId, List<float>> ShaderParameterDefaults = new Dictionary<MtrlShaderParameterId, List<float>>() {
-            { MtrlShaderParameterId.AlphaLimiter, new List<float>(){ 0.5f } },
-            { MtrlShaderParameterId.Occlusion, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
-            { MtrlShaderParameterId.Reflection1, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.SkinWetnessLerp, new List<float>(){ 3f } },
-            { MtrlShaderParameterId.SkinFresnel, new List<float>(){ 0.02f, 0.02f, 0.02f } },
-            { MtrlShaderParameterId.SkinMatParamRow2, new List<float>(){ 0.4f, 0.4f, 0.4f } },
-            { MtrlShaderParameterId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderParameterId.SkinTileMultiplier, new List<float>(){ 65f, 100f } },
-            { MtrlShaderParameterId.SkinTileMaterial, new List<float>(){ 63f } },
-            { MtrlShaderParameterId.Equipment1, new List<float>(){ 0f } },
-            { MtrlShaderParameterId.Face1, new List<float>(){ 32f } },
-            { MtrlShaderParameterId.Hair1, new List<float>(){ 0.35f } },
-            { MtrlShaderParameterId.Hair2, new List<float>(){ 0.5f } },
+        public static Dictionary<ShaderConstantId, List<float>> ShaderParameterDefaults = new Dictionary<ShaderConstantId, List<float>>() {
+            { ShaderConstantId.AlphaLimiter, new List<float>(){ 0.5f } },
+            { ShaderConstantId.Occlusion, new List<float>(){ 1f } },
+            { ShaderConstantId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
+            { ShaderConstantId.Reflection1, new List<float>(){ 1f } },
+            { ShaderConstantId.SkinWetnessLerp, new List<float>(){ 3f } },
+            { ShaderConstantId.SkinFresnel, new List<float>(){ 0.02f, 0.02f, 0.02f } },
+            { ShaderConstantId.SkinMatParamRow2, new List<float>(){ 0.4f, 0.4f, 0.4f } },
+            { ShaderConstantId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
+            { ShaderConstantId.SkinTileMultiplier, new List<float>(){ 65f, 100f } },
+            { ShaderConstantId.SkinTileMaterial, new List<float>(){ 63f } },
+            { ShaderConstantId.Equipment1, new List<float>(){ 0f } },
+            { ShaderConstantId.Face1, new List<float>(){ 32f } },
+            { ShaderConstantId.Hair1, new List<float>(){ 0.35f } },
+            { ShaderConstantId.Hair2, new List<float>(){ 0.5f } },
 
 
-            { MtrlShaderParameterId.Furniture1, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture2, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture3, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderParameterId.Furniture4, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture5, new List<float>(){ 0.15f } },
-            { MtrlShaderParameterId.Furniture6, new List<float>(){ 0.15f } },
-            { MtrlShaderParameterId.Furniture7, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture8, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture9, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture10, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture11, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture12, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture13, new List<float>(){ 0f, 0f, 0f } },
+            { ShaderConstantId.Furniture1, new List<float>(){ 1f, 1f, 1f } },
+            { ShaderConstantId.Furniture2, new List<float>(){ 1f, 1f, 1f } },
+            { ShaderConstantId.Furniture3, new List<float>(){ 0f, 0f, 0f } },
+            { ShaderConstantId.Furniture4, new List<float>(){ 1f } },
+            { ShaderConstantId.Furniture5, new List<float>(){ 0.15f } },
+            { ShaderConstantId.Furniture6, new List<float>(){ 0.15f } },
+            { ShaderConstantId.Furniture7, new List<float>(){ 1f } },
+            { ShaderConstantId.Furniture8, new List<float>(){ 1f } },
+            { ShaderConstantId.Furniture9, new List<float>(){ 1f } },
+            { ShaderConstantId.Furniture10, new List<float>(){ 1f, 1f, 1f } },
+            { ShaderConstantId.Furniture11, new List<float>(){ 1f, 1f, 1f } },
+            { ShaderConstantId.Furniture12, new List<float>(){ 1f, 1f, 1f } },
+            { ShaderConstantId.Furniture13, new List<float>(){ 0f, 0f, 0f } },
         };
 
 
@@ -570,31 +561,32 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         xivMtrl.Unknown3 = br.ReadUInt16();
 
-                        xivMtrl.MaterialInputList = new List<MaterialInput>((int)originalMaterialInputCount);
+                        xivMtrl.ShaderTechniqueList = new List<ShaderTechniques>((int)originalMaterialInputCount);
                         for (var i = 0; i < originalMaterialInputCount; i++)
                         {
-                            xivMtrl.MaterialInputList.Add(new MaterialInput
+                            xivMtrl.ShaderTechniqueList.Add(new ShaderTechniques
                             {
-                                InputId = br.ReadUInt32(), InputModifier = br.ReadUInt32()});
-                        }
-
-                        xivMtrl.ShaderParameterList = new List<ShaderParameter>(originalShaderParameterCount);
-                        for (var i = 0; i < originalShaderParameterCount; i++)
-                        {
-                            xivMtrl.ShaderParameterList.Add(new ShaderParameter
-                            {
-                                ParameterId = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
+                                TechniqueId = br.ReadUInt32(), Value = br.ReadUInt32()
                             });
                         }
 
-                        xivMtrl.TextureSamplerList = new List<TextureSampler>(originalTextureDescriptorCount);
+                        xivMtrl.ShaderParameterList = new List<ShaderConstants>(originalShaderParameterCount);
+                        for (var i = 0; i < originalShaderParameterCount; i++)
+                        {
+                            xivMtrl.ShaderParameterList.Add(new ShaderConstants
+                            {
+                                ConstantId = (ShaderConstantId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
+                            });
+                        }
+
+                        xivMtrl.TextureSamplerList = new List<TextureSamplerSettings>(originalTextureDescriptorCount);
                         for (var i = 0; i < originalTextureDescriptorCount; i++)
                         {
-                            xivMtrl.TextureSamplerList.Add(new TextureSampler
+                            xivMtrl.TextureSamplerList.Add(new TextureSamplerSettings
                             {
                                 SamplerId = br.ReadUInt32(),
-                                Flags1 = br.ReadInt16(),
-                                Flags2 = br.ReadInt16(),
+                                SamplerSettings = br.ReadInt16(),
+                                Flags = br.ReadInt16(),
                                 TextureIndex = br.ReadUInt32()
                             });
                         }
@@ -605,19 +597,19 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             var offset = shaderParam.Offset;
                             var size = shaderParam.Size;
-                            shaderParam.Args = new List<float>();
+                            shaderParam.Constants = new List<float>();
                             if (bytesRead + size <= originalShaderParameterDataSize)
                             {
                                 for (var idx = offset; idx < offset + size; idx+=4)
                                 {
                                     var arg = br.ReadSingle();
-                                    shaderParam.Args.Add(arg);
+                                    shaderParam.Constants.Add(arg);
                                     bytesRead += 4;
                                 }
                             } else
                             {
                                 // Just use a blank array if we have missing/invalid shader data.
-                                shaderParam.Args = new List<float>(new float[size / 4]);
+                                shaderParam.Constants = new List<float>(new float[size / 4]);
                             }
                         }
 
@@ -877,10 +869,10 @@ namespace xivModdingFramework.Materials.FileTypes
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
 
-            foreach (var dataStruct1 in xivMtrl.MaterialInputList)
+            foreach (var dataStruct1 in xivMtrl.ShaderTechniqueList)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.InputId));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.InputModifier));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.TechniqueId));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Value));
             }
 
             var offset = 0;
@@ -888,11 +880,11 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 // Ensure we're writing correctly calculated data.
                 parameter.Offset = (short) offset;
-                parameter.Size = (short)parameter.Args.Count;
+                parameter.Size = (short)parameter.Constants.Count;
                 offset += parameter.Size * 4;
                 short byteSize = (short)(parameter.Size * 4);
 
-                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ParameterId));
+                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ConstantId));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameter.Offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(byteSize));
             }
@@ -900,8 +892,8 @@ namespace xivModdingFramework.Materials.FileTypes
             foreach (var parameterStruct in xivMtrl.TextureSamplerList)
             {
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.SamplerId));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Flags1));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Flags2));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.SamplerSettings));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Flags));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
             }
 
@@ -910,7 +902,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var shaderBytes = new List<byte>();
             foreach (var shaderParam in xivMtrl.ShaderParameterList)
             {
-                foreach (var f in shaderParam.Args)
+                foreach (var f in shaderParam.Constants)
                 {
                     shaderBytes.AddRange(BitConverter.GetBytes(f));
                 }

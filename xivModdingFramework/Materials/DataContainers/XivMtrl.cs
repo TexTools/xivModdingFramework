@@ -175,7 +175,7 @@ namespace xivModdingFramework.Materials.DataContainers
             get {
                 var size = 0;
                 ShaderParameterList.ForEach(x => {
-                    size += x.Args.Count * 4;
+                    size += x.Constants.Count * 4;
                 }
                 );
 
@@ -191,7 +191,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The number of type 1 data sturctures 
         /// </summary>
-        public ushort TextureUsageCount { get { return (ushort)MaterialInputList.Count; } set
+        public ushort TextureUsageCount { get { return (ushort)ShaderTechniqueList.Count; } set
             {
                 //No-Op
                 throw new Exception("Attempted to directly set TextureUsageCount");
@@ -240,17 +240,17 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The list of Type 1 data structures
         /// </summary>
-        public List<MaterialInput> MaterialInputList { get; set; }
+        public List<ShaderTechniques> ShaderTechniqueList { get; set; }
 
         /// <summary>
         /// The list of Type 2 data structures
         /// </summary>
-        public List<ShaderParameter> ShaderParameterList { get; set; }
+        public List<ShaderConstants> ShaderParameterList { get; set; }
 
         /// <summary>
         /// The list of Parameter data structures
         /// </summary>
-        public List<TextureSampler> TextureSamplerList { get; set; }
+        public List<TextureSamplerSettings> TextureSamplerList { get; set; }
 
         /// <summary>
         /// The TexTools expected list of textures in the item, including colorset 'texture'.
@@ -334,7 +334,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.RenderBackfaces = true;
             }
 
-            var txul = MaterialInputList;
+            var txul = ShaderTechniqueList;
             var txdl = TextureSamplerList;
             var shpl = ShaderParameterList;
 
@@ -349,7 +349,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     if(hasSpec)
                     {
-                        if (GetTextureUsage(XivTexType.Specular) != null)
+                        if (GetShaderTechnique(ShaderTechniqueId.SpecToMulti) != null)
                         {
                             info.Preset = MtrlShaderPreset.Monster;
                         }
@@ -368,19 +368,19 @@ namespace xivModdingFramework.Materials.DataContainers
             }
             else if (info.Shader == MtrlShader.Skin)
             {
-                if(GetTextureUsage(XivTexType.Skin) == null)
+                if(GetShaderTechnique(ShaderTechniqueId.Skin) == null)
                 {
                     info.Preset = MtrlShaderPreset.Face;
                 }
 
-                if(GetTextureUsage(XivTexType.Skin) != null && GetTextureUsage(XivTexType.Skin).InputModifier == 1476344676)
+                if(GetShaderTechnique(ShaderTechniqueId.Skin) != null && GetShaderTechnique(ShaderTechniqueId.Skin).Value == 1476344676)
                 {
                     info.Preset = MtrlShaderPreset.BodyWithHair;
                 }
-                else if(ShaderParameterList.Any(x => x.ParameterId == MtrlShaderParameterId.SkinTileMaterial))
+                else if(ShaderParameterList.Any(x => x.ConstantId == ShaderConstantId.SkinTileMaterial))
                 {
-                    var param = ShaderParameterList.First(x => x.ParameterId == MtrlShaderParameterId.SkinTileMaterial);
-                    if(param.Args[0] == 0)
+                    var param = ShaderParameterList.First(x => x.ConstantId == ShaderConstantId.SkinTileMaterial);
+                    if(param.Constants[0] == 0)
                     {
                         if(info.Preset == MtrlShaderPreset.Face)
                         {
@@ -394,14 +394,14 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
             } else if(info.Shader == MtrlShader.Hair)
             {
-                if(GetTextureUsage(XivTexType.Other) != null)
+                if(GetShaderTechnique(ShaderTechniqueId.HighlightsToTattoo) != null)
                 {
                     info.Preset = MtrlShaderPreset.Face;
                     var mul = 1.4f;
-                    var param = ShaderParameterList.FirstOrDefault(x => x.ParameterId == MtrlShaderParameterId.SkinColor);
+                    var param = ShaderParameterList.FirstOrDefault(x => x.ConstantId == ShaderConstantId.SkinColor);
                     if(param != null)
                     {
-                        mul = param.Args[0];
+                        mul = param.Constants[0];
                     }
 
                     // Limbal ring faces (Au Ra) use a 3.0 multiplier for brightness.
@@ -554,7 +554,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="raw"></param>
         /// <returns></returns>
-        private static MtrlTextureSamplerFlagSets GetFlagSet(short raw)
+        private static TextureSamplerSettingsPresets GetFlagSet(short raw)
         {
 
             // Pare format short down of extraneous data.
@@ -564,14 +564,14 @@ namespace xivModdingFramework.Materials.DataContainers
             format = (short)(format | setFirstBit);
 
             // Scan through known formats.
-            foreach (var formatEntry in Mtrl.TextureDescriptorFormatValues)
+            foreach (var formatEntry in Mtrl.SamplerSettingsPresets)
             {
                 if (format == formatEntry.Value)
                 {
                     return formatEntry.Key;
                 }
             }
-            return MtrlTextureSamplerFlagSets.Other;
+            return TextureSamplerSettingsPresets.Other;
         }
 
 
@@ -590,15 +590,9 @@ namespace xivModdingFramework.Materials.DataContainers
             // Look for the right map type in the parameter list.
             foreach (var paramSet in TextureSamplerList)
             {
-                if (paramSet.SamplerId == Mtrl.TextureDescriptorValues[MapType])
+                if (SamplerToTexType.ContainsKey(paramSet.SamplerId) && SamplerToTexType[paramSet.SamplerId] == MapType)
                 {
                     mapIndex = (int) paramSet.TextureIndex;
-                    info.Format = GetFlagSet(paramSet.Flags1);
-                }
-                else if (paramSet.SamplerId == Mtrl.FurnitureTextureDescriptorValues[MapType])
-                {
-                    mapIndex = (int)paramSet.TextureIndex;
-                    info.Format = GetFlagSet(paramSet.Flags1);
                 }
             }
 
@@ -650,21 +644,15 @@ namespace xivModdingFramework.Materials.DataContainers
                 if(descriptor.TextureIndex == idx)
                 {
                     // If we know what this texture descriptor actually means
-                    // TODO -- UPDATE THIS HANDLING FOR TEXTURE SAMPLER DATA.
-                    if(Mtrl.TextureDescriptorValues.ContainsValue(descriptor.SamplerId))
+                    if(SamplerToTexType.ContainsKey(descriptor.SamplerId))
                     {
-                        info.Usage = Mtrl.TextureDescriptorValues.First(x => x.Value == descriptor.SamplerId).Key;
-                    }
-                    else if (Mtrl.FurnitureTextureDescriptorValues.ContainsValue(descriptor.SamplerId))
-                    {
-                        info.Usage = Mtrl.FurnitureTextureDescriptorValues.First(x => x.Value == descriptor.SamplerId).Key;
+                        info.Usage = SamplerToTexType[descriptor.SamplerId];
                     }
                     else
                     {
                         info.Usage = XivTexType.Other;
                     }
 
-                    info.Format = GetFlagSet(descriptor.Flags1);
                 }
             }
 
@@ -688,13 +676,13 @@ namespace xivModdingFramework.Materials.DataContainers
             }
            
             var paramIdx = -1;
-            TextureSampler oldInfo = new TextureSampler();
+            TextureSamplerSettings oldInfo = new TextureSamplerSettings();
             // Look for the right map type in the parameter list.
             for( var i = 0; i < TextureSamplerList.Count; i++)
             {
                 var paramSet = TextureSamplerList[i];
 
-                if (paramSet.SamplerId == Mtrl.TextureDescriptorValues[MapType])
+                if (SamplerToTexType.ContainsKey(paramSet.SamplerId) && SamplerToTexType[paramSet.SamplerId] == MapType)
                 {
                     paramIdx = i;
                     oldInfo = paramSet;
@@ -768,10 +756,12 @@ namespace xivModdingFramework.Materials.DataContainers
 
 
 
-            var raw = new TextureSampler();
-            raw.SamplerId = Mtrl.TextureDescriptorValues[info.Usage];
-            raw.Flags2 = 15;
-            raw.Flags1 = Mtrl.TextureDescriptorFormatValues[info.Format];
+            var raw = new TextureSamplerSettings();
+            raw.SamplerId = TexTypeToSamplerDefault[info.Usage];
+            raw.Flags = 15;
+
+            // TODO: FIXFIX
+            raw.SamplerSettings = (ushort) TextureSamplerSettingsPresets.UsesColorset;
             raw.TextureIndex = (paramIdx >= 0 ? (uint)oldInfo.TextureIndex : (uint)TexturePathList.Count);
 
             // Inject the new parameters.
@@ -800,7 +790,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         private void RegenerateTextureUsageList(ShaderInfo info)
         {
-            MaterialInputList.Clear();
+            ShaderTechniqueList.Clear();
 
             // These shaders do not use the texture usage list at all.
             if (info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture || info.Shader == MtrlShader.Iris || info.Shader == MtrlShader.Hair)
@@ -809,7 +799,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 { 
                     // The facial hair shaders use this texture usage value to pipe in 
                     // Tattoo/Limbal color instead of Hair Highlight color.
-                    SetTextureUsage(XivTexType.Other);
+                    SetShaderTechnique(ShaderTechniqueId.HighlightsToTattoo);
                 }
                 return;
             }
@@ -818,54 +808,51 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
-                    SetTextureUsage(XivTexType.Normal);
-                    SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Decal);
-                    SetTextureUsage(XivTexType.Specular);
+                    SetShaderTechnique(ShaderTechniqueId.Common);
                 }
                 else if(info.Preset == MtrlShaderPreset.BodyWithHair)
                 {
-                    SetTextureUsage(XivTexType.Skin, 1476344676);
+                    SetShaderTechnique(ShaderTechniqueId.Skin, 1476344676);
                 } else 
                 {
                     // Non-Face Skin textures use a single custom usage value.
-                    SetTextureUsage(XivTexType.Skin);
+                    SetShaderTechnique(ShaderTechniqueId.Skin);
                 }
 
             }
             else if (info.Shader == MtrlShader.Standard)
             {
-                SetTextureUsage(XivTexType.Normal);
+                SetShaderTechnique(ShaderTechniqueId.Common);
                 if (info.Preset == MtrlShaderPreset.Default)
                 {
-                    SetTextureUsage(XivTexType.Decal);
+                    SetShaderTechnique(ShaderTechniqueId.Decal);
 
                 }
                 else if (info.Preset == MtrlShaderPreset.DiffuseMulti)
                 {
                     // This seems to crash the game atm.
-                    SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Decal);
+                    SetShaderTechnique(ShaderTechniqueId.Diffuse);
+                    SetShaderTechnique(ShaderTechniqueId.Decal);
                 }
                 else if (info.Preset == MtrlShaderPreset.Monster)
                 {
-                    SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Decal);
+                    SetShaderTechnique(ShaderTechniqueId.Diffuse);
+                    SetShaderTechnique(ShaderTechniqueId.Decal);
 
                     // This flag seems to convert Specular textures to Multi textures.
-                    SetTextureUsage(XivTexType.Specular);
+                    SetShaderTechnique(ShaderTechniqueId.SpecToMulti);
                 }
                 else
                 {
-                    SetTextureUsage(XivTexType.Diffuse);
-                    SetTextureUsage(XivTexType.Decal);
+                    SetShaderTechnique(ShaderTechniqueId.Diffuse);
+                    SetShaderTechnique(ShaderTechniqueId.Decal);
                 }
             }
             else
             {
                 // This is uh... Glass shader?  I think is the only fall through here.
-                SetTextureUsage(XivTexType.Normal);
-                SetTextureUsage(XivTexType.Decal);
+                SetShaderTechnique(ShaderTechniqueId.Common);
+                SetShaderTechnique(ShaderTechniqueId.Decal);
             }
 
         }
@@ -875,81 +862,81 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         private void RegenerateShaderParameterList(ShaderInfo info)
         {
-            var args = new Dictionary<MtrlShaderParameterId, List<float>>();
+            var args = new Dictionary<ShaderConstantId, List<float>>();
 
-            args.Add(MtrlShaderParameterId.AlphaLimiter, null);
-            args.Add(MtrlShaderParameterId.Occlusion, null);
+            args.Add(ShaderConstantId.AlphaLimiter, null);
+            args.Add(ShaderConstantId.Occlusion, null);
 
             if (info.Shader == MtrlShader.Skin)
             {
-                args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinMatParamRow2, null);
-                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
-                args.Add(MtrlShaderParameterId.SkinUnknown2, null);
-                args.Add(MtrlShaderParameterId.SkinFresnel, null);
-                args.Add(MtrlShaderParameterId.Reflection1, null);
+                args.Add(ShaderConstantId.SkinColor, null);
+                args.Add(ShaderConstantId.SkinMatParamRow2, null);
+                args.Add(ShaderConstantId.SkinWetnessLerp, null);
+                args.Add(ShaderConstantId.SkinUnknown2, null);
+                args.Add(ShaderConstantId.SkinFresnel, null);
+                args.Add(ShaderConstantId.Reflection1, null);
 
                 if(info.Preset == MtrlShaderPreset.BodyNoPores || info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
-                    args.Add(MtrlShaderParameterId.SkinTileMaterial, new List<float>() { 0 });
-                    args.Add(MtrlShaderParameterId.SkinTileMultiplier, new List<float>() { 0, 0 });
+                    args.Add(ShaderConstantId.SkinTileMaterial, new List<float>() { 0 });
+                    args.Add(ShaderConstantId.SkinTileMultiplier, new List<float>() { 0, 0 });
 
                 } else
                 {
-                    args.Add(MtrlShaderParameterId.SkinTileMaterial, null);
-                    args.Add(MtrlShaderParameterId.SkinTileMultiplier, null);
+                    args.Add(ShaderConstantId.SkinTileMaterial, null);
+                    args.Add(ShaderConstantId.SkinTileMultiplier, null);
                 }
 
                 if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
-                    args.Add(MtrlShaderParameterId.Face1, null);
+                    args.Add(ShaderConstantId.Face1, null);
                 }
             }
             else if (info.Shader == MtrlShader.Standard)
             {
                 if (info.Preset == MtrlShaderPreset.Monster)
                 {
-                    args.Remove(MtrlShaderParameterId.AlphaLimiter);
-                    args.Remove(MtrlShaderParameterId.Occlusion);
-                    args.Add(MtrlShaderParameterId.AlphaLimiter, new List<float>() { 0.5f });
-                    args.Add(MtrlShaderParameterId.Occlusion, new List<float>() { 0.25f });
-                    args.Add(MtrlShaderParameterId.Hair1, new List<float>() { 0 });
+                    args.Remove(ShaderConstantId.AlphaLimiter);
+                    args.Remove(ShaderConstantId.Occlusion);
+                    args.Add(ShaderConstantId.AlphaLimiter, new List<float>() { 0.5f });
+                    args.Add(ShaderConstantId.Occlusion, new List<float>() { 0.25f });
+                    args.Add(ShaderConstantId.Hair1, new List<float>() { 0 });
                 }
                 else
                 {
-                    args.Add(MtrlShaderParameterId.Equipment1, null);
-                    args.Add(MtrlShaderParameterId.Reflection1, null);
+                    args.Add(ShaderConstantId.Equipment1, null);
+                    args.Add(ShaderConstantId.Reflection1, null);
                 }
             }
             else if (info.Shader == MtrlShader.Iris)
             {
-                args.Add(MtrlShaderParameterId.Equipment1, null);
-                args.Add(MtrlShaderParameterId.Reflection1, null);
-                args.Add(MtrlShaderParameterId.SkinFresnel, null);
-                args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
+                args.Add(ShaderConstantId.Equipment1, null);
+                args.Add(ShaderConstantId.Reflection1, null);
+                args.Add(ShaderConstantId.SkinFresnel, null);
+                args.Add(ShaderConstantId.SkinColor, null);
+                args.Add(ShaderConstantId.SkinWetnessLerp, null);
             }
             else if(info.Shader == MtrlShader.Hair)
             {
-                args.Add(MtrlShaderParameterId.Equipment1, null);
-                args.Add(MtrlShaderParameterId.Reflection1, null);
-                args.Add(MtrlShaderParameterId.SkinColor, null);
-                args.Add(MtrlShaderParameterId.SkinWetnessLerp, null);
-                args.Add(MtrlShaderParameterId.Hair1, null);
-                args.Add(MtrlShaderParameterId.Hair2, null);
+                args.Add(ShaderConstantId.Equipment1, null);
+                args.Add(ShaderConstantId.Reflection1, null);
+                args.Add(ShaderConstantId.SkinColor, null);
+                args.Add(ShaderConstantId.SkinWetnessLerp, null);
+                args.Add(ShaderConstantId.Hair1, null);
+                args.Add(ShaderConstantId.Hair2, null);
 
                 if (info.Preset == MtrlShaderPreset.FaceBright)
                 {
                     // Limbals use a 3x skin color modifier.
-                    args[MtrlShaderParameterId.SkinColor] = new List<float>() { 3f, 3f, 3f };
+                    args[ShaderConstantId.SkinColor] = new List<float>() { 3f, 3f, 3f };
                 }
             }
             else if(info.Shader == MtrlShader.Glass)
             {
-                args.Remove(MtrlShaderParameterId.AlphaLimiter);
-                args.Remove(MtrlShaderParameterId.Occlusion);
-                args.Add(MtrlShaderParameterId.AlphaLimiter, new List<float>() { 0.25f });
-                args.Add(MtrlShaderParameterId.Hair2, new List<float>() { 1.0f });
+                args.Remove(ShaderConstantId.AlphaLimiter);
+                args.Remove(ShaderConstantId.Occlusion);
+                args.Add(ShaderConstantId.AlphaLimiter, new List<float>() { 0.25f });
+                args.Add(ShaderConstantId.Hair2, new List<float>() { 1.0f });
             }
 
 
@@ -969,9 +956,9 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="parameterId"></param>
         /// <returns></returns>
-        private ShaderParameter GetShaderParameter(MtrlShaderParameterId parameterId)
+        private ShaderConstants GetShaderParameter(ShaderConstantId parameterId)
         {
-            return ShaderParameterList.FirstOrDefault(x => x.ParameterId == parameterId);
+            return ShaderParameterList.FirstOrDefault(x => x.ConstantId == parameterId);
         }
 
         /// <summary>
@@ -979,16 +966,16 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="parameterId"></param>
         /// <param name="data"></param>
-        private void SetShaderParameter(MtrlShaderParameterId parameterId, List<float> data = null)
+        private void SetShaderParameter(ShaderConstantId parameterId, List<float> data = null)
         {
             try
             {
-                var value = ShaderParameterList.First(x => x.ParameterId == parameterId);
+                var value = ShaderParameterList.First(x => x.ConstantId == parameterId);
 
                 // Only overwrite if we were given explicit data.
                 if (value != null && data != null)
                 {
-                    value.Args = data;
+                    value.Constants = data;
                 }
             }
             catch (Exception ex)
@@ -998,10 +985,10 @@ namespace xivModdingFramework.Materials.DataContainers
                     data = Mtrl.ShaderParameterDefaults[parameterId];
                 }
 
-                ShaderParameterList.Add(new ShaderParameter
+                ShaderParameterList.Add(new ShaderConstants
                 {
-                    ParameterId = parameterId,
-                    Args = data
+                    ConstantId = parameterId,
+                    Constants = data
                 });
             }
         }
@@ -1010,65 +997,64 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Removes a given shader parameter.
         /// </summary>
         /// <param name="parameterId"></param>
-        private void ClearShaderParameter(MtrlShaderParameterId parameterId)
+        private void ClearShaderParameter(ShaderConstantId parameterId)
         {
-            ShaderParameterList = ShaderParameterList.Where(x => x.ParameterId != parameterId).ToList();
+            ShaderParameterList = ShaderParameterList.Where(x => x.ConstantId != parameterId).ToList();
         }
 
 
         /// <summary>
-        /// Gets a given texture usage object by its usage value.
+        /// Retrieves a given shader technique
         /// </summary>
         /// <param name="usage"></param>
         /// <returns></returns>
-        private MaterialInput GetTextureUsage(XivTexType usage)
+        private ShaderTechniques GetShaderTechnique(ShaderTechniqueId  techniqueId)
         {
-            return MaterialInputList.FirstOrDefault(x => x.InputId == Mtrl.MaterialInputDefaults[usage].InputId);
+            return ShaderTechniqueList.FirstOrDefault(x => x.TechniqueId == techniqueId);
         }
 
         /// <summary>
-        /// Clears a texture usage value.
+        /// Removes a given shader technique setting.
         /// </summary>
         /// <param name="usage"></param>
-        private bool ClearTextureUsage(XivTexType usage)
+        private bool ClearShaderTechnique(ShaderTechniqueId techniqueId)
         {
-            var oldCount = MaterialInputList.Count;
-            MaterialInputList = MaterialInputList.Where(x => x.InputId != Mtrl.MaterialInputDefaults[usage].InputId).ToList();
-            return oldCount != MaterialInputList.Count;
+            var oldCount = ShaderTechniqueList.Count;
+            ShaderTechniqueList = ShaderTechniqueList.Where(x => x.TechniqueId != techniqueId).ToList();
+            return oldCount != ShaderTechniqueList.Count;
         }
 
         /// <summary>
-        /// Adds or changes a texture usage value.
+        /// Adds or changes a shader technique value
         /// </summary>
         /// <param name="usage"></param>
         /// <param name="unknownValue"></param>
-        private void SetTextureUsage(XivTexType usage, uint? unknownValue = null)
+        private void SetShaderTechnique(ShaderTechniqueId techniqueId, uint? value = null)
         {
-            if(unknownValue == null)
+            if(value == null)
             {
-                unknownValue = Mtrl.MaterialInputDefaults[usage].InputModifier;
+                value = Mtrl.ShaderTechniqueDefaults[techniqueId].Value;
             }
             try
             {
-                var val = MaterialInputList.First(x => x.InputId == Mtrl.MaterialInputDefaults[usage].InputId);
+                var val = ShaderTechniqueList.First(x => x.TechniqueId == techniqueId);
                 if(val != null)
                 {
-                    // Despite being named 'Struct' this is actually a class.
-                    val.InputModifier = (uint) unknownValue;
+                    val.Value = (uint)value;
                 } else
                 {
-                    MaterialInputList.Add(new MaterialInput()
+                    ShaderTechniqueList.Add(new ShaderTechniques()
                     {
-                        InputId = Mtrl.MaterialInputDefaults[usage].InputId,
-                        InputModifier = (uint) unknownValue
+                        TechniqueId = techniqueId,
+                        Value = (uint)value
                     });
                 }
             } catch(Exception ex)
             {
-                MaterialInputList.Add(new MaterialInput()
+                ShaderTechniqueList.Add(new ShaderTechniques()
                 {
-                    InputId = Mtrl.MaterialInputDefaults[usage].InputId,
-                    InputModifier = (uint) unknownValue
+                    TechniqueId = techniqueId,
+                    Value = (uint)value
                 });
             }
         }
@@ -1086,7 +1072,6 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 var info = new MapInfo();
                 info.Path = TexturePathList[i];
-                info.Format = MtrlTextureSamplerFlagSets.Other;
                 info.Usage = XivTexType.Other;
 
                 // Check if the texture appears in the parameter list.
@@ -1095,28 +1080,14 @@ namespace xivModdingFramework.Materials.DataContainers
                     if(p.TextureIndex == i)
                     {
                         // This is a known parameter.
-                        if(Mtrl.TextureDescriptorValues.ContainsValue(p.SamplerId))
+                        if(SamplerToTexType.ContainsKey(p.SamplerId))
                         {
-                            var usage = Mtrl.TextureDescriptorValues.First(x =>
-                            {
-                                return (x.Value == p.SamplerId);
-                            }).Key;
-                            info.Usage = usage;
-                        } else if(Mtrl.FurnitureTextureDescriptorValues.ContainsValue(p.SamplerId))
-                        {
-                            // Known parameter for the furniture shaders.
-                            var usage = Mtrl.FurnitureTextureDescriptorValues.First(x =>
-                            {
-                                return (x.Value == p.SamplerId);
-                            }).Key;
-                            info.Usage = usage;
-
+                            info.Usage = SamplerToTexType[p.SamplerId];
                         } else 
                         {
                             info.Usage = XivTexType.Other;
                         }
 
-                        info.Format = GetFlagSet(p.Flags1);
                         break;
                     }
                 }
@@ -1423,58 +1394,80 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
 
+        /// <summary>
+        /// This is the default we assign for each tex type.  May not be the correct type in the case of furniture or custom materials.
+        /// </summary>
+        public static Dictionary<XivTexType, MtrlSamplerId> TexTypeToSamplerDefault = new Dictionary<XivTexType, MtrlSamplerId>() {
+            { XivTexType.Normal, MtrlSamplerId.Normal },
+            { XivTexType.Specular, MtrlSamplerId.Specular },
+            { XivTexType.Diffuse, MtrlSamplerId.Diffuse },
+            { XivTexType.Multi, MtrlSamplerId.Multi },
+            { XivTexType.Reflection, MtrlSamplerId.Catchlight },
+        };
+
+        public static Dictionary<MtrlSamplerId, XivTexType> SamplerToTexType = new Dictionary<MtrlSamplerId, XivTexType>() {
+            { MtrlSamplerId.Normal, XivTexType.Normal },
+            { MtrlSamplerId.FurnishingNormal, XivTexType.Normal },
+            { MtrlSamplerId.Specular, XivTexType.Specular },
+            { MtrlSamplerId.FurnishingSpecular, XivTexType.Specular },
+            { MtrlSamplerId.Diffuse, XivTexType.Diffuse },
+            { MtrlSamplerId.FurnishingDiffuse, XivTexType.Diffuse },
+            { MtrlSamplerId.Multi, XivTexType.Multi },
+            { MtrlSamplerId.Catchlight, XivTexType.Reflection },
+            { MtrlSamplerId.Reflection, XivTexType.Reflection },
+        };
     }
 
     /// <summary>
-    /// This class contains the information for the texture usage structs in MTRL data.
+    /// These control the shader passes/major shader features used by this material.
     /// </summary>
-    public class MaterialInput
+    public class ShaderTechniques
     {
         // The ID for this type of input.
-        public MtrlInputId InputId; 
+        public ShaderTechniqueId TechniqueId; 
 
         // Some kind of modifying value.
-        public uint InputModifier;
+        public uint Value;
     }
 
     /// <summary>
-    /// This class containst he information for the shader parameters at the end the MTRL File
+    /// These are constants supplied to the shaders
     /// </summary>
-    public class ShaderParameter
+    public class ShaderConstants
     {
-        public MtrlShaderParameterId ParameterId;
+        public ShaderConstantId ConstantId;
 
-        public short Offset;
+        public ushort Offset;
 
-        public short Size;
+        public ushort Size;
 
-        public List<float> Args;
+        public List<float> Constants;
     }
 
     /// <summary>
-    /// This class contains the information for MTRL texture parameters.
+    /// These control how each texture is sampled/piped into the shaders.
     /// </summary>
-    public class TextureSampler
+    public class TextureSamplerSettings
     {
         // Which texture sampler to use.
-        public uint SamplerId;
+        public MtrlSamplerId SamplerId;
 
         // Flags, primarily seems to specify Colorset usage, or at least that's the only known ones currently.
-        public short Flags1; 
+        public ushort SamplerSettings; 
 
-        // More flags, seems to always be [15]
-        public short Flags2;   
+        // Unknown flags, seems to always be [15]
+        public ushort Flags;   
 
         // Index to the texture to be used in the material's texture list.
         public uint TextureIndex;
     }
 
     // Enums representing common channel descriptor formats used by the game.
-    public enum MtrlTextureSamplerFlagSets
+    public enum TextureSamplerSettingsPresets : ushort
     {
-        UsesColorset,
-        NoColorset,
-        Other
+        Other = 0,
+        UsesColorset = 32768,
+        NoColorset = 33600
     }
 
     // Enum representation of the shader names used in mtrl files.
@@ -1490,8 +1483,7 @@ namespace xivModdingFramework.Materials.DataContainers
         Other               // Unknown Shader
     }
 
-    // Enum representation of the shader presets that the framework
-    // Knows how to build.
+    // These are the custom presets TexTools has set up.
     public enum MtrlShaderPreset
     {
         Default,      
@@ -1506,10 +1498,10 @@ namespace xivModdingFramework.Materials.DataContainers
     }
 
     /// <summary>
-    /// Enums for the various shader parameter Ids.  These likely are used to pipe extra data from elsewhere into the shader.
+    /// Enums for the various shader constants.  These likely are used to pipe extra data from elsewhere into the shader.
     /// Ex. Local Reflection Maps, Character Skin/Hair Color, Dye Color, etc.
     /// </summary>
-    public enum MtrlShaderParameterId : uint
+    public enum ShaderConstantId : uint
     {
         AlphaLimiter = 699138595,        // Used in every material.  Overwriting bytes with 0s seems to have no effect.
         Occlusion = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
@@ -1556,24 +1548,25 @@ namespace xivModdingFramework.Materials.DataContainers
         Basic2 = 0x213CB439,
         Basic3 = 0x563B84AF,
         Catchlight = 0xFEA0F3D2,
-        ColorMap1 = 0x1E6FEF9C,
+        FurnishingDiffuse = 0x1E6FEF9C,
         ColorMap2 = 0x6968DF0A,
         Diffuse = 0x115306BE,
         EnvMap = 0xF8D7957A,
-        Mask = 0x8A4E82B6,
+        Multi = 0x8A4E82B6,
         Normal = 0x0C5EC1F1,
-        NormalMap1 = 0xAAB4D9E9,
+        FurnishingNormal = 0xAAB4D9E9,
         NormalMap2 = 0xDDB3E97F,
         Reflection = 0x87F6474D,
         Specular = 0x2B99E025,
-        SpecularMap1 = 0x1BBC2F12,
+        FurnishingSpecular = 0x1BBC2F12,
         SpecularMap2 = 0x6CBB1F84,
         WaveMap = 0xE6321AFC,
         WaveletMap1 = 0x574E22D6,
         WaveletMap2 = 0x20491240,
         WhitecapMap = 0x95E1F64D
     }
-    public enum MtrlInputId : uint
+
+    public enum ShaderTechniqueId : uint
     {
         // Used always(?)
         Common = 4113354501,
@@ -1729,7 +1722,6 @@ namespace xivModdingFramework.Materials.DataContainers
     public class MapInfo : ICloneable
     {
         public XivTexType Usage;
-        public MtrlTextureSamplerFlagSets Format;
         public string Path;
 
 
