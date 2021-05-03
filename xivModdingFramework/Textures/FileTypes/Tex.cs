@@ -902,10 +902,10 @@ namespace xivModdingFramework.Textures.FileTypes
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
             xivMtrl.ColorSetDyeData = colorSetExtraData;
-            if (xivMtrl.Unknown2.Length > 0)
+            if (xivMtrl.DxFlags.Length > 0)
             {
                 // This byte enables the dye set if it's not already enabled.
-                xivMtrl.Unknown2[0] = 12;
+                xivMtrl.DxFlags[0] = 12;
             }
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
@@ -1015,10 +1015,10 @@ namespace xivModdingFramework.Textures.FileTypes
             xivMtrl.ColorSetData = colorSetData;
             xivMtrl.ColorSetDyeData = colorSetExtraData;
 
-            if (xivMtrl.Unknown2.Length > 0)
+            if (xivMtrl.DxFlags.Length > 0)
             {
                 // This byte enables the dye set if it's not already enabled.
-                xivMtrl.Unknown2[0] = 12;
+                xivMtrl.DxFlags[0] = 12;
             }
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);

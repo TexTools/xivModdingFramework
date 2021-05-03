@@ -101,7 +101,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The number of bytes to skip after path section
         /// </summary>
-        public byte UnknownDataSize { get; set; }
+        public byte DxFlagsDataSize { get; set; }
 
         /// <summary>
         /// A list containing the Texture Path offsets
@@ -119,9 +119,9 @@ namespace xivModdingFramework.Materials.DataContainers
         public List<int> MapPathOffsetList { get; set; }
 
         /// <summary>
-        /// A list containing the Map Path Unknowns
+        /// A list containing the Map Path DX information
         /// </summary>
-        public List<short> MapPathUnknownList { get; set; }
+        public List<short> MapPathDxList { get; set; }
 
         /// <summary>
         /// A list containing the ColorSet Path offsets
@@ -149,14 +149,14 @@ namespace xivModdingFramework.Materials.DataContainers
         public List<string> ColorSetPathList { get; set; }
 
         /// <summary>
-        /// The name of the shader used by the item
+        /// The name of the shader pack used by the item
         /// </summary>
-        public string Shader { get; set; }
+        public string ShaderPack { get; set; }
 
         /// <summary>
-        /// Unknown value
+        /// Flags for DX Level information and some other unknown flags
         /// </summary>
-        public byte[] Unknown2 { get; set; }
+        public byte[] DxFlags { get; set; }
 
         /// <summary>
         /// The list of half floats containing the ColorSet data
@@ -171,7 +171,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The size of the additional MTRL Data
         /// </summary>
-        public ushort ShaderParameterDataSize { 
+        public ushort ShaderConstantsDataSize { 
             get {
                 var size = 0;
                 ShaderParameterList.ForEach(x => {
@@ -191,7 +191,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The number of type 1 data sturctures 
         /// </summary>
-        public ushort TextureUsageCount { get { return (ushort)ShaderTechniqueList.Count; } set
+        public ushort ShaderTechniqueCount { get { return (ushort)ShaderTechniqueList.Count; } set
             {
                 //No-Op
                 throw new Exception("Attempted to directly set TextureUsageCount");
@@ -201,7 +201,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The number of type 2 data structures
         /// </summary>
-        public ushort ShaderParameterCount
+        public ushort ShaderConstantsCount
         {
             get { return (ushort)ShaderParameterList.Count; }
             set
@@ -213,9 +213,9 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The number of parameter stuctures
         /// </summary>
-        public ushort TextureDescriptorCount
+        public ushort TextureSamplerSettingsCount
         {
-            get { return (ushort)TextureSamplerList.Count; }
+            get { return (ushort)TextureSamplerSettingsList.Count; }
             set
             {
                 //No-Op
@@ -224,18 +224,14 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
         /// <summary>
-        /// The shader number used by the item
+        /// Some flags used in rendering.  Of note, includes the backface toggle bit.
         /// </summary>
-        /// <remarks>
-        /// This is a guess and has not been tested to be true
-        /// Seems to be more likely that this is some base argument passed into the shader.
-        /// </remarks>
-        public ushort ShaderNumber { get; set; }
+        public ushort RenderFlags { get; set; }
 
         /// <summary>
-        /// Unknown Value
+        /// Some unknown flags or padding data.
         /// </summary>
-        public ushort Unknown3 { get; set; }
+        public ushort UnknownFlags { get; set; }
 
         /// <summary>
         /// The list of Type 1 data structures
@@ -250,7 +246,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The list of Parameter data structures
         /// </summary>
-        public List<TextureSamplerSettings> TextureSamplerList { get; set; }
+        public List<TextureSamplerSettings> TextureSamplerSettingsList { get; set; }
 
         /// <summary>
         /// The TexTools expected list of textures in the item, including colorset 'texture'.
@@ -282,7 +278,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public ShaderInfo GetShaderInfo()
         {
             var info = new ShaderInfo();
-            switch (Shader)
+            switch (ShaderPack)
             {
                 case "character.shpk":
                     info.Shader = MtrlShader.Standard;
@@ -313,7 +309,7 @@ namespace xivModdingFramework.Materials.DataContainers
             // Check the transparency bit.
             const ushort transparencyBit = 16;
             const ushort backfaceBit = 1;
-            var bit = (ushort)(ShaderNumber & transparencyBit);
+            var bit = (ushort)(RenderFlags & transparencyBit);
 
             if(bit > 0)
             {
@@ -323,7 +319,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.TransparencyEnabled = false;
             }
 
-            bit = (ushort)(ShaderNumber & backfaceBit);
+            bit = (ushort)(RenderFlags & backfaceBit);
 
             if (bit > 0)
             {
@@ -335,7 +331,7 @@ namespace xivModdingFramework.Materials.DataContainers
             }
 
             var txul = ShaderTechniqueList;
-            var txdl = TextureSamplerList;
+            var txdl = TextureSamplerSettingsList;
             var shpl = ShaderParameterList;
 
             info.Preset = MtrlShaderPreset.Default;
@@ -432,34 +428,34 @@ namespace xivModdingFramework.Materials.DataContainers
             var transparency = info.ForcedTransparency == null ? info.TransparencyEnabled : (bool)info.ForcedTransparency;
             if (transparency)
             {
-                ShaderNumber = (ushort)(ShaderNumber | transparencyBit);
+                RenderFlags = (ushort)(RenderFlags | transparencyBit);
             }
             else
             {
-                ShaderNumber = (ushort)(ShaderNumber & (~transparencyBit));
+                RenderFlags = (ushort)(RenderFlags & (~transparencyBit));
             }
 
             // Set Backfaces bit.
             var backfaces = info.RenderBackfaces;
             if (!backfaces)
             {
-                ShaderNumber = (ushort)(ShaderNumber | backfaceBit);
+                RenderFlags = (ushort)(RenderFlags | backfaceBit);
             }
             else
             {
-                ShaderNumber = (ushort)(ShaderNumber & (~backfaceBit));
+                RenderFlags = (ushort)(RenderFlags & (~backfaceBit));
             }
 
             // Update us to DX11 material style if we're not already.
-            for (var idx = 0; idx < Unknown2.Length; idx++)
+            for (var idx = 0; idx < DxFlags.Length; idx++)
             {
                 if (idx == 0)
                 {
-                    Unknown2[idx] = 12;
+                    DxFlags[idx] = 12;
                 }
                 else
                 {
-                    Unknown2[idx] = 0;
+                    DxFlags[idx] = 0;
                 }
             }
 
@@ -483,25 +479,25 @@ namespace xivModdingFramework.Materials.DataContainers
             switch (info.Shader)
             {
                 case MtrlShader.Standard:
-                    Shader = "character.shpk";
+                    ShaderPack = "character.shpk";
                     break;
                 case MtrlShader.Glass:
-                    Shader = "characterglass.shpk";
+                    ShaderPack = "characterglass.shpk";
                     break;
                 case MtrlShader.Hair:
-                    Shader = "hair.shpk";
+                    ShaderPack = "hair.shpk";
                     break;
                 case MtrlShader.Iris:
-                    Shader = "iris.shpk";
+                    ShaderPack = "iris.shpk";
                     break;
                 case MtrlShader.Skin:
-                    Shader = "skin.shpk";
+                    ShaderPack = "skin.shpk";
                     break;
                 case MtrlShader.Furniture:
-                    Shader = "bg.shpk";
+                    ShaderPack = "bg.shpk";
                     break;
                 case MtrlShader.DyeableFurniture:
-                    Shader = "bgcolorchange.shpk";
+                    ShaderPack = "bgcolorchange.shpk";
                     break;
                 default:
                     // No change to the Shader for 'Other' type entries.
@@ -588,7 +584,7 @@ namespace xivModdingFramework.Materials.DataContainers
             info.Usage = MapType;
 
             // Look for the right map type in the parameter list.
-            foreach (var paramSet in TextureSamplerList)
+            foreach (var paramSet in TextureSamplerSettingsList)
             {
                 if (SamplerToTexType.ContainsKey(paramSet.SamplerId) && SamplerToTexType[paramSet.SamplerId] == MapType)
                 {
@@ -638,7 +634,7 @@ namespace xivModdingFramework.Materials.DataContainers
             var info = new MapInfo();
             info.Path = path;
             
-            foreach(var descriptor in TextureSamplerList)
+            foreach(var descriptor in TextureSamplerSettingsList)
             {
                 // Found the descriptor.
                 if(descriptor.TextureIndex == idx)
@@ -678,9 +674,9 @@ namespace xivModdingFramework.Materials.DataContainers
             var paramIdx = -1;
             TextureSamplerSettings oldInfo = new TextureSamplerSettings();
             // Look for the right map type in the parameter list.
-            for( var i = 0; i < TextureSamplerList.Count; i++)
+            for( var i = 0; i < TextureSamplerSettingsList.Count; i++)
             {
-                var paramSet = TextureSamplerList[i];
+                var paramSet = TextureSamplerSettingsList[i];
 
                 if (SamplerToTexType.ContainsKey(paramSet.SamplerId) && SamplerToTexType[paramSet.SamplerId] == MapType)
                 {
@@ -705,17 +701,17 @@ namespace xivModdingFramework.Materials.DataContainers
                     }
 
                     // Remove Parameter List
-                    TextureSamplerList.RemoveAt(paramIdx);
+                    TextureSamplerSettingsList.RemoveAt(paramIdx);
 
                     // Update other texture offsets
-                    for (var i = 0; i < TextureSamplerList.Count; i++)
+                    for (var i = 0; i < TextureSamplerSettingsList.Count; i++)
                     {
-                        var p = TextureSamplerList[i];
+                        var p = TextureSamplerSettingsList[i];
                         if (p.TextureIndex > oldInfo.TextureIndex)
                         {
                             p.TextureIndex--;
                         }
-                        TextureSamplerList[i] = p;
+                        TextureSamplerSettingsList[i] = p;
                     }
                 }
 
@@ -767,10 +763,10 @@ namespace xivModdingFramework.Materials.DataContainers
             // Inject the new parameters.
             if(paramIdx >= 0)
             {
-                TextureSamplerList[paramIdx] = raw;
+                TextureSamplerSettingsList[paramIdx] = raw;
             } else
             {
-                TextureSamplerList.Add(raw);
+                TextureSamplerSettingsList.Add(raw);
             }
 
             // Inject the new string
@@ -1075,7 +1071,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.Usage = XivTexType.Other;
 
                 // Check if the texture appears in the parameter list.
-                foreach(var p in TextureSamplerList)
+                foreach(var p in TextureSamplerSettingsList)
                 {
                     if(p.TextureIndex == i)
                     {
