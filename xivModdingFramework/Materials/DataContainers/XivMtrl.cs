@@ -584,11 +584,12 @@ namespace xivModdingFramework.Materials.DataContainers
             info.Usage = MapType;
 
             // Look for the right map type in the parameter list.
-            foreach (var paramSet in TextureSamplerSettingsList)
+            foreach (var samplerInfo in TextureSamplerSettingsList)
             {
-                if (SamplerToTexType.ContainsKey(paramSet.SamplerId) && SamplerToTexType[paramSet.SamplerId] == MapType)
+                if (SamplerToTexType.ContainsKey(samplerInfo.SamplerId) && SamplerToTexType[samplerInfo.SamplerId] == MapType)
                 {
-                    mapIndex = (int) paramSet.TextureIndex;
+                    mapIndex = (int) samplerInfo.TextureIndex;
+                    info.Sampler = samplerInfo;
                 }
             }
 
@@ -634,21 +635,21 @@ namespace xivModdingFramework.Materials.DataContainers
             var info = new MapInfo();
             info.Path = path;
             
-            foreach(var descriptor in TextureSamplerSettingsList)
+            foreach(var samplerInfo in TextureSamplerSettingsList)
             {
                 // Found the descriptor.
-                if(descriptor.TextureIndex == idx)
+                if(samplerInfo.TextureIndex == idx)
                 {
                     // If we know what this texture descriptor actually means
-                    if(SamplerToTexType.ContainsKey(descriptor.SamplerId))
+                    if(SamplerToTexType.ContainsKey(samplerInfo.SamplerId))
                     {
-                        info.Usage = SamplerToTexType[descriptor.SamplerId];
+                        info.Usage = SamplerToTexType[samplerInfo.SamplerId];
                     }
                     else
                     {
                         info.Usage = XivTexType.Other;
                     }
-
+                    info.Sampler = samplerInfo;
                 }
             }
 
@@ -660,29 +661,40 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// Sets or deletes the texture information from the Mtrl based on the
         /// incoming usage and info.
+        /// 
+        /// A null MapType creates a map based off the sampler info in the MapInfo object.
         /// </summary>
         /// <param name="MapType"></param>
         /// <param name="info"></param>
-        public void SetMapInfo(XivTexType MapType, MapInfo info)
+        public void SetMapInfo(XivTexType? MapType, MapInfo info)
         {
             // Sanity check.
             if(info != null && info.Usage != MapType)
             {
                 throw new System.Exception("Invalid attempt to reassign map materials.");
             }
+
+            if(MapType == null && info.Sampler == null)
+            {
+                throw new InvalidDataException("Either MapType or SamplerInfo must be provided to set material texture map info.");
+            }
            
             var paramIdx = -1;
             TextureSamplerSettings oldInfo = new TextureSamplerSettings();
-            // Look for the right map type in the parameter list.
-            for( var i = 0; i < TextureSamplerSettingsList.Count; i++)
-            {
-                var paramSet = TextureSamplerSettingsList[i];
 
-                if (SamplerToTexType.ContainsKey(paramSet.SamplerId) && SamplerToTexType[paramSet.SamplerId] == MapType)
+            if (MapType != null)
+            {
+                // Look for the right map type in the parameter list.
+                for (var i = 0; i < TextureSamplerSettingsList.Count; i++)
                 {
-                    paramIdx = i;
-                    oldInfo = paramSet;
-                    break;
+                    var samplerInfo = TextureSamplerSettingsList[i];
+
+                    if (SamplerToTexType.ContainsKey(samplerInfo.SamplerId) && SamplerToTexType[samplerInfo.SamplerId] == MapType)
+                    {
+                        paramIdx = i;
+                        oldInfo = samplerInfo;
+                        break;
+                    }
                 }
             }
 
@@ -756,8 +768,15 @@ namespace xivModdingFramework.Materials.DataContainers
             raw.SamplerId = TexTypeToSamplerDefault[info.Usage];
             raw.Flags = 15;
 
-            // TODO: FIXFIX
-            raw.SamplerSettings = (ushort) TextureSamplerSettingsPresets.UsesColorset;
+            // TODO Could use some better handling here.
+            if (MapType == XivTexType.Normal)
+            {
+                raw.SamplerSettings = (ushort)TextureSamplerSettingsPresets.UsesColorset;
+            } else
+            {
+                raw.SamplerSettings = (ushort)TextureSamplerSettingsPresets.NoColorset;
+            }
+
             raw.TextureIndex = (paramIdx >= 0 ? (uint)oldInfo.TextureIndex : (uint)TexturePathList.Count);
 
             // Inject the new parameters.
@@ -1417,19 +1436,23 @@ namespace xivModdingFramework.Materials.DataContainers
     /// <summary>
     /// These control the shader passes/major shader features used by this material.
     /// </summary>
-    public class ShaderTechniques
+    public class ShaderTechniques : ICloneable
     {
         // The ID for this type of input.
         public ShaderTechniqueId TechniqueId; 
 
         // Some kind of modifying value.
         public uint Value;
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
     }
 
     /// <summary>
     /// These are constants supplied to the shaders
     /// </summary>
-    public class ShaderConstants
+    public class ShaderConstants : ICloneable
     {
         public ShaderConstantId ConstantId;
 
@@ -1438,12 +1461,20 @@ namespace xivModdingFramework.Materials.DataContainers
         public ushort Size;
 
         public List<float> Constants;
+        public object Clone()
+        {
+            var obj = this.MemberwiseClone();
+
+            // Not the most efficient, but works.
+            ((ShaderConstants)obj).Constants = Constants.Select(item => item).ToList();
+            return obj;
+        }
     }
 
     /// <summary>
     /// These control how each texture is sampled/piped into the shaders.
     /// </summary>
-    public class TextureSamplerSettings
+    public class TextureSamplerSettings : ICloneable
     {
         // Which texture sampler to use.
         public MtrlSamplerId SamplerId;
@@ -1456,6 +1487,11 @@ namespace xivModdingFramework.Materials.DataContainers
 
         // Index to the texture to be used in the material's texture list.
         public uint TextureIndex;
+
+        public object Clone()
+        {
+            return this.MemberwiseClone();
+        }
     }
 
     // Enums representing common channel descriptor formats used by the game.
@@ -1720,12 +1756,24 @@ namespace xivModdingFramework.Materials.DataContainers
         public XivTexType Usage;
         public string Path;
 
+        // Optional Sampler Settings information.
+        public TextureSamplerSettings Sampler;
+
+        public object Clone()
+        {
+            var obj = this.MemberwiseClone();
+            ((MapInfo)obj).Sampler = (TextureSamplerSettings)Sampler.Clone();
+            return obj;
+        }
+    }
+
+    public class MapInfoDetail : ICloneable
+    {
 
         public object Clone()
         {
             return this.MemberwiseClone();
         }
     }
-
 
 }
