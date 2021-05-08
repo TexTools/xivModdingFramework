@@ -126,6 +126,24 @@
   <data name="All" xml:space="preserve">
     <value>すべて</value>
   </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>アウラ♀</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>アウラ♀ NPC</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>アウラ♂</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>アウラ♂ NPC</value>
+  </data>
+  <data name="AuRa_Raen" xml:space="preserve">
+    <value>アウラ・レン</value>
+  </data>
+  <data name="AuRa_Xaela" xml:space="preserve">
+    <value>アウラ・ゼラ</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>アウラ</value>
   </data>
@@ -180,11 +198,32 @@
   <data name="Diffuse" xml:space="preserve">
     <value>Diffuse</value>
   </data>
-  <data name="Ears" xml:space="preserve">
+  <data name="Ear" xml:space="preserve">
     <value>耳</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>イヤリング</value>
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>エレゼン</value>
+  </data>
+  <data name="Elezen_Duskwright" xml:space="preserve">
+    <value>エレゼン(シェーダー)</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>エレゼン♀</value>
+  </data>
+  <data name="Elezen_Female_NPC" xml:space="preserve">
+    <value>エレゼン♀ NPC</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>エレゼン♂</value>
+  </data>
+  <data name="Elezen_Male_NPC" xml:space="preserve">
+    <value>エレゼン♂ NPC</value>
+  </data>
+  <data name="Elezen_Wildwood" xml:space="preserve">
+    <value>エレゼン(フォレスター)</value>
   </data>
   <data name="Emote" xml:space="preserve">
     <value>エモート</value>
@@ -202,7 +241,7 @@
     <value>Unable to find file, please check your directories under settings</value>
   </data>
   <data name="Etc" xml:space="preserve">
-    <value>Etc</value>
+    <value>その他</value>
   </data>
   <data name="Event" xml:space="preserve">
     <value>イベント</value>
@@ -221,6 +260,12 @@
   </data>
   <data name="Food" xml:space="preserve">
     <value>調理品</value>
+  </data>
+  <data name="Furniture_Indoor" xml:space="preserve">
+    <value>調度品</value>
+  </data>
+  <data name="Furniture_Outdoor" xml:space="preserve">
+    <value>庭具</value>
   </data>
   <data name="Garuda_Egi" xml:space="preserve">
     <value>ガルーダ・エギ</value>
@@ -246,11 +291,56 @@
   <data name="Housing" xml:space="preserve">
     <value>ハウジング</value>
   </data>
+  <data name="Hrothgar" xml:space="preserve">
+    <value>ロスガル</value>
+  </data>
+  <data name="Hrothgar_Hellion" xml:space="preserve">
+    <value>ロスガル(ヘリオン)</value>
+  </data>
+  <data name="Hrothgar_Lost" xml:space="preserve">
+    <value>ロスガル(ロスト)</value>
+  </data>
+  <data name="Hrothgar_NPC" xml:space="preserve">
+    <value>ロスガル NPC</value>
+  </data>
+  <data name="Human" xml:space="preserve">
+    <value>人族</value>
+  </data>
   <data name="Hyur_H" xml:space="preserve">
-    <value>Hyur Highlander</value>
+    <value>ヒューラン(ハイランダー)</value>
+  </data>
+  <data name="Hyur_Highlander" xml:space="preserve">
+    <value>ヒューラン(ハイランダー)</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>ヒューラン♀(ハイランダー)</value>
+  </data>
+  <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
+    <value>ヒューラン♀(ハイランダー) NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>ヒューラン♂(ハイランダー)</value>
+  </data>
+  <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
+    <value>ヒューラン♂(ハイランダー) NPC</value>
   </data>
   <data name="Hyur_M" xml:space="preserve">
-    <value>Hyur Midlander</value>
+    <value>ヒューラン(ミッドランダー)</value>
+  </data>
+  <data name="Hyur_Midlander" xml:space="preserve">
+    <value>ヒューラン(ミッドランダー)</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>ヒューラン♀(ミッドランダー)</value>
+  </data>
+  <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
+    <value>ヒューラン♀(ミッドランダー) NPC</value>
+  </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>ヒューラン♂(ミッドランダー)</value>
+  </data>
+  <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
+    <value>ヒューラン♂(ミッドランダー) NPC</value>
   </data>
   <data name="Ifrit_Egi" xml:space="preserve">
     <value>イフリート・エギ</value>
@@ -264,11 +354,32 @@
   <data name="Lalafell" xml:space="preserve">
     <value>ララフェル</value>
   </data>
+  <data name="Lalafell_Dunesfolk" xml:space="preserve">
+    <value>ララフェル(デューンフォーク)</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>ララフェル♀</value>
+  </data>
+  <data name="Lalafell_Female_NPC" xml:space="preserve">
+    <value>ララフェル♀ NPC</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>ララフェル♂</value>
+  </data>
+  <data name="Lalafell_Male_NPC" xml:space="preserve">
+    <value>ララフェル♂ NPC</value>
+  </data>
+  <data name="Lalafell_Plainsfolk" xml:space="preserve">
+    <value>ララフェル(プレーンフォーク)</value>
+  </data>
   <data name="Language" xml:space="preserve">
     <value>ja</value>
   </data>
   <data name="Language_Change_Ja" xml:space="preserve">
     <value>言語を変更するには、アプリケーションを再起動する必要があります。 \n今すぐ再起動？</value>
+  </data>
+  <data name="LeftRing" xml:space="preserve">
+    <value>左指</value>
   </data>
   <data name="Legs" xml:space="preserve">
     <value>脚</value>
@@ -295,7 +406,7 @@
     <value>マーカー</value>
   </data>
   <data name="Mask" xml:space="preserve">
-    <value>Mask</value>
+    <value>マスク</value>
   </data>
   <data name="Minions" xml:space="preserve">
     <value>ミニオン</value>
@@ -303,8 +414,26 @@
   <data name="Miqote" xml:space="preserve">
     <value>ミコッテ</value>
   </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>ミコッテ♀</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>ミコッテ♀ NPC</value>
+  </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>ミコッテ(ムーンキーパー)</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>ミコッテ♂</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>ミコッテ♂ NPC</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>ミコッテ(サンシーカー)</value>
+  </data>
   <data name="Monster" xml:space="preserve">
-    <value>Monster</value>
+    <value>モンスター</value>
   </data>
   <data name="Mounts" xml:space="preserve">
     <value>マウント</value>
@@ -317,6 +446,9 @@
   </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>サブアーム</value>
+  </data>
+  <data name="Ornaments" xml:space="preserve">
+    <value>ファッションアクセサリ</value>
   </data>
   <data name="Other" xml:space="preserve">
     <value>その他</value>
@@ -333,6 +465,24 @@
   <data name="Roegadyn" xml:space="preserve">
     <value>ルガディン</value>
   </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>ルガディン♀</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>ルガディン♀ NPC</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>ルガディン(ローエンガルデ)</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>ルガディン♂</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>ルガディン♂ NPC</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>ルガディン(ゼーヴォルフ)</value>
+  </data>
   <data name="Rook_Autoturret" xml:space="preserve">
     <value>オートタレット・ルーク</value>
   </data>
@@ -346,7 +496,7 @@
     <value>ソウルクリスタル</value>
   </data>
   <data name="Specular" xml:space="preserve">
-    <value>Specular</value>
+    <value>鏡面反射</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>ステータス</value>
@@ -359,6 +509,18 @@
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>両手</value>
+  </data>
+  <data name="Viera" xml:space="preserve">
+    <value>ヴィエラ</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>ヴィエラ NPC</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>ラヴァ・ヴィエラ</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>ヴィナ・ヴィエラ</value>
   </data>
   <data name="Waist" xml:space="preserve">
     <value>帯</value>
