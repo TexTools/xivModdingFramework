@@ -89,14 +89,14 @@ namespace xivModdingFramework.Materials.FileTypes
         // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
         // The exact order of these structs does not seem to be important, only the data in question.
         // It may be viable (though inefficient) to simply include all of them.
-        public static Dictionary<ShaderTechniqueId, ShaderTechniques> ShaderTechniqueDefaults = new Dictionary<ShaderTechniqueId, ShaderTechniques>()
+        public static Dictionary<ShaderTechniqueId, ShaderTechnique> ShaderTechniqueDefaults = new Dictionary<ShaderTechniqueId, ShaderTechnique>()
         {
-            { ShaderTechniqueId.Common, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Common, Value = 2815623008 } },
-            { ShaderTechniqueId.Decal, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Decal, Value = 4083110193 } },
-            { ShaderTechniqueId.Diffuse, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Diffuse, Value = 1611594207 } },
-            { ShaderTechniqueId.SpecToMulti, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.SpecToMulti, Value = 2687453224 } },
-            { ShaderTechniqueId.Skin, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.Skin, Value = 735790577 } },
-            { ShaderTechniqueId.HighlightsToTattoo, new ShaderTechniques() { TechniqueId = ShaderTechniqueId.HighlightsToTattoo, Value = 1851494160 } },
+            { ShaderTechniqueId.Common, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Common, Value = 2815623008 } },
+            { ShaderTechniqueId.Decal, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Decal, Value = 4083110193 } },
+            { ShaderTechniqueId.Diffuse, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Diffuse, Value = 1611594207 } },
+            { ShaderTechniqueId.SpecToMulti, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.SpecToMulti, Value = 2687453224 } },
+            { ShaderTechniqueId.Skin, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Skin, Value = 735790577 } },
+            { ShaderTechniqueId.HighlightsToTattoo, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.HighlightsToTattoo, Value = 1851494160 } },
         };  // Probably want to key this off a custom enum soon if we keep finding additional texture usage values.
 
 
@@ -561,19 +561,19 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         xivMtrl.UnknownFlags = br.ReadUInt16();
 
-                        xivMtrl.ShaderTechniqueList = new List<ShaderTechniques>((int)originalMaterialInputCount);
+                        xivMtrl.ShaderTechniqueList = new List<ShaderTechnique>((int)originalMaterialInputCount);
                         for (var i = 0; i < originalMaterialInputCount; i++)
                         {
-                            xivMtrl.ShaderTechniqueList.Add(new ShaderTechniques
+                            xivMtrl.ShaderTechniqueList.Add(new ShaderTechnique
                             {
                                 TechniqueId = (ShaderTechniqueId) br.ReadUInt32(), Value = br.ReadUInt32()
                             });
                         }
 
-                        xivMtrl.ShaderParameterList = new List<ShaderConstants>(originalShaderParameterCount);
+                        xivMtrl.ShaderConstantList = new List<ShaderConstant>(originalShaderParameterCount);
                         for (var i = 0; i < originalShaderParameterCount; i++)
                         {
-                            xivMtrl.ShaderParameterList.Add(new ShaderConstants
+                            xivMtrl.ShaderConstantList.Add(new ShaderConstant
                             {
                                 ConstantId = (ShaderConstantId) br.ReadUInt32(), Offset = br.ReadUInt16(), Size = br.ReadUInt16()
                             });
@@ -593,7 +593,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
                         var bytesRead = 0;
-                        foreach (var shaderParam in xivMtrl.ShaderParameterList)
+                        foreach (var shaderParam in xivMtrl.ShaderConstantList)
                         {
                             var offset = shaderParam.Offset;
                             var size = shaderParam.Size;
@@ -876,7 +876,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var offset = 0;
-            foreach (var parameter in xivMtrl.ShaderParameterList)
+            foreach (var parameter in xivMtrl.ShaderConstantList)
             {
                 // Ensure we're writing correctly calculated data.
                 parameter.Offset = (ushort) offset;
@@ -900,7 +900,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             var shaderBytes = new List<byte>();
-            foreach (var shaderParam in xivMtrl.ShaderParameterList)
+            foreach (var shaderParam in xivMtrl.ShaderConstantList)
             {
                 foreach (var f in shaderParam.Constants)
                 {
