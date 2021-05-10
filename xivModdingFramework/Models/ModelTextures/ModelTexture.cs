@@ -475,7 +475,7 @@ namespace xivModdingFramework.Models.ModelTextures
             const float PlayerColorMultiplier = 1.4f;
             const float BrightPlayerColorMultiplier = 3.0f;
 
-            if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
+            if (info.Shader == MtrlShader.Character || info.Shader == MtrlShader.Glass)
             {
                 // Common
                 // Base color here is diffuse if we have one...

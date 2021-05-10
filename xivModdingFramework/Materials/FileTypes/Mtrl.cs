@@ -91,7 +91,7 @@ namespace xivModdingFramework.Materials.FileTypes
         // It may be viable (though inefficient) to simply include all of them.
         public static Dictionary<ShaderTechniqueId, ShaderTechnique> ShaderTechniqueDefaults = new Dictionary<ShaderTechniqueId, ShaderTechnique>()
         {
-            { ShaderTechniqueId.Common, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Common, Value = 2815623008 } },
+            { ShaderTechniqueId.CharacterCommon, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.CharacterCommon, Value = 2815623008 } },
             { ShaderTechniqueId.Decal, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Decal, Value = 4083110193 } },
             { ShaderTechniqueId.Diffuse, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.Diffuse, Value = 1611594207 } },
             { ShaderTechniqueId.SpecToMulti, new ShaderTechnique() { TechniqueId = ShaderTechniqueId.SpecToMulti, Value = 2687453224 } },
@@ -571,32 +571,48 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
 
                         xivMtrl.ShaderConstantList = new List<ShaderConstant>(originalShaderParameterCount);
+                        Dictionary<ShaderConstantId, (ushort Offset, ushort Size)> constantsOffsetAndSize = new Dictionary<ShaderConstantId, (ushort Offset, ushort Size)>();
                         for (var i = 0; i < originalShaderParameterCount; i++)
                         {
+
+                            var key = (ShaderConstantId)br.ReadUInt32();
+                            var offset = br.ReadUInt16();
+                            var size = br.ReadUInt16();
                             xivMtrl.ShaderConstantList.Add(new ShaderConstant
                             {
-                                ConstantId = (ShaderConstantId) br.ReadUInt32(), Offset = br.ReadUInt16(), Size = br.ReadUInt16()
+                                ConstantId = key
                             });
+                            constantsOffsetAndSize.Add(key, (offset, size));
+
                         }
 
                         xivMtrl.TextureSamplerSettingsList = new List<TextureSamplerSettings>(originalTextureDescriptorCount);
                         for (var i = 0; i < originalTextureDescriptorCount; i++)
                         {
-                            xivMtrl.TextureSamplerSettingsList.Add(new TextureSamplerSettings
+                            var sampler = new TextureSamplerSettings
                             {
-                                SamplerId = (MtrlSamplerId) br.ReadUInt32(),
+                                SamplerId = (MtrlSamplerId)br.ReadUInt32(),
                                 SamplerSettings = br.ReadUInt16(),
                                 Flags = br.ReadUInt16(),
-                                TextureIndex = br.ReadUInt32()
-                            });
+                            };
+                            xivMtrl.TextureSamplerSettingsList.Add(sampler);
+
+                            var texIdx = br.ReadUInt32();
+                            if(texIdx < xivMtrl.TexturePathList.Count)
+                            {
+                                sampler.TexturePath = xivMtrl.TexturePathList[(int)texIdx];
+                            } else
+                            {
+                                sampler.TexturePath = "";
+                            }
                         }
 
 
                         var bytesRead = 0;
                         foreach (var shaderParam in xivMtrl.ShaderConstantList)
                         {
-                            var offset = shaderParam.Offset;
-                            var size = shaderParam.Size;
+                            var offset = constantsOffsetAndSize[shaderParam.ConstantId].Offset;
+                            var size = constantsOffsetAndSize[shaderParam.ConstantId].Size;
                             shaderParam.Constants = new List<float>();
                             if (bytesRead + size <= originalShaderParameterDataSize)
                             {
@@ -783,6 +799,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 xivMtrl.TexturePathOffsetList.Add(stringListBytes.Count);
                 var path = texPathString;
+
                 // This is an old style DX9/DX11 Mixed Texture reference, make sure to clean it up if needed.
                 if(xivMtrl.TexturePathUnknownList[texIdx] != 0)
                 {
@@ -875,17 +892,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Value));
             }
 
-            var offset = 0;
+            short offset = 0;
             foreach (var parameter in xivMtrl.ShaderConstantList)
             {
                 // Ensure we're writing correctly calculated data.
-                parameter.Offset = (ushort) offset;
-                parameter.Size = (ushort) parameter.Constants.Count;
-                offset += parameter.Size * 4;
-                short byteSize = (short)(parameter.Size * 4);
+                short size = (short)parameter.Constants.Count;
+                offset += (short)(size * 4);
+                short byteSize = (short)(size * 4);
 
                 mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ConstantId));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameter.Offset));
+                mtrlBytes.AddRange(BitConverter.GetBytes(offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(byteSize));
             }
 
@@ -894,7 +910,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrlBytes.AddRange(BitConverter.GetBytes((uint) parameterStruct.SamplerId));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.SamplerSettings));
                 mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Flags));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.GetTextureIndex(xivMtrl)));
             }
 
 

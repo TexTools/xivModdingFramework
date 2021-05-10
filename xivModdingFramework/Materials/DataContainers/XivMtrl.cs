@@ -324,7 +324,7 @@ namespace xivModdingFramework.Materials.DataContainers
             switch (ShaderPack)
             {
                 case "character.shpk":
-                    info.Shader = MtrlShader.Standard;
+                    info.Shader = MtrlShader.Character;
                     break;
                 case "characterglass.shpk":
                     info.Shader = MtrlShader.Glass;
@@ -379,7 +379,7 @@ namespace xivModdingFramework.Materials.DataContainers
             var shpl = ShaderConstantList;
 
             info.Preset = MtrlShaderPreset.Default;
-            if (info.Shader == MtrlShader.Standard)
+            if (info.Shader == MtrlShader.Character)
             {
                 bool hasSpec = GetMapInfo(XivTexType.Specular) != null;
                 bool hasDiffuse = GetMapInfo(XivTexType.Diffuse) != null;
@@ -526,7 +526,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
             switch (info.Shader)
             {
-                case MtrlShader.Standard:
+                case MtrlShader.Character:
                     ShaderPack = "character.shpk";
                     break;
                 case MtrlShader.Glass:
@@ -628,7 +628,6 @@ namespace xivModdingFramework.Materials.DataContainers
         public MapInfo GetMapInfo(XivTexType MapType)
         {
             var info = new MapInfo();
-            int mapIndex = -1;
 
             info.Usage = MapType;
 
@@ -637,20 +636,14 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 if (SamplerToTexType.ContainsKey(samplerInfo.SamplerId) && SamplerToTexType[samplerInfo.SamplerId] == MapType)
                 {
-                    mapIndex = (int)samplerInfo.TextureIndex;
+                    info.Path = samplerInfo.TexturePath;
                     info.Sampler = samplerInfo;
                 }
             }
 
-            if (mapIndex < 0)
+            if (info.Sampler == null)
             {
                 return null;
-            }
-
-            info.Path = "";
-            if (mapIndex < TexturePathList.Count)
-            {
-                info.Path = TexturePathList[mapIndex];
             }
 
             info.Path = TokenizePath(info.Path, info.Usage);
@@ -687,7 +680,7 @@ namespace xivModdingFramework.Materials.DataContainers
             foreach (var samplerInfo in TextureSamplerSettingsList)
             {
                 // Found the descriptor.
-                if (samplerInfo.TextureIndex == idx)
+                if (samplerInfo.TexturePath == path)
                 {
                     // If we know what this texture descriptor actually means
                     if (SamplerToTexType.ContainsKey(samplerInfo.SamplerId))
@@ -749,35 +742,24 @@ namespace xivModdingFramework.Materials.DataContainers
 
 
             // Deleting existing info.
-            if (info == null)
+            if (paramIdx >= 0)
             {
-
-                if (paramIdx >= 0)
+                var texIdx = oldInfo.GetTextureIndex(this);
+                // Remove texture from path list if it exists.
+                if (texIdx >= 0)
                 {
-                    // Remove texture from path list if it exists.
-                    if (TexturePathList.Count > oldInfo.TextureIndex)
-                    {
-                        TexturePathList.RemoveAt((int)oldInfo.TextureIndex);
-                        TexturePathUnknownList.RemoveAt((int)oldInfo.TextureIndex);
-                    }
-
-                    // Remove Parameter List
-                    TextureSamplerSettingsList.RemoveAt(paramIdx);
-
-                    // Update other texture offsets
-                    for (var i = 0; i < TextureSamplerSettingsList.Count; i++)
-                    {
-                        var p = TextureSamplerSettingsList[i];
-                        if (p.TextureIndex > oldInfo.TextureIndex)
-                        {
-                            p.TextureIndex--;
-                        }
-                        TextureSamplerSettingsList[i] = p;
-                    }
+                    TexturePathList.RemoveAt(texIdx);
+                    TexturePathUnknownList.RemoveAt(texIdx);
                 }
 
-                return;
+                // Remove Parameter List
+                TextureSamplerSettingsList = TextureSamplerSettingsList.Where(x => x.TexturePath != oldInfo.TexturePath).ToList();
+            }
 
+            if (info == null)
+            {
+                // If we just wanted to delete, and nothing else, end here.
+                return;
             }
 
             var rootPath = GetTextureRootDirectoy();
@@ -811,44 +793,42 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.Path = info.Path += ".tex";
             }
 
+            TextureSamplerSettings newInfo;
+            if (info.Sampler == null)
+            {
+                // If no sampler was supplied, use the defaults.
+                newInfo = new TextureSamplerSettings();
+                newInfo.SamplerId = TexTypeToSamplerDefault[info.Usage];
+                newInfo.Flags = 15;
+            } else
+            {
+                // If an explicit sampler was provided, use that.
+                newInfo = (TextureSamplerSettings) info.Clone();
+            }
 
-
-
-            var raw = new TextureSamplerSettings();
-            raw.SamplerId = TexTypeToSamplerDefault[info.Usage];
-            raw.Flags = 15;
+            // Update sampler to use the top level path supplied in case of conflicts.
+            newInfo.TexturePath = info.Path;
 
             // TODO Could use some better handling here.
             if (MapType == XivTexType.Normal)
             {
-                raw.SamplerSettings = (ushort)TextureSamplerSettingsPresets.UsesColorset;
+                newInfo.SamplerSettings = (ushort)TextureSamplerSettingsPresets.UsesColorset;
             }
             else
             {
-                raw.SamplerSettings = (ushort)TextureSamplerSettingsPresets.NoColorset;
+                newInfo.SamplerSettings = (ushort)TextureSamplerSettingsPresets.NoColorset;
             }
 
-            raw.TextureIndex = (paramIdx >= 0 ? (uint)oldInfo.TextureIndex : (uint)TexturePathList.Count);
 
             // Inject the new parameters.
-            if (paramIdx >= 0)
-            {
-                TextureSamplerSettingsList[paramIdx] = raw;
-            }
-            else
-            {
-                TextureSamplerSettingsList.Add(raw);
-            }
+            TextureSamplerSettingsList.Add(newInfo);
 
-            // Inject the new string
-            if (raw.TextureIndex == TexturePathList.Count)
+            // Inject the new string if needed
+            var newTexIdx = newInfo.GetTextureIndex(this);
+            if (newTexIdx < 0)
             {
                 TexturePathList.Add(info.Path);
                 TexturePathUnknownList.Add((short)0); // This value seems to always be 0 for textures.
-            }
-            else
-            {
-                TexturePathList[(int)raw.TextureIndex] = info.Path;
             }
         }
 
@@ -876,7 +856,7 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
                 {
-                    SetShaderTechnique(ShaderTechniqueId.Common);
+                    SetShaderTechnique(ShaderTechniqueId.CharacterCommon);
                 }
                 else if (info.Preset == MtrlShaderPreset.BodyWithHair)
                 {
@@ -889,9 +869,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
 
             }
-            else if (info.Shader == MtrlShader.Standard)
+            else if (info.Shader == MtrlShader.Character)
             {
-                SetShaderTechnique(ShaderTechniqueId.Common);
+                SetShaderTechnique(ShaderTechniqueId.CharacterCommon);
                 if (info.Preset == MtrlShaderPreset.Default)
                 {
                     SetShaderTechnique(ShaderTechniqueId.Decal);
@@ -920,7 +900,7 @@ namespace xivModdingFramework.Materials.DataContainers
             else
             {
                 // This is uh... Glass shader?  I think is the only fall through here.
-                SetShaderTechnique(ShaderTechniqueId.Common);
+                SetShaderTechnique(ShaderTechniqueId.CharacterCommon);
                 SetShaderTechnique(ShaderTechniqueId.Decal);
             }
 
@@ -962,7 +942,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     args.Add(ShaderConstantId.Face1, null);
                 }
             }
-            else if (info.Shader == MtrlShader.Standard)
+            else if (info.Shader == MtrlShader.Character)
             {
                 if (info.Preset == MtrlShaderPreset.Monster)
                 {
@@ -1146,19 +1126,15 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.Path = TexturePathList[i];
                 info.Usage = XivTexType.Other;
 
-                // Check if the texture appears in the parameter list.
+                // Find the texture's sampler.
                 foreach (var p in TextureSamplerSettingsList)
                 {
-                    if (p.TextureIndex == i)
+                    if (p.TexturePath == info.Path)
                     {
                         // This is a known parameter.
                         if (SamplerToTexType.ContainsKey(p.SamplerId))
                         {
                             info.Usage = SamplerToTexType[p.SamplerId];
-                        }
-                        else
-                        {
-                            info.Usage = XivTexType.Other;
                         }
 
                         break;
@@ -1497,6 +1473,78 @@ namespace xivModdingFramework.Materials.DataContainers
             { MtrlSamplerId.Catchlight, XivTexType.Reflection },
             { MtrlSamplerId.Reflection, XivTexType.Reflection },
         };
+
+
+        // These values extracted by Aers, and should cover the entire universe of currently used values as of patch 5.5 Global -Sel
+        // Each of these values is some kind of CRC32 hashed string.
+        // Default values are always index[0] in their resepective lists.
+        public static Dictionary<ShaderTechniqueId, List<uint>> AvailableValuesByTechnique = new Dictionary<ShaderTechniqueId, List<uint>>() {
+            { ShaderTechniqueId.CharacterCommon, new List<uint>() { 0xDFE74BAC, 0xA7D2FF60 } },
+            { ShaderTechniqueId.Decal, new List<uint>() { 0xF35F5131, 0x7C6FA05B, 0xBD94649A } },
+            { ShaderTechniqueId.Bg1, new List<uint>() { 0x7C6FA05B, 0xBD94649A } },
+            { ShaderTechniqueId.BgAnimated1, new List<uint>() { 0x5D146A23, 0x72AAA9AE } },
+            { ShaderTechniqueId.Lighting, new List<uint>() { 0x470E5A1E, 0x2807B89E } }, //LightingNormal and LightingLow
+            { ShaderTechniqueId.Diffuse, new List<uint>() { 0x5CC605B5, 0x600EF9DF, 0x22A4AABF, 0x669A451B, 0x1DF2985C, 0x941820BE, 0xE49AD72B } },
+            { ShaderTechniqueId.SpecToMulti, new List<uint>() { 0x198D11CD, 0xA02F4828 } },
+            { ShaderTechniqueId.Skin, new List<uint>() { 0xF5673524, 0x2BDB45F1, 0x57FF3B64 } },
+            { ShaderTechniqueId.HighlightsToTattoo, new List<uint>() { 0xF7B8956E, 0x6E5B8F10 } },
+            { ShaderTechniqueId.Lightshaft, new List<uint>() { 0xB1064103, 0xC6017195 } },
+            { ShaderTechniqueId.River1, new List<uint>() { 0x32F05363, 0x26E40878 } },
+            { ShaderTechniqueId.River2, new List<uint>() { 0x86B217C3, 0x08404EC3, 0xE6A6AD27 } },
+            { ShaderTechniqueId.Water1, new List<uint>() { 0x28981633, 0xDD54E76C } },
+            { ShaderTechniqueId.Water2, new List<uint>() { 0x0EC4134E, 0x1140F45C } },
+            { ShaderTechniqueId.Water3, new List<uint>() { 0x4B740B02, 0x824D5B42 } }
+
+        };
+
+        /// <summary>
+        ///  Mapping of the few Shader Technique values we actually have some kind of name/reference for.
+        /// </summary>
+        public static Dictionary<uint, string> ShaderTechniqueValueNames = new Dictionary<uint, string>()
+        {
+            { 0xDFE74BAC, "CharacterCommon Default" },
+            { 0xF35F5131, "Decal Default" },
+            { 0x7C6FA05B, "Bg1 Default" },
+            { 0x5D146A23, "BgAnimated1 Default" },
+
+            { 0x470E5A1E, "LightingNormal" },
+            { 0x2807B89E, "LightingLow" },
+
+            { 0x5CC605B5, "Diffuse Default" },
+            { 0x669A451B, "Diffuse BG Default" },
+
+            { 0x198D11CD, "SpecToMulti Default" },
+            
+            { 0xF5673524, "Skin Default" },
+            { 0x57FF3B64, "Hrothgar Skin" },
+
+            { 0xF7B8956E, "HighlightsToTattoo Default" },
+            { 0xB1064103, "Lightshaft Default" },
+            { 0x32F05363, "River1 Default" },
+            { 0x86B217C3, "River2 Default" },
+            { 0x28981633, "Water1 Default" },
+            { 0x0EC4134E, "Water2 Default" },
+            { 0x4B740B02, "Water3 Default" },
+        };
+
+
+        public static Dictionary<MtrlShader, List<ShaderTechniqueId>> AvailableTechniquesByShader = new Dictionary<MtrlShader, List<ShaderTechniqueId>>()
+        {
+            { MtrlShader.Character, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, ShaderTechniqueId.Decal, ShaderTechniqueId.Diffuse, ShaderTechniqueId.SpecToMulti } },
+            { MtrlShader.Glass, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, } },
+            { MtrlShader.Skin, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, ShaderTechniqueId.Skin } },
+            { MtrlShader.Hair, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, ShaderTechniqueId.HighlightsToTattoo } },
+            { MtrlShader.Iris, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, } },
+            { MtrlShader.Furniture, new List<ShaderTechniqueId>() { ShaderTechniqueId.Bg1, ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
+            { MtrlShader.DyeableFurniture, new List<ShaderTechniqueId>() { ShaderTechniqueId.Bg1, ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
+            { MtrlShader.BgScroll, new List<ShaderTechniqueId>() { ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
+            { MtrlShader.BgDecal, new List<ShaderTechniqueId>() { ShaderTechniqueId.Lighting, } },
+            { MtrlShader.Water, new List<ShaderTechniqueId>() { ShaderTechniqueId.Water1, ShaderTechniqueId.Water2, ShaderTechniqueId.Water3, ShaderTechniqueId.River2 } },
+            { MtrlShader.River, new List<ShaderTechniqueId>() { ShaderTechniqueId.River1, ShaderTechniqueId.River2 } },
+            { MtrlShader.Lightshaft, new List<ShaderTechniqueId>() { ShaderTechniqueId.Lightshaft } },
+            { MtrlShader.Other, new List<ShaderTechniqueId>() { } }
+        };
+
     }
 
     /// <summary>
@@ -1522,11 +1570,8 @@ namespace xivModdingFramework.Materials.DataContainers
     {
         public ShaderConstantId ConstantId;
 
-        public ushort Offset;
-
-        public ushort Size;
-
         public List<float> Constants;
+
         public object Clone()
         {
             var obj = this.MemberwiseClone();
@@ -1551,9 +1596,20 @@ namespace xivModdingFramework.Materials.DataContainers
         // Unknown flags, seems to always be [15]
         public ushort Flags;
 
-        // Index to the texture to be used in the material's texture list.
-        public uint TextureIndex;
+        // Texture path this sampler uses.
+        public string TexturePath;
 
+        public int GetTextureIndex(XivMtrl mtrl)
+        {
+            for(int i = 0; i < mtrl.TexturePathList.Count; i++)
+            {
+                if(mtrl.TexturePathList[i] == TexturePath)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
         public object Clone()
         {
             return this.MemberwiseClone();
@@ -1571,13 +1627,18 @@ namespace xivModdingFramework.Materials.DataContainers
     // Enum representation of the shader names used in mtrl files.
     public enum MtrlShader
     {
-        Standard,           // character.shpk
+        Character,           // character.shpk
         Glass,              // characterglass.shpk
         Skin,               // skin.shpk
         Hair,               // hair.shpk
         Iris,               // iris.shpk
         Furniture,          // bg.shpk
         DyeableFurniture,   // bgcolorchange.shpk 
+        BgScroll,           // bguvscroll.shpk
+        BgDecal,            // bgdecal.shpk
+        Water,              // water.shpk
+        River,              // river.shpk
+        Lightshaft,         // lightshaft.shpk
         Other               // Unknown Shader
     }
 
@@ -1636,7 +1697,6 @@ namespace xivModdingFramework.Materials.DataContainers
         Furniture13 = 133014596
     }
 
-
     /// <summary>
     /// Known valid texture samplers.
     /// </summary>
@@ -1667,24 +1727,60 @@ namespace xivModdingFramework.Materials.DataContainers
     public enum ShaderTechniqueId : uint
     {
         // Used always(?)
-        Common = 4113354501,
+        // iris, skin, characterglass, hair, character
+        CharacterCommon = 0xF52CCF05,
 
         // Pipes Equipment Decal data in.
-        Decal = 3531043187,
+        // character
+        Decal = 0xD2777173,
 
-        //???
-        Diffuse = 3054951514,
+        // bg
+        Bg1 = 0x4F4F0636,
+
+        // bg, bguvscroll
+        BgAnimated1 = 0xA9A3EE25,
+
+        // bgdecal, bg, bguvscroll
+        Lighting = 0x575CA84C,
+
+
+        // Used primarily by Diffuse texture materials?
+        // character, bg, bguvscroll
+        Diffuse = 0xB616DC5A,
 
         // Converts Specular inputs to Multi inputs (only used on monster items?)
-        SpecToMulti = 3367837167,
+        // character
+        SpecToMulti = 0xC8BD1DEF,
 
         // Something to do with skin color.
         // Alternative sub/flag value for this switches between normal skin usage hrothgar style skin (hair color piped in)
-        Skin = 940355280,
+        // skin
+        Skin = 0x380CAED0,
 
         // Converts Hair Highlight color to Tattoo color (used for facial hair/"etc" textures)
-        HighlightsToTattoo = 612525193,
+        // hair
+        HighlightsToTattoo = 0x24826489,
+
+        // lightshaft
+        Lightshaft = 0x0DA8270B,
+
+        // river
+        River1 = 0xE041892A,
+
+        // river, water
+        River2 = 0xF8EF655E,
+
+        // water
+        Water1 = 0x28981633,
+
+        // water
+        Water2 = 0xFB7AD5E4,
+
+        // water
+        Water3 = 0xB5B1C44A,
+
     }
+
 
     public class ShaderInfo
     {
@@ -1697,7 +1793,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                if (Shader == MtrlShader.Character || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
                 {
                     return true;
                 }
@@ -1712,7 +1808,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Standard && Preset == MtrlShaderPreset.Default)
+                if (Shader == MtrlShader.Character && Preset == MtrlShaderPreset.Default)
                 {
                     return false;
                 }
@@ -1750,7 +1846,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Standard && (Preset == MtrlShaderPreset.DiffuseSpecular || Preset == MtrlShaderPreset.Monster))
+                if (Shader == MtrlShader.Character && (Preset == MtrlShaderPreset.DiffuseSpecular || Preset == MtrlShaderPreset.Monster))
                 {
                     return true;
                 }
@@ -1776,7 +1872,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                if (Shader == MtrlShader.Character || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
                 {
                     // These shaders allow variable transparency.
                     return null;
@@ -1800,7 +1896,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             var presets = new List<MtrlShaderPreset>();
             presets.Add(MtrlShaderPreset.Default);
-            if (shader == MtrlShader.Standard)
+            if (shader == MtrlShader.Character)
             {
                 //presets.Add(MtrlShaderPreset.DiffuseMulti);
                 presets.Add(MtrlShaderPreset.DiffuseSpecular);
