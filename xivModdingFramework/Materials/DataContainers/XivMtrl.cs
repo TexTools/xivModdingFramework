@@ -327,7 +327,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     info.Shader = MtrlShader.Character;
                     break;
                 case "characterglass.shpk":
-                    info.Shader = MtrlShader.Glass;
+                    info.Shader = MtrlShader.CharacterGlass;
                     break;
                 case "skin.shpk":
                     info.Shader = MtrlShader.Skin;
@@ -339,10 +339,10 @@ namespace xivModdingFramework.Materials.DataContainers
                     info.Shader = MtrlShader.Iris;
                     break;
                 case "bg.shpk":
-                    info.Shader = MtrlShader.Furniture;
+                    info.Shader = MtrlShader.Bg;
                     break;
                 case "bgcolorchange.shpk":
-                    info.Shader = MtrlShader.DyeableFurniture;
+                    info.Shader = MtrlShader.BgColorChange;
                     break;
                 default:
                     info.Shader = MtrlShader.Other;
@@ -529,7 +529,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 case MtrlShader.Character:
                     ShaderPack = "character.shpk";
                     break;
-                case MtrlShader.Glass:
+                case MtrlShader.CharacterGlass:
                     ShaderPack = "characterglass.shpk";
                     break;
                 case MtrlShader.Hair:
@@ -541,10 +541,10 @@ namespace xivModdingFramework.Materials.DataContainers
                 case MtrlShader.Skin:
                     ShaderPack = "skin.shpk";
                     break;
-                case MtrlShader.Furniture:
+                case MtrlShader.Bg:
                     ShaderPack = "bg.shpk";
                     break;
-                case MtrlShader.DyeableFurniture:
+                case MtrlShader.BgColorChange:
                     ShaderPack = "bgcolorchange.shpk";
                     break;
                 default:
@@ -841,7 +841,7 @@ namespace xivModdingFramework.Materials.DataContainers
             ShaderTechniqueList.Clear();
 
             // These shaders do not use the texture usage list at all.
-            if (info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture || info.Shader == MtrlShader.Iris || info.Shader == MtrlShader.Hair)
+            if (info.Shader == MtrlShader.Bg || info.Shader == MtrlShader.BgColorChange || info.Shader == MtrlShader.Iris || info.Shader == MtrlShader.Hair)
             {
                 if (info.Shader == MtrlShader.Hair && info.Preset != MtrlShaderPreset.Default)
                 {
@@ -981,7 +981,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     args[ShaderConstantId.SkinColor] = new List<float>() { 3f, 3f, 3f };
                 }
             }
-            else if (info.Shader == MtrlShader.Glass)
+            else if (info.Shader == MtrlShader.CharacterGlass)
             {
                 args.Remove(ShaderConstantId.AlphaLimiter);
                 args.Remove(ShaderConstantId.Occlusion);
@@ -1170,7 +1170,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = XivTexType.Skin };
 
                 }
-                else if (shaderInfo.Shader == MtrlShader.Furniture && map.Path.Contains("dummy"))
+                else if (shaderInfo.Shader == MtrlShader.Bg && map.Path.Contains("dummy"))
                 {
                     // Dummy textures are skipped.
                     continue;
@@ -1464,11 +1464,11 @@ namespace xivModdingFramework.Materials.DataContainers
 
         public static Dictionary<MtrlSamplerId, XivTexType> SamplerToTexType = new Dictionary<MtrlSamplerId, XivTexType>() {
             { MtrlSamplerId.Normal, XivTexType.Normal },
-            { MtrlSamplerId.FurnishingNormal, XivTexType.Normal },
+            { MtrlSamplerId.NormalMap0, XivTexType.Normal },
             { MtrlSamplerId.Specular, XivTexType.Specular },
-            { MtrlSamplerId.FurnishingSpecular, XivTexType.Specular },
+            { MtrlSamplerId.SpecularMap0, XivTexType.Specular },
             { MtrlSamplerId.Diffuse, XivTexType.Diffuse },
-            { MtrlSamplerId.FurnishingDiffuse, XivTexType.Diffuse },
+            { MtrlSamplerId.ColorMap0, XivTexType.Diffuse },
             { MtrlSamplerId.Multi, XivTexType.Multi },
             { MtrlSamplerId.Catchlight, XivTexType.Reflection },
             { MtrlSamplerId.Reflection, XivTexType.Reflection },
@@ -1531,20 +1531,82 @@ namespace xivModdingFramework.Materials.DataContainers
         public static Dictionary<MtrlShader, List<ShaderTechniqueId>> AvailableTechniquesByShader = new Dictionary<MtrlShader, List<ShaderTechniqueId>>()
         {
             { MtrlShader.Character, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, ShaderTechniqueId.Decal, ShaderTechniqueId.Diffuse, ShaderTechniqueId.SpecToMulti } },
-            { MtrlShader.Glass, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, } },
+            { MtrlShader.CharacterGlass, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, } },
             { MtrlShader.Skin, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, ShaderTechniqueId.Skin } },
             { MtrlShader.Hair, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, ShaderTechniqueId.HighlightsToTattoo } },
             { MtrlShader.Iris, new List<ShaderTechniqueId>() { ShaderTechniqueId.CharacterCommon, } },
-            { MtrlShader.Furniture, new List<ShaderTechniqueId>() { ShaderTechniqueId.Bg1, ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
-            { MtrlShader.DyeableFurniture, new List<ShaderTechniqueId>() { ShaderTechniqueId.Bg1, ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
-            { MtrlShader.BgScroll, new List<ShaderTechniqueId>() { ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
+            { MtrlShader.Bg, new List<ShaderTechniqueId>() { ShaderTechniqueId.Bg1, ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
+            { MtrlShader.BgColorChange, new List<ShaderTechniqueId>() { ShaderTechniqueId.Bg1, ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
+            { MtrlShader.BgUvScroll, new List<ShaderTechniqueId>() { ShaderTechniqueId.BgAnimated1, ShaderTechniqueId.Lighting, ShaderTechniqueId.Diffuse } },
             { MtrlShader.BgDecal, new List<ShaderTechniqueId>() { ShaderTechniqueId.Lighting, } },
             { MtrlShader.Water, new List<ShaderTechniqueId>() { ShaderTechniqueId.Water1, ShaderTechniqueId.Water2, ShaderTechniqueId.Water3, ShaderTechniqueId.River2 } },
             { MtrlShader.River, new List<ShaderTechniqueId>() { ShaderTechniqueId.River1, ShaderTechniqueId.River2 } },
             { MtrlShader.Lightshaft, new List<ShaderTechniqueId>() { ShaderTechniqueId.Lightshaft } },
             { MtrlShader.Other, new List<ShaderTechniqueId>() { } }
         };
+        /*
+            None = 0,
+            Sampler = 0x88408C04,
+            Sampler1 = 0x213CB439,
+            Sampler2 = 0x563B84AF,
+            Catchlight = 0xFEA0F3D2,
+            ColorMap0 = 0x1E6FEF9C, // Furnishing Sampler
+            ColorMap1 = 0x6968DF0A, // Furnishing Sampler
+            Diffuse = 0x115306BE,
+            EnvMap = 0xF8D7957A,
+            Multi = 0x8A4E82B6,
+            Normal = 0x0C5EC1F1,
+            FurnishingNormal = 0xAAB4D9E9,
+            NormalMap2 = 0xDDB3E97F,
+            Reflection = 0x87F6474D,
+            Specular = 0x2B99E025,
+            SpecularMap0 = 0x1BBC2F12,  // Furnishing Sampler
+            SpecularMap1 = 0x6CBB1F84,  // Furnishing Sampler
+            WaveMap = 0xE6321AFC,
+            WaveletMap1 = 0x574E22D6,
+            WaveletMap2 = 0x20491240,
+            WhitecapMap = 0x95E1F64D,
+            LightDiffuse = 0x23D0F850,
+            LightSpecular = 0x6C19ACA4,
+            GBuffer = 0xEBBB29BD,
+            Occlusion = 0x32667BD7,
+            Dither = 0x9F467267,
+            Decal = 0x0237CB94,
+            Shadow = 0x58AD2B38,
+            Caustics = 0x0EFB24F7*/
 
+        /* 
+         
+        Character,           // character.shpk
+        Glass,              // characterglass.shpk
+        Skin,               // skin.shpk
+        Hair,               // hair.shpk
+        Iris,               // iris.shpk
+        Furniture,          // bg.shpk
+        DyeableFurniture,   // bgcolorchange.shpk 
+        BgScroll,           // bguvscroll.shpk
+        BgDecal,            // bgdecal.shpk
+        Water,              // water.shpk
+        River,              // river.shpk
+        Lightshaft,         // lightshaft.shpk
+        Other               // Unknown Shader
+        */
+        public static Dictionary<MtrlShader, List<MtrlSamplerId>> AvailableSamplersByShader = new Dictionary<MtrlShader, List<MtrlSamplerId>>()
+        {
+            { MtrlShader.Character, new List<MtrlSamplerId>() { MtrlSamplerId.Normal, MtrlSamplerId.TileNormal, MtrlSamplerId.LightDiffuse, MtrlSamplerId.LightSpecular, MtrlSamplerId.Reflection, MtrlSamplerId.Occlusion, MtrlSamplerId.Diffuse, MtrlSamplerId.TileDiffuse, MtrlSamplerId.Dither, MtrlSamplerId.Specular, MtrlSamplerId.Decal, MtrlSamplerId.Multi } },
+            { MtrlShader.CharacterGlass, new List<MtrlSamplerId>() { MtrlSamplerId.Normal, MtrlSamplerId.Multi, MtrlSamplerId.Reflection, MtrlSamplerId.Dither } },
+            { MtrlShader.Skin, new List<MtrlSamplerId>() { MtrlSamplerId.LightDiffuse, MtrlSamplerId.LightSpecular, MtrlSamplerId.TileNormal, MtrlSamplerId.TileDiffuse, MtrlSamplerId.Occlusion, MtrlSamplerId.Dither, MtrlSamplerId.Normal, MtrlSamplerId.Multi } },
+            { MtrlShader.Hair, new List<MtrlSamplerId>() { MtrlSamplerId.Normal, MtrlSamplerId.Multi, MtrlSamplerId.LightDiffuse, MtrlSamplerId.LightSpecular, MtrlSamplerId.Occlusion, MtrlSamplerId.Decal, MtrlSamplerId.Dither, MtrlSamplerId.Reflection  } },
+            { MtrlShader.Iris, new List<MtrlSamplerId>() { MtrlSamplerId.Normal, MtrlSamplerId.LightDiffuse, MtrlSamplerId.LightSpecular, MtrlSamplerId.Multi, MtrlSamplerId.Catchlight, MtrlSamplerId.Occlusion, MtrlSamplerId.Reflection, MtrlSamplerId.Dither } },
+            { MtrlShader.Bg, new List<MtrlSamplerId>() { MtrlSamplerId.ColorMap0, MtrlSamplerId.SpecularMap0, MtrlSamplerId.Occlusion, MtrlSamplerId.Fresnel, MtrlSamplerId.LightDiffuse, MtrlSamplerId.LightSpecular, MtrlSamplerId.Dither, MtrlSamplerId.NormalMap0, MtrlSamplerId.NormalMap1, MtrlSamplerId.ColorMap1, MtrlSamplerId.SpecularMap1 } },
+            { MtrlShader.BgColorChange, new List<MtrlSamplerId>() { MtrlSamplerId.ColorMap0, MtrlSamplerId.NormalMap0, MtrlSamplerId.SpecularMap0, MtrlSamplerId.Dither } },
+            { MtrlShader.BgUvScroll, new List<MtrlSamplerId>() { MtrlSamplerId.ColorMap0, MtrlSamplerId.NormalMap0, MtrlSamplerId.SpecularMap0, MtrlSamplerId.Dither, MtrlSamplerId.NormalMap1, MtrlSamplerId.ColorMap1, MtrlSamplerId.SpecularMap1 } },
+            { MtrlShader.BgDecal, new List<MtrlSamplerId>() { MtrlSamplerId.NormalMap, MtrlSamplerId.ColorMap, MtrlSamplerId.Occlusion, MtrlSamplerId.Fresnel, MtrlSamplerId.LightDiffuse, MtrlSamplerId.LightSpecular, MtrlSamplerId.Dither } },
+            { MtrlShader.Water, new List<MtrlSamplerId>() { } },
+            { MtrlShader.River, new List<MtrlSamplerId>() { } },
+            { MtrlShader.Lightshaft, new List<MtrlSamplerId>() { } },
+            { MtrlShader.Other, new List<MtrlSamplerId>() { } },
+        };
     }
 
     /// <summary>
@@ -1627,20 +1689,46 @@ namespace xivModdingFramework.Materials.DataContainers
     // Enum representation of the shader names used in mtrl files.
     public enum MtrlShader
     {
-        Character,           // character.shpk
-        Glass,              // characterglass.shpk
+        Character,          // character.shpk
+        CharacterGlass,     // characterglass.shpk
         Skin,               // skin.shpk
         Hair,               // hair.shpk
         Iris,               // iris.shpk
-        Furniture,          // bg.shpk
-        DyeableFurniture,   // bgcolorchange.shpk 
-        BgScroll,           // bguvscroll.shpk
+        Bg,                 // bg.shpk
+        BgColorChange,      // bgcolorchange.shpk 
+        BgCrestChange,
         BgDecal,            // bgdecal.shpk
+        BgUvScroll,         // bguvscroll.shpk
         Water,              // water.shpk
         River,              // river.shpk
         Lightshaft,         // lightshaft.shpk
+        PanelLighting,
+        PointLighting,
+        SpotLighting,
+        DirectionalLighting,
+        DirectionalShadow,
+        Grass,
+        VerticalFog,
+        Weather,
+        Channeling,
+        _3DUI,              // Awkward naming because enums can't start with numbers.  3dui.shpk
         Other               // Unknown Shader
     }
+
+    // Will we actually ever use these? Who knows, but might as well keep the list here.
+    public enum ApricotShader
+    {
+        apricot_decal,
+        apricot_decal_dummy,
+        apricot_decal_ring,
+        apricot_model,
+        apricot_model_dummy,
+        apricot_morph,
+        apricot_powder,
+        apricot_powder_dummy,
+        apricot_shape,
+        apricot_shape_dummy
+    }        
 
     // These are the custom presets TexTools has set up.
     public enum MtrlShaderPreset
@@ -1702,27 +1790,73 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public enum MtrlSamplerId : uint
     {
+        // Placeholder value for TT menus/etc., there isn't actually a 'none/unused' setting in XIV, the entire sampler
+        // block just gets omitted in those cases.
         None = 0,
-        Basic1 = 0x88408C04,
-        Basic2 = 0x213CB439,
-        Basic3 = 0x563B84AF,
+
+        // Common item/character samplers.
         Catchlight = 0xFEA0F3D2,
-        FurnishingDiffuse = 0x1E6FEF9C,
-        ColorMap2 = 0x6968DF0A,
         Diffuse = 0x115306BE,
         EnvMap = 0xF8D7957A,
         Multi = 0x8A4E82B6,
+        Fresnel = 0xBA8D7950,
         Normal = 0x0C5EC1F1,
-        FurnishingNormal = 0xAAB4D9E9,
-        NormalMap2 = 0xDDB3E97F,
         Reflection = 0x87F6474D,
         Specular = 0x2B99E025,
-        FurnishingSpecular = 0x1BBC2F12,
-        SpecularMap2 = 0x6CBB1F84,
+        LightDiffuse = 0x23D0F850,
+        LightSpecular = 0x6C19ACA4,
+        Occlusion = 0x32667BD7,
+        Dither = 0x9F467267,
+        Decal = 0x0237CB94,
+        TileNormal = 0x92F03E53,
+        TileDiffuse = 0x29156A85,
+        RefractionMap = 0xA38E45E1,
+
+
+        // Probably internal use only samplers.
+        GBuffer = 0xEBBB29BD,
+        Gbuffer1 = 0xE4E57422, 
+        Gbuffer2 = 0x7DEC2598,
+        Gbuffer3 = 0x0AEB150E,
+        ViewPosition = 0xBC615663,
+        Table = 0x2005679F, // Pretty sure this is just a var and not actually a 'sampler', but the name is the same structure as the samplers, soo...
+        Index = 0x565F8FD8, // Pretty sure this is just a var and not actually a 'sampler', but the name is the same structure as the samplers, soo...
+
+        // Bg Element Samplers
+        ColorMap = 0x6E1DF4A2,
+        ColorMap0 = 0x1E6FEF9C,
+        ColorMap1 = 0x6968DF0A,
+        NormalMap = 0xBE95B65E,
+        NormalMap0 = 0xAAB4D9E9,
+        NormalMap1 = 0xDDB3E97F,
+        SpecularMap = 0xBD8A6965,
+        SpecularMap0 = 0x1BBC2F12,  
+        SpecularMap1 = 0x6CBB1F84,
+
+        // Oddball Samplers
+        Sampler = 0x88408C04,
+        Sampler1 = 0x213CB439,
+        Sampler2 = 0x563B84AF,
+        DistortionMap = 0x180A838E,
         WaveMap = 0xE6321AFC,
         WaveletMap1 = 0x574E22D6,
         WaveletMap2 = 0x20491240,
         WhitecapMap = 0x95E1F64D,
+        Shadow = 0x58AD2B38,
+        Caustics = 0x0EFB24F7,
+        CloudShadow = 0xB821F0D3,
+
+        // Apricot / VFX Samplers
+        Depth = 0x2C8FF4B0,
+        Sky = 0xB4C285EF,
+        Distortion = 0xD7033544,
+        ToneMap = 0x592595B8,
+        Color1 = 0x77B74A36,
+        Color2 = 0xEEBE1B8C,
+        Color3 = 0x99B92B1A,
+        Color4 = 0x07DDBEB9,
+        Palette = 0x781777B1
+
     }
 
     public enum ShaderTechniqueId : uint
@@ -1794,7 +1928,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Character || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                if (Shader == MtrlShader.Character || Shader == MtrlShader.CharacterGlass || Shader == MtrlShader.Bg || Shader == MtrlShader.BgColorChange)
                 {
                     return true;
                 }
@@ -1821,7 +1955,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     return false;
                 }
-                else if (Shader == MtrlShader.Glass)
+                else if (Shader == MtrlShader.CharacterGlass)
                 {
                     return false;
                 }
@@ -1851,7 +1985,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     return true;
                 }
-                else if (Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                else if (Shader == MtrlShader.Bg || Shader == MtrlShader.BgColorChange)
                 {
                     return true;
                 }
@@ -1873,7 +2007,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if (Shader == MtrlShader.Character || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
+                if (Shader == MtrlShader.Character || Shader == MtrlShader.Bg || Shader == MtrlShader.BgColorChange)
                 {
                     // These shaders allow variable transparency.
                     return null;
@@ -1881,7 +2015,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 else
                 {
                     // These shaders require transparency to be strictly On or Off.
-                    if (Shader == MtrlShader.Hair || Shader == MtrlShader.Glass)
+                    if (Shader == MtrlShader.Hair || Shader == MtrlShader.CharacterGlass)
                     {
                         return true;
                     }

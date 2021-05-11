@@ -475,7 +475,7 @@ namespace xivModdingFramework.Models.ModelTextures
             const float PlayerColorMultiplier = 1.4f;
             const float BrightPlayerColorMultiplier = 3.0f;
 
-            if (info.Shader == MtrlShader.Character || info.Shader == MtrlShader.Glass)
+            if (info.Shader == MtrlShader.Character || info.Shader == MtrlShader.CharacterGlass)
             {
                 // Common
                 // Base color here is diffuse if we have one...
@@ -520,12 +520,12 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
 
-            } else if(info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture)
+            } else if(info.Shader == MtrlShader.Bg || info.Shader == MtrlShader.BgColorChange)
             {
                 // Furniture
                 newDiffuse = new Color(baseDiffuse.R, baseDiffuse.G, baseDiffuse.B, (byte)255);
 
-                if(info.Shader == MtrlShader.DyeableFurniture)
+                if(info.Shader == MtrlShader.BgColorChange)
                 {
                     float colorInfluence = ByteToFloat(baseDiffuse.A);
                     Color furnitureColor = MultiplyColor(colors.FurnitureColor, 1.0f);
