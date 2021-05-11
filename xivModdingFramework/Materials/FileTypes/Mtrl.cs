@@ -423,11 +423,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         // get the texture path offsets
                         xivMtrl.TexturePathOffsetList = new List<int>(xivMtrl.TextureCount);
-                        xivMtrl.TexturePathUnknownList = new List<short>(xivMtrl.TextureCount);
+                        xivMtrl.TextureDxSettingsList = new List<short>(xivMtrl.TextureCount);
                         for (var i = 0; i < xivMtrl.TextureCount; i++)
                         {
                             xivMtrl.TexturePathOffsetList.Add(br.ReadInt16());
-                            xivMtrl.TexturePathUnknownList.Add(br.ReadInt16());
+                            xivMtrl.TextureDxSettingsList.Add(br.ReadInt16());
 
                             // add the size of the paths
                             if (i > 0)
@@ -801,7 +801,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var path = texPathString;
 
                 // This is an old style DX9/DX11 Mixed Texture reference, make sure to clean it up if needed.
-                if(xivMtrl.TexturePathUnknownList[texIdx] != 0)
+                if(xivMtrl.TextureDxSettingsList[texIdx] != 0)
                 {
                     path = path.Replace("--", string.Empty);
                 }
@@ -846,7 +846,7 @@ namespace xivModdingFramework.Materials.FileTypes
             for (var i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
             {
                 mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathUnknownList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TextureDxSettingsList[i]));
             }
 
             for (var i = 0; i < xivMtrl.MapPathOffsetList.Count; i++)

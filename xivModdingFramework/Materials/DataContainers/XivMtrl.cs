@@ -115,7 +115,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// A list containing the Texture Path Unknowns
         /// </summary>
-        public List<short> TexturePathUnknownList { get; set; }
+        public List<short> TextureDxSettingsList { get; set; }
 
         /// <summary>
         /// A list containing the Map Path offsets
@@ -293,7 +293,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
             // Clone all the primitive lists/arrays.
             castedObj.TexturePathOffsetList = TexturePathOffsetList.Select(item => item).ToList();
-            castedObj.TexturePathUnknownList = TexturePathUnknownList.Select(item => item).ToList();
+            castedObj.TextureDxSettingsList = TextureDxSettingsList.Select(item => item).ToList();
             castedObj.MapPathOffsetList = MapPathOffsetList.Select(item => item).ToList();
             castedObj.MapPathDxList = MapPathDxList.Select(item => item).ToList();
             castedObj.ColorSetPathOffsetList = ColorSetPathOffsetList.Select(item => item).ToList();
@@ -507,9 +507,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
             }
 
-            for (var idx = 0; idx < TexturePathUnknownList.Count; idx++)
+            for (var idx = 0; idx < TextureDxSettingsList.Count; idx++)
             {
-                TexturePathUnknownList[idx] = 0;
+                TextureDxSettingsList[idx] = 0;
             }
 
 
@@ -749,7 +749,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 if (texIdx >= 0)
                 {
                     TexturePathList.RemoveAt(texIdx);
-                    TexturePathUnknownList.RemoveAt(texIdx);
+                    TextureDxSettingsList.RemoveAt(texIdx);
                 }
 
                 // Remove Parameter List
@@ -828,7 +828,7 @@ namespace xivModdingFramework.Materials.DataContainers
             if (newTexIdx < 0)
             {
                 TexturePathList.Add(info.Path);
-                TexturePathUnknownList.Add((short)0); // This value seems to always be 0 for textures.
+                TextureDxSettingsList.Add((short)0); // This value seems to always be 0 for textures.
             }
         }
 
@@ -1702,6 +1702,7 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public enum MtrlSamplerId : uint
     {
+        None = 0,
         Basic1 = 0x88408C04,
         Basic2 = 0x213CB439,
         Basic3 = 0x563B84AF,
@@ -1721,7 +1722,7 @@ namespace xivModdingFramework.Materials.DataContainers
         WaveMap = 0xE6321AFC,
         WaveletMap1 = 0x574E22D6,
         WaveletMap2 = 0x20491240,
-        WhitecapMap = 0x95E1F64D
+        WhitecapMap = 0x95E1F64D,
     }
 
     public enum ShaderTechniqueId : uint
