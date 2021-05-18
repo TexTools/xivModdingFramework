@@ -71,6 +71,14 @@ namespace xivModdingFramework.Items.Categories
             return furnitureList;
         }
 
+        private static Dictionary<string, int> DataLengthByPatch = new Dictionary<string, int>()
+        {
+            { "5.3", 160 },
+            { "5.4", 168 },
+            { "5.5", 160 },
+        };
+
+
         /// <summary>
         /// Gets the list of indoor furniture
         /// </summary>
@@ -91,15 +99,15 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 14;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 160;
+            int itemDataLength = DataLengthByPatch["5.5"];
             const int itemIconDataOffset = 136;
 
             if(_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 160;
+                itemDataLength = DataLengthByPatch["5.4"];
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = 168;
+                itemDataLength = DataLengthByPatch["5.4"];
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -183,20 +191,21 @@ namespace xivModdingFramework.Items.Categories
 
             const int itemNameDataOffset = 14;
             const int housingIndexOffset = 112;
-            int itemDataLength = 160;
+            int itemDataLength = DataLengthByPatch["5.5"];
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
             var pictureDictionary = await ex.ReadExData(XivEx.picture);
             var itemDictionary = await ex.ReadExData(XivEx.item);
 
+
             if (_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 160;
+                itemDataLength = DataLengthByPatch["5.4"];
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = 168;
+                itemDataLength = DataLengthByPatch["5.4"];
             }
 
 
@@ -265,17 +274,19 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 13;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = 160;
+            int itemDataLength = DataLengthByPatch["5.5"];
             const int itemIconDataOffset = 136;
 
-            if ( _xivLanguage == XivLanguage.Korean)
+
+            if (_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = 160;
+                itemDataLength = DataLengthByPatch["5.4"];
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = 168;
+                itemDataLength = DataLengthByPatch["5.4"];
             }
+
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
             var housingDictionary = await ex.ReadExData(XivEx.housingyardobject);

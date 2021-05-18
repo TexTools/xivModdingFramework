@@ -159,6 +159,9 @@ namespace xivModdingFramework.Items.DataContainers
                 {
                     resPaths.Add(Name, "ui/uld/" + Name.ToLower() + ".tex");
                 }
+            } else if(SecondaryCategory == XivStrings.LoadingScreen)
+            {
+                resPaths.Add(Name, UiPath + '/' + Name + ".tex");
             }
             else
             {
