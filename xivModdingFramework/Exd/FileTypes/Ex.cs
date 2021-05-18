@@ -179,8 +179,17 @@ namespace xivModdingFramework.Exd.FileTypes
 
                 var exdFolderHash = HashGenerator.GetHash("exd");
                 var exdFileHash = HashGenerator.GetHash(exdFile);
+                var offset = await _index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
 
-                exdNameOffsetDictionary.Add(await _index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd), exdFile);
+                try
+                {
+                    exdNameOffsetDictionary.Add(offset, exdFile);
+                }
+                catch (Exception ex)
+                {
+                    var zz = "zz";
+                    throw ex;
+                }
             }
 
             await Task.Run(async () =>
