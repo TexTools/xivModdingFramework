@@ -209,6 +209,19 @@ namespace xivModdingFramework.Items
                         if(match.Success)
                         {
                             return match.Groups[1].Value;
+                        } else
+                        {
+                            // Hackhack fallback for cases where we have mounts listed in the item list
+                            // with no actual specific equipment slot assigned, such as the Company Chocobo.
+                            if(mi.PrimaryID == 1 && mi.SecondaryID == 1)
+                            {
+                                // Company chocobo
+                                return "dwn";
+                            } else
+                            {
+                                // Other mounts
+                                return "top";
+                            }
                         }
                     }
                 }
