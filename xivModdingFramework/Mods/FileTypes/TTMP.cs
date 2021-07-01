@@ -50,6 +50,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
         private readonly string _currentWizardTTMPVersion = "1.3w";
         private readonly string _currentSimpleTTMPVersion = "1.3s";
+        private readonly string _currentBackupTTMPVersion = "1.0b";
         private const string _minimumAssembly = "1.3.0.0";
 
         private string _tempMPD, _tempMPL, _source;
@@ -461,8 +462,9 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="progress">The progress of the import</param>
         /// <param name="GetRootConversionsFunction">Function called part-way through import to resolve rood conversions, if any are desired.  Function takes a List of files, the in-progress modified index and modlist files, and returns a dictionary of conversion data.  If this function throws and OperationCancelledException, the import is cancelled.</param>
         /// <returns>The number of total mods imported</returns>
-        public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(DirectoryInfo modPackDirectory, List<ModsJson> modsJson,
-            DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null )
+        public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(
+            DirectoryInfo modPackDirectory, List<ModsJson> modsJson, DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, 
+            Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
@@ -490,7 +492,7 @@ namespace xivModdingFramework.Mods.FileTypes
             // the *LAST* mod json entry for each file path.
             // This keeps us from having to constantly re-query the mod list file, and filters out redundant imports.
             var filePaths = new HashSet<string>();
-            var newList = new List<ModsJson>(modsJson.Count);
+            var filteredModsJson = new List<ModsJson>(modsJson.Count);
             for(int i = modsJson.Count -1; i >= 0; i--)
             {
                 var mj = modsJson[i];
@@ -504,11 +506,10 @@ namespace xivModdingFramework.Mods.FileTypes
                 if (ForbiddenModTypes.Contains(Path.GetExtension(mj.FullPath))) continue;
 
                 filePaths.Add(mj.FullPath);
-                newList.Add(mj);
+                filteredModsJson.Add(mj);
             }
-            modsJson = newList;
 
-            if(modsJson.Count == 0)
+            if(filteredModsJson.Count == 0)
             {
                 return (0, 0, "", 0);
             }
@@ -577,7 +578,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     progress.Report((0, 0, "Writing new mod data to DAT files..."));
                     using (var binaryReader = new BinaryReader(new FileStream(_tempMPD, FileMode.Open)))
                     {
-                        foreach (var modJson in modsJson)
+                        foreach (var modJson in filteredModsJson)
                         {
                             try
                             {
@@ -598,7 +599,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 Mod mod = null;
                                 if (modsByFile.ContainsKey(modJson.FullPath))
                                 {
-                                    mod= modsByFile[modJson.FullPath];
+                                    mod = modsByFile[modJson.FullPath];
                                 }
 
                                 // Always write data to end of file during modpack imports in case we need
@@ -669,17 +670,23 @@ namespace xivModdingFramework.Mods.FileTypes
                         progress.Report((count, totalFiles, "Updating Index file references..."));
                     }
 
-
-                    var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson[0].ModPackEntry.name);
-
-                    if (!modPackExists)
+                    // Add entries for new modpacks to the mod list 
+                    foreach (var modsJson in filteredModsJson)
                     {
-                        modList.ModPacks.Add(modsJson[0].ModPackEntry);
+                        var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson.ModPackEntry.name);
+
+                        if (!modPackExists)
+                        {
+                            modList.ModPacks.Add(modsJson.ModPackEntry);
+                        }
                     }
-                    var modPack = modList.ModPacks.First(x => x.name == modsJson[0].ModPackEntry.name);
+
 
                     if (GetRootConversionsFunction != null)
                     {
+                        // Get the modpack to list the conversions under, this is the just the modpack entry of the first modsJson since they're all the same unless it's a backup
+                        // However, this code isn't used for importing backup modpacks since they already had the choice to change the destination item after the initial import
+                        var modPack = modList.ModPacks.First(x => x.name == filteredModsJson[0].ModPackEntry.name);
 
                         Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
                         try
@@ -730,7 +737,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     foreach (var fileKv in convertedFiles)
                                     {
                                         // Remove the file from our json list, the conversion already handled everything we needed to do with it.
-                                        var json = modsJson.RemoveAll(x => x.FullPath == fileKv.Key);
+                                        var json = filteredModsJson.RemoveAll(x => x.FullPath == fileKv.Key);
 
                                         if (fileKv.Key != fileKv.Value)
                                         {
@@ -784,14 +791,14 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // Update the Mod List file.
 
-
                     foreach (var file in filePaths)
                     {
                         if (ErroneousFiles.Contains(file)) continue;
                         try
                         {
-                            var json = modsJson.FirstOrDefault(x => x.FullPath == file);
+                            var json = filteredModsJson.FirstOrDefault(x => x.FullPath == file);
                             if (json == null) continue;
+
 
                             var mod = modList.Mods.FirstOrDefault(x => x.fullPath == file);
                             var longOffset = ((long)DatOffsets[file]) * 8L;
@@ -827,13 +834,12 @@ namespace xivModdingFramework.Mods.FileTypes
                                 mod.data.originalOffset = (fileAdditionMod ? longOffset : longOriginal);
                                 mod.data.dataType = fileType;
                                 mod.enabled = true;
-                                mod.modPack = modPack;
+                                mod.modPack = json.ModPackEntry;
                                 modList.Mods.Add(mod);
 
                             }
                             else
                             {
-
                                 var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                                 if (fileAdditionMod)
                                 {
@@ -843,7 +849,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 mod.data.modSize = size;
                                 mod.data.modOffset = longOffset;
                                 mod.enabled = true;
-                                mod.modPack = modPack;
+                                mod.modPack = json.ModPackEntry;
                                 mod.data.dataType = fileType;
                                 mod.name = json.Name;
                                 mod.category = json.Category;
@@ -938,7 +944,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     count = 0;
                     progress.Report((0, 0, "Queuing Cache Updates..."));
                     // Metadata files expanded, last thing is to queue everthing up for the Cache.
-                    var files = modsJson.Select(x => x.FullPath).ToList();
+                    var files = filteredModsJson.Select(x => x.FullPath).ToList();
                     try
                     {
                         XivCache.QueueDependencyUpdate(files);
