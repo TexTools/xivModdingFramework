@@ -336,6 +336,14 @@ namespace xivModdingFramework.Mods.FileTypes
             return processCount;
         }
 
+        /// <summary>
+        /// Creates a backup modpack which retains the original modpacks on import
+        /// </summary>
+        /// <param name="backupModpackData">The data that will go into the mod pack</param>
+        /// <param name="gameDirectory">The game directory</param>
+        /// <param name="progress">The progress of the mod pack creation</param>
+        /// <param name="overwriteModpack">Whether or not to overwrite an existing modpack with the same name</param>
+        /// <returns>The number of mods processed for the mod pack</returns>
         public async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress, bool overwriteModpack)
         {
             var processCount = await Task.Run<int>(() =>

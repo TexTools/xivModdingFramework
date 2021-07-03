@@ -22,7 +22,6 @@ using System.Security.Cryptography;
 using System.Text;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
-using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
@@ -117,6 +116,12 @@ namespace xivModdingFramework.Mods.DataContainers
             return data.modOffset == data.originalOffset;
         }
 
+        /// <summary>
+        /// Creates a Mod instance using the provided JSON
+        /// </summary>
+        /// <param name="modsJson"></param>
+        /// <param name="sourceApplication"></param>
+        /// <returns></returns>
         public static Mod MakeModFromJson(ModsJson modsJson, string sourceApplication)
         {
             return new Mod
