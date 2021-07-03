@@ -336,6 +336,114 @@ namespace xivModdingFramework.Mods.FileTypes
             return processCount;
         }
 
+        public async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress, bool overwriteModpack)
+        {
+            var processCount = await Task.Run<int>(() =>
+            {
+                var dat = new Dat(gameDirectory);
+
+                var guid = Guid.NewGuid();
+
+                var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
+                Directory.CreateDirectory(dir);
+
+
+                _tempMPD = Path.Combine(dir, "TTMPD.mpd");
+                _tempMPL = Path.Combine(dir, "TTMPL.mpl");
+
+                var modCount = 0;
+
+                var modPackJson = new ModPackJson
+                {
+                    TTMPVersion = _currentBackupTTMPVersion,
+                    Name = backupModpackData.Name,
+                    Author = backupModpackData.Author,
+                    Version = backupModpackData.Version.ToString(),
+                    MinimumFrameworkVersion = _minimumAssembly,
+                    Url = backupModpackData.Url,
+                    Description = backupModpackData.Description,
+                    SimpleModsList = new List<ModsJson>()
+                };
+
+                try
+                {
+                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Create)))
+                    {
+                        foreach (var backupModData in backupModpackData.ModsToBackup)
+                        {
+                            if (ForbiddenModTypes.Contains(Path.GetExtension(backupModData.SimpleModData.FullPath))) continue;
+
+                            var modsJson = new ModsJson
+                            {
+                                Name = backupModData.SimpleModData.Name,
+                                Category = backupModData.SimpleModData.Category.GetEnDisplayName(),
+                                FullPath = backupModData.SimpleModData.FullPath,
+                                ModSize = backupModData.SimpleModData.ModSize,
+                                DatFile = backupModData.SimpleModData.DatFile,
+                                IsDefault = backupModData.SimpleModData.IsDefault,
+                                ModOffset = binaryWriter.BaseStream.Position,
+                                ModPackEntry = backupModData.ModPack,
+                            };
+
+                            var rawData = dat.GetRawData(backupModData.SimpleModData.ModOffset,
+                                XivDataFiles.GetXivDataFile(backupModData.SimpleModData.DatFile),
+                                backupModData.SimpleModData.ModSize);
+
+                            if (rawData == null)
+                            {
+                                throw new Exception("Unable to obtain data for the following mod\n\n" +
+                                                    $"Name: {backupModData.SimpleModData.Name}\nFull Path: {backupModData.SimpleModData.FullPath}\n" +
+                                                    $"Mod Offset: {backupModData.SimpleModData.ModOffset}\nData File: {backupModData.SimpleModData.DatFile}\n\n" +
+                                                    $"Unselect the above mod and try again.");
+                            }
+
+                            binaryWriter.Write(rawData);
+
+                            modPackJson.SimpleModsList.Add(modsJson);
+
+                            progress?.Report((++modCount, backupModpackData.ModsToBackup.Count, string.Empty));
+                        }
+                    }
+
+                    progress?.Report((0, backupModpackData.ModsToBackup.Count, GeneralStrings.TTMP_Creating));
+
+                    File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
+
+                    var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{backupModpackData.Name}.ttmp2");
+
+                    if (File.Exists(modPackPath) && !overwriteModpack)
+                    {
+                        var fileNum = 1;
+                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{backupModpackData.Name}({fileNum}).ttmp2");
+                        while (File.Exists(modPackPath))
+                        {
+                            fileNum++;
+                            modPackPath = Path.Combine(_modPackDirectory.FullName, $"{backupModpackData.Name}({fileNum}).ttmp2");
+                        }
+                    }
+                    else if (File.Exists(modPackPath) && overwriteModpack)
+                    {
+                        File.Delete(modPackPath);
+                    }
+
+                    var zf = new ZipFile();
+                    zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
+                    zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
+                    zf.AddFile(_tempMPL, "");
+                    zf.AddFile(_tempMPD, "");
+                    zf.Save(modPackPath);
+                }
+                finally
+                {
+                    Directory.Delete(dir, true);
+                }
+
+                return modCount;
+            });
+
+            return processCount;
+        }
+
         /// <summary>
         /// Gets the data from a mod pack including images if present
         /// </summary>
@@ -673,6 +781,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     // Add entries for new modpacks to the mod list 
                     foreach (var modsJson in filteredModsJson)
                     {
+                        if (modsJson.ModPackEntry == null) continue;
+
                         var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson.ModPackEntry.name);
 
                         if (!modPackExists)
@@ -685,8 +795,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     if (GetRootConversionsFunction != null)
                     {
                         // Get the modpack to list the conversions under, this is the just the modpack entry of the first modsJson since they're all the same unless it's a backup
-                        // However, this code isn't used for importing backup modpacks since they already had the choice to change the destination item after the initial import
-                        var modPack = modList.ModPacks.First(x => x.name == filteredModsJson[0].ModPackEntry.name);
+                        // However, this code shouldn't be used when importing backup modpacks since they already had the choice to change the destination item after the initial import
+                        var modPack = modList.ModPacks.First(x => x.name == filteredModsJson[0].ModPackEntry?.name);
 
                         Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
                         try
