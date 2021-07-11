@@ -77,6 +77,10 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public int IconNumber { get; set; }
 
+        /// <summary>
+        /// Whether or not this file has a hi-res equivalent
+        /// </summary>
+        public bool HasHiRes { get; private set; }
 
         /// <summary>
         /// Gets the item's name as it should be written to the modlist/modpack files.
@@ -119,9 +123,20 @@ namespace xivModdingFramework.Items.DataContainers
             return this.Name.GetHashCode() ^ this.IconNumber.GetHashCode();
         }
 
+        private const string HiResUiExt = "_hr1";
 
-        public async Task<Dictionary<string, string>> GetTexPaths()
+        /// <summary>
+        /// Retrieve texture paths.  
+        /// If both low and high res are false, low res is still returned.
+        /// Maps only have a single resolution.
+        /// </summary>
+        /// <param name="addLowRes"></param>
+        /// <param name="addHiRes"></param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes = true, bool addHiRes = false)
         {
+            var resPaths = new Dictionary<string, string>();
+
             if(SecondaryCategory == XivStrings.Maps)
             {
                 var _tex = new Tex(XivCache.GameInfo.GameDirectory);
@@ -131,14 +146,45 @@ namespace xivModdingFramework.Items.DataContainers
             } else if(SecondaryCategory == XivStrings.HUD)
             {
                 //ui/uld/aozactionlearned.tex
-                return new Dictionary<string, string>() { { Name, "ui/uld/" + Name.ToLower() + ".tex" } };
+                HasHiRes = true;
+
+                if (addHiRes && !addLowRes)
+                {
+                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
+                } else if(addHiRes && addLowRes)
+                {
+                    resPaths.Add(Name + "SD", "ui/uld/" + Name.ToLower() + ".tex");
+                    resPaths.Add(Name + "HD", "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
+                } else
+                {
+                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + ".tex");
+                }
+            } else if(SecondaryCategory == XivStrings.LoadingScreen)
+            {
+                resPaths.Add(Name, UiPath + '/' + Name + ".tex");
             }
             else
             {
+                HasHiRes = true;
+
                 var block = ((IconNumber / 1000) * 1000).ToString().PadLeft(6,'0');
                 var icon = IconNumber.ToString().PadLeft(6, '0');
-                return new Dictionary<string, string>() { { Name, "ui/icon/" + block + '/' + icon + ".tex" } };
+
+                if (addHiRes && !addLowRes)
+                {
+                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
+                }
+                else if (addHiRes && addLowRes)
+                {
+                    resPaths.Add(Name + "SD", "ui/icon/" + block + '/' + icon + ".tex");
+                    resPaths.Add(Name + "HD", "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
+                } else
+                {
+                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + ".tex");
+                }
             }
+
+            return resPaths;
         }
     }
 }

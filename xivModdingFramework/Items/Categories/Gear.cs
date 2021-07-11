@@ -63,6 +63,21 @@ namespace xivModdingFramework.Items.Categories
             return await XivCache.GetCachedGearList(substring);
         }
 
+        private static Dictionary<string, int> DataLengthByPatch = new Dictionary<string, int>()
+        {
+            { "5.3", 160 },
+            { "5.4", 168 },
+            { "5.5", 160 },
+        };
+
+        private static Dictionary<string, int> SlotDataOffsetByPatch = new Dictionary<string, int>()
+        {
+            { "5.3", 154 },
+            { "5.4", 156 },
+            { "5.5", 154 },
+        };
+
+
         /// <summary>
         /// A getter for available gear in the Item exd files
         /// </summary>
@@ -72,21 +87,21 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int modelDataCheckOffset = 30;
-            int dataLength = 160;
+            int dataLength = DataLengthByPatch["5.5"];
             const int nameDataOffset = 14;
             const int modelDataOffset = 24;
             const int iconDataOffset = 136;
-            int slotDataOffset = 154;
+            int slotDataOffset = SlotDataOffsetByPatch["5.5"];
 
 
             if( _xivLanguage == XivLanguage.Korean)
             {
-                dataLength = 160;
-                slotDataOffset = 154;
+                dataLength = DataLengthByPatch["5.4"];
+                slotDataOffset = SlotDataOffsetByPatch["5.4"];
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
-                dataLength = 168;
-                slotDataOffset = 156;
+                dataLength = DataLengthByPatch["5.4"];
+                slotDataOffset = SlotDataOffsetByPatch["5.4"];
             }
 
             var xivGearList = new List<XivGear>();
