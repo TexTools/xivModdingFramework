@@ -24,7 +24,7 @@
     <PackageReference Include="DotNetZip" Version="1.15.0" />
     <PackageReference Include="HelixToolkit" Version="2.9.0" />
     <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.9.0" />
-    <PackageReference Include="Lumina" Version="2.5.1" />
+    <PackageReference Include="Lumina" Version="3.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="SharpDX" Version="4.2.0" />
     <PackageReference Include="SharpDX.Mathematics" Version="4.2.0" />
