@@ -93,6 +93,20 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return 34359738368;
                 case "exFAT":
                     return 34359738368;
+                case "ext2":
+                    return 34359738368;
+                case "ext3":
+                    return 34359738368;
+                case "ext4":
+                    return 34359738368;
+                case "XFS":
+                    return 34359738368;
+                case "btrfs":
+                    return 34359738368;
+                case "ZFS":
+                    return 34359738368;
+                case "ReiserFS":
+                    return 34359738368;
                 default:
                     // Unknown HDD Format, default to the basic limit.
                     return 2000000000;
