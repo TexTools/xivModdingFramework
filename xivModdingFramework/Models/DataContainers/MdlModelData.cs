@@ -81,9 +81,14 @@ namespace xivModdingFramework.Models.DataContainers
         public ushort ShapeDataCount { get; set; }
 
         /// <summary>
+        /// The total number of LoD
+        /// </summary>
+        public byte LoDCount { get; set; }
+
+        /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown1 { get; set; }
+        public byte Unknown1 { get; set; }
 
         /// <summary>
         /// Unknown Usage

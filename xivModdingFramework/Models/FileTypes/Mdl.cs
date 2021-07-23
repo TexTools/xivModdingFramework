@@ -485,7 +485,8 @@ namespace xivModdingFramework.Models.FileTypes
                     ShapeCount = br.ReadInt16(),
                     ShapePartCount = br.ReadInt16(),
                     ShapeDataCount = br.ReadUInt16(),
-                    Unknown1 = br.ReadInt16(),
+                    LoDCount = br.ReadByte(),
+                    Unknown1 = br.ReadByte(),
                     Unknown2 = br.ReadInt16(),
                     Unknown3 = br.ReadInt16(),
                     Unknown4 = br.ReadInt16(),
@@ -2542,7 +2543,8 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
+                modelDataBlock.Add(1); // LoD count, set to 1 since we only use the highest LoD
+                modelDataBlock.Add(ogModelData.Unknown1);
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown4));
@@ -3799,8 +3801,10 @@ namespace xivModdingFramework.Models.FileTypes
                 datHeader.AddRange(BitConverter.GetBytes((ushort)totalMeshCount));
                 // Material Count
                 datHeader.AddRange(BitConverter.GetBytes((ushort)ttModel.Materials.Count));
+                // LoD Count
+                datHeader.Add(1); // We only use the highest LoD instead of three
                 // Unknown 1
-                datHeader.AddRange(BitConverter.GetBytes((short)259));
+                datHeader.Add(1);
                 // Unknown 2
                 datHeader.AddRange(BitConverter.GetBytes((short)0));
 
