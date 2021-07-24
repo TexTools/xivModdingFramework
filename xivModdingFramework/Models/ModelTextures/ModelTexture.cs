@@ -414,9 +414,18 @@ namespace xivModdingFramework.Models.ModelTextures
                     using (var img = Image.LoadPixelData<Rgba32>(texMapData.Normal.Data, texMapData.Normal.Width,
                         texMapData.Normal.Height))
                     {
-                        img.Mutate(x => x.Resize(width, height));
+                        // ImageSharp pre-multiplies the RGB by the alpha component during resize, if alpha is 0 (colourset row 0)
+                        // this ends up causing issues and destroying the RGB values resulting in an invisible preview model
+                        // https://github.com/SixLabors/ImageSharp/issues/1498#issuecomment-757519563
+                        img.Mutate(x => x.Resize(
+                            new ResizeOptions
+                            {
+                                Size = new Size(width, height),
+                                PremultiplyAlpha = false
+                            })
+                        );
 
-                        texMapData.Normal.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
+                        texMapData.Normal.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
                     }
                 }
 
@@ -436,7 +445,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         }
                         img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Diffuse.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
+                        texMapData.Diffuse.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
                     }
                 }
 
@@ -448,7 +457,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         img.Mutate(x => x.Resize(width, height));
 
-                        texMapData.Specular.Data = MemoryMarshal.AsBytes(img.GetPixelSpan()).ToArray();
+                        texMapData.Specular.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
                     }
                 }
             });
