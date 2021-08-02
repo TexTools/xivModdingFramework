@@ -3062,18 +3062,6 @@ namespace xivModdingFramework.Models.FileTypes
                     var lodNumber = 0;
                     foreach (var lod in ogMdl.LoDList)
                     {
-                        var indexMeshNum = new Dictionary<int, int>();
-
-                        // Get the index data offsets in each mesh
-                        for (var i = 0; i < lod.MeshCount; i++)
-                        {
-                            var indexDataOffset = lod.MeshDataList[i].MeshInfo.IndexDataOffset;
-
-                            indexMeshNum.Add(indexDataOffset, i);
-                        }
-
-
-
                         // We only store the shape info for LoD 0.
                         if (lodNumber == 0)
                         {
