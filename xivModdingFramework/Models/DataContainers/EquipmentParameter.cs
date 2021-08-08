@@ -191,7 +191,7 @@ namespace xivModdingFramework.Models.DataContainers
         BodyShowNecklace = 11,
         BodyShowBracelet = 12,          // "Wrist[slot]" is not used in this context b/c it can be confusing with other settings.
         BodyShowTail = 13,
-        BodyTriggersomeShapeData = 14,
+        BodyDisableBreastPhysics = 14,
         Bit15 = 15,
 
         // Byte 2 - Leg

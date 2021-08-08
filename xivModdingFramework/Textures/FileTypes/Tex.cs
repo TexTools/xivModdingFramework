@@ -619,14 +619,14 @@ namespace xivModdingFramework.Textures.FileTypes
                         {
                             for (var x = 0; x < width; x++)
                             {
-                                var red = br.ReadByte();
-                                var green = br.ReadByte();
                                 var blue = br.ReadByte();
+                                var green = br.ReadByte();
+                                var red = br.ReadByte();
                                 var alpha = br.ReadByte();
 
-                                convertedBytes.Add(blue);
-                                convertedBytes.Add(green);
                                 convertedBytes.Add(red);
+                                convertedBytes.Add(green);
+                                convertedBytes.Add(blue);
                                 convertedBytes.Add(alpha);
                             }
                         }
