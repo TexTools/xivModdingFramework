@@ -107,7 +107,7 @@ namespace xivModdingFramework.Items.Categories
                 itemDataLength = DataLengthByPatch["5.4"];
             } else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = DataLengthByPatch["5.4"];
+                itemDataLength = DataLengthByPatch["5.5"];
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -205,7 +205,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = DataLengthByPatch["5.4"];
+                itemDataLength = DataLengthByPatch["5.5"];
             }
 
 
@@ -284,7 +284,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = DataLengthByPatch["5.4"];
+                itemDataLength = DataLengthByPatch["5.5"];
             }
 
 
