@@ -96,9 +96,10 @@ namespace xivModdingFramework.Items.Categories
 
             if( _xivLanguage == XivLanguage.Korean)
             {
-                dataLength = DataLengthByPatch["5.4"];
-                slotDataOffset = SlotDataOffsetByPatch["5.4"];
-            } else if (_xivLanguage == XivLanguage.Chinese)
+                dataLength = DataLengthByPatch["5.5"];
+                slotDataOffset = SlotDataOffsetByPatch["5.5"];
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
             {
                 dataLength = DataLengthByPatch["5.5"];
                 slotDataOffset = SlotDataOffsetByPatch["5.5"];
