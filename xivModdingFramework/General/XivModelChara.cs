@@ -103,8 +103,8 @@ namespace xivModdingFramework.General
             int modelDataOffset = 8;
             if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Chinese)
             {
-                startOffset = 4;
-                modelDataOffset = 8;
+                startOffset = 0;
+                modelDataOffset = 4;
 
             } else if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Korean)
             { 
