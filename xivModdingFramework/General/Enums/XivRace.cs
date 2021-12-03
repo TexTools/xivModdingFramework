@@ -101,10 +101,14 @@ namespace xivModdingFramework.General.Enums
         [Description("1304")] AuRa_Male_NPC,
         [Description("1401")] AuRa_Female,
         [Description("1404")] AuRa_Female_NPC,
-        [Description("1501")] Hrothgar,
-        [Description("1504")] Hrothgar_NPC,
-        [Description("1801")] Viera,
-        [Description("1804")] Viera_NPC,
+        [Description("1501")] Hrothgar_Male,
+        [Description("1504")] Hrothgar_Male_NPC,
+        [Description("1601")] Hrothgar_Female,
+        [Description("1604")] Hrothgar_Female_NPC,
+        [Description("1701")] Viera_Male,
+        [Description("1704")] Viera_Male_NPC,
+        [Description("1801")] Viera_Female,
+        [Description("1804")] Viera_Female_NPC,
         [Description("9104")] NPC_Male,
         [Description("9204")] NPC_Female,
         [Description("0000")] All_Races,
@@ -156,6 +160,13 @@ namespace xivModdingFramework.General.Enums
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
             });
+            dict.Add(XivRace.Viera_Male, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Hyur_Midlander_Male],
+                Race = XivRace.Viera_Male,
+                Children = new List<XivRaceNode>(),
+                HasSkin = true
+            });
 
 
             // Muscular Race Males
@@ -173,10 +184,10 @@ namespace xivModdingFramework.General.Enums
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
             });
-            dict.Add(XivRace.Hrothgar, new XivRaceNode()
+            dict.Add(XivRace.Hrothgar_Male, new XivRaceNode()
             {
                 Parent = dict[XivRace.Roegadyn_Male],
-                Race = XivRace.Hrothgar,
+                Race = XivRace.Hrothgar_Male,
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
             });
@@ -196,10 +207,10 @@ namespace xivModdingFramework.General.Enums
                 Race = XivRace.Elezen_Female,
                 Children = new List<XivRaceNode>()
             });
-            dict.Add(XivRace.Viera, new XivRaceNode()
+            dict.Add(XivRace.Viera_Female, new XivRaceNode()
             {
                 Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Viera,
+                Race = XivRace.Viera_Female,
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
             });
@@ -269,6 +280,13 @@ namespace xivModdingFramework.General.Enums
                 Race = XivRace.Hyur_Highlander_Male_NPC,
                 Children = new List<XivRaceNode>()
             });
+            dict.Add(XivRace.Viera_Male_NPC, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Hyur_Highlander_Male],
+                Race = XivRace.Viera_Male_NPC,
+                Children = new List<XivRaceNode>()
+            });
+
 
             dict.Add(XivRace.Hyur_Highlander_Female_NPC, new XivRaceNode()
             {
@@ -339,16 +357,16 @@ namespace xivModdingFramework.General.Enums
                 Race = XivRace.Lalafell_Female_NPC,
                 Children = new List<XivRaceNode>()
             });
-            dict.Add(XivRace.Viera_NPC, new XivRaceNode()
+            dict.Add(XivRace.Viera_Female_NPC, new XivRaceNode()
             {
-                Parent = dict[XivRace.Viera],
-                Race = XivRace.Viera_NPC,
+                Parent = dict[XivRace.Viera_Female],
+                Race = XivRace.Viera_Female_NPC,
                 Children = new List<XivRaceNode>()
             });
-            dict.Add(XivRace.Hrothgar_NPC, new XivRaceNode()
+            dict.Add(XivRace.Hrothgar_Male_NPC, new XivRaceNode()
             {
-                Parent = dict[XivRace.Hrothgar],
-                Race = XivRace.Hrothgar_NPC,
+                Parent = dict[XivRace.Hrothgar_Male],
+                Race = XivRace.Hrothgar_Male_NPC,
                 Children = new List<XivRaceNode>()
             });
 
@@ -599,11 +617,11 @@ namespace xivModdingFramework.General.Enums
                 case XivRace.AuRa_Male_NPC:
                 case XivRace.AuRa_Female_NPC:
                     return XivBaseRace.AuRa;
-                case XivRace.Viera:
-                case XivRace.Viera_NPC:
+                case XivRace.Viera_Female:
+                case XivRace.Viera_Female_NPC:
                     return XivBaseRace.Viera;
-                case XivRace.Hrothgar:
-                case XivRace.Hrothgar_NPC:
+                case XivRace.Hrothgar_Male:
+                case XivRace.Hrothgar_Male_NPC:
                     return XivBaseRace.Hrothgar;
                 default:
                     return XivBaseRace.Hyur;
@@ -649,8 +667,9 @@ namespace xivModdingFramework.General.Enums
             XivRace.Lalafell_Female,
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
-            XivRace.Hrothgar,
-            XivRace.Viera,
+            XivRace.Hrothgar_Male,
+            XivRace.Viera_Female,
+            XivRace.Viera_Male,
         };
 
         /// <summary>
@@ -693,8 +712,8 @@ namespace xivModdingFramework.General.Enums
                 case XivRace.Miqote_Female_NPC:
                 case XivRace.AuRa_Female:
                 case XivRace.AuRa_Female_NPC:
-                case XivRace.Viera:
-                case XivRace.Viera_NPC:
+                case XivRace.Viera_Female:
+                case XivRace.Viera_Female_NPC:
                 case XivRace.Hyur_Highlander_Female:
                 case XivRace.Hyur_Highlander_Female_NPC:
                 case XivRace.Elezen_Female:
@@ -710,8 +729,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Miqote_Female_NPC,
                         XivRace.AuRa_Female,
                         XivRace.AuRa_Female_NPC,
-                        XivRace.Viera,
-                        XivRace.Viera_NPC,
+                        XivRace.Viera_Female,
+                        XivRace.Viera_Female_NPC,
                         XivRace.Hyur_Highlander_Female,
                         XivRace.Hyur_Highlander_Female_NPC,
                         XivRace.Elezen_Female,
@@ -728,6 +747,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Male_NPC,
                         XivRace.AuRa_Male,
                         XivRace.AuRa_Male_NPC,
+                        XivRace.Viera_Male,
+                        XivRace.Viera_Male_NPC,
 
                         // Highlander Next
                         XivRace.Hyur_Highlander_Male,
@@ -736,8 +757,8 @@ namespace xivModdingFramework.General.Enums
                         // Roe M?  These are pretty fucked at this point.
                         XivRace.Roegadyn_Male,
                         XivRace.Roegadyn_Male_NPC,
-                        XivRace.Hrothgar,
-                        XivRace.Hrothgar_NPC,
+                        XivRace.Hrothgar_Male,
+                        XivRace.Hrothgar_Male_NPC,
 
                         // Lala ? 
                         XivRace.Lalafell_Male,
@@ -755,6 +776,8 @@ namespace xivModdingFramework.General.Enums
                 case XivRace.Elezen_Male_NPC:
                 case XivRace.AuRa_Male:
                 case XivRace.AuRa_Male_NPC:
+                case XivRace.Viera_Male:
+                case XivRace.Viera_Male_NPC:
                     return new List<XivRace>()
                     {
                         // Male Base Races First
@@ -766,6 +789,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Male_NPC,
                         XivRace.AuRa_Male,
                         XivRace.AuRa_Male_NPC,
+                        XivRace.Viera_Male,
+                        XivRace.Viera_Male_NPC,
 
                         // Highlander Next
                         XivRace.Hyur_Highlander_Male,
@@ -778,8 +803,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Miqote_Female_NPC,
                         XivRace.AuRa_Female,
                         XivRace.AuRa_Female_NPC,
-                        XivRace.Viera,
-                        XivRace.Viera_NPC,
+                        XivRace.Viera_Female,
+                        XivRace.Viera_Female_NPC,
                         XivRace.Hyur_Highlander_Female,
                         XivRace.Hyur_Highlander_Female_NPC,
                         XivRace.Elezen_Female,
@@ -790,8 +815,8 @@ namespace xivModdingFramework.General.Enums
                         // Roe M? These are pretty fucked at this point.
                         XivRace.Roegadyn_Male,
                         XivRace.Roegadyn_Male_NPC,
-                        XivRace.Hrothgar,
-                        XivRace.Hrothgar_NPC,
+                        XivRace.Hrothgar_Male,
+                        XivRace.Hrothgar_Male_NPC,
 
                         // Lala ? 
                         XivRace.Lalafell_Male,
@@ -818,6 +843,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Male_NPC,
                         XivRace.AuRa_Male,
                         XivRace.AuRa_Male_NPC,
+                        XivRace.Viera_Male,
+                        XivRace.Viera_Male_NPC,
 
                         // Standard Female Races Next ?  We're getting into trouble territory here.
                         XivRace.Hyur_Midlander_Female,
@@ -826,8 +853,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Miqote_Female_NPC,
                         XivRace.AuRa_Female,
                         XivRace.AuRa_Female_NPC,
-                        XivRace.Viera,
-                        XivRace.Viera_NPC,
+                        XivRace.Viera_Female,
+                        XivRace.Viera_Female_NPC,
                         XivRace.Hyur_Highlander_Female,
                         XivRace.Hyur_Highlander_Female_NPC,
                         XivRace.Elezen_Female,
@@ -838,8 +865,8 @@ namespace xivModdingFramework.General.Enums
                         // Roe M? These are pretty fucked at this point.
                         XivRace.Roegadyn_Male,
                         XivRace.Roegadyn_Male_NPC,
-                        XivRace.Hrothgar,
-                        XivRace.Hrothgar_NPC,
+                        XivRace.Hrothgar_Male,
+                        XivRace.Hrothgar_Male_NPC,
 
                         // Lala ? 
                         XivRace.Lalafell_Male,
@@ -851,15 +878,15 @@ namespace xivModdingFramework.General.Enums
                 // Big Boys
                 case XivRace.Roegadyn_Male:
                 case XivRace.Roegadyn_Male_NPC:
-                case XivRace.Hrothgar:
-                case XivRace.Hrothgar_NPC:
+                case XivRace.Hrothgar_Male:
+                case XivRace.Hrothgar_Male_NPC:
                     return new List<XivRace>()
                     {
                         // Roe M
                         XivRace.Roegadyn_Male,
                         XivRace.Roegadyn_Male_NPC,
-                        XivRace.Hrothgar,
-                        XivRace.Hrothgar_NPC,
+                        XivRace.Hrothgar_Male,
+                        XivRace.Hrothgar_Male_NPC,
 
                         // Highlander Next
                         XivRace.Hyur_Highlander_Male,
@@ -874,6 +901,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Male_NPC,
                         XivRace.AuRa_Male,
                         XivRace.AuRa_Male_NPC,
+                        XivRace.Viera_Male,
+                        XivRace.Viera_Male_NPC,
 
                         // Standard Female Races Next ?  We're getting into trouble territory here.
                         XivRace.Hyur_Midlander_Female,
@@ -882,8 +911,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Miqote_Female_NPC,
                         XivRace.AuRa_Female,
                         XivRace.AuRa_Female_NPC,
-                        XivRace.Viera,
-                        XivRace.Viera_NPC,
+                        XivRace.Viera_Female,
+                        XivRace.Viera_Female_NPC,
                         XivRace.Hyur_Highlander_Female,
                         XivRace.Hyur_Highlander_Female_NPC,
                         XivRace.Elezen_Female,
@@ -920,6 +949,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Male_NPC,
                         XivRace.AuRa_Male,
                         XivRace.AuRa_Male_NPC,
+                        XivRace.Viera_Male,
+                        XivRace.Viera_Male_NPC,
                         
                         // Standard Female Races Next ?  We're getting into trouble territory here.
                         XivRace.Hyur_Midlander_Female,
@@ -928,8 +959,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Miqote_Female_NPC,
                         XivRace.AuRa_Female,
                         XivRace.AuRa_Female_NPC,
-                        XivRace.Viera,
-                        XivRace.Viera_NPC,
+                        XivRace.Viera_Female,
+                        XivRace.Viera_Female_NPC,
                         XivRace.Hyur_Highlander_Female,
                         XivRace.Hyur_Highlander_Female_NPC,
                         XivRace.Elezen_Female,
@@ -944,8 +975,8 @@ namespace xivModdingFramework.General.Enums
                         // Roe M
                         XivRace.Roegadyn_Male,
                         XivRace.Roegadyn_Male_NPC,
-                        XivRace.Hrothgar,
-                        XivRace.Hrothgar_NPC
+                        XivRace.Hrothgar_Male,
+                        XivRace.Hrothgar_Male_NPC
                     };
 
             }
