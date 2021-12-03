@@ -635,10 +635,12 @@ namespace xivModdingFramework.Items.Categories
             {"1304", XivRace.AuRa_Male_NPC},
             {"1401", XivRace.AuRa_Female},
             {"1404", XivRace.AuRa_Female_NPC},
-            {"1501", XivRace.Hrothgar},
-            {"1504", XivRace.Hrothgar_NPC},
-            {"1801", XivRace.Viera},
-            {"1804", XivRace.Viera_NPC},
+            {"1501", XivRace.Hrothgar_Male},
+            {"1504", XivRace.Hrothgar_Male_NPC},
+            {"1701", XivRace.Viera_Male},
+            {"1704", XivRace.Viera_Male_NPC},
+            {"1801", XivRace.Viera_Female},
+            {"1804", XivRace.Viera_Female_NPC},
             {"9104", XivRace.NPC_Male},
             {"9204", XivRace.NPC_Female}
         };
