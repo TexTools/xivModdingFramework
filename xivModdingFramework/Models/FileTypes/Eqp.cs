@@ -61,8 +61,8 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.Lalafell_Female,
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
-            XivRace.Hrothgar,
-            XivRace.Viera,
+            XivRace.Hrothgar_Male,
+            XivRace.Viera_Female,
         };
 
         // List of All Races including their NPC Versions
@@ -82,8 +82,9 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.Lalafell_Female,
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
-            XivRace.Hrothgar,
-            XivRace.Viera,
+            XivRace.Hrothgar_Male,
+            XivRace.Viera_Female,
+            XivRace.Viera_Male,
             XivRace.Hyur_Midlander_Male_NPC,
             XivRace.Hyur_Midlander_Female_NPC,
             XivRace.Hyur_Highlander_Male_NPC,
@@ -98,8 +99,9 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.Lalafell_Female_NPC,
             XivRace.AuRa_Male_NPC,
             XivRace.AuRa_Female_NPC,
-            XivRace.Hrothgar_NPC,
-            XivRace.Viera_NPC,
+            XivRace.Hrothgar_Male_NPC,
+            XivRace.Viera_Female_NPC,
+            XivRace.Viera_Male_NPC,
             XivRace.NPC_Male,
             XivRace.NPC_Female
         };
