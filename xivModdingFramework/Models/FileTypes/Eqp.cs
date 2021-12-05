@@ -63,6 +63,8 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.AuRa_Female,
             XivRace.Hrothgar_Male,
             XivRace.Viera_Female,
+            XivRace.Viera_Male,
+
         };
 
         // List of All Races including their NPC Versions
