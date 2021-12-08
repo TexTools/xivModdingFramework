@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -122,7 +123,7 @@ namespace xivModdingFramework.Mods.DataContainers
         public List<ModOptionJson> OptionList { get; set; }
     }
 
-    public class ModOptionJson
+    public class ModOptionJson : INotifyPropertyChanged
     {
         /// <summary>
         /// The name of the option
@@ -157,7 +158,32 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The status of the radio or checkbox
         /// </summary>
-        public bool IsChecked { get; set; }
+        private bool isChecked;
+        public bool IsChecked {
+            get {
+                return isChecked;
+            }
+            set {
+                isChecked = value;
+                NotifyPropertyChanged("IsChecked");
+            } 
+        }
+
+        /// <summary>
+        /// Implementation of INotifyPropertyChanged (to update UI)
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>
+        /// Helper to raise the property changed event
+        /// </summary>
+        /// <param name="propName">Name of the property that changed</param>
+        private void NotifyPropertyChanged(string propName)
+        {
+            if (PropertyChanged != null)
+                PropertyChanged(this, new PropertyChangedEventArgs(propName));
+        }
+
     }
 
     public class ModsJson

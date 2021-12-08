@@ -55,7 +55,8 @@ namespace xivModdingFramework.General
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int modelDataOffset = 4;
+            int startOffset = 8;
+            int modelDataOffset = 12;
 
             var ex = new Ex(gameDirectory);
             var modelCharaEx = await ex.ReadExData(XivEx.modelchara);
@@ -63,6 +64,7 @@ namespace xivModdingFramework.General
             // Big Endian Byte Order 
             using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
             {
+                br.BaseStream.Seek(startOffset, SeekOrigin.Begin);
                 xivModelInfo.PrimaryID = br.ReadInt16();
 
                 br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
@@ -99,8 +101,8 @@ namespace xivModdingFramework.General
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            int startOffset = 4;
-            int modelDataOffset = 8;
+            int startOffset = 8;
+            int modelDataOffset = 12;
             if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Chinese)
             {
                 startOffset = 0;
@@ -115,8 +117,6 @@ namespace xivModdingFramework.General
             // Big Endian Byte Order 
             using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
             {
-
-
                 br.BaseStream.Seek(startOffset, SeekOrigin.Begin);
                 xivModelInfo.PrimaryID = br.ReadInt16();
 
