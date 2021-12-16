@@ -88,30 +88,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return 2147483647;
                 case "FAT32":
                     return 4294967296;
-                case "NTFS":
+                default:
+                    // Unknown HDD Format, default to the max index limit.
                     // 2 ^35 is the maximum addressable size in the Index files. (28 precision bits, left-shifted 7 bits (increments of 128)
                     return 34359738368;
-                case "exFAT":
-                    return 34359738368;
-                case "ext2":
-                    return 34359738368;
-                case "ext3":
-                    return 34359738368;
-                case "ext4":
-                    return 34359738368;
-                case "XFS":
-                    return 34359738368;
-                case "btrfs":
-                    return 34359738368;
-                case "ZFS":
-                    return 34359738368;
-                case "ReiserFS":
-                    return 34359738368;
-                case "apfs":
-                    return 34359738368;
-                default:
-                    // Unknown HDD Format, default to the basic limit.
-                    return 2000000000;
             }
         }
 
