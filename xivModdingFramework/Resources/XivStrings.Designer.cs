@@ -655,11 +655,11 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Elezen - Duskwright.
+        ///   Looks up a localized string similar to Elezen - Duskwight.
         /// </summary>
-        internal static string Elezen_Duskwright {
+        internal static string Elezen_Duskwight {
             get {
-                return ResourceManager.GetString("Elezen_Duskwright", resourceCulture);
+                return ResourceManager.GetString("Elezen_Duskwight", resourceCulture);
             }
         }
         
