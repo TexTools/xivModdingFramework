@@ -522,7 +522,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
 
             var fileName = Path.GetFileName(filePath);
-            var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
+            var folderName = Path.GetDirectoryName(filePath)?.Replace("\\", "/") ?? string.Empty;
             var fileHash = (uint) HashGenerator.GetHash(fileName);
             var folderHash = (uint) HashGenerator.GetHash(folderName);
 

@@ -44,7 +44,7 @@ namespace xivModdingFramework.General.Enums
         Hyur_Midlander = 0,
         Hyur_Highlander,
         Elezen_Wildwood,
-        Elezen_Duskwright,
+        Elezen_Duskwight,
         Lalafell_Plainsfolk,
         Lalafell_Dunesfolk,
         Miqote_Seeker,
