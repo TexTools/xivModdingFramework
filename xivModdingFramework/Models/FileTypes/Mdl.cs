@@ -128,7 +128,11 @@ namespace xivModdingFramework.Models.FileTypes
                 var hashes = new HashSet<HalfUV>();
                 for(int i = 0; i < rawUvs.Length; i++)
                 {
-                    var huv = new HalfUV(rawUvs[i][0], rawUvs[i][1]);
+                    var fx = rawUvs[i][0];
+                    var fy = rawUvs[i][1];
+
+
+                    var huv = new HalfUV(fx, fy);
                     hashes.Add(huv);
                 }
 
@@ -4436,57 +4440,19 @@ namespace xivModdingFramework.Models.FileTypes
             var ogMdl = await GetRawMdlData(mdlPath);
             var ttMdl = TTModel.FromRaw(ogMdl);
 
-            var biboLayout = GetUVHashSet("bibo");
-
             bool anyChanges = false;
-            foreach(var mg in ttMdl.MeshGroups)
+            anyChanges = SkinCheckBibo(ttMdl);
+
+            if(!anyChanges)
             {
-                var rex = ModelModifiers.SkinMaterialRegex;
-                if(rex.IsMatch(mg.Material))
-                {
-                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
-                    var res = extractRex.Match(mg.Material);
-                    if (!res.Success) continue;
-
-                    var matId = res.Groups[1].Value;
-                    if (matId != "b") continue;
-
-                    // We have a Material B skin reference in a Hyur F model.
-
-                    var totalVerts = mg.VertexCount;
-                    uint sampleCount = 100;
-                    uint hits = 0;
-                    float requiredRatio = 0.9f;
-
-                    var parts = mg.Parts.Count;
-
-                    var rand = new Random(); // Is system supplied random seed sufficient?
-
-                    HashSet<long> values = new HashSet<long>();
-
-                    for(int i = 0; i < sampleCount; i++)
-                    {
-                        // Get a random vertex.
-                        var vert = mg.GetVertexAt(rand.Next((int)totalVerts));
-
-                        var huv = new HalfUV(vert.UV1[0], vert.UV1[1]);
-                        if (biboLayout.Contains(huv))
-                        {
-                            hits++;
-                        }
-                    }
-
-                    float ratio = hits / sampleCount;
-
-
-                    // This Mesh group needs to be swapped.
-                    if(ratio >= requiredRatio)
-                    {
-                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_d.mtrl");
-                        anyChanges = true;
-                    }
-                }
+                anyChanges = SkinCheckAndrofirm(ttMdl);
             }
+
+            if (!anyChanges)
+            {
+                anyChanges = SkinCheckGen3(ttMdl);
+            }
+
 
             if (anyChanges)
             {
@@ -4502,6 +4468,318 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             return anyChanges;
+        }
+
+        private bool SkinCheckGen2()
+        {
+            // If something is on Mat A, we can just assume it's fine realistically to save time.
+
+            // For now this is unneeded as Mat A things are default Gen2, and there are some derivatives of Gen2 on other materials
+            // which would complicate this check.
+            return false;
+        }
+
+        private bool SkinCheckGen3(TTModel ttMdl)
+        {
+            // Standard forward check.  Primarily this is looking for Mat D materials that are 'gen3 compat patch' for bibo.
+            // To pull them back onto mat B.
+
+            // Standard forward check.  Primarily this is looking for standard Mat B bibo materials,
+            // To pull them onto mat D.
+
+            var layout = GetUVHashSet("gen3");
+            if (layout == null || layout.Count == 0) return false;
+
+            bool anyChanges = false;
+            foreach (var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if (rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "d") continue;
+
+                    // We have a Material B skin reference in a Hyur F model.
+
+                    var totalVerts = mg.VertexCount;
+
+                    // Take 100 evenly divided samples, or however many we can get if there's not enough verts.
+                    uint sampleCount = 100;
+                    int sampleDivision = (int)(totalVerts / sampleCount);
+                    if (sampleDivision <= 0)
+                    {
+                        sampleDivision = 1;
+                    }
+
+                    uint hits = 0;
+                    const float requiredRatio = 0.5f;
+
+
+                    var realSamples = 0;
+                    for (int i = 0; i < totalVerts; i += sampleDivision)
+                    {
+                        realSamples++;
+                        // Get a random vertex.
+                        var vert = mg.GetVertexAt(i);
+
+                        var fx = vert.UV1[0];
+                        var fy = vert.UV1[1];
+                        // Sort quadrant.
+                        while (fy < -1)
+                        {
+                            fy += 1;
+                        }
+                        while (fy > 0)
+                        {
+                            fy -= 1;
+                        }
+
+                        while (fx > 1)
+                        {
+                            fx -= 1;
+                        }
+                        while (fx < 0)
+                        {
+                            fx += 1;
+                        }
+
+                        // This is a simple hash comparison checking if the 
+                        // UVs are bytewise idential at half precision.
+                        // In the future a better comparison method may be needed,
+                        // but this is super fast as it is.
+                        var huv = new HalfUV(fx, fy);
+                        if (layout.Contains(huv))
+                        {
+                            hits++;
+                        }
+                    }
+
+                    float ratio = (float)hits / (float)realSamples;
+
+
+                    // This Mesh group needs to be swapped.
+                    if (ratio >= requiredRatio)
+                    {
+                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_b.mtrl");
+                        anyChanges = true;
+                    }
+                }
+            }
+            return anyChanges;
+        }
+
+        private bool SkinCheckBibo(TTModel ttMdl)
+        {
+            // Standard forward check.  Primarily this is looking for standard Mat B bibo materials,
+            // To pull them onto mat D.
+
+            var layout = GetUVHashSet("bibo");
+            if (layout == null || layout.Count == 0) return false;
+
+            bool anyChanges = false;
+            foreach (var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if (rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "b") continue;
+
+                    // We have a Material B skin reference in a Hyur F model.
+
+                    var totalVerts = mg.VertexCount;
+
+                    // Take 100 evenly divided samples, or however many we can get if there's not enough verts.
+                    uint sampleCount = 100;
+                    int sampleDivision = (int)(totalVerts / sampleCount);
+                    if (sampleDivision <= 0)
+                    {
+                        sampleDivision = 1;
+                    }
+
+                    uint hits = 0;
+                    const float requiredRatio = 0.5f;
+
+
+                    var realSamples = 0;
+                    for (int i = 0; i < totalVerts; i += sampleDivision)
+                    {
+                        realSamples++;
+                        // Get a random vertex.
+                        var vert = mg.GetVertexAt(i);
+
+                        var fx = vert.UV1[0];
+                        var fy = vert.UV1[1];
+                        // Sort quadrant.
+                        while (fy < -1)
+                        {
+                            fy += 1;
+                        }
+                        while (fy > 0)
+                        {
+                            fy -= 1;
+                        }
+
+                        while (fx > 1)
+                        {
+                            fx -= 1;
+                        }
+                        while (fx < 0)
+                        {
+                            fx += 1;
+                        }
+
+                        // This is a simple hash comparison checking if the 
+                        // UVs are bytewise idential at half precision.
+                        // In the future a better comparison method may be needed,
+                        // but this is super fast as it is.
+                        var huv = new HalfUV(fx, fy);
+                        if (layout.Contains(huv))
+                        {
+                            hits++;
+                        }
+                    }
+
+                    float ratio = (float)hits / (float)realSamples;
+
+
+                    // This Mesh group needs to be swapped.
+                    if (ratio >= requiredRatio)
+                    {
+                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_d.mtrl");
+                        anyChanges = true;
+                    }
+                }
+            }
+            return anyChanges;
+        }
+
+
+        private bool SkinCheckAndrofirm(TTModel ttMdl)
+        {
+            // AF is a bit of a special case.
+            // It's a derivative of Gen2, that only varies on the legs.
+            // So if it's anything other than a leg model, we can pass, since it's really just a gen2 model.
+
+            // If it /is/ a leg model though, we have to create a hashset of the 
+            // UVs in the material, then reverse check
+            // So we have to sample the heuristic data, and see if there are
+            // a sufficient amount of matches in the model.
+
+            if (!ttMdl.Source.EndsWith("_dwn.mdl")) return false;
+
+            var layout = GetUVHashSet("androfirm");
+            if (layout == null || layout.Count == 0) return false;
+
+
+            HashSet<HalfUV> modelUVs = new HashSet<HalfUV>();
+            List<TTMeshGroup> meshes = new List<TTMeshGroup>();
+            bool anyChanges = false;
+            foreach (var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if (rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "a") continue; // Androfirm was originally published on the A Material.
+
+                    var totalVerts = mg.VertexCount;
+
+                    meshes.Add(mg);
+
+                    for (int i = 0; i < totalVerts; i++)
+                    {
+                        // Get vertex
+                        var vert = mg.GetVertexAt(i);
+
+                        var fx = vert.UV1[0];
+                        var fy = vert.UV1[1];
+
+                        // Sort quadrant.
+                        while (fy < -1)
+                        {
+                            fy += 1;
+                        }
+                        while (fy > 0)
+                        {
+                            fy -= 1;
+                        }
+
+                        while (fx > 1)
+                        {
+                            fx -= 1;
+                        }
+                        while (fx < 0)
+                        {
+                            fx += 1;
+                        }
+
+                        // Add to HashSet
+                        modelUVs.Add(new HalfUV(fx, fy));
+                    }
+                }
+            }
+
+            if (modelUVs.Count == 0) return false;
+
+            // We have some amount of material A leg UVs.
+
+            var layoutVerts = layout.Count;
+            var desiredSamples = 100;
+            var skip = layoutVerts / desiredSamples;
+            var hits = 0;
+            var realSamples = 0;
+
+            // Have to itterate these because can't index access a hashset.
+            // maybe cache an array version later if speed proves to be an issue?
+            var id = 0;
+            foreach(var uv in layout)
+            {
+                id++;
+                if(id % skip == 0)
+                {
+                    realSamples++;
+                    if (modelUVs.Contains(uv))
+                    {
+                        hits++;
+                    }
+                }
+            }
+
+            float ratio = (float)hits / (float)realSamples;
+            const float requiredRatio = 0.5f;
+
+            if(ratio > requiredRatio)
+            {
+                anyChanges = true;
+                foreach(var mesh in meshes)
+                {
+                    mesh.Material = mesh.Material.Replace("_a.mtrl", "_e.mtrl");
+                }
+            }
+
+            return anyChanges;
+        }
+
+        private bool SkinCheckUNFConnector()
+        {
+            // Standard forward check.
+
+            // For now this is unneeded, since UNF is the only mod to have been published using the _f material,
+            // and has only been published on _f and no other material letter.
+            return false;
         }
 
         /// <summary>
