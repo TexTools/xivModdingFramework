@@ -16,6 +16,7 @@
 
 using Ionic.Zip;
 using Newtonsoft.Json;
+using SharpDX;
 using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
@@ -40,6 +41,7 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class TTMP
     {
+
         // These file types are forbidden from being included in Modpacks or being imported via modpacks.
         // This is because these file types are re-built from constituent smaller files, and thus importing
         // a complete file would bash the user's current file state in unpredictable ways.
@@ -577,10 +579,12 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
         /// <param name="GetRootConversionsFunction">Function called part-way through import to resolve rood conversions, if any are desired.  Function takes a List of files, the in-progress modified index and modlist files, and returns a dictionary of conversion data.  If this function throws and OperationCancelledException, the import is cancelled.</param>
+        /// <param name="AutoAssignBodyMaterials">Whether models should be scanned for auto material assignment or not.</param>
         /// <returns>The number of total mods imported</returns>
         public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(
             DirectoryInfo modPackDirectory, List<ModsJson> modsJson, DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, 
-            Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null)
+            Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null,
+            bool AutoAssignBodyMaterials = false)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
@@ -1058,6 +1062,41 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                     await _modding.SaveModListAsync(modList);
 
+
+                    if (AutoAssignBodyMaterials) {
+                        progress.Report((0, 0, "Scanning for body material corrections..."));
+
+                        // Find all relevant models..
+                        var modelFiles = filteredModsJson.Where(x => x.FullPath.EndsWith(".mdl"));
+                        var hyurFModels = modelFiles.Where(x => x.FullPath.Contains("c0201")).ToList();
+
+                        if(hyurFModels.Any())
+                        {
+                            var indexFile = await _index.GetIndexFile(XivDataFile._04_Chara);
+                            var modelCount = hyurFModels.Count;
+                            progress.Report((0, modelCount, "Scanning and updating body models..."));
+                            var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory, XivDataFile._04_Chara);
+
+                            // Loop them to perform heuristic check.
+                            var anyChanges = false;
+                            var i = 0;
+                            foreach (var mdlEntry in hyurFModels)
+                            {
+                                i++;
+                                var file = mdlEntry.FullPath;
+                                progress.Report((i, modelCount, "Scanning and updating body models..."));
+                                var changed = await _mdl.CheckSkinAssignment(mdlEntry.FullPath, indexFile, modList);
+                                anyChanges |= changed;
+                            }
+
+                            // Save the modified index/modlist.
+                            if(anyChanges)
+                            {
+                                await _index.SaveIndexFile(indexFile);
+                                await _modding.SaveModListAsync(modList);
+                            }
+                        }
+                    }
 
                     count = 0;
                     progress.Report((0, 0, "Queuing Cache Updates..."));

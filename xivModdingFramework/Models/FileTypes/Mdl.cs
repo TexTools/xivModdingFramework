@@ -71,6 +71,79 @@ namespace xivModdingFramework.Models.FileTypes
         private readonly DirectoryInfo _modListDirectory;
         private readonly XivDataFile _dataFile;
 
+        // Simple internal use hashable pair of Halfs.
+        private struct HalfUV
+        {
+            public HalfUV(Half _x, Half _y)
+            {
+                x = _x;
+                y = _y;
+            }
+            public HalfUV(float _x, float _y)
+            {
+                x = _x;
+                y = _y;
+            }
+
+            public Half x;
+            public Half y;
+
+            public override int GetHashCode()
+            {
+                var bx = BitConverter.GetBytes(x);
+                var by = BitConverter.GetBytes(y);
+
+                var bytes = new byte[4];
+                bytes[0] = bx[0];
+                bytes[1] = bx[1];
+                bytes[2] = by[0];
+                bytes[3] = by[1];
+
+                return BitConverter.ToInt32(bytes, 0);
+            }
+        }
+
+        private static Dictionary<string, HashSet<HalfUV>> BodyHashes;
+
+        // Retrieve hash list of UVs for use in heuristics.
+        private HashSet<HalfUV> GetUVHashSet(string key)
+        {
+            if (BodyHashes == null)
+            {
+                BodyHashes = new Dictionary<string, HashSet<HalfUV>>();
+            }
+
+            if (BodyHashes.ContainsKey(key))
+            {
+                return BodyHashes[key];
+            }
+
+            try
+            {
+                var uvFile = "Resources/UVHeuristics/" + key + ".json";
+                var uvLines = File.ReadAllLines(uvFile);
+                string uvJson = uvLines[0];
+                var rawUvs = JsonConvert.DeserializeObject<float[][]>(uvJson);
+
+                var hashes = new HashSet<HalfUV>();
+                for(int i = 0; i < rawUvs.Length; i++)
+                {
+                    var huv = new HalfUV(rawUvs[i][0], rawUvs[i][1]);
+                    hashes.Add(huv);
+                }
+
+                BodyHashes.Add(key, hashes);
+                return hashes;
+
+            }
+            catch (Exception ex)
+            {
+                // blep
+            }
+
+            return null;
+        }
+
         public Mdl(DirectoryInfo gameDirectory, XivDataFile dataFile)
         {
             _gameDirectory = gameDirectory;
@@ -4350,6 +4423,86 @@ namespace xivModdingFramework.Models.FileTypes
 
         private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
         private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+
+
+        /// <summary>
+        /// Performs a heuristic check on the UV data of the given model to determine if its skin material assignment needs to be altered.
+        /// Primarily for handling Gen3/Bibo+ compat issues on Female Model skin materials B/D.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <returns></returns>
+        public async Task<bool> CheckSkinAssignment(string mdlPath, IndexFile _index, ModList _modlist)
+        {
+            var ogMdl = await GetRawMdlData(mdlPath);
+            var ttMdl = TTModel.FromRaw(ogMdl);
+
+            var biboLayout = GetUVHashSet("bibo");
+
+            bool anyChanges = false;
+            foreach(var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if(rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "b") continue;
+
+                    // We have a Material B skin reference in a Hyur F model.
+
+                    var totalVerts = mg.VertexCount;
+                    uint sampleCount = 100;
+                    uint hits = 0;
+                    float requiredRatio = 0.9f;
+
+                    var parts = mg.Parts.Count;
+
+                    var rand = new Random(); // Is system supplied random seed sufficient?
+
+                    HashSet<long> values = new HashSet<long>();
+
+                    for(int i = 0; i < sampleCount; i++)
+                    {
+                        // Get a random vertex.
+                        var vert = mg.GetVertexAt(rand.Next((int)totalVerts));
+
+                        var huv = new HalfUV(vert.UV1[0], vert.UV1[1]);
+                        if (biboLayout.Contains(huv))
+                        {
+                            hits++;
+                        }
+                    }
+
+                    float ratio = hits / sampleCount;
+
+
+                    // This Mesh group needs to be swapped.
+                    if(ratio >= requiredRatio)
+                    {
+                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_d.mtrl");
+                        anyChanges = true;
+                    }
+                }
+            }
+
+            if (anyChanges)
+            {
+
+                var bytes = await MakeNewMdlFile(ttMdl, ogMdl);
+
+                // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
+                var modEntry = _modlist.Mods.First(x => x.fullPath == mdlPath);
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+                
+                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, _index, _modlist);
+
+            }
+
+            return anyChanges;
+        }
 
         /// <summary>
         /// Creates a new racial model for a given set/slot by copying from already existing racial models.
