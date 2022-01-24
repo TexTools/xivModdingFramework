@@ -30,6 +30,7 @@ using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
@@ -1068,19 +1069,19 @@ namespace xivModdingFramework.Mods.FileTypes
 
                         // Find all relevant models..
                         var modelFiles = filteredModsJson.Where(x => x.FullPath.EndsWith(".mdl"));
-                        var hyurFModels = modelFiles.Where(x => x.FullPath.Contains("c0201")).ToList();
+                        var usableModels = modelFiles.Where(x => Mdl.IsAutoAssignableModel(x.FullPath)).ToList();
 
-                        if(hyurFModels.Any())
+                        if(usableModels.Any())
                         {
                             var indexFile = await _index.GetIndexFile(XivDataFile._04_Chara);
-                            var modelCount = hyurFModels.Count;
+                            var modelCount = usableModels.Count;
                             progress.Report((0, modelCount, "Scanning and updating body models..."));
                             var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory, XivDataFile._04_Chara);
 
                             // Loop them to perform heuristic check.
                             var anyChanges = false;
                             var i = 0;
-                            foreach (var mdlEntry in hyurFModels)
+                            foreach (var mdlEntry in usableModels)
                             {
                                 i++;
                                 var file = mdlEntry.FullPath;

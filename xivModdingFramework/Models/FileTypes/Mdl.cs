@@ -61,6 +61,8 @@ using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using System.Data.SQLite;
+using static xivModdingFramework.Cache.XivCache;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -120,25 +122,32 @@ namespace xivModdingFramework.Models.FileTypes
 
             try
             {
-                var uvFile = "Resources/UVHeuristics/" + key + ".json";
-                var uvLines = File.ReadAllLines(uvFile);
-                string uvJson = uvLines[0];
-                var rawUvs = JsonConvert.DeserializeObject<float[][]>(uvJson);
 
-                var hashes = new HashSet<HalfUV>();
-                for(int i = 0; i < rawUvs.Length; i++)
+                var connectString = "Data Source=resources/db/uv_heuristics.db;";
+                using (var db = new SQLiteConnection(connectString))
                 {
-                    var fx = rawUvs[i][0];
-                    var fy = rawUvs[i][1];
+                    db.Open();
 
+                    // Time to go root hunting.
+                    var query = "select * from " + key + ";";
 
-                    var huv = new HalfUV(fx, fy);
-                    hashes.Add(huv);
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        var uvs = new HashSet<HalfUV>();
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                var uv = new HalfUV();
+                                uv.x = reader.GetFloat("x");
+                                uv.y = reader.GetFloat("y");
+                                uvs.Add(uv);
+                            }
+                        }
+                        BodyHashes[key] = uvs;
+                        return BodyHashes[key];
+                    }
                 }
-
-                BodyHashes.Add(key, hashes);
-                return hashes;
-
             }
             catch (Exception ex)
             {
@@ -4428,6 +4437,34 @@ namespace xivModdingFramework.Models.FileTypes
         private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
         private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
 
+        public static bool IsAutoAssignableModel(string mdlPath)
+        {
+            if (!mdlPath.StartsWith("chara/"))
+            {
+                return false;
+            }
+
+            if (!mdlPath.EndsWith(".mdl"))
+            {
+                return false;
+            }
+
+            // Ensure Midlander F Based model.
+            if (
+                (!mdlPath.Contains("c0201"))
+                && (!mdlPath.Contains("c0401"))
+                && (!mdlPath.Contains("c0601"))
+                && (!mdlPath.Contains("c0801"))
+                && (!mdlPath.Contains("c1001"))
+                && (!mdlPath.Contains("c1401"))
+                && (!mdlPath.Contains("c1601"))
+                && (!mdlPath.Contains("c1801")))
+            {
+                return false;
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Performs a heuristic check on the UV data of the given model to determine if its skin material assignment needs to be altered.
@@ -4437,6 +4474,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<bool> CheckSkinAssignment(string mdlPath, IndexFile _index, ModList _modlist)
         {
+            if(!IsAutoAssignableModel(mdlPath))
+            {
+                return false;
+            }
+
             var ogMdl = await GetRawMdlData(mdlPath);
             var ttMdl = TTModel.FromRaw(ogMdl);
 
@@ -4470,6 +4512,37 @@ namespace xivModdingFramework.Models.FileTypes
             return anyChanges;
         }
 
+        /// <summary>
+        /// Loops through all mods in the modlist to update their skin assignments, performing a batch save at the end if 
+        /// everything was successful.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> CheckAllModsSkinAssignments()
+        {
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var modList = await _modding.GetModListAsync();
+
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+            var index = await _index.GetIndexFile(XivDataFile._04_Chara);
+
+            int count = 0;
+            foreach(var mod in modList.Mods)
+            {
+                var changed = await CheckSkinAssignment(mod.fullPath, index, modList);
+                if(changed)
+                {
+                    count++;
+                }
+            }
+
+            if(count > 0)
+            {
+                await _index.SaveIndexFile(index);
+                await _modding.SaveModListAsync(modList);
+            }
+
+            return count;
+        }
         private bool SkinCheckGen2()
         {
             // If something is on Mat A, we can just assume it's fine realistically to save time.
