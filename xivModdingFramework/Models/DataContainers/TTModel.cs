@@ -356,7 +356,7 @@ namespace xivModdingFramework.Models.DataContainers
             TTMeshPart part = Parts[0];
             foreach(var p in Parts)
             {
-                if(startingOffset + p.Vertices.Count < id)
+                if(startingOffset + p.Vertices.Count <= id)
                 {
                     startingOffset += p.Vertices.Count;
                 } else

@@ -61,6 +61,8 @@ using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using System.Data.SQLite;
+using static xivModdingFramework.Cache.XivCache;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -70,6 +72,90 @@ namespace xivModdingFramework.Models.FileTypes
         private readonly DirectoryInfo _gameDirectory;
         private readonly DirectoryInfo _modListDirectory;
         private readonly XivDataFile _dataFile;
+
+        // Simple internal use hashable pair of Halfs.
+        private struct HalfUV
+        {
+            public HalfUV(Half _x, Half _y)
+            {
+                x = _x;
+                y = _y;
+            }
+            public HalfUV(float _x, float _y)
+            {
+                x = _x;
+                y = _y;
+            }
+
+            public Half x;
+            public Half y;
+
+            public override int GetHashCode()
+            {
+                var bx = BitConverter.GetBytes(x);
+                var by = BitConverter.GetBytes(y);
+
+                var bytes = new byte[4];
+                bytes[0] = bx[0];
+                bytes[1] = bx[1];
+                bytes[2] = by[0];
+                bytes[3] = by[1];
+
+                return BitConverter.ToInt32(bytes, 0);
+            }
+        }
+
+        private static Dictionary<string, HashSet<HalfUV>> BodyHashes;
+
+        // Retrieve hash list of UVs for use in heuristics.
+        private HashSet<HalfUV> GetUVHashSet(string key)
+        {
+            if (BodyHashes == null)
+            {
+                BodyHashes = new Dictionary<string, HashSet<HalfUV>>();
+            }
+
+            if (BodyHashes.ContainsKey(key))
+            {
+                return BodyHashes[key];
+            }
+
+            try
+            {
+
+                var connectString = "Data Source=resources/db/uv_heuristics.db;";
+                using (var db = new SQLiteConnection(connectString))
+                {
+                    db.Open();
+
+                    // Time to go root hunting.
+                    var query = "select * from " + key + ";";
+
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        var uvs = new HashSet<HalfUV>();
+                        using (var reader = new CacheReader(cmd.ExecuteReader()))
+                        {
+                            while (reader.NextRow())
+                            {
+                                var uv = new HalfUV();
+                                uv.x = reader.GetFloat("x");
+                                uv.y = reader.GetFloat("y");
+                                uvs.Add(uv);
+                            }
+                        }
+                        BodyHashes[key] = uvs;
+                        return BodyHashes[key];
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // blep
+            }
+
+            return null;
+        }
 
         public Mdl(DirectoryInfo gameDirectory, XivDataFile dataFile)
         {
@@ -485,7 +571,8 @@ namespace xivModdingFramework.Models.FileTypes
                     ShapeCount = br.ReadInt16(),
                     ShapePartCount = br.ReadInt16(),
                     ShapeDataCount = br.ReadUInt16(),
-                    Unknown1 = br.ReadInt16(),
+                    LoDCount = br.ReadByte(),
+                    Unknown1 = br.ReadByte(),
                     Unknown2 = br.ReadInt16(),
                     Unknown3 = br.ReadInt16(),
                     Unknown4 = br.ReadInt16(),
@@ -2542,7 +2629,8 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown1));
+                modelDataBlock.Add(1); // LoD count, set to 1 since we only use the highest LoD
+                modelDataBlock.Add(ogModelData.Unknown1);
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown2));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown3));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown4));
@@ -3060,18 +3148,6 @@ namespace xivModdingFramework.Models.FileTypes
                     var lodNumber = 0;
                     foreach (var lod in ogMdl.LoDList)
                     {
-                        var indexMeshNum = new Dictionary<int, int>();
-
-                        // Get the index data offsets in each mesh
-                        for (var i = 0; i < lod.MeshCount; i++)
-                        {
-                            var indexDataOffset = lod.MeshDataList[i].MeshInfo.IndexDataOffset;
-
-                            indexMeshNum.Add(indexDataOffset, i);
-                        }
-
-
-
                         // We only store the shape info for LoD 0.
                         if (lodNumber == 0)
                         {
@@ -3799,8 +3875,10 @@ namespace xivModdingFramework.Models.FileTypes
                 datHeader.AddRange(BitConverter.GetBytes((ushort)totalMeshCount));
                 // Material Count
                 datHeader.AddRange(BitConverter.GetBytes((ushort)ttModel.Materials.Count));
+                // LoD Count
+                datHeader.Add(1); // We only use the highest LoD instead of three
                 // Unknown 1
-                datHeader.AddRange(BitConverter.GetBytes((short)259));
+                datHeader.Add(1);
                 // Unknown 2
                 datHeader.AddRange(BitConverter.GetBytes((short)0));
 
@@ -4358,6 +4436,424 @@ namespace xivModdingFramework.Models.FileTypes
 
         private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
         private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+
+        public static bool IsAutoAssignableModel(string mdlPath)
+        {
+            if (!mdlPath.StartsWith("chara/"))
+            {
+                return false;
+            }
+
+            if (!mdlPath.EndsWith(".mdl"))
+            {
+                return false;
+            }
+
+            // Ensure Midlander F Based model.
+            if (
+                (!mdlPath.Contains("c0201"))
+                && (!mdlPath.Contains("c0401"))
+                && (!mdlPath.Contains("c0601"))
+                && (!mdlPath.Contains("c0801"))
+                && (!mdlPath.Contains("c1001"))
+                && (!mdlPath.Contains("c1401"))
+                && (!mdlPath.Contains("c1601"))
+                && (!mdlPath.Contains("c1801")))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Performs a heuristic check on the UV data of the given model to determine if its skin material assignment needs to be altered.
+        /// Primarily for handling Gen3/Bibo+ compat issues on Female Model skin materials B/D.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <returns></returns>
+        public async Task<bool> CheckSkinAssignment(string mdlPath, IndexFile _index, ModList _modlist)
+        {
+            if(!IsAutoAssignableModel(mdlPath))
+            {
+                return false;
+            }
+
+            var ogMdl = await GetRawMdlData(mdlPath);
+            var ttMdl = TTModel.FromRaw(ogMdl);
+
+            bool anyChanges = false;
+            anyChanges = SkinCheckBibo(ttMdl);
+
+            if(!anyChanges)
+            {
+                anyChanges = SkinCheckAndrofirm(ttMdl);
+            }
+
+            if (!anyChanges)
+            {
+                anyChanges = SkinCheckGen3(ttMdl);
+            }
+
+
+            if (anyChanges)
+            {
+
+                var bytes = await MakeNewMdlFile(ttMdl, ogMdl);
+
+                // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
+                var modEntry = _modlist.Mods.First(x => x.fullPath == mdlPath);
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+                
+                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, _index, _modlist);
+
+            }
+
+            return anyChanges;
+        }
+
+        /// <summary>
+        /// Loops through all mods in the modlist to update their skin assignments, performing a batch save at the end if 
+        /// everything was successful.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> CheckAllModsSkinAssignments()
+        {
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var modList = await _modding.GetModListAsync();
+
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+            var index = await _index.GetIndexFile(XivDataFile._04_Chara);
+
+            int count = 0;
+            foreach(var mod in modList.Mods)
+            {
+                var changed = await CheckSkinAssignment(mod.fullPath, index, modList);
+                if(changed)
+                {
+                    count++;
+                }
+            }
+
+            if(count > 0)
+            {
+                await _index.SaveIndexFile(index);
+                await _modding.SaveModListAsync(modList);
+            }
+
+            return count;
+        }
+        private bool SkinCheckGen2()
+        {
+            // If something is on Mat A, we can just assume it's fine realistically to save time.
+
+            // For now this is unneeded as Mat A things are default Gen2, and there are some derivatives of Gen2 on other materials
+            // which would complicate this check.
+            return false;
+        }
+
+        private bool SkinCheckGen3(TTModel ttMdl)
+        {
+            // Standard forward check.  Primarily this is looking for Mat D materials that are 'gen3 compat patch' for bibo.
+            // To pull them back onto mat B.
+
+            // Standard forward check.  Primarily this is looking for standard Mat B bibo materials,
+            // To pull them onto mat D.
+
+            var layout = GetUVHashSet("gen3");
+            if (layout == null || layout.Count == 0) return false;
+
+            bool anyChanges = false;
+            foreach (var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if (rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "d") continue;
+
+                    // We have a Material B skin reference in a Hyur F model.
+
+                    var totalVerts = mg.VertexCount;
+
+                    // Take 100 evenly divided samples, or however many we can get if there's not enough verts.
+                    uint sampleCount = 100;
+                    int sampleDivision = (int)(totalVerts / sampleCount);
+                    if (sampleDivision <= 0)
+                    {
+                        sampleDivision = 1;
+                    }
+
+                    uint hits = 0;
+                    const float requiredRatio = 0.5f;
+
+
+                    var realSamples = 0;
+                    for (int i = 0; i < totalVerts; i += sampleDivision)
+                    {
+                        realSamples++;
+                        // Get a random vertex.
+                        var vert = mg.GetVertexAt(i);
+
+                        var fx = vert.UV1[0];
+                        var fy = vert.UV1[1];
+                        // Sort quadrant.
+                        while (fy < -1)
+                        {
+                            fy += 1;
+                        }
+                        while (fy > 0)
+                        {
+                            fy -= 1;
+                        }
+
+                        while (fx > 1)
+                        {
+                            fx -= 1;
+                        }
+                        while (fx < 0)
+                        {
+                            fx += 1;
+                        }
+
+                        // This is a simple hash comparison checking if the 
+                        // UVs are bytewise idential at half precision.
+                        // In the future a better comparison method may be needed,
+                        // but this is super fast as it is.
+                        var huv = new HalfUV(fx, fy);
+                        if (layout.Contains(huv))
+                        {
+                            hits++;
+                        }
+                    }
+
+                    float ratio = (float)hits / (float)realSamples;
+
+
+                    // This Mesh group needs to be swapped.
+                    if (ratio >= requiredRatio)
+                    {
+                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_b.mtrl");
+                        anyChanges = true;
+                    }
+                }
+            }
+            return anyChanges;
+        }
+
+        private bool SkinCheckBibo(TTModel ttMdl)
+        {
+            // Standard forward check.  Primarily this is looking for standard Mat B bibo materials,
+            // To pull them onto mat D.
+
+            var layout = GetUVHashSet("bibo");
+            if (layout == null || layout.Count == 0) return false;
+
+            bool anyChanges = false;
+            foreach (var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if (rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "b") continue;
+
+                    // We have a Material B skin reference in a Hyur F model.
+
+                    var totalVerts = mg.VertexCount;
+
+                    // Take 100 evenly divided samples, or however many we can get if there's not enough verts.
+                    uint sampleCount = 100;
+                    int sampleDivision = (int)(totalVerts / sampleCount);
+                    if (sampleDivision <= 0)
+                    {
+                        sampleDivision = 1;
+                    }
+
+                    uint hits = 0;
+                    const float requiredRatio = 0.5f;
+
+
+                    var realSamples = 0;
+                    for (int i = 0; i < totalVerts; i += sampleDivision)
+                    {
+                        realSamples++;
+                        // Get a random vertex.
+                        var vert = mg.GetVertexAt(i);
+
+                        var fx = vert.UV1[0];
+                        var fy = vert.UV1[1];
+                        // Sort quadrant.
+                        while (fy < -1)
+                        {
+                            fy += 1;
+                        }
+                        while (fy > 0)
+                        {
+                            fy -= 1;
+                        }
+
+                        while (fx > 1)
+                        {
+                            fx -= 1;
+                        }
+                        while (fx < 0)
+                        {
+                            fx += 1;
+                        }
+
+                        // This is a simple hash comparison checking if the 
+                        // UVs are bytewise idential at half precision.
+                        // In the future a better comparison method may be needed,
+                        // but this is super fast as it is.
+                        var huv = new HalfUV(fx, fy);
+                        if (layout.Contains(huv))
+                        {
+                            hits++;
+                        }
+                    }
+
+                    float ratio = (float)hits / (float)realSamples;
+
+
+                    // This Mesh group needs to be swapped.
+                    if (ratio >= requiredRatio)
+                    {
+                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_d.mtrl");
+                        anyChanges = true;
+                    }
+                }
+            }
+            return anyChanges;
+        }
+
+
+        private bool SkinCheckAndrofirm(TTModel ttMdl)
+        {
+            // AF is a bit of a special case.
+            // It's a derivative of Gen2, that only varies on the legs.
+            // So if it's anything other than a leg model, we can pass, since it's really just a gen2 model.
+
+            // If it /is/ a leg model though, we have to create a hashset of the 
+            // UVs in the material, then reverse check
+            // So we have to sample the heuristic data, and see if there are
+            // a sufficient amount of matches in the model.
+
+            if (!ttMdl.Source.EndsWith("_dwn.mdl")) return false;
+
+            var layout = GetUVHashSet("androfirm");
+            if (layout == null || layout.Count == 0) return false;
+
+
+            HashSet<HalfUV> modelUVs = new HashSet<HalfUV>();
+            List<TTMeshGroup> meshes = new List<TTMeshGroup>();
+            bool anyChanges = false;
+            foreach (var mg in ttMdl.MeshGroups)
+            {
+                var rex = ModelModifiers.SkinMaterialRegex;
+                if (rex.IsMatch(mg.Material))
+                {
+                    var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                    var res = extractRex.Match(mg.Material);
+                    if (!res.Success) continue;
+
+                    var matId = res.Groups[1].Value;
+                    if (matId != "a") continue; // Androfirm was originally published on the A Material.
+
+                    var totalVerts = mg.VertexCount;
+
+                    meshes.Add(mg);
+
+                    for (int i = 0; i < totalVerts; i++)
+                    {
+                        // Get vertex
+                        var vert = mg.GetVertexAt(i);
+
+                        var fx = vert.UV1[0];
+                        var fy = vert.UV1[1];
+
+                        // Sort quadrant.
+                        while (fy < -1)
+                        {
+                            fy += 1;
+                        }
+                        while (fy > 0)
+                        {
+                            fy -= 1;
+                        }
+
+                        while (fx > 1)
+                        {
+                            fx -= 1;
+                        }
+                        while (fx < 0)
+                        {
+                            fx += 1;
+                        }
+
+                        // Add to HashSet
+                        modelUVs.Add(new HalfUV(fx, fy));
+                    }
+                }
+            }
+
+            if (modelUVs.Count == 0) return false;
+
+            // We have some amount of material A leg UVs.
+
+            var layoutVerts = layout.Count;
+            var desiredSamples = 100;
+            var skip = layoutVerts / desiredSamples;
+            var hits = 0;
+            var realSamples = 0;
+
+            // Have to itterate these because can't index access a hashset.
+            // maybe cache an array version later if speed proves to be an issue?
+            var id = 0;
+            foreach(var uv in layout)
+            {
+                id++;
+                if(id % skip == 0)
+                {
+                    realSamples++;
+                    if (modelUVs.Contains(uv))
+                    {
+                        hits++;
+                    }
+                }
+            }
+
+            float ratio = (float)hits / (float)realSamples;
+            const float requiredRatio = 0.5f;
+
+            if(ratio > requiredRatio)
+            {
+                anyChanges = true;
+                foreach(var mesh in meshes)
+                {
+                    mesh.Material = mesh.Material.Replace("_a.mtrl", "_e.mtrl");
+                }
+            }
+
+            return anyChanges;
+        }
+
+        private bool SkinCheckUNFConnector()
+        {
+            // Standard forward check.
+
+            // For now this is unneeded, since UNF is the only mod to have been published using the _f material,
+            // and has only been published on _f and no other material letter.
+            return false;
+        }
 
         /// <summary>
         /// Creates a new racial model for a given set/slot by copying from already existing racial models.

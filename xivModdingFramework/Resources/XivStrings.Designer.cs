@@ -655,11 +655,11 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Elezen - Duskwright.
+        ///   Looks up a localized string similar to Elezen - Duskwight.
         /// </summary>
-        internal static string Elezen_Duskwright {
+        internal static string Elezen_Duskwight {
             get {
-                return ResourceManager.GetString("Elezen_Duskwright", resourceCulture);
+                return ResourceManager.GetString("Elezen_Duskwight", resourceCulture);
             }
         }
         
@@ -1186,6 +1186,24 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Hrothgar Female.
+        /// </summary>
+        internal static string Hrothgar_Female {
+            get {
+                return ResourceManager.GetString("Hrothgar_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar Female NPC.
+        /// </summary>
+        internal static string Hrothgar_Female_NPC {
+            get {
+                return ResourceManager.GetString("Hrothgar_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Hrothgar - Hellion.
         /// </summary>
         internal static string Hrothgar_Hellion {
@@ -1200,6 +1218,24 @@ namespace xivModdingFramework.Resources {
         internal static string Hrothgar_Lost {
             get {
                 return ResourceManager.GetString("Hrothgar_Lost", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar Male.
+        /// </summary>
+        internal static string Hrothgar_Male {
+            get {
+                return ResourceManager.GetString("Hrothgar_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hrothgar Male NPC.
+        /// </summary>
+        internal static string Hrothgar_Male_NPC {
+            get {
+                return ResourceManager.GetString("Hrothgar_Male_NPC", resourceCulture);
             }
         }
         
@@ -2379,6 +2415,42 @@ namespace xivModdingFramework.Resources {
         internal static string Viera {
             get {
                 return ResourceManager.GetString("Viera", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera Female.
+        /// </summary>
+        internal static string Viera_Female {
+            get {
+                return ResourceManager.GetString("Viera_Female", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera Female NPC.
+        /// </summary>
+        internal static string Viera_Female_NPC {
+            get {
+                return ResourceManager.GetString("Viera_Female_NPC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera Male.
+        /// </summary>
+        internal static string Viera_Male {
+            get {
+                return ResourceManager.GetString("Viera_Male", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Viera Male NPC.
+        /// </summary>
+        internal static string Viera_Male_NPC {
+            get {
+                return ResourceManager.GetString("Viera_Male_NPC", resourceCulture);
             }
         }
         

@@ -1,16 +1,16 @@
 // xivModdingFramework
 // Copyright © 2018 Rafael Gonzalez - All Rights Reserved
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -42,7 +42,7 @@ using xivModdingFramework.Textures.Enums;
 namespace xivModdingFramework.SqPack.FileTypes
 {
     /// <summary>
-    /// This class contains the methods that deal with the .dat file type 
+    /// This class contains the methods that deal with the .dat file type
     /// </summary>
     public class Dat
     {
@@ -92,6 +92,22 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // 2 ^35 is the maximum addressable size in the Index files. (28 precision bits, left-shifted 7 bits (increments of 128)
                     return 34359738368;
                 case "exFAT":
+                    return 34359738368;
+                case "ext2":
+                    return 34359738368;
+                case "ext3":
+                    return 34359738368;
+                case "ext4":
+                    return 34359738368;
+                case "XFS":
+                    return 34359738368;
+                case "btrfs":
+                    return 34359738368;
+                case "ZFS":
+                    return 34359738368;
+                case "ReiserFS":
+                    return 34359738368;
+                case "apfs":
                     return 34359738368;
                 default:
                     // Unknown HDD Format, default to the basic limit.
@@ -206,7 +222,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var unmoddedList = await GetUnmoddedDatList(dataFile, alreadyLocked);
             var datPath = $"{dataFile.GetDataFileName()}{DatExtension}{datNum}";
-            
+
             for(int i = 0; i < unmoddedList.Count; i++)
             {
                 unmoddedList[i] = Path.GetFileName(unmoddedList[i]);
@@ -336,7 +352,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Makes the header for the SqPack portion of the dat file. 
+        /// Makes the header for the SqPack portion of the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
         internal static byte[] MakeSqPackHeader()
@@ -444,8 +460,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // If it doesn't exist in the modlist(the item is not modded) or force original is false,
-            // grab the data directly from them index file. 
-            
+            // grab the data directly from them index file.
+
             var offset = index.Get8xDataOffset(internalPath);
 
             if (offset == 0)
@@ -701,7 +717,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // If it doesn't exist in the modlist(the item is not modded) or force original is false,
-            // grab the data directly from them index file. 
+            // grab the data directly from them index file.
             var folder = Path.GetDirectoryName(internalPath);
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
@@ -917,7 +933,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // If it doesn't exist in the modlist(the item is not modded) or force original is false,
-            // grab the data directly from them index file. 
+            // grab the data directly from them index file.
 
             var folder = Path.GetDirectoryName(internalPath);
             folder = folder.Replace("\\", "/");
@@ -1048,7 +1064,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 var offsetFromHeaderEnd = br.ReadInt32();
                                 var mipMapCompressedSize = br.ReadInt32();
 
-                                
+
                                 lastOffset = offsetFromHeaderEnd;
                                 lastSize = mipMapCompressedSize;
                             }
@@ -1421,7 +1437,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // If the DAT doesn't exist at all, we can assume we need to create a new DAT.
                 if (fInfo == null || !fInfo.Exists) break;
-                
+
 
                 var datSize = fInfo.Length;
 
@@ -1487,7 +1503,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Copies a file from a given offset to a new path in the game files.
-        /// 
+        ///
         /// If the Index File and Modlist are provided, the actions will only be wrtiten to memory,
         /// and not to the live Index Files/ModList.
         /// </summary>
@@ -1559,9 +1575,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Writes a new block of data to the given data file, without changing 
+        /// Writes a new block of data to the given data file, without changing
         /// the indexes.  Returns the raw-index-style offset to the new data.
-        /// 
+        ///
         /// A target offset of 0 or negative will append to the end of the first data file with space.
         /// </summary>
         /// <param name="importData"></param>
@@ -1587,7 +1603,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 seekPointer = (targetOffset >> 7) << 7;
 
                 // If the space we're told to write to would require modification,
-                // don't allow writing to it, because we might potentially write 
+                // don't allow writing to it, because we might potentially write
                 // past the end of this safe slot.
                 if(seekPointer % 256 != 0)
                 {
@@ -1691,10 +1707,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Writes a given block of data to the DAT files, updates the index to point to it for the given file path,
         /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
-        /// 
+        ///
         /// NOTE -- If the Index File and ModList are provided, the steps SAVING those entires are SKIPPED for performance.
         /// It is assumed if they are provided, that the calling function will handle saving them once it is done manipulating them.
-        /// 
+        ///
         /// LUMINA - If Lumina writing is enabled, the indexes/modlist/dats will NEVER be modified by this function, making it
         /// functionally a NoOp() as far as the internal TexTools system state is concerned.  This means if another function
         /// relies upon the DATs/Indexes/Modlist to be altered coming out of this function, the calling function needs to
@@ -1807,7 +1823,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (!doLumina)
             {
                 // Update the Index files.
-                
+
                 if (doDatSave)
                 {
                     originalOffset = await _index.UpdateDataOffset(retOffset, internalFilePath, true);
@@ -1816,7 +1832,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     originalOffset = index.SetDataOffset(internalFilePath, retOffset);
                 }
-                
+
             }
 
             var longOriginal = ((long)originalOffset) * 8L;
@@ -1877,7 +1893,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     await _modding.SaveModListAsync(modList);
                 }
-                
+
                 // Perform metadata expansion if needed.
                 var ext = Path.GetExtension(internalFilePath);
                 if (ext == ".meta")
@@ -1923,7 +1939,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             Debug.WriteLine($"[LUMINA] Export START for {internalPath}");
 
-            
+
             var extractedFile = new FileInfo(Path.Combine(outDirectory.FullName, internalPath));
             extractedFile.Directory?.Create();
 
@@ -2006,7 +2022,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var ret = offset - (16 * datNum);
             return ret;
         }
-        
+
         /// <summary>
         /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only).
         /// </summary>

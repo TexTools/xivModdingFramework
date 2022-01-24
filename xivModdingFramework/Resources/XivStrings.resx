@@ -900,8 +900,8 @@
   <data name="Right" xml:space="preserve">
     <value>Right</value>
   </data>
-  <data name="Elezen_Duskwright" xml:space="preserve">
-    <value>Elezen - Duskwright</value>
+  <data name="Elezen_Duskwight" xml:space="preserve">
+    <value>Elezen - Duskwight</value>
   </data>
   <data name="Elezen_Wildwood" xml:space="preserve">
     <value>Elezen - Wildwood</value>
@@ -944,5 +944,29 @@
   </data>
   <data name="Cure" xml:space="preserve">
     <value>Cure</value>
+  </data>
+  <data name="Hrothgar_Female" xml:space="preserve">
+    <value>Hrothgar Female</value>
+  </data>
+  <data name="Hrothgar_Female_NPC" xml:space="preserve">
+    <value>Hrothgar Female NPC</value>
+  </data>
+  <data name="Hrothgar_Male" xml:space="preserve">
+    <value>Hrothgar Male</value>
+  </data>
+  <data name="Hrothgar_Male_NPC" xml:space="preserve">
+    <value>Hrothgar Male NPC</value>
+  </data>
+  <data name="Viera_Female" xml:space="preserve">
+    <value>Viera Female</value>
+  </data>
+  <data name="Viera_Female_NPC" xml:space="preserve">
+    <value>Viera Female NPC</value>
+  </data>
+  <data name="Viera_Male" xml:space="preserve">
+    <value>Viera Male</value>
+  </data>
+  <data name="Viera_Male_NPC" xml:space="preserve">
+    <value>Viera Male NPC</value>
   </data>
 </root>
