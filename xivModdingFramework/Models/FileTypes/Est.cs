@@ -169,7 +169,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
         {
-            var entries = await GetEstFile(type, false);
+            var entries = await GetEstFile(type, false, cachedIndexFile);
 
             // Add/Remove entries.
             foreach (var entry in modifiedEntries)
@@ -316,10 +316,10 @@ namespace xivModdingFramework.Models.FileTypes
             return entries[race][setId];
         }
 
-        private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false)
+        private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false, IndexFile cachedIndexFile = null)
         {
             var _dat = new Dat(_gameDirectory);
-            var data = await _dat.GetType2Data(EstFiles[type], forceDefault);
+            var data = await _dat.GetType2Data(EstFiles[type], forceDefault, cachedIndexFile);
 
             var count = BitConverter.ToUInt32(data, 0);
 

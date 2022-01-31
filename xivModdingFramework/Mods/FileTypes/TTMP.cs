@@ -895,7 +895,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                 {
                                     var oldOffset = originalIndexFiles[df].Get8xDataOffset(file);
                                     modifiedIndexFiles[df].SetDataOffset(file, oldOffset);
-
                                 }
                             }
                         }
