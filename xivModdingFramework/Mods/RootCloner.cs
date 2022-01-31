@@ -413,10 +413,6 @@ namespace xivModdingFramework.Mods
                 // Save the new Metadata file via the batch function so that it's only written to the memory cache for now.
                 await ItemMetadata.ApplyMetadataBatched(new List<ItemMetadata>() { newMetadata }, index, modlist, false);
 
-                
-
-
-
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Filling in missing material sets...");

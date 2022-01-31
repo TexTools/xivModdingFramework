@@ -127,7 +127,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            var file = (await LoadGimmickParameterFile(false));
+            var file = await LoadGimmickParameterFile(false, cachedIndexFile);
 
 
             var offsets = new Dictionary<uint, int>();
@@ -259,9 +259,9 @@ namespace xivModdingFramework.Models.FileTypes
         {
             await _dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
         }
-        private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false)
+        private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false, IndexFile cachedIndexFile = null)
         {
-            return await _dat.GetType2Data(GimmickParameterFile, forceDefault);
+            return await _dat.GetType2Data(GimmickParameterFile, forceDefault, cachedIndexFile);
         }
 
         /// <summary>
@@ -282,7 +282,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            var file = (await LoadEquipmentParameterFile(false));
+            var file = await LoadEquipmentParameterFile(false, cachedIndexFile);
 
 
             var offsets = new Dictionary<uint, int>();
@@ -505,9 +505,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment parameter file.
         /// </summary>
         /// <returns></returns>
-        private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false)
+        private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false, IndexFile cachedIndexFile = null)
         {
-            return await _dat.GetType2Data(EquipmentParameterFile, forceDefault);
+            return await _dat.GetType2Data(EquipmentParameterFile, forceDefault, cachedIndexFile);
         }
 
 
@@ -730,7 +730,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var race = raceKv.Key;
                 var fileName = EquipmentDeformerParameterRootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-                var data = await LoadEquipmentDeformationFile(race, false, false);
+                var data = await LoadEquipmentDeformationFile(race, false, false, cachedIndexFile);
 
                 // Loop through until we've expanded all of the data entries that we need in order to write the data.
                 bool clean = false;
@@ -1224,11 +1224,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment or accessory deformation parameters file for a given race.
         /// </summary>
         /// <returns></returns>
-        private async Task<byte[]> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false)
+        private async Task<byte[]> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false, IndexFile cachedIndexFile = null)
         {
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            return await _dat.GetType2Data(fileName, forceDefault);
+            return await _dat.GetType2Data(fileName, forceDefault, cachedIndexFile);
         }
 
         /// <summary>
