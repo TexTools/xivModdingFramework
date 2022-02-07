@@ -44,7 +44,7 @@ namespace xivModdingFramework.General.Enums
         Hyur_Midlander = 0,
         Hyur_Highlander,
         Elezen_Wildwood,
-        Elezen_Duskwright,
+        Elezen_Duskwight,
         Lalafell_Plainsfolk,
         Lalafell_Dunesfolk,
         Miqote_Seeker,
@@ -617,7 +617,9 @@ namespace xivModdingFramework.General.Enums
                 case XivRace.AuRa_Male_NPC:
                 case XivRace.AuRa_Female_NPC:
                     return XivBaseRace.AuRa;
+                case XivRace.Viera_Male:
                 case XivRace.Viera_Female:
+                case XivRace.Viera_Male_NPC:
                 case XivRace.Viera_Female_NPC:
                     return XivBaseRace.Viera;
                 case XivRace.Hrothgar_Male:
