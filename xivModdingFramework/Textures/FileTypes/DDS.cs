@@ -67,6 +67,21 @@ namespace xivModdingFramework.Textures.FileTypes
             File.WriteAllBytes(savePath, DDS.ToArray());
         }
 
+
+        public static byte[] MakeDDS(byte[] data, XivTexFormat format, int width, int height, int layers, int mipCount)
+        {
+            var DDS = new List<byte>();
+            DDS.AddRange(CreateDDSHeader(format, width, height, layers, mipCount));
+
+            if (format == XivTexFormat.A8R8G8B8 && layers > 1)
+            {
+                data = ShiftLayers(data);
+            }
+            DDS.AddRange(data);
+
+            return DDS.ToArray();
+        }
+
         // This is a simple shift of the layers around in order to convert ARGB to RGBA
         private static byte[] ShiftLayers(byte[] data)
         {
@@ -92,6 +107,12 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>Byte array containing DDS header</returns>
         private static byte[] CreateDDSHeader(XivTex xivTex)
         {
+            return CreateDDSHeader(xivTex.TextureFormat, xivTex.Width, xivTex.Height, xivTex.Layers, xivTex.MipMapCount);
+        }
+
+
+        private static byte[] CreateDDSHeader(XivTexFormat format, int width, int height, int layers, int mipCount)
+        {
             uint dwPitchOrLinearSize, pfFlags, dwFourCC;
             var header = new List<byte>();
 
@@ -105,34 +126,34 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Flags to indicate which members contain valid data.
             uint dwFlags = 528391;
-            if(xivTex.Layers > 1)
+            if(layers > 1)
             {
                 dwFlags = 0x00000004;
             }
             header.AddRange(BitConverter.GetBytes(dwFlags));
 
-            // Surface height (in pixels).
-            var dwHeight = (uint)xivTex.Height;
+            // Surface height (in pixels). 
+            var dwHeight = (uint)height;
             header.AddRange(BitConverter.GetBytes(dwHeight));
 
             // Surface width (in pixels).
-            var dwWidth = (uint)xivTex.Width;
+            var dwWidth = (uint)width;
             header.AddRange(BitConverter.GetBytes(dwWidth));
 
             // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
-            if (xivTex.TextureFormat == XivTexFormat.A16B16G16R16F)
+            if (format == XivTexFormat.A16B16G16R16F)
             {
                 dwPitchOrLinearSize = 512;
             }
-            else if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8)
+            else if (format == XivTexFormat.A8R8G8B8)
             {
                 dwPitchOrLinearSize = (dwHeight * dwWidth) * 4;
             }
-            else if (xivTex.TextureFormat == XivTexFormat.DXT1)
+            else if (format == XivTexFormat.DXT1)
             {
                 dwPitchOrLinearSize = (dwHeight * dwWidth) / 2;
             }
-            else if (xivTex.TextureFormat == XivTexFormat.A4R4G4B4 || xivTex.TextureFormat == XivTexFormat.A1R5G5B5)
+            else if (format == XivTexFormat.A4R4G4B4 || format == XivTexFormat.A1R5G5B5)
             {
                 dwPitchOrLinearSize = (dwHeight * dwWidth) * 2;
             }
@@ -148,7 +169,7 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(dwDepth));
 
             // Number of mipmap levels, otherwise unused.
-            var dwMipMapCount = (uint)xivTex.MipMapCount;
+            var dwMipMapCount = (uint)mipCount;
             header.AddRange(BitConverter.GetBytes(dwMipMapCount));
 
             // Unused.
@@ -162,7 +183,7 @@ namespace xivModdingFramework.Textures.FileTypes
             const uint pfSize = 32;
             header.AddRange(BitConverter.GetBytes(pfSize));
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 // Values which indicate what type of data is in the surface.
                 case XivTexFormat.A8R8G8B8:
@@ -179,7 +200,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             header.AddRange(BitConverter.GetBytes(pfFlags));
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 // Four-character codes for specifying compressed or custom formats.
                 case XivTexFormat.DXT1:
@@ -204,7 +225,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     return null;
             }
 
-            if(xivTex.Layers > 1)
+            if(layers > 1)
             {
                 var bytes = System.Text.Encoding.UTF8.GetBytes("DX10");
                 dwFourCC = BitConverter.ToUInt32(bytes, 0);
@@ -212,7 +233,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             header.AddRange(BitConverter.GetBytes(dwFourCC));
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 case XivTexFormat.A8R8G8B8:
                     {
@@ -362,13 +383,13 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             // Need to write DX10 header here.
-            if(xivTex.Layers > 1)
+            if(layers > 1)
             {
                 // DXGI_FORMAT dxgiFormat
                 uint dxgiFormat = 0;
-                if (xivTex.TextureFormat == XivTexFormat.DXT1) {
+                if (format == XivTexFormat.DXT1) {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM;
-                } else if (xivTex.TextureFormat == XivTexFormat.DXT5)
+                } else if (format == XivTexFormat.DXT5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
                 } else {
@@ -384,7 +405,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 header.AddRange(BitConverter.GetBytes((int)0));
 
                 // UINT arraySize
-                header.AddRange(BitConverter.GetBytes(xivTex.Layers));
+                header.AddRange(BitConverter.GetBytes(layers));
 
                 // UINT miscFlags2
                 header.AddRange(BitConverter.GetBytes((int)0));
@@ -392,6 +413,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             return header.ToArray();
         }
+
 
         /// <summary>
         /// Creates the DDS header for given texture data.

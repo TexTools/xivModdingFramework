@@ -217,11 +217,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             return sha1Bytes;
         }
 
-        public async Task<long> GetDataOffset(string fullPath)
+        public async Task<long> GetDataOffset(string fullPath, IndexFile cachedIndexFile = null)
         {
-            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
-            var index = await GetIndexFile(dataFile, false, true);
-            return index.Get8xDataOffset(fullPath);
+            if (cachedIndexFile == null)
+            {
+                var dataFile = IOUtil.GetDataFileFromPath(fullPath);
+                cachedIndexFile = await GetIndexFile(dataFile, false, true);
+            }
+            return cachedIndexFile.Get8xDataOffset(fullPath);
         }
 
         /// <summary>

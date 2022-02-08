@@ -43,6 +43,8 @@ using xivModdingFramework.Variants.FileTypes;
 
 using Surface = TeximpNet.Surface;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -404,12 +406,15 @@ namespace xivModdingFramework.Textures.FileTypes
         public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
         {
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
-
             Directory.CreateDirectory(path);
-
             var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivTex.TextureTypeAndPath.Path) + ".dds");
+            SaveTexAsDDS(savePath, xivTex);
+        }
 
-            DDS.MakeDDS(xivTex, savePath);
+
+        public void SaveTexAsDDS(string path, XivTex xivTex)
+        {
+            DDS.MakeDDS(xivTex, path);
         }
 
         /// <summary>
@@ -703,7 +708,126 @@ namespace xivModdingFramework.Textures.FileTypes
             return textureType;
         }
 
-        
+
+        /// <summary>
+        /// Applies an overlay texture onto a base texture.
+        /// Stores the output as a PNG file in the temporary files directory and returns the path.
+        /// </summary>
+        /// <param name="baseData"></param>
+        /// <param name="overlayData"></param>
+        /// <returns></returns>
+        public async Task<string> ApplyOverlay(XivTex baseTex, Stream overlayDdsStream)
+        {
+            // Get both images in pixel format.
+            var basePixelData = await GetImageData(baseTex);
+            var overlayPixelData = await DDStoPixel(overlayDdsStream);
+
+            // Pump images into ImageSharp.
+            var baseImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(basePixelData, baseTex.Width, baseTex.Height);
+            var overlayImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(overlayPixelData.Item1, overlayPixelData.Item2, overlayPixelData.Item3);
+
+            if(baseImage.Width != overlayImage.Width || baseImage.Height != overlayImage.Height)
+            {
+                // Resize the overlay to match.
+                overlayImage.Mutate(x => x.Resize(baseImage.Width, baseImage.Height));
+            }
+
+            // Merge Images
+            baseImage.Mutate(x =>
+            {
+                x.DrawImage(overlayImage, 1.0f);
+            });
+
+            var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".png");
+            baseImage.SaveAsPng(tempFile);
+
+
+            return tempFile;
+        }
+
+        /// <summary>
+        /// Takes a raw DDS Data block and decodes it into pixel data.
+        /// Only works with single layer DDS files.
+        /// 
+        /// Return Pixel Data, Width, Height, Original DDS format.
+        /// </summary>
+        /// <param name="ddsData"></param>
+        /// <returns></returns>
+        public async Task<Tuple<byte[], int, int, XivTexFormat>> DDStoPixel(byte [] rawDdsData)
+        {
+            using (var mStream = new MemoryStream(rawDdsData))
+            {
+                return await DDStoPixel(mStream);
+            }
+        }
+
+        /// <summary>
+        /// Takes a raw DDS Data block and decodes it into pixel data.
+        /// Only works with single layer DDS files.
+        /// 
+        /// Return Pixel Data, Width, Height, Original DDS format.
+        /// </summary>
+        /// <param name="ddsData"></param>
+        /// <returns></returns>
+        public async Task<Tuple<byte[], int, int, XivTexFormat>> DDStoPixel(Stream ddsStream)
+        {
+            using (var reader = new BinaryReader(ddsStream))
+            {
+                var format = GetDDSTexFormat(reader);
+                var ddsContainer = new DDSContainer();
+
+                reader.BaseStream.Seek(12, SeekOrigin.Begin);
+
+                var height = reader.ReadInt32();
+                var width = reader.ReadInt32();
+
+                byte[] imageData = null;
+                var layers = 1;
+
+
+                reader.BaseStream.Seek(0, SeekOrigin.Begin);
+                var rawData = IOUtil.ReadAllBytes(reader);
+
+                switch (format)
+                {
+                    case XivTexFormat.DXT1:
+                        imageData = DxtUtil.DecompressDxt1(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.DXT3:
+                        imageData = DxtUtil.DecompressDxt3(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.DXT5:
+                        imageData = DxtUtil.DecompressDxt5(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.A4R4G4B4:
+                        imageData = await Read4444Image(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.A1R5G5B5:
+                        imageData = await Read5551Image(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.A8R8G8B8:
+                        imageData = await SwapRBColors(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.L8:
+                    case XivTexFormat.A8:
+                        imageData = await Read8bitImage(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.X8R8G8B8:
+                    case XivTexFormat.R32F:
+                    case XivTexFormat.G16R16F:
+                    case XivTexFormat.G32R32F:
+                    case XivTexFormat.A16B16G16R16F:
+                    case XivTexFormat.A32B32G32R32F:
+                    case XivTexFormat.D16:
+                    default:
+                        imageData = rawData;
+                        break;
+                }
+
+                return new Tuple<byte[], int, int, XivTexFormat>(imageData, width, height, format);
+            }
+        }
+
         /// <summary>
         /// Creates texture data ready to be imported into the DATs from an external file.
         /// If format is not specified, either the incoming file's DDS format is used (DDS files), 
