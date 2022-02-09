@@ -30,6 +30,7 @@ using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
@@ -541,7 +542,9 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <summary>
         /// Gets the version from a mod pack
         /// </summary>
-        /// <param name="modPackDirectory">The mod pack directory</param>
+        /// <param name="packPath">Path to the overlay pack file.</param>
+        /// <param name="modifierFunction">Intermediate function that performs any user requested modifications to the overlay pack.  Returns true if the import should be aborted.</param>
+        /// <param name="source">Standard import source name</param>
         /// <returns>The version of the mod pack as a string</returns>
         public static string GetVersion(DirectoryInfo modPackDirectory)
         {
@@ -569,6 +572,103 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
             return modPackJson.TTMPVersion;
+        }
+
+        /// <summary>
+        /// Imports an overlay pack asynchronously.
+        /// </summary>
+        /// <param name="packPath">Path to the .ttop file.</param>
+        /// <param name="modifierFunction">Intermediate function, function takes the overlay pack to modify, and a string indicating the active temporary zip directory.  Returns true if the process should abort</param>
+        /// <returns></returns>
+        public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportOverlaypackAsync(string packPath, Func<OverlayPack, string, Task<bool>> modifierFunction = null)
+        {
+            if (XivCache.GameInfo.UseLumina)
+            {
+                throw new Exception("Cannot import modpacks via TexTools in Lumina mode.");
+            }
+
+            // We don't need to stop the cache worker for overlay imports, since Textures are the bottom of the dependency chain.
+
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var modList = _modding.GetModList();
+
+            var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+            try
+            {
+                Directory.CreateDirectory(tempPath);
+
+                // 0 - Extract the header file.
+                using (var zf = ZipFile.Read(packPath))
+                {
+                    zf.ExtractAll(tempPath);
+                }
+
+                var rootFile = "list.json";
+
+                var listPath = Path.Combine(tempPath, rootFile);
+
+                var overlayPack = JsonConvert.DeserializeObject<OverlayPack>(File.ReadAllText(listPath));
+
+                // Throw the pack to the modifier function if there is one.
+                if (modifierFunction != null)
+                {
+                    var abort = await modifierFunction(overlayPack, tempPath);
+                    if (abort)
+                    {
+                        return new(0, 0, "User Cancelled Import Process.", 0);
+                    }
+                }
+
+                var mp = new ModPack();
+                mp.name = overlayPack.Name;
+                mp.author = overlayPack.Author;
+                mp.url = overlayPack.URL;
+                mp.version = overlayPack.ModVersion;
+
+                modList.ModPacks.Add(mp);
+
+                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+                var _index = new Index(XivCache.GameInfo.GameDirectory);
+
+                var index = await _index.GetIndexFile(XivDataFile._04_Chara);
+
+                var imported = 0;
+                var filesPath = Path.Combine(tempPath, "files");
+                foreach(var kv in overlayPack.Files)
+                {
+                    var overlay = kv.Value; 
+                    var filePath = Path.Combine(filesPath, overlay.ZipPath);
+                    var fileStream = File.Open(filePath, FileMode.Open);
+                    var moddedTex = await _mtrl.ApplyOverlayToMaterial(overlay.MtrlPath, overlay.TexType, fileStream, _source, index, modList);
+                    
+                    // Bind this new mod entry to our overlay modpack.
+                    var modEntry = modList.Mods.First(x => x.fullPath == moddedTex);
+                    modEntry.modPack = mp;
+
+                    imported++;
+                }
+
+
+                // Save changes.
+                await _index.SaveIndexFile(index);
+                await _modding.SaveModListAsync(modList);
+
+
+                return new(imported, 0, null, 0);
+            }
+            finally
+            {
+                try
+                {
+                    // Clean up temp files.
+                    Directory.Delete(tempPath, true);
+                } catch
+                {
+
+                }
+            }
+
         }
 
         /// <summary>

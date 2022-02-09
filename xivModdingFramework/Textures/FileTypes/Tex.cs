@@ -45,6 +45,7 @@ using Surface = TeximpNet.Surface;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Processing.Processors.Transforms;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -58,6 +59,9 @@ namespace xivModdingFramework.Textures.FileTypes
         private readonly Index _index;
         private readonly Dat _dat;
         private readonly XivDataFile _dataFile;
+
+        // The 'magic number' for PNG file headers, indicating that the following data is a PNG file.
+        private readonly byte[] _PNG_MAGIC = { 137, 80, 78, 71, 13, 10, 26, 10 };
 
         /// <summary>
         /// Gets the path to the default blank texture for a given texture format.
@@ -711,20 +715,52 @@ namespace xivModdingFramework.Textures.FileTypes
 
         /// <summary>
         /// Applies an overlay texture onto a base texture.
+        /// Overlays must be either DDS or PNG file streams.
         /// Stores the output as a PNG file in the temporary files directory and returns the path.
+        /// 
+        /// This does NOT modify the game dats or indexes.
         /// </summary>
         /// <param name="baseData"></param>
         /// <param name="overlayData"></param>
         /// <returns></returns>
-        public async Task<string> ApplyOverlay(XivTex baseTex, Stream overlayDdsStream)
+        public async Task<string> CreateMergedOverlayFile(XivTex baseTex, Stream overlayStream)
         {
+
             // Get both images in pixel format.
             var basePixelData = await GetImageData(baseTex);
-            var overlayPixelData = await DDStoPixel(overlayDdsStream);
-
-            // Pump images into ImageSharp.
             var baseImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(basePixelData, baseTex.Width, baseTex.Height);
-            var overlayImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(overlayPixelData.Item1, overlayPixelData.Item2, overlayPixelData.Item3);
+
+            Image overlayImage;
+
+
+            // Check if it's a PNG or DDS stream.
+            var isPng = true;
+            var position = overlayStream.Position;
+            var buff = new byte[8];
+            overlayStream.Read(buff, 0, 8);
+
+            for(int i = 0; i < _PNG_MAGIC.Length; i++)
+            {
+                if(_PNG_MAGIC[i] != buff[i])
+                {
+                    isPng = false;
+                }
+            }
+
+            // Rewind stream.
+            overlayStream.Seek(position, SeekOrigin.Begin);
+
+            if(isPng)
+            {
+                // If it's a PNG stream, imagesharp should be able to just directly load it.
+                overlayImage = Image.Load(overlayStream);
+
+            } else
+            {
+                // Read DDS data, then pump the raw pixels into ImageSharp.
+                var overlayPixelData = await DDStoPixel(overlayStream);
+                overlayImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(overlayPixelData.Item1, overlayPixelData.Item2, overlayPixelData.Item3);
+            }
 
             if(baseImage.Width != overlayImage.Width || baseImage.Height != overlayImage.Height)
             {
@@ -743,6 +779,35 @@ namespace xivModdingFramework.Textures.FileTypes
 
 
             return tempFile;
+        }
+
+        /// <summary>
+        /// Applies an overlay texture onto a base texture.
+        /// Overlays must be either DDS or PNG file streams.
+        /// 
+        /// Writes the resulting file to the Dats/Indexes.
+        /// </summary>
+        /// <param name="baseTex"></param>
+        /// <param name="overlayStream"></param>
+        /// <returns></returns>
+        public async Task ApplyOverlay(XivTex baseTex, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
+        {
+            var pngPath = await CreateMergedOverlayFile(baseTex, overlayStream);
+
+            var root = await XivCache.GetFirstRoot(baseTex.TextureTypeAndPath.Path);
+            var item = root.GetFirstItem();
+
+            await ImportTex(baseTex.TextureTypeAndPath.Path, pngPath, item, source, index, modList);
+
+            try
+            {
+                // Clear out temp files.
+                File.Delete(pngPath);
+            }
+            catch
+            {
+
+            }
         }
 
         /// <summary>

@@ -941,18 +941,21 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
         /// <summary>
-        /// Applies a given texture onto 
+        /// Applies a given texture overlay onto the given texture type of the given material.
+        /// the texture overlay stream must be a PNG or DDS file stream.
+        /// 
+        /// Returns the internal file path that was modified.
         /// </summary>
         /// <param name="mtrlPath">The path to the material to modify</param>
         /// <param name="textureType">The texture type within the material to replace.</param>
         /// <param name="index">Cached Index File</param>
         /// <param name="modList">Cached Modlist File</param>
-        public async Task<bool> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
+        public async Task<string> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
         {
             var mtrl = await GetMtrlData(mtrlPath, -1, 11, index);
             var map = mtrl.GetMapInfo(textureType, false);
 
-            if (map == null) return false;
+            if (map == null) return null;
 
             var texPath = map.Path;
 
@@ -960,14 +963,9 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var tex = await _Tex.GetTexData(map);
 
-            var pngPath = await _Tex.ApplyOverlay(tex, overlayStream);
+            await _Tex.ApplyOverlay(tex, overlayStream, source, index, modList);
 
-            var root = await XivCache.GetFirstRoot(texPath);
-            var item = root.GetFirstItem();
-
-            await _Tex.ImportTex(texPath, pngPath, item, source, index, modList);
-
-            return true;
+            return texPath;
         }
 
         /// <summary>
