@@ -582,7 +582,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="MapType"></param>
         /// <returns></returns>
-        public MapInfo GetMapInfo(XivTexType MapType)
+        public MapInfo GetMapInfo(XivTexType MapType, bool tokenized = true)
         {
             var info = new MapInfo();
             int mapIndex = -1;
@@ -615,7 +615,10 @@ namespace xivModdingFramework.Materials.DataContainers
                 info.Path = TexturePathList[mapIndex];
             }
 
-            info.Path = TokenizePath(info.Path, info.Usage);
+            if (tokenized)
+            {
+                info.Path = TokenizePath(info.Path, info.Usage);
+            }
             return info;
         }
 

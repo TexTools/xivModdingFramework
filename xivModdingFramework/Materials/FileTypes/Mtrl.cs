@@ -205,7 +205,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="mtrlFile">The Mtrl file</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(IItemModel item, string mtrlFile, int dxVersion = 11)
+        public async Task<XivMtrl> GetMtrlData(IItemModel item, string mtrlFile, int dxVersion = 11, IndexFile cachedIndexFile = null)
         {
 
             var imc = new Imc(_gameDirectory);
@@ -225,7 +225,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            return await GetMtrlData(mtrlFile, materialSet, dxVersion);
+            return await GetMtrlData(mtrlFile, materialSet, dxVersion, cachedIndexFile);
         }
 
         /// <summary>
@@ -235,7 +235,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="materialSet"></param>
         /// <param name="dxVersion"></param>
         /// <returns></returns>
-        public async Task<XivMtrl> GetMtrlData(string mtrlFile, int materialSet = -1, int dxVersion = 11) { 
+        public async Task<XivMtrl> GetMtrlData(string mtrlFile, int materialSet = -1, int dxVersion = 11, IndexFile cachedIndexFile = null) { 
             string mtrlPath = "";
             long mtrlOffset = 0;
             var index = new Index(_gameDirectory);
@@ -268,7 +268,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            mtrlOffset = await index.GetDataOffset(mtrlPath);
+            mtrlOffset = await index.GetDataOffset(mtrlPath, cachedIndexFile);
 
             if(mtrlOffset == 0)
             {
@@ -938,6 +938,35 @@ namespace xivModdingFramework.Materials.FileTypes
         private static readonly Regex _raceMatch = new Regex("(c[0-9]{4})");
         private static readonly Regex _bodyRegex = new Regex("(b[0-9]{4})");
         private static readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+
+
+        /// <summary>
+        /// Applies a given texture overlay onto the given texture type of the given material.
+        /// the texture overlay stream must be a PNG or DDS file stream.
+        /// 
+        /// Returns the internal file path that was modified.
+        /// </summary>
+        /// <param name="mtrlPath">The path to the material to modify</param>
+        /// <param name="textureType">The texture type within the material to replace.</param>
+        /// <param name="index">Cached Index File</param>
+        /// <param name="modList">Cached Modlist File</param>
+        public async Task<string> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
+        {
+            var mtrl = await GetMtrlData(mtrlPath, -1, 11, index);
+            var map = mtrl.GetMapInfo(textureType, false);
+
+            if (map == null) return null;
+
+            var texPath = map.Path;
+
+            var _Tex = new Tex(_gameDirectory);
+
+            var tex = await _Tex.GetTexData(map);
+
+            await _Tex.ApplyOverlay(tex, overlayStream, source, index, modList);
+
+            return texPath;
+        }
 
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.
