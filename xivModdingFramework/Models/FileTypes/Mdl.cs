@@ -4483,7 +4483,7 @@ namespace xivModdingFramework.Models.FileTypes
             var ttMdl = TTModel.FromRaw(ogMdl);
 
             bool anyChanges = false;
-            anyChanges = SkinCheckBibo(ttMdl);
+            anyChanges = SkinCheckBibo(ttMdl, _index);
 
             if(!anyChanges)
             {
@@ -4645,11 +4645,13 @@ namespace xivModdingFramework.Models.FileTypes
             return anyChanges;
         }
 
-        private bool SkinCheckBibo(TTModel ttMdl)
+        private bool SkinCheckBibo(TTModel ttMdl, IndexFile _index)
         {
             // Standard forward check.  Primarily this is looking for standard Mat B bibo materials,
             // To pull them onto mat D.
 
+            const string bibo_path = "chara/human/c0201/obj/body/b0001/material/v0001/mt_c0201b0001_bibo.mtrl";
+            bool biboPathExists = _index.FileExists(bibo_path);
             var layout = GetUVHashSet("bibo");
             if (layout == null || layout.Count == 0) return false;
 
@@ -4664,7 +4666,12 @@ namespace xivModdingFramework.Models.FileTypes
                     if (!res.Success) continue;
 
                     var matId = res.Groups[1].Value;
-                    if (matId != "b") continue;
+
+                    // We only care if this is a B material model or D material model with a _bibo path to move it to.
+                    if(!(matId == "b" || (matId == "d" && biboPathExists)))
+                    {
+                        continue;
+                    }
 
                     // We have a Material B skin reference in a Hyur F model.
 
@@ -4727,11 +4734,41 @@ namespace xivModdingFramework.Models.FileTypes
                     // This Mesh group needs to be swapped.
                     if (ratio >= requiredRatio)
                     {
-                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_d.mtrl");
+                        // If the new _bibo material actually exists, move it.
+                        if(biboPathExists)
+                        {
+                            mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_bibo.mtrl");
+                        } else
+                        {
+                            mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_d.mtrl");
+                        }
+
+
                         anyChanges = true;
                     }
                 }
             }
+
+            // IF we moved files onto _bibo, we should move any pubes as well onto their pubic hair path.
+            if (anyChanges && biboPathExists)
+            {
+                foreach (var mg in ttMdl.MeshGroups)
+                {
+                    var rex = ModelModifiers.SkinMaterialRegex;
+                    if (rex.IsMatch(mg.Material))
+                    {
+                        var extractRex = new Regex("_([a-z]+)\\.mtrl$");
+                        var res = extractRex.Match(mg.Material);
+                        if (!res.Success) continue;
+
+                        var matId = res.Groups[1].Value;
+                        if (matId != "c") continue;
+
+                        mg.Material = mg.Material.Replace("_" + matId + ".mtrl", "_bibopube.mtrl");
+                    }
+                }
+            }
+
             return anyChanges;
         }
 
