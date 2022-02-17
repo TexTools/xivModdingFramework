@@ -1719,8 +1719,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
         /// <param name="sourceApplication"></param>
+        /// <param name="retainModpack"></param>
         /// <returns></returns>
-        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, IndexFile index = null, ModList modList = null)
+        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, IndexFile index = null, ModList modList = null, ModPack modpackBinding = null)
         {
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
@@ -1860,7 +1861,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     mod.data.modSize = size;
                     mod.data.dataType = fileType;
                     mod.enabled = true;
-                    mod.modPack = null;
+                    mod.modPack = modpackBinding;
                     modList.Mods.Add(mod);
                 }
                 else
@@ -1873,7 +1874,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     mod.data.modOffset = retOffset;
                     mod.enabled = true;
-                    mod.modPack = null;
+                    mod.modPack = modpackBinding;
                     mod.data.modSize = size;
                     mod.data.dataType = fileType;
                     mod.name = itemName;
