@@ -4505,7 +4505,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var modEntry = _modlist.Mods.First(x => x.fullPath == mdlPath);
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 
-                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, _index, _modlist);
+                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, _index, _modlist, modEntry.modPack);
 
             }
 
