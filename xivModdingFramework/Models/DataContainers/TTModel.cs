@@ -1190,7 +1190,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public void SaveToFile(string filePath, Action<bool, string> loggingFunction = null)
+        public void SaveToFile(string filePath, string texturePath = null, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -1198,6 +1198,12 @@ namespace xivModdingFramework.Models.DataContainers
             }
             File.Delete(filePath);
             var directory = Path.GetDirectoryName(filePath);
+            var textureDirectory = directory;
+
+            if (texturePath != null)
+            {
+                textureDirectory = Path.GetDirectoryName(texturePath);
+            }
 
             ModelModifiers.MakeExportReady(this, loggingFunction);
 
@@ -1313,7 +1319,7 @@ namespace xivModdingFramework.Models.DataContainers
                             query = @"insert into materials (material_id, name, diffuse, normal, specular, opacity, emissive) values ($material_id, $name, $diffuse, $normal, $specular, $opacity, $emissive);";
                             using (var cmd = new SQLiteCommand(query, db))
                             {
-                                var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
+                                var mtrl_prefix = textureDirectory + "\\" + Path.GetFileNameWithoutExtension(material.Substring(1)) + "_";
                                 var mtrl_suffix = ".png";
                                 var name = material;
                                 try
