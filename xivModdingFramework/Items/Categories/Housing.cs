@@ -71,11 +71,22 @@ namespace xivModdingFramework.Items.Categories
             return furnitureList;
         }
 
-        private static Dictionary<string, int> DataLengthByPatch = new Dictionary<string, int>()
+        private static Dictionary<string, int> ItemDataLengthByPatch = new Dictionary<string, int>()
         {
             { "5.3", 160 },
             { "5.4", 168 },
             { "5.5", 160 },
+        };
+
+        private static Dictionary<string, int> OutdoorModelNumberOffsetByPatch = new Dictionary<string, int>()
+        {
+            { "5.5", 12 },
+            { "6.1", 13 },
+        };
+        private static Dictionary<string, int> OutdoorItemCategoryOffestByPatch = new Dictionary<string, int>()
+        {
+            { "5.5", 13 },
+            { "6.1", 14 },
         };
 
 
@@ -99,16 +110,16 @@ namespace xivModdingFramework.Items.Categories
             const int itemCategoryOffset = 14;
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = DataLengthByPatch["5.5"];
+            int itemDataLength = ItemDataLengthByPatch["5.5"];
             const int itemIconDataOffset = 136;
 
             if(_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                itemDataLength = ItemDataLengthByPatch["5.5"];
             } 
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                itemDataLength = ItemDataLengthByPatch["5.5"];
             }
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -192,7 +203,7 @@ namespace xivModdingFramework.Items.Categories
 
             const int itemNameDataOffset = 14;
             const int housingIndexOffset = 112;
-            int itemDataLength = DataLengthByPatch["5.5"];
+            int itemDataLength = ItemDataLengthByPatch["5.5"];
             const int itemIconDataOffset = 136;
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
@@ -202,11 +213,11 @@ namespace xivModdingFramework.Items.Categories
 
             if (_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                itemDataLength = ItemDataLengthByPatch["5.5"];
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                itemDataLength = ItemDataLengthByPatch["5.5"];
             }
 
 
@@ -270,22 +281,27 @@ namespace xivModdingFramework.Items.Categories
             var outdoorLock = new object();
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int itemIndexOffset = 10;
-            const int modelNumberOffset = 12;
-            const int itemCategoryOffset = 13;
+
+            int itemIndexOffset = 10;
+            int modelNumberOffset = OutdoorModelNumberOffsetByPatch["6.1"];
+            int itemCategoryOffset = OutdoorItemCategoryOffestByPatch["6.1"];
 
             const int itemNameDataOffset = 14;
-            int itemDataLength = DataLengthByPatch["5.5"];
+            int itemDataLength = ItemDataLengthByPatch["5.5"];
             const int itemIconDataOffset = 136;
 
 
             if (_xivLanguage == XivLanguage.Korean)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                itemDataLength = ItemDataLengthByPatch["5.5"];
+                modelNumberOffset = OutdoorModelNumberOffsetByPatch["5.5"];
+                itemCategoryOffset = OutdoorItemCategoryOffestByPatch["5.5"];
             }
             else if (_xivLanguage == XivLanguage.Chinese)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                itemDataLength = ItemDataLengthByPatch["5.5"];
+                modelNumberOffset = OutdoorModelNumberOffsetByPatch["5.5"];
+                itemCategoryOffset = OutdoorItemCategoryOffestByPatch["5.5"];
             }
 
 
