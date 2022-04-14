@@ -254,11 +254,16 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
 
+
+
             var dir = Path.GetDirectoryName(outputFilePath);
             if (!Directory.Exists(dir))
             {
                 System.IO.Directory.CreateDirectory(dir);
             }
+
+            // Remove the existing file if it exists, so that the user doesn't get confused thinking an old file is the new one.
+            File.Delete(outputFilePath);
 
             outputFilePath = outputFilePath.Replace("/", "\\");
 
@@ -295,13 +300,14 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
+
             // Save the DB file.
 
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
-            model.SaveToFile(dbPath);
+            model.SaveToFile(dbPath, outputFilePath);
 
 
             if (fileFormat == "db")
@@ -319,6 +325,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // We don't really care that much about showing the user a log
                 // during exports, so we can just do this the simple way.
+
+                var outputFile = converterFolder + "\\result." + fileFormat;
+
+                // Get rid of any existing intermediate output file, in case it causes problems for any converters.
+                File.Delete(outputFile);
+
                 var proc = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -341,8 +353,6 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     throw new Exception("Exporter threw error code: " + proc.ExitCode);
                 }
-
-                var outputFile = converterFolder + "\\result." + fileFormat;
 
                 // Just move the result file if we need to.
                 if (!Path.Equals(outputFilePath, outputFile))
