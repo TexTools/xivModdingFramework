@@ -57,6 +57,20 @@ namespace xivModdingFramework.Items.Categories
             return await XivCache.GetCachedMinionsList(substring);
         }
 
+        private static Dictionary<string, int> MountDataLengthByPatch = new Dictionary<string, int>()
+        {
+            { "6.0", 76 },
+            { "6.1", 79 },
+        };
+
+        private static Dictionary<string, int> OrnamentDataLengthByPatch = new Dictionary<string, int>()
+        {
+            { "6.0", 28 },
+            { "6.1", 31 },
+        };
+
+
+
         /// <summary>
         /// Gets the list to be displayed in the Minion category
         /// </summary>
@@ -143,9 +157,19 @@ namespace xivModdingFramework.Items.Categories
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int dataLength = 76;
+            int dataLength = MountDataLengthByPatch["6.1"];
             const int nameDataOffset = 6;
             const int modelCharaIndexOffset = 30;
+
+            if (_xivLanguage == XivLanguage.Korean)
+            {
+                dataLength = MountDataLengthByPatch["6.0"];
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                dataLength = MountDataLengthByPatch["6.0"];
+            }
+
 
             var mountEx = await _ex.ReadExData(XivEx.mount);
             var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
@@ -210,9 +234,18 @@ namespace xivModdingFramework.Items.Categories
 
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int dataLength = 28;
+            int dataLength = OrnamentDataLengthByPatch["6.1"];
             const int nameDataOffset = 6;
             const int modelCharaIndexOffset = 16;
+
+            if (_xivLanguage == XivLanguage.Korean)
+            {
+                dataLength = OrnamentDataLengthByPatch["6.0"];
+            }
+            else if (_xivLanguage == XivLanguage.Chinese)
+            {
+                dataLength = OrnamentDataLengthByPatch["6.0"];
+            }
 
             var ornamentEx = await _ex.ReadExData(XivEx.ornament);
             var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
