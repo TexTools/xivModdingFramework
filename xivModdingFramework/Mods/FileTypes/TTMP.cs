@@ -461,15 +461,12 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
+        public static Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
         {
             return Task.Run(() =>
             {
                 ModPackJson modPackJson = null;
                 var imageDictionary = new Dictionary<string, Image>();
-
-
-
 
                 using (var zf = ZipFile.Read(modPackDirectory.FullName))
                 {
@@ -490,6 +487,36 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 return (modPackJson, imageDictionary);
+            });
+        }
+
+        public static Task<byte[]> GetModPackData(DirectoryInfo modPackDirectory)
+        {
+            return Task.Run(() =>
+            {
+                using (var zf = ZipFile.Read(modPackDirectory.FullName))
+                {
+                    var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
+
+                    using (var ms = new MemoryStream())
+                    {
+                        mpd.Extract(ms);
+                        return ms.ToArray();
+                    }
+                }
+                //using (var stream = new ZipInputStream(modPackDirectory.FullName))
+                //{
+                //    while (stream.GetNextEntry() is var entry)
+                //    {
+                //        if (entry.FileName.EndsWith(".mpd"))
+                //        {
+                //            stream.Read(buffer, 0, modJson.ModSize);
+                //            stream.Read(buffer, 0, modJson.ModSize);
+                //            stream.Read(buffer, 0, modJson.ModSize);
+                //            break;
+                //        }
+                //    }
+                //};
             });
         }
 
