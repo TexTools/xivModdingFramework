@@ -546,7 +546,7 @@ namespace xivModdingFramework.Items.Categories
 
 
 
-        // A dictionary containg <Slot ID, Gear Category>
+        // A dictionary containing <Slot ID, Gear Category>
         private readonly Dictionary<int, string> _slotNameDictionary = new Dictionary<int, string>
         {
             {0, XivStrings.Food },
@@ -570,7 +570,8 @@ namespace xivModdingFramework.Items.Categories
             {18, XivStrings.Legs_Feet },
             {19, XivStrings.All },
             {20, XivStrings.Body_Hands_Legs },
-            {21, XivStrings.Body_Legs_Feet }
+            {21, XivStrings.Body_Legs_Feet },
+            {22, XivStrings.Body_Hands }
         };
 
         /// <summary>
