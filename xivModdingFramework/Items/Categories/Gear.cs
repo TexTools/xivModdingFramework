@@ -565,13 +565,13 @@ namespace xivModdingFramework.Items.Categories
             {13, XivStrings.Two_Handed },
             {14, XivStrings.Main_Off },
             {15, XivStrings.Head_Body },
-            {16, XivStrings.Body_Hands },
-            {17, XivStrings.Body_Hands_Legs },
-            {18, XivStrings.Body_Legs_Feet },
-            {19, XivStrings.Body_Hands_Legs_Feet },
-            {20, XivStrings.Legs_Feet },
-            {21, XivStrings.Soul_Crystal },
-            {22, XivStrings.All }
+            {16, XivStrings.Body_Hands_Legs_Feet },
+            {17, XivStrings.Soul_Crystal },
+            {18, XivStrings.Legs_Feet },
+            {19, XivStrings.All },
+            {20, XivStrings.Body_Hands_Legs },
+            {21, XivStrings.Body_Legs_Feet },
+            {22, XivStrings.Body_Hands }
         };
 
         /// <summary>
