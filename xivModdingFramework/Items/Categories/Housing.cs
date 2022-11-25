@@ -81,7 +81,6 @@ namespace xivModdingFramework.Items.Categories
         private static Dictionary<string, int> OutdoorModelNumberOffsetByPatch = new Dictionary<string, int>()
         {
             { "5.5", 12 },
-            { "6.1", 13 },
         };
         private static Dictionary<string, int> OutdoorItemCategoryOffestByPatch = new Dictionary<string, int>()
         {
@@ -283,7 +282,7 @@ namespace xivModdingFramework.Items.Categories
             // These will need to be changed if data gets added or removed with a patch
 
             int itemIndexOffset = 10;
-            int modelNumberOffset = OutdoorModelNumberOffsetByPatch["6.1"];
+            int modelNumberOffset = OutdoorModelNumberOffsetByPatch["5.5"];
             int itemCategoryOffset = OutdoorItemCategoryOffestByPatch["6.1"];
 
             const int itemNameDataOffset = 14;
@@ -326,7 +325,7 @@ namespace xivModdingFramework.Items.Categories
                     var itemIndex = br.ReadUInt16();
 
                     br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
-                    item.ModelInfo.PrimaryID = br.ReadByte();
+                    item.ModelInfo.PrimaryID = br.ReadInt16();
 
                     br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
                     var housingCategory = br.ReadByte();
