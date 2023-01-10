@@ -1,4 +1,4 @@
-﻿// xivModdingFramework
+// xivModdingFramework
 // Copyright © 2018 Rafael Gonzalez - All Rights Reserved
 // 
 // This program is free software: you can redistribute it and/or modify
@@ -105,7 +105,7 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int regionMapDataOffset = 12;
-            const int dataLength = 32;
+            const int dataLength = 36;
 
             var mapList = new List<XivUi>();
 
