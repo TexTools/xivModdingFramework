@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Autoupdater.NET.Official" Version="1.7.0" />
     <PackageReference Include="DotNetZip" Version="1.16.0" />
     <PackageReference Include="HelixToolkit" Version="2.17.0" />
     <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.17.0" />
