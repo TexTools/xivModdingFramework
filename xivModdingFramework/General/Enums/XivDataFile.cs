@@ -75,7 +75,7 @@ namespace xivModdingFramework.General.Enums
         /// <summary>
         /// Contains Game Scripts in LUA format
         /// </summary>
-        [XivDataFileDescription("0b0000", "game_script")] _0B_GameScript,
+        ///[XivDataFileDescription("0b0000", "game_script")] _0B_GameScript, ///Currently Disabled due to a CVE 
         /// <summary>
         /// Contains Music data
         /// </summary>
