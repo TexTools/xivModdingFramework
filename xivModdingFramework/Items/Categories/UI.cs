@@ -533,7 +533,9 @@ namespace xivModdingFramework.Items.Categories
                     // Filter out any actions using placeholder icons
                     if (iconNumber == 0 || iconNumber == 405) return;
 
-                    var nameLength = action.Length - 6;
+                    br.BaseStream.Seek(10, SeekOrigin.Begin);
+
+                    var nameLength = action.Length - 10;
 
                     var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
 
