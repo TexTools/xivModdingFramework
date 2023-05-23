@@ -747,7 +747,7 @@ namespace xivModdingFramework.Items.Categories
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
             const int iconNumberOffset = 6;
-            const int dataSize = 12;
+            const int dataSize = 14;
 
             var onlineStatusExData = await _ex.ReadExData(XivEx.onlinestatus);
 
