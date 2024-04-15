@@ -774,11 +774,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var decompressedSize = br.ReadInt32();
                         var buffer1 = br.ReadInt32();
                         var buffer2 = br.ReadInt32();
-                        var parts = br.ReadInt16();
+                        var version = br.ReadInt32();
 
                         var endOfHeader = offset + headerLength;
 
-                        byteList.AddRange(new byte[68]);
+                        byteList.AddRange(BitConverter.GetBytes(version));
+                        byteList.AddRange(new byte[64]);
+
 
                         br.BaseStream.Seek(offset + 24, SeekOrigin.Begin);
 
