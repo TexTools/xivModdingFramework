@@ -2223,7 +2223,9 @@ namespace xivModdingFramework.Models.DataContainers
             var badBoneId = 900;
             foreach (var s in bones)
             {
-                var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);
+                // XXX: This is messing up the new tongue bones in Dawntrail: j_f_bero_01, j_f_bero_02, j_f_bero_03
+                //var fixedBone = Regex.Replace(s, "[0-9]+$", string.Empty);
+                var fixedBone = s;
 
                 if (fullSkel.ContainsKey(fixedBone))
                 {
