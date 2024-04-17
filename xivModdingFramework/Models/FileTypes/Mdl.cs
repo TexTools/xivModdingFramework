@@ -550,6 +550,9 @@ namespace xivModdingFramework.Models.FileTypes
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
             {
+                uint mdlSignature = br.ReadUInt32();
+                int mdlVersion = (mdlSignature >= 0x1000006) ? 6 : 5;
+
                 // We skip the Vertex Data Structures for now
                 // This is done so that we can get the correct number of meshes per LoD first
                 br.BaseStream.Seek(64 + 136 * mdlData.MeshCount + 4, SeekOrigin.Begin);
@@ -996,21 +999,55 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Bone Lists
                 xivMdl.MeshBoneSets = new List<BoneSet>();
-                for (var i = 0; i < xivMdl.ModelData.BoneListCount; i++)
+                if (mdlVersion >= 6) // Mdl Version 6
                 {
-                    var boneIndexMesh = new BoneSet
-                    {
-                        BoneIndices = new List<short>(64)
-                    };
+                    var boneIndexMetaTable = new List<short[]>();
 
-                    for (var j = 0; j < 64; j++)
+                    for (var i = 0; i < xivMdl.ModelData.BoneListCount; ++i)
                     {
-                        boneIndexMesh.BoneIndices.Add(br.ReadInt16());
+                        boneIndexMetaTable.Add(new short[2] { br.ReadInt16(), br.ReadInt16() });
                     }
 
-                    boneIndexMesh.BoneIndexCount = br.ReadInt32();
+                    for (var i = 0; i < xivMdl.ModelData.BoneListCount; ++i)
+                    {
+                        var boneCount = boneIndexMetaTable[i][1];
+                        var boneIndexMesh = new BoneSet
+                        {
+                            BoneIndices = new List<short>(boneCount)
+                        };
 
-                    xivMdl.MeshBoneSets.Add(boneIndexMesh);
+                        for (var j = 0; j < boneCount; j++)
+                        {
+                            boneIndexMesh.BoneIndices.Add(br.ReadInt16());
+                        }
+
+                        // Eat another value for alignment to 4 bytes
+                        if (boneCount % 2 == 1)
+                            br.ReadInt16();
+
+                        boneIndexMesh.BoneIndexCount = boneCount;
+
+                        xivMdl.MeshBoneSets.Add(boneIndexMesh);
+                    }
+                }
+                else // Mdl Version 5
+                {
+                    for (var i = 0; i < xivMdl.ModelData.BoneListCount; i++)
+                    {
+                        var boneIndexMesh = new BoneSet
+                        {
+                            BoneIndices = new List<short>(64)
+                        };
+
+                        for (var j = 0; j < 64; j++)
+                        {
+                            boneIndexMesh.BoneIndices.Add(br.ReadInt16());
+                        }
+
+                        boneIndexMesh.BoneIndexCount = br.ReadInt32();
+
+                        xivMdl.MeshBoneSets.Add(boneIndexMesh);
+                    }
                 }
 
                 var shapeDataLists = new ShapeData
@@ -5288,9 +5325,11 @@ namespace xivModdingFramework.Models.FileTypes
                 {0x8, VertexDataType.Ubyte4n},
                 {0x9, VertexDataType.Short2n},
                 {0xA, VertexDataType.Short4n},
-                {0xD, VertexDataType.Half2},
-                {0xE, VertexDataType.Half4},
-                {0xF, VertexDataType.Compress}
+                {0xD, VertexDataType.Half2}, // XXX: These were originally added here with the wrong values
+                {0xE, VertexDataType.Half4}, //      Keeping them here in case someone was relying on it
+                {0xF, VertexDataType.Half2},
+                {0x10, VertexDataType.Half4},
+                {0x11, VertexDataType.Unknown17} // XXX: Bone weights use this type, not sure what it is
             };
 
         private static readonly Dictionary<byte, VertexUsageType> VertexUsageDictionary =

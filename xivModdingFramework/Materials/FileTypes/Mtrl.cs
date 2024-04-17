@@ -537,15 +537,16 @@ namespace xivModdingFramework.Materials.FileTypes
                         if (colorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
-                            var colorDataSize = 512;
+                            // DT: Color Data is always 2048 instead
+                            var colorDataSize = (colorSetDataSize >= 2048) ? 2048 : 512;
 
                             for (var i = 0; i < colorDataSize / 2; i++)
                             {
                                 xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
                             }
 
-                            // If the color set is 544 in length, it has an extra 32 bytes at the end
-                            if (colorSetDataSize == 544)
+                            // If the color set is 544 (DT: 2080) in length, it has an extra 32 bytes at the end
+                            if (colorSetDataSize == colorDataSize + 32)
                             {
                                 xivMtrl.ColorSetDyeData = br.ReadBytes(32);
                             }
