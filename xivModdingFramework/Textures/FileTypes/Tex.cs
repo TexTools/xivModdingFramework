@@ -449,6 +449,12 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.DXT5:
                         imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
+                    case XivTexFormat.BC5:
+                        imageData = DxtUtil.DecompressBc5(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
+                        break;
+                    case XivTexFormat.BC7:
+                        imageData = DxtUtil.DecompressBc7(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
+                        break;
                     case XivTexFormat.A4R4G4B4:
                         imageData = await Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
                         break;
@@ -863,6 +869,12 @@ namespace xivModdingFramework.Textures.FileTypes
                         break;
                     case XivTexFormat.DXT5:
                         imageData = DxtUtil.DecompressDxt5(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.BC5:
+                        imageData = DxtUtil.DecompressBc5(rawData, width, height * layers);
+                        break;
+                    case XivTexFormat.BC7:
+                        imageData = DxtUtil.DecompressBc7(rawData, width, height * layers);
                         break;
                     case XivTexFormat.A4R4G4B4:
                         imageData = await Read4444Image(rawData, width, height * layers);

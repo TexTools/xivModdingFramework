@@ -392,6 +392,15 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+        internal static byte[] DecompressBc5(byte[] imageData, int width, int height)
+        {
+            return new byte[width * height * 4];
+        }
+        internal static byte[] DecompressBc7(byte[] imageData, int width, int height)
+        {
+            return new byte[width * height * 4];
+        }
+
         private static void ConvertRgb565ToRgb888(ushort color, out byte r, out byte g, out byte b)
         {
             int temp;
