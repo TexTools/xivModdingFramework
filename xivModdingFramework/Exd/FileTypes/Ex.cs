@@ -181,6 +181,10 @@ namespace xivModdingFramework.Exd.FileTypes
                 var exdFileHash = HashGenerator.GetHash(exdFile);
                 var offset = await _index.GetDataOffset(exdFolderHash, exdFileHash, XivDataFile._0A_Exd);
 
+                // Benchmark omits parts of some exd files by giving them an offset and size of zero
+                if (offset == 0)
+                    continue;
+
                 try
                 {
                     exdNameOffsetDictionary.Add(offset, exdFile);

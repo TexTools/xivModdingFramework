@@ -330,6 +330,10 @@ namespace xivModdingFramework.Items.Categories
                     br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
                     var housingCategory = br.ReadByte();
 
+                    // Benchmark
+                    if (!itemDictionary.ContainsKey(itemIndex))
+                        return;
+
                     using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
                     {
                         br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
