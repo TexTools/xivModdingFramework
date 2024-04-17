@@ -2008,7 +2008,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             {13344, XivTexFormat.DXT1 },
             {13360, XivTexFormat.DXT3 },
             {13361, XivTexFormat.DXT5 },
-            {16704, XivTexFormat.D16 }
+            {16704, XivTexFormat.D16 },
+            {25136, XivTexFormat.BC5 },
+            {25650, XivTexFormat.BC7 }
         };
 
         /// <summary>

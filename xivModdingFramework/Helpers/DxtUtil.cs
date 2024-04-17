@@ -5,6 +5,7 @@
  * See LICENSE for details.
  */
 using System.IO;
+using JeremyAnsel.BcnSharp;
 
 namespace xivModdingFramework.Helpers
 {
@@ -392,13 +393,32 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+        // XXX: It seems like BcnSharp produces the wrong pixel format -- swap Red/Blue channels on its output
+        internal static void SwapRedBlue(byte[] imageData)
+        {
+            for (int i = 0; i < imageData.Length; i += 4)
+            {
+                byte x = imageData[i];
+                byte y = imageData[i + 2];
+                imageData[i] = y;
+                imageData[i + 2] = x;
+            }
+        }
+
         internal static byte[] DecompressBc5(byte[] imageData, int width, int height)
         {
-            return new byte[width * height * 4];
+            var result = new byte[width * height * 4];
+            Bc5Sharp.Decode(imageData, result, width, height);
+            SwapRedBlue(result);
+            return result;
         }
+
         internal static byte[] DecompressBc7(byte[] imageData, int width, int height)
         {
-            return new byte[width * height * 4];
+            var result = new byte[width * height * 4];
+            Bc7Sharp.Decode(imageData, result, width, height);
+            SwapRedBlue(result);
+            return result;
         }
 
         private static void ConvertRgb565ToRgb888(ushort color, out byte r, out byte g, out byte b)
