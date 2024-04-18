@@ -31,8 +31,10 @@ namespace xivModdingFramework.Models.Enums
         Ubyte4n  = 0x8,
         Short2n  = 0x9,
         Short4n  = 0xA,
-        Half2    = 0xD,
-        Half4    = 0xE,
-        Compress = 0xF
+        Ushort2n = 0xB,
+        Ushort4n = 0xC,
+        Half2    = 0xF,
+        Half4    = 0x10,
+        Unknown17 = 0x11
     }
 }

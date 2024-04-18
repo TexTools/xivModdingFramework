@@ -227,6 +227,13 @@ namespace xivModdingFramework.General.Enums
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
             });
+            dict.Add(XivRace.Hrothgar_Female, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Elezen_Female],
+                Race = XivRace.Hrothgar_Female,
+                Children = new List<XivRaceNode>(),
+                HasSkin = true
+            });
 
 
             // Muscular Race Females
@@ -367,6 +374,12 @@ namespace xivModdingFramework.General.Enums
             {
                 Parent = dict[XivRace.Hrothgar_Male],
                 Race = XivRace.Hrothgar_Male_NPC,
+                Children = new List<XivRaceNode>()
+            });
+            dict.Add(XivRace.Hrothgar_Female_NPC, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Hrothgar_Female],
+                Race = XivRace.Hrothgar_Female_NPC,
                 Children = new List<XivRaceNode>()
             });
 
@@ -624,6 +637,8 @@ namespace xivModdingFramework.General.Enums
                     return XivBaseRace.Viera;
                 case XivRace.Hrothgar_Male:
                 case XivRace.Hrothgar_Male_NPC:
+                case XivRace.Hrothgar_Female:
+                case XivRace.Hrothgar_Female_NPC:
                     return XivBaseRace.Hrothgar;
                 default:
                     return XivBaseRace.Hyur;
@@ -670,6 +685,7 @@ namespace xivModdingFramework.General.Enums
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
             XivRace.Hrothgar_Male,
+            XivRace.Hrothgar_Female,
             XivRace.Viera_Female,
             XivRace.Viera_Male,
         };
@@ -722,6 +738,8 @@ namespace xivModdingFramework.General.Enums
                 case XivRace.Elezen_Female_NPC:
                 case XivRace.Roegadyn_Female:
                 case XivRace.Roegadyn_Female_NPC:
+                case XivRace.Hrothgar_Female:
+                case XivRace.Hrothgar_Female_NPC:
                     return new List<XivRace>()
                     {
                         // Standard Female Races First
@@ -739,6 +757,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Female_NPC,
                         XivRace.Roegadyn_Female,
                         XivRace.Roegadyn_Female_NPC,
+                        XivRace.Hrothgar_Female,
+                        XivRace.Hrothgar_Female_NPC,
 
                         // Male Base Races Next
                         XivRace.Hyur_Midlander_Male,
@@ -813,6 +833,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Female_NPC,
                         XivRace.Roegadyn_Female,
                         XivRace.Roegadyn_Female_NPC,
+                        XivRace.Hrothgar_Female,
+                        XivRace.Hrothgar_Female_NPC,
 
                         // Roe M? These are pretty fucked at this point.
                         XivRace.Roegadyn_Male,
@@ -863,6 +885,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Female_NPC,
                         XivRace.Roegadyn_Female,
                         XivRace.Roegadyn_Female_NPC,
+                        XivRace.Hrothgar_Female,
+                        XivRace.Hrothgar_Female_NPC,
 
                         // Roe M? These are pretty fucked at this point.
                         XivRace.Roegadyn_Male,
@@ -969,6 +993,8 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Female_NPC,
                         XivRace.Roegadyn_Female,
                         XivRace.Roegadyn_Female_NPC,
+                        XivRace.Hrothgar_Female,
+                        XivRace.Hrothgar_Female_NPC,
 
                         // Highlander Next
                         XivRace.Hyur_Highlander_Male,

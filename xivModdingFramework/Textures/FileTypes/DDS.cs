@@ -140,6 +140,9 @@ namespace xivModdingFramework.Textures.FileTypes
             var dwWidth = (uint)width;
             header.AddRange(BitConverter.GetBytes(dwWidth));
 
+            // DX10 format magic number
+            const uint fourccDX10 = 0x30315844;
+
             // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
             if (format == XivTexFormat.A16B16G16R16F)
             {
@@ -212,6 +215,10 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexFormat.DXT3:
                     dwFourCC = 0x33545844;
                     break;
+                case XivTexFormat.BC5:
+                case XivTexFormat.BC7:
+                    dwFourCC = fourccDX10;
+                    break;
                 case XivTexFormat.A16B16G16R16F:
                     dwFourCC = 0x71;
                     break;
@@ -227,8 +234,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if(layers > 1)
             {
-                var bytes = System.Text.Encoding.UTF8.GetBytes("DX10");
-                dwFourCC = BitConverter.ToUInt32(bytes, 0);
+                dwFourCC = fourccDX10;
             }
 
             header.AddRange(BitConverter.GetBytes(dwFourCC));
@@ -383,7 +389,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             // Need to write DX10 header here.
-            if(layers > 1)
+            if(dwFourCC == fourccDX10)
             {
                 // DXGI_FORMAT dxgiFormat
                 uint dxgiFormat = 0;
@@ -392,6 +398,12 @@ namespace xivModdingFramework.Textures.FileTypes
                 } else if (format == XivTexFormat.DXT5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
+                } else if (format == XivTexFormat.BC5)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM;
+                } else if (format == XivTexFormat.BC7)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM;
                 } else {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
                 }

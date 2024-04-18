@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core.Utilities;
 using SharpDX;
 using System;
 using System.Collections.Generic;
@@ -385,6 +386,10 @@ namespace xivModdingFramework.Materials.FileTypes
             return ret;
         }
 
+        private static List<Half> ColorsetData;
+        private static byte[] DyeData;
+
+
         /// <summary>
         /// Gets the MTRL data for the given offset and path
         /// </summary>
@@ -532,20 +537,22 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         xivMtrl.Unknown2 = br.ReadBytes(xivMtrl.UnknownDataSize);
 
+
                         xivMtrl.ColorSetData = new List<Half>();
                         xivMtrl.ColorSetDyeData = null;
                         if (colorSetDataSize > 0)
                         {
                             // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
-                            var colorDataSize = 512;
+                            // DT: Color Data is always 2048 instead
+                            var colorDataSize = (colorSetDataSize >= 2048) ? 2048 : 512;
 
                             for (var i = 0; i < colorDataSize / 2; i++)
                             {
                                 xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
                             }
 
-                            // If the color set is 544 in length, it has an extra 32 bytes at the end
-                            if (colorSetDataSize == 544)
+                            // If the color set is 544 (DT: 2080) in length, it has an extra 32 bytes at the end
+                            if (colorSetDataSize == colorDataSize + 32)
                             {
                                 xivMtrl.ColorSetDyeData = br.ReadBytes(32);
                             }
@@ -568,7 +575,9 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             xivMtrl.TextureUsageList.Add(new TextureUsageStruct
                             {
-                                TextureType = br.ReadUInt32(), Unknown = br.ReadUInt32()});
+                                TextureType = br.ReadUInt32(),
+                                Unknown = br.ReadUInt32()
+                            });
                         }
 
                         xivMtrl.ShaderParameterList = new List<ShaderParameterStruct>(originalShaderParameterCount);
@@ -629,6 +638,7 @@ namespace xivModdingFramework.Materials.FileTypes
             {
             }
 
+            UpdateMtrl(xivMtrl);
             return xivMtrl;
         }
 
@@ -744,6 +754,128 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
+        public void UpdateMtrl(XivMtrl mtrl)
+        {
+            if(mtrl.ColorSetData.Count != 256)
+            {
+                return;
+            }
+            if(mtrl.Shader != "character.shpk")
+            {
+                return;
+            }
+
+            // Wipe Dye data b/c we don't know how to handle it atm.
+            mtrl.ColorSetDyeData = null;
+
+            List<Half> newData = new List<Half>();
+
+            // Going by rows.
+            for (int i = 0; i < mtrl.ColorSetData.Count; i+= 16)
+            {
+                var pixel = i + 0;
+
+                // Diffuse Pixel
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(mtrl.ColorSetData[pixel + 3]);
+
+                pixel += 4;
+
+                // Specular Pixel
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(mtrl.ColorSetData[pixel + 3]);
+
+                pixel += 4;
+                // Emissive Pixel
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(1.0f);
+
+                //Unknown1
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(2.0f);
+                newData.Add(0);
+
+                //Unknown2
+                newData.Add(0.5f);
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(0);
+
+                //Unknown3
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(0);
+
+                //Unknown + subsurface material id
+                newData.Add(0);
+                newData.Add(mtrl.ColorSetData[pixel + 3]);
+                newData.Add(1.0f);
+                newData.Add(0);
+
+                pixel += 4;
+                //Subsurface scaling data.
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(mtrl.ColorSetData[pixel + 3]);
+
+                // Add a blank row after, since only populating every other row.
+                newData.AddRange(GetDefaultColorsetRow());
+            }
+            mtrl.ColorSetData = newData;
+
+            mtrl.TextureUsageList.Add(new TextureUsageStruct()
+            {
+                TextureType = 4113354501,
+                Unknown = 2815623008,
+            });
+            mtrl.TexturePathUnknownList.Add(0);
+
+            var normalTex = mtrl.TexturePathList.First(x => x.EndsWith("_n.tex"));
+            var idTex = normalTex.Replace("_n.tex", "_id.tex");
+            mtrl.TexturePathList.Add(idTex);
+            mtrl.TextureDescriptorList.Add(new TextureDescriptorStruct()
+            {
+                FileFormat = -32768,
+                TextureIndex = 2,
+                TextureType = 1449103320,
+                Unknown = 15,
+            });
+
+        }
+        private Half[] GetDefaultColorsetRow()
+        {
+            var row = new Half[32];
+
+            // Diffuse pixel base
+            row[0] = 1.0f;
+            row[1] = 1.0f;
+            row[2] = 1.0f;
+            for(int i =0 ; i < 7; i++)
+            {
+                row[i] = 1.0f;
+            }
+
+            row[11] = 1.0f;
+            row[14] = 2.0f;
+            row[16] = 0.5f;
+            row[25] = 0.0078125f;
+            row[26] = 1.0f;
+
+
+            row[7 * 4 + 0] = 16.0f;
+            row[7 * 4 + 1] = 16.0f;
+            return row;
+        }
+
         /// <summary>
         /// Converts an XivMtrl object into the raw bytes of a Mtrl file.
         /// </summary>
@@ -752,6 +884,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new mtrl file byte data</returns>
         public byte[] CreateMtrlFile(XivMtrl xivMtrl, IItem item)
         {
+            xivMtrl.ColorSetDyeData = null;
 
             var mtrlBytes = new List<byte>();
 
@@ -850,6 +983,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             // Don't know what these (4) bytes do, but hey, whatever.
             mtrlBytes.AddRange(xivMtrl.Unknown2);
+
 
             foreach (var colorSetHalf in xivMtrl.ColorSetData)
             {

@@ -223,8 +223,16 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 var dataFile = IOUtil.GetDataFileFromPath(fullPath);
                 cachedIndexFile = await GetIndexFile(dataFile, false, true);
+                var offset = cachedIndexFile.Get8xDataOffset(fullPath);
+                if (offset != 0)
+                {
+                    return offset;
+                }
+                return 0;
+            } else
+            {
+                return cachedIndexFile.Get8xDataOffset(fullPath);
             }
-            return cachedIndexFile.Get8xDataOffset(fullPath);
         }
 
         /// <summary>
@@ -510,68 +518,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 _semaphoreSlim.Release();
             }
             return 0;
-        }
-
-        /// <summary>
-        /// Gets the offset for the data in the .dat file
-        /// </summary>
-        /// <param name="hashedFolder">The hashed value of the folder path</param>
-        /// <param name="hashedFile">The hashed value of the file name</param>
-        /// <param name="dataFile">The data file to look in</param>
-        /// <returns>The offset to the data</returns>
-        public Task<long> GetDataOffset(int hashedFolder, int hashedFile, XivDataFile dataFile)
-        {
-            return Task.Run(async () =>
-            {
-                var indexPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
-                long offset = 0;
-
-                // These are the offsets to relevant data
-                const int fileCountOffset = 1036;
-                const int dataStartOffset = 2048;
-
-                await _semaphoreSlim.WaitAsync();
-
-                try
-                {
-                    using (var br = new BinaryReader(File.OpenRead(indexPath)))
-                    {
-                        br.BaseStream.Seek(fileCountOffset, SeekOrigin.Begin);
-                        var fileCount = br.ReadInt32();
-
-                        br.BaseStream.Seek(dataStartOffset, SeekOrigin.Begin);
-
-                        // loop through each file entry
-                        for (var i = 0; i < fileCount; i += 16)
-                        {
-                            // 16 Bytes per entry.
-                            var fileNameHash = br.ReadInt32();
-                            var folderPathHash = br.ReadInt32();
-                            long fileoffset = br.ReadUInt32();
-                            var unknown = br.ReadUInt32();
-
-                            // check if the provided file name hash matches the current file name hash
-                            if (fileNameHash == hashedFile)
-                            {
-
-                                // check if the provided folder path hash matches the current folder path hash
-                                if (folderPathHash == hashedFolder)
-                                {
-                                    // this is the entry we are looking for, get the offset and break out of the loop
-                                    offset = fileoffset * 8;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                finally
-                {
-                    _semaphoreSlim.Release();
-                }
-
-                return offset;
-            });
         }
 
         /// <summary>

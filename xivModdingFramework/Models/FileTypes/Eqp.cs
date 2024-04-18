@@ -62,6 +62,7 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
             XivRace.Hrothgar_Male,
+            XivRace.Hrothgar_Female,
             XivRace.Viera_Female,
             XivRace.Viera_Male,
 
@@ -85,6 +86,7 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
             XivRace.Hrothgar_Male,
+            XivRace.Hrothgar_Female,
             XivRace.Viera_Female,
             XivRace.Viera_Male,
             XivRace.Hyur_Midlander_Male_NPC,
@@ -102,6 +104,7 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.AuRa_Male_NPC,
             XivRace.AuRa_Female_NPC,
             XivRace.Hrothgar_Male_NPC,
+            XivRace.Hrothgar_Female_NPC,
             XivRace.Viera_Female_NPC,
             XivRace.Viera_Male_NPC,
             XivRace.NPC_Male,

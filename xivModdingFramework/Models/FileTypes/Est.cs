@@ -278,6 +278,11 @@ namespace xivModdingFramework.Models.FileTypes
 
             foreach (var race in races)
             {
+                if(!entries.ContainsKey(race))
+                {
+                    continue;
+                }
+
                 var dict = entries[race];
                 if (dict.ContainsKey(setId))
                 {

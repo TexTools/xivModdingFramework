@@ -239,10 +239,7 @@ namespace xivModdingFramework.Mods
                 var originalOffset = modEntry.data.originalOffset;
                 var moddedOffset = modEntry.data.modOffset;
 
-                var offset = await index.GetDataOffset(
-                    HashGenerator.GetHash(Path.GetDirectoryName(internalPath).Replace("\\", "/")),
-                    HashGenerator.GetHash(Path.GetFileName(internalPath)),
-                    XivDataFiles.GetXivDataFile(modEntry.datFile));
+                var offset = await index.GetDataOffset(internalPath);
 
                 if (offset.Equals(originalOffset))
                 {
