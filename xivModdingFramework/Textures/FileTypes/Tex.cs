@@ -129,7 +129,7 @@ namespace xivModdingFramework.Textures.FileTypes
             hashedfile = HashGenerator.GetHash(file);
             var df = IOUtil.GetDataFileFromPath(path);
 
-            offset = await _index.GetDataOffset(hashedfolder, hashedfile, df);
+            offset = await _index.GetDataOffset(path);
 
             if (offset == 0)
             {

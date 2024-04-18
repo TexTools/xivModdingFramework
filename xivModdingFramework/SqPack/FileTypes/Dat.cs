@@ -722,8 +722,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
-            var offset = await index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
-                dataFile);
+            var offset = await index.GetDataOffset(internalPath);
 
             if (offset == 0)
             {
@@ -941,8 +940,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
-            var offset = await index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file),
-                dataFile);
+            var offset = await index.GetDataOffset(internalPath);
 
             if (offset == 0)
             {

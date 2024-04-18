@@ -69,7 +69,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var folder = vfxPath.Substring(0, vfxPath.LastIndexOf("/"));
             var file = Path.GetFileName(vfxPath);
-            var vfxOffset = await index.GetDataOffset(HashGenerator.GetHash(folder), HashGenerator.GetHash(file), _dataFile);
+            var vfxOffset = await index.GetDataOffset(vfxPath);
             var atexTexTypePathList = new List<TexTypePath>();
 
             if (vfxOffset <= 0)

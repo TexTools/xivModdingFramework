@@ -461,8 +461,7 @@ namespace xivModdingFramework.Items.Categories
                 assetFile = $"gar_b0_m{id}.sgb";
             }
 
-            var assetOffset = await index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile),
-                XivDataFile._01_Bgcommon);
+            var assetOffset = await index.GetDataOffset(assetFolder + "/" + assetFile);
 
             var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
 
@@ -561,7 +560,7 @@ namespace xivModdingFramework.Items.Categories
                 var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
                 var assetFile = Path.GetFileName(additionalAsset);
 
-                var assetOffset = await index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile), XivDataFile._01_Bgcommon);
+                var assetOffset = await index.GetDataOffset(additionalAsset);
 
                 var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
 
