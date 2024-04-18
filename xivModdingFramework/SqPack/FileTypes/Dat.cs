@@ -260,18 +260,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
                                 binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
-                                bool anyNonZero = false;
-                                for (int byteIdx = 0; byteIdx < 8; byteIdx++)
-                                {
-                                    if (binaryReader.ReadByte() != 0)
-                                    {
-                                        anyNonZero = true;
-                                        break;
-                                    }
-                                }
+                                var one = binaryReader.ReadInt32();
+                                var two = binaryReader.ReadInt32();
 
-                                // If there is any data in these bytes, it is an original dat.
-                                if (anyNonZero)
+                                if(one != 1337 || two != 1337)
                                 {
                                     datList.Add(datFilePath);
                                 }
@@ -321,18 +313,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
                                 binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
-                                bool anyNonZero = false;
-                                for (int byteIdx = 0; byteIdx < 8; byteIdx++)
-                                {
-                                    if (binaryReader.ReadByte() != 0)
-                                    {
-                                        anyNonZero = true;
-                                        break;
-                                    }
-                                }
+                                var one = binaryReader.ReadInt32();
+                                var two = binaryReader.ReadInt32();
 
-                                // If it's all zeros, this is a custom modded dat.
-                                if(!anyNonZero)
+                                // Check the magic numbers
+                                if(one == 1337 && two == 1337)
                                 {
                                     datList.Add(datFilePath);
                                 }
@@ -369,6 +354,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 bw.Write(1024);
                 bw.Write(1);
                 bw.Write(1);
+                bw.Write(1337);
+                bw.Write(1337);
                 bw.Seek(8, SeekOrigin.Current);
                 bw.Write(-1);
                 bw.Seek(960, SeekOrigin.Begin);

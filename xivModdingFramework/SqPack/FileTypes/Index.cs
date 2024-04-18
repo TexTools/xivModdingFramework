@@ -228,7 +228,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     return offset;
                 }
-                return await GetDataOffsetIndex2(fullPath);
+                return 0;
             } else
             {
                 return cachedIndexFile.Get8xDataOffset(fullPath);

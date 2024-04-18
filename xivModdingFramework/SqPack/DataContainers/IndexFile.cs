@@ -532,6 +532,13 @@ namespace xivModdingFramework.SqPack.DataContainers
                 return entry.RawOffset;
             }
 
+            // BENCHMARK ONLY -- Fallback for Index 2 Reads?
+            var fullHash = (uint) HashGenerator.GetHash(filePath);
+            if(Index2Entries.ContainsKey(fullHash))
+            {
+                return Index2Entries[fullHash].RawFileOffset;
+            }
+
             return 0;
         }
 
