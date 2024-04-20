@@ -176,6 +176,9 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 if (entry.SkelId == 0)
                 {
+                    if (!entries.ContainsKey(entry.Race)) {
+                        continue;
+                    }
                     // Remove this entry.
                     if (entries[entry.Race].ContainsKey(entry.SetId))
                     {
