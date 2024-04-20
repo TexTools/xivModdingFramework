@@ -23,6 +23,8 @@ using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.IO;
 using System.Linq;
+using System.Security.Permissions;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
@@ -43,7 +45,6 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class TTMP
     {
-
         // These file types are forbidden from being included in Modpacks or being imported via modpacks.
         // This is because these file types are re-built from constituent smaller files, and thus importing
         // a complete file would bash the user's current file state in unpredictable ways.
@@ -712,7 +713,7 @@ namespace xivModdingFramework.Mods.FileTypes
         public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(
             DirectoryInfo modPackDirectory, List<ModsJson> modsJson, DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, 
             Func<HashSet<string>, Dictionary<XivDataFile, IndexFile>, ModList, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null,
-            bool AutoAssignBodyMaterials = false)
+            bool AutoAssignBodyMaterials = false, ModPackJson ModPackData = null, bool fixPreDawntrailMods = true, bool updateShaders = false)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
@@ -1225,6 +1226,15 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
 
+                    // If we have a Pre Dawntrail Modpack, we need to fix things up.
+                    if (fixPreDawntrailMods)
+                    {
+                        if (ModPackData != null && Int32.Parse(ModPackData.TTMPVersion.Substring(0, 1)) <= 1)
+                        {
+                            await FixPreDawntrailImports(filePaths, updateShaders, "DawntrailFix", progress);
+                        }
+                    }
+
                     count = 0;
                     progress.Report((0, 0, "Queuing Cache Updates..."));
                     // Metadata files expanded, last thing is to queue everthing up for the Cache.
@@ -1339,6 +1349,38 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
             throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
+        }
+
+
+
+        private async Task FixPreDawntrailImports(HashSet<string> filePaths, bool updateShaders, string source, IProgress<(int current, int total, string message)> progress)
+        {
+            var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
+            var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
+
+            var fixableMtrlsRegex = new Regex("chara\\/(equipment|weapon)\\/.*\\.mtrl");
+            var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
+
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, XivDataFile._04_Chara);
+
+            var idx = 0;
+            var total = fixableMtrls.Count;
+            foreach(var path in fixableMtrls)
+            {
+
+                progress?.Report((idx, total, "Fixing Pre-Dawntrail Materials..."));
+                await _mtrl.FixPreDawntrailMaterial(path, updateShaders, source);
+                idx++;
+            }
+
+            idx = 0;
+            total = fixableMdls.Count;
+            foreach (var path in fixableMdls)
+            {
+                progress?.Report((idx, total, "Fixing Pre-Dawntrail Models..."));
+                await _mdl.FixPreDawntrailMdl(path, source);
+            }
         }
     }
 }

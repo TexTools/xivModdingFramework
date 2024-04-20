@@ -63,6 +63,8 @@ using xivModdingFramework.Mods.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
+using System.Runtime.InteropServices.ComTypes;
+using SixLabors.ImageSharp.Metadata.Profiles.Iptc;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -550,8 +552,12 @@ namespace xivModdingFramework.Models.FileTypes
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
             {
-                uint mdlSignature = br.ReadUInt32();
-                int mdlVersion = (mdlSignature >= 0x1000006) ? 6 : 5;
+                var version = br.ReadUInt16();
+                var val2 = br.ReadUInt16();
+                var mdlSignature = 0;
+
+                int mdlVersion = version >= 6 ? 6 : 5;
+                xivMdl.MdlVersion = version;
 
                 // We skip the Vertex Data Structures for now
                 // This is done so that we can get the correct number of meshes per LoD first
@@ -959,7 +965,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                             meshData.MeshPartList.Add(meshPart);
                         }
+                        meshIdx++;
                     }
+                    lodIdx++; ;
                 }
 
                 // Unknown data block
@@ -1323,11 +1331,15 @@ namespace xivModdingFramework.Models.FileTypes
                                 var bwOffset = lod.VertexDataOffset + vertexDataOffset + bwDataStruct.DataOffset + vertexDataSize * i;
 
                                 br.BaseStream.Seek(bwOffset, SeekOrigin.Begin);
+                                var b0 = br.ReadByte();
+                                var b1 = br.ReadByte();
+                                var b2 = br.ReadByte();
+                                var b3 = br.ReadByte();
 
-                                var bw0 = br.ReadByte() / 255f;
-                                var bw1 = br.ReadByte() / 255f;
-                                var bw2 = br.ReadByte() / 255f;
-                                var bw3 = br.ReadByte() / 255f;
+                                var bw0 = b0 / 255f;
+                                var bw1 = b1 / 255f;
+                                var bw2 = b2 / 255f;
+                                var bw3 = b3 / 255f;
 
                                 vertexData.BoneWeights.Add(new[] { bw0, bw1, bw2, bw3 });
                             }
@@ -2358,6 +2370,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="ogMdl">The currently modified Mdl file.</param>
         internal async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
+            var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
@@ -2431,6 +2444,17 @@ namespace xivModdingFramework.Models.FileTypes
                                     else
                                     {
                                         isAlreadyModified2 = true;
+                                    }
+                                }
+
+                                if(dataUsage == VertexUsageType.BoneWeight)
+                                {
+                                    if(mdlVersion >= 6)
+                                    {
+                                        dataType = VertexDataType.Ubyte4;
+                                    } else
+                                    {
+                                        dataType = VertexDataType.Ubyte4n;
                                     }
                                 }
 
@@ -2689,7 +2713,8 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.Add(ogModelData.Unknown10a);
                 modelDataBlock.Add(ogModelData.Unknown10b);
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown11));
-                modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown12));
+                var boneSetSizePointer = modelDataBlock.Count;
+                modelDataBlock.AddRange(BitConverter.GetBytes((short)0));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
                 modelDataBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
@@ -3104,11 +3129,78 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var boneSetsBlock = new List<byte>();
 
-                for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                if (mdlVersion >= 6)
                 {
-                    boneSetsBlock.AddRange(ttModel.GetBoneSet(mi));
+                    List<List<byte>> data = new List<List<byte>>();
+                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                    {
+                        data.Add(ttModel.Getv6BoneSet(mi));
+                    }
+
+                    var offset = ttModel.MeshGroups.Count;
+                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                    {
+                        var dataSize = data[mi].Count;
+                        short count = (short) (dataSize / 2);
+
+                        boneSetsBlock.AddRange(BitConverter.GetBytes((short) 0));
+                        boneSetsBlock.AddRange(BitConverter.GetBytes((short) (count)));
+
+                    }
+                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                    {
+                        var headerLocation = mi * 4;
+                        var distance = (short)((boneSetsBlock.Count - headerLocation) / 4);
+
+                        boneSetsBlock.AddRange(data[mi]);
+                        if(data[mi].Count % 4 != 0)
+                        {
+                            boneSetsBlock.AddRange(new byte[2]);
+                        }
+
+                        // Copy in the offset information.
+                        var offsetBytes = BitConverter.GetBytes(distance);
+                        boneSetsBlock[headerLocation] = offsetBytes[0];
+                        boneSetsBlock[headerLocation + 1] = offsetBytes[1];
+
+                    }
                 }
-                var boneIndexListSize = boneSetsBlock.Count;
+                else
+                {
+                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                    {
+                        var originalBoneSet = ttModel.GetBoneSet(mi);
+                        var data = originalBoneSet;
+                        // Cut or pad to exactly 64 bones + blanks.  (v5 has a static array size of 128 bytes/64 shorts)
+                        if (data.Count > 128)
+                        {
+                            data = data.GetRange(0, 128);
+                        }
+                        else if (data.Count < 128)
+                        {
+                            data.AddRange(new byte[128 - data.Count]);
+                        }
+                        //data.AddRange(BitConverter.GetBytes(64));//ttModel.MeshGroups[mi].Bones.Count));
+
+                        // This is the array size... Which seems to need to be +1'd in Dawntrail for some reason.
+                        if (mi == 0 || ttModel.MeshGroups[mi].Bones.Count >= 64)
+                        {
+                            data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
+                        } else
+                        {
+                            // DAWNTRAIL BENCHMARK HACKHACK - Add +1 to the bone count here to work around MDL v5 -> v6 in engine off-by-one error.
+                            data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count + 1));
+                        }
+                        
+                        boneSetsBlock.AddRange(data);
+                    }
+                    var boneIndexListSize = boneSetsBlock.Count;
+                }
+
+                // Update the size listing.
+                var sizeBytes = BitConverter.GetBytes( (short)(boneSetsBlock.Count / 2));
+                modelDataBlock[boneSetSizePointer] = sizeBytes[0];
+                modelDataBlock[boneSetSizePointer + 1] = sizeBytes[1];
 
                 // Higher LoD Bone sets are omitted.
 
@@ -3766,8 +3858,8 @@ namespace xivModdingFramework.Models.FileTypes
                 datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128 + 16));
                 // Buffer Size
                 datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128));
-                // Block count
-                datHeader.AddRange(BitConverter.GetBytes((short)5));
+                // Mdl Version
+                datHeader.AddRange(BitConverter.GetBytes((short)mdlVersion));
                 // Unknown
                 datHeader.AddRange(BitConverter.GetBytes((short)256));
 
@@ -5182,6 +5274,21 @@ namespace xivModdingFramework.Models.FileTypes
             XivCache.QueueDependencyUpdate(allFiles.ToList());
 
             return offset;
+        }
+
+
+        public async Task FixPreDawntrailMdl(string path, string source = "Unknown")
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+            // HACKHACK: This is going to be extremely inefficient, but works for the moment.
+            var ttMdl = await GetModel(path);
+            var xivMdl = await GetRawMdlData(path);
+
+            var bytes = await MakeNewMdlFile(ttMdl, xivMdl);
+            await _dat.WriteModFile(bytes, path, source);
+
+
         }
 
         /// <summary>

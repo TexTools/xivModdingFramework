@@ -16,6 +16,8 @@
 
 using HelixToolkit.SharpDX.Core.Utilities;
 using SharpDX;
+using SharpDX.Direct3D11;
+using SharpDX.DXGI;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -24,6 +26,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using TeximpNet.Compression;
+using TeximpNet.DDS;
+using TeximpNet;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -40,6 +45,11 @@ using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using SixLabors.ImageSharp.Memory;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Bmp;
 
 namespace xivModdingFramework.Materials.FileTypes
 {
@@ -638,7 +648,6 @@ namespace xivModdingFramework.Materials.FileTypes
             {
             }
 
-            UpdateMtrl(xivMtrl);
             return xivMtrl;
         }
 
@@ -703,7 +712,7 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             try
             {
-                var mtrlBytes = CreateMtrlFile(xivMtrl, item);
+                var mtrlBytes = CreateMtrlFile(xivMtrl);
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
@@ -754,7 +763,13 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        public void UpdateMtrl(XivMtrl mtrl)
+        public async Task FixPreDawntrailMaterial(string mtrlPath, bool updateShaders, string source)
+        {
+            var data = await GetMtrlData(mtrlPath);
+            await FixPreDawntrailMaterial(data, updateShaders, source);
+        }
+
+        public async Task FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
@@ -763,6 +778,11 @@ namespace xivModdingFramework.Materials.FileTypes
             if(mtrl.Shader != "character.shpk")
             {
                 return;
+            }
+
+            if (updateShaders)
+            {
+                mtrl.Shader = "characterlegacy.shpk";
             }
 
             // Wipe Dye data b/c we don't know how to handle it atm.
@@ -839,16 +859,66 @@ namespace xivModdingFramework.Materials.FileTypes
             });
             mtrl.TexturePathUnknownList.Add(0);
 
-            var normalTex = mtrl.TexturePathList.First(x => x.EndsWith("_n.tex"));
-            var idTex = normalTex.Replace("_n.tex", "_id.tex");
+            var normalTexPath = mtrl.TexturePathList.First(x => x.EndsWith("_n.tex"));
+            var idTex = normalTexPath.Replace("_n.tex", "_id.tex");
+            
             mtrl.TexturePathList.Add(idTex);
             mtrl.TextureDescriptorList.Add(new TextureDescriptorStruct()
             {
                 FileFormat = -32768,
-                TextureIndex = 2,
+                TextureIndex = mtrl.TextureCount,
                 TextureType = 1449103320,
                 Unknown = 15,
             });
+            var _tex = new Tex(_gameDirectory);
+            var normalTex = await _tex.GetTexData(normalTexPath);
+            var texData = await _tex.GetImageData(normalTex);
+
+            // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
+            var idPixels = new byte[texData.Length];
+            var width = normalTex.Width;
+            var height = normalTex.Height;
+            if (height <= 32 || width <= 32)
+            {
+                height = 64;
+                width = 64;
+                var pix = texData[3];
+                idPixels = new byte[64 * 64 * 4];
+                for (int i = 0; i < idPixels.Length; i += 4)
+                {
+                    idPixels[i] = pix;
+                    idPixels[i + 1] = 255;
+                    idPixels[i + 2] = 0;
+                    idPixels[i + 3] = 0;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < idPixels.Length; i += 4)
+                {
+                    idPixels[i] = texData[i + 3];
+                    idPixels[i + 1] = 255;
+                    idPixels[i + 2] = 0;
+                    idPixels[i + 3] = 0;
+                }
+            }
+
+
+            var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".png");
+            using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(idPixels, width, height))
+            {
+                img.Save(tempFile, new PngEncoder());
+            }
+
+            try
+            {
+                await _tex.ImportTex(idTex, tempFile, null, source, null, null, XivTexFormat.A8R8G8B8, true);
+            } catch (Exception ex) {
+                throw ex;
+            }
+
+            await ImportMtrl(mtrl, null, source);
+
 
         }
         private Half[] GetDefaultColorsetRow()
@@ -882,7 +952,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item</param>
         /// <returns>The new mtrl file byte data</returns>
-        public byte[] CreateMtrlFile(XivMtrl xivMtrl, IItem item)
+        public byte[] CreateMtrlFile(XivMtrl xivMtrl)
         {
             xivMtrl.ColorSetDyeData = null;
 

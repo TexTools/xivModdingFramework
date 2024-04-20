@@ -498,6 +498,11 @@ namespace xivModdingFramework.Models.DataContainers
         public string Source = "";
 
         /// <summary>
+        /// The internal FFXIV Mdl Version of this file.
+        /// </summary>
+        public ushort MdlVersion;
+
+        /// <summary>
         /// The Mesh groups and parts of this mesh.
         /// </summary>
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
@@ -878,17 +883,36 @@ namespace xivModdingFramework.Models.DataContainers
         /// Creates a bone set from the model and group information.
         /// </summary>
         /// <param name="PartNumber"></param>
+        public List<byte> Getv6BoneSet(int groupNumber)
+        {
+            var fullList = Bones;
+            var partial = MeshGroups[groupNumber].Bones;
+            var used = new List<short>();
+
+            var result = new List<byte>(new byte[(partial.Count * 2)]);
+
+            // This is essential a translation table of [mesh group bone index] => [full model bone index]
+            for (int i = 0; i < partial.Count; i++)
+            {
+                var idx = (short)fullList.IndexOf(partial[i]);
+                used.Add(idx);
+                var b = BitConverter.GetBytes(idx);
+                IOUtil.ReplaceBytesAt(result, b, i * 2);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a bone set from the model and group information.
+        /// </summary>
+        /// <param name="PartNumber"></param>
         public List<byte> GetBoneSet(int groupNumber)
         {
             var fullList = Bones;
             var partial = MeshGroups[groupNumber].Bones;
 
-            var result = new List<byte>(new byte[128]);
-
-            if(partial.Count > 64)
-            {
-                throw new InvalidDataException("Individual Mesh groups cannot reference more than 64 bones.");
-            }
+            var result = new List<byte>(new byte[partial.Count * 2]);
 
             // This is essential a translation table of [mesh group bone index] => [full model bone index]
             for (int i = 0; i < partial.Count; i++)
@@ -896,8 +920,6 @@ namespace xivModdingFramework.Models.DataContainers
                 var b = BitConverter.GetBytes(((short) fullList.IndexOf(partial[i])));
                 IOUtil.ReplaceBytesAt(result, b, i * 2);
             }
-
-            result.AddRange(BitConverter.GetBytes(partial.Count));
 
             return result;
         }
@@ -2030,6 +2052,7 @@ namespace xivModdingFramework.Models.DataContainers
                 ModelModifiers.ClearShapeData(ttModel, loggingFunction);
             }
             ttModel.Source = rawMdl.MdlPath;
+            ttModel.MdlVersion = rawMdl.MdlVersion;
 
             return ttModel;
         }

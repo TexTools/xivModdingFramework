@@ -914,7 +914,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="texFormat"></param>
         /// <returns></returns>
-        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID )
+        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, bool ?makeMips = null )
         {
             // Ensure file exists.
             if (!File.Exists(externalPath))
@@ -922,7 +922,15 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new IOException($"Could not find file: {externalPath}");
             }
 
-            var root = await XivCache.GetFirstRoot(internalPath);
+            bool useMips;
+            if(makeMips == null)
+            {
+                var root = await XivCache.GetFirstRoot(internalPath);
+                useMips = root != null;
+            } else
+            {
+                useMips = (bool) makeMips;
+            }
             bool isDds = Path.GetExtension(externalPath).ToLower() == ".dds";
 
             var ddsContainer = new DDSContainer();
@@ -982,7 +990,7 @@ namespace xivModdingFramework.Textures.FileTypes
                         surface.FlipVertically();
 
                         var maxMipCount = 1;
-                        if (root != null)
+                        if (useMips)
                         {
                             // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
                             // (Ex. The Default Mat-Add textures)
@@ -1059,13 +1067,13 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, XivTexFormat format = XivTexFormat.INVALID, bool? createMipMaps = null)
         {
             long offset = 0;
             var path = internalPath;
             var df = IOUtil.GetDataFileFromPath(path);
 
-            var data = await MakeTexData(path, externalPath);
+            var data = await MakeTexData(path, externalPath, format, createMipMaps);
             var modding = new Modding(_gameDirectory);
             Mod entry = null;
             if(cachedModList != null) 
@@ -1198,7 +1206,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="ddsFileDirectory">The dds directory of the new ColorSet</param>
         /// <param name="item">The item</param>
         /// <returns>The raw mtrl data</returns>
-        public byte[] DDStoMtrlData(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, XivLanguage lang)
+        public byte[] DDStoMtrlData(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory)
         {
             var colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
 
@@ -1223,7 +1231,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            return _mtrl.CreateMtrlFile(xivMtrl, item);
+            return _mtrl.CreateMtrlFile(xivMtrl);
         }
 
         /// <summary>

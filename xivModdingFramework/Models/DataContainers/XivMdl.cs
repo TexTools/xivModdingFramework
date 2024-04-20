@@ -52,6 +52,7 @@ namespace xivModdingFramework.Models.DataContainers
             }
         }
 
+        public ushort MdlVersion { get; set;  }
 
         /// <summary>
         /// The path data contained in the mdl file
