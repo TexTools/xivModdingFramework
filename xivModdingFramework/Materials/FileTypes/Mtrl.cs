@@ -666,11 +666,19 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     colorSetData.AddRange(BitConverter.GetBytes(colorSetHalf.RawValue));
                 }
+                var width = 4;
+                var height = 16;
+
+                if(xivMtrl.ColorSetData.Count == 1024)
+                {
+                    width = 8;
+                    height = 32;
+                }
 
                 var xivTex = new XivTex
                 {
-                    Width = 4,
-                    Height = 16,
+                    Width = width,
+                    Height = height,
                     MipMapCount = 0,
                     TexData = colorSetData.ToArray(),
                     TextureFormat = XivTexFormat.A16B16G16R16F,
@@ -780,7 +788,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 return;
             }
 
-            if (updateShaders)
+            if (!updateShaders)
             {
                 mtrl.Shader = "characterlegacy.shpk";
             }

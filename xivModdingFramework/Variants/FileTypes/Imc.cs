@@ -133,6 +133,10 @@ namespace xivModdingFramework.Variants.FileTypes
         public async Task<XivImc> GetImcInfo(IItemModel item)
         {
             var info = await GetFullImcInfo(item);
+            if(info == null)
+            {
+                return null;
+            }
             var slot = item.GetItemSlotAbbreviation();
 
             var result = info.GetEntry(item.ModelInfo.ImcSubsetID, slot);

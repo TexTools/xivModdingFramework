@@ -965,9 +965,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             meshData.MeshPartList.Add(meshPart);
                         }
-                        meshIdx++;
                     }
-                    lodIdx++; ;
                 }
 
                 // Unknown data block

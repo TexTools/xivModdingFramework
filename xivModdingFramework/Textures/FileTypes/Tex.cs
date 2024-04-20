@@ -1151,14 +1151,30 @@ namespace xivModdingFramework.Textures.FileTypes
                 {
                     throw new Exception($"Incorrect file type. Expected: A16B16G16R16F  Given: {textureType}");
                 }
-                var colorSetData = new List<Half>(256);
+
+                br.BaseStream.Seek(12, SeekOrigin.Begin);
+
+                var height = br.ReadInt32();
+                var width = br.ReadInt32();
+
+                List<Half> colorSetData;
+                int size;
+                if (width == 4) {
+                    size = 256;
+                    colorSetData = new List<Half>(256);
+                } else
+                {
+                    size = 1024;
+                    colorSetData = new List<Half>(1024);
+                }
+
 
                 // skip DDS header
                 br.BaseStream.Seek(128, SeekOrigin.Begin);
 
                 // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
                 // this reads 256 ushort values which is 256 x 2 = 512
-                for (var i = 0; i < 256; i++)
+                for (var i = 0; i < size; i++)
                 {
                     colorSetData.Add((new Half(br.ReadUInt16())));
                 }

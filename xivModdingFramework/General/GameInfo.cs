@@ -67,7 +67,14 @@ namespace xivModdingFramework
         {
             GameDirectory = gameDirectory;
             GameLanguage  = xivLanguage;
-            GameVersion   = GetGameVersion();
+            try
+            {
+                GameVersion = GetGameVersion();
+            } catch
+            {
+                // Default.  No version file is a non-critical bug.
+                GameVersion = new Version("0.0.0.0");
+            }
             LuminaDirectory = luminaDirectory;
             UseLumina = useLumina;
             DxMode = dxMode;

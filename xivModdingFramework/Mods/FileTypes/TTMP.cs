@@ -53,9 +53,9 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
-        private readonly string _currentWizardTTMPVersion = "1.3w";
-        private readonly string _currentSimpleTTMPVersion = "1.3s";
-        private readonly string _currentBackupTTMPVersion = "1.0b";
+        private readonly string _currentWizardTTMPVersion = "2.0w";
+        private readonly string _currentSimpleTTMPVersion = "2.0s";
+        private readonly string _currentBackupTTMPVersion = "2.0b";
         private const string _minimumAssembly = "1.3.0.0";
 
         private string _tempMPD, _tempMPL, _source;
