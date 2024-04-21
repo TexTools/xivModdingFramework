@@ -71,7 +71,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown4 { get; set; }
+        public int MeshGroupTotal { get; set; }
 
         /// <summary>
         /// Unknown Usage

@@ -672,7 +672,7 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         var mat = Encoding.ASCII.GetString(materialName.ToArray()).Replace("\0", "");
-                        if (mat.StartsWith("shp_"))
+                        if (mat.StartsWith("shp_") || (mat == "original" && mdlVersion > 5))
                         {
                             // Catch case for situation where there's null values at the end of the materials list.
                             mdlPathData.ShapeList.Add(mat);
@@ -758,7 +758,7 @@ namespace xivModdingFramework.Models.FileTypes
                         MeshSum = br.ReadInt16(),
                         Unknown2 = br.ReadInt16(),
                         Unknown3 = br.ReadInt32(),
-                        Unknown4 = br.ReadInt32(),
+                        MeshGroupTotal = br.ReadInt32(),
                         Unknown5 = br.ReadInt32(),
                         IndexDataStart = br.ReadInt32(),
                         Unknown6 = br.ReadInt32(),
@@ -815,7 +815,7 @@ namespace xivModdingFramework.Models.FileTypes
                             MeshSum = br.ReadInt16(),
                             Unknown2 = br.ReadInt16(),
                             Unknown3 = br.ReadInt32(),
-                            Unknown4 = br.ReadInt32(),
+                            MeshGroupTotal = br.ReadInt32(),
                             Unknown5 = br.ReadInt32(),
                             IndexDataStart = br.ReadInt32(),
                             Unknown6 = br.ReadInt32(),
@@ -967,6 +967,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         for (var i = 0; i < meshData.MeshInfo.MeshPartCount; i++)
                         {
+                            // SUS - Some value differences here
                             var meshPart = new MeshPart
                             {
                                 IndexOffset = br.ReadInt32(),
@@ -1051,6 +1052,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else // Mdl Version 5
                 {
+                    // SUS - Value differences here.
                     for (var i = 0; i < xivMdl.ModelData.BoneListCount; i++)
                     {
                         var boneIndexMesh = new BoneSet
@@ -2496,10 +2498,21 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     if(mdlVersion >= 6)
                                     {
-                                        dataType = VertexDataType.Ubyte4;
+                                        if (dataType != VertexDataType.Unknown17)
+                                        {
+                                            dataType = VertexDataType.Ubyte4;
+                                        }
                                     } else
                                     {
                                         dataType = VertexDataType.Ubyte4n;
+                                    }
+                                }
+
+                                if(dataUsage == VertexUsageType.BoneIndex)
+                                {
+                                    if (dataType != VertexDataType.Unknown17 || mdlVersion == 5)
+                                    {
+                                        dataType = VertexDataType.Ubyte4;
                                     }
                                 }
 
@@ -2775,7 +2788,7 @@ namespace xivModdingFramework.Models.FileTypes
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshSum));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown3));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown4));
+                        extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.MeshGroupTotal));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown5));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.IndexDataStart));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
@@ -2964,7 +2977,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var meshPartDataBlock = new List<byte>();
 
-                lodNum = 0;
                 if (!ogMdl.Partless)
                 {
 
@@ -2972,12 +2984,18 @@ namespace xivModdingFramework.Models.FileTypes
                     var previousIndexOffset = 0;
                     previousIndexCount = 0;
                     var indexOffset = 0;
-                    foreach (var lod in ogMdl.LoDList)
+                    for(int l = 0; l < ogMdl.LoDList.Count; l++)
                     {
+                        if (l > 0)
+                        {
+                            continue;
+                        }
+
+                        var lod = ogMdl.LoDList[l];
                         var partPadding = 0;
 
                         // Identify the correct # of meshes
-                        var meshMax = lodNum > 0 ? 0 : ttModel.MeshGroups.Count;
+                        var meshMax = ttModel.MeshGroups.Count;
 
                         for (int meshNum = 0; meshNum < meshMax; meshNum++)
                         {
@@ -2986,7 +3004,7 @@ namespace xivModdingFramework.Models.FileTypes
                             var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
 
                             // Identify correct # of parts.
-                            var partMax = lodNum == 0 ? ttMeshGroup.Parts.Count : 0;
+                            var partMax = ttMeshGroup.Parts.Count;
 
                             // Totals for each group
                             var ogPartCount = ogGroup == null ? 0 : lod.MeshDataList[meshNum].MeshPartList.Count;
@@ -3004,64 +3022,53 @@ namespace xivModdingFramework.Models.FileTypes
                                 short boneCount = 0;
                                 uint attributeMask = 0;
 
-                                if (lodNum == 0)
-                                {
-                                    // At LoD Zero we're not importing old FFXIV data, we're importing
-                                    // the new stuff.
+                                // At LoD Zero we're not importing old FFXIV data, we're importing
+                                // the new stuff.
 
-                                    // Recalculate Index Offset
-                                    if (meshNum == 0)
+                                // Recalculate Index Offset
+                                if (meshNum == 0)
+                                {
+                                    if (partNum == 0)
                                     {
-                                        if (partNum == 0)
-                                        {
-                                            indexOffset = 0;
-                                        }
-                                        else
-                                        {
-                                            indexOffset = previousIndexOffset + previousIndexCount;
-                                        }
+                                        indexOffset = 0;
                                     }
                                     else
                                     {
-                                        if (partNum == 0)
-                                        {
-                                            indexOffset = previousIndexOffset + previousIndexCount + partPadding;
-                                        }
-                                        else
-                                        {
-                                            indexOffset = previousIndexOffset + previousIndexCount;
-                                        }
-
+                                        indexOffset = previousIndexOffset + previousIndexCount;
                                     }
-
-                                    attributeMask = ttModel.GetAttributeBitmask(meshNum, partNum);
-                                    indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
-
-                                    // Count of bones for Mesh.  High LoD Meshes get 0... Not really ideal.
-                                    boneCount = (short)(lodNum == 0 ? ttMeshGroup.Bones.Count : 0);
-
-                                    // Calculate padding between meshes
-                                    if (partNum == newPartCount - 1)
-                                    {
-                                        var padd = (indexOffset + indexCount) % 8;
-
-                                        if (padd != 0)
-                                        {
-                                            partPadding = 8 - padd;
-                                        }
-                                        else
-                                        {
-                                            partPadding = 0;
-                                        }
-                                    }
-
                                 }
                                 else
                                 {
-                                    // LoD non-zero
-                                    indexCount = ogPart.IndexCount;
-                                    boneCount = 0;
-                                    attributeMask = 0;
+                                    if (partNum == 0)
+                                    {
+                                        indexOffset = previousIndexOffset + previousIndexCount + partPadding;
+                                    }
+                                    else
+                                    {
+                                        indexOffset = previousIndexOffset + previousIndexCount;
+                                    }
+
+                                }
+
+                                attributeMask = ttModel.GetAttributeBitmask(meshNum, partNum);
+                                indexCount = ttModel.MeshGroups[meshNum].Parts[partNum].TriangleIndices.Count;
+
+                                // Count of bones for Mesh.
+                                boneCount = (short)ttMeshGroup.Bones.Count;
+
+                                // Calculate padding between meshes
+                                if (partNum == newPartCount - 1)
+                                {
+                                    var padd = (indexOffset + indexCount) % 8;
+
+                                    if (padd != 0)
+                                    {
+                                        partPadding = 8 - padd;
+                                    }
+                                    else
+                                    {
+                                        partPadding = 0;
+                                    }
                                 }
 
                                 meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
@@ -3076,8 +3083,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                             }
                         }
-
-                        lodNum++;
                     }
                 }
 
@@ -3546,7 +3551,9 @@ namespace xivModdingFramework.Models.FileTypes
                     lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown2));
 
                     lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown3));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown4));
+                    
+                    // This is a running sum of mesh groups, but since we don't write LoD 1+, we can be lazy.
+                    lodDataBlock.AddRange(BitConverter.GetBytes(ttModel.MeshGroups.Count));
                     lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown5));
 
                     lodDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
