@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
+
 namespace xivModdingFramework.Models.Enums
 {
     /// <summary>
@@ -36,5 +38,27 @@ namespace xivModdingFramework.Models.Enums
         Half2    = 0xF,
         Half4    = 0x10,
         Unknown17 = 0x11
+    }
+
+    public static class VertexDataTypeInfo
+    {
+        public static Dictionary<VertexDataType, int> Sizes = new Dictionary<VertexDataType, int>() {
+            { VertexDataType.Float1, 4 },
+            { VertexDataType.Float2, 8 },
+            { VertexDataType.Float3, 12 },
+            { VertexDataType.Float4, 16 },
+            { VertexDataType.Ubyte4, 4 },
+            { VertexDataType.Short2, 4 },
+            { VertexDataType.Short4, 8 },
+            { VertexDataType.Ubyte4n, 4 },
+            { VertexDataType.Short2n, 4 },
+            { VertexDataType.Short4n, 8 },
+            { VertexDataType.Ushort2n, 4 },
+            { VertexDataType.Ushort4n, 8 },
+            { VertexDataType.Half2, 4 },
+            { VertexDataType.Half4, 8 },
+            { VertexDataType.Unknown17, 4 },
+        };
+
     }
 }

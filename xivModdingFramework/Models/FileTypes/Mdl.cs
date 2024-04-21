@@ -508,6 +508,11 @@ namespace xivModdingFramework.Models.FileTypes
             return await GetRawMdlData(mdlPath, getOriginal);
         }
 
+        // Some constant pointers/sizes
+        private const int _endOfHeader = 0x44; // 68 Decimal
+        private const int _vertexDataHeaderSize = 0x88; // 136 Decimal
+
+
         /// <summary>
         /// Retrieves the raw XivMdl file at a given internal file path.
         /// 
@@ -550,6 +555,10 @@ namespace xivModdingFramework.Models.FileTypes
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
 
+
+            // Calculated offsets
+            int _endOfVertexDataHeaders = _endOfHeader + (_vertexDataHeaderSize * mdlData.MeshCount);
+
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
             {
                 var version = br.ReadUInt16();
@@ -561,7 +570,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // We skip the Vertex Data Structures for now
                 // This is done so that we can get the correct number of meshes per LoD first
-                br.BaseStream.Seek(64 + 136 * mdlData.MeshCount + 4, SeekOrigin.Begin);
+                br.BaseStream.Seek(_endOfVertexDataHeaders, SeekOrigin.Begin);
 
                 var mdlPathData = new MdlPathData()
                 {
@@ -823,11 +832,13 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
+                #region Vertex Data Structures
+
                 // Now that we have the LoD data, we can go back and read the Vertex Data Structures
                 // First we save our current position
                 var savePosition = br.BaseStream.Position;
 
-                var loDStructPos = 68;
+                var loDStructPos = _endOfHeader;
                 // for each mesh in each lod
                 for (var i = 0; i < xivMdl.LoDList.Count; i++)
                 {
@@ -839,7 +850,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // LoD Index * Vertex Data Structure size + Header
 
-                        br.BaseStream.Seek(j * 136 + loDStructPos, SeekOrigin.Begin);
+                        br.BaseStream.Seek(j * _vertexDataHeaderSize + loDStructPos, SeekOrigin.Begin);
 
                         // If the first byte is 255, we reached the end of the Vertex Data Structs
                         var dataBlockNum = br.ReadByte();
@@ -864,9 +875,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                     loDStructPos += 136 * xivMdl.LoDList[i].MeshCount;
                 }
+                
 
                 // Now that we finished reading the Vertex Data Structures, we can go back to our saved position
                 br.BaseStream.Seek(savePosition, SeekOrigin.Begin);
+                #endregion
 
                 // Mesh Data Information
                 var meshNum = 0;
@@ -1225,6 +1238,7 @@ namespace xivModdingFramework.Models.FileTypes
                             BiNormalHandedness = new List<byte>(),
                             Tangents = new Vector3Collection(),
                             Colors = new List<SharpDX.Color>(),
+                            Colors2 = new List<SharpDX.Color>(),
                             Colors4 = new Color4Collection(),
                             TextureCoordinates0 = new Vector2Collection(),
                             TextureCoordinates1 = new Vector2Collection(),
@@ -1553,10 +1567,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                         #region VertexColor
 
+                        var colorDataStructs = (from vertexDataStruct in meshData.VertexDataStructList
+                                                where vertexDataStruct.DataUsage == VertexUsageType.Color
+                                                select vertexDataStruct).ToList();
                         // Get the Vertex Data Structure for colors
-                        var colorDataStruct = (from vertexDataStruct in meshData.VertexDataStructList
-                                               where vertexDataStruct.DataUsage == VertexUsageType.Color
-                                               select vertexDataStruct).FirstOrDefault();
+                        var colorDataStruct = colorDataStructs.Count > 0 ? colorDataStructs[0] : null;
 
                         if (colorDataStruct != null)
                         {
@@ -1596,6 +1611,46 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                         }
 
+                        #endregion
+
+                        #region Color2 Data
+                        var color2DataStruct = colorDataStructs.Count > 1 ? colorDataStructs[1] : null;
+                        if (color2DataStruct != null)
+                        {
+                            var dataStruct = color2DataStruct;
+                            // Determine which data block the color data is in
+                            // This always seems to be in the second data block
+                            switch (dataStruct.DataBlock)
+                            {
+                                case 0:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset0;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize0;
+                                    break;
+                                case 1:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset1;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize1;
+
+                                    break;
+                                default:
+                                    vertexDataOffset = meshData.MeshInfo.VertexDataOffset2;
+                                    vertexDataSize = meshData.MeshInfo.VertexDataEntrySize2;
+                                    break;
+                            }
+
+                            for (var i = 0; i < meshData.MeshInfo.VertexCount; i++)
+                            {
+                                var dataOffset = lod.VertexDataOffset + vertexDataOffset + dataStruct.DataOffset + vertexDataSize * i;
+
+                                br.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
+
+                                var r = br.ReadByte();
+                                var g = br.ReadByte();
+                                var b = br.ReadByte();
+                                var a = br.ReadByte();
+
+                                vertexData.Colors2.Add(new SharpDX.Color(r, g, b, a));
+                            }
+                        }
                         #endregion
 
 
@@ -2378,25 +2433,27 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var isAlreadyModified = false;
                 var isAlreadyModified2 = false;
-                var totalMeshCount = 0;
+                var finalMeshCount = 0;
 
                 // Vertex Info
                 #region Vertex Info Block
 
                 var vertexInfoBlock = new List<byte>();
-                var vertexInfoDict = new Dictionary<int, Dictionary<VertexUsageType, VertexDataType>>();
+                var vertexInfoLists = new List<Dictionary<VertexUsageType, List<VertexDataType>>>();
 
                 var lodNum = 0;
+                var perVertexDataSizes = new List<List<int>>();
                 foreach (var lod in ogMdl.LoDList)
                 {
                     // Higher LoDs are skipped.
                     if (lodNum > 0) continue;
 
-                    var vdsDictionary = new Dictionary<VertexUsageType, VertexDataType>();
                     var meshMax = lodNum > 0 ? ogMdl.LoDList[lodNum].MeshCount : ttModel.MeshGroups.Count;
 
                     for (int meshNum = 0; meshNum < meshMax; meshNum++)
                     {
+                        var vdsDictionary = new Dictionary<VertexUsageType, List<VertexDataType>>();
+                        var startOfMesh = vertexInfoBlock.Count;
                         // Test if we have both old and new data or not.
                         var ogGroup = lod.MeshDataList.Count > meshNum ? lod.MeshDataList[meshNum] : null;
                         var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
@@ -2412,19 +2469,18 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             source = ogGroup.VertexDataStructList;
                         }
-
-                        var dataSize = 0;
+                        var runningOffsets = new List<int>() { 0, 0, 0 };
+                        source.OrderBy(x => (x.DataBlock * 1000) + x.DataOffset);
                         foreach (var vds in source)
                         {
-
-                            // Padding
-                            vertexInfoBlock.AddRange(new byte[4]);
-
-
                             var dataBlock = vds.DataBlock;
                             var dataOffset = vds.DataOffset;
                             var dataType = vds.DataType;
                             var dataUsage = vds.DataUsage;
+                            if(vdsDictionary.ContainsKey(dataUsage))
+                            {
+                                //continue;
+                            }
 
                             if (lodNum == 0)
                             {
@@ -2433,16 +2489,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 // This increases the data from 8 bytes to 12 bytes
                                 if (dataUsage == VertexUsageType.Position)
                                 {
-                                    // If the data type is already Float3 (in the case of an already modified model)
-                                    // we skip it.
-                                    if (dataType != VertexDataType.Float3)
-                                    {
-                                        dataType = VertexDataType.Float3;
-                                    }
-                                    else
-                                    {
-                                        isAlreadyModified2 = true;
-                                    }
+                                    dataType = VertexDataType.Float3;
                                 }
 
                                 if(dataUsage == VertexUsageType.BoneWeight)
@@ -2460,95 +2507,68 @@ namespace xivModdingFramework.Models.FileTypes
                                 // This increases the data from 8 bytes to 12 bytes
                                 if (dataUsage == VertexUsageType.Normal)
                                 {
-                                    // If the data type is already Float3 (in the case of an already modified model)
-                                    // we skip it.
-                                    if (dataType != VertexDataType.Float3)
-                                    {
-                                        dataType = VertexDataType.Float3;
-                                    }
-                                    else
-                                    {
-                                        isAlreadyModified = true;
-                                    }
+                                    dataType = VertexDataType.Float3;
                                 }
 
                                 // Change Texture Coordinates to Float from its default of Half for greater accuracy
                                 // This increases the data from 8 bytes to 16 bytes, or from 4 bytes to 8 bytes if it is a housing item
                                 if (dataUsage == VertexUsageType.TextureCoordinate)
                                 {
-                                    if (dataType == VertexDataType.Half2 || dataType == VertexDataType.Half4)
+                                    if (dataType == VertexDataType.Half2)
                                     {
-                                        if (dataType == VertexDataType.Half2)
-                                        {
-                                            dataType = VertexDataType.Float2;
-                                        }
-                                        else
-                                        {
-                                            dataType = VertexDataType.Float4;
-                                        }
+                                        dataType = VertexDataType.Float2;
                                     }
                                     else
                                     {
-                                        isAlreadyModified = true;
+                                        dataType = VertexDataType.Float4;
                                     }
                                 }
 
-                                // We have to adjust each offset after the Normal value because its size changed
-                                // Normal is always in data block 1 and the first so its offset is 0
-                                // Note: Texture Coordinates are always last so there is no need to adjust for it
-                                if (dataBlock == 1 && dataOffset > 0 && !isAlreadyModified)
-                                {
-                                    dataOffset += 4;
-                                }
-                                // We have to adjust each offset after the Normal value because its size changed
-                                // Normal is always in data block 1 and the first so its offset is 0
-                                // Note: Texture Coordinates are always last so there is no need to adjust for it
-                                if (dataBlock == 0 && dataOffset > 0 && !isAlreadyModified2)
-                                {
-                                    dataOffset += 4;
-                                }
                             }
 
                             vertexInfoBlock.Add((byte)dataBlock);
-                            vertexInfoBlock.Add((byte)dataOffset);
+                            vertexInfoBlock.Add((byte)runningOffsets[dataBlock]);
                             vertexInfoBlock.Add((byte)dataType);
                             vertexInfoBlock.Add((byte)dataUsage);
 
+                            var size = VertexDataTypeInfo.Sizes[dataType];
+                            runningOffsets[dataBlock] += size;
+
                             if (!vdsDictionary.ContainsKey(dataUsage))
                             {
-                                vdsDictionary.Add(dataUsage, dataType);
+                                vdsDictionary.Add(dataUsage, new List<VertexDataType>());
                             }
+                            vdsDictionary[dataUsage].Add(dataType);
 
-                            dataSize += 8;
+                            // Padding between usage blocks
+                            vertexInfoBlock.AddRange(new byte[4]);
+                        }
+
+                        if (lodNum == 0)
+                        {
+                            // Store these for later.
+                            perVertexDataSizes.Add(runningOffsets);
                         }
 
                         // End flag
-                        vertexInfoBlock.AddRange(new byte[4]);
                         vertexInfoBlock.Add(0xFF);
-                        vertexInfoBlock.AddRange(new byte[3]);
+                        var meshBlockSize = vertexInfoBlock.Count - startOfMesh;
 
-                        dataSize += 8;
-
-                        if (dataSize < 64)
+                        // Fill rest of the array size.
+                        if (meshBlockSize < _vertexDataHeaderSize)
                         {
-                            var remaining = 64 - dataSize;
+                            var remaining = _vertexDataHeaderSize - meshBlockSize;
 
                             vertexInfoBlock.AddRange(new byte[remaining]);
                         }
+                        var finalMeshBlockSize = vertexInfoBlock.Count - startOfMesh;
 
-                        // Padding between data
-                        vertexInfoBlock.AddRange(new byte[72]);
+                        // Add this mesh group's vertex dictionary.
+                        vertexInfoLists.Add(vdsDictionary);
                     }
-
-
-                    vertexInfoDict.Add(lodNum, vdsDictionary);
 
                     lodNum++;
                 }
-
-                // The first vertex info block does not have padding so we remove it and add it at the end
-                vertexInfoBlock.RemoveRange(0, 4);
-                vertexInfoBlock.AddRange(new byte[4]);
                 #endregion
 
                 // All of the data blocks for the model data
@@ -2734,7 +2754,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 // Get the imported data
-                var importDataDictionary = GetGeometryData(ttModel, vertexInfoDict);
+                var importDataDictionary = GetGeometryData(ttModel, vertexInfoLists);
 
                 // Extra LoD Data
                 #region Extra Level Of Detail Block
@@ -2809,9 +2829,9 @@ namespace xivModdingFramework.Models.FileTypes
                         var vertexDataOffset0 = addedMesh ? 0 : meshInfo.VertexDataOffset0;
                         var vertexDataOffset1 = addedMesh ? 0 : meshInfo.VertexDataOffset1;
                         var vertexDataOffset2 = addedMesh ? 0 : meshInfo.VertexDataOffset2;
-                        byte vertexDataEntrySize0 = addedMesh ? (byte)lod0VertexDataEntrySize0 : meshInfo.VertexDataEntrySize0;
-                        byte vertexDataEntrySize1 = addedMesh ? (byte)lod0VertexDataEntrySize1 : meshInfo.VertexDataEntrySize1;
-                        byte vertexDataEntrySize2 = addedMesh ? (byte)0 : meshInfo.VertexDataEntrySize2;
+                        byte vertexDataEntrySize0 = addedMesh ? (byte)lod0VertexDataEntrySize0 : (byte)perVertexDataSizes[mi][0];
+                        byte vertexDataEntrySize1 = addedMesh ? (byte)lod0VertexDataEntrySize1 : (byte)perVertexDataSizes[mi][1];
+                        byte vertexDataEntrySize2 = addedMesh ? (byte)0 : (byte)perVertexDataSizes[mi][2];
                         short partCount = addedMesh ? (short)0 : meshInfo.MeshPartCount;
                         short materialIndex = addedMesh ? (short)0 : meshInfo.MaterialIndex;
                         short boneSetIndex = addedMesh ? (short)0 : (short)0;
@@ -2824,31 +2844,6 @@ namespace xivModdingFramework.Models.FileTypes
                         boneSetIndex = (short)meshNum;
                         materialIndex = ttModel.GetMaterialIndex(meshNum);
                         vDataBlockCount = 2;
-
-                        if (!addedMesh)
-                        {
-                            // Since we changed Normals and Texture coordinates from half to floats, we need
-                            // to adjust the vertex data entry size for that data block from 24 to 36, or from 16 to 24 if its a housing item
-                            // we skip this adjustment if the model is already modified
-                            if (!isAlreadyModified)
-                            {
-                                var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
-
-                                if (texCoordDataType == VertexDataType.Float2)
-                                {
-                                    vertexDataEntrySize1 += 8;
-                                }
-                                else
-                                {
-                                    vertexDataEntrySize1 += 12;
-                                }
-                            }
-                            if (!isAlreadyModified2)
-                            {
-                                vertexDataEntrySize0 += 4;
-
-                            }
-                        }
 
                         // Add in any shape vertices.
                         if (ttModel.HasShapeData)
@@ -3430,175 +3425,143 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
-                #region LoD Block
                 // Combined Data Block Sizes
                 // This is the offset to the beginning of the vertex data
-                var combinedDataBlockSize = 68 + vertexInfoBlock.Count + pathInfoBlock.Count + modelDataBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
+                var combinedDataBlockSize = _endOfHeader + vertexInfoBlock.Count + pathInfoBlock.Count + modelDataBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
                     boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneTransformDataBlock.Count;
 
-                var lodDataBlock = new List<byte>();
 
+                #region Finalize Pre-Compression Vertex Data Block
+
+                var vertexDataSectionList = new List<VertexDataSection>();
+                if (ttModel.HasShapeData)
+                {
+                    // Shape parts need to be rewitten in specific order.
+                    var parts = rawShapeData;
+                    foreach (var p in parts)
+                    {
+                        // Because our imported data does not include mesh shape data, we must include it manually
+                        var group = ttModel.MeshGroups[p.MeshId];
+                        var importData = importDataDictionary[p.MeshId];
+                        foreach (var v in p.Vertices)
+                        {
+                            WriteVertex(importData, vertexInfoLists[p.MeshId], ttModel, v);
+                        }
+                    }
+                }
+
+                List<VertexDataSection> vertexDataSections = new List<VertexDataSection>();
                 lodNum = 0;
-                var importVertexDataSize = 0;
-                var importIndexDataSize = 0;
-                var previousVertexDataSize = 0;
-                var previousindexDataSize = 0;
-                var previousVertexDataOffset = 0;
-                short meshOffset = 0;
-
                 foreach (var lod in ogMdl.LoDList)
                 {
-                    short mCount = 0;
-                    // Index Data Size is recalculated for LoD 0, because of the imported data, but remains the same
-                    // for every other LoD.
-                    var indexDataSize = 0;
+                    var vertexDataSection = new VertexDataSection();
+                    var meshNum = 0;
 
-                    // Both of these index values are always the same.
-                    // Because index data starts after the vertex data, these values need to be recalculated because
-                    // the imported data can add/remove vertex data
-                    var indexDataStart = 0;
-                    var indexDataOffset = 0;
-
-
-                    // This value is modified for LoD0 when import settings are present
-                    // This value is recalculated for every other LoD because of the imported data can add/remove vertex data.
-                    var vertexDataOffset = 0;
-
-                    // Vertex Data Size is recalculated for LoD 0, because of the imported data, but remains the same
-                    // for every other LoD.
-                    var vertexDataSize = 0;
-
-                    // Calculate the new values based on imported data
-                    // Note: Only the highest quality LoD is used which is LoD 0
                     if (lodNum == 0)
                     {
-                        // Get the sum of the vertex data and indices for all meshes in the imported data
-                        foreach (var importData in importDataDictionary)
+                        var totalMeshes = ttModel.MeshGroups.Count;
+
+                        for (var i = 0; i < totalMeshes; i++)
                         {
-                            mCount++;
-                            MeshData meshData;
+                            var importData = importDataDictionary[meshNum];
 
-                            bool addedMesh = false;
-                            // If meshes were added, no entry exists for it in the original data, so we grab the last available mesh
-                            if (importData.Key >= lod.MeshDataList.Count)
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
+                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
+                            vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
+
+                            var indexPadding = (importData.IndexCount * 2) % 16;
+                            if (indexPadding != 0)
                             {
-                                var diff = (importData.Key + 1) - lod.MeshDataList.Count;
-                                meshData = lod.MeshDataList[importData.Key - diff];
-                                addedMesh = true;
-                            }
-                            else
-                            {
-                                meshData = lod.MeshDataList[importData.Key];
+                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
                             }
 
-                            var shapeDataCount = 0;
-                            // Write the shape data if it exists.
-                            if (ttModel.HasShapeData && lodNum == 0)
-                            {
-                                var entrySizeSum = meshData.MeshInfo.VertexDataEntrySize0 + meshData.MeshInfo.VertexDataEntrySize1;
-                                if (!isAlreadyModified)
-                                {
-                                    var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
-
-                                    if (texCoordDataType == VertexDataType.Float2)
-                                    {
-                                        entrySizeSum += 8;
-                                    }
-                                    else
-                                    {
-                                        entrySizeSum += 12;
-                                    }
-                                }
-
-                                var group = ttModel.MeshGroups[importData.Key];
-                                var sum = 0;
-                                foreach (var p in group.Parts)
-                                {
-                                    foreach(var shp in p.ShapeParts)
-                                    {
-                                        if (shp.Key.StartsWith("shp_"))
-                                        {
-                                            sum += shp.Value.Vertices.Count;
-                                        }
-                                    }
-                                }
-                                shapeDataCount = sum * entrySizeSum;
-                            }
-
-                            importVertexDataSize += importData.Value.VertexData0.Count + importData.Value.VertexData1.Count + shapeDataCount;
-
-                            var indexPadding = 16 - importData.Value.IndexData.Count % 16;
-                            if (indexPadding == 16)
-                            {
-                                indexPadding = 0;
-                            }
-
-                            importIndexDataSize += importData.Value.IndexData.Count + indexPadding;
+                            meshNum++;
                         }
-
-                        vertexDataOffset = combinedDataBlockSize;
-
-                        vertexDataSize = importVertexDataSize;
-                        indexDataSize = importIndexDataSize;
-
-                        indexDataOffset = vertexDataOffset + vertexDataSize;
-                        indexDataStart = indexDataOffset;
                     }
-                    else
-                    {
-                        // The (vertex offset + vertex data size + index data size) of the previous LoD give you the vertex offset of the current LoD
-                        vertexDataOffset = previousVertexDataOffset + previousVertexDataSize + previousindexDataSize;
+                    vertexDataSections.Add(vertexDataSection);
+                }
+                #endregion
 
-                        // The (vertex data offset + vertex data size) of the current LoD give you the index offset
-                        // In this case it uses the newly calculated vertex data offset to get the correct index offset
-                        indexDataOffset = vertexDataOffset + 0;
-                        indexDataStart = indexDataOffset;
+                #region LoD Block
+                var lodDataBlock = new List<byte>();
+
+                finalMeshCount = importDataDictionary.Count;
+                List<int> indexStartInjectPointers = new List<int>();
+                for(int l = 0; l < ogMdl.LoDList.Count; l++)
+                {
+                    var originalLod = ogMdl.LoDList[l];
+
+                    int vertexDataOffset = 0;
+                    int vertexDataSize = 0;
+                    int indexDataOffset = 0;
+                    int indexDataSize = 0;
+
+                    // LoD 0 values.
+                    short meshOffset = 0;
+                    short mCount = (short)importDataDictionary.Count;
+                    var vertexDataSection = vertexDataSections[0];
+                    vertexDataOffset = combinedDataBlockSize;
+                    vertexDataSize = vertexDataSection.VertexDataBlock.Count;
+                    indexDataOffset = vertexDataOffset + vertexDataSize;
+                    indexDataSize = importDataDictionary.Sum(x =>
+                    {
+                        var size = x.Value.IndexData.Count;
+                        if (size % 16 != 0)
+                        {
+                            size += 16 - (size % 16);
+                        }
+                        return size;
+                    });
+
+                    // LoD 1+ is always empty in our imports, so the real values for their offsets are just the end of LoD 0's data with 0s for counts
+                    if (l > 0)
+                    {
+                        meshOffset = mCount;
+                        mCount = 0;
+                        vertexDataOffset = indexDataOffset + indexDataSize;
+                        indexDataOffset = indexDataOffset + indexDataSize;
+                        indexDataSize = 0;
+                        vertexDataSize = 0;
                     }
 
                     // We add any additional meshes to the offset if we added any through advanced importing, otherwise additionalMeshCount stays at 0
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)meshOffset));
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)mCount));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown0));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown1));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown0));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown1));
 
-                    // Not sure when or how shapes are considered "extra" meshses for the sake of this var,
+                    // Not sure when or how shapes are considered "extra" meshes for the sake of this var,
                     // but it seems like never?
                     short shapeMeshCount = (short)(0);
-                    // We add any additional meshes to the mesh end and mesh sum if we added any through advanced imoprting, otherwise additionalMeshCount stays at 0
+                    // We add any additional meshes to the mesh end and mesh sum if we added any through advanced importing, otherwise additionalMeshCount stays at 0
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)(meshOffset + mCount)));
                     lodDataBlock.AddRange(BitConverter.GetBytes(shapeMeshCount));
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)(meshOffset + mCount + shapeMeshCount)));
 
-                    // Might as well keep this updated for later.
-                    totalMeshCount = meshOffset + mCount + shapeMeshCount;
 
                     meshOffset += (short)(mCount + shapeMeshCount);
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown2));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown2));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown3));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown4));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown5));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown3));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown4));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown5));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(indexDataStart));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown6));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(lod.Unknown7));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown6));
+                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown7));
 
                     lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataSize));
                     lodDataBlock.AddRange(BitConverter.GetBytes(indexDataSize));
                     lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataOffset));
                     lodDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
-
-                    previousVertexDataSize = vertexDataSize;
-                    previousindexDataSize = indexDataSize;
-                    previousVertexDataOffset = vertexDataOffset;
-
-                    lodNum++;
                 }
                 #endregion
+
+
 
                 // Combine All DataBlocks
                 fullModelDataBlock.AddRange(pathInfoBlock);
@@ -3680,58 +3643,14 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-                // Vertex Data Block
-                #region Vertex Data Block
 
-                var vertexDataSectionList = new List<VertexDataSection>();
+                #region Vertex Data Block Compression
                 var compressedMeshSizes = new List<int>();
                 var compressedIndexSizes = new List<int>();
-
-                if (ttModel.HasShapeData)
+                for (int l = 0; l < ogMdl.LoDList.Count; l++)
                 {
-                    // Shape parts need to be rewitten in specific order.
-                    var parts = rawShapeData;
-                    foreach (var p in parts)
-                    {
-                        // Because our imported data does not include mesh shape data, we must include it manually
-                        var group = ttModel.MeshGroups[p.MeshId];
-                        var importData = importDataDictionary[p.MeshId];
-                        foreach (var v in p.Vertices)
-                        {
-                            WriteVertex(importData, vertexInfoDict, ttModel, v);
-                        }
-                    }
-                }
-
-
-                lodNum = 0;
-                foreach (var lod in ogMdl.LoDList)
-                {
-                    var vertexDataSection = new VertexDataSection();
-                    var meshNum = 0;
-
-                    if (lodNum == 0)
-                    {
-                        var totalMeshes = ttModel.MeshGroups.Count;
-
-                        for (var i = 0; i < totalMeshes; i++)
-                        {
-                            var importData = importDataDictionary[meshNum];
-
-                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData0);
-                            vertexDataSection.VertexDataBlock.AddRange(importData.VertexData1);
-                            vertexDataSection.IndexDataBlock.AddRange(importData.IndexData);
-
-                            var indexPadding = (importData.IndexCount * 2) % 16;
-                            if (indexPadding != 0)
-                            {
-                                vertexDataSection.IndexDataBlock.AddRange(new byte[16 - indexPadding]);
-                            }
-
-                            meshNum++;
-                        }
-                    }
-
+                    var lod = ogMdl.LoDList[l];
+                    var vertexDataSection = vertexDataSections[l];
 
                     // Vertex Compression
                     vertexDataSection.VertexDataBlockPartCount =
@@ -4009,7 +3928,7 @@ namespace xivModdingFramework.Models.FileTypes
                 datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].IndexDataBlockPartCount));
 
                 // Mesh Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)totalMeshCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)finalMeshCount));
                 // Material Count
                 datHeader.AddRange(BitConverter.GetBytes((ushort)ttModel.Materials.Count));
                 // LoD Count
@@ -4087,7 +4006,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A dictionary containing the vertex byte data per mesh</returns>
-        private Dictionary<int, VertexByteData> GetGeometryData(TTModel ttModel, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict)
+        private Dictionary<int, VertexByteData> GetGeometryData(TTModel ttModel, List<Dictionary<VertexUsageType, List<VertexDataType>>> vertexInfoDict)
         {
             var importDataDictionary = new Dictionary<int, VertexByteData>();
 
@@ -4096,8 +4015,9 @@ namespace xivModdingFramework.Models.FileTypes
 
             // Add the first vertex data set to the ImportData list
             // This contains [ Position, Bone Weights, Bone Indices]
-            foreach (var m in ttModel.MeshGroups)
+            for(var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
             {
+                var m = ttModel.MeshGroups[mi];
                 var importData = new VertexByteData()
                 {
                     VertexData0 = new List<byte>(),
@@ -4111,7 +4031,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     foreach (var v in p.Vertices)
                     {
-                        WriteVertex(importData, vertexInfoDict, ttModel, v);
+                        WriteVertex(importData, vertexInfoDict[mi], ttModel, v);
                     }
 
                 }
@@ -4335,11 +4255,21 @@ namespace xivModdingFramework.Models.FileTypes
             return vertexByteData;
         }
 
-        private void WriteVertex(VertexByteData importData, Dictionary<int, Dictionary<VertexUsageType, VertexDataType>> vertexInfoDict, TTModel model, TTVertex v)
+
+        /// <summary>
+        /// Writes vertex data to the given import structures, and returns the total byte size of the index written.
+        /// </summary>
+        /// <param name="importData"></param>
+        /// <param name="vertexInfoList"></param>
+        /// <param name="model"></param>
+        /// <param name="v"></param>
+        /// <returns></returns>
+        private int WriteVertex(VertexByteData importData, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, TTModel model, TTVertex v)
         {
             // Positions for Weapon and Monster item types are half precision floating points
-            var posDataType = vertexInfoDict[0][VertexUsageType.Position];
-
+            var posDataType = vertexInfoList[VertexUsageType.Position][0];
+            var start0 = importData.VertexData0.Count;
+            var start1 = importData.VertexData1.Count;
 
             Half hx, hy, hz;
             if (posDataType == VertexDataType.Half4)
@@ -4395,23 +4325,31 @@ namespace xivModdingFramework.Models.FileTypes
             importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(biNormal, handedness));
 
 
-            if (vertexInfoDict[0].ContainsKey(VertexUsageType.Tangent))
+            if (vertexInfoList.ContainsKey(VertexUsageType.Tangent))
             {
                 // 99% sure this code path is never actually used.
                 importData.VertexData1.AddRange(ConvertVectorBinormalToBytes(v.Tangent, handedness * -1));
             }
 
-
-            if (vertexInfoDict[0].ContainsKey(VertexUsageType.Color))
+            var temp = importData.VertexData1.Count - start1;
+            if (vertexInfoList.ContainsKey(VertexUsageType.Color))
             {
                 importData.VertexData1.Add(v.VertexColor[0]);
                 importData.VertexData1.Add(v.VertexColor[1]);
                 importData.VertexData1.Add(v.VertexColor[2]);
                 importData.VertexData1.Add(v.VertexColor[3]);
             }
+            if (vertexInfoList.ContainsKey(VertexUsageType.Color) && vertexInfoList[VertexUsageType.Color].Count > 1)
+            {
+                // Gee Mom, why does SE let you have two vertex color channels?
+                importData.VertexData1.Add(v.VertexColor2[0]);
+                importData.VertexData1.Add(v.VertexColor2[1]);
+                importData.VertexData1.Add(v.VertexColor2[2]);
+                importData.VertexData1.Add(v.VertexColor2[3]);
+            }
 
             // Texture Coordinates
-            var texCoordDataType = vertexInfoDict[0][VertexUsageType.TextureCoordinate];
+            var texCoordDataType = vertexInfoList[VertexUsageType.TextureCoordinate][0];
 
 
             importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV1[0]));
@@ -4422,6 +4360,9 @@ namespace xivModdingFramework.Models.FileTypes
                 importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[0]));
                 importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV2[1]));
             }
+            var size0 = importData.VertexData0.Count - start0;
+            var size1 = importData.VertexData1.Count - start1;
+            return size0 + size1;
         }
 
 

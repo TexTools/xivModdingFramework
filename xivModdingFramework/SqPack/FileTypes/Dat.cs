@@ -816,7 +816,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             blockSizes[i] = br.ReadUInt16();
                         }
 
-                        br.BaseStream.Seek(offset + headerLength + chunkOffsets[0], SeekOrigin.Begin);
+                        br.BaseStream.Seek(endOfHeader + chunkOffsets[0], SeekOrigin.Begin);
 
                         for (var i = 0; i < totalBlocks; i++)
                         {

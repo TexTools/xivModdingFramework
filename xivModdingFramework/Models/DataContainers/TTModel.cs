@@ -46,6 +46,7 @@ namespace xivModdingFramework.Models.DataContainers
 
         // RGBA
         public byte[] VertexColor = new byte[] { 255, 255, 255, 255 };
+        public byte[] VertexColor2 = new byte[] { 255, 255, 255, 255 };
 
         // BoneIds and Weights.  FFXIV Vertices can only be affected by a maximum of 4 bones.
         public byte[] BoneIds = new byte[4];
@@ -64,12 +65,12 @@ namespace xivModdingFramework.Models.DataContainers
             for(var ci = 0; ci < 4; ci++)
             {
                 if (a.VertexColor[ci] != b.VertexColor[ci]) return false;
+                if (a.VertexColor2[ci] != b.VertexColor2[ci]) return false;
                 if (a.BoneIds[ci] != b.BoneIds[ci]) return false;
                 if (a.Weights[ci] != b.Weights[ci]) return false;
-
             }
 
-            return true;
+                return true;
         }
 
         public static bool operator !=(TTVertex a, TTVertex b)
@@ -89,12 +90,14 @@ namespace xivModdingFramework.Models.DataContainers
             var clone = (TTVertex) this.MemberwiseClone();
 
             clone.VertexColor = new byte[4];
+            clone.VertexColor2 = new byte[4];
             clone.BoneIds = new byte[4];
             clone.Weights = new byte[4];
 
             Array.Copy(this.BoneIds, 0, clone.BoneIds, 0, 4);
             Array.Copy(this.Weights, 0, clone.Weights, 0, 4);
             Array.Copy(this.VertexColor, 0, clone.VertexColor, 0, 4);
+            Array.Copy(this.VertexColor2, 0, clone.VertexColor2, 0, 4);
 
             return clone;
         }
@@ -1118,6 +1121,12 @@ namespace xivModdingFramework.Models.DataContainers
                         vertex.VertexColor[2] = (byte)(Math.Round(reader.GetFloat("color_b") * 255));
                         vertex.VertexColor[3] = (byte)(Math.Round(reader.GetFloat("color_a") * 255));
 
+                        // Vertex Colors - Vertex color is RGBA
+                        vertex.VertexColor2[0] = (byte)(Math.Round(reader.GetFloat("color2_r") * 255));
+                        vertex.VertexColor2[1] = (byte)(Math.Round(reader.GetFloat("color2_g") * 255));
+                        vertex.VertexColor2[2] = (byte)(Math.Round(reader.GetFloat("color2_b") * 255));
+                        vertex.VertexColor2[3] = (byte)(Math.Round(reader.GetFloat("color2_a") * 255));
+
                         // UV Coordinates
                         vertex.UV1.X = reader.GetFloat("uv_1_u");
                         vertex.UV1.Y = reader.GetFloat("uv_1_v");
@@ -1415,8 +1424,8 @@ namespace xivModdingFramework.Models.DataContainers
                                 var vIdx = 0;
                                 foreach (var v in p.Vertices)
                                 {
-                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
-                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
+                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a, color2_r,  color2_g,  color2_b,  color2_a, uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
+                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
                                     using (var cmd = new SQLiteCommand(query, db))
                                     {
                                         cmd.Parameters.AddWithValue("part", partIdx);
@@ -1435,6 +1444,11 @@ namespace xivModdingFramework.Models.DataContainers
                                         cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
                                         cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
                                         cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
+
+                                        cmd.Parameters.AddWithValue("color2_r", v.VertexColor2[0] / 255f);
+                                        cmd.Parameters.AddWithValue("color2_g", v.VertexColor2[1] / 255f);
+                                        cmd.Parameters.AddWithValue("color2_b", v.VertexColor2[2] / 255f);
+                                        cmd.Parameters.AddWithValue("color2_a", v.VertexColor2[3] / 255f);
 
                                         cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
                                         cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
@@ -1839,8 +1853,8 @@ namespace xivModdingFramework.Models.DataContainers
                                     var vIdx = 0;
                                     foreach (var v in p.Vertices)
                                     {
-                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
-                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
+                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a, color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
+                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
                                         using (var cmd = new SQLiteCommand(query, db))
                                         {
                                             cmd.Parameters.AddWithValue("part", partIdx);
@@ -1859,6 +1873,11 @@ namespace xivModdingFramework.Models.DataContainers
                                             cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
                                             cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
                                             cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
+
+                                            cmd.Parameters.AddWithValue("color2_r", v.VertexColor2[0] / 255f);
+                                            cmd.Parameters.AddWithValue("color2_g", v.VertexColor2[1] / 255f);
+                                            cmd.Parameters.AddWithValue("color2_b", v.VertexColor2[2] / 255f);
+                                            cmd.Parameters.AddWithValue("color2_a", v.VertexColor2[3] / 255f);
 
                                             cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
                                             cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
@@ -2377,6 +2396,7 @@ namespace xivModdingFramework.Models.DataContainers
 
                     bool anyAlpha = false;
                     bool anyColor = false;
+                    bool anyColor2 = false;
                     bool anyWeirdUV1s = false;
                     bool anyWeirdUV2s = false;
 
@@ -2384,6 +2404,7 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
                         anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
+                        anyColor2 = anyColor2 || (v.VertexColor2[0] > 0 || v.VertexColor2[1] > 0 || v.VertexColor2[2] > 0 || v.VertexColor2[3] > 0);
                         anyWeirdUV1s = anyWeirdUV1s || (v.UV1.X > 2 || v.UV1.X < -2 || v.UV1.Y > 2 || v.UV1.Y < -2);
                         anyWeirdUV2s = anyWeirdUV2s || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
                     }
@@ -2396,6 +2417,10 @@ namespace xivModdingFramework.Models.DataContainers
                     if (!anyColor)
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
+                    }
+                    if (!anyColor)
+                    {
+                        // TODO: Do we care about this? Who knows.
                     }
 
                     if (anyWeirdUV1s)

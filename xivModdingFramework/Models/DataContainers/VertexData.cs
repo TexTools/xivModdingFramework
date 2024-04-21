@@ -75,6 +75,11 @@ namespace xivModdingFramework.Models.DataContainers
         public List<Color> Colors { get; set; }
 
         /// <summary>
+        /// Second Vertex Color Channel
+        /// </summary>
+        public List<Color> Colors2 { get; set; }
+
+        /// <summary>
         /// The vertex color data in Color4 format
         /// </summary>
         public Color4Collection Colors4 { get; set; }

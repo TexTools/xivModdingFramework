@@ -406,6 +406,13 @@ namespace xivModdingFramework.Models.Helpers
                             ttVert.VertexColor[2] = baseMesh.VertexData.Colors[oldVertexId].B;
                             ttVert.VertexColor[3] = baseMesh.VertexData.Colors[oldVertexId].A;
                         }
+                        if (baseMesh.VertexData.Colors2.Count > oldVertexId)
+                        {
+                            ttVert.VertexColor2[0] = baseMesh.VertexData.Colors2[oldVertexId].R;
+                            ttVert.VertexColor2[1] = baseMesh.VertexData.Colors2[oldVertexId].G;
+                            ttVert.VertexColor2[2] = baseMesh.VertexData.Colors2[oldVertexId].B;
+                            ttVert.VertexColor2[3] = baseMesh.VertexData.Colors2[oldVertexId].A;
+                        }
                         if (baseMesh.VertexData.BiNormalHandedness.Count > oldVertexId)
                         {
                             ttVert.Handedness = baseMesh.VertexData.BiNormalHandedness[oldVertexId] == 0 ? false : true;
