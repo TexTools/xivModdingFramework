@@ -746,6 +746,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var meshCount = 0;
             var materialCount = 0;
 
+            var index = 0;
             await Task.Run(async () =>
             {
                 await _lock.WaitAsync();
@@ -820,6 +821,13 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         for (var i = 0; i < totalBlocks; i++)
                         {
+                            if (blockSizes[i] == 0)
+                            {
+                                // ???
+                                continue;
+                            }
+
+                            index = i;
                             long lastPos = br.BaseStream.Position;
 
                             br.ReadBytes(8);
@@ -841,6 +849,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                             br.BaseStream.Seek(lastPos + blockSizes[i], SeekOrigin.Begin);
                         }
                     }
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine(index.ToString());
+
                 }
                 finally
                 {

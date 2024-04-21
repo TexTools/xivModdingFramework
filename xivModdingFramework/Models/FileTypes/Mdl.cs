@@ -3651,6 +3651,19 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var lod = ogMdl.LoDList[l];
                     var vertexDataSection = vertexDataSections[l];
+                    if( l > 0)
+                    {
+                        // We do not bother with LoDs above 0.
+                        vertexDataSection.IndexDataBlock = new List<byte>();
+                        vertexDataSection.VertexDataBlock = new List<byte>();
+
+                        vertexDataSection.VertexDataBlockPartCount = 0;
+                        vertexDataSection.IndexDataBlockPartCount = 0;
+
+                        vertexDataSection.CompressedVertexDataBlockSize = 0;
+                        vertexDataSection.CompressedIndexDataBlockSize = 0;
+                        continue;
+                    }
 
                     // Vertex Compression
                     vertexDataSection.VertexDataBlockPartCount =
@@ -3732,8 +3745,6 @@ namespace xivModdingFramework.Models.FileTypes
                     }
 
                     vertexDataSectionList.Add(vertexDataSection);
-
-                    lodNum++;
                 }
                 #endregion
 
@@ -3745,7 +3756,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This is the most common size of header for models
                 var headerLength = 256;
 
-                var blockCount = compressedMeshSizes.Count + modelDataPartCount + 3 + compressedIndexSizes.Count;
+                var blockCount = 1 + compressedMeshSizes.Count + modelDataPartCount + compressedIndexSizes.Count;
 
                 // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
                 if (blockCount > 24)
@@ -3793,13 +3804,9 @@ namespace xivModdingFramework.Models.FileTypes
                 datPadding = datPadding == 128 ? 0 : datPadding;
                 datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[0].VertexDataBlock.Count + datPadding));
                 // Vertex Data Block LoD[1] Uncompressed
-                datPadding = 128 - vertexDataSectionList[1].VertexDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[1].VertexDataBlock.Count + datPadding));
+                datHeader.AddRange(BitConverter.GetBytes(0));
                 // Vertex Data Block LoD[2] Uncompressed
-                datPadding = 128 - vertexDataSectionList[2].VertexDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[2].VertexDataBlock.Count + datPadding));
+                datHeader.AddRange(BitConverter.GetBytes(0));
                 // Blank 1
                 datHeader.AddRange(BitConverter.GetBytes(0));
                 // Blank 2
@@ -3811,13 +3818,9 @@ namespace xivModdingFramework.Models.FileTypes
                 datPadding = datPadding == 128 ? 0 : datPadding;
                 datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[0].IndexDataBlock.Count + datPadding));
                 // Index Data Block LoD[1] Uncompressed
-                datPadding = 128 - vertexDataSectionList[1].IndexDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[1].IndexDataBlock.Count + datPadding));
+                datHeader.AddRange(BitConverter.GetBytes(0));
                 // Index Data Block LoD[2] Uncompressed
-                datPadding = 128 - vertexDataSectionList[2].IndexDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[2].IndexDataBlock.Count + datPadding));
+                datHeader.AddRange(BitConverter.GetBytes(0));
 
                 // Vertex Info Block Compressed
                 datHeader.AddRange(BitConverter.GetBytes(compressedVertexInfoSize));
@@ -3826,9 +3829,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Vertex Data Block LoD[0] Compressed
                 datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[0].CompressedVertexDataBlockSize));
                 // Vertex Data Block LoD[1] Compressed
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[1].CompressedVertexDataBlockSize));
+                datHeader.AddRange(BitConverter.GetBytes(0));
                 // Vertex Data Block LoD[2] Compressed
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[2].CompressedVertexDataBlockSize));
+                datHeader.AddRange(BitConverter.GetBytes(0));
                 // Blank 1
                 datHeader.AddRange(BitConverter.GetBytes(0));
                 // Blank 2
@@ -3838,18 +3841,18 @@ namespace xivModdingFramework.Models.FileTypes
                 // Index Data Block LoD[0] Compressed
                 datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[0].CompressedIndexDataBlockSize));
                 // Index Data Block LoD[1] Compressed
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[1].CompressedIndexDataBlockSize));
+                datHeader.AddRange(BitConverter.GetBytes(0));
                 // Index Data Block LoD[2] Compressed
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataSectionList[2].CompressedIndexDataBlockSize));
+                datHeader.AddRange(BitConverter.GetBytes(0));
 
                 var vertexInfoOffset = 0;
                 var modelDataOffset = compressedVertexInfoSize;
                 var vertexDataBlock1Offset = modelDataOffset + totalModelDataCompressedSize;
                 var indexDataBlock1Offset = vertexDataBlock1Offset + vertexDataSectionList[0].CompressedVertexDataBlockSize;
                 var vertexDataBlock2Offset = indexDataBlock1Offset + vertexDataSectionList[0].CompressedIndexDataBlockSize;
-                var indexDataBlock2Offset = vertexDataBlock2Offset + vertexDataSectionList[1].CompressedVertexDataBlockSize;
-                var vertexDataBlock3Offset = indexDataBlock2Offset + vertexDataSectionList[1].CompressedIndexDataBlockSize;
-                var indexDataBlock3Offset = vertexDataBlock3Offset + vertexDataSectionList[2].CompressedVertexDataBlockSize;
+                var indexDataBlock2Offset = vertexDataBlock2Offset;
+                var vertexDataBlock3Offset = vertexDataBlock2Offset;
+                var indexDataBlock3Offset = vertexDataBlock2Offset;
 
                 // Vertex Info Offset
                 datHeader.AddRange(BitConverter.GetBytes(vertexInfoOffset));
@@ -3877,9 +3880,9 @@ namespace xivModdingFramework.Models.FileTypes
                 var vertexDataBlock1 = 1 + modelDataPartCount;
                 var indexDataBlock1 = vertexDataBlock1 + vertexDataSectionList[0].VertexDataBlockPartCount;
                 var vertexDataBlock2 = indexDataBlock1 + vertexDataSectionList[0].IndexDataBlockPartCount;
-                var indexDataBlock2 = vertexDataBlock2 + vertexDataSectionList[1].VertexDataBlockPartCount;
-                var vertexDataBlock3 = indexDataBlock2 + 1;
-                var indexDataBlock3 = vertexDataBlock3 + vertexDataSectionList[2].VertexDataBlockPartCount;
+                var indexDataBlock2 = vertexDataBlock2;
+                var vertexDataBlock3 = vertexDataBlock2;
+                var indexDataBlock3 = vertexDataBlock2;
 
                 // Vertex Info Index
                 datHeader.AddRange(BitConverter.GetBytes((short)0));
@@ -3911,9 +3914,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Vertex Data Block LoD[0] part count
                 datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[0].VertexDataBlockPartCount));
                 // Vertex Data Block LoD[1] part count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[1].VertexDataBlockPartCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
                 // Vertex Data Block LoD[2] part count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].VertexDataBlockPartCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
                 // Blank 1
                 datHeader.AddRange(BitConverter.GetBytes((short)0));
                 // Blank 2
@@ -3923,9 +3926,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Index Data Block LoD[0] part count
                 datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[0].IndexDataBlockPartCount));
                 // Index Data Block LoD[1] part count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[1].IndexDataBlockPartCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
                 // Index Data Block LoD[2] part count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].IndexDataBlockPartCount));
+                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
 
                 // Mesh Count
                 datHeader.AddRange(BitConverter.GetBytes((ushort)finalMeshCount));
@@ -3960,26 +3963,8 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexSizes[i]));
                 }
-
-                // Vertex Data Block LoD[1] part padded sizes
-                for (var i = 0; i < vertexDataSectionList[1].VertexDataBlockPartCount; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedMeshSizes[vertexDataBlockCount + i]));
-                }
-
-                vertexDataBlockCount += vertexDataSectionList[1].VertexDataBlockPartCount;
-
-                // Index Data Block LoD[1] padded size
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[1].CompressedIndexDataBlockSize));
-
-                // Vertex Data Block LoD[2] part padded sizes
-                for (var i = 0; i < vertexDataSectionList[2].VertexDataBlockPartCount; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedMeshSizes[vertexDataBlockCount + i]));
-                }
-
-                // Index Data Block LoD[2] padded size
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataSectionList[2].CompressedIndexDataBlockSize));
+                
+                // LoD 1+ is skipped since we don't bother with them.
 
                 if (datHeader.Count != headerLength)
                 {
