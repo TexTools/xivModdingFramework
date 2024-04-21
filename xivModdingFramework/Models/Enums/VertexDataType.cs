@@ -37,7 +37,7 @@ namespace xivModdingFramework.Models.Enums
         Ushort4n = 0xC,
         Half2    = 0xF,
         Half4    = 0x10,
-        Unknown17 = 0x11
+        UByte8 = 0x11
     }
 
     public static class VertexDataTypeInfo
@@ -57,7 +57,7 @@ namespace xivModdingFramework.Models.Enums
             { VertexDataType.Ushort4n, 8 },
             { VertexDataType.Half2, 4 },
             { VertexDataType.Half4, 8 },
-            { VertexDataType.Unknown17, 4 },
+            { VertexDataType.UByte8, 8 },
         };
 
     }

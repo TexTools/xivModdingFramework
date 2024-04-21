@@ -18,6 +18,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Models.Helpers;
+using xivModdingFramework.Models.ModelTextures;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
 
@@ -48,9 +49,11 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] VertexColor = new byte[] { 255, 255, 255, 255 };
         public byte[] VertexColor2 = new byte[] { 255, 255, 255, 255 };
 
-        // BoneIds and Weights.  FFXIV Vertices can only be affected by a maximum of 4 bones.
-        public byte[] BoneIds = new byte[4];
-        public byte[] Weights = new byte[4];
+        private const int _BONE_ARRAY_LENGTH = 8;
+
+        // BoneIds and Weights.
+        public byte[] BoneIds = new byte[_BONE_ARRAY_LENGTH];
+        public byte[] Weights = new byte[_BONE_ARRAY_LENGTH];
 
         public static bool operator ==(TTVertex a, TTVertex b)
         {
@@ -62,10 +65,14 @@ namespace xivModdingFramework.Models.DataContainers
             if (a.UV1 != b.UV1) return false;
             if (a.UV2 != b.UV2) return false;
 
-            for(var ci = 0; ci < 4; ci++)
+            for(var ci = 0; ci < _BONE_ARRAY_LENGTH; ci++)
             {
-                if (a.VertexColor[ci] != b.VertexColor[ci]) return false;
-                if (a.VertexColor2[ci] != b.VertexColor2[ci]) return false;
+                if (ci < 4)
+                {
+                    if (a.VertexColor[ci] != b.VertexColor[ci]) return false;
+                    if (a.VertexColor2[ci] != b.VertexColor2[ci]) return false;
+                }
+
                 if (a.BoneIds[ci] != b.BoneIds[ci]) return false;
                 if (a.Weights[ci] != b.Weights[ci]) return false;
             }
@@ -91,11 +98,11 @@ namespace xivModdingFramework.Models.DataContainers
 
             clone.VertexColor = new byte[4];
             clone.VertexColor2 = new byte[4];
-            clone.BoneIds = new byte[4];
-            clone.Weights = new byte[4];
+            clone.BoneIds = new byte[_BONE_ARRAY_LENGTH];
+            clone.Weights = new byte[_BONE_ARRAY_LENGTH];
 
-            Array.Copy(this.BoneIds, 0, clone.BoneIds, 0, 4);
-            Array.Copy(this.Weights, 0, clone.Weights, 0, 4);
+            Array.Copy(this.BoneIds, 0, clone.BoneIds, 0, _BONE_ARRAY_LENGTH);
+            Array.Copy(this.Weights, 0, clone.Weights, 0, _BONE_ARRAY_LENGTH);
             Array.Copy(this.VertexColor, 0, clone.VertexColor, 0, 4);
             Array.Copy(this.VertexColor2, 0, clone.VertexColor2, 0, 4);
 
@@ -1138,12 +1145,20 @@ namespace xivModdingFramework.Models.DataContainers
                         vertex.BoneIds[1] = (byte)(reader.GetByte("bone_2_id"));
                         vertex.BoneIds[2] = (byte)(reader.GetByte("bone_3_id"));
                         vertex.BoneIds[3] = (byte)(reader.GetByte("bone_4_id"));
+                        vertex.BoneIds[4] = (byte)(reader.GetByte("bone_5_id"));
+                        vertex.BoneIds[5] = (byte)(reader.GetByte("bone_6_id"));
+                        vertex.BoneIds[6] = (byte)(reader.GetByte("bone_7_id"));
+                        vertex.BoneIds[7] = (byte)(reader.GetByte("bone_8_id"));
 
                         // Weights
                         vertex.Weights[0] = (byte)(Math.Round(reader.GetFloat("bone_1_weight") * 255));
                         vertex.Weights[1] = (byte)(Math.Round(reader.GetFloat("bone_2_weight") * 255));
                         vertex.Weights[2] = (byte)(Math.Round(reader.GetFloat("bone_3_weight") * 255));
                         vertex.Weights[3] = (byte)(Math.Round(reader.GetFloat("bone_4_weight") * 255));
+                        vertex.Weights[4] = (byte)(Math.Round(reader.GetFloat("bone_5_weight") * 255));
+                        vertex.Weights[5] = (byte)(Math.Round(reader.GetFloat("bone_6_weight") * 255));
+                        vertex.Weights[6] = (byte)(Math.Round(reader.GetFloat("bone_7_weight") * 255));
+                        vertex.Weights[7] = (byte)(Math.Round(reader.GetFloat("bone_8_weight") * 255));
 
                         return vertex;
                     }).GetAwaiter().GetResult();
@@ -1298,6 +1313,11 @@ namespace xivModdingFramework.Models.DataContainers
                             cmd.Parameters.AddWithValue("value", "r");
                             cmd.ExecuteScalar();
 
+                            var for3ds = ModelTexture.GetCustomColors().InvertNormalGreen;
+                            cmd.Parameters.AddWithValue("key", "for_3ds_max");
+                            cmd.Parameters.AddWithValue("value", for3ds ? "1" : "0");
+                            cmd.ExecuteScalar();
+
 
                             // FFXIV stores stuff in Meters.
                             cmd.Parameters.AddWithValue("key", "root_name");
@@ -1424,8 +1444,8 @@ namespace xivModdingFramework.Models.DataContainers
                                 var vIdx = 0;
                                 foreach (var v in p.Vertices)
                                 {
-                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a, color2_r,  color2_g,  color2_b,  color2_a, uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
-                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
+                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
+                                                        values    ( $mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
                                     using (var cmd = new SQLiteCommand(query, db))
                                     {
                                         cmd.Parameters.AddWithValue("part", partIdx);
@@ -1467,6 +1487,20 @@ namespace xivModdingFramework.Models.DataContainers
 
                                         cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
                                         cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_5_id", v.BoneIds[4]);
+                                        cmd.Parameters.AddWithValue("bone_5_weight", v.Weights[4] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_6_id", v.BoneIds[5]);
+                                        cmd.Parameters.AddWithValue("bone_6_weight", v.Weights[5] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_7_id", v.BoneIds[6]);
+                                        cmd.Parameters.AddWithValue("bone_7_weight", v.Weights[6] / 255f);
+
+                                        cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
+                                        cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
+
+
 
                                         cmd.ExecuteScalar();
                                         vIdx++;
@@ -1853,8 +1887,8 @@ namespace xivModdingFramework.Models.DataContainers
                                     var vIdx = 0;
                                     foreach (var v in p.Vertices)
                                     {
-                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a, color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight) 
-                                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight);";
+                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a, uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
+                                                        values         ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
                                         using (var cmd = new SQLiteCommand(query, db))
                                         {
                                             cmd.Parameters.AddWithValue("part", partIdx);
@@ -1896,6 +1930,18 @@ namespace xivModdingFramework.Models.DataContainers
 
                                             cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
                                             cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
+
+                                            cmd.Parameters.AddWithValue("bone_5_id", v.BoneIds[4]);
+                                            cmd.Parameters.AddWithValue("bone_5_weight", v.Weights[4] / 255f);
+
+                                            cmd.Parameters.AddWithValue("bone_6_id", v.BoneIds[5]);
+                                            cmd.Parameters.AddWithValue("bone_6_weight", v.Weights[5] / 255f);
+
+                                            cmd.Parameters.AddWithValue("bone_7_id", v.BoneIds[6]);
+                                            cmd.Parameters.AddWithValue("bone_7_weight", v.Weights[6] / 255f);
+
+                                            cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
+                                            cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
 
                                             cmd.ExecuteScalar();
                                             vIdx++;
@@ -2371,7 +2417,7 @@ namespace xivModdingFramework.Models.DataContainers
             }
             loggingFunction(false, "Checking for unusual data...");
 
-            if (model.Materials.Count > 4)
+            if (model.Materials.Count > 4 && model.MdlVersion == 5)
             {
                 loggingFunction(true, "Model has more than four active materials.  The following materials will be ignored in game: ");
                 var idx = 0;

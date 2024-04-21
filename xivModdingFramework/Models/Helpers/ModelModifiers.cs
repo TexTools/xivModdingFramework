@@ -441,9 +441,9 @@ namespace xivModdingFramework.Models.Helpers
                         }
 
 
-
+                        var vertexBoneArrayLength = baseMesh.VertexBoneArraySize;
                         // Now for the fun part, establishing bones.
-                        for(var bIdx = 0; bIdx < 4; bIdx++)
+                        for(var bIdx = 0; bIdx < vertexBoneArrayLength; bIdx++)
                         {
                             // Vertex doesn't have weights.
                             if (baseMesh.VertexData.BoneWeights.Count <= oldVertexId) break;

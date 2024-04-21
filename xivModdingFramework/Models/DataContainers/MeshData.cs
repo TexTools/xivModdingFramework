@@ -21,6 +21,8 @@ namespace xivModdingFramework.Models.DataContainers
 {
     public class MeshData
     {
+        public int VertexBoneArraySize { get; set; }
+
         /// <summary>
         /// The information for the mesh data
         /// </summary>

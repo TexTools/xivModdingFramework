@@ -866,6 +866,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                             xivMdl.LoDList[i].MeshDataList[j].VertexDataStructList.Add(vertexDataStruct);
 
+                            if(vertexDataStruct.DataUsage == VertexUsageType.BoneIndex)
+                            {
+                                // Store bone array size for reference later.
+                                xivMdl.LoDList[i].MeshDataList[j].VertexBoneArraySize = vertexDataStruct.DataType == VertexDataType.UByte8 ? 8 : 4;
+                            }
+
                             // padding between Vertex Data Structs
                             br.ReadBytes(4);
 
@@ -1345,17 +1351,35 @@ namespace xivModdingFramework.Models.FileTypes
                                 var bwOffset = lod.VertexDataOffset + vertexDataOffset + bwDataStruct.DataOffset + vertexDataSize * i;
 
                                 br.BaseStream.Seek(bwOffset, SeekOrigin.Begin);
-                                var b0 = br.ReadByte();
-                                var b1 = br.ReadByte();
-                                var b2 = br.ReadByte();
-                                var b3 = br.ReadByte();
 
-                                var bw0 = b0 / 255f;
-                                var bw1 = b1 / 255f;
-                                var bw2 = b2 / 255f;
-                                var bw3 = b3 / 255f;
+                                byte[] byteValues = bwDataStruct.DataType == VertexDataType.UByte8 ? new byte[8] : new byte[4];
 
-                                vertexData.BoneWeights.Add(new[] { bw0, bw1, bw2, bw3 });
+                                if (bwDataStruct.DataType == VertexDataType.UByte8)
+                                {
+                                    // Silly low => High format
+                                    byteValues[0] = br.ReadByte();
+                                    byteValues[4] = br.ReadByte();
+                                    byteValues[1] = br.ReadByte();
+                                    byteValues[5] = br.ReadByte();
+                                    byteValues[2] = br.ReadByte();
+                                    byteValues[6] = br.ReadByte();
+                                    byteValues[3] = br.ReadByte();
+                                    byteValues[7] = br.ReadByte();
+                                } else
+                                {
+                                    for(int z = 0; z < byteValues.Length; z++)
+                                    {
+                                        byteValues[z] = br.ReadByte();
+                                    }
+                                }
+
+                                var floatValues = new float[byteValues.Length];
+                                for(int z = 0; z < floatValues.Length; z++)
+                                {
+                                    floatValues[z] = byteValues[z] / 255f;
+                                }
+
+                                vertexData.BoneWeights.Add(floatValues);
                             }
                         }
 
@@ -1398,12 +1422,29 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 br.BaseStream.Seek(biOffset, SeekOrigin.Begin);
 
-                                var bi0 = br.ReadByte();
-                                var bi1 = br.ReadByte();
-                                var bi2 = br.ReadByte();
-                                var bi3 = br.ReadByte();
+                                byte[] byteValues = biDataStruct.DataType == VertexDataType.UByte8 ? new byte[8] : new byte[4];
 
-                                vertexData.BoneIndices.Add(new[] { bi0, bi1, bi2, bi3 });
+                                if (biDataStruct.DataType == VertexDataType.UByte8)
+                                {
+                                    // Silly low => High format
+                                    byteValues[0] = br.ReadByte();
+                                    byteValues[4] = br.ReadByte();
+                                    byteValues[1] = br.ReadByte();
+                                    byteValues[5] = br.ReadByte();
+                                    byteValues[2] = br.ReadByte();
+                                    byteValues[6] = br.ReadByte();
+                                    byteValues[3] = br.ReadByte();
+                                    byteValues[7] = br.ReadByte();
+                                }
+                                else
+                                {
+                                    for (int z = 0; z < byteValues.Length; z++)
+                                    {
+                                        byteValues[z] = br.ReadByte();
+                                    }
+                                }
+
+                                vertexData.BoneIndices.Add(byteValues);
                             }
                         }
 
@@ -2498,7 +2539,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 {
                                     if(mdlVersion >= 6)
                                     {
-                                        if (dataType != VertexDataType.Unknown17)
+                                        if (dataType != VertexDataType.UByte8)
                                         {
                                             dataType = VertexDataType.Ubyte4;
                                         }
@@ -2510,7 +2551,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 if(dataUsage == VertexUsageType.BoneIndex)
                                 {
-                                    if (dataType != VertexDataType.Unknown17 || mdlVersion == 5)
+                                    if (mdlVersion == 5)
                                     {
                                         dataType = VertexDataType.Ubyte4;
                                     }
@@ -2812,7 +2853,6 @@ namespace xivModdingFramework.Models.FileTypes
                 var meshDataBlock = new List<byte>();
 
                 lodNum = 0;
-                int lastVertexCount = 0;
                 var previousIndexCount = 0;
                 short totalParts = 0;
                 var meshIndexOffsets = new List<int>();
@@ -2828,6 +2868,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var previousIndexDataOffset = 0;
                     var lod0VertexDataEntrySize0 = 0;
                     var lod0VertexDataEntrySize1 = 0;
+                    var nextVertexDataOffset = 0;
 
                     var lodMax = lodNum == 0 ? ttModel.MeshGroups.Count : 0;
 
@@ -2893,7 +2934,7 @@ namespace xivModdingFramework.Models.FileTypes
                         // Calculate new Vertex Data Offsets
                         if (meshNum > 0)
                         {
-                            vertexDataOffset0 = previousVertexDataOffset1 + lastVertexCount * vertexDataEntrySize1;
+                            vertexDataOffset0 = nextVertexDataOffset;
 
                             vertexDataOffset1 = vertexDataOffset0 + vertexCount * vertexDataEntrySize0;
 
@@ -2903,17 +2944,18 @@ namespace xivModdingFramework.Models.FileTypes
                             vertexDataOffset1 = vertexCount * vertexDataEntrySize0;
                         }
 
-
-                        lastVertexCount = vertexCount;
-
                         if (lod0VertexDataEntrySize0 == 0)
                         {
+                            // Used as a baseline value when adding new meshes.
                             lod0VertexDataEntrySize0 = vertexDataEntrySize0;
                             lod0VertexDataEntrySize1 = vertexDataEntrySize1;
                         }
 
+                        nextVertexDataOffset = vertexDataOffset1 + vertexCount * vertexDataEntrySize1;
+
+
                         // Partless models strictly cannot have parts divisions.
-                        if(ogMdl.Partless)
+                        if (ogMdl.Partless)
                         {
                             partCount = 0;
                         }
@@ -4098,156 +4140,6 @@ namespace xivModdingFramework.Models.FileTypes
             return bytes;
         }
 
-        /// <summary>
-        /// Get the vertex data in byte format
-        /// </summary>
-        /// <param name="vertexData">The vertex data to convert</param>
-        /// <param name="itemType">The item type</param>
-        /// <returns>A class containing the byte data for the given data</returns>
-        private static VertexByteData GetVertexByteData(VertexData vertexData, Dictionary<VertexUsageType, VertexDataType> vertexInfoDict, bool hasWeights)
-        {
-            var vertexByteData = new VertexByteData
-            {
-                VertexCount = vertexData.Positions.Count,
-                IndexCount = vertexData.Indices.Count
-            };
-
-            // Vertex Block 0
-            for (var i = 0; i < vertexData.Positions.Count; i++)
-            {
-                if (vertexInfoDict[VertexUsageType.Position] == VertexDataType.Half4)
-                {
-                    var x = new Half(vertexData.Positions[i].X);
-                    var y = new Half(vertexData.Positions[i].Y);
-                    var z = new Half(vertexData.Positions[i].Z);
-
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(x.RawValue));
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(y.RawValue));
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(z.RawValue));
-
-                    // Half float positions have a W coordinate but it is never used and is defaulted to 1.
-                    var w = new Half(1.0f);
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(w.RawValue));
-                }
-                // If positions are not Half values, they are single values
-                else
-                {
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(vertexData.Positions[i].X));
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(vertexData.Positions[i].Y));
-                    vertexByteData.VertexData0.AddRange(BitConverter.GetBytes(vertexData.Positions[i].Z));
-                }
-
-                if (hasWeights)
-                {
-                    // Bone Weights
-                    foreach (var boneWeight in vertexData.BoneWeights[i])
-                    {
-                        vertexByteData.VertexData0.Add((byte)Math.Round(boneWeight * 255f));
-                    }
-
-                    // Bone Indices
-                    vertexByteData.VertexData0.AddRange(vertexData.BoneIndices[i]);
-                }
-            }
-
-            // Vertex Block 1
-            for (var i = 0; i < vertexData.Normals.Count; i++)
-            {
-                if (vertexInfoDict[VertexUsageType.Normal] == VertexDataType.Half4)
-                {
-                    // Normals
-                    var x = new Half(vertexData.Normals[i].X);
-                    var y = new Half(vertexData.Normals[i].Y);
-                    var z = new Half(vertexData.Normals[i].Z);
-                    var w = new Half(0);
-
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(x.RawValue));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(y.RawValue));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(z.RawValue));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(w.RawValue));
-                }
-                else
-                {
-                    // Normals
-                    var x = vertexData.Normals[i].X;
-                    var y = vertexData.Normals[i].Y;
-                    var z = vertexData.Normals[i].Z;
-
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(x));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(y));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(z));
-                }
-
-
-                // BiNormals - GetVertexByteData
-                vertexByteData.VertexData1.AddRange(ConvertVectorBinormalToBytes(vertexData.BiNormals[i], vertexData.BiNormalHandedness[i]));
-
-                // Tangents
-                if (vertexInfoDict.ContainsKey(VertexUsageType.Tangent))
-                {
-                    vertexByteData.VertexData1.AddRange(ConvertVectorBinormalToBytes(vertexData.Tangents[i], vertexData.BiNormalHandedness[i]));
-                }
-
-                // Colors
-                if (vertexData.Colors.Count > 0)
-                {
-                    var colorVector = vertexData.Colors[i].ToVector4();
-
-                    vertexByteData.VertexData1.Add((byte)(colorVector.W * 255));
-                    vertexByteData.VertexData1.Add((byte)(colorVector.X * 255));
-                    vertexByteData.VertexData1.Add((byte)(colorVector.Y * 255));
-                    vertexByteData.VertexData1.Add((byte)(colorVector.Z * 255));
-                }
-
-                var texCoordDataType = vertexInfoDict[VertexUsageType.TextureCoordinate];
-
-                if (texCoordDataType == VertexDataType.Float2 || texCoordDataType == VertexDataType.Float4)
-                {
-                    var tc0x = vertexData.TextureCoordinates0[i].X;
-                    var tc0y = vertexData.TextureCoordinates0[i].Y * -1f;
-
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0x));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0y));
-
-                    if (vertexData.TextureCoordinates1.Count > 0)
-                    {
-                        var tc1x = vertexData.TextureCoordinates1[i].X;
-                        var tc1y = vertexData.TextureCoordinates1[i].Y;
-
-                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1x));
-                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1y));
-                    }
-                }
-                else
-                {
-                    // Texture Coordinates
-                    var tc0x = new Half(vertexData.TextureCoordinates0[i].X);
-                    var tc0y = new Half(vertexData.TextureCoordinates0[i].Y);
-
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0x.RawValue));
-                    vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc0y.RawValue));
-
-                    if (vertexData.TextureCoordinates1.Count > 0)
-                    {
-                        var tc1x = new Half(vertexData.TextureCoordinates1[i].X);
-                        var tc1y = new Half(vertexData.TextureCoordinates1[i].Y);
-
-                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1x.RawValue));
-                        vertexByteData.VertexData1.AddRange(BitConverter.GetBytes(tc1y.RawValue));
-                    }
-                }
-
-            }
-
-            // Indices
-            foreach (var index in vertexData.Indices)
-            {
-                vertexByteData.IndexData.AddRange(BitConverter.GetBytes((ushort)index));
-            }
-
-            return vertexByteData;
-        }
-
 
         /// <summary>
         /// Writes vertex data to the given import structures, and returns the total byte size of the index written.
@@ -4291,11 +4183,40 @@ namespace xivModdingFramework.Models.FileTypes
             // Furniture items do not have bone data
             if (model.HasWeights)
             {
-                // Bone Weights
-                importData.VertexData0.AddRange(v.Weights);
+                if (vertexInfoList[VertexUsageType.BoneIndex][0] == VertexDataType.UByte8)
+                {
+                    // 8 Byte stye...
+                    importData.VertexData0.Add(v.Weights[0]);
+                    importData.VertexData0.Add(v.Weights[4]);
+                    importData.VertexData0.Add(v.Weights[1]);
+                    importData.VertexData0.Add(v.Weights[5]);
+                    importData.VertexData0.Add(v.Weights[2]);
+                    importData.VertexData0.Add(v.Weights[6]);
+                    importData.VertexData0.Add(v.Weights[3]);
+                    importData.VertexData0.Add(v.Weights[7]);
 
-                // Bone Indices
-                importData.VertexData0.AddRange(v.BoneIds);
+                    importData.VertexData0.Add(v.BoneIds[0]);
+                    importData.VertexData0.Add(v.BoneIds[4]);
+                    importData.VertexData0.Add(v.BoneIds[1]);
+                    importData.VertexData0.Add(v.BoneIds[5]);
+                    importData.VertexData0.Add(v.BoneIds[2]);
+                    importData.VertexData0.Add(v.BoneIds[6]);
+                    importData.VertexData0.Add(v.BoneIds[3]);
+                    importData.VertexData0.Add(v.BoneIds[7]);
+                } else
+                {
+                    // 4 byte style ...
+                    importData.VertexData0.Add(v.Weights[0]);
+                    importData.VertexData0.Add(v.Weights[1]);
+                    importData.VertexData0.Add(v.Weights[2]);
+                    importData.VertexData0.Add(v.Weights[3]);
+
+                    // Bone Indices
+                    importData.VertexData0.Add(v.BoneIds[0]);
+                    importData.VertexData0.Add(v.BoneIds[1]);
+                    importData.VertexData0.Add(v.BoneIds[2]);
+                    importData.VertexData0.Add(v.BoneIds[3]);
+                }
             }
 
             // Normals
@@ -5368,7 +5289,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {0xE, VertexDataType.Half4}, //      Keeping them here in case someone was relying on it
                 {0xF, VertexDataType.Half2},
                 {0x10, VertexDataType.Half4},
-                {0x11, VertexDataType.Unknown17} // XXX: Bone weights use this type, not sure what it is
+                {0x11, VertexDataType.UByte8} // XXX: Bone weights use this type, not sure what it is
             };
 
         private static readonly Dictionary<byte, VertexUsageType> VertexUsageDictionary =
