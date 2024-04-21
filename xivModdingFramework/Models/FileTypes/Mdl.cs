@@ -2685,8 +2685,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Padding before next section
                 var currentSize = pathInfoBlock.Count - 8;
 
-                // Pad out to divisions of 8 bytes.
-                var pathPadding = 2;
+                // Pad out to divisions of 4 bytes.
+                var pathPadding = 4 - (currentSize % 4);
+                pathPadding = pathPadding == 4 ? 0 : pathPadding;
                 pathInfoBlock.AddRange(new byte[pathPadding]);
 
                 // Go back and rewrite our counts with correct data.
