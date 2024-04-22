@@ -2520,9 +2520,11 @@ namespace xivModdingFramework.Models.FileTypes
                             var dataOffset = vds.DataOffset;
                             var dataType = vds.DataType;
                             var dataUsage = vds.DataUsage;
-                            if(vdsDictionary.ContainsKey(dataUsage))
+
+                            // Model version 5 doesn't allow double color channel information.
+                            if(vdsDictionary.ContainsKey(dataUsage) && mdlVersion == 5)
                             {
-                                //continue;
+                                continue;
                             }
 
                             if (lodNum == 0)
