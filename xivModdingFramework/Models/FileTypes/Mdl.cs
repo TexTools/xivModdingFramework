@@ -579,7 +579,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var mdlModelData = new MdlModelData
                 {
-                    Radius = br.ReadInt32(),
+                    Radius = br.ReadInt32(), //1071701907
                     MeshCount = br.ReadInt16(),
                     AttributeCount = br.ReadInt16(),
                     MeshPartCount = br.ReadInt16(),
@@ -726,6 +726,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var unkData0 = new UnknownData0
                 {
                     Unknown = br.ReadBytes(mdlModelData.ElementIdCount * 32)
+                    // int ElementId
+                    // int ParentboneName(?)
+                    // float[3] Translate
+                    // float[3] Rotate
                 };
 
                 // Finished reading all UnknownData0
@@ -1002,7 +1006,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                 xivMdl.MatDataBlock = matDataBlock;
 
-                // Data block for bones
                 // Currently unknown usage
                 var boneDataBlock = new BoneDataBlock
                 {
