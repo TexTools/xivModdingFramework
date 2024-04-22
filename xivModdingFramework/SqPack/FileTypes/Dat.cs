@@ -718,7 +718,13 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetType3Data(offset, dataFile);
         }
-
+        
+        private void Write3IntBuffer(List<byte> bufferTarget, uint[] dataToAdd)
+        {
+            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[0]));
+            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[1]));
+            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[2]));
+        }
         private uint[] Read3IntBuffer(BinaryReader br, bool shortOnly = false)
         {
             uint[] data = new uint[3];
@@ -851,11 +857,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                         byteList.AddRange(BitConverter.GetBytes((ushort) meshCount));
                         byteList.AddRange(BitConverter.GetBytes((ushort) materialCount));
 
-                        byteList.AddRange(new byte[48]);
-                        // int[3] - Vertex Offset by LoD
-                        // int[3] - Index Offset by LoD
-                        // int[3] - Vertex Buffer Size by LoD
-                        // int[3] - Index Buffer Size by LoD
+                        Write3IntBuffer(byteList, vertexBufferOffsets);
+                        Write3IntBuffer(byteList, indexBufferOffsets);
+                        Write3IntBuffer(byteList, vertexBufferSizes);
+                        Write3IntBuffer(byteList, indexBufferSizes);
 
                         byteList.Add(lodCount);
                         byteList.Add(flags);
