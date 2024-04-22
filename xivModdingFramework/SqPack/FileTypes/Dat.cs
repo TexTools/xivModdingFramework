@@ -719,6 +719,24 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetType3Data(offset, dataFile);
         }
 
+        private uint[] Read3IntBuffer(BinaryReader br, bool shortOnly = false)
+        {
+            uint[] data = new uint[3];
+            if (shortOnly)
+            {
+                data[0] = br.ReadUInt16();
+                data[1] = br.ReadUInt16();
+                data[2] = br.ReadUInt16();
+            }
+            else
+            {
+                data[0] = br.ReadUInt32();
+                data[1] = br.ReadUInt32();
+                data[2] = br.ReadUInt32();
+            }
+            return data;
+        }
+
         /// <summary>
         /// Gets the data for Type 3 (Model) files
         /// </summary>
@@ -763,52 +781,56 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var buffer2 = br.ReadInt32();
                         var version = br.ReadInt32();
 
+
                         var endOfHeader = offset + headerLength;
 
-                        byteList.AddRange(BitConverter.GetBytes(version));
-                        byteList.AddRange(new byte[64]);
+                        // Uncompressed...
+                        var stackSize = br.ReadInt32();
+                        var runtimeSize = br.ReadInt32();
+                        var vertexBufferSizes = Read3IntBuffer(br);
+                        var edgeGeometryVertexBufferSizes = Read3IntBuffer(br);
+                        var indexBufferSizes = Read3IntBuffer(br);
 
+                        // Compressed...
+                        var compressedStackSize = br.ReadInt32();
+                        var compressedRuntimeSize = br.ReadInt32();
+                        var compressedvertexBufferSizes = Read3IntBuffer(br);
+                        var compressededgeGeometryVertexBufferSizes = Read3IntBuffer(br);
+                        var compressedindexBufferSizes = Read3IntBuffer(br);
 
-                        br.BaseStream.Seek(offset + 24, SeekOrigin.Begin);
+                        // Offsets....
+                        var stackOffset = br.ReadInt32();
+                        var runtimeOffset = br.ReadInt32();
+                        var vertexBufferOffsets = Read3IntBuffer(br);
+                        var edgeGeometryVertexBufferOffsets = Read3IntBuffer(br);
+                        var indexBufferOffsets = Read3IntBuffer(br);
 
-                        var chunkUncompSizes = new int[11];
-                        var chunkLengths = new int[11];
-                        var chunkOffsets = new int[11];
-                        var chunkBlockStart = new int[11];
-                        var chunkNumBlocks = new int[11];
+                        // Block Indexes....
+                        var stackBlockIndex = br.ReadInt16();
+                        var runtimeBlockIndex = br.ReadInt16();
+                        var vertexBufferBlockIndexs = Read3IntBuffer(br, true);
+                        var edgeGeometryVertexBufferBlockIndexs = Read3IntBuffer(br, true);
+                        var indexBufferBlockIndexs = Read3IntBuffer(br, true);
 
-                        for (var i = 0; i < 11; i++)
-                        {
-                            chunkUncompSizes[i] = br.ReadInt32();
-                        }
-
-                        for (var i = 0; i < 11; i++)
-                        {
-                            chunkLengths[i] = br.ReadInt32();
-                        }
-
-                        for (var i = 0; i < 11; i++)
-                        {
-                            chunkOffsets[i] = br.ReadInt32();
-                        }
-
-                        for (var i = 0; i < 11; i++)
-                        {
-                            chunkBlockStart[i] = br.ReadUInt16();
-                        }
-
-                        var totalBlocks = 0;
-                        for (var i = 0; i < 11; i++)
-                        {
-                            chunkNumBlocks[i] = br.ReadUInt16();
-
-                            totalBlocks += chunkNumBlocks[i];
-                        }
+                        // Block Counts....
+                        var stackBlockCount = br.ReadInt16();
+                        var runtimeBlockCount = br.ReadInt16();
+                        var vertexBufferBlockCounts = Read3IntBuffer(br, true);
+                        var edgeGeometryVertexBufferBlockCounts = Read3IntBuffer(br, true);
+                        var indexBufferBlockCounts = Read3IntBuffer(br, true);
 
                         meshCount = br.ReadUInt16();
                         materialCount = br.ReadUInt16();
 
-                        br.ReadBytes(4);
+                        var lodCount = br.ReadByte();
+                        var flags = br.ReadByte();
+
+                        var padding = br.ReadBytes(2);
+
+                        var totalBlocks = stackBlockCount + runtimeBlockCount;
+                        totalBlocks += vertexBufferBlockCounts.Sum(x => (int) x);
+                        totalBlocks += edgeGeometryVertexBufferBlockCounts.Sum(x => (int)x);
+                        totalBlocks += indexBufferBlockCounts.Sum(x => (int)x);
 
                         var blockSizes = new int[totalBlocks];
 
@@ -817,7 +839,27 @@ namespace xivModdingFramework.SqPack.FileTypes
                             blockSizes[i] = br.ReadUInt16();
                         }
 
-                        br.BaseStream.Seek(endOfHeader + chunkOffsets[0], SeekOrigin.Begin);
+                        br.BaseStream.Seek(endOfHeader + stackOffset, SeekOrigin.Begin);
+
+                        // This header isn't actually written back to the game anywhere currently,
+                        // and is generated internally by FFXIV when loading type 3 files.
+                        // It's best for us to attempt to replicate it though in the long run.
+                        // But it's still missing many values atm.
+                        byteList.AddRange(BitConverter.GetBytes(version));
+                        byteList.AddRange(BitConverter.GetBytes(stackSize));
+                        byteList.AddRange(BitConverter.GetBytes(runtimeSize));
+                        byteList.AddRange(BitConverter.GetBytes((ushort) meshCount));
+                        byteList.AddRange(BitConverter.GetBytes((ushort) materialCount));
+
+                        byteList.AddRange(new byte[48]);
+                        // int[3] - Vertex Offset by LoD
+                        // int[3] - Index Offset by LoD
+                        // int[3] - Vertex Buffer Size by LoD
+                        // int[3] - Index Buffer Size by LoD
+
+                        byteList.Add(lodCount);
+                        byteList.Add(flags);
+                        byteList.AddRange(padding);
 
                         for (var i = 0; i < totalBlocks; i++)
                         {
@@ -848,6 +890,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             br.BaseStream.Seek(lastPos + blockSizes[i], SeekOrigin.Begin);
                         }
+
                     }
                 }
                 catch(Exception ex)
