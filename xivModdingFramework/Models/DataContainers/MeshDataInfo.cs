@@ -101,6 +101,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The number of vertex data blocks for the mesh
         /// </summary>
-        public byte VertexDataBlockCount { get; set; }
+        public byte VertexStreamCountUnknown { get; set; }
     }
 }

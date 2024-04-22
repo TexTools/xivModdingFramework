@@ -27,7 +27,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown0 { get; set; }
+        public int Radius { get; set; }
 
         /// <summary>
         /// The total number of meshes that the model contains
@@ -85,50 +85,55 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public byte LoDCount { get; set; }
 
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public byte Unknown1 { get; set; }
+        /*
+            DustOcclusionEnabled
+            SnowOcclusionEnabled
+            RainOcclusionEnabled
+            Unknown1
+            BgLightingReflectionEnabled
+            WavingAnimationDisabled
+            LightShadowDisabled
+            ShadowDisabled
+        */
+
+
+        public byte Flags1 { get; set; }
+
+        public ushort ElementIdCount { get; set; }
+
+        public byte TerrainShadowMeshCount { get; set; }
+        /*
+            Unknown2
+            BgUvScrollEnabled
+            EnableForceNonResident
+            ExtraLodEnabled
+            ShadowMaskEnabled
+            ForceLodRangeEnabled
+            EdgeGeometryEnabled
+            Unknown3
+
+         */
+        public byte Flags2 { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown2 { get; set; }
+        public float ModelClipOutDistance { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown3 { get; set; }
+        public float ShadowClipOutDistance { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown4 { get; set; }
+        public ushort Unknown8 { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown5 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown6 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown7 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown8 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown9 { get; set; }
+        public short TerrainShadowSubmeshCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
@@ -138,17 +143,19 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public byte Unknown10b { get; set; }
+        public byte BgChangeMaterialIndex { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown11 { get; set; }
+        public byte BgCrestChangeMaterialIndex { get; set; }
+
+        public byte Unknown12 { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown12 { get; set; }
+        public short BoneSetSize { get; set; }
 
         /// <summary>
         /// Unknown Usage
@@ -161,17 +168,17 @@ namespace xivModdingFramework.Models.DataContainers
         public short Unknown14 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Padding?
         /// </summary>
         public short Unknown15 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Padding?
         /// </summary>
         public short Unknown16 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Padding?
         /// </summary>
         public short Unknown17 { get; set; }
     }
