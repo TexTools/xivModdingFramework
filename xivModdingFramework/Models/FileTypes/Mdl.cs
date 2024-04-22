@@ -4234,13 +4234,9 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Normals
-            hx = v.Normal[0];
-            hy = v.Normal[1];
-            hz = v.Normal[2];
-
-            importData.VertexData1.AddRange(BitConverter.GetBytes(hx));
-            importData.VertexData1.AddRange(BitConverter.GetBytes(hy));
-            importData.VertexData1.AddRange(BitConverter.GetBytes(hz));
+            importData.VertexData1.AddRange(BitConverter.GetBytes(v.Normal[0]));
+            importData.VertexData1.AddRange(BitConverter.GetBytes(v.Normal[1]));
+            importData.VertexData1.AddRange(BitConverter.GetBytes(v.Normal[2]));
 
             // BiNormals
             // Change the BiNormals based on Handedness
