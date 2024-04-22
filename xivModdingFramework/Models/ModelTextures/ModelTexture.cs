@@ -33,6 +33,7 @@ using Color = SharpDX.Color;
 using xivModdingFramework.Materials.FileTypes;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using HelixToolkit.SharpDX.Core;
+using System.Linq;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -40,7 +41,7 @@ namespace xivModdingFramework.Models.ModelTextures
     /// <summary>
     /// Data holder for the entire set of custom colors needed to render everything that supports custom colors.
     /// </summary>
-    public class CustomModelColors
+    public class CustomModelColors : ICloneable
     {
         public Color SkinColor;
         public Color EyeColor;      // Off eye color customization isn't really sanely doable since it's managed by Vertex Color.
@@ -56,7 +57,7 @@ namespace xivModdingFramework.Models.ModelTextures
         // Optional values.
         public Color? HairHighlightColor;
 
-        public bool InvertNormalGreen = false;
+        public bool InvertNormalGreen;
 
 
 
@@ -85,6 +86,13 @@ namespace xivModdingFramework.Models.ModelTextures
                 DyeColors.Add(null);
             }
         }
+
+        public object Clone()
+        {
+            var clone = (CustomModelColors) MemberwiseClone();
+            clone.DyeColors = new List<Color?>(DyeColors.ToList());
+            return clone;
+        }
     }
 
     public static class ModelTexture
@@ -104,7 +112,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 // Make a default entry if none was ever set.
                 _defaultColors = new CustomModelColors();
             }
-            return _defaultColors;
+
+            // Return a clone to prevent the get function copy from bashing the stored copy.
+            return (CustomModelColors)_defaultColors.Clone();
         }
 
 
