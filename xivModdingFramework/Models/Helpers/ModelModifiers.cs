@@ -654,13 +654,20 @@ namespace xivModdingFramework.Models.Helpers
                                     vert.UV1 = ogGroup.VertexData.TextureCoordinates0.Count > vId ? ogGroup.VertexData.TextureCoordinates0[vId] : new Vector2();
                                     vert.UV2 = ogGroup.VertexData.TextureCoordinates1.Count > vId ? ogGroup.VertexData.TextureCoordinates1[vId] : new Vector2();
                                     var color = ogGroup.VertexData.Colors.Count > vId ? ogGroup.VertexData.Colors[vId] : new Color();
+                                    var color2 = ogGroup.VertexData.Colors2.Count > vId ? ogGroup.VertexData.Colors2[vId] : new Color();
 
                                     vert.VertexColor[0] = color.R;
                                     vert.VertexColor[1] = color.G;
                                     vert.VertexColor[2] = color.B;
                                     vert.VertexColor[3] = color.A;
 
-                                    for (int i = 0; i < 4 && i < ogGroup.VertexData.BoneWeights[vId].Length; i++)
+                                    vert.VertexColor2[0] = color2.R;
+                                    vert.VertexColor2[1] = color2.G;
+                                    vert.VertexColor2[2] = color2.B;
+                                    vert.VertexColor2[3] = color2.A;
+
+
+                                    for (int i = 0; i < ogGroup.VertexData.BoneWeights[vId].Length; i++)
                                     {
                                         // Copy Weights over.
                                         vert.Weights[i] = (byte)(Math.Round(ogGroup.VertexData.BoneWeights[vId][i] * 255));
@@ -1116,7 +1123,7 @@ namespace xivModdingFramework.Models.Helpers
                             Vector3 tangent = Vector3.Zero;
 
                             // And each bone in that vertex.
-                            for (var b = 0; b < 4; b++)
+                            for (var b = 0; b < v.Weights.Length; b++)
                             {
                                 if (v.Weights[b] == 0) continue;
                                 var boneName = m.Bones[v.BoneIds[b]];
@@ -1157,7 +1164,7 @@ namespace xivModdingFramework.Models.Helpers
                                 Vector3 tangent = Vector3.Zero;
 
                                 // And each bone in that vertex.
-                                for (var b = 0; b < 4; b++)
+                                for (var b = 0; b < v.Weights.Length; b++)
                                 {
                                     if (v.Weights[b] == 0) continue;
                                     var boneName = m.Bones[v.BoneIds[b]];
@@ -1234,6 +1241,145 @@ namespace xivModdingFramework.Models.Helpers
         }
 
         /// <summary>
+        /// Cleans the the weights for a given vertex.
+        /// Returns True if a major correction was made.
+        /// </summary>
+        /// <param name="v"></param>
+        /// <param name="maxWeights"></param>
+        /// <param name="loggingFunction"></param>
+        /// <returns></returns>
+        public static bool CleanWeight(TTVertex v, int maxWeights = 4, Action<bool, string> loggingFunction = null)
+        {
+            var ret = false;
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            if (maxWeights == 4)
+            {
+                v.Weights[4] = 0;
+                v.Weights[5] = 0;
+                v.Weights[6] = 0;
+                v.Weights[7] = 0;
+            }
+
+            int boneSum = 0;
+            var sum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
+            if(sum == 255)
+            {
+                return false;
+            }
+
+            if (sum == 0)
+            {
+                v.Weights[0] = 255;
+                v.Weights[1] = 0;
+                v.Weights[2] = 0;
+                v.Weights[3] = 0;
+                v.Weights[4] = 0;
+                v.Weights[5] = 0;
+                v.Weights[6] = 0;
+                v.Weights[7] = 0;
+            }
+            else if (sum > 500)
+            {
+                v.Weights[0] = 255;
+                v.Weights[1] = 0;
+                v.Weights[2] = 0;
+                v.Weights[3] = 0;
+                v.Weights[4] = 0;
+                v.Weights[5] = 0;
+                v.Weights[6] = 0;
+                v.Weights[7] = 0;
+            }
+            else if (sum > 256 || sum < 254)
+            {
+                ret = true;
+            }
+
+            v.Weights = Normalize(v.Weights).ToArray();
+            boneSum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
+
+            // Weight corrections.
+            while (boneSum != 255)
+            {
+                boneSum = 0;
+                var mostMajor = 0;
+                var most = 0;
+
+                // Loop them to sum them up.
+                // and snag the least/most major influences while we're at it.
+                for (var i = 0; i < v.Weights.Length; i++)
+                {
+                    var value = v.Weights[i];
+
+                    // Don't care about 0 weight entries.
+                    if (value == 0) continue;
+
+                    boneSum += value;
+                    if (value > most)
+                    {
+                        mostMajor = i;
+                        most = value;
+                    }
+                }
+
+                var alteration = 255 - boneSum;
+
+                // Take or Add to the most major bone to resolve rounding errors.
+                v.Weights[mostMajor] = (byte)(v.Weights[mostMajor] + alteration);
+                boneSum += alteration;
+            }
+            return ret;
+        }
+
+
+        public static void CleanWeights(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            if (!model.HasWeights)
+            {
+                return;
+            }
+            var mIdx = 0;
+            foreach (var m in model.MeshGroups)
+            {
+                var pIdx = 0;
+                foreach (var p in m.Parts)
+                {
+                    var perPartMajorCorrections = 0;
+
+                    var vIdx = 0;
+                    foreach (var v in p.Vertices)
+                    {
+                        var majorCorrection = CleanWeight(v, model.MdlVersion == 5 ? 4 : 8, loggingFunction);
+                        if (majorCorrection)
+                        {
+                            perPartMajorCorrections++;
+                        }
+                        vIdx++;
+                    }
+
+
+                    if (perPartMajorCorrections > 0)
+                    {
+                        if (loggingFunction != null)
+                        {
+                            loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
+                        }
+                    }
+                    pIdx++;
+                }
+                mIdx++;
+            }
+        }
+
+        /// <summary>
         /// This function does all the minor adjustments to a Model that makes it
         /// ready for injection into the SE filesystem.  Such as flipping the 
         /// UVs, calculating tangents, and applying the global level size multiplier.
@@ -1261,8 +1407,6 @@ namespace xivModdingFramework.Models.Helpers
                 var pIdx = 0;
                 foreach (var p in m.Parts)
                 {
-                    var perPartMajorCorrections = 0;
-                    var warnings = new List<string>();
 
                     var vIdx = 0;
                     foreach (var v in p.Vertices)
@@ -1270,80 +1414,7 @@ namespace xivModdingFramework.Models.Helpers
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
-
-                        if (!reconvert)
-                        {
-                            // Model version 6 does not require normalized weights (and specifically needs non-normalized weights on some models)
-                            if (model.MdlVersion == 5)
-                            {
-                                // Weight Validation
-                                if (model.HasWeights)
-                                {
-                                    int boneSum = 0;
-                                    var sum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
-
-                                    if (sum == 0)
-                                    {
-                                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has no valid bone weights.  This will cause animation issues.");
-                                        v.Weights[0] = 255;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                    }
-                                    else if (sum > 500)
-                                    {
-                                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " Vertex:" + vIdx + " Has extremely abnormal weights; the weight values for the vertex have been reset.");
-                                        v.Weights[0] = 255;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                        v.Weights[1] = 0;
-                                    }
-                                    else if (sum > 256 || sum < 254)
-                                    {
-                                        perPartMajorCorrections++;
-                                    }
-                                    var og = v.Weights;
-                                    v.Weights = Normalize(v.Weights).ToArray();
-                                    boneSum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
-
-                                    // Weight corrections.
-                                    while (boneSum != 255)
-                                    {
-                                        boneSum = 0;
-                                        var mostMajor = 0;
-                                        var most = 0;
-
-                                        // Loop them to sum them up.
-                                        // and snag the least/most major influences while we're at it.
-                                        for (var i = 0; i < v.Weights.Length; i++)
-                                        {
-                                            var value = v.Weights[i];
-
-                                            // Don't care about 0 weight entries.
-                                            if (value == 0) continue;
-
-                                            boneSum += value;
-                                            if (value > most)
-                                            {
-                                                mostMajor = i;
-                                                most = value;
-                                            }
-                                        }
-
-                                        var alteration = 255 - boneSum;
-
-                                        // Take or Add to the most major bone to resolve rounding errors.
-                                        v.Weights[mostMajor] = (byte)(v.Weights[mostMajor] + alteration);
-                                        boneSum += alteration;
-                                    }
-                                }
-                            }
-                        }
                         vIdx++;
-                    }
-                    if(perPartMajorCorrections > 0)
-                    {
-                        loggingFunction(true, "Group: " + mIdx + " Part: " + pIdx + " :: " + perPartMajorCorrections.ToString() + " Vertices had major corrections made to their weight data.");
                     }
                     pIdx++;
                 }

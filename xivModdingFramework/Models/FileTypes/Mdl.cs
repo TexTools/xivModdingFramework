@@ -25,23 +25,17 @@ using HelixToolkit.SharpDX.Core;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
-using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Mods;
-using xivModdingFramework.Mods.Enums;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using BoundingBox = xivModdingFramework.Models.DataContainers.BoundingBox;
 using System.Diagnostics;
 using xivModdingFramework.Items.Categories;
-using HelixToolkit.SharpDX.Core.Core;
-using System.Transactions;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using SharpDX.Win32;
 using xivModdingFramework.Models.Helpers;
 using Newtonsoft.Json;
 using xivModdingFramework.Materials.FileTypes;
@@ -49,22 +43,17 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Models.ModelTextures;
-using SixLabors.ImageSharp.Formats.Bmp;
 using xivModdingFramework.Variants.FileTypes;
 using SixLabors.ImageSharp.Formats.Png;
-using System.Data;
 using System.Text.RegularExpressions;
-using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Cache;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
-
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
-using System.Runtime.InteropServices.ComTypes;
-using SixLabors.ImageSharp.Metadata.Profiles.Iptc;
+using AutoUpdaterDotNET;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -869,6 +858,7 @@ namespace xivModdingFramework.Models.FileTypes
                             if(vertexDataStruct.DataUsage == VertexUsageType.BoneIndex)
                             {
                                 // Store bone array size for reference later.
+                                // (We could rip through the vertex list to see if any 5+ bone vertices exist, but that's expensive)
                                 xivMdl.LoDList[i].MeshDataList[j].VertexBoneArraySize = vertexDataStruct.DataType == VertexDataType.UByte8 ? 8 : 4;
                             }
 
@@ -2467,6 +2457,8 @@ namespace xivModdingFramework.Models.FileTypes
         internal async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
+            ttModel.MdlVersion = mdlVersion;
+
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
@@ -2811,7 +2803,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 // Get the imported data
-                var importDataDictionary = GetGeometryData(ttModel, vertexInfoLists);
+                var importDataDictionary = GetGeometryData(ttModel, vertexInfoLists, loggingFunction);
 
                 // Extra LoD Data
                 #region Extra Level Of Detail Block
@@ -3223,7 +3215,6 @@ namespace xivModdingFramework.Models.FileTypes
                         {
                             data.AddRange(new byte[128 - data.Count]);
                         }
-                        //data.AddRange(BitConverter.GetBytes(64));//ttModel.MeshGroups[mi].Bones.Count));
 
                         // This is the array size... Which seems to need to be +1'd in Dawntrail for some reason.
                         if (mi == 0 || ttModel.MeshGroups[mi].Bones.Count >= 64)
@@ -3307,15 +3298,15 @@ namespace xivModdingFramework.Models.FileTypes
                     #region Shape Parts Data Block
 
                     var shapePartsDataBlock = new List<byte>();
-                    int sum = 0;
+                    int offset = 0;
 
                     foreach (var shapePart in rawShapeData)
                     {
                         shapePartsDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[shapePart.MeshId]));
                         shapePartsDataBlock.AddRange(BitConverter.GetBytes(shapePart.IndexReplacements.Count));
-                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(sum));
+                        shapePartsDataBlock.AddRange(BitConverter.GetBytes(offset));
 
-                        sum += shapePart.IndexReplacements.Count;
+                        offset += shapePart.IndexReplacements.Count;
                     }
 
                     FullShapeDataBlock.AddRange(shapePartsDataBlock);
@@ -3496,7 +3487,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var importData = importDataDictionary[p.MeshId];
                         foreach (var v in p.Vertices)
                         {
-                            WriteVertex(importData, vertexInfoLists[p.MeshId], ttModel, v);
+                            WriteVertex(importData, vertexInfoLists[p.MeshId], ttModel, v, loggingFunction);
                         }
                     }
                 }
@@ -4043,7 +4034,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A dictionary containing the vertex byte data per mesh</returns>
-        private Dictionary<int, VertexByteData> GetGeometryData(TTModel ttModel, List<Dictionary<VertexUsageType, List<VertexDataType>>> vertexInfoDict)
+        private Dictionary<int, VertexByteData> GetGeometryData(TTModel ttModel, List<Dictionary<VertexUsageType, List<VertexDataType>>> vertexInfoDict, Action<bool, string> loggingFunction)
         {
             var importDataDictionary = new Dictionary<int, VertexByteData>();
 
@@ -4068,7 +4059,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     foreach (var v in p.Vertices)
                     {
-                        WriteVertex(importData, vertexInfoDict[mi], ttModel, v);
+                        WriteVertex(importData, vertexInfoDict[mi], ttModel, v, loggingFunction);
                     }
 
                 }
@@ -4151,7 +4142,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="v"></param>
         /// <returns></returns>
-        private int WriteVertex(VertexByteData importData, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, TTModel model, TTVertex v)
+        private int WriteVertex(VertexByteData importData, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, TTModel model, TTVertex v, Action<bool, string> loggingFunction)
         {
             // Positions for Weapon and Monster item types are half precision floating points
             var posDataType = vertexInfoList[VertexUsageType.Position][0];
@@ -4187,6 +4178,8 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 if (vertexInfoList[VertexUsageType.BoneIndex][0] == VertexDataType.UByte8)
                 {
+                    ModelModifiers.CleanWeight(v, 8, loggingFunction);
+
                     // 8 Byte stye...
                     importData.VertexData0.Add(v.Weights[0]);
                     importData.VertexData0.Add(v.Weights[4]);
@@ -4207,6 +4200,7 @@ namespace xivModdingFramework.Models.FileTypes
                     importData.VertexData0.Add(v.BoneIds[7]);
                 } else
                 {
+                    ModelModifiers.CleanWeight(v, 4, loggingFunction);
                     // 4 byte style ...
                     importData.VertexData0.Add(v.Weights[0]);
                     importData.VertexData0.Add(v.Weights[1]);
