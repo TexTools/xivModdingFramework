@@ -53,7 +53,6 @@ using xivModdingFramework.Mods.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
-using AutoUpdaterDotNET;
 using xivModdingFramework.Materials.DataContainers;
 using HelixToolkit.SharpDX.Core.Helper;
 

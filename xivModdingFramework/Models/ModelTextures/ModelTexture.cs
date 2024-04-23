@@ -337,6 +337,28 @@ namespace xivModdingFramework.Models.ModelTextures
             return texMapData;
         }
 
+        private static void ResizeTexture(TexInfo texInfo, int width, int height)
+        {
+            using var img = Image.LoadPixelData<Rgba32>(texInfo.Data, texInfo.Width, texInfo.Height);
+
+            // ImageSharp pre-multiplies the RGB by the alpha component during resize, if alpha is 0 (colourset row 0)
+            // this ends up causing issues and destroying the RGB values resulting in an invisible preview model
+            // https://github.com/SixLabors/ImageSharp/issues/1498#issuecomment-757519563
+            img.Mutate(x => x.Resize(
+                new ResizeOptions
+                {
+                    Size = new Size(width, height),
+                    PremultiplyAlpha = false,
+                })
+            );
+
+            texInfo.Data = new byte[width * height * 4];
+            img.CopyPixelDataTo(texInfo.Data.AsSpan());
+
+            texInfo.Width = width;
+            texInfo.Height = height;
+        }
+
         /// <summary>
         /// Equalizes the size of the textures by scaling to the largest known texture size
         /// </summary>
@@ -417,59 +439,14 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
+                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
+                    ResizeTexture(texMapData.Normal, width, height);
 
-                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height ||
-                    scaleDown)
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Normal.Data, texMapData.Normal.Width,
-                        texMapData.Normal.Height))
-                    {
-                        // ImageSharp pre-multiplies the RGB by the alpha component during resize, if alpha is 0 (colourset row 0)
-                        // this ends up causing issues and destroying the RGB values resulting in an invisible preview model
-                        // https://github.com/SixLabors/ImageSharp/issues/1498#issuecomment-757519563
-                        img.Mutate(x => x.Resize(
-                            new ResizeOptions
-                            {
-                                Size = new Size(width, height),
-                                PremultiplyAlpha = false
-                            })
-                        );
+                if (texMapData.Diffuse != null && largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown)
+                    ResizeTexture(texMapData.Diffuse, width, height);
 
-                        texMapData.Normal.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
-                    }
-                }
-
-                if (texMapData.Diffuse != null &&
-                    (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Diffuse.Data, texMapData.Diffuse.Width,
-                        texMapData.Diffuse.Height))
-                    {
-                        for (int i = 0; i < img.Height; i++)
-                        {
-                            var pixelRowSpan = img.GetPixelRowSpan(i);
-                            for (int j = 0; j < img.Width; j++)
-                            {
-                                pixelRowSpan[j] = new Rgba32(pixelRowSpan[j].R, pixelRowSpan[j].G, pixelRowSpan[j].B, 255);
-                            }
-                        }
-                        img.Mutate(x => x.Resize(width, height));
-
-                        texMapData.Diffuse.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
-                    }
-                }
-
-                if (texMapData.Specular != null &&
-                    (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Specular.Data, texMapData.Specular.Width,
-                        texMapData.Specular.Height))
-                    {
-                        img.Mutate(x => x.Resize(width, height));
-
-                        texMapData.Specular.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
-                    }
-                }
+                if (texMapData.Specular != null && largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown)
+                    ResizeTexture(texMapData.Specular, width, height);
             });
 
             return (width, height);
