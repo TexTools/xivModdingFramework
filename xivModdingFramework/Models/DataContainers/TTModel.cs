@@ -2437,7 +2437,11 @@ namespace xivModdingFramework.Models.DataContainers
                 foreach (var p in m.Parts)
                 {
 
-                    if (p.Vertices.Count == 0) continue;
+                    if (p.Vertices.Count == 0)
+                    {
+                        pIdx++;
+                        continue;
+                    }
 
                     bool anyAlpha = false;
                     bool anyColor = false;
