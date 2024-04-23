@@ -791,36 +791,36 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var endOfHeader = offset + headerLength;
 
                         // Uncompressed...
-                        var stackSize = br.ReadInt32();
-                        var runtimeSize = br.ReadInt32();
+                        var vertexInfoSize = br.ReadInt32();
+                        var modelDataSize = br.ReadInt32();
                         var vertexBufferSizes = Read3IntBuffer(br);
                         var edgeGeometryVertexBufferSizes = Read3IntBuffer(br);
                         var indexBufferSizes = Read3IntBuffer(br);
 
                         // Compressed...
-                        var compressedStackSize = br.ReadInt32();
-                        var compressedRuntimeSize = br.ReadInt32();
+                        var vertexInfoCompressedSize = br.ReadInt32();
+                        var modelDataCompressedSize = br.ReadInt32();
                         var compressedvertexBufferSizes = Read3IntBuffer(br);
                         var compressededgeGeometryVertexBufferSizes = Read3IntBuffer(br);
                         var compressedindexBufferSizes = Read3IntBuffer(br);
 
                         // Offsets....
-                        var stackOffset = br.ReadInt32();
-                        var runtimeOffset = br.ReadInt32();
+                        var vertexInfoOffset = br.ReadInt32();
+                        var modelDataOffset = br.ReadInt32();
                         var vertexBufferOffsets = Read3IntBuffer(br);
                         var edgeGeometryVertexBufferOffsets = Read3IntBuffer(br);
                         var indexBufferOffsets = Read3IntBuffer(br);
 
                         // Block Indexes....
-                        var stackBlockIndex = br.ReadInt16();
-                        var runtimeBlockIndex = br.ReadInt16();
+                        var vertexInfoBlockIndex = br.ReadInt16();
+                        var modelDataBLockIndex = br.ReadInt16();
                         var vertexBufferBlockIndexs = Read3IntBuffer(br, true);
                         var edgeGeometryVertexBufferBlockIndexs = Read3IntBuffer(br, true);
                         var indexBufferBlockIndexs = Read3IntBuffer(br, true);
 
                         // Block Counts....
-                        var stackBlockCount = br.ReadInt16();
-                        var runtimeBlockCount = br.ReadInt16();
+                        var vertexInfoBlockCount = br.ReadInt16();
+                        var modelDataBlockCount = br.ReadInt16();
                         var vertexBufferBlockCounts = Read3IntBuffer(br, true);
                         var edgeGeometryVertexBufferBlockCounts = Read3IntBuffer(br, true);
                         var indexBufferBlockCounts = Read3IntBuffer(br, true);
@@ -833,7 +833,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         var padding = br.ReadBytes(2);
 
-                        var totalBlocks = stackBlockCount + runtimeBlockCount;
+                        var totalBlocks = vertexInfoBlockCount + modelDataBlockCount;
                         totalBlocks += vertexBufferBlockCounts.Sum(x => (int) x);
                         totalBlocks += edgeGeometryVertexBufferBlockCounts.Sum(x => (int)x);
                         totalBlocks += indexBufferBlockCounts.Sum(x => (int)x);
@@ -845,15 +845,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                             blockSizes[i] = br.ReadUInt16();
                         }
 
-                        br.BaseStream.Seek(endOfHeader + stackOffset, SeekOrigin.Begin);
+                        br.BaseStream.Seek(endOfHeader + vertexInfoOffset, SeekOrigin.Begin);
 
                         // This header isn't actually written back to the game anywhere currently,
                         // and is generated internally by FFXIV when loading type 3 files.
-                        // It's best for us to attempt to replicate it though in the long run.
-                        // But it's still missing many values atm.
+                        // It's best for us to replicate it though.
                         byteList.AddRange(BitConverter.GetBytes(version));
-                        byteList.AddRange(BitConverter.GetBytes(stackSize));
-                        byteList.AddRange(BitConverter.GetBytes(runtimeSize));
+                        byteList.AddRange(BitConverter.GetBytes(vertexInfoSize));
+                        byteList.AddRange(BitConverter.GetBytes(modelDataSize));
                         byteList.AddRange(BitConverter.GetBytes((ushort) meshCount));
                         byteList.AddRange(BitConverter.GetBytes((ushort) materialCount));
 
