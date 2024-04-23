@@ -707,10 +707,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                 } else
                 {
                     var lastTime = File.GetLastWriteTimeUtc(index1Path).Ticks;
-                    var creationTime = File.GetCreationTimeUtc(index1Path).Ticks;
 
                     // If we don't have the file cached or the write time doesn't match exactly.
-                    if (!_ReadOnlyIndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _ReadOnlyIndexLastModifiedTime[dataFile] || lastTime == creationTime || lastTime == 0)
+                    if (!_ReadOnlyIndexLastModifiedTime.ContainsKey(dataFile) || lastTime != _ReadOnlyIndexLastModifiedTime[dataFile] || lastTime == 0)
                     {
                         using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
                         {
