@@ -997,6 +997,75 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetType4Data(offset, dataFile);
         }
 
+        public static void Pad<T>(List<T> data, int paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (data.Count % paddingTarget);
+            if(pad == paddingTarget && !forcePadding)
+            {
+                return;
+            }
+            data.AddRange(new T[pad]);
+        }
+
+
+        /// <summary>
+        /// Compresses a single data block, returning the singular compressed byte array.
+        /// For blocks larger than 16,000, use CompressData() instead.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static async Task<byte[]> CompressSmallData(byte[] data)
+        {
+            if (data.Length > 16000)
+            {
+                throw new Exception("CompressSmallData() data is too large.");
+            }
+
+            List<Byte> result = new List<byte>();
+            // Vertex Info Compression
+            var compressedData = await IOUtil.Compressor(data);
+            result.AddRange(BitConverter.GetBytes(16));
+            result.AddRange(BitConverter.GetBytes(0));
+            result.AddRange(BitConverter.GetBytes(compressedData.Length));
+            result.AddRange(BitConverter.GetBytes(data.Length));
+            result.AddRange(compressedData);
+
+            Pad(result, 128);
+            return result.ToArray();
+        }
+
+        /// <summary>
+        /// Compresses data, returning the compressed byte arrays in parts.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static async Task<List<byte[]>> CompressData(List<byte> data)
+        {
+            var partCount = (int)Math.Ceiling(data.Count / 16000f);
+            var partSizes = new List<int>(partCount);
+            var remainingDataSize = data.Count;
+
+            for (var i = 0; i < partCount; i++)
+            {
+                if (remainingDataSize >= 16000)
+                {
+                    partSizes.Add(16000);
+                    remainingDataSize -= 16000;
+                }
+                else
+                {
+                    partSizes.Add(remainingDataSize);
+                }
+            }
+
+            var parts = new List<byte[]>();
+            for (var i = 0; i < partCount; i++)
+            {
+                var part = await CompressSmallData(data.GetRange(i * 16000, partSizes[i]).ToArray());
+                parts.Add(part);
+            }
+            return parts;
+        }
 
         public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
         {
