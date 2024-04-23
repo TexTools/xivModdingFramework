@@ -912,7 +912,7 @@ namespace xivModdingFramework.Models.FileTypes
                             VertexStreamCountUnknown = br.ReadByte()
                         };
 
-                        lod.MeshDataList[i].MeshInfo = meshDataInfo;
+                         lod.MeshDataList[i].MeshInfo = meshDataInfo;
 
                         // In the event we have a null material reference, set it to material 0 to be safe.
                         if (meshDataInfo.MaterialIndex >= totalNonNullMaterials)
@@ -2685,21 +2685,33 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var vertexDataBlock = new List<byte>();
                 var indexDataBlock = new List<byte>();
+
+                List<int> meshVertex1Offsets = new List<int>();
+                List<int> meshVertex2Offsets = new List<int>();
+                List<int> meshIndexOffsets = new List<int>();
                 for (var i = 0; i < ttModel.MeshGroups.Count; i++)
                 {
                     var importData = geometryData[i];
-
+                    
+                    meshVertex1Offsets.Add(vertexDataBlock.Count);
                     vertexDataBlock.AddRange(importData.VertexData0);
+
+                    meshVertex2Offsets.Add(vertexDataBlock.Count);
                     vertexDataBlock.AddRange(importData.VertexData1);
+
+                    meshIndexOffsets.Add(indexDataBlock.Count / 2);
                     indexDataBlock.AddRange(importData.IndexData);
+
+                    Dat.Pad(indexDataBlock, 16);
                 }
+                Dat.Pad(indexDataBlock, 16, true);
                 #endregion
 
 
                 // Path Data
                 #region Path Info Block
 
-                var pathInfoBlock = new List<byte>();
+        var pathInfoBlock = new List<byte>();
                 var pathCount = 0;
 
                 // Attribute paths
@@ -2901,7 +2913,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var previousIndexCount = 0;
                 short totalParts = 0;
-                var meshIndexOffsets = new List<int>();
 
 
                 var previousIndexDataOffset = 0;
@@ -2975,25 +2986,6 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                         }
 
-                        // Calculate new index data offset
-                        if (mi > 0)
-                        {
-                            indexDataOffset = previousIndexDataOffset + previousIndexCount;
-                        }
-
-                        // Calculate new Vertex Data Offsets
-                        if (mi > 0)
-                        {
-                            vertexDataOffset0 = nextVertexDataOffset;
-
-                            vertexDataOffset1 = vertexDataOffset0 + vertexCount * vertexDataEntrySize0;
-
-                        }
-                        else
-                        {
-                            vertexDataOffset1 = vertexCount * vertexDataEntrySize0;
-                        }
-
                         if (lod0VertexDataEntrySize0 == 0)
                         {
                             // Used as a baseline value when adding new meshes.
@@ -3001,8 +2993,6 @@ namespace xivModdingFramework.Models.FileTypes
                             lod0VertexDataEntrySize1 = vertexDataEntrySize1;
                             lod0vertexStreamThing = vertexStreamCountPlusFlags;
                         }
-
-                        nextVertexDataOffset = vertexDataOffset1 + vertexCount * vertexDataEntrySize1;
 
 
                         // Partless models strictly cannot have parts divisions.
@@ -3020,12 +3010,15 @@ namespace xivModdingFramework.Models.FileTypes
                         totalParts += partCount;
 
                         meshDataBlock.AddRange(BitConverter.GetBytes((short)boneSetIndex));
-                        meshDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
-                        meshIndexOffsets.Add(indexDataOffset);  // Need these for later.
 
-                        meshDataBlock.AddRange(BitConverter.GetBytes(vertexDataOffset0));
-                        meshDataBlock.AddRange(BitConverter.GetBytes(vertexDataOffset1));
-                        meshDataBlock.AddRange(BitConverter.GetBytes(vertexDataOffset2));
+                        // Can just use the real values from the already compiled geometry data.
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[mi]));
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertex1Offsets[mi]));
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertex2Offsets[mi]));
+
+                        // Don't have real data for this value atm.
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertex2Offsets[mi]));
+
                         meshDataBlock.Add(vertexDataEntrySize0);
                         meshDataBlock.Add(vertexDataEntrySize1);
                         meshDataBlock.Add(vertexDataEntrySize2);
@@ -3576,7 +3569,7 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
 
 
-                #region Final ModelData Segment Compliation
+                #region Model Data Segment Compliation
 
                 // Combine All DataBlocks
                 List<byte> modelDataBlock = new List<byte>();
