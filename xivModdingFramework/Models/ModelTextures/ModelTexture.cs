@@ -152,11 +152,11 @@ namespace xivModdingFramework.Models.ModelTextures
 
             var dimensions = await EqualizeTextureSizes(texMapData);
 
-            var diffuseMap = new List<byte>();
-            var normalMap = new List<byte>();
-            var specularMap = new List<byte>();
-            var emissiveMap = new List<byte>();
-            var alphaMap = new List<byte>();
+            var diffuseMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var normalMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var specularMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var emissiveMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var alphaMap = new byte[dimensions.Width * dimensions.Height * 4];
 
             var diffuseColorList = new List<Color>();
             var specularColorList = new List<Color>();
@@ -253,12 +253,11 @@ namespace xivModdingFramework.Models.ModelTextures
                     specularColor.A = 255;
                     normalColor.A = 255;
 
-
-                    diffuseMap.AddRange(BitConverter.GetBytes(diffuseColor.ToRgba()));
-                    specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
-                    emissiveMap.AddRange(BitConverter.GetBytes(emissiveColor.ToRgba()));
-                    alphaMap.AddRange(BitConverter.GetBytes(alphaColor.ToRgba()));
-                    normalMap.AddRange(BitConverter.GetBytes(normalColor.ToRgba()));
+                    Array.Copy(BitConverter.GetBytes(diffuseColor.ToRgba()), 0, diffuseMap, i - 3, 3);
+                    Array.Copy(BitConverter.GetBytes(specularColor.ToRgba()), 0, specularMap, i - 3, 3);
+                    Array.Copy(BitConverter.GetBytes(emissiveColor.ToRgba()), 0, emissiveMap, i - 3, 3);
+                    Array.Copy(BitConverter.GetBytes(alphaColor.ToRgba()), 0, alphaMap, i - 3, 3);
+                    Array.Copy(BitConverter.GetBytes(normalColor.ToRgba()), 0, normalMap, i - 3, 3);
                 }
             });
 
@@ -266,11 +265,11 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 Width = dimensions.Width,
                 Height = dimensions.Height,
-                Normal = normalMap.ToArray(),
-                Diffuse = diffuseMap.ToArray(),
-                Specular = specularMap.ToArray(),
-                Emissive = emissiveMap.ToArray(),
-                Alpha = alphaMap.ToArray(),
+                Normal = normalMap,
+                Diffuse = diffuseMap,
+                Specular = specularMap,
+                Emissive = emissiveMap,
+                Alpha = alphaMap,
                 MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
             };
 
