@@ -3253,31 +3253,34 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var boneSetsBlock = new List<byte>();
 
+                var boneSetSize = 0;
                 if (mdlVersion >= 6)
                 {
-                    List<List<byte>> data = new List<List<byte>>();
+                    List<List<byte>> meshBoneSets = new List<List<byte>>();
                     for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                     {
-                        data.Add(ttModel.Getv6BoneSet(mi));
+                        meshBoneSets.Add(ttModel.Getv6BoneSet(mi));
                     }
 
                     var offset = ttModel.MeshGroups.Count;
                     for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                     {
-                        var dataSize = data[mi].Count;
+                        var dataSize = meshBoneSets[mi].Count;
                         short count = (short) (dataSize / 2);
 
                         boneSetsBlock.AddRange(BitConverter.GetBytes((short) 0));
                         boneSetsBlock.AddRange(BitConverter.GetBytes((short) (count)));
 
                     }
+
+                    var boneSetStart = boneSetsBlock.Count;
                     for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                     {
                         var headerLocation = mi * 4;
                         var distance = (short)((boneSetsBlock.Count - headerLocation) / 4);
 
-                        boneSetsBlock.AddRange(data[mi]);
-                        if(data[mi].Count % 4 != 0)
+                        boneSetsBlock.AddRange(meshBoneSets[mi]);
+                        if (meshBoneSets[mi].Count % 4 != 0)
                         {
                             boneSetsBlock.AddRange(new byte[2]);
                         }
@@ -3286,8 +3289,9 @@ namespace xivModdingFramework.Models.FileTypes
                         var offsetBytes = BitConverter.GetBytes(distance);
                         boneSetsBlock[headerLocation] = offsetBytes[0];
                         boneSetsBlock[headerLocation + 1] = offsetBytes[1];
-
                     }
+                    var boneSetEnd = boneSetsBlock.Count;
+                    boneSetSize = (boneSetStart - boneSetEnd) / 2;
                 }
                 else
                 {
@@ -3321,7 +3325,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 // Update the size listing.
-                var sizeBytes = BitConverter.GetBytes( (short)(boneSetsBlock.Count / 2));
+                var sizeBytes = BitConverter.GetBytes((short)(boneSetSize));
                 basicModelBlock[boneSetSizePointer] = sizeBytes[0];
                 basicModelBlock[boneSetSizePointer + 1] = sizeBytes[1];
 
