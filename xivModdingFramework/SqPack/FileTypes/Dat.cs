@@ -743,6 +743,71 @@ namespace xivModdingFramework.SqPack.FileTypes
             return data;
         }
 
+        public async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
+        {
+            if (offset > 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+
+            var start = br.BaseStream.Position;
+
+
+            byte[] data;
+
+            // Some variety of magic numbers presumably?
+            var sixTeen = br.ReadInt32();
+            var zero = br.ReadInt32();
+
+            // Relevant info.
+            var partCompSize = br.ReadInt32();
+            var partDecompSize = br.ReadInt32();
+
+            if (partCompSize == 32000)
+            {
+                data = br.ReadBytes(partDecompSize);
+            }
+            else
+            {
+                data = await IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
+            }
+
+            var end = br.BaseStream.Position;
+            var length = end - start;
+
+            var target = Pad((int)length, 128);
+            var remaining = target - length;
+
+            var paddingData = br.ReadBytes((int) remaining);
+            if(paddingData.Any(x => x != 0))
+            {
+                throw new Exception("Unexpected real data in compressed data block padding section.");
+            }
+
+            return data;
+        }
+
+
+        public async Task<byte[]> ReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        {
+            if(blockCount == 0)
+            {
+                return new byte[0];
+            }
+
+            if (offset > 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+
+            var ret = (IEnumerable<byte>) new List<byte>();
+            for (int i = 0; i < blockCount; i++) {
+                var data = await ReadCompressedBlock(br);
+                ret = ret.Concat(data);
+            }
+            return ret.ToArray();
+        }
+
         /// <summary>
         /// Gets the data for Type 3 (Model) files
         /// </summary>
@@ -766,9 +831,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
-            var byteList = new List<byte>();
             var meshCount = 0;
             var materialCount = 0;
+            byte[] result = new byte[0];
 
             var index = 0;
             await Task.Run(async () =>
@@ -849,14 +914,42 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var extraData = br.ReadBytes((int)distanceToEndOfHeader);
 
 
+
+                        // Read the compressed blocks.
+                        // These could technically be read as contiguous blocks typically,
+                        // But it's safer to actually use their offsets and validate them in the process.
+
+                        var vertexInfoData = await ReadCompressedBlocks(br, vertexInfoBlockCount, endOfHeader + vertexInfoOffset);
+                        var modelInfoData = await ReadCompressedBlocks(br, modelDataBlockCount, endOfHeader + modelDataOffset);
+
+                        const int _VertexSegments = 3;
+                        byte[][] vertexBuffers = new byte[_VertexSegments][];
+                        for(int i = 0; i < _VertexSegments; i++)
+                        {
+                            vertexBuffers[i] = await ReadCompressedBlocks(br, (int) vertexBufferBlockCounts[i], endOfHeader + vertexBufferOffsets[i]);
+                        }
+
+                        byte[][] edgeBuffers = new byte[_VertexSegments][];
+                        for (int i = 0; i < _VertexSegments; i++)
+                        {
+                            edgeBuffers[i] = await ReadCompressedBlocks(br, (int)edgeGeometryVertexBufferBlockCounts[i], endOfHeader + edgeGeometryVertexBufferOffsets[i]);
+                        }
+
+                        byte[][] indexBuffers = new byte[_VertexSegments][];
+                        for (int i = 0; i < _VertexSegments; i++)
+                        {
+                            indexBuffers[i] = await ReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i]);
+                        }
+
+                        var byteList = new List<byte>();
                         // This header isn't actually written back to the game anywhere currently,
                         // and is generated internally by FFXIV when loading type 3 files.
                         // It's best for us to replicate it though.
                         byteList.AddRange(BitConverter.GetBytes(version));
                         byteList.AddRange(BitConverter.GetBytes(vertexInfoSize));
                         byteList.AddRange(BitConverter.GetBytes(modelDataSize));
-                        byteList.AddRange(BitConverter.GetBytes((ushort) meshCount));
-                        byteList.AddRange(BitConverter.GetBytes((ushort) materialCount));
+                        byteList.AddRange(BitConverter.GetBytes((ushort)meshCount));
+                        byteList.AddRange(BitConverter.GetBytes((ushort)materialCount));
 
                         Write3IntBuffer(byteList, vertexBufferOffsets);
                         Write3IntBuffer(byteList, indexBufferOffsets);
@@ -867,40 +960,22 @@ namespace xivModdingFramework.SqPack.FileTypes
                         byteList.Add(flags);
                         byteList.AddRange(padding);
 
+                        var decompressedData = (IEnumerable<byte>)byteList;
 
-                        // Technically we should be re-seeking after each section, but they're
-                        // written contiguously always anyways, so we can just read the blocks straight through.
-                        br.BaseStream.Seek(endOfHeader + vertexInfoOffset, SeekOrigin.Begin);
+                        // Vertex and Model Headers
+                        decompressedData = decompressedData.Concat(vertexInfoData);
+                        decompressedData = decompressedData.Concat(modelInfoData);
 
-                        for (var i = 0; i < totalBlocks; i++)
+                        for(int i = 0; i < _VertexSegments; i++)
                         {
-                            if (blockSizes[i] == 0)
-                            {
-                                // ???
-                                continue;
-                            }
+                            // Geometry data in LoD order.
+                            decompressedData = decompressedData.Concat(vertexBuffers[i]);
+                            decompressedData = decompressedData.Concat(edgeBuffers[i]);
+                            decompressedData = decompressedData.Concat(indexBuffers[i]);
 
-                            index = i;
-                            long lastPos = br.BaseStream.Position;
-
-                            br.ReadBytes(8);
-
-                            var partCompSize = br.ReadInt32();
-                            var partDecompSize = br.ReadInt32();
-
-                            if (partCompSize == 32000)
-                            {
-                                byteList.AddRange(br.ReadBytes(partDecompSize));
-                            }
-                            else
-                            {
-                                var partDecompBytes = await IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
-
-                                byteList.AddRange(partDecompBytes);
-                            }
-
-                            br.BaseStream.Seek(lastPos + blockSizes[i], SeekOrigin.Begin);
                         }
+
+                        result = decompressedData.ToArray();
 
                     }
                 }
@@ -915,7 +990,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             });
 
-            return (meshCount, materialCount, byteList.ToArray());
+            return (meshCount, materialCount, result);
         }
 
         public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offsetWithDatNumber)
@@ -1004,6 +1079,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetType4Data(offset, dataFile);
         }
 
+        /// <summary>
+        /// Pads a given byte list to the target padding interval with empty bytes.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="data"></param>
+        /// <param name="paddingTarget"></param>
+        /// <param name="forcePadding"></param>
         public static void Pad<T>(List<T> data, int paddingTarget, bool forcePadding = false)
         {
             var pad = paddingTarget - (data.Count % paddingTarget);
@@ -1012,6 +1094,24 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return;
             }
             data.AddRange(new T[pad]);
+        }
+
+
+        /// <summary>
+        /// Pads a given int length to the next padding interval.
+        /// </summary>
+        /// <param name="size"></param>
+        /// <param name="paddingTarget"></param>
+        /// <returns></returns>
+        public static int Pad(int size, int paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (size % paddingTarget);
+            if(pad == paddingTarget && !forcePadding)
+            {
+                return size;
+            }
+            return size + pad;
+
         }
 
 
