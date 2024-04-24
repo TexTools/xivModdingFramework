@@ -845,7 +845,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                             blockSizes[i] = br.ReadUInt16();
                         }
 
-                        br.BaseStream.Seek(endOfHeader + vertexInfoOffset, SeekOrigin.Begin);
+                        var distanceToEndOfHeader = endOfHeader - br.BaseStream.Position;
+                        var extraData = br.ReadBytes((int)distanceToEndOfHeader);
+
 
                         // This header isn't actually written back to the game anywhere currently,
                         // and is generated internally by FFXIV when loading type 3 files.
@@ -864,6 +866,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                         byteList.Add(lodCount);
                         byteList.Add(flags);
                         byteList.AddRange(padding);
+
+
+                        // Technically we should be re-seeking after each section, but they're
+                        // written contiguously always anyways, so we can just read the blocks straight through.
+                        br.BaseStream.Seek(endOfHeader + vertexInfoOffset, SeekOrigin.Begin);
 
                         for (var i = 0; i < totalBlocks; i++)
                         {

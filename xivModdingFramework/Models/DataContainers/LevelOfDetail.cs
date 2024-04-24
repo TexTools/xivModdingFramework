@@ -36,52 +36,64 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown0 { get; set; }
+        public float ModelLoDRange { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown1 { get; set; }
+        public float TextureLoDRange { get; set; }
 
         /// <summary>
         /// Mesh End
         /// </summary>
-        public short MeshEnd { get; set; }
+        public short WaterMeshIndex { get; set; }
 
         /// <summary>
         /// Extra Mesh Count
         /// </summary>
-        public short ExtraMeshCount { get; set; }
+        public short WaterMeshCount { get; set; }
 
         /// <summary>
         /// Mesh Sum
         /// </summary>
-        public short MeshSum{ get; set; }
+        public short ShadowMeshIndex{ get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown2 { get; set; }
+        public short ShadowMeshCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown3 { get; set; }
+        public short TerrainShadowMeshIndex { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int MeshGroupTotal { get; set; }
+        public short TerrainShadowMeshCount { get; set; }
+
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown5 { get; set; }
+        public short FogMeshIndex { get; set; }
+
+        /// <summary>
+        /// Unknown Usage
+        /// </summary>
+        public short FogMeshCount { get; set; }
+
+
+        /// <summary>
+        /// Unknown Usage
+        /// </summary>
+        public int EdgeGeometrySize { get; set; }
 
         /// <summary>
         /// The offset at which the index data begins
         /// </summary>
-        public int IndexDataStart { get; set; }
+        public int EdgeGeometryOffset { get; set; }
 
         /// <summary>
         /// Unknown Usage

@@ -47,7 +47,7 @@ namespace xivModdingFramework.Models.DataContainers
 
         // RGBA
         public byte[] VertexColor = new byte[] { 255, 255, 255, 255 };
-        public byte[] VertexColor2 = new byte[] { 255, 255, 255, 255 };
+        public byte[] VertexColor2 = new byte[] { 0, 0, 0, 255 };
 
         private const int _BONE_ARRAY_LENGTH = 8;
 
@@ -487,6 +487,28 @@ namespace xivModdingFramework.Models.DataContainers
                 return count;
             }
         }
+
+        /// <summary>
+        /// Creates the list of Mesh Level Triangle indices, using Mesh Level index pointers.
+        /// This data should be cached and not repeatedly accessed via this property.
+        /// </summary>
+        public List<int> TriangleIndices
+        {
+            get
+            {
+                var indices = new List<int>((int)IndexCount);
+                var vertCount = 0;
+                foreach(var p in Parts)
+                {
+                    foreach (var index in p.TriangleIndices)
+                    {
+                        indices.Add(index + vertCount);
+                    }
+                    vertCount += p.Vertices.Count;
+                }
+                return indices;
+            }
+        }
     }
 
 
@@ -722,121 +744,178 @@ namespace xivModdingFramework.Models.DataContainers
             }
         }
 
+        private class VertexReplacementInfo
+        {
+            public int MeshVertexId;
+            public TTVertex VertexData;
+            public TTShapePart Shape;
+            public int ShapeVertexId;
+        }
+
         /// <summary>
         /// Gets all the raw shape data of the mesh for use with importing the data back into FFXIV's file system.
         /// Calling/building this data is somewhat expensive, and should only be done
         /// if actually needed in this specified format.
         /// </summary>
-        internal List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)> GetRawShapeParts()
+
+        internal (List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements)> ShapeList, List<List<TTVertex>> Vertices) GetRawShapeParts()
         {
-            var ret = new List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements, List<TTVertex> Vertices)>();
+            // This is the final list of ShapeParts that will be written to file.
+            var ret = new List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements)>();
 
-            var shapeNames = ShapeNames;
-            shapeNames.Sort();
+            // This is a Per-Mesh list of vertices ordered in vertex ID of the vertex they replace.
+            var finalVertices = new List<List<TTVertex>>();
 
-            // This is a key of [Mesh] [Part] [Vertex Id] => List of referencing indices
-            var partRelevantVertexIdToReferringIndices = new Dictionary<int, Dictionary<int, Dictionary<int, List<int>>>>();
-            var meshVertexOffsets = new Dictionary<int, int>();
-
-            var idx = 0;
-            foreach(var m in MeshGroups)
+            var meshVertexOffset = 0;
+            var meshId = 0;
+            var shapeOrder = new List<string>();
+            foreach (var m in MeshGroups)
             {
-                meshVertexOffsets.Add(idx, (int) m.VertexCount);
-                idx++;
-            }
 
-            foreach (var shpName in shapeNames)
-            {
-                var mIdx = 0;
-                foreach (var m in MeshGroups)
+                // Converts Mesh relevant vertex ID to Mesh relevant triangle index.
+                var vertexToIndexDictionary = new Dictionary<int, List<int>>();
+                var meshIndices = m.TriangleIndices;
+                for (int i = 0; i < m.IndexCount; i++)
                 {
-                    if (!m.Parts.Any(x => x.ShapeParts.Any(y => y.Key == shpName)))
+                    var vertId = meshIndices[i];
+                    if(!vertexToIndexDictionary.ContainsKey(vertId))
                     {
-                        mIdx++;
-                        continue;
+                        vertexToIndexDictionary.Add(vertId, new List<int>());
                     }
+                    vertexToIndexDictionary[vertId].Add(i);
+                }
 
-                    // Generate key if needed.
-                    if(!partRelevantVertexIdToReferringIndices.ContainsKey(mIdx))
+
+                // We need to build the dictionaries of Vertex-To-Vertex replacement.
+
+                // ShapeVertexId will be populated only after we compile the final shape vertex list.
+                var perShapeDictionary = new Dictionary<string, (List<VertexReplacementInfo> ShapeData, int MinTargetVertex)>();
+                var partVertexOffset = 0;
+                foreach(var p in m.Parts)
+                {
+                    foreach(var shapeKv in p.ShapeParts)
                     {
-                        partRelevantVertexIdToReferringIndices.Add(mIdx, new Dictionary<int, Dictionary<int, List<int>>>());
-                    }
-
-                    Dictionary<int, int> replacements = new Dictionary<int, int>();
-                    List<TTVertex> vertices = new List<TTVertex>();
-
-
-                    var baseIndexOffset = m.IndexCount;
-
-                    var partVertexOffset = 0;
-                    var partIndexOffset = 0;
-                    var pIdx = 0;
-                    foreach(var p in m.Parts)
-                    {
-                        // Build index reference table if needed.
-                        if (!partRelevantVertexIdToReferringIndices[mIdx].ContainsKey(pIdx))
+                        var shapeName = shapeKv.Key;
+                        if(!shapeName.StartsWith("shp_"))
                         {
-                            partRelevantVertexIdToReferringIndices[mIdx].Add(pIdx, new Dictionary<int, List<int>>());
-
-                            for(int i = 0; i < p.TriangleIndices.Count; i++)
-                            {
-                                var vertexId = p.TriangleIndices[i];
-                                if (!partRelevantVertexIdToReferringIndices[mIdx][pIdx].ContainsKey(vertexId))
-                                {
-                                    partRelevantVertexIdToReferringIndices[mIdx][pIdx].Add(vertexId, new List<int>());
-                                }
-                                partRelevantVertexIdToReferringIndices[mIdx][pIdx][vertexId].Add(i);
-                            }
-                        }
-
-                        if (!p.ShapeParts.ContainsKey(shpName))
-                        {
-                            partVertexOffset += p.Vertices.Count;
-                            partIndexOffset += p.TriangleIndices.Count;
-                            pIdx++;
                             continue;
                         }
 
-                        var shp = p.ShapeParts[shpName];
-
-                        // Here we have to convert every vertex into a list of original
-                        // indices that reference it.
-                        foreach (var kv in shp.VertexReplacements)
+                        var shape = shapeKv.Value;
+                        var dataList = new List<VertexReplacementInfo>();
+                        var minVert = int.MaxValue;
+                        foreach (var replacement in shape.VertexReplacements)
                         {
-                            var partRelevantOriginalVertexId = kv.Key;
-                            var shapeRelevantReplacementVertexId = kv.Value;
-                            var originalVertex = p.Vertices[partRelevantOriginalVertexId];
-                            var newVertex = shp.Vertices[shapeRelevantReplacementVertexId];
-                            
-                            // Clone the reference to an array.
-                            var originalReferencingIndices = partRelevantVertexIdToReferringIndices[mIdx][pIdx][partRelevantOriginalVertexId].ToArray();
+                            VertexReplacementInfo data = new VertexReplacementInfo();
 
-                            for(int i =0; i < originalReferencingIndices.Length; i++)
+                            data.MeshVertexId = partVertexOffset + replacement.Key;
+                            data.VertexData = shape.Vertices[replacement.Value];
+                            data.Shape = shape;
+                            dataList.Add(data);
+
+                            if (data.MeshVertexId < minVert)
                             {
-                                replacements.Add(originalReferencingIndices[i] + partIndexOffset, shapeRelevantReplacementVertexId + meshVertexOffsets[mIdx] + vertices.Count);
+                                minVert = data.MeshVertexId;
                             }
                         }
-
-                        vertices.AddRange(shp.Vertices);
-
-                        partIndexOffset += p.TriangleIndices.Count;
-                        partVertexOffset += p.Vertices.Count;
-                        pIdx++;
+                        
+                        // We have to squish all the parts back together here.
+                        if(!perShapeDictionary.ContainsKey(shapeName))
+                        {
+                            perShapeDictionary.Add(shapeName, (dataList, minVert));
+                        }
+                        else
+                        {
+                            var val = perShapeDictionary[shapeName];
+                            val.ShapeData.AddRange(dataList);
+                            if(val.MinTargetVertex > minVert)
+                            {
+                                val.MinTargetVertex = minVert;
+                            }
+                            perShapeDictionary[shapeName] = val;
+                        }
                     }
-
-
-
-                    meshVertexOffsets[mIdx] += vertices.Count;
-                    ret.Add((shpName, mIdx, replacements, vertices));
-                    mIdx++;
+                    partVertexOffset += p.Vertices.Count;
                 }
+
+
+                // The dictionaries now need to be sorted to determine vertex write order.
+                // (SE Writes shape groups in the order they're encountered in the mesh vertex array... With some kind of unknown tiebreaker.)
+                List<(List<VertexReplacementInfo> ShapeData, int MinTargetVertex)> sorted;
+                sorted = perShapeDictionary.Values.ToList();
+                sorted.Sort((a, b) =>
+                {
+                    if (a.MinTargetVertex != b.MinTargetVertex)
+                    {
+                        return a.MinTargetVertex - b.MinTargetVertex;
+                    }
+                    return String.Compare(a.ShapeData[0].Shape.Name, b.ShapeData[0].Shape.Name);
+                });
+
+
+
+                // This is now the order which we write the vertex blocks.
+                // But -- NOT -- the order the shapes are listed in.
+                var vertexList = new List<TTVertex>();
+                foreach(var val in sorted)
+                {
+                    var rawShapeInfo = val.ShapeData;
+                    foreach(var vertexReplacement in rawShapeInfo)
+                    {
+                        vertexReplacement.ShapeVertexId = vertexList.Count;
+                        vertexList.Add(vertexReplacement.VertexData);
+                    }
+                } 
+
+                
+                finalVertices.Add(vertexList);
+
+
+                var finalShapeParts = new List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements)>();
+
+                // These are now reconstituted per-shape dictionaries of vertex replacements.
+                // We now need to convert them into Triangle Index => Shape Vertex lists.
+                // This list must be ordered in Shape Part order.
+                foreach (var kv in perShapeDictionary)
+                {
+                    var shapeName = kv.Key;
+                    var list = kv.Value.ShapeData;
+
+                    // Index replacements of the format [Mesh Level Index => Mesh Level Vertex]
+                    var replacements = new Dictionary<int, int>();
+                    foreach (var data in list)
+                    {
+                        var meshReleventShapeVertexId = data.ShapeVertexId + (int)m.VertexCount;
+                        var indexesUsedByVertex = vertexToIndexDictionary[data.MeshVertexId];
+                        foreach(var meshRelevantIndex in indexesUsedByVertex)
+                        {
+                            //var modelRelevantIndex = 
+                            replacements.Add(meshRelevantIndex, meshReleventShapeVertexId);
+                        }
+                    }
+                    ret.Add((shapeName, meshId, replacements));
+                }
+
+                // Vertices are written BY GROUP as
+                // [ Main Vertices ] [ Shape Vertices ] ... [[ Next Group ]]
+                meshVertexOffset += (int) m.VertexCount + vertexList.Count;
+                meshId++;
             }
 
-            return ret;
+            // Shape listing is sorted by Shape Name => MeshId
+            ret.Sort((a, b) =>
+            {
+                var cmp = String.Compare(a.ShapeName, b.ShapeName);
+                if (cmp != 0)
+                {
+                    return cmp;
+                }
+                return a.MeshId - b.MeshId;
+            });
+
+            return (ret, finalVertices);
         }
 
-        private static List<TTVertex> defaultBaseVerts = new List<TTVertex>();
-        private static List<TTVertex> defaultShapeVerts = new List<TTVertex>();
 
         /// <summary>
         /// Whether or not this Model actually has animation/weight data.
