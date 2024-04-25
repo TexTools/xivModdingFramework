@@ -71,6 +71,34 @@ namespace xivModdingFramework.Items.Enums
             { XivItemType.outdoor, XivStrings.Furniture_Outdoor }
         };
 
+        private static Dictionary<XivItemType, string> typeToSystemNameDict = new();
+        private static Dictionary<string, XivItemType> systemNameToTypeDict = new();
+        private static Dictionary<char, XivItemType> systemPrefixToTypeDict = new();
+
+        static XivItemTypes()
+        {
+            foreach (XivItemType type in (XivItemType[])Enum.GetValues(typeof(XivItemType)))
+            {
+                var field = type.GetType().GetField(type.ToString());
+                var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
+                if (attribute.Length > 0 && attribute[0].Description.Length > 0)
+                {
+                    var systemName = attribute[0].Description;
+                    systemPrefixToTypeDict[systemName[0]] = type;
+                    if (systemName == "human")
+                        systemPrefixToTypeDict['c'] = type;
+                    typeToSystemNameDict[type] = systemName;
+                    systemNameToTypeDict[systemName] = type;
+                }
+                else
+                {
+                    typeToSystemNameDict[type] = type.ToString();
+                    systemNameToTypeDict[type.ToString()] = type;
+                }
+            }
+            int x = 1;
+        }
+
         /// <summary>
         /// Gets the file type prefix for the enum value from its description.
         /// </summary>
@@ -83,7 +111,6 @@ namespace xivModdingFramework.Items.Enums
                 // this one's weird.
                 return "c";
             }
-
 
             var name = GetSystemName(value);
             var letter = "";
@@ -101,16 +128,9 @@ namespace xivModdingFramework.Items.Enums
         /// <returns>The race code</returns>
         public static XivItemType FromSystemPrefix(char value)
         {
-            foreach (XivItemType type in (XivItemType[])Enum.GetValues(typeof(XivItemType)))
-            {
-                var prefix = type.GetSystemPrefix();
-                if (prefix.Length == 0) continue;
-                if (prefix[0] == value)
-                {
-                    return type;
-                }
-            }
-            return XivItemType.unknown;
+            var result = XivItemType.unknown;
+            systemPrefixToTypeDict.TryGetValue(value, out result);
+            return result;
         }
 
         /// <summary>
@@ -120,9 +140,7 @@ namespace xivModdingFramework.Items.Enums
         /// <returns>The race code</returns>
         public static string GetSystemName(this XivItemType value)
         {
-            var field = value.GetType().GetField(value.ToString());
-            var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
-            return attribute.Length > 0 ? attribute[0].Description : value.ToString();
+            return typeToSystemNameDict[value];
         }
 
         /// <summary>
@@ -132,14 +150,9 @@ namespace xivModdingFramework.Items.Enums
         /// <returns>The race code</returns>
         public static XivItemType FromSystemName(string value)
         {
-            foreach (XivItemType type in (XivItemType[])Enum.GetValues(typeof(XivItemType)))
-            {
-                if(type.GetSystemName() == value)
-                {
-                    return type;
-                }
-            }
-            return XivItemType.unknown;
+            var result = XivItemType.unknown;
+            systemNameToTypeDict.TryGetValue(value, out result);
+            return result;
         }
 
         /// <summary>
