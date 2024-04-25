@@ -591,12 +591,16 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
 
                         xivMtrl.ShaderConstants = new List<ShaderConstant>(originalShaderParameterCount);
+                        var constantOffsets = new List<short>();
+                        var constantSizes = new List<short>();
                         for (var i = 0; i < originalShaderParameterCount; i++)
                         {
                             xivMtrl.ShaderConstants.Add(new ShaderConstant
                             {
-                                ConstantId = (MtrlShaderConstantId) br.ReadUInt32(), DataOffset = br.ReadInt16(), DataSize = br.ReadInt16()
+                                ConstantId = (MtrlShaderConstantId)br.ReadUInt32()
                             });
+                            constantOffsets.Add(br.ReadInt16());
+                            constantSizes.Add(br.ReadInt16());
                         }
 
                         xivMtrl.TextureSamplers = new List<TextureSampler>(originalTextureSamplerCount);
@@ -613,10 +617,11 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
                         var bytesRead = 0;
-                        foreach (var shaderConstant in xivMtrl.ShaderConstants)
+                        for(int i = 0; i < xivMtrl.ShaderConstants.Count; i++)
                         {
-                            var offset = shaderConstant.DataOffset;
-                            var size = shaderConstant.DataSize;
+                            var shaderConstant = xivMtrl.ShaderConstants[i];
+                            var offset = constantOffsets[i];
+                            var size = constantSizes[i];
                             shaderConstant.Values = new List<float>();
                             if (bytesRead + size <= originalShaderConstantsDataSize)
                             {
@@ -1092,13 +1097,11 @@ namespace xivModdingFramework.Materials.FileTypes
             foreach (var parameter in xivMtrl.ShaderConstants)
             {
                 // Ensure we're writing correctly calculated data.
-                parameter.DataOffset = (short) offset;
-                parameter.DataSize = (short)parameter.Values.Count;
-                offset += parameter.DataSize * 4;
-                short byteSize = (short)(parameter.DataSize * 4);
+                offset += parameter.Values.Count * 4;
+                short byteSize = (short)(parameter.Values.Count * 4);
 
                 mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ConstantId));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameter.DataOffset));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(byteSize));
             }
 

@@ -1439,7 +1439,8 @@ namespace xivModdingFramework.Materials.DataContainers
     }
 
     /// <summary>
-    /// This class contains the information for the texture usage structs in MTRL data.
+    /// This class contains the information for the shader keys.
+    /// Primarily these enable/disable shader functionality at large.
     /// </summary>
     public class ShaderKey
     {
@@ -1449,25 +1450,35 @@ namespace xivModdingFramework.Materials.DataContainers
     }
 
     /// <summary>
-    /// This class containst he information for the shader parameters at the end the MTRL File
+    /// This class contains the information for the shader parameters at the end the MTRL File
     /// </summary>
     public class ShaderConstant
     {
-        public MtrlShaderConstantId ConstantId;
+        public MtrlShaderConstantId ConstantId
+        {
+            get
+            {
+                if(Enum.IsDefined(typeof(MtrlShaderConstantId), ConstantIdRaw))
+                {
+                    return (MtrlShaderConstantId)ConstantIdRaw;
+                }
+                return MtrlShaderConstantId.Unknown;
+            }
+            set
+            {
+                ConstantIdRaw = (uint)value;
+            }
+        }
 
-
-        // Offset to the data in the Mtrl file.
-        public short DataOffset;
-
-        // Length of the data in the Mtrl file.
-        public short DataSize;
+        public uint ConstantIdRaw;
 
         // The actual data (after extraction).
         public List<float> Values;
     }
 
     /// <summary>
-    /// This class contains the information for MTRL texture parameters.
+    /// This class contains the information for MTRL texture samplers.
+    /// These determine how each texture is used.
     /// </summary>
     public class TextureSampler
     {
@@ -1522,6 +1533,7 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public enum MtrlShaderConstantId : uint
     {
+        Unknown = 0,
         AlphaLimiter = 699138595,        // Used in every material.  Overwriting bytes with 0s seems to have no effect.
         Occlusion = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
 
