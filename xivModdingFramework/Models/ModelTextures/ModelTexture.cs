@@ -476,6 +476,8 @@ namespace xivModdingFramework.Models.ModelTextures
         delegate ColorMapperResult ShaderColorMapperDelegate(Color4 diffuse, Color4 normal, Color4 specular);
         private static ShaderColorMapperDelegate GetShaderColorMapper(CustomModelColors colors, XivMtrl mtrl)
         {
+            // This is basically codifying this document: https://docs.google.com/spreadsheets/d/1kIKvVsW3fOnVeTi9iZlBDqJo6GWVn6K6BCUIRldEjhw/edit#gid=2112506802
+
             // This var is technically defined in the Shaders parameters.
             // But we can use a constant copy of it for now, since it's largely non-changeable.
             const float PlayerColorMultiplier = 1.4f;
@@ -488,7 +490,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     return (Color4 diffuse, Color4 normal, Color4 specular) => {
                         return new ColorMapperResult()
                         {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, diffuse.Blue),
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
                             Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                             Specular = specular,
                             Opacity = normal.Blue
@@ -500,9 +502,9 @@ namespace xivModdingFramework.Models.ModelTextures
                     return (Color4 diffuse, Color4 normal, Color4 specular) => {
                         return new ColorMapperResult()
                         {
-                            Diffuse = diffuse,
-                            Normal = new Color(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = specular,
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
                             Opacity = normal.Blue
                         };
                     };
