@@ -22,19 +22,22 @@ using System.IO;
 using System.Linq;
 using System.Resources;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
+using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
     /// <summary>
     /// This class holds the information for an MTRL file
     /// </summary>
-    public class XivMtrl
+    public class XivMtrl : ICloneable
     {
         public const string ItemPathToken = "{item_folder}";
         public const string VariantToken = "{variant}";
@@ -70,10 +73,22 @@ namespace xivModdingFramework.Materials.DataContainers
 
         public List<MtrlString> ColorsetStrings { get; set; }
 
+        public EShaderPack Shader
+        {
+            get
+            {
+                return ShaderHelpers.GetShpkFromString(ShaderPackRaw);
+            }
+            set
+            {
+                ShaderPackRaw = ShaderHelpers.GetEnumDescription(value);
+            }
+        }
+
         /// <summary>
         /// The name of the shader used by the item
         /// </summary>
-        public string Shader { get; set; }
+        public string ShaderPackRaw { get; set; }
 
         /// <summary>
         /// Unknown value
@@ -184,598 +199,9 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
         /// <summary>
-        /// Whether or not this Material's Variant has VFX associated with it.
-        /// Used to indicate if TexTools should retrieve the VFX textures
-        /// for the Texture Listing.
-        /// </summary>
-        public bool hasVfx { get; set; }
-
-        /// <summary>
         /// The internal MTRL path
         /// </summary>
         public string MTRLPath { get; set; }
-
-        /// <summary>
-        /// Retreives the Shader information for this Mtrl file.
-        /// </summary>
-        /// <returns></returns>
-        public ShaderInfo GetShaderInfo()
-        {
-            var info = new ShaderInfo();
-            switch (Shader)
-            {
-                case "character.shpk":
-                    info.Shader = MtrlShader.Standard;
-                    break;
-                case "characterglass.shpk":
-                    info.Shader = MtrlShader.Glass;
-                    break;
-                case "skin.shpk":
-                    info.Shader = MtrlShader.Skin;
-                    break;
-                case "hair.shpk":
-                    info.Shader = MtrlShader.Hair;
-                    break;
-                case "iris.shpk":
-                    info.Shader = MtrlShader.Iris;
-                    break;
-                case "bg.shpk":
-                    info.Shader = MtrlShader.Furniture;
-                    break;
-                case "bgcolorchange.shpk":
-                    info.Shader = MtrlShader.DyeableFurniture;
-                    break;
-                default:
-                    info.Shader = MtrlShader.Other;
-                    break;
-            }
-
-            // Check the transparency bit.
-            const ushort transparencyBit = 16;
-            const ushort backfaceBit = 1;
-            var bit = (ushort)(ShaderFlags & transparencyBit);
-
-            if(bit > 0)
-            {
-                info.TransparencyEnabled = true;
-            } else
-            {
-                info.TransparencyEnabled = false;
-            }
-
-            bit = (ushort)(ShaderFlags & backfaceBit);
-
-            if (bit > 0)
-            {
-                info.RenderBackfaces = false;
-            }
-            else
-            {
-                info.RenderBackfaces = true;
-            }
-
-            info.Preset = MtrlShaderPreset.Default;
-            if (info.Shader == MtrlShader.Standard)
-            {
-                bool hasSpec = GetMapInfo(XivTexType.Specular) != null;
-                bool hasDiffuse = GetMapInfo(XivTexType.Diffuse) != null;
-                bool hasMulti = GetMapInfo(XivTexType.Multi) != null;
-
-                if (hasDiffuse)
-                {
-                    if(hasSpec)
-                    {
-                        if (GetShaderKey(XivTexType.Specular) != null)
-                        {
-                            info.Preset = MtrlShaderPreset.Monster;
-                        }
-                        else
-                        {
-                            info.Preset = MtrlShaderPreset.DiffuseSpecular;
-                        }
-                    } else
-                    {
-                        info.Preset = MtrlShaderPreset.DiffuseMulti;
-                    }
-                } else
-                {
-                    info.Preset = MtrlShaderPreset.Default;
-                }
-            }
-            else if (info.Shader == MtrlShader.Skin)
-            {
-                if(GetShaderKey(XivTexType.Skin) == null)
-                {
-                    info.Preset = MtrlShaderPreset.Face;
-                }
-
-                if(GetShaderKey(XivTexType.Skin) != null && GetShaderKey(XivTexType.Skin).Value == 1476344676)
-                {
-                    info.Preset = MtrlShaderPreset.BodyWithHair;
-                }
-                else if(ShaderConstants.Any(x => x.ConstantId == MtrlShaderConstantId.SkinTileMaterial))
-                {
-                    var param = ShaderConstants.First(x => x.ConstantId == MtrlShaderConstantId.SkinTileMaterial);
-                    if(param.Values[0] == 0)
-                    {
-                        if(info.Preset == MtrlShaderPreset.Face)
-                        {
-                            info.Preset = MtrlShaderPreset.FaceNoPores;
-
-                        } else
-                        {
-                            info.Preset = MtrlShaderPreset.BodyNoPores;
-                        }
-                    }
-                }
-            } else if(info.Shader == MtrlShader.Hair)
-            {
-                if(GetShaderKey(XivTexType.Other) != null)
-                {
-                    info.Preset = MtrlShaderPreset.Face;
-                    var mul = 1.4f;
-                    var param = ShaderConstants.FirstOrDefault(x => x.ConstantId == MtrlShaderConstantId.SkinColor);
-                    if(param != null)
-                    {
-                        mul = param.Values[0];
-                    }
-
-                    // Limbal ring faces (Au Ra) use a 3.0 multiplier for brightness.
-                    if(mul == 3.0)
-                    {
-                        info.Preset = MtrlShaderPreset.FaceBright;
-                    }
-
-
-                }
-            }
-
-
-            return info;
-        }
-
-        /// <summary>
-        /// Sets the shader info for this Mtrl file.
-        /// </summary>
-        /// <param name="info"></param>
-        public void SetShaderInfo(ShaderInfo info, bool forced = false)
-        {
-            var old = GetShaderInfo();
-
-            // Set transparency bit as needed.
-            const ushort transparencyBit = 16;
-            const ushort backfaceBit = 1;
-            var transparency = info.ForcedTransparency == null ? info.TransparencyEnabled : (bool)info.ForcedTransparency;
-            if (transparency)
-            {
-                ShaderFlags = (ushort)(ShaderFlags | transparencyBit);
-            }
-            else
-            {
-                ShaderFlags = (ushort)(ShaderFlags & (~transparencyBit));
-            }
-
-            // Set Backfaces bit.
-            var backfaces = info.RenderBackfaces;
-            if (!backfaces)
-            {
-                ShaderFlags = (ushort)(ShaderFlags | backfaceBit);
-            }
-            else
-            {
-                ShaderFlags = (ushort)(ShaderFlags & (~backfaceBit));
-            }
-
-            // Update us to DX11 material style if we're not already.
-            for (var idx = 0; idx < AdditionalData.Length; idx++)
-            {
-                if (idx == 0)
-                {
-                    AdditionalData[idx] = 12;
-                }
-                else
-                {
-                    AdditionalData[idx] = 0;
-                }
-            }
-
-            for (var idx = 0; idx < Textures.Count; idx++)
-            {
-                Textures[idx].Flags = 0;
-            }
-
-
-            if (forced == false && info.Shader == old.Shader && info.Preset == old.Preset)
-            {
-                // Nothing needs to be changed.
-                // Returning here ensures shader information
-                // is not bashed unless edited.
-                return;
-            }
-
-            RegenerateShaderKeys(info);
-            RegenerateShaderConstants(info);
-
-            switch (info.Shader)
-            {
-                case MtrlShader.Standard:
-                    Shader = "character.shpk";
-                    break;
-                case MtrlShader.Glass:
-                    Shader = "characterglass.shpk";
-                    break;
-                case MtrlShader.Hair:
-                    Shader = "hair.shpk";
-                    break;
-                case MtrlShader.Iris:
-                    Shader = "iris.shpk";
-                    break;
-                case MtrlShader.Skin:
-                    Shader = "skin.shpk";
-                    break;
-                case MtrlShader.Furniture:
-                    Shader = "bg.shpk";
-                    break;
-                case MtrlShader.DyeableFurniture:
-                    Shader = "bgcolorchange.shpk";
-                    break;
-                default:
-                    // No change to the Shader for 'Other' type entries.
-                    break;
-            }
-
-            // Clear unused maps.
-            if (!info.HasDiffuse)
-            {
-                SetMapInfo(XivTexType.Diffuse, null);
-            }
-            if (!info.HasSpec)
-            {
-                SetMapInfo(XivTexType.Specular, null);
-            }
-            if (!info.HasMulti)
-            {
-                SetMapInfo(XivTexType.Multi, null);
-            }
-            if (!info.HasReflection)
-            {
-                SetMapInfo(XivTexType.Reflection, null);
-            }
-
-            // Clear or set the Colorset if needed.
-            if(!info.HasColorset)
-            {
-                // ColorSetCount seems to always be 1, even when the data is empty.
-                ColorsetStrings = new List<MtrlString>();
-                ColorSetData = new List<Half>();
-                ColorSetDyeData = null;
-            } else
-            {
-                if(ColorsetStrings.Count == 0 || ColorSetData == null || ColorSetData.Count != 256)
-                {
-                    // Get default Colorset Data.
-                    ColorSetData = Tex.GetColorsetDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
-                }
-                if(ColorSetDyeData == null || ColorSetDyeData.Length != 32)
-                {
-                    ColorSetDyeData = Tex.GetColorsetExtraDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
-                }
-            }
-
-        }
-
-        /// <summary>
-        /// Converts raw Mtrl format data into the appropriate enum.
-        /// Does a bit of math to ignore extraneous bits that don't have known purpose yet.
-        /// </summary>
-        /// <param name="raw"></param>
-        /// <returns></returns>
-        private static MtrlTextureSamplerFormatPresets GetFormat(short raw)
-        {
-
-            // Pare format short down of extraneous data.
-            short clearLast6Bits = -64; // Hex 0xFFC0
-            short format = (short)(raw & clearLast6Bits);
-            short setFirstBit = -32768;
-            format = (short)(format | setFirstBit);
-
-            // Scan through known formats.
-            foreach (var formatEntry in Mtrl.TextureSamplerFormatFlags)
-            {
-                if (format == formatEntry.Value)
-                {
-                    return formatEntry.Key;
-                }
-            }
-            return MtrlTextureSamplerFormatPresets.Other;
-        }
-
-
-        /// <summary>
-        /// Gets the given texture map info based on the textures used in this mtrl file.
-        /// </summary>
-        /// <param name="MapType"></param>
-        /// <returns></returns>
-        public MapInfo GetMapInfo(XivTexType MapType, bool tokenized = true)
-        {
-
-            var tex = Textures.FirstOrDefault(x => x.Usage == MapType);
-            if(tex == null)
-            {
-                return null;
-            }
-
-            var info = new MapInfo();
-            info.Usage = MapType;
-            info.Path = tex.TexturePath;
-
-            if (tokenized)
-            {
-                info.Path = TokenizePath(info.Path, info.Usage);
-            }
-            return info;
-        }
-
-        /// <summary>
-        /// Retrieves the MapInfo struct for a given path contained in the Mtrl.
-        /// Null if texture does not exist in the Mtrl.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        public MapInfo GetMapInfo(string path)
-        {
-            var tex = Textures.FirstOrDefault(x => x.TexturePath == path);
-            if(tex == null)
-            {
-                return null;
-            }
-
-            var info = new MapInfo();
-            info.Path = path; 
-            info.Format = GetFormat(tex.Sampler.FormatFlags);
-            info.Usage = tex.Usage;
-
-            info.Path = TokenizePath(info.Path, info.Usage);
-
-            return info;
-        }
-
-        /// <summary>
-        /// Sets or deletes the texture information from the Mtrl based on the
-        /// incoming usage and info.
-        /// </summary>
-        /// <param name="MapType"></param>
-        /// <param name="info"></param>
-        public void SetMapInfo(XivTexType MapType, MapInfo info)
-        {
-            // Sanity check.
-            if(info != null && info.Usage != MapType)
-            {
-                throw new System.Exception("Invalid attempt to reassign map materials.");
-            }
-           
-            var tex = Textures.FirstOrDefault(x => x.Usage == MapType);
-
-            if(info == null)
-            {
-                Textures.Remove(tex);
-                return;
-            }
-
-            var rootPath = GetTextureRootDirectoy();
-            var defaultFileName = GetDefaultTexureName(info.Usage);
-
-            // No path, assign it by default.
-            if (info.Path.Trim() == "")
-            {
-                info.Path = rootPath + "/" + defaultFileName;
-            }
-
-            // Detokenize paths
-            info.Path = DetokenizePath(info.Path, info.Usage);
-
-            // Test the path goes to a legitimate DAT file.
-            try
-            {
-                IOUtil.GetDataFileFromPath(info.Path);
-            } catch
-            {
-                // Prefix the item's personal path onto it.
-                info.Path = ItemPathToken + "/" + info.Path;
-                info.Path = DetokenizePath(info.Path, info.Usage);
-            }
-
-            // Ensure .tex or .atex ending for sanity.
-            var match = Regex.Match(info.Path, "\\.a?tex$");
-            if(!match.Success)
-            {
-                info.Path = info.Path += ".tex";
-            }
-
-
-
-
-            var sampler = new TextureSampler();
-            sampler.SamplerId = Mtrl.TextureSamplerIds[info.Usage];
-            sampler.UnknownFlags = 15;
-            sampler.FormatFlags = Mtrl.TextureSamplerFormatFlags[info.Format];
-
-            var newTex = new MtrlTexture()
-            {
-                TexturePath = info.Path,
-                Sampler = sampler
-            };
-            Textures.Add(newTex);
-        }
-
-        /// <summary>
-        /// Regenerates/Cleans up the texture usage list based on the 
-        /// Texture Maps that are set in the Texture Description Fields.
-        /// </summary>
-        private void RegenerateShaderKeys(ShaderInfo info)
-        {
-            ShaderKeys.Clear();
-
-            // These shaders do not use the texture usage list at all.
-            if (info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture || info.Shader == MtrlShader.Iris || info.Shader == MtrlShader.Hair)
-            {
-                if(info.Shader == MtrlShader.Hair && info.Preset != MtrlShaderPreset.Default) 
-                { 
-                    // The facial hair shaders use this texture usage value to pipe in 
-                    // Tattoo/Limbal color instead of Hair Highlight color.
-                    SetShaderKey(XivTexType.Other);
-                }
-                return;
-            }
-
-            if (info.Shader == MtrlShader.Skin)
-            {
-                if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
-                {
-                    SetShaderKey(XivTexType.Normal);
-                    SetShaderKey(XivTexType.Diffuse);
-                    SetShaderKey(XivTexType.Decal);
-                    SetShaderKey(XivTexType.Specular);
-                }
-                else if(info.Preset == MtrlShaderPreset.BodyWithHair)
-                {
-                    SetShaderKey(XivTexType.Skin, 1476344676);
-                } else 
-                {
-                    // Non-Face Skin textures use a single custom usage value.
-                    SetShaderKey(XivTexType.Skin);
-                }
-
-            }
-            else if (info.Shader == MtrlShader.Standard)
-            {
-                SetShaderKey(XivTexType.Normal);
-                if (info.Preset == MtrlShaderPreset.Default)
-                {
-                    SetShaderKey(XivTexType.Decal);
-
-                }
-                else if (info.Preset == MtrlShaderPreset.DiffuseMulti)
-                {
-                    // This seems to crash the game atm.
-                    SetShaderKey(XivTexType.Diffuse);
-                    SetShaderKey(XivTexType.Decal);
-                }
-                else if (info.Preset == MtrlShaderPreset.Monster)
-                {
-                    SetShaderKey(XivTexType.Diffuse);
-                    SetShaderKey(XivTexType.Decal);
-
-                    // This flag seems to convert Specular textures to Multi textures.
-                    SetShaderKey(XivTexType.Specular);
-                }
-                else
-                {
-                    SetShaderKey(XivTexType.Diffuse);
-                    SetShaderKey(XivTexType.Decal);
-                }
-            }
-            else
-            {
-                // This is uh... Glass shader?  I think is the only fall through here.
-                SetShaderKey(XivTexType.Normal);
-                SetShaderKey(XivTexType.Decal);
-            }
-
-        }
-
-        /// <summary>
-        /// Regenerates the Shader Parameter list based on shader and texture information.
-        /// </summary>
-        private void RegenerateShaderConstants(ShaderInfo info)
-        {
-            var args = new Dictionary<MtrlShaderConstantId, List<float>>();
-
-            args.Add(MtrlShaderConstantId.AlphaLimiter, null);
-            args.Add(MtrlShaderConstantId.Occlusion, null);
-
-            if (info.Shader == MtrlShader.Skin)
-            {
-                args.Add(MtrlShaderConstantId.SkinColor, null);
-                args.Add(MtrlShaderConstantId.SkinMatParamRow2, null);
-                args.Add(MtrlShaderConstantId.SkinWetnessLerp, null);
-                args.Add(MtrlShaderConstantId.SkinUnknown2, null);
-                args.Add(MtrlShaderConstantId.SkinFresnel, null);
-                args.Add(MtrlShaderConstantId.Reflection1, null);
-
-                if(info.Preset == MtrlShaderPreset.BodyNoPores || info.Preset == MtrlShaderPreset.FaceNoPores)
-                {
-                    args.Add(MtrlShaderConstantId.SkinTileMaterial, new List<float>() { 0 });
-                    args.Add(MtrlShaderConstantId.SkinTileMultiplier, new List<float>() { 0, 0 });
-
-                } else
-                {
-                    args.Add(MtrlShaderConstantId.SkinTileMaterial, null);
-                    args.Add(MtrlShaderConstantId.SkinTileMultiplier, null);
-                }
-
-                if (info.Preset == MtrlShaderPreset.Face || info.Preset == MtrlShaderPreset.FaceNoPores)
-                {
-                    args.Add(MtrlShaderConstantId.Face1, null);
-                }
-            }
-            else if (info.Shader == MtrlShader.Standard)
-            {
-                if (info.Preset == MtrlShaderPreset.Monster)
-                {
-                    args.Remove(MtrlShaderConstantId.AlphaLimiter);
-                    args.Remove(MtrlShaderConstantId.Occlusion);
-                    args.Add(MtrlShaderConstantId.AlphaLimiter, new List<float>() { 0.5f });
-                    args.Add(MtrlShaderConstantId.Occlusion, new List<float>() { 0.25f });
-                    args.Add(MtrlShaderConstantId.Hair1, new List<float>() { 0 });
-                }
-                else
-                {
-                    args.Add(MtrlShaderConstantId.Equipment1, null);
-                    args.Add(MtrlShaderConstantId.Reflection1, null);
-                }
-            }
-            else if (info.Shader == MtrlShader.Iris)
-            {
-                args.Add(MtrlShaderConstantId.Equipment1, null);
-                args.Add(MtrlShaderConstantId.Reflection1, null);
-                args.Add(MtrlShaderConstantId.SkinFresnel, null);
-                args.Add(MtrlShaderConstantId.SkinColor, null);
-                args.Add(MtrlShaderConstantId.SkinWetnessLerp, null);
-            }
-            else if(info.Shader == MtrlShader.Hair)
-            {
-                args.Add(MtrlShaderConstantId.Equipment1, null);
-                args.Add(MtrlShaderConstantId.Reflection1, null);
-                args.Add(MtrlShaderConstantId.SkinColor, null);
-                args.Add(MtrlShaderConstantId.SkinWetnessLerp, null);
-                args.Add(MtrlShaderConstantId.Hair1, null);
-                args.Add(MtrlShaderConstantId.Hair2, null);
-
-                if (info.Preset == MtrlShaderPreset.FaceBright)
-                {
-                    // Limbals use a 3x skin color modifier.
-                    args[MtrlShaderConstantId.SkinColor] = new List<float>() { 3f, 3f, 3f };
-                }
-            }
-            else if(info.Shader == MtrlShader.Glass)
-            {
-                args.Remove(MtrlShaderConstantId.AlphaLimiter);
-                args.Remove(MtrlShaderConstantId.Occlusion);
-                args.Add(MtrlShaderConstantId.AlphaLimiter, new List<float>() { 0.25f });
-                args.Add(MtrlShaderConstantId.Hair2, new List<float>() { 1.0f });
-            }
-
-
-            // Regenerate the list.
-            ShaderConstants.Clear();
-            //args.ForEach(x => SetShaderParameter(x));
-            foreach(var kv in args)
-            {
-                // Nulls use defaults.
-                SetShaderConstant(kv.Key, kv.Value);
-            }
-        }
 
 
         /// <summary>
@@ -783,9 +209,14 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="parameterId"></param>
         /// <returns></returns>
-        private ShaderConstant GetShaderConstant(MtrlShaderConstantId parameterId)
+        private ShaderConstant GetShaderConstant(uint parameterId, bool clone = true)
         {
-            return ShaderConstants.FirstOrDefault(x => x.ConstantId == parameterId);
+            var val = ShaderConstants.FirstOrDefault(x => x.ConstantId == parameterId);
+            if(val != null && clone)
+            {
+                val = (ShaderConstant) val.Clone();
+            }
+            return val;
         }
 
         /// <summary>
@@ -793,125 +224,25 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="parameterId"></param>
         /// <param name="data"></param>
-        private void SetShaderConstant(MtrlShaderConstantId parameterId, List<float> data = null)
+        private void SetShaderConstant(uint parameterId, List<float> data = null)
         {
-            try
-            {
-                var value = ShaderConstants.First(x => x.ConstantId == parameterId);
+            var value = ShaderConstants.FirstOrDefault(x => x.ConstantId == parameterId);
 
-                // Only overwrite if we were given explicit data.
-                if (value != null && data != null)
-                {
-                    value.Values = data;
-                }
+            if (value != null && data != null)
+            {
+                // Altering Existing Constant Value
+                value.Values = data;
+            } else if(value != null && data == null)
+            {
+                // Removing Constant
+                ShaderConstants.Remove(value);
             }
-            catch (Exception ex)
+            else if(value == null && data != null)
             {
-                if (data == null)
-                {
-                    data = Mtrl.ShaderConstantValues[parameterId];
-                }
-
-                ShaderConstants.Add(new ShaderConstant
-                {
-                    ConstantId = parameterId,
-                    Values = data
-                });
+                //Adding a constant
+                var c = new ShaderConstant() { ConstantId = parameterId, Values = data };
+                ShaderConstants.Add(c);
             }
-        }
-
-        /// <summary>
-        /// Removes a given shader parameter.
-        /// </summary>
-        /// <param name="parameterId"></param>
-        private void ClearShaderConstant(MtrlShaderConstantId parameterId)
-        {
-            ShaderConstants = ShaderConstants.Where(x => x.ConstantId != parameterId).ToList();
-        }
-
-
-        /// <summary>
-        /// Gets a given shader key by its usage value.
-        /// </summary>
-        /// <param name="usage"></param>
-        /// <returns></returns>
-        private ShaderKey GetShaderKey(XivTexType usage)
-        {
-            return ShaderKeys.FirstOrDefault(x => x.Category == Mtrl.ShaderKeyCategories[usage].Category);
-        }
-
-        /// <summary>
-        /// Clears a texture usage value.
-        /// </summary>
-        /// <param name="usage"></param>
-        private bool ClearShaderKey(XivTexType usage)
-        {
-            var oldCount = ShaderKeys.Count;
-            ShaderKeys = ShaderKeys.Where(x => x.Category != Mtrl.ShaderKeyCategories[usage].Category).ToList();
-            return oldCount != ShaderKeys.Count;
-        }
-
-        /// <summary>
-        /// Adds or changes a shader key.
-        /// </summary>
-        /// <param name="usage"></param>
-        /// <param name="unknownValue"></param>
-        private void SetShaderKey(XivTexType usage, uint? unknownValue = null)
-        {
-            if(unknownValue == null)
-            {
-                unknownValue = Mtrl.ShaderKeyCategories[usage].Value;
-            }
-            try
-            {
-                var val = ShaderKeys.First(x => x.Category == Mtrl.ShaderKeyCategories[usage].Category);
-                if(val != null)
-                {
-                    // Despite being named 'Struct' this is actually a class.
-                    val.Value = (uint) unknownValue;
-                } else
-                {
-                    ShaderKeys.Add(new ShaderKey()
-                    {
-                        Category = Mtrl.ShaderKeyCategories[usage].Category,
-                        Value = (uint) unknownValue
-                    });
-                }
-            } catch(Exception ex)
-            {
-                ShaderKeys.Add(new ShaderKey()
-                {
-                    Category = Mtrl.ShaderKeyCategories[usage].Category,
-                    Value = (uint) unknownValue
-                });
-            }
-        }
-
-        /// <summary>
-        /// Retrieve all MapInfo structs for all textures associated with this MTRL,
-        /// Including textures with unknown usage.
-        /// </summary>
-        /// <returns></returns>
-        public List<MapInfo> GetAllMapInfos(bool tokenize = true)
-        {
-            var ret = new List<MapInfo>();
-            var shaderInfo = GetShaderInfo();
-
-            foreach(var tex in Textures)
-            {
-                var info = new MapInfo();
-                info.Path = tex.TexturePath;
-                info.Format = GetFormat(tex.Sampler.FormatFlags);
-                info.Usage = tex.Usage;
-
-                if (tokenize)
-                {
-                    info.Path = TokenizePath(info.Path, info.Usage);
-                }
-                ret.Add(info);
-            }
-
-            return ret;
         }
 
         /// <summary>
@@ -922,6 +253,9 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public List<TexTypePath> GetTextureTypePathList()
         {
+            return new List<TexTypePath>();
+            /*
+            // TODO:  Get rid of/refactor the entire pipeline that calls this function. (Only used 1x)
             var ret = new List<TexTypePath>();
             var maps = GetAllMapInfos(false);
             var shaderInfo = GetShaderInfo();
@@ -963,7 +297,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 ret.Add(ttp);
             }
 
-            return ret;
+            return ret;*/
         }
 
         /// <summary>
@@ -973,6 +307,23 @@ namespace xivModdingFramework.Materials.DataContainers
         public XivDataFile GetDataFile()
         {
             return Helpers.IOUtil.GetDataFileFromPath(MTRLPath);
+        }
+
+
+        /// <summary>
+        /// Simplified one-line accessor for ease of use.
+        /// </summary>
+        /// <param name="usage"></param>
+        /// <returns></returns>
+        public MtrlTexture GetTexture(XivTexType usage, bool clone = true)
+        {
+
+            var val = Textures.FirstOrDefault(x => x.Usage == usage);
+            if(val != null && clone)
+            {
+                val = (MtrlTexture)val.Clone();
+            }
+            return val;
         }
 
         /// <summary>
@@ -1072,7 +423,7 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 ret += "_s";
             }
-            else if (texType == XivTexType.Multi)
+            else if (texType == XivTexType.Mask)
             {
                 var path = MTRLPath;
                 if (path.Contains("chara/human/c"))
@@ -1206,6 +557,36 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
 
+        public object Clone()
+        {
+            var clone = (XivMtrl) MemberwiseClone();
+
+            clone.Textures = new List<MtrlTexture>();
+            for (int i = 0; i < Textures.Count; i++)
+            {
+                clone.Textures[i] = (MtrlTexture)Textures[i].Clone();
+            }
+
+            clone.ShaderConstants= new List<ShaderConstant>();
+            for (int i = 0; i < ShaderConstants.Count; i++)
+            {
+                clone.ShaderConstants[i] = (ShaderConstant)ShaderConstants[i].Clone();
+            }
+
+            clone.ShaderKeys = new List<ShaderKey>();
+            for (int i = 0; i < ShaderKeys.Count; i++)
+            {
+                clone.ShaderKeys[i] = (ShaderKey)ShaderKeys[i].Clone();
+            }
+
+            clone.AdditionalData = (byte[]) AdditionalData.Clone();
+            clone.ColorSetData = ColorSetData.ToList();
+            clone.ColorSetDyeData = (byte[]) ColorSetDyeData.Clone();
+
+
+            return clone;
+        }
+
     }
 
     public class MtrlString : ICloneable
@@ -1230,6 +611,13 @@ namespace xivModdingFramework.Materials.DataContainers
 
         public TextureSampler Sampler;
 
+        // Shortcut accessor for the texture data.
+        public async Task<XivTex> GetTexData()
+        {
+            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
+            return await _tex.GetTexData(this);
+        }
+
         /// <summary>
         /// Retrieves this texture's usage type based on the sampler id.
         /// </summary>
@@ -1237,11 +625,11 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                if(Sampler == null || !Mtrl.TextureSamplerIds.ContainsValue(Sampler.SamplerId))
+                if(Sampler == null)
                 {
                     return XivTexType.Other;
                 }
-                return Mtrl.TextureSamplerIds.First(x => x.Value == Sampler.SamplerId).Key;
+                return Sampler.TexType;
             }
         }
 
@@ -1274,23 +662,7 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class ShaderConstant : ICloneable
     {
-        public MtrlShaderConstantId ConstantId
-        {
-            get
-            {
-                if(Enum.IsDefined(typeof(MtrlShaderConstantId), ConstantIdRaw))
-                {
-                    return (MtrlShaderConstantId)ConstantIdRaw;
-                }
-                return MtrlShaderConstantId.Unknown;
-            }
-            set
-            {
-                ConstantIdRaw = (uint)value;
-            }
-        }
-
-        public uint ConstantIdRaw;
+        public uint ConstantId;
 
         // The actual data (after extraction).
         public List<float> Values;
@@ -1309,237 +681,38 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class TextureSampler : ICloneable
     {
-        public uint SamplerId; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
+        public ESamplerId SamplerId
+        {
+            get
+            {
+                if(Enum.IsDefined(typeof(ESamplerId), SamplerIdRaw))
+                {
+                    return (ESamplerId)SamplerIdRaw;
+                }
+                return ESamplerId.Unknown;
+            }
+            set
+            {
+                SamplerIdRaw = (uint)value;
+            }
+        }
 
-        public short FormatFlags; // Mappings for this FileFormat value to MtrlTextureDescriptorFormat value are available in Mtrl.cs 
+        public XivTexType TexType
+        {
+            get {
+                return SamplerIdToTexUsage(SamplerId);
+            }
+        }
 
-        public short UnknownFlags;   // Always seems to be [15]?
+        public uint SamplerIdRaw; 
+
+        // Bit field of sampler flags, not all of them are known.
+        public short FormatFlags; 
+
+        public short UnknownFlags;
         public object Clone()
         {
             return MemberwiseClone();
-        }
-    }
-
-    // Enum representation of the format map data is used as.
-    public enum MtrlTextureSamplerFormatPresets
-    {
-        UsesColorset,
-        NoColorset,
-        Other
-    }
-
-    // Enum representation of the shader names used in mtrl files.
-    public enum MtrlShader
-    {
-        Standard,           // character.shpk
-        Glass,              // characterglass.shpk
-        Skin,               // skin.shpk
-        Hair,               // hair.shpk
-        Iris,               // iris.shpk
-        Furniture,          // bg.shpk
-        DyeableFurniture,   //bgcolorchange.shpk 
-        Other               // Unknown Shader
-    }
-
-    // Enum representation of the shader presets that the framework
-    // Knows how to build.
-    public enum MtrlShaderPreset
-    {
-        Default,      
-        DiffuseMulti,    
-        DiffuseSpecular,
-        BodyNoPores,
-        BodyWithHair,
-        Face,
-        FaceNoPores,
-        FaceBright,
-        Monster,
-    }
-
-    /// <summary>
-    /// Enums for the various shader parameter Ids.  These likely are used to pipe extra data from elsewhere into the shader.
-    /// Ex. Local Reflection Maps, Character Skin/Hair Color, Dye Color, etc.
-    /// </summary>
-    public enum MtrlShaderConstantId : uint
-    {
-        Unknown = 0,
-        AlphaLimiter = 699138595,        // Used in every material.  Overwriting bytes with 0s seems to have no effect.
-        Occlusion = 1465565106,       // Used in every material.  Overwriting bytes with 0s seems to have no effect.
-
-        SkinColor = 740963549,          // This skin args seem to be the same for all races.
-        SkinWetnessLerp = 2569562539,
-        SkinMatParamRow2 = 390837838,
-        SkinUnknown2 = 950420322,          // Always all 0 data?
-        SkinTileMaterial = 1112929012,
-
-        Face1 = 2274043692,
-
-        Equipment1 = 3036724004,    // Used in some equipment rarely, particularly Legacy items.  Always seems to have [0]'s for data.
-        Reflection1 = 906496720,     // This seems to be some kind of setting related to reflecitivty/specular intensity.
-
-        Hair1 = 364318261,          // Character Hair Color?
-        Hair2 = 3042205627,         // Character Highlight Color
-
-        SkinFresnel = 1659128399,         // This arg is the same for most races, but Highlander and Roe M use a different value
-        SkinTileMultiplier = 778088561,          // Roe M is the only one that has a change to this arg's data.?
-
-        Furniture1 = 1066058257,
-        Furniture2 = 337060565,
-        Furniture3 = 2858904847,
-        Furniture4 = 2033894819,
-        Furniture5 = 2408251504,
-        Furniture6 = 1139120744,
-        Furniture7 = 3086627810,
-        Furniture8 = 2456716813,
-        Furniture9 = 3219771693,
-        Furniture10 = 2781883474,
-        Furniture11 = 2365826946,
-        Furniture12 = 3147419510,
-        Furniture13 = 133014596
-    }
-
-
-    public class ShaderInfo
-    {
-        public MtrlShader Shader;
-        public MtrlShaderPreset Preset;
-        public bool TransparencyEnabled;
-        public bool RenderBackfaces = false;
-        
-        public bool HasColorset {
-            get
-            {
-                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Glass || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-        }
-
-        public bool HasDiffuse
-        {
-            get
-            {
-                if (Shader == MtrlShader.Standard && Preset == MtrlShaderPreset.Default)
-                {
-                    return false;
-                }
-                else if (Shader == MtrlShader.Hair)
-                {
-                    return false;
-                }
-                else if (Shader == MtrlShader.Iris)
-                {
-                    return false;
-                }
-                else if (Shader == MtrlShader.Glass)
-                {
-                    return false;
-                }
-                else
-                {
-                    return true;
-                }
-            }
-        }
-        public bool HasReflection
-        {
-            get
-            {
-                if (Shader == MtrlShader.Iris)
-                {
-                    return true;
-                }
-
-                return false;
-            }
-        }
-        public bool HasSpec
-        {
-            get
-            {
-                if (Shader == MtrlShader.Standard && (Preset == MtrlShaderPreset.DiffuseSpecular || Preset == MtrlShaderPreset.Monster))
-                {
-                    return true;
-                } else if(Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
-                {
-                    return true;
-                } else
-                {
-                    return false;
-                }
-
-            }
-        }
-        public bool HasMulti
-        {
-            get
-            {
-                return !HasSpec;
-            }
-        }
-        public bool? ForcedTransparency
-        {
-            get
-            {
-                if (Shader == MtrlShader.Standard || Shader == MtrlShader.Furniture || Shader == MtrlShader.DyeableFurniture)
-                {
-                    // These shaders allow variable transparency.
-                    return null;
-                }
-                else
-                {
-                    // These shaders require transparency to be strictly On or Off.
-                    if(Shader == MtrlShader.Hair || Shader == MtrlShader.Glass)
-                    {
-                        return true;
-                    } else
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        public static List<MtrlShaderPreset> GetAvailablePresets(MtrlShader shader)
-        {
-            var presets = new List<MtrlShaderPreset>();
-            presets.Add(MtrlShaderPreset.Default);
-            if (shader == MtrlShader.Standard)
-            {
-                //presets.Add(MtrlShaderPreset.DiffuseMulti);
-                presets.Add(MtrlShaderPreset.DiffuseSpecular);
-                presets.Add(MtrlShaderPreset.Monster);
-            } else if(shader == MtrlShader.Skin)
-            {
-                presets.Add(MtrlShaderPreset.BodyNoPores);
-                presets.Add(MtrlShaderPreset.BodyWithHair);
-                presets.Add(MtrlShaderPreset.Face);
-                presets.Add(MtrlShaderPreset.FaceNoPores);
-            } else if(shader == MtrlShader.Hair)
-            {
-                presets.Add(MtrlShaderPreset.Face);
-                presets.Add(MtrlShaderPreset.FaceBright);
-            }
-
-            return presets;
-        }
-    }
-
-    public class MapInfo : ICloneable
-    {
-        public XivTexType Usage;
-        public MtrlTextureSamplerFormatPresets Format;
-        public string Path;
-
-
-        public object Clone()
-        {
-            return this.MemberwiseClone();
         }
     }
 

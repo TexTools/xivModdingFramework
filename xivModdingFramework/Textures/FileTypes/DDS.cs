@@ -47,7 +47,6 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexType.Diffuse:
                 case XivTexType.Specular:
                 case XivTexType.Normal:
-                case XivTexType.Multi:
                 case XivTexType.Mask:
                 case XivTexType.Skin:
                 case XivTexType.Map:

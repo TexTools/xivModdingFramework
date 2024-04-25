@@ -2391,7 +2391,7 @@ namespace xivModdingFramework.Models.DataContainers
             foreach (var s in bones)
             {
                 // Merge additional bone copies in tools like 3ds/etc.  But not things like the tongue bones that end in _##.
-                var fixedBone = Regex.Replace(s, "[^_][0-9]+$", string.Empty);
+                var fixedBone = Regex.Replace(s, "(?<=[^_0-9])[0-9]+$", string.Empty);
 
                 if (fullSkel.ContainsKey(fixedBone))
                 {

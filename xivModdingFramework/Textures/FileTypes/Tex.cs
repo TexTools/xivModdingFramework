@@ -95,21 +95,24 @@ namespace xivModdingFramework.Textures.FileTypes
             _dataFile = dataFile;
         }
 
-        public async Task<XivTex> GetTexData(MapInfo map)
+        public async Task<XivTex> GetTexData(MtrlTexture tex)
         {
-
-            var dataFile = IOUtil.GetDataFileFromPath(map.Path);
-            var ttp = new TexTypePath()
-            {
-                DataFile = dataFile,
-                Path = map.Path,
-                Type = map.Usage
-            };
-            return await GetTexData(ttp);
+            return await GetTexData(tex.TexturePath, tex.Usage);
         }
 
         public async Task<XivTex> GetTexData(TexTypePath ttp)
         {
+            return await GetTexData(ttp.Path, ttp.Type);
+        }
+        public async Task<XivTex> GetTexData(string path, XivTexType usage)
+        {
+            var dataFile = IOUtil.GetDataFileFromPath(path);
+            var ttp = new TexTypePath()
+            {
+                DataFile = dataFile,
+                Path = path,
+                Type = usage
+            };
             var xivTex = await GetTexData(ttp.Path);
             xivTex.TextureTypeAndPath = ttp;
             return xivTex;

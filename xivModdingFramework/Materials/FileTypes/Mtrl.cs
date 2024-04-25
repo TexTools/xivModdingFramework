@@ -68,109 +68,6 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
-        /* 
-         Sampler Ids from Lumina: https://github.com/NotAdam/Lumina/blob/master/src/Lumina/Data/Parsing/MtrlStructs.cs
-            Sampler = 0x88408C04,
-            Sampler0 = 0x213CB439,
-            Sampler1 = 0x563B84AF,
-            SamplerCatchlight = 0xFEA0F3D2,
-            SamplerColorMap0 = 0x1E6FEF9C,
-            SamplerColorMap1 = 0x6968DF0A,
-            SamplerDiffuse = 0x115306BE,
-            SamplerEnvMap = 0xF8D7957A,
-            SamplerMask = 0x8A4E82B6,
-            SamplerNormal = 0x0C5EC1F1,
-            SamplerNormalMap0 = 0xAAB4D9E9,
-            SamplerNormalMap1 = 0xDDB3E97F,
-            SamplerReflection = 0x87F6474D,
-            SamplerSpecular = 0x2B99E025,
-            SamplerSpecularMap0 = 0x1BBC2F12,
-            SamplerSpecularMap1 = 0x6CBB1F84,
-            SamplerWaveMap = 0xE6321AFC,
-            SamplerWaveletMap0 = 0x574E22D6,
-            SamplerWaveletMap1 = 0x20491240,
-            SamplerWhitecapMap = 0x95E1F64D
-        */
-
-        // MtrlParam constants for texture types.
-        public static Dictionary<XivTexType, uint> TextureSamplerIds = new Dictionary<XivTexType, uint>()
-        {
-            { XivTexType.Normal, 207536625 },
-            { XivTexType.Diffuse, 290653886 },
-            { XivTexType.Specular, 731504677 },
-            { XivTexType.Multi, 2320401078 },
-            { XivTexType.Reflection, 4271961042 }   // Used for the Catchlight texture in Iris Materials.
-        };
-
-        public static Dictionary<XivTexType, uint> FurnitureTextureSamplerIds = new Dictionary<XivTexType, uint>()
-        {
-            { XivTexType.Normal, 2863978985 },
-            { XivTexType.Diffuse, 510652316 },
-            { XivTexType.Specular, 465317650 },
-            { XivTexType.Multi, 0 },
-            { XivTexType.Reflection, 0 }
-        };
-
-        // MtrlParam constants for file compressions/formats.
-        public static Dictionary<MtrlTextureSamplerFormatPresets, short> TextureSamplerFormatFlags = new Dictionary<MtrlTextureSamplerFormatPresets, short>()
-        {
-            { MtrlTextureSamplerFormatPresets.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
-            { MtrlTextureSamplerFormatPresets.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
-            // Non-normal maps are always [WithoutAlpha].  Normal maps are always [WithAlpha], 
-            // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
-
-            // In the case of faces, the first bit is also flipped to 0 for the normal maps.  Unknown why.
-        };
-
-
-        // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
-        // The exact order of these structs does not seem to be important, only the data in question.
-        // It may be viable (though inefficient) to simply include all of them.
-        public static Dictionary<XivTexType, ShaderKey> ShaderKeyCategories = new Dictionary<XivTexType, ShaderKey>()
-        {
-            { XivTexType.Normal, new ShaderKey() { Category = 4113354501, Value = 2815623008 } },
-            { XivTexType.Decal, new ShaderKey() { Category = 3531043187, Value = 4083110193 } },
-            { XivTexType.Diffuse, new ShaderKey() { Category = 3054951514, Value = 1611594207 } },
-            { XivTexType.Specular, new ShaderKey() { Category = 3367837167, Value = 2687453224 } },
-            { XivTexType.Skin, new ShaderKey() { Category = 940355280, Value = 735790577 } },
-            { XivTexType.Other, new ShaderKey() { Category = 612525193, Value = 1851494160 } },
-        };  // Probably want to key this off a custom enum soon if we keep finding additional texture usage values.
-
-
-        // Shader Parameter defaults.  For most of them they seem to be used as multipliers.
-        public static Dictionary<MtrlShaderConstantId, List<float>> ShaderConstantValues = new Dictionary<MtrlShaderConstantId, List<float>>() {
-            { MtrlShaderConstantId.AlphaLimiter, new List<float>(){ 0.5f } },
-            { MtrlShaderConstantId.Occlusion, new List<float>(){ 1f } },
-            { MtrlShaderConstantId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
-            { MtrlShaderConstantId.Reflection1, new List<float>(){ 1f } },
-            { MtrlShaderConstantId.SkinWetnessLerp, new List<float>(){ 3f } },
-            { MtrlShaderConstantId.SkinFresnel, new List<float>(){ 0.02f, 0.02f, 0.02f } },
-            { MtrlShaderConstantId.SkinMatParamRow2, new List<float>(){ 0.4f, 0.4f, 0.4f } },
-            { MtrlShaderConstantId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderConstantId.SkinTileMultiplier, new List<float>(){ 65f, 100f } },
-            { MtrlShaderConstantId.SkinTileMaterial, new List<float>(){ 63f } },
-            { MtrlShaderConstantId.Equipment1, new List<float>(){ 0f } },
-            { MtrlShaderConstantId.Face1, new List<float>(){ 32f } },
-            { MtrlShaderConstantId.Hair1, new List<float>(){ 0.35f } },
-            { MtrlShaderConstantId.Hair2, new List<float>(){ 0.5f } },
-
-
-            { MtrlShaderConstantId.Furniture1, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderConstantId.Furniture2, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderConstantId.Furniture3, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderConstantId.Furniture4, new List<float>(){ 1f } },
-            { MtrlShaderConstantId.Furniture5, new List<float>(){ 0.15f } },
-            { MtrlShaderConstantId.Furniture6, new List<float>(){ 0.15f } },
-            { MtrlShaderConstantId.Furniture7, new List<float>(){ 1f } },
-            { MtrlShaderConstantId.Furniture8, new List<float>(){ 1f } },
-            { MtrlShaderConstantId.Furniture9, new List<float>(){ 1f } },
-            { MtrlShaderConstantId.Furniture10, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderConstantId.Furniture11, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderConstantId.Furniture12, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderConstantId.Furniture13, new List<float>(){ 0f, 0f, 0f } },
-        };
-
-
         /// <summary>
         /// Gets a material for an item based upon the material suffix, rather than full material name.
         /// </summary>
@@ -420,9 +317,6 @@ namespace xivModdingFramework.Materials.FileTypes
             return ret;
         }
 
-        private static List<Half> ColorsetData;
-        private static byte[] DyeData;
-
 
         /// <summary>
         /// Gets the MTRL data for the given offset and path
@@ -526,7 +420,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
 
                         br.BaseStream.Seek(stringBlockStart + shaderNameOffset, SeekOrigin.Begin);
-                        xivMtrl.Shader = Dat.ReadNullTerminatedString(br);
+                        xivMtrl.ShaderPackRaw = Dat.ReadNullTerminatedString(br);
 
                         br.BaseStream.Seek(stringBlockStart + stringBlockSize, SeekOrigin.Begin);
 
@@ -619,7 +513,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             xivMtrl.ShaderConstants.Add(new ShaderConstant
                             {
-                                ConstantId = (MtrlShaderConstantId)br.ReadUInt32()
+                                ConstantId = br.ReadUInt32()
                             });
                             constantOffsets.Add(br.ReadInt16());
                             constantSizes.Add(br.ReadInt16());
@@ -629,7 +523,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         {
                             var sampler = new TextureSampler
                             {
-                                SamplerId = br.ReadUInt32(),
+                                SamplerIdRaw = br.ReadUInt32(),
                                 FormatFlags = br.ReadInt16(),
                                 UnknownFlags = br.ReadInt16(),
                             };
@@ -757,20 +651,19 @@ namespace xivModdingFramework.Materials.FileTypes
                 long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList);
 
                 // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
-                var mapInfoList = xivMtrl.GetAllMapInfos(false);
                 var _index = new Index(_gameDirectory);
                 var _tex = new Tex(_gameDirectory);
-                foreach (var mapInfo in mapInfoList)
+                foreach (var tex in xivMtrl.Textures)
                 {
-                    var path = mapInfo.Path;
+                    var path = tex.TexturePath;
                     bool exists = false;
                     if (cachedIndexFile != null)
                     {
-                        exists = cachedIndexFile.FileExists(mapInfo.Path);
+                        exists = cachedIndexFile.FileExists(tex.TexturePath);
                     }
                     else
                     {
-                        exists = await _index.FileExists(mapInfo.Path, IOUtil.GetDataFileFromPath(path));
+                        exists = await _index.FileExists(tex.TexturePath, IOUtil.GetDataFileFromPath(path));
                     }
 
                     if(exists)
@@ -783,11 +676,11 @@ namespace xivModdingFramework.Materials.FileTypes
                     var xivTex = new XivTex();
                     xivTex.TextureTypeAndPath = new TexTypePath()
                     {
-                        DataFile = IOUtil.GetDataFileFromPath(path), Path = path, Type = mapInfo.Usage
+                        DataFile = IOUtil.GetDataFileFromPath(path), Path = path, Type = tex.Usage
                     };
                     xivTex.TextureFormat = format;
 
-                    var di = Tex.GetDefaultTexturePath(mapInfo.Usage);
+                    var di = Tex.GetDefaultTexturePath(tex.Usage);
 
                     var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList);
 
@@ -813,14 +706,14 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 return;
             }
-            if(mtrl.Shader != "character.shpk")
+            if(mtrl.ShaderPackRaw != "character.shpk")
             {
                 return;
             }
 
             if (!updateShaders)
             {
-                mtrl.Shader = "characterlegacy.shpk";
+                mtrl.ShaderPackRaw = "characterlegacy.shpk";
             }
 
             // Wipe Dye data b/c we don't know how to handle it atm.
@@ -908,9 +801,10 @@ namespace xivModdingFramework.Materials.FileTypes
                 tex.Sampler = new TextureSampler()
                 {
                     FormatFlags = -32768,
-                    SamplerId = 1449103320,
+                    SamplerIdRaw = 1449103320,
                     UnknownFlags = 15,
                 };
+                mtrl.Textures.Add(tex);
 
                 var _tex = new Tex(_gameDirectory);
                 var normalTex = await _tex.GetTexData(normalTexPath.TexturePath);
@@ -1057,7 +951,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var shaderNamePointer = (ushort)stringBlock.Count;
-            stringBlock.AddRange(Encoding.UTF8.GetBytes(xivMtrl.Shader));
+            stringBlock.AddRange(Encoding.UTF8.GetBytes(xivMtrl.ShaderPackRaw));
             stringBlock.Add(0);
 
             Dat.Pad(stringBlock, 8);
@@ -1132,7 +1026,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var tex = xivMtrl.Textures[i];
                 if (tex.Sampler != null)
                 {
-                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerId));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerIdRaw));
                     mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.FormatFlags));
                     mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.UnknownFlags));
                     mtrlBytes.Add((byte)i);
@@ -1191,17 +1085,18 @@ namespace xivModdingFramework.Materials.FileTypes
         public async Task<string> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
         {
             var mtrl = await GetMtrlData(mtrlPath, -1, 11, index);
-            var map = mtrl.GetMapInfo(textureType, false);
 
-            if (map == null) return null;
+            var tex = mtrl.Textures.FirstOrDefault(x => x.Usage == textureType);
 
-            var texPath = map.Path;
+            if (tex == null) return null;
+
+            var texPath = tex.TexturePath;
 
             var _Tex = new Tex(_gameDirectory);
 
-            var tex = await _Tex.GetTexData(map);
+            var texData = await _Tex.GetTexData(tex);
 
-            await _Tex.ApplyOverlay(tex, overlayStream, source, index, modList);
+            await _Tex.ApplyOverlay(texData, overlayStream, source, index, modList);
 
             return texPath;
         }
@@ -1470,6 +1365,5 @@ namespace xivModdingFramework.Materials.FileTypes
             {XivStrings.InnerEar, "fac_"},
             {XivStrings.OuterEar, ""}
         };
-
     }
 }

@@ -36,6 +36,8 @@ using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using HelixToolkit.SharpDX.Core;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using static xivModdingFramework.Models.DataContainers.ShapeData;
+using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -163,9 +165,6 @@ namespace xivModdingFramework.Models.ModelTextures
                 colors = GetCustomColors();
             }
 
-            var shaderInfo = mtrl.GetShaderInfo();
-            var mtrlMaps = mtrl.GetAllMapInfos();
-
             var texMapData = await GetTexMapData(tex, mtrl);
 
             var dimensions = await EqualizeTextureSizes(texMapData);
@@ -219,7 +218,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
-                var colorShader = GetShaderColorMapper(GetCustomColors(), shaderInfo);
+                var colorShader = GetShaderColorMapper(GetCustomColors(), mtrl);
                 bool invertNormalGreen = colors != null && colors.InvertNormalGreen;
 
                 for (var i = 0; i < dataLength - 3; i += 4)
@@ -307,7 +306,7 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 if (ttp.Type != XivTexType.ColorSet)
                 {
-                    var texData = await tex.GetTexData(ttp);
+                    var texData = await tex.GetTexData(ttp.Path, ttp.Type);
                     var imageData = await tex.GetImageData(texData);
 
                     switch (ttp.Type)
@@ -316,7 +315,7 @@ namespace xivModdingFramework.Models.ModelTextures
                             texMapData.Diffuse = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                             break;
                         case XivTexType.Specular:
-                        case XivTexType.Multi:
+                        case XivTexType.Mask:
                         case XivTexType.Skin:
                             texMapData.Specular = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
                             break;
@@ -466,7 +465,6 @@ namespace xivModdingFramework.Models.ModelTextures
 
             return (width, height);
         }
-
         private struct ColorMapperResult
         {
             public Color4 Diffuse;
@@ -476,17 +474,16 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 
         delegate ColorMapperResult ShaderColorMapperDelegate(Color4 diffuse, Color4 normal, Color4 specular);
-
-        private static ShaderColorMapperDelegate GetShaderColorMapper(CustomModelColors colors, ShaderInfo info)
+        private static ShaderColorMapperDelegate GetShaderColorMapper(CustomModelColors colors, XivMtrl mtrl)
         {
             // This var is technically defined in the Shaders parameters.
             // But we can use a constant copy of it for now, since it's largely non-changeable.
             const float PlayerColorMultiplier = 1.4f;
             const float BrightPlayerColorMultiplier = 3.0f;
 
-            if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
+            if (mtrl.Shader == ShaderHelpers.EShaderPack.Character || mtrl.Shader == ShaderHelpers.EShaderPack.CharacterGlass)
             {
-                if (info.Preset == MtrlShaderPreset.DiffuseSpecular)
+                if (mtrl.Textures.Any(x => x.Usage == XivTexType.Diffuse))
                 {
                     return (Color4 diffuse, Color4 normal, Color4 specular) => {
                         return new ColorMapperResult()
@@ -498,7 +495,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         };
                     };
                 }
-                else if (info.Preset == MtrlShaderPreset.DiffuseMulti || info.Preset == MtrlShaderPreset.Monster)
+                else if (mtrl.Textures.Any(x => x.Usage == XivTexType.Diffuse) && mtrl.Textures.Any(x => x.Usage == XivTexType.Mask ))
                 {
                     return (Color4 diffuse, Color4 normal, Color4 specular) => {
                         return new ColorMapperResult()
@@ -523,7 +520,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 }
             }
-            else if (info.Shader == MtrlShader.Furniture)
+            else if (mtrl.Shader == EShaderPack.Furniture)
             {
                 return (Color4 diffuse, Color4 normal, Color4 specular) => {
                     return new ColorMapperResult()
@@ -535,7 +532,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (info.Shader == MtrlShader.DyeableFurniture)
+            else if (mtrl.Shader == EShaderPack.DyeableFurniture)
             {
                 Color4 furnitureColor = colors.FurnitureColor;
                 return (Color4 diffuse, Color4 normal, Color4 specular) => {
@@ -549,7 +546,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (info.Shader == MtrlShader.Skin)
+            else if (mtrl.Shader == EShaderPack.Skin)
             {
                 var skinColor = colors.SkinColor;
                 var lipColor = colors.LipColor;
@@ -596,12 +593,14 @@ namespace xivModdingFramework.Models.ModelTextures
                     return result;
                 };
 
-                if (info.Preset == MtrlShaderPreset.Face)
+
+                // TODO: Need to fix this based on Shader Key settings
+                if (mtrl.Shader == EShaderPack.Skin)
                     return faceShader;
                 else
                     return skinShader;
             }
-            else if (info.Shader == MtrlShader.Hair)
+            else if (mtrl.Shader == EShaderPack.Hair)
             {
                 var hairHighlightColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
                 var hairTargetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
@@ -613,9 +612,12 @@ namespace xivModdingFramework.Models.ModelTextures
                 // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
                 Color4 targetColor;
 
-                if (info.Preset == MtrlShaderPreset.Face)
+                // TODO: Need to fix this based on Shader Key settings
+                if (false) //info.Preset == MtrlShaderPreset.Face)
                     targetColor = colors.TattooColor;
-                else if (info.Preset == MtrlShaderPreset.FaceBright)
+
+                // TODO: Need to fix this based on Shader Key settings
+                else if (false)//info.Preset == MtrlShaderPreset.FaceBright)
                     // Multiplier here is 3.0 instead of 1.4
                     targetColor = Color4.Scale(colors.TattooColor, BrightPlayerColorMultiplier / PlayerColorMultiplier);
                 else
@@ -644,7 +646,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (info.Shader == MtrlShader.Iris)
+            else if (mtrl.Shader == EShaderPack.Iris)
             {
                 return (Color4 diffuse, Color4 normal, Color4 specular) =>
                 {
@@ -673,7 +675,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
         // This is only called in one place, and benefits greatly from being inlined
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color4 baseDiffuse, Color4 baseSpecular, out Color4 newDiffuse, out Color4 newSpecular, out Color4 emissiveColor, int highlightRow = -1)
+        static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color4 baseDiffuse, Color4 baseSpecular, out Color4 newDiffuse, out Color4 newSpecular, out Color4 emissiveColor, int highlightRow = -1)
         {
             int rowNumber = colorsetByte / 17;
             int nextRow = rowNumber >= 15 ? 15 : rowNumber + 1;
