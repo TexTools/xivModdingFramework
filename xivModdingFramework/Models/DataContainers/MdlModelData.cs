@@ -27,7 +27,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Radius { get; set; }
+        public float Radius { get; set; }
 
         /// <summary>
         /// The total number of meshes that the model contains
@@ -86,32 +86,32 @@ namespace xivModdingFramework.Models.DataContainers
         public byte LoDCount { get; set; }
 
         /*
-            DustOcclusionEnabled
-            SnowOcclusionEnabled
-            RainOcclusionEnabled
-            Unknown1
-            BgLightingReflectionEnabled
-            WavingAnimationDisabled
-            LightShadowDisabled
-            ShadowDisabled
+         From Lumina:
+            DustOcclusionEnabled = 0x80,
+            SnowOcclusionEnabled = 0x40,
+            RainOcclusionEnabled = 0x20,
+            Unknown1 = 0x10,
+            LightingReflectionEnabled = 0x08,
+            WavingAnimationDisabled = 0x04,
+            LightShadowDisabled = 0x02,
+            ShadowDisabled = 0x01,
         */
-
-
         public byte Flags1 { get; set; }
 
         public ushort ElementIdCount { get; set; }
 
         public byte TerrainShadowMeshCount { get; set; }
-        /*
-            Unknown2
-            BgUvScrollEnabled
-            EnableForceNonResident
-            ExtraLodEnabled
-            ShadowMaskEnabled
-            ForceLodRangeEnabled
-            EdgeGeometryEnabled
-            Unknown3
 
+        /*
+         From Lumina:
+            Unknown2 = 0x80,
+            BgUvScrollEnabled = 0x40,
+            EnableForceNonResident = 0x20,
+            ExtraLodEnabled = 0x10,
+            ShadowMaskEnabled = 0x08,
+            ForceLodRangeEnabled = 0x04,
+            EdgeGeometryEnabled = 0x02,
+            Unknown3 = 0x01
          */
         public byte Flags2 { get; set; }
 
@@ -128,7 +128,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public ushort Unknown8 { get; set; }
+        public ushort UnknownBoundingBoxCount { get; set; }
 
         /// <summary>
         /// Unknown Usage

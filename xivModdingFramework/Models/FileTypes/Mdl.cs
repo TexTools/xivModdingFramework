@@ -582,32 +582,42 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var mdlModelData = new MdlModelData
                 {
-                    Radius = br.ReadInt32(), //1071701907
+                    Radius = br.ReadSingle(),
+
                     MeshCount = br.ReadInt16(),
                     AttributeCount = br.ReadInt16(),
                     MeshPartCount = br.ReadInt16(),
                     MaterialCount = br.ReadInt16(),
+
                     BoneCount = br.ReadInt16(),
                     BoneListCount = br.ReadInt16(),
+
                     ShapeCount = br.ReadInt16(),
                     ShapePartCount = br.ReadInt16(),
                     ShapeDataCount = br.ReadUInt16(),
+
                     LoDCount = br.ReadByte(),
+
                     Flags1 = br.ReadByte(),
+
                     ElementIdCount = br.ReadUInt16(),
                     TerrainShadowMeshCount = br.ReadByte(),
+
                     Flags2 = br.ReadByte(),
-                    
+
                     ModelClipOutDistance = br.ReadSingle(),
                     ShadowClipOutDistance = br.ReadSingle(),
-                    Unknown8 = br.ReadUInt16(),
+
+                    UnknownBoundingBoxCount = br.ReadUInt16(),
                     TerrainShadowSubmeshCount = br.ReadInt16(),
                     Unknown10a = br.ReadByte(),
+
                     BgChangeMaterialIndex = br.ReadByte(),
                     BgCrestChangeMaterialIndex = br.ReadByte(),
+
                     Unknown12 = br.ReadByte(),
-                    
-                    BoneSetSize = br.ReadInt16(), // 330 vs 132
+                    BoneSetSize = br.ReadInt16(),
+
                     Unknown13 = br.ReadInt16(),
                     Unknown14 = br.ReadInt16(),
                     Unknown15 = br.ReadInt16(),
@@ -1203,38 +1213,36 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.PaddingSize = br.ReadByte();
                 xivMdl.PaddedBytes = br.ReadBytes(xivMdl.PaddingSize);
 
-                // Bounding box
-                var boundingBox = new BoundingBox
-                {
-                    PointList = new List<Vector4>()
-                };
 
-                for (var i = 0; i < 8; i++)
+                // There are 4 bounding boxes in sequence, defined by a min and max point.
+                // The 4 boxes are:
+                // "BoundingBox"
+                // "ModelBoundingBox"
+                // "WaterBoundingbox"           - Typically full 0s - Probably used by water furnishings?
+                // "VerticalFogBoundingBox"     - Typically full 0s - Probably used by (???)
+                xivMdl.BoundingBoxes = new List<List<Vector4>>();
+                for (var i = 0; i < 4; i++)
                 {
-                    boundingBox.PointList.Add(new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle()));
+                    var minPoint = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    var maxPoint = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    xivMdl.BoundingBoxes.Add(new List<Vector4>() { minPoint, maxPoint });
                 }
 
-                xivMdl.BoundBox = boundingBox;
 
-                // Bone Transform Data
-                xivMdl.BoneTransformDataList = new List<BoneTransformData>();
-
+                // Bone Bounding Box Data.
+                xivMdl.BoneBoundingBoxes = new List<List<Vector4>>();
                 var transformCount = xivMdl.ModelData.BoneCount;
-
                 if (transformCount == 0)
                 {
-                    transformCount = (short) xivMdl.ModelData.Unknown8;
+                    transformCount = (short) xivMdl.ModelData.UnknownBoundingBoxCount;
                 }
 
+                xivMdl.BoneBoundingBoxes = new List<List<Vector4>>();
                 for (var i = 0; i < transformCount; i++)
                 {
-                    var boneTransformData = new BoneTransformData
-                    {
-                        Transform0 = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle()),
-                        Transform1 = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle())
-                    };
-
-                    xivMdl.BoneTransformDataList.Add(boneTransformData);
+                    var minPoint = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    var maxPoint = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    xivMdl.BoneBoundingBoxes.Add(new List<Vector4>() { minPoint, maxPoint });
                 }
 
                 var lodNum = 0;
@@ -2493,6 +2501,15 @@ namespace xivModdingFramework.Models.FileTypes
             // Not really much reason to ever use lower precision other than file size/perf though.
             bool _UpgradePrecision = true;
 
+            // Arbitrarily long distance that we use for LoD distance.
+            // If this is too high the game explodes. 500 Meters seems ok.  1000 Crashes.
+            // Maybe it's at some point capped to 512? /Random Guess.
+            float _ReallyLongDistance = 500.0f;
+
+            // Mildly long distance used for Texture LoD levels.
+            // The default is around 50 meters.  We bump it up to about double.
+            float _KindOfLongDistance = 100.0f;
+
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
@@ -2501,6 +2518,38 @@ namespace xivModdingFramework.Models.FileTypes
             try
             { 
                 var rawShapeData = ttModel.GetRawShapeParts();
+
+                // Calculate Radius here for convenience.
+                // These values also used in writing bounding boxes later.
+                float minX = 9999.0f, minY = 9999.0f, minZ = 9999.0f;
+                float maxX = -9999.0f, maxY = -9999.0f, maxZ = -9999.0f;
+                float absX = 0, absY = 0, absZ = 0;
+                foreach (var m in ttModel.MeshGroups)
+                {
+                    foreach (var p in m.Parts)
+                    {
+                        foreach (var v in p.Vertices)
+                        {
+                            minX = minX < v.Position.X ? minX : v.Position.X;
+                            minY = minY < v.Position.Y ? minY : v.Position.Y;
+                            minZ = minZ < v.Position.Z ? minZ : v.Position.Z;
+
+                            maxX = maxX > v.Position.X ? maxX : v.Position.X;
+                            maxY = maxY > v.Position.Y ? maxY : v.Position.Y;
+                            maxZ = maxZ > v.Position.Z ? maxZ : v.Position.Z;
+
+                            absX = absX < Math.Abs(v.Position.X) ? Math.Abs(v.Position.X) : absX;
+                            absY = absY < Math.Abs(v.Position.Y) ? Math.Abs(v.Position.Y) : absY;
+                            absZ = absZ < Math.Abs(v.Position.Z) ? Math.Abs(v.Position.Z) : absZ;
+                        }
+                    }
+                }
+                var minVect = new Vector3(minX, minY, minZ);
+                var maxVect = new Vector3(maxX, maxY, maxZ);
+
+                // Radius seems like it's from (0,0,0), so just take the maximum absolute distances from 0 on each axis, and call it good enough.
+                var absVect = new Vector3(absX, absY, absZ);
+                var modelRadius = absVect.Length();
 
                 // Vertex Info
                 #region Vertex Info Block
@@ -2736,18 +2785,23 @@ namespace xivModdingFramework.Models.FileTypes
                 var vertexDataBlock = new List<byte>();
                 var indexDataBlock = new List<byte>();
 
-                List<int> meshVertex1Offsets = new List<int>();
-                List<int> meshVertex2Offsets = new List<int>();
+                // This is keyed by Mesh Id => Vertex Stream #
+                List<List<int>> meshVertexOffsets = new List<List<int>>();
                 List<int> meshIndexOffsets = new List<int>();
                 for (var i = 0; i < ttModel.MeshGroups.Count; i++)
                 {
                     var importData = geometryData[i];
-                    
-                    meshVertex1Offsets.Add(vertexDataBlock.Count);
+                    var vertexBlockOffsets = new List<int>();
+                    meshVertexOffsets.Add(vertexBlockOffsets);
+
+                    vertexBlockOffsets.Add(vertexDataBlock.Count);
                     vertexDataBlock.AddRange(importData.VertexData0);
 
-                    meshVertex2Offsets.Add(vertexDataBlock.Count);
+                    vertexBlockOffsets.Add(vertexDataBlock.Count);
                     vertexDataBlock.AddRange(importData.VertexData1);
+
+                    vertexBlockOffsets.Add(vertexDataBlock.Count);
+                    vertexDataBlock.AddRange(importData.VertexData2);
 
                     meshIndexOffsets.Add(indexDataBlock.Count / 2);
                     indexDataBlock.AddRange(importData.IndexData);
@@ -2874,8 +2928,8 @@ namespace xivModdingFramework.Models.FileTypes
                     meshPartCount += (short)m.Parts.Count;
                 }
 
-
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Radius));
+                // Geometry-related stuff that we have actual values for.
+                basicModelBlock.AddRange(BitConverter.GetBytes(modelRadius));
                 basicModelBlock.AddRange(BitConverter.GetBytes(meshCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Attributes.Count));
                 basicModelBlock.AddRange(BitConverter.GetBytes(meshPartCount));
@@ -2886,20 +2940,35 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
                 basicModelBlock.Add(_LoDCount); // LoD count, set to 1 since we only use the highest LoD
+
+
+                // Largely unknown stuff.  Flag definitions have comments for their values, but typically are just 0 on most normal things.
                 basicModelBlock.Add(ogModelData.Flags1);
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ElementIdCount));
                 basicModelBlock.Add(ogModelData.TerrainShadowMeshCount);
                 basicModelBlock.Add(ogModelData.Flags2);
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ModelClipOutDistance));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ShadowClipOutDistance));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown8));
+                
+                // Model and Shadow Clip-Out distances.  Can set these to 0 to disable.
+                basicModelBlock.AddRange(BitConverter.GetBytes(0));
+                basicModelBlock.AddRange(BitConverter.GetBytes(0));
+
+                // Largely unknown stuff.
+                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.UnknownBoundingBoxCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.TerrainShadowSubmeshCount));
                 basicModelBlock.Add(ogModelData.Unknown10a);
+                
+                // Handles which materials get some variable data (Ex. FC crests?)
                 basicModelBlock.Add(ogModelData.BgChangeMaterialIndex);
-                basicModelBlock.Add(ogModelData.BgChangeMaterialIndex);
+                basicModelBlock.Add(ogModelData.BgCrestChangeMaterialIndex);
+
+                // More Unknowns
                 basicModelBlock.Add(ogModelData.Unknown12);
+
+                // We fix this pointer later after bone table is done.
                 var boneSetSizePointer = basicModelBlock.Count;
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)0));
+
+                // Unknowns that are probably partly padding.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
@@ -2958,7 +3027,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 // Mesh Data
-                #region Mesh Data Block
+                #region Mesh Groups Block
 
                 var meshDataBlock = new List<byte>();
 
@@ -2969,7 +3038,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var previousIndexDataOffset = 0;
                 var lod0VertexDataEntrySize0 = 0;
                 var lod0VertexDataEntrySize1 = 0;
-                var nextVertexDataOffset = 0;
+                var lod0VertexDataEntrySize2 = 0;
                 byte lod0vertexStreamThing = 2;
 
                 for (int mi = 0; mi < ttModel.MeshGroups.Count; mi++)
@@ -2988,7 +3057,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var vertexDataOffset2 = addedMesh ? 0 : meshInfo.VertexDataOffset2;
                         byte vertexDataEntrySize0 = addedMesh ? (byte)lod0VertexDataEntrySize0 : (byte)perVertexDataSizes[mi][0];
                         byte vertexDataEntrySize1 = addedMesh ? (byte)lod0VertexDataEntrySize1 : (byte)perVertexDataSizes[mi][1];
-                        byte vertexDataEntrySize2 = addedMesh ? (byte)0 : (byte)perVertexDataSizes[mi][2];
+                        byte vertexDataEntrySize2 = addedMesh ? (byte)lod0VertexDataEntrySize2 : (byte)perVertexDataSizes[mi][2];
                         short partCount = addedMesh ? (short)0 : meshInfo.MeshPartCount;
                         short materialIndex = addedMesh ? (short)0 : meshInfo.MaterialIndex;
                         short boneSetIndex = addedMesh ? (short)0 : (short)0;
@@ -3042,6 +3111,7 @@ namespace xivModdingFramework.Models.FileTypes
                             // Used as a baseline value when adding new meshes.
                             lod0VertexDataEntrySize0 = vertexDataEntrySize0;
                             lod0VertexDataEntrySize1 = vertexDataEntrySize1;
+                            lod0VertexDataEntrySize2 = vertexDataEntrySize2;
                             lod0vertexStreamThing = vertexStreamCountPlusFlags;
                         }
 
@@ -3052,6 +3122,8 @@ namespace xivModdingFramework.Models.FileTypes
                             partCount = 0;
                         }
 
+                        // Lots of offsets and counts.
+                        // Pretty nuts & bolts with no frills.
                         meshDataBlock.AddRange(BitConverter.GetBytes(vertexCount));
                         meshDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                         meshDataBlock.AddRange(BitConverter.GetBytes((short)materialIndex));
@@ -3064,11 +3136,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // Can just use the real values from the already compiled geometry data.
                         meshDataBlock.AddRange(BitConverter.GetBytes(meshIndexOffsets[mi]));
-                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertex1Offsets[mi]));
-                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertex2Offsets[mi]));
-
-                        // Don't have real data for this value atm.
-                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertex2Offsets[mi]));
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertexOffsets[mi][0]));
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertexOffsets[mi][1]));
+                        meshDataBlock.AddRange(BitConverter.GetBytes(meshVertexOffsets[mi][2]));
 
                         meshDataBlock.Add(vertexDataEntrySize0);
                         meshDataBlock.Add(vertexDataEntrySize1);
@@ -3291,7 +3361,7 @@ namespace xivModdingFramework.Models.FileTypes
                         boneSetsBlock[headerLocation + 1] = offsetBytes[1];
                     }
                     var boneSetEnd = boneSetsBlock.Count;
-                    boneSetSize = (boneSetStart - boneSetEnd) / 2;
+                    boneSetSize = (boneSetEnd - boneSetStart) / 2;
                 }
                 else
                 {
@@ -3477,70 +3547,55 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var boundingBoxDataBlock = new List<byte>();
 
-                // All right, time to tough it out and just recalculate the bounding box.
-                // These are used for occlusion culling.  Primarily editing these mostly matters
-                // for furniture, but helps for everything.
-                float minX = 9999.0f, minY = 9999.0f, minZ = 9999.0f;
-                float maxX = -9999.0f, maxY = -9999.0f, maxZ = -9999.0f;
-                foreach (var m in ttModel.MeshGroups)
+                // There are 4 bounding boxes in sequence, defined by a min and max point.
+                // The 4 boxes are:
+                    // "BoundingBox"                - Bounding box from Origin, encompasing model.
+                    // "ModelBoundingBox"           - Bounding box only around the model itself.
+                    // "WaterBoundingbox"           - Typically full 0s
+                    // "VerticalFogBoundingBox"     - Typically full 0s
+                for (int i = 0; i < 4; i++)
                 {
-                    foreach (var p in m.Parts)
+                    if (i < 2)
                     {
-                        foreach (var v in p.Vertices)
-                        {
-                            minX = minX < v.Position.X ? minX : v.Position.X;
-                            minY = minY < v.Position.Y ? minY : v.Position.Y;
-                            minZ = minZ < v.Position.Z ? minZ : v.Position.Z;
+                        // First bounding box is bounds from the origin.
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.X > 0 ? 0.0f : minVect.X));
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.Y > 0 ? 0.0f : minVect.Y));
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.Z > 0 ? 0.0f : minVect.Z));
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
 
-                            maxX = maxX > v.Position.X ? maxX : v.Position.X;
-                            maxY = maxY > v.Position.Y ? maxY : v.Position.Y;
-                            maxZ = maxZ > v.Position.Z ? maxZ : v.Position.Z;
-                        }
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && maxVect.X < 0 ? 0.0f : maxVect.X));
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && maxVect.Y < 0 ? 0.0f : maxVect.Y));
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && maxVect.Z < 0 ? 0.0f : maxVect.Z));
+                        boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
+                    } else
+                    {
+                        // Water and Vertical Fog bounding boxes are always 0 currently.
+                        // Could use data from the original model, but better to find some models with the values first.
+                        boundingBoxDataBlock.AddRange(new byte[32]);
                     }
                 }
-                var oldBb = ogMdl.BoundBox;
-                var bb = new List<Vector4>(8);
-                bb.Add(new Vector4(minX, minY, minZ, 1.0f));
-                bb.Add(new Vector4(maxX, maxY, maxZ, 1.0f));
-                bb.Add(new Vector4(minX, minY, minZ, 1.0f));
-                bb.Add(new Vector4(maxX, maxY, maxZ, 1.0f));
-                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));  // Is this padding?
-                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));  // Is it some kind of magical second bounding box?
-                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));  // The world may never know...
-                bb.Add(new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
 
-
-
-
-                foreach (var point in bb)
-                {
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.Z));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(point.W));
-                }
-
-
-
-                #endregion
-
-                // Bone Transform
-                #region Bone Transform Data Block
-
-                var boneTransformDataBlock = new List<byte>();
-
+                // Afterwards there are is a bounding box for every bone.
+                // Again, we'll be lazy and just use the full model bounding box for each.
+                // Unsure what these are actually used for since there seems no difference
+                // in model function whether these have real data or no data.
+                var boneBoundingBoxDataBlock = new List<byte>();
                 for (var i = 0; i < ttModel.Bones.Count; i++)
                 {
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.X));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.Y));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.Z));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
 
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
-                    boneTransformDataBlock.AddRange(BitConverter.GetBytes(0f));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.X));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.Y));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.Z));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
                 }
+
+                // ogMdl.ModelData.UnknownBoundingBoxCount
+                // If ^ is greater than 0, we're supposed to write some kind of extra bounding boxes here.
+                // Seems to only exist for models with no bones, like furniture?
 
 
 
@@ -3548,12 +3603,13 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 #region LoD Block
+                // LoD block is the most complex block, and so we write it last, even though it's actually pretty early on in the file.
 
                 // Combined Data Block Sizes
                 // This is the offset to the beginning of the vertex data
                 var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
-                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneTransformDataBlock.Count;
+                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
 
                 var lodDataBlock = new List<byte>();
                 List<int> indexStartInjectPointers = new List<int>();
@@ -3568,7 +3624,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // LoD 0 values.
                     short meshOffset = 0;
-                    short mCount = (short)geometryData.Count;
+                    short totalMeshes = (short)geometryData.Count;
                     vertexDataOffset = combinedDataBlockSize;
                     vertexDataSize = vertexDataBlock.Count;
                     indexDataOffset = vertexDataOffset + vertexDataSize;
@@ -3577,8 +3633,8 @@ namespace xivModdingFramework.Models.FileTypes
                     // LoD 1+ is always empty in our imports, so the real values for their offsets are just the end of LoD 0's data with 0s for counts
                     if (l > 0)
                     {
-                        meshOffset = mCount;
-                        mCount = 0;
+                        meshOffset = totalMeshes;
+                        totalMeshes = 0;
                         vertexDataOffset = indexDataOffset + indexDataSize;
                         indexDataOffset = indexDataOffset + indexDataSize;
                         indexDataSize = 0;
@@ -3587,38 +3643,41 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // We add any additional meshes to the offset if we added any through advanced importing, otherwise additionalMeshCount stays at 0
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)meshOffset));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)mCount));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.ModelLoDRange));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.TextureLoDRange));
+                    // Distances to kick in LoD effects
+                    lodDataBlock.AddRange(BitConverter.GetBytes(_ReallyLongDistance * (l + 1))); // Model LoD
+                    lodDataBlock.AddRange(BitConverter.GetBytes(_KindOfLongDistance * (l + 1))); // Texture LoD - We're actually okay with this one since we have MipMaps.
 
-                    // Not sure when or how shapes are considered "extra" meshes for the sake of this var,
-                    // but it seems like never?
-                    short shapeMeshCount = (short)(0);
-                    // We add any additional meshes to the mesh end and mesh sum if we added any through advanced importing, otherwise additionalMeshCount stays at 0
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(meshOffset + mCount)));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(shapeMeshCount));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(meshOffset + mCount + shapeMeshCount)));
+                    // Water Mesh Index and Count.
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(totalMeshes)));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
 
+                    // Shadow Mesh Index and Count
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(totalMeshes)));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
 
-                    meshOffset += (short)(mCount + shapeMeshCount);
+                    // Terrain Shadow Mesh Index and Count
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.ShadowMeshCount));
+                    // Fog Mesh Index and Count
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
 
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.TerrainShadowMeshIndex));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.TerrainShadowMeshCount));
+                    // Edge Geometry Size and Offset
+                    lodDataBlock.AddRange(BitConverter.GetBytes((int)0));
+                    lodDataBlock.AddRange(BitConverter.GetBytes((int)indexDataOffset));
 
-                    // This is a running sum of mesh groups, but since we don't write LoD 1+, we can be lazy.
-                    lodDataBlock.AddRange(BitConverter.GetBytes(ttModel.MeshGroups.Count));
-                    lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.EdgeGeometrySize));
-
-                    lodDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
-
+                    // Unknown x2 - Probably Another Size and Offset?
                     lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown6));
                     lodDataBlock.AddRange(BitConverter.GetBytes(originalLod.Unknown7));
 
+                    // Vertex & Index Sizes
                     lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataSize));
                     lodDataBlock.AddRange(BitConverter.GetBytes(indexDataSize));
+
+                    // Vertex & Index Offsets
                     lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataOffset));
                     lodDataBlock.AddRange(BitConverter.GetBytes(indexDataOffset));
                 }
@@ -3627,7 +3686,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #region Model Data Segment Compliation
 
-                // Combine All DataBlocks
+                // Combine all the data blocks included in the final compressed model data block.
+                // This is basically everything except the header, vertex info, and geometry data.
                 List<byte> modelDataBlock = new List<byte>();
                 modelDataBlock.AddRange(pathInfoBlock);
                 modelDataBlock.AddRange(basicModelBlock);
@@ -3649,7 +3709,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(partBoneSetsBlock);
                 modelDataBlock.AddRange(paddingDataBlock);
                 modelDataBlock.AddRange(boundingBoxDataBlock);
-                modelDataBlock.AddRange(boneTransformDataBlock);
+                modelDataBlock.AddRange(boneBoundingBoxDataBlock);
 
                 if(combinedDataBlockSize != modelDataBlock.Count + _MdlHeaderSize + vertexInfoBlock.Count)
                 {
@@ -5244,6 +5304,8 @@ namespace xivModdingFramework.Models.FileTypes
             public List<byte> VertexData0 { get; set; } = new List<byte>();
 
             public List<byte> VertexData1 { get; set; } = new List<byte>();
+
+            public List<byte> VertexData2 { get; set; } = new List<byte>();
 
             public List<byte> IndexData { get; set; } = new List<byte>();
 

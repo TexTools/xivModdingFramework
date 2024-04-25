@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SharpDX;
 using System.Collections.Generic;
 
 namespace xivModdingFramework.Models.DataContainers
@@ -125,14 +126,14 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] PaddedBytes { get; set; }
 
         /// <summary>
-        /// The bounding box information for the model
+        // Bounding Boxes for the model
         /// </summary>
-        public BoundingBox BoundBox { get; set; }
+        public List<List<Vector4>> BoundingBoxes { get; set; }
 
         /// <summary>
-        /// The list containing the transform data for each bone
+        /// Bone Bounding Boxes
         /// </summary>
-        public List<BoneTransformData> BoneTransformDataList { get; set; }
+        public List<List<Vector4>> BoneBoundingBoxes { get; set; }
 
         /// <summary>
         /// Flag set when the model has shape data
