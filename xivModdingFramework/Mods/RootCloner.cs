@@ -316,11 +316,11 @@ namespace xivModdingFramework.Mods
                         var xivMtrl = await _mtrl.GetMtrlData(offset, src, 11);
                         xivMtrl.MTRLPath = dst;
 
-                        for (int i = 0; i < xivMtrl.TexturePathList.Count; i++)
+                        for (int i = 0; i < xivMtrl.TextureStrings.Count; i++)
                         {
                             foreach (var tkv in newTexturePaths)
                             {
-                                xivMtrl.TexturePathList[i] = xivMtrl.TexturePathList[i].Replace(tkv.Key, tkv.Value);
+                                xivMtrl.TextureStrings[i] = xivMtrl.TextureStrings[i].Replace(tkv.Key, tkv.Value);
                             }
                         }
 

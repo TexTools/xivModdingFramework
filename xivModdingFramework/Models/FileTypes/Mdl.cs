@@ -5009,16 +5009,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (copyTextures)
                     {
-                        for(int i = 0; i < mtrl.TexturePathList.Count; i++)
+                        for(int i = 0; i < mtrl.TextureStrings.Count; i++)
                         {
-                            var tex = mtrl.TexturePathList[i];
+                            var tex = mtrl.TextureStrings[i];
                             var ntex = RootCloner.UpdatePath(fromRoot, toRoot, tex);
                             if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
                             {
                                 ntex = _raceRegex.Replace(ntex, "c" + newRace.GetRaceCode());
                             }
 
-                            mtrl.TexturePathList[i] = ntex;
+                            mtrl.TextureStrings[i] = ntex;
 
                             allFiles.Add(ntex);
                             await _dat.CopyFile(tex, ntex, source, true, item, index, modlist);

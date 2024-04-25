@@ -69,7 +69,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
         // MtrlParam constants for texture types.
-        public static Dictionary<XivTexType, uint> TextureDescriptorValues = new Dictionary<XivTexType, uint>()
+        public static Dictionary<XivTexType, uint> TextureSamplerIds = new Dictionary<XivTexType, uint>()
         {
             { XivTexType.Normal, 207536625 },
             { XivTexType.Diffuse, 290653886 },
@@ -78,7 +78,7 @@ namespace xivModdingFramework.Materials.FileTypes
             { XivTexType.Reflection, 4271961042 }   // Used for the Catchlight texture in Iris Materials.
         };
 
-        public static Dictionary<XivTexType, uint> FurnitureTextureDescriptorValues = new Dictionary<XivTexType, uint>()
+        public static Dictionary<XivTexType, uint> FurnitureTextureSamplerIds = new Dictionary<XivTexType, uint>()
         {
             { XivTexType.Normal, 2863978985 },
             { XivTexType.Diffuse, 510652316 },
@@ -88,10 +88,10 @@ namespace xivModdingFramework.Materials.FileTypes
         };
 
         // MtrlParam constants for file compressions/formats.
-        public static Dictionary<MtrlTextureDescriptorFormat, short> TextureDescriptorFormatValues = new Dictionary<MtrlTextureDescriptorFormat, short>()
+        public static Dictionary<MtrlTextureSamplerFormatPresets, short> TextureSamplerFormatFlags = new Dictionary<MtrlTextureSamplerFormatPresets, short>()
         {
-            { MtrlTextureDescriptorFormat.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
-            { MtrlTextureDescriptorFormat.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
+            { MtrlTextureSamplerFormatPresets.UsesColorset, -32768 },   // There is some variation on these values, but it always occures in the last 6 bits, and doesn't seem
+            { MtrlTextureSamplerFormatPresets.NoColorset, -31936 },      // To have an appreciable change (Either [000000] or [010101])
             // Non-normal maps are always [WithoutAlpha].  Normal maps are always [WithAlpha], 
             // with the exception that 8.8.8.8 ARGB normal maps use the WithoutAlpha flag (And do not pull a colorset).
 
@@ -102,48 +102,48 @@ namespace xivModdingFramework.Materials.FileTypes
         // Data for setting up MTRL shaders.  Taken from SE samples.  Seems to be consistent across each type of setup.
         // The exact order of these structs does not seem to be important, only the data in question.
         // It may be viable (though inefficient) to simply include all of them.
-        public static Dictionary<XivTexType, TextureUsageStruct> TextureUsageValues = new Dictionary<XivTexType, TextureUsageStruct>()
+        public static Dictionary<XivTexType, ShaderKey> ShaderKeyCategories = new Dictionary<XivTexType, ShaderKey>()
         {
-            { XivTexType.Normal, new TextureUsageStruct() { TextureType = 4113354501, Unknown = 2815623008 } },
-            { XivTexType.Decal, new TextureUsageStruct() { TextureType = 3531043187, Unknown = 4083110193 } },
-            { XivTexType.Diffuse, new TextureUsageStruct() { TextureType = 3054951514, Unknown = 1611594207 } },
-            { XivTexType.Specular, new TextureUsageStruct() { TextureType = 3367837167, Unknown = 2687453224 } },
-            { XivTexType.Skin, new TextureUsageStruct() { TextureType = 940355280, Unknown = 735790577 } },
-            { XivTexType.Other, new TextureUsageStruct() { TextureType = 612525193, Unknown = 1851494160 } },
+            { XivTexType.Normal, new ShaderKey() { Category = 4113354501, Value = 2815623008 } },
+            { XivTexType.Decal, new ShaderKey() { Category = 3531043187, Value = 4083110193 } },
+            { XivTexType.Diffuse, new ShaderKey() { Category = 3054951514, Value = 1611594207 } },
+            { XivTexType.Specular, new ShaderKey() { Category = 3367837167, Value = 2687453224 } },
+            { XivTexType.Skin, new ShaderKey() { Category = 940355280, Value = 735790577 } },
+            { XivTexType.Other, new ShaderKey() { Category = 612525193, Value = 1851494160 } },
         };  // Probably want to key this off a custom enum soon if we keep finding additional texture usage values.
 
 
         // Shader Parameter defaults.  For most of them they seem to be used as multipliers.
-        public static Dictionary<MtrlShaderParameterId, List<float>> ShaderParameterValues = new Dictionary<MtrlShaderParameterId, List<float>>() {
-            { MtrlShaderParameterId.AlphaLimiter, new List<float>(){ 0.5f } },
-            { MtrlShaderParameterId.Occlusion, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
-            { MtrlShaderParameterId.Reflection1, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.SkinWetnessLerp, new List<float>(){ 3f } },
-            { MtrlShaderParameterId.SkinFresnel, new List<float>(){ 0.02f, 0.02f, 0.02f } },
-            { MtrlShaderParameterId.SkinMatParamRow2, new List<float>(){ 0.4f, 0.4f, 0.4f } },
-            { MtrlShaderParameterId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderParameterId.SkinTileMultiplier, new List<float>(){ 65f, 100f } },
-            { MtrlShaderParameterId.SkinTileMaterial, new List<float>(){ 63f } },
-            { MtrlShaderParameterId.Equipment1, new List<float>(){ 0f } },
-            { MtrlShaderParameterId.Face1, new List<float>(){ 32f } },
-            { MtrlShaderParameterId.Hair1, new List<float>(){ 0.35f } },
-            { MtrlShaderParameterId.Hair2, new List<float>(){ 0.5f } },
+        public static Dictionary<MtrlShaderConstantId, List<float>> ShaderConstantValues = new Dictionary<MtrlShaderConstantId, List<float>>() {
+            { MtrlShaderConstantId.AlphaLimiter, new List<float>(){ 0.5f } },
+            { MtrlShaderConstantId.Occlusion, new List<float>(){ 1f } },
+            { MtrlShaderConstantId.SkinColor, new List<float>(){ 1.4f, 1.4f, 1.4f } },     // Direct R/G/B Multiplier.  3.0 for Limbal rings.
+            { MtrlShaderConstantId.Reflection1, new List<float>(){ 1f } },
+            { MtrlShaderConstantId.SkinWetnessLerp, new List<float>(){ 3f } },
+            { MtrlShaderConstantId.SkinFresnel, new List<float>(){ 0.02f, 0.02f, 0.02f } },
+            { MtrlShaderConstantId.SkinMatParamRow2, new List<float>(){ 0.4f, 0.4f, 0.4f } },
+            { MtrlShaderConstantId.SkinUnknown2, new List<float>(){ 0f, 0f, 0f } },
+            { MtrlShaderConstantId.SkinTileMultiplier, new List<float>(){ 65f, 100f } },
+            { MtrlShaderConstantId.SkinTileMaterial, new List<float>(){ 63f } },
+            { MtrlShaderConstantId.Equipment1, new List<float>(){ 0f } },
+            { MtrlShaderConstantId.Face1, new List<float>(){ 32f } },
+            { MtrlShaderConstantId.Hair1, new List<float>(){ 0.35f } },
+            { MtrlShaderConstantId.Hair2, new List<float>(){ 0.5f } },
 
 
-            { MtrlShaderParameterId.Furniture1, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture2, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture3, new List<float>(){ 0f, 0f, 0f } },
-            { MtrlShaderParameterId.Furniture4, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture5, new List<float>(){ 0.15f } },
-            { MtrlShaderParameterId.Furniture6, new List<float>(){ 0.15f } },
-            { MtrlShaderParameterId.Furniture7, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture8, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture9, new List<float>(){ 1f } },
-            { MtrlShaderParameterId.Furniture10, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture11, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture12, new List<float>(){ 1f, 1f, 1f } },
-            { MtrlShaderParameterId.Furniture13, new List<float>(){ 0f, 0f, 0f } },
+            { MtrlShaderConstantId.Furniture1, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderConstantId.Furniture2, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderConstantId.Furniture3, new List<float>(){ 0f, 0f, 0f } },
+            { MtrlShaderConstantId.Furniture4, new List<float>(){ 1f } },
+            { MtrlShaderConstantId.Furniture5, new List<float>(){ 0.15f } },
+            { MtrlShaderConstantId.Furniture6, new List<float>(){ 0.15f } },
+            { MtrlShaderConstantId.Furniture7, new List<float>(){ 1f } },
+            { MtrlShaderConstantId.Furniture8, new List<float>(){ 1f } },
+            { MtrlShaderConstantId.Furniture9, new List<float>(){ 1f } },
+            { MtrlShaderConstantId.Furniture10, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderConstantId.Furniture11, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderConstantId.Furniture12, new List<float>(){ 1f, 1f, 1f } },
+            { MtrlShaderConstantId.Furniture13, new List<float>(){ 0f, 0f, 0f } },
         };
 
 
@@ -439,72 +439,72 @@ namespace xivModdingFramework.Materials.FileTypes
                         var pathSizeList = new List<int>();
 
                         // get the texture path offsets
-                        xivMtrl.TexturePathOffsetList = new List<int>(xivMtrl.TextureCount);
-                        xivMtrl.TexturePathUnknownList = new List<short>(xivMtrl.TextureCount);
+                        xivMtrl.TexturePathOffsets = new List<int>(xivMtrl.TextureCount);
+                        xivMtrl.TextureFlags = new List<short>(xivMtrl.TextureCount);
                         for (var i = 0; i < xivMtrl.TextureCount; i++)
                         {
-                            xivMtrl.TexturePathOffsetList.Add(br.ReadInt16());
-                            xivMtrl.TexturePathUnknownList.Add(br.ReadInt16());
+                            xivMtrl.TexturePathOffsets.Add(br.ReadInt16());
+                            xivMtrl.TextureFlags.Add(br.ReadInt16());
 
                             // add the size of the paths
                             if (i > 0)
                             {
                                 pathSizeList.Add(
-                                    xivMtrl.TexturePathOffsetList[i] - xivMtrl.TexturePathOffsetList[i - 1]);
+                                    xivMtrl.TexturePathOffsets[i] - xivMtrl.TexturePathOffsets[i - 1]);
                             }
                         }
 
                         // get the map path offsets
-                        xivMtrl.MapPathOffsetList = new List<int>(xivMtrl.MapCount);
-                        xivMtrl.MapPathUnknownList = new List<short>(xivMtrl.MapCount);
+                        xivMtrl.MapOffsets = new List<int>(xivMtrl.MapCount);
+                        xivMtrl.MapFlags = new List<short>(xivMtrl.MapCount);
                         for (var i = 0; i < xivMtrl.MapCount; i++)
                         {
-                            xivMtrl.MapPathOffsetList.Add(br.ReadInt16());
-                            xivMtrl.MapPathUnknownList.Add(br.ReadInt16());
+                            xivMtrl.MapOffsets.Add(br.ReadInt16());
+                            xivMtrl.MapFlags.Add(br.ReadInt16());
 
                             // add the size of the paths
                             if (i > 0)
                             {
-                                pathSizeList.Add(xivMtrl.MapPathOffsetList[i] - xivMtrl.MapPathOffsetList[i - 1]);
+                                pathSizeList.Add(xivMtrl.MapOffsets[i] - xivMtrl.MapOffsets[i - 1]);
                             }
                             else
                             {
                                 if (xivMtrl.TextureCount > 0)
                                 {
-                                    pathSizeList.Add(xivMtrl.MapPathOffsetList[i] -
-                                                     xivMtrl.TexturePathOffsetList[xivMtrl.TextureCount - 1]);
+                                    pathSizeList.Add(xivMtrl.MapOffsets[i] -
+                                                     xivMtrl.TexturePathOffsets[xivMtrl.TextureCount - 1]);
                                 }
                             }
                         }
 
                         // get the color set offsets
-                        xivMtrl.ColorSetPathOffsetList = new List<int>(xivMtrl.ColorSetCount);
-                        xivMtrl.ColorSetPathUnknownList = new List<short>(xivMtrl.ColorSetCount);
+                        xivMtrl.ColorsetOffsets = new List<int>(xivMtrl.ColorSetCount);
+                        xivMtrl.ColorsetFlags = new List<short>(xivMtrl.ColorSetCount);
                         for (var i = 0; i < xivMtrl.ColorSetCount; i++)
                         {
-                            xivMtrl.ColorSetPathOffsetList.Add(br.ReadInt16());
-                            xivMtrl.ColorSetPathUnknownList.Add(br.ReadInt16());
+                            xivMtrl.ColorsetOffsets.Add(br.ReadInt16());
+                            xivMtrl.ColorsetFlags.Add(br.ReadInt16());
 
                             // add the size of the paths
                             if (i > 0)
                             {
-                                pathSizeList.Add(xivMtrl.ColorSetPathOffsetList[i] -
-                                                 xivMtrl.ColorSetPathOffsetList[i - 1]);
+                                pathSizeList.Add(xivMtrl.ColorsetOffsets[i] -
+                                                 xivMtrl.ColorsetOffsets[i - 1]);
                             }
                             else
                             {
-                                pathSizeList.Add(xivMtrl.ColorSetPathOffsetList[i] -
-                                                 xivMtrl.MapPathOffsetList[xivMtrl.MapCount - 1]);
+                                pathSizeList.Add(xivMtrl.ColorsetOffsets[i] -
+                                                 xivMtrl.MapOffsets[xivMtrl.MapCount - 1]);
                             }
                         }
 
                         pathSizeList.Add(xivMtrl.TexturePathsDataSize -
-                                         xivMtrl.ColorSetPathOffsetList[xivMtrl.ColorSetCount - 1]);
+                                         xivMtrl.ColorsetOffsets[xivMtrl.ColorSetCount - 1]);
 
                         var count = 0;
 
                         // get the texture path strings
-                        xivMtrl.TexturePathList = new List<string>(xivMtrl.TextureCount);
+                        xivMtrl.TextureStrings = new List<string>(xivMtrl.TextureCount);
                         for (var i = 0; i < xivMtrl.TextureCount; i++)
                         {
                             var texturePath = Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count]))
@@ -519,24 +519,24 @@ namespace xivModdingFramework.Materials.FileTypes
                                 texturePath = texturePath.Insert(texturePath.LastIndexOf("/") + 1, "--");
                             }
 
-                            xivMtrl.TexturePathList.Add(texturePath);
+                            xivMtrl.TextureStrings.Add(texturePath);
                             count++;
                         }
 
                         // get the map path strings
-                        xivMtrl.MapPathList = new List<string>(xivMtrl.MapCount);
+                        xivMtrl.MapStrings = new List<string>(xivMtrl.MapCount);
                         for (var i = 0; i < xivMtrl.MapCount; i++)
                         {
-                            xivMtrl.MapPathList.Add(Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count]))
+                            xivMtrl.MapStrings.Add(Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count]))
                                 .Replace("\0", ""));
                             count++;
                         }
 
                         // get the color set path strings
-                        xivMtrl.ColorSetPathList = new List<string>(xivMtrl.ColorSetCount);
+                        xivMtrl.ColorsetStrings = new List<string>(xivMtrl.ColorSetCount);
                         for (var i = 0; i < xivMtrl.ColorSetCount; i++)
                         {
-                            xivMtrl.ColorSetPathList.Add(Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count]))
+                            xivMtrl.ColorsetStrings.Add(Encoding.UTF8.GetString(br.ReadBytes(pathSizeList[count]))
                                 .Replace("\0", ""));
                             count++;
                         }
@@ -568,73 +568,73 @@ namespace xivModdingFramework.Materials.FileTypes
                             }
                         }
 
-                        var originalShaderParameterDataSize = br.ReadUInt16();
+                        var originalShaderConstantsDataSize = br.ReadUInt16();
 
-                        var originalTextureUsageCount = br.ReadUInt16();
+                        var originalShaderKeyCount = br.ReadUInt16();
 
                         var originalShaderParameterCount = br.ReadUInt16();
 
-                        var originalTextureDescriptorCount = br.ReadUInt16();
+                        var originalTextureSamplerCount = br.ReadUInt16();
 
-                        xivMtrl.ShaderNumber = br.ReadUInt16();
+                        xivMtrl.ShaderFlags = br.ReadUInt16();
 
-                        xivMtrl.Unknown3 = br.ReadUInt16();
+                        xivMtrl.ShaderUnknown = br.ReadUInt16();
 
-                        xivMtrl.TextureUsageList = new List<TextureUsageStruct>((int)originalTextureUsageCount);
-                        for (var i = 0; i < originalTextureUsageCount; i++)
+                        xivMtrl.ShaderKeys = new List<ShaderKey>((int)originalShaderKeyCount);
+                        for (var i = 0; i < originalShaderKeyCount; i++)
                         {
-                            xivMtrl.TextureUsageList.Add(new TextureUsageStruct
+                            xivMtrl.ShaderKeys.Add(new ShaderKey
                             {
-                                TextureType = br.ReadUInt32(),
-                                Unknown = br.ReadUInt32()
+                                Category = br.ReadUInt32(),
+                                Value = br.ReadUInt32()
                             });
                         }
 
-                        xivMtrl.ShaderParameterList = new List<ShaderParameterStruct>(originalShaderParameterCount);
+                        xivMtrl.ShaderConstants = new List<ShaderConstant>(originalShaderParameterCount);
                         for (var i = 0; i < originalShaderParameterCount; i++)
                         {
-                            xivMtrl.ShaderParameterList.Add(new ShaderParameterStruct
+                            xivMtrl.ShaderConstants.Add(new ShaderConstant
                             {
-                                ParameterID = (MtrlShaderParameterId) br.ReadUInt32(), Offset = br.ReadInt16(), Size = br.ReadInt16()
+                                ConstantId = (MtrlShaderConstantId) br.ReadUInt32(), DataOffset = br.ReadInt16(), DataSize = br.ReadInt16()
                             });
                         }
 
-                        xivMtrl.TextureDescriptorList = new List<TextureDescriptorStruct>(originalTextureDescriptorCount);
-                        for (var i = 0; i < originalTextureDescriptorCount; i++)
+                        xivMtrl.TextureSamplers = new List<TextureSampler>(originalTextureSamplerCount);
+                        for (var i = 0; i < originalTextureSamplerCount; i++)
                         {
-                            xivMtrl.TextureDescriptorList.Add(new TextureDescriptorStruct
+                            xivMtrl.TextureSamplers.Add(new TextureSampler
                             {
-                                TextureType = br.ReadUInt32(),
-                                FileFormat = br.ReadInt16(),
-                                Unknown = br.ReadInt16(),
+                                SamplerId = br.ReadUInt32(),
+                                FormatFlags = br.ReadInt16(),
+                                UnknownFlags = br.ReadInt16(),
                                 TextureIndex = br.ReadUInt32()
                             });
                         }
 
 
                         var bytesRead = 0;
-                        foreach (var shaderParam in xivMtrl.ShaderParameterList)
+                        foreach (var shaderConstant in xivMtrl.ShaderConstants)
                         {
-                            var offset = shaderParam.Offset;
-                            var size = shaderParam.Size;
-                            shaderParam.Args = new List<float>();
-                            if (bytesRead + size <= originalShaderParameterDataSize)
+                            var offset = shaderConstant.DataOffset;
+                            var size = shaderConstant.DataSize;
+                            shaderConstant.Values = new List<float>();
+                            if (bytesRead + size <= originalShaderConstantsDataSize)
                             {
                                 for (var idx = offset; idx < offset + size; idx+=4)
                                 {
                                     var arg = br.ReadSingle();
-                                    shaderParam.Args.Add(arg);
+                                    shaderConstant.Values.Add(arg);
                                     bytesRead += 4;
                                 }
                             } else
                             {
                                 // Just use a blank array if we have missing/invalid shader data.
-                                shaderParam.Args = new List<float>(new float[size / 4]);
+                                shaderConstant.Values = new List<float>(new float[size / 4]);
                             }
                         }
 
                         // Chew through any remaining padding.
-                        while(bytesRead < originalShaderParameterDataSize)
+                        while(bytesRead < originalShaderConstantsDataSize)
                         {
                             br.ReadByte();
                             bytesRead++;
@@ -860,23 +860,23 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             mtrl.ColorSetData = newData;
 
-            mtrl.TextureUsageList.Add(new TextureUsageStruct()
+            mtrl.ShaderKeys.Add(new ShaderKey()
             {
-                TextureType = 4113354501,
-                Unknown = 2815623008,
+                Category = 4113354501,
+                Value = 2815623008,
             });
-            mtrl.TexturePathUnknownList.Add(0);
+            mtrl.TextureFlags.Add(0);
 
-            var normalTexPath = mtrl.TexturePathList.First(x => x.EndsWith("_n.tex"));
+            var normalTexPath = mtrl.TextureStrings.First(x => x.EndsWith("_n.tex"));
             var idTex = normalTexPath.Replace("_n.tex", "_id.tex");
             
-            mtrl.TexturePathList.Add(idTex);
-            mtrl.TextureDescriptorList.Add(new TextureDescriptorStruct()
+            mtrl.TextureStrings.Add(idTex);
+            mtrl.TextureSamplers.Add(new TextureSampler()
             {
-                FileFormat = -32768,
+                FormatFlags = -32768,
                 TextureIndex = mtrl.TextureCount,
-                TextureType = 1449103320,
-                Unknown = 15,
+                SamplerId = 1449103320,
+                UnknownFlags = 15,
             });
             var _tex = new Tex(_gameDirectory);
             var normalTex = await _tex.GetTexData(normalTexPath);
@@ -978,25 +978,25 @@ namespace xivModdingFramework.Materials.FileTypes
             var texturePathsDataSizePointer = mtrlBytes.Count;
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort)0)); //Backfilled later
 
-            mtrlBytes.Add((byte)xivMtrl.TexturePathList.Count);
-            mtrlBytes.Add((byte)xivMtrl.MapPathList.Count);
-            mtrlBytes.Add((byte)xivMtrl.ColorSetPathList.Count);
+            mtrlBytes.Add((byte)xivMtrl.TextureStrings.Count);
+            mtrlBytes.Add((byte)xivMtrl.MapStrings.Count);
+            mtrlBytes.Add((byte)xivMtrl.ColorsetStrings.Count);
             mtrlBytes.Add(xivMtrl.UnknownDataSize);
 
             // Regenerate offset list as we build the string list.
-            xivMtrl.TexturePathOffsetList.Clear();
-            xivMtrl.MapPathOffsetList.Clear();
-            xivMtrl.ColorSetPathOffsetList.Clear();
+            xivMtrl.TexturePathOffsets.Clear();
+            xivMtrl.MapOffsets.Clear();
+            xivMtrl.ColorsetOffsets.Clear();
 
 
             var stringListBytes = new List<byte>();
             var texIdx = 0;
-            foreach (var texPathString in xivMtrl.TexturePathList)
+            foreach (var texPathString in xivMtrl.TextureStrings)
             {
-                xivMtrl.TexturePathOffsetList.Add(stringListBytes.Count);
+                xivMtrl.TexturePathOffsets.Add(stringListBytes.Count);
                 var path = texPathString;
                 // This is an old style DX9/DX11 Mixed Texture reference, make sure to clean it up if needed.
-                if(xivMtrl.TexturePathUnknownList[texIdx] != 0)
+                if(xivMtrl.TextureFlags[texIdx] != 0)
                 {
                     path = path.Replace("--", string.Empty);
                 }
@@ -1006,16 +1006,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 texIdx++;
             }
 
-            foreach (var mapPathString in xivMtrl.MapPathList)
+            foreach (var mapPathString in xivMtrl.MapStrings)
             {
-                xivMtrl.MapPathOffsetList.Add(stringListBytes.Count);
+                xivMtrl.MapOffsets.Add(stringListBytes.Count);
                 stringListBytes.AddRange(Encoding.UTF8.GetBytes(mapPathString));
                 stringListBytes.Add(0);
             }
 
-            foreach (var colorSetPathString in xivMtrl.ColorSetPathList)
+            foreach (var colorSetPathString in xivMtrl.ColorsetStrings)
             {
-                xivMtrl.ColorSetPathOffsetList.Add(stringListBytes.Count);
+                xivMtrl.ColorsetOffsets.Add(stringListBytes.Count);
                 stringListBytes.AddRange(Encoding.UTF8.GetBytes(colorSetPathString));
                 stringListBytes.Add(0);
             }
@@ -1038,22 +1038,22 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             // Write the new offset list.
-            for (var i = 0; i < xivMtrl.TexturePathOffsetList.Count; i++)
+            for (var i = 0; i < xivMtrl.TexturePathOffsets.Count; i++)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathUnknownList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TexturePathOffsets[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.TextureFlags[i]));
             }
 
-            for (var i = 0; i < xivMtrl.MapPathOffsetList.Count; i++)
+            for (var i = 0; i < xivMtrl.MapOffsets.Count; i++)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapPathUnknownList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapOffsets[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapFlags[i]));
             }
 
-            for (var i = 0; i < xivMtrl.ColorSetPathOffsetList.Count; i++)
+            for (var i = 0; i < xivMtrl.ColorsetOffsets.Count; i++)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathOffsetList[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorSetPathUnknownList[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorsetOffsets[i]));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.ColorsetFlags[i]));
             }
 
             // Write the actual string list (including padding).
@@ -1074,57 +1074,57 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
 
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderParameterDataSize));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TextureUsageCount));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderParameterCount));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TextureDescriptorCount));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderNumber));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderConstantsDataSize));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderKeyCount));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderConstantsCount));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.TextureSamplerCount));
 
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Unknown3));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderFlags));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderUnknown));
 
-            foreach (var dataStruct1 in xivMtrl.TextureUsageList)
+            foreach (var dataStruct1 in xivMtrl.ShaderKeys)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.TextureType));
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Unknown));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Category));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Value));
             }
 
             var offset = 0;
-            foreach (var parameter in xivMtrl.ShaderParameterList)
+            foreach (var parameter in xivMtrl.ShaderConstants)
             {
                 // Ensure we're writing correctly calculated data.
-                parameter.Offset = (short) offset;
-                parameter.Size = (short)parameter.Args.Count;
-                offset += parameter.Size * 4;
-                short byteSize = (short)(parameter.Size * 4);
+                parameter.DataOffset = (short) offset;
+                parameter.DataSize = (short)parameter.Values.Count;
+                offset += parameter.DataSize * 4;
+                short byteSize = (short)(parameter.DataSize * 4);
 
-                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ParameterID));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameter.Offset));
+                mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ConstantId));
+                mtrlBytes.AddRange(BitConverter.GetBytes(parameter.DataOffset));
                 mtrlBytes.AddRange(BitConverter.GetBytes(byteSize));
             }
 
-            foreach (var parameterStruct in xivMtrl.TextureDescriptorList)
+            foreach (var sampler in xivMtrl.TextureSamplers)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureType));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.FileFormat));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.Unknown));
-                mtrlBytes.AddRange(BitConverter.GetBytes(parameterStruct.TextureIndex));
+                mtrlBytes.AddRange(BitConverter.GetBytes(sampler.SamplerId));
+                mtrlBytes.AddRange(BitConverter.GetBytes(sampler.FormatFlags));
+                mtrlBytes.AddRange(BitConverter.GetBytes(sampler.UnknownFlags));
+                mtrlBytes.AddRange(BitConverter.GetBytes(sampler.TextureIndex));
             }
 
 
 
             var shaderBytes = new List<byte>();
-            foreach (var shaderParam in xivMtrl.ShaderParameterList)
+            foreach (var shaderParam in xivMtrl.ShaderConstants)
             {
-                foreach (var f in shaderParam.Args)
+                foreach (var f in shaderParam.Values)
                 {
                     shaderBytes.AddRange(BitConverter.GetBytes(f));
                 }
             }
 
             // Pad out if we're missing anything.
-            if (shaderBytes.Count < xivMtrl.ShaderParameterDataSize)
+            if (shaderBytes.Count < xivMtrl.ShaderConstantsDataSize)
             {
-                shaderBytes.AddRange(new byte[xivMtrl.ShaderParameterDataSize - shaderBytes.Count]);
+                shaderBytes.AddRange(new byte[xivMtrl.ShaderConstantsDataSize - shaderBytes.Count]);
             }
             mtrlBytes.AddRange(shaderBytes);
 
