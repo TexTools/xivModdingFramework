@@ -153,6 +153,26 @@ namespace xivModdingFramework.Materials.DataContainers
             AddCustomNamesAndValues();
         }
 
+        /// Updates a given Shader Constant name if it exists and doesn't already have a name.
+        private static void UpdateName(EShaderPack shpk, uint constantId, string name) {
+            if(ShaderConstants.ContainsKey(shpk) && ShaderConstants[shpk].ContainsKey(constantId) && ShaderConstants[shpk][constantId].Name == "")
+            {
+                var sc = ShaderConstants[shpk][constantId];
+                sc.Name = name;
+                ShaderConstants[shpk][constantId] = sc;
+            }
+        }
+
+        // Updates a given Shader Key name if it exists and doesn't already have a name.
+        private static void UpdateKeyName(EShaderPack shpk, uint keyId, string name)
+        {
+            if (ShaderKeys.ContainsKey(shpk) && ShaderKeys[shpk].ContainsKey(keyId) && ShaderKeys[shpk][keyId].Name == "")
+            {
+                var sc = ShaderKeys[shpk][keyId];
+                sc.Name = name;
+                ShaderKeys[shpk][keyId] = sc;
+            }
+        }
 
         /// <summary>
         /// Adds custom hand-written names and values to shader keys/constants which
@@ -161,6 +181,20 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         private static void AddCustomNamesAndValues()
         {
+            foreach(var shKv in ShaderKeys)
+            {
+                UpdateKeyName(shKv.Key, 4113354501, "Use Normal Map");
+                UpdateKeyName(shKv.Key, 3531043187, "Use Decal Map");
+                UpdateKeyName(shKv.Key, 3054951514, "Use Diffuse Map");
+                UpdateKeyName(shKv.Key, 3367837167, "Use Specular Map");
+                UpdateKeyName(shKv.Key, 940355280, "Is Skin");
+            }
+
+            UpdateName(EShaderPack.Skin, 1659128399, "Skin Fresnel");
+            UpdateName(EShaderPack.Skin, 778088561, "Skin Tile Multiplier");
+            UpdateName(EShaderPack.Skin, 740963549, "Skin Color");
+            UpdateName(EShaderPack.Skin, 2569562539, "Skin Wetness Lerp");
+            UpdateName(EShaderPack.Skin, 1112929012, "Skin Tile Material");
 
         }
 

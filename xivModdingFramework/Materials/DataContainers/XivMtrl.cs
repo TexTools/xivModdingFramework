@@ -253,51 +253,31 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public List<TexTypePath> GetTextureTypePathList()
         {
-            return new List<TexTypePath>();
-            /*
-            // TODO:  Get rid of/refactor the entire pipeline that calls this function. (Only used 1x)
-            var ret = new List<TexTypePath>();
-            var maps = GetAllMapInfos(false);
-            var shaderInfo = GetShaderInfo();
-            TexTypePath ttp;
-            foreach (var map in maps)
+            var list = new List<TexTypePath>();
+            foreach(var tex in Textures)
             {
-                if (shaderInfo.Shader == MtrlShader.Skin && map.Usage == XivTexType.Multi)
+                var ttp = new TexTypePath()
                 {
-                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = XivTexType.Skin };
-
-                } else if (shaderInfo.Shader == MtrlShader.Furniture && map.Path.Contains("dummy")) {
-                    // Dummy textures are skipped.
-                    continue;
-                }
-                else
-                {
-                    ttp = new TexTypePath() { DataFile = GetDataFile(), Path = map.Path, Type = map.Usage };
-                }
-                var fName = Path.GetFileNameWithoutExtension(map.Path);
-                if (fName != "")
-                {
-                    var name = map.Usage.ToString() + ": " + fName;
-                    ttp.Name = name;
-                }
-
-                ret.Add(ttp);
+                    DataFile = IOUtil.GetDataFileFromPath(tex.TexturePath),
+                    Path = tex.TexturePath,
+                    Type = tex.Usage,
+                    Name = Path.GetFileNameWithoutExtension(tex.TexturePath)
+                };
+                list.Add(ttp);
             }
-
-
             // Include the colorset as its own texture if we have one.
             if (ColorsetStrings.Count > 0 && ColorSetData.Count > 0)
             {
-                ttp = new TexTypePath
+                var ttp = new TexTypePath
                 {
                     Path = MTRLPath,
                     Type = XivTexType.ColorSet,
-                    DataFile = GetDataFile()
+                    DataFile = GetDataFile(),
+                    Name = Path.GetFileNameWithoutExtension(MTRLPath)
                 };
-                ret.Add(ttp);
+                list.Add(ttp);
             }
-
-            return ret;*/
+            return list;
         }
 
         /// <summary>
