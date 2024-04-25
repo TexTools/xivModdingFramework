@@ -1184,8 +1184,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var xivTex = new XivTex();
 
-            var decompressedData = new List<byte>();
-
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offset / 8) & 0x0F) / 2;
 
@@ -1333,7 +1331,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var xivTex = new XivTex();
 
-            var decompressedData = new List<byte>();
+            byte[] decompressedData = null;
 
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offset / 8) & 0x0F) / 2;
@@ -1371,6 +1369,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                         xivTex.Layers = br.ReadInt16();
                         var imageCount2 = br.ReadInt16();
 
+                        decompressedData = new byte[uncompressedFileSize];
+                        int dataOffset = 0;
+
                         for (int i = 0, j = 0; i < xivTex.MipMapCount; i++)
                         {
                             br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
@@ -1395,7 +1396,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                                 var decompressedPartData = await IOUtil.Decompressor(compressedData, uncompressedSize);
 
-                                decompressedData.AddRange(decompressedPartData);
+                                decompressedPartData.CopyTo(decompressedData, dataOffset);
+                                dataOffset += decompressedPartData.Length;
 
                                 for (var k = 1; k < mipMapParts; k++)
                                 {
@@ -1416,12 +1418,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                                         decompressedPartData =
                                             await IOUtil.Decompressor(compressedData, uncompressedSize);
 
-                                        decompressedData.AddRange(decompressedPartData);
+                                        decompressedPartData.CopyTo(decompressedData, dataOffset);
+                                        dataOffset += decompressedPartData.Length;
                                     }
                                     else
                                     {
                                         decompressedPartData = br.ReadBytes(uncompressedSize);
-                                        decompressedData.AddRange(decompressedPartData);
+                                        decompressedPartData.CopyTo(decompressedData, dataOffset);
+                                        dataOffset += decompressedPartData.Length;
                                     }
                                 }
                             }
@@ -1432,31 +1436,25 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 {
                                     var compressedData = br.ReadBytes(compressedSize);
 
-                                    var uncompressedData = await IOUtil.Decompressor(compressedData, uncompressedSize);
+                                    var decompressedPartData = await IOUtil.Decompressor(compressedData, uncompressedSize);
 
-                                    decompressedData.AddRange(uncompressedData);
+                                    decompressedPartData.CopyTo(decompressedData, dataOffset);
+                                    dataOffset += decompressedPartData.Length;
                                 }
                                 else
                                 {
                                     var decompressedPartData = br.ReadBytes(uncompressedSize);
-                                    decompressedData.AddRange(decompressedPartData);
+                                    decompressedPartData.CopyTo(decompressedData, dataOffset);
+                                    dataOffset += decompressedPartData.Length;
                                 }
                             }
 
                             j = j + 20;
                         }
-
-                        if (decompressedData.Count < uncompressedFileSize)
-                        {
-                            var difference = uncompressedFileSize - decompressedData.Count;
-                            var padding = new byte[difference];
-                            Array.Clear(padding, 0, difference);
-                            decompressedData.AddRange(padding);
-                        }
                     }
                 });
 
-                xivTex.TexData = decompressedData.ToArray();
+                xivTex.TexData = decompressedData ?? new byte[0];
             }
             finally
             {

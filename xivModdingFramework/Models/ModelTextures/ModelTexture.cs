@@ -30,10 +30,12 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 using Color = SharpDX.Color;
+using Color4 = SharpDX.Color4;
 using xivModdingFramework.Materials.FileTypes;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using HelixToolkit.SharpDX.Core;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -132,6 +134,22 @@ namespace xivModdingFramework.Models.ModelTextures
             return await GetModelMaps(tex, mtrl, colors, highlightedRow);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static float Clamp(float value, float min = 0.0f, float max = 1.0f)
+        {
+            value = value < min ? min : value;
+            return value > max ? max : value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void EncodeColorBytes(byte[] buf, int offset, Color4 c)
+        {
+            buf[offset] = (byte)(Clamp(c.Red) * 255.0f);
+            buf[offset + 1] = (byte)(Clamp(c.Green) * 255.0f);
+            buf[offset + 2] = (byte)(Clamp(c.Blue) * 255.0f);
+            buf[offset + 3] = (byte)(Clamp(c.Alpha) * 255.0f);
+        }
+
         /// <summary>
         /// Gets the texture maps for the model
         /// </summary>
@@ -152,11 +170,11 @@ namespace xivModdingFramework.Models.ModelTextures
 
             var dimensions = await EqualizeTextureSizes(texMapData);
 
-            var diffuseMap = new List<byte>();
-            var normalMap = new List<byte>();
-            var specularMap = new List<byte>();
-            var emissiveMap = new List<byte>();
-            var alphaMap = new List<byte>();
+            var diffuseMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var normalMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var specularMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var emissiveMap = new byte[dimensions.Width * dimensions.Height * 4];
+            var alphaMap = new byte[dimensions.Width * dimensions.Height * 4];
 
             var diffuseColorList = new List<Color>();
             var specularColorList = new List<Color>();
@@ -201,64 +219,61 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
-                for (var i = 3; i < dataLength; i += 4)
+                var colorShader = GetShaderColorMapper(GetCustomColors(), shaderInfo);
+                bool invertNormalGreen = colors != null && colors.InvertNormalGreen;
+
+                for (var i = 0; i < dataLength - 3; i += 4)
                 {
-                // Load the individual pixels into memory.
-                    Color baseNormalColor = new Color(127, 127, 255, 255);
-                    Color baseDiffuseColor = new Color(255, 255, 255, 255);
-                    Color baseSpecularColor = new Color(255, 255, 255, 255);
-
-
-                    if (normalPixels != null)
-                    {
-                        baseNormalColor = new Color(normalPixels[i - 3], normalPixels[i - 2], normalPixels[i - 1], normalPixels[i]);
-                    }
+                    // Load the individual pixels into memory.
+                    Color4 baseDiffuseColor;
+                    Color4 baseNormalColor;
+                    Color4 baseSpecularColor;
 
                     if (diffusePixels != null)
+                        baseDiffuseColor = new Color(diffusePixels[i], diffusePixels[i + 1], diffusePixels[i + 2], diffusePixels[i + 3]);
+                    else
+                        baseDiffuseColor = new Color4(1.0f, 1.0f, 1.0f, 1.0f);
+
+                    if (normalPixels != null)
+                        baseNormalColor = new Color(normalPixels[i], normalPixels[i + 1], normalPixels[i + 2], normalPixels[i + 3]);
+                    else
+                        baseNormalColor = new Color4(0.5f, 0.5f, 1.0f, 1.0f);
+
+                    if (specularPixels != null)
+                        baseSpecularColor = new Color(specularPixels[i], specularPixels[i + 1], specularPixels[i + 2], specularPixels[i + 3]);
+                    else
+                        baseSpecularColor = new Color4(1.0f, 1.0f, 1.0f, 1.0f);
+
+                    if (colors != null && colors.InvertNormalGreen)
+                        baseNormalColor.Green = 1.0f - baseNormalColor.Green;
+
+                    var shaderResult = colorShader(baseDiffuseColor, baseNormalColor, baseSpecularColor);
+                    Color4 diffuseColor = shaderResult.Diffuse;
+                    Color4 normalColor = shaderResult.Normal;
+                    Color4 specularColor = shaderResult.Specular;
+                    Color4 alphaColor = new Color4(shaderResult.Opacity, shaderResult.Opacity, shaderResult.Opacity, shaderResult.Opacity);
+                    Color4 emissiveColor = Color4.Black;
+
+                    // Apply colorset if needed.
+                    if (mtrl.ColorSetData.Count > 0)
                     {
-                        baseDiffuseColor = new Color(diffusePixels[i - 3], diffusePixels[i - 2], diffusePixels[i - 1], diffusePixels[i]);
-                    }
-
-                    if(specularPixels != null)
-                    { 
-                        baseSpecularColor = new Color(specularPixels[i - 3], specularPixels[i - 2], specularPixels[i - 1], specularPixels[i]);
-                    }
-
-                    if(colors != null && colors.InvertNormalGreen)
-                    {
-                        baseNormalColor[1] = (byte)(255 - baseNormalColor[1]);
-                    }
-
-                    byte colorsetValue = baseNormalColor.A;
-
-                    // Calculate real colors from the inputs and shader.
-                    Color normalColor, diffuseColor, specularColor;
-                    byte opacity;
-                    ComputeShaderColors(colors, shaderInfo, baseNormalColor, baseDiffuseColor, baseSpecularColor, out normalColor, out diffuseColor, out specularColor, out opacity);
-                    Color alphaColor = new Color(opacity, opacity, opacity, opacity);
-
-                    // Apply colorset if needed.  (This could really be baked into ComputeShaderColors)
-                    Color emissiveColor = new Color(0, 0, 0, 0);
-                    if(mtrl.ColorSetData.Count > 0)
-                    {
-                        var cs = texMapData.ColorSet.Data;
-                        Color finalDiffuseColor, finalSpecularColor;
-                        ComputeColorsetBlending(mtrl, colorsetValue, cs, diffuseColor, specularColor, out finalDiffuseColor, out finalSpecularColor, out emissiveColor, highlightedRow);
+                        byte colorsetValue = normalPixels[i + 3]; // Normal Alpha channel
+                        byte[] colorSetData = texMapData.ColorSet.Data;
+                        Color4 finalDiffuseColor, finalSpecularColor;
+                        ComputeColorsetBlending(mtrl, colorsetValue, colorSetData, diffuseColor, specularColor, out finalDiffuseColor, out finalSpecularColor, out emissiveColor, highlightedRow);
                         diffuseColor = finalDiffuseColor;
                         specularColor = finalSpecularColor;
                     }
 
                     // White out the opacity channels where appropriate.
-                    diffuseColor.A = opacity;
-                    specularColor.A = 255;
-                    normalColor.A = 255;
+                    specularColor.Alpha = 1.0f;
+                    normalColor.Alpha = 1.0f;
 
-
-                    diffuseMap.AddRange(BitConverter.GetBytes(diffuseColor.ToRgba()));
-                    specularMap.AddRange(BitConverter.GetBytes(specularColor.ToRgba()));
-                    emissiveMap.AddRange(BitConverter.GetBytes(emissiveColor.ToRgba()));
-                    alphaMap.AddRange(BitConverter.GetBytes(alphaColor.ToRgba()));
-                    normalMap.AddRange(BitConverter.GetBytes(normalColor.ToRgba()));
+                    EncodeColorBytes(diffuseMap, i, diffuseColor);
+                    EncodeColorBytes(normalMap, i, normalColor);
+                    EncodeColorBytes(specularMap, i, specularColor);
+                    EncodeColorBytes(alphaMap, i, alphaColor);
+                    EncodeColorBytes(emissiveMap, i, emissiveColor);
                 }
             });
 
@@ -266,11 +281,11 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 Width = dimensions.Width,
                 Height = dimensions.Height,
-                Normal = normalMap.ToArray(),
-                Diffuse = diffuseMap.ToArray(),
-                Specular = specularMap.ToArray(),
-                Emissive = emissiveMap.ToArray(),
-                Alpha = alphaMap.ToArray(),
+                Normal = normalMap,
+                Diffuse = diffuseMap,
+                Specular = specularMap,
+                Emissive = emissiveMap,
+                Alpha = alphaMap,
                 MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
             };
 
@@ -335,6 +350,28 @@ namespace xivModdingFramework.Models.ModelTextures
             }
 
             return texMapData;
+        }
+
+        private static void ResizeTexture(TexInfo texInfo, int width, int height)
+        {
+            using var img = Image.LoadPixelData<Rgba32>(texInfo.Data, texInfo.Width, texInfo.Height);
+
+            // ImageSharp pre-multiplies the RGB by the alpha component during resize, if alpha is 0 (colourset row 0)
+            // this ends up causing issues and destroying the RGB values resulting in an invisible preview model
+            // https://github.com/SixLabors/ImageSharp/issues/1498#issuecomment-757519563
+            img.Mutate(x => x.Resize(
+                new ResizeOptions
+                {
+                    Size = new Size(width, height),
+                    PremultiplyAlpha = false,
+                })
+            );
+
+            texInfo.Data = new byte[width * height * 4];
+            img.CopyPixelDataTo(texInfo.Data.AsSpan());
+
+            texInfo.Width = width;
+            texInfo.Height = height;
         }
 
         /// <summary>
@@ -417,78 +454,31 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
+                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
+                    ResizeTexture(texMapData.Normal, width, height);
 
-                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height ||
-                    scaleDown)
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Normal.Data, texMapData.Normal.Width,
-                        texMapData.Normal.Height))
-                    {
-                        // ImageSharp pre-multiplies the RGB by the alpha component during resize, if alpha is 0 (colourset row 0)
-                        // this ends up causing issues and destroying the RGB values resulting in an invisible preview model
-                        // https://github.com/SixLabors/ImageSharp/issues/1498#issuecomment-757519563
-                        img.Mutate(x => x.Resize(
-                            new ResizeOptions
-                            {
-                                Size = new Size(width, height),
-                                PremultiplyAlpha = false
-                            })
-                        );
+                if (texMapData.Diffuse != null && largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown)
+                    ResizeTexture(texMapData.Diffuse, width, height);
 
-                        texMapData.Normal.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
-                    }
-                }
-
-                if (texMapData.Diffuse != null &&
-                    (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Diffuse.Data, texMapData.Diffuse.Width,
-                        texMapData.Diffuse.Height))
-                    {
-                        for (int i = 0; i < img.Height; i++)
-                        {
-                            var pixelRowSpan = img.GetPixelRowSpan(i);
-                            for (int j = 0; j < img.Width; j++)
-                            {
-                                pixelRowSpan[j] = new Rgba32(pixelRowSpan[j].R, pixelRowSpan[j].G, pixelRowSpan[j].B, 255);
-                            }
-                        }
-                        img.Mutate(x => x.Resize(width, height));
-
-                        texMapData.Diffuse.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
-                    }
-                }
-
-                if (texMapData.Specular != null &&
-                    (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
-                {
-                    using (var img = Image.LoadPixelData<Rgba32>(texMapData.Specular.Data, texMapData.Specular.Width,
-                        texMapData.Specular.Height))
-                    {
-                        img.Mutate(x => x.Resize(width, height));
-
-                        texMapData.Specular.Data = MemoryMarshal.AsBytes(img.GetPixelMemoryGroup()[0].Span).ToArray();
-                    }
-                }
+                if (texMapData.Specular != null && largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown)
+                    ResizeTexture(texMapData.Specular, width, height);
             });
 
             return (width, height);
         }
 
-        private static void ComputeShaderColors(ShaderInfo info, Color baseNormal, Color baseDiffuse, Color baseSpecular, out Color newNormal, out Color newDiffuse, out Color newSpecular, out byte opacity)
+        private struct ColorMapperResult
         {
-            ComputeShaderColors(GetCustomColors(), info, baseNormal, baseDiffuse, baseSpecular, out newNormal, out newDiffuse, out newSpecular, out opacity);
+            public Color4 Diffuse;
+            public Color4 Normal;
+            public Color4 Specular;
+            public float Opacity;
         }
 
-        private static void ComputeShaderColors(CustomModelColors colors,  ShaderInfo info, Color baseNormal, Color baseDiffuse, Color baseSpecular, out Color newNormal, out Color newDiffuse, out Color newSpecular, out byte opacity)
+        delegate ColorMapperResult ShaderColorMapperDelegate(Color4 diffuse, Color4 normal, Color4 specular);
+
+        private static ShaderColorMapperDelegate GetShaderColorMapper(CustomModelColors colors, ShaderInfo info)
         {
-            // This is basically codifying this document: https://docs.google.com/spreadsheets/d/1kIKvVsW3fOnVeTi9iZlBDqJo6GWVn6K6BCUIRldEjhw/edit#gid=2112506802
-            opacity = 255;
-            newNormal = baseNormal;
-            newDiffuse = baseDiffuse;
-            newSpecular = baseSpecular;
-
-
             // This var is technically defined in the Shaders parameters.
             // But we can use a constant copy of it for now, since it's largely non-changeable.
             const float PlayerColorMultiplier = 1.4f;
@@ -496,221 +486,241 @@ namespace xivModdingFramework.Models.ModelTextures
 
             if (info.Shader == MtrlShader.Standard || info.Shader == MtrlShader.Glass)
             {
-                // Common
-                // Base color here is diffuse if we have one...
-                if(info.Preset == MtrlShaderPreset.DiffuseSpecular)
+                if (info.Preset == MtrlShaderPreset.DiffuseSpecular)
                 {
-                    // Has a raw diffuse.
-                    newDiffuse = baseDiffuse;
-                    newDiffuse.A = baseNormal.B;
-
-                    // Has a raw specular.
-                    newSpecular = baseSpecular;
-
-                } else if(info.Preset == MtrlShaderPreset.DiffuseMulti || info.Preset == MtrlShaderPreset.Monster)
-                {
-                    // Has a raw diffuse.
-                    newDiffuse = baseDiffuse;
-
-                    // But we also have to modulate that diffuse color by the multi red channel.
-                    //newDiffuse = MultiplyColor(newDiffuse, baseSpecular.R);
-
-                    newDiffuse.A = baseNormal.B;
-
-                    // Uses multi green/blue in some fashion.
-                    // We'll just show green for now.
-                    newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
-
-                } else
-                {
-                    // Uses multi channel Red as a base/ao map.
-                    newDiffuse = new Color(baseSpecular.R, baseSpecular.R, baseSpecular.R, (byte)255);
-                    newDiffuse.A = baseNormal.B;
-
-                    // Uses multi green/blue in some fashion.
-                    // We'll just show green for now.
-                    newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
-
+                    return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                        return new ColorMapperResult()
+                        {
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, diffuse.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = specular,
+                            Opacity = normal.Blue
+                        };
+                    };
                 }
-
-                // Normal is the same for all of them.
-                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
-                opacity = baseNormal.B;
-
-
-
-            } else if(info.Shader == MtrlShader.Furniture || info.Shader == MtrlShader.DyeableFurniture)
-            {
-                // Furniture
-                newDiffuse = new Color(baseDiffuse.R, baseDiffuse.G, baseDiffuse.B, (byte)255);
-
-                if(info.Shader == MtrlShader.DyeableFurniture)
+                else if (info.Preset == MtrlShaderPreset.DiffuseMulti || info.Preset == MtrlShaderPreset.Monster)
                 {
-                    float colorInfluence = ByteToFloat(baseDiffuse.A);
-                    Color furnitureColor = MultiplyColor(colors.FurnitureColor, 1.0f);
-
-                    newDiffuse = Blend(baseDiffuse, furnitureColor, colorInfluence);
-
+                    return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                        return new ColorMapperResult()
+                        {
+                            Diffuse = diffuse,
+                            Normal = new Color(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = specular,
+                            Opacity = normal.Blue
+                        };
+                    };
                 }
-
-                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
-                newNormal = new Color(baseNormal.R, baseNormal.G, baseNormal.B, (byte)255);
-
-                // This needs some more research all around
-
-            } else if(info.Shader == MtrlShader.Skin)
-            {
-
-                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
-                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G,(byte) 255);
-                opacity = 255;
-
-                // This is an arbitrary number.  There's likely some value in the shader params for skin that
-                // tones down the specularity here, but without it the skin is hyper reflective.
-                newSpecular = MultiplyColor(newSpecular, 0.25f);
-
-                // New diffuse starts from regular diffuse file.
-                // Then factors in the player's skin color multiplied by the shader value.
-                float skinInfluence = ByteToFloat(baseSpecular.R);
-                var coloredSkin = MultiplyColor(baseDiffuse, colors.SkinColor);
-
-                newDiffuse = Blend(baseDiffuse, coloredSkin, skinInfluence);
-
-                if (info.Preset == MtrlShaderPreset.Face)
+                else
                 {
+                    return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                        return new ColorMapperResult()
+                        {
+                            Diffuse = new Color4(diffuse.Red, diffuse.Red, diffuse.Red, normal.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
+                            Opacity = normal.Blue
+                        };
+                    };
+                }
+            }
+            else if (info.Shader == MtrlShader.Furniture)
+            {
+                return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    return new ColorMapperResult()
+                    {
+                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f),
+                        Normal = new Color4(normal.Red, normal.Green, diffuse.Blue, 1.0f),
+                        Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
+                        Opacity = normal.Blue
+                    };
+                };
+            }
+            else if (info.Shader == MtrlShader.DyeableFurniture)
+            {
+                Color4 furnitureColor = colors.FurnitureColor;
+                return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    float colorInfluence = diffuse.Alpha;
+                    return new ColorMapperResult()
+                    {
+                        Diffuse = Color4.Lerp(new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f), furnitureColor, colorInfluence),
+                        Normal = new Color4(normal.Red, normal.Green, diffuse.Blue, 1.0f),
+                        Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
+                        Opacity = normal.Blue
+                    };
+                };
+            }
+            else if (info.Shader == MtrlShader.Skin)
+            {
+                var skinColor = colors.SkinColor;
+                var lipColor = colors.LipColor;
+
+                ShaderColorMapperDelegate skinShader = (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
+                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
+
+                    // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                    // tones down the specularity here, but without it the skin is hyper reflective.
+                    newSpecular = Color4.Scale(newSpecular, 0.25f);
+
+                    // New diffuse starts from regular diffuse file.
+                    // Then factors in the player's skin color multiplied by the shader value.
+                    float skinInfluence = specular.Red;
+                    var coloredSkin = diffuse * skinColor;
+
+                    Color4 newDiffuse = Color4.Lerp(diffuse, coloredSkin, skinInfluence);
+
+                    return new ColorMapperResult()
+                    {
+                        Diffuse = newDiffuse,
+                        Normal = newNormal,
+                        Specular = newSpecular,
+                        Opacity = 1.0f
+                    };
+                };
+
+                ShaderColorMapperDelegate faceShader = (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    ColorMapperResult result = skinShader(diffuse, normal, specular);
+
                     // Face shaders also allow for lip color.
-                    var coloredLip = MultiplyColor(baseDiffuse, colors.LipColor);
-                    float lipInfluence = ByteToFloat(baseSpecular.B);
-                    newDiffuse = Blend(newDiffuse, coloredLip, lipInfluence);
+                    var coloredLip = diffuse * lipColor;
+                    float lipInfluence = specular.Blue;
+                    result.Diffuse = Color4.Lerp(result.Diffuse, coloredLip, lipInfluence);
 
                     // For lipstick, increase the specular value slightly.
                     float specAmp = 1.0f + (lipInfluence * 0.25f);
-                    newSpecular = MultiplyColor(newSpecular, specAmp);
+                    result.Specular = result.Specular * specAmp;
 
                     // Face shader supports alpha, unlike normal skin textures.
-                    opacity = baseNormal.B;
-                }
+                    result.Opacity = normal.Blue;
 
+                    return result;
+                };
 
-            } else if(info.Shader == MtrlShader.Hair)
+                if (info.Preset == MtrlShaderPreset.Face)
+                    return faceShader;
+                else
+                    return skinShader;
+            }
+            else if (info.Shader == MtrlShader.Hair)
             {
-
-                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
-                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
-                opacity = baseNormal.A;
-
-                // This is an arbitrary number.  There's likely some value in the shader params for skin that
-                // tones down the specularity here, but without it the skin is hyper reflective.
-                newSpecular = MultiplyColor(newSpecular, 0.25f);
-
-                // The influence here determines which base color we use.
-                float influenceStrength = ByteToFloat(baseSpecular.A);
+                var hairHighlightColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
+                var hairTargetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
 
                 // Starting from the original hair color...
-                var baseColor = MultiplyColor(colors.HairColor, 1.0f);
+                var baseColor = colors.HairColor;
 
                 // Hair highlight color if available.
-                var targetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
-
-
                 // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
+                Color4 targetColor;
+
                 if (info.Preset == MtrlShaderPreset.Face)
-                {
-                    targetColor = MultiplyColor(colors.TattooColor, 1.0f);
-                } else if(info.Preset == MtrlShaderPreset.FaceBright)
-                {
+                    targetColor = colors.TattooColor;
+                else if (info.Preset == MtrlShaderPreset.FaceBright)
                     // Multiplier here is 3.0 instead of 1.4
-                    targetColor = MultiplyColor(colors.TattooColor, BrightPlayerColorMultiplier / PlayerColorMultiplier);
+                    targetColor = Color4.Scale(colors.TattooColor, BrightPlayerColorMultiplier / PlayerColorMultiplier);
+                else
+                    targetColor = hairHighlightColor;
 
-                }
+                return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
+                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
 
-                // This gets us our actual base color.
-                baseColor = Blend(baseColor, targetColor, influenceStrength);
+                    // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                    // tones down the specularity here, but without it the skin is hyper reflective.
+                    newSpecular = Color4.Scale(newSpecular, 0.25f);
 
-                // Now this needs to be straight multiplied with the multi channel red.
-                newDiffuse = MultiplyColor(baseColor, baseSpecular.R);
+                    // The influence here determines which base color we use.
+                    float influenceStrength = specular.Alpha;
 
-            } else if(info.Shader == MtrlShader.Iris)
-            {
-                // Eyes
-                newNormal = new Color(baseNormal.R, baseNormal.G, (byte)255, (byte)255);
-                newSpecular = new Color(baseSpecular.G, baseSpecular.G, baseSpecular.G, (byte)255);
-                opacity = baseNormal.A;
+                    Color4 newDiffuse = Color4.Lerp(baseColor, targetColor, influenceStrength);
+                    newDiffuse = Color4.Scale(newDiffuse, specular.Red);
 
-
-                // Base color is the selected eye color.
-                var baseColor = colors.EyeColor;
-
-                // Pretty sure some data is missing in here.
-                // Catchlight is also not factored in atm.
-
-                // Now this needs to be straight multiplied with the multi channel red.
-                newDiffuse = MultiplyColor(baseColor, baseSpecular.R);
-
-
-            } else
-            {
-                // Fall through just shows stuff as is.
-                newNormal = baseNormal;
-                newDiffuse = baseDiffuse;
-                newSpecular = baseSpecular;
+                    return new ColorMapperResult()
+                    {
+                        Diffuse = newDiffuse,
+                        Normal = newNormal,
+                        Specular = newSpecular,
+                        Opacity = normal.Alpha
+                    };
+                };
             }
-
-            // Transparency filtering.
-            if (!info.TransparencyEnabled)
+            else if (info.Shader == MtrlShader.Iris)
             {
-                opacity = (byte)(opacity < 128 ? 0 : 255);
+                return (Color4 diffuse, Color4 normal, Color4 specular) =>
+                {
+                    return new ColorMapperResult()
+                    {
+                        Diffuse = Color4.Scale(colors.EyeColor, specular.Red),
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
+                        Opacity = normal.Alpha
+                    };
+                };
+            }
+            else
+            {
+                return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    return new ColorMapperResult()
+                    {
+                        Diffuse = diffuse,
+                        Normal = normal,
+                        Specular = specular,
+                        Opacity = 1.0f
+                    };
+                };
             }
         }
 
-        private static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color baseDiffuse, Color baseSpecular, out Color newDiffuse, out Color newSpecular, out Color emissiveColor, int highlightRow = -1)
+        // This is only called in one place, and benefits greatly from being inlined
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ComputeColorsetBlending(XivMtrl mtrl, byte colorsetByte, byte[] colorSetData, Color4 baseDiffuse, Color4 baseSpecular, out Color4 newDiffuse, out Color4 newSpecular, out Color4 emissiveColor, int highlightRow = -1)
         {
             int rowNumber = colorsetByte / 17;
             int nextRow = rowNumber >= 15 ? 15 : rowNumber + 1;
             int blendAmount = (colorsetByte % 17);
             float fBlendAmount = blendAmount / 17.0f;
 
-            Color diffuse1, diffuse2;
-            Color spec1, spec2;
-            Color emiss1, emiss2;
+            Color4 diffuse1, diffuse2;
+            Color4 spec1, spec2;
+            Color4 emiss1, emiss2;
 
             // Byte offset to rows
-            var row1Offset = Clamp(rowNumber * 16);
-            var row2Offset = Clamp(nextRow * 16);
+            var row1Offset = rowNumber * 16;
+            var row2Offset = nextRow * 16;
 
             if (highlightRow >= 0)
             {
                 if (rowNumber == highlightRow)
                 {
-                    diffuse1 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
-                    diffuse2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    diffuse1 = Color4.White;
+                    diffuse2 = Color4.Black;
 
-                    spec1 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
-                    spec2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    spec1 = Color4.White;
+                    spec2 = Color4.Black;
 
-                    emiss1 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
-                    emiss2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    emiss1 = Color4.White;
+                    emiss2 = Color4.Black;
                 }
                 else if (nextRow == highlightRow)
                 {
-                    diffuse1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
-                    diffuse2 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                    diffuse1 = Color4.Black;
+                    diffuse2 = Color4.White;
 
-                    spec1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
-                    spec2 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                    spec1 = Color4.Black;
+                    spec2 = Color4.White;
 
-                    emiss1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
-                    emiss2 = new Color((byte)255, (byte)255, (byte)255, (byte)255);
+                    emiss1 = Color4.Black;
+                    emiss2 = Color4.White;
                 } else
                 {
-                    diffuse1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
-                    diffuse2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    diffuse1 = Color4.Black;
+                    diffuse2 = Color4.Black;
 
-                    spec1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
-                    spec2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    spec1 = Color4.Black;
+                    spec2 = Color4.Black;
 
-                    emiss1 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
-                    emiss2 = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                    emiss1 = Color4.Black;
+                    emiss2 = Color4.Black;
                 }
             }
             else
@@ -727,124 +737,16 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
             // These are now our base values to multiply the base values by.
-            Color diffuse = Blend(diffuse1, diffuse2, fBlendAmount);
-            Color specular = Blend(spec1, spec2, fBlendAmount);
-            Color emissive = Blend(emiss1, emiss2, fBlendAmount);
+            Color4 diffuse = Color4.Lerp(diffuse1, diffuse2, fBlendAmount);
+            Color4 specular = Color4.Lerp(spec1, spec2, fBlendAmount);
+            Color4 emissive = Color4.Lerp(emiss1, emiss2, fBlendAmount);
 
-            newDiffuse = MultiplyColor(baseDiffuse, diffuse);
-            newSpecular = MultiplyColor(baseSpecular, specular);
+            newDiffuse = baseDiffuse * diffuse;
+            newSpecular = baseSpecular * specular;
             emissiveColor = emissive;  // Nothing to multiply by here.
 
         }
 
-
-        #region Math Helpers
-        /// <summary>Blends the specified colors together.</summary>
-        /// <param name="backColor">Color to blend the other color onto.</param>
-        /// <param name="color">Color to blend onto the background color.</param>
-        /// <param name="amount">How much of <paramref name="color"/> to keep,
-        /// “on top of” <paramref name="backColor"/>.</param>
-        /// <returns>The blended colors.</returns>
-        private static Color Blend(Color backColor, Color color, float amount)
-        {
-            var r = (byte)Clamp(Math.Round((color.R * amount) + backColor.R * (1 - amount)));
-            var g = (byte)Clamp(Math.Round((color.G * amount) + backColor.G * (1 - amount)));
-            var b = (byte)Clamp(Math.Round((color.B * amount) + backColor.B * (1 - amount)));
-            return new Color(r, g, b);
-        }
-
-        private static int Clamp(int i)
-        {
-            if (i > 255)
-            {
-                return 255;
-            }
-            else if (i < 0)
-            {
-                return 0;
-            }
-            else
-            {
-                return i;
-            }
-        }
-        private static float Clamp(double f)
-        {
-            if (f > 255)
-            {
-                return 255;
-            }
-            else if (f < 0)
-            {
-                return 0;
-            }
-            else
-            {
-                return (float)f;
-            }
-        }
-        /// <summary>
-        /// Performs a basic alpha blending of two colors.
-        /// </summary>
-        /// <param name="bg"></param>
-        /// <param name="fg"></param>
-        /// <returns></returns>
-        private static float ByteToFloat(byte b)
-        {
-            float f = b / 255f;
-            return f;
-        }
-
-        private static byte FloatToByte(float f)
-        {
-            byte b;
-
-            if (f > 1)
-            {
-                b = 255;
-            }
-            else if (f < 0)
-            {
-                b = 0;
-            }
-            else
-            {
-                b = (byte)Math.Round(f * 255f);
-            }
-
-            return b;
-        }
-
-        private static Color MultiplyColor(Color c1, byte b)
-        {
-            var ret = new Color();
-            ret.R = FloatToByte(ByteToFloat(c1.R) * ByteToFloat(b));
-            ret.G = FloatToByte(ByteToFloat(c1.G) * ByteToFloat(b));
-            ret.B = FloatToByte(ByteToFloat(c1.B) * ByteToFloat(b));
-            ret.A = FloatToByte(ByteToFloat(c1.A) * ByteToFloat(b));
-            return ret;
-
-        }
-        private static Color MultiplyColor(Color c1, float f)
-        {
-            var ret = new Color();
-            ret.R = FloatToByte(ByteToFloat(c1.R) * f);
-            ret.G = FloatToByte(ByteToFloat(c1.G) * f);
-            ret.B = FloatToByte(ByteToFloat(c1.B) * f);
-            ret.A = FloatToByte(ByteToFloat(c1.A) * f);
-            return ret;
-
-        }
-        private static Color MultiplyColor(Color c1, Color c2)
-        {
-            var ret = new Color();
-            ret.R = FloatToByte(ByteToFloat(c1.R) * ByteToFloat(c2.R));
-            ret.G = FloatToByte(ByteToFloat(c1.G) * ByteToFloat(c2.G));
-            ret.B = FloatToByte(ByteToFloat(c1.B) * ByteToFloat(c2.B));
-            ret.A = FloatToByte(ByteToFloat(c1.A) * ByteToFloat(c2.A));
-            return ret;
-        }
-        #endregion
         public class TexMapData
         {
             public TexInfo Diffuse { get; set; }
