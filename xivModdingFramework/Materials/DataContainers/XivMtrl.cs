@@ -66,89 +66,9 @@ namespace xivModdingFramework.Materials.DataContainers
             return (ushort) size;
         } }
 
-        /// <summary>
-        /// The size of the Material Data section
-        /// </summary>
-        /// <remarks>
-        /// This is the size of the data chunk containing all of the path and filename strings
-        /// </remarks>
-        public ushort MaterialDataSize { get; set; }
+        public List<MtrlString> MapStrings { get; set; }
 
-        /// <summary>
-        /// The size of the Texture Path Data section
-        /// </summary>
-        /// <remarks>
-        /// This is the size of the data chucnk containing only the texture paths
-        /// </remarks>
-        public ushort TexturePathsDataSize { get; set; }
-
-        /// <summary>
-        /// The number of textures paths in the mtrl
-        /// </summary>
-        public byte TextureCount { get; set; }
-
-        /// <summary>
-        /// The number of map paths in the mtrl
-        /// </summary>
-        public byte MapCount { get; set; }
-
-        /// <summary>
-        /// The amount of color sets in the mtrl
-        /// </summary>
-        /// <remarks>
-        /// It is not known if there are any instances where this is greater than 1
-        /// </remarks>
-        public byte ColorSetCount { get; set; }
-
-        /// <summary>
-        /// The number of bytes to skip after path section
-        /// </summary>
-        public byte UnknownDataSize { get; set; }
-
-        /// <summary>
-        /// A list containing the Texture Path offsets
-        /// </summary>
-        public List<int> TexturePathOffsets { get; set; }
-
-        /// <summary>
-        /// A list containing the Texture Path Unknowns
-        /// </summary>
-        public List<short> TextureFlags { get; set; }
-
-        /// <summary>
-        /// A list containing the Map Path offsets
-        /// </summary>
-        public List<int> MapOffsets { get; set; }
-
-        /// <summary>
-        /// A list containing the Map Path Unknowns
-        /// </summary>
-        public List<short> MapFlags { get; set; }
-
-        /// <summary>
-        /// A list containing the ColorSet Path offsets
-        /// </summary>
-        public List<int> ColorsetOffsets { get; set; }
-
-        /// <summary>
-        /// A list containing the ColorSet Path Unknowns
-        /// </summary>
-        public List<short> ColorsetFlags { get; set; }
-
-        /// <summary>
-        /// A list containing the Texture Path strings
-        /// </summary>
-        public List<string> TextureStrings { get; set; }
-
-        /// <summary>
-        /// A list containing the Map Path strings
-        /// </summary>
-        public List<string> MapStrings { get; set; }
-
-        /// <summary>
-        /// A list containing the ColorSet Path strings
-        /// </summary>
-        public List<string> ColorsetStrings { get; set; }
+        public List<MtrlString> ColorsetStrings { get; set; }
 
         /// <summary>
         /// The name of the shader used by the item
@@ -158,7 +78,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// Unknown value
         /// </summary>
-        public byte[] Unknown2 { get; set; }
+        public byte[] AdditionalData { get; set; }
 
         /// <summary>
         /// The list of half floats containing the ColorSet data
@@ -212,18 +132,8 @@ namespace xivModdingFramework.Materials.DataContainers
                 throw new Exception("Attempted to directly set ShaderParameterCount");
             }
         }
-        /// <summary>
-        /// The number of parameter stuctures
-        /// </summary>
-        public ushort TextureSamplerCount
-        {
-            get { return (ushort)TextureSamplers.Count; }
-            set
-            {
-                //No-Op
-                throw new Exception("Attempted to directly set TextureDescriptorCount");
-            }
-        }
+
+        public List<MtrlTexture> Textures;
 
         /// <summary>
         /// Shader flags, only partially known:
@@ -261,11 +171,6 @@ namespace xivModdingFramework.Materials.DataContainers
         /// The list of Type 2 data structures
         /// </summary>
         public List<ShaderConstant> ShaderConstants { get; set; }
-
-        /// <summary>
-        /// The list of Parameter data structures
-        /// </summary>
-        public List<TextureSampler> TextureSamplers { get; set; }
 
         /// <summary>
         /// The TexTools expected list of textures in the item, including colorset 'texture'.
@@ -462,21 +367,21 @@ namespace xivModdingFramework.Materials.DataContainers
             }
 
             // Update us to DX11 material style if we're not already.
-            for (var idx = 0; idx < Unknown2.Length; idx++)
+            for (var idx = 0; idx < AdditionalData.Length; idx++)
             {
                 if (idx == 0)
                 {
-                    Unknown2[idx] = 12;
+                    AdditionalData[idx] = 12;
                 }
                 else
                 {
-                    Unknown2[idx] = 0;
+                    AdditionalData[idx] = 0;
                 }
             }
 
-            for (var idx = 0; idx < TextureFlags.Count; idx++)
+            for (var idx = 0; idx < Textures.Count; idx++)
             {
-                TextureFlags[idx] = 0;
+                Textures[idx].Flags = 0;
             }
 
 
@@ -541,12 +446,12 @@ namespace xivModdingFramework.Materials.DataContainers
             if(!info.HasColorset)
             {
                 // ColorSetCount seems to always be 1, even when the data is empty.
-                ColorSetCount = 1;
+                ColorsetStrings = new List<MtrlString>();
                 ColorSetData = new List<Half>();
                 ColorSetDyeData = null;
             } else
             {
-                if(ColorSetCount == 0 || ColorSetData == null || ColorSetData.Count != 256)
+                if(ColorsetStrings.Count == 0 || ColorSetData == null || ColorSetData.Count != 256)
                 {
                     // Get default Colorset Data.
                     ColorSetData = Tex.GetColorsetDataFromDDS(Tex.GetDefaultTexturePath(XivTexType.ColorSet));
@@ -593,36 +498,16 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public MapInfo GetMapInfo(XivTexType MapType, bool tokenized = true)
         {
-            var info = new MapInfo();
-            int mapIndex = -1;
 
-            info.Usage = MapType;
-
-            // Look for the right map type in the parameter list.
-            foreach (var paramSet in TextureSamplers)
-            {
-                if (paramSet.SamplerId == Mtrl.TextureSamplerIds[MapType])
-                {
-                    mapIndex = (int) paramSet.TextureIndex;
-                    info.Format = GetFormat(paramSet.FormatFlags);
-                }
-                else if (paramSet.SamplerId == Mtrl.FurnitureTextureSamplerIds[MapType])
-                {
-                    mapIndex = (int)paramSet.TextureIndex;
-                    info.Format = GetFormat(paramSet.FormatFlags);
-                }
-            }
-
-            if(mapIndex < 0)
+            var tex = Textures.FirstOrDefault(x => x.Usage == MapType);
+            if(tex == null)
             {
                 return null;
             }
 
-            info.Path = "";
-            if ( mapIndex < TextureStrings.Count )
-            {
-                info.Path = TextureStrings[mapIndex];
-            }
+            var info = new MapInfo();
+            info.Usage = MapType;
+            info.Path = tex.TexturePath;
 
             if (tokenized)
             {
@@ -639,47 +524,16 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public MapInfo GetMapInfo(string path)
         {
-
-            // Step 1 - Get index of the path
-            var idx = -1;
-            for(var i = 0; i < TextureStrings.Count; i++)
-            {
-                if(TextureStrings[i] == path)
-                {
-                    idx = i;
-                    break;
-                }
-            }
-            if(idx == -1)
+            var tex = Textures.FirstOrDefault(x => x.TexturePath == path);
+            if(tex == null)
             {
                 return null;
             }
 
             var info = new MapInfo();
-            info.Path = path;
-            
-            foreach(var descriptor in TextureSamplers)
-            {
-                // Found the descriptor.
-                if(descriptor.TextureIndex == idx)
-                {
-                    // If we know what this texture descriptor actually means
-                    if(Mtrl.TextureSamplerIds.ContainsValue(descriptor.SamplerId))
-                    {
-                        info.Usage = Mtrl.TextureSamplerIds.First(x => x.Value == descriptor.SamplerId).Key;
-                    }
-                    else if (Mtrl.FurnitureTextureSamplerIds.ContainsValue(descriptor.SamplerId))
-                    {
-                        info.Usage = Mtrl.FurnitureTextureSamplerIds.First(x => x.Value == descriptor.SamplerId).Key;
-                    }
-                    else
-                    {
-                        info.Usage = XivTexType.Other;
-                    }
-
-                    info.Format = GetFormat(descriptor.FormatFlags);
-                }
-            }
+            info.Path = path; 
+            info.Format = GetFormat(tex.Sampler.FormatFlags);
+            info.Usage = tex.Usage;
 
             info.Path = TokenizePath(info.Path, info.Usage);
 
@@ -700,52 +554,12 @@ namespace xivModdingFramework.Materials.DataContainers
                 throw new System.Exception("Invalid attempt to reassign map materials.");
             }
            
-            var paramIdx = -1;
-            TextureSampler oldInfo = new TextureSampler();
-            // Look for the right map type in the parameter list.
-            for( var i = 0; i < TextureSamplers.Count; i++)
+            var tex = Textures.FirstOrDefault(x => x.Usage == MapType);
+
+            if(info == null)
             {
-                var paramSet = TextureSamplers[i];
-
-                if (paramSet.SamplerId == Mtrl.TextureSamplerIds[MapType])
-                {
-                    paramIdx = i;
-                    oldInfo = paramSet;
-                    break;
-                }
-            }
-
-
-            // Deleting existing info.
-            if (info == null)
-            {
-
-                if (paramIdx >= 0)
-                {
-                    // Remove texture from path list if it exists.
-                    if (TextureStrings.Count > oldInfo.TextureIndex)
-                    {
-                        TextureStrings.RemoveAt((int)oldInfo.TextureIndex);
-                        TextureFlags.RemoveAt((int)oldInfo.TextureIndex);
-                    }
-
-                    // Remove Parameter List
-                    TextureSamplers.RemoveAt(paramIdx);
-
-                    // Update other texture offsets
-                    for (var i = 0; i < TextureSamplers.Count; i++)
-                    {
-                        var p = TextureSamplers[i];
-                        if (p.TextureIndex > oldInfo.TextureIndex)
-                        {
-                            p.TextureIndex--;
-                        }
-                        TextureSamplers[i] = p;
-                    }
-                }
-
+                Textures.Remove(tex);
                 return;
-
             }
 
             var rootPath = GetTextureRootDirectoy();
@@ -781,30 +595,17 @@ namespace xivModdingFramework.Materials.DataContainers
 
 
 
-            var raw = new TextureSampler();
-            raw.SamplerId = Mtrl.TextureSamplerIds[info.Usage];
-            raw.UnknownFlags = 15;
-            raw.FormatFlags = Mtrl.TextureSamplerFormatFlags[info.Format];
-            raw.TextureIndex = (paramIdx >= 0 ? (uint)oldInfo.TextureIndex : (uint)TextureStrings.Count);
+            var sampler = new TextureSampler();
+            sampler.SamplerId = Mtrl.TextureSamplerIds[info.Usage];
+            sampler.UnknownFlags = 15;
+            sampler.FormatFlags = Mtrl.TextureSamplerFormatFlags[info.Format];
 
-            // Inject the new parameters.
-            if(paramIdx >= 0)
+            var newTex = new MtrlTexture()
             {
-                TextureSamplers[paramIdx] = raw;
-            } else
-            {
-                TextureSamplers.Add(raw);
-            }
-
-            // Inject the new string
-            if(raw.TextureIndex == TextureStrings.Count)
-            {
-                TextureStrings.Add(info.Path);
-                TextureFlags.Add((short) 0); // This value seems to always be 0 for textures.
-            } else
-            {
-                TextureStrings[(int) raw.TextureIndex] = info.Path;
-            }
+                TexturePath = info.Path,
+                Sampler = sampler
+            };
+            Textures.Add(newTex);
         }
 
         /// <summary>
@@ -1095,44 +896,13 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             var ret = new List<MapInfo>();
             var shaderInfo = GetShaderInfo();
-            for(var i = 0; i < TextureStrings.Count; i++)
+
+            foreach(var tex in Textures)
             {
                 var info = new MapInfo();
-                info.Path = TextureStrings[i];
-                info.Format = MtrlTextureSamplerFormatPresets.Other;
-                info.Usage = XivTexType.Other;
-
-                // Check if the texture appears in the parameter list.
-                foreach(var p in TextureSamplers)
-                {
-                    if(p.TextureIndex == i)
-                    {
-                        // This is a known parameter.
-                        if(Mtrl.TextureSamplerIds.ContainsValue(p.SamplerId))
-                        {
-                            var usage = Mtrl.TextureSamplerIds.First(x =>
-                            {
-                                return (x.Value == p.SamplerId);
-                            }).Key;
-                            info.Usage = usage;
-                        } else if(Mtrl.FurnitureTextureSamplerIds.ContainsValue(p.SamplerId))
-                        {
-                            // Known parameter for the furniture shaders.
-                            var usage = Mtrl.FurnitureTextureSamplerIds.First(x =>
-                            {
-                                return (x.Value == p.SamplerId);
-                            }).Key;
-                            info.Usage = usage;
-
-                        } else 
-                        {
-                            info.Usage = XivTexType.Other;
-                        }
-
-                        info.Format = GetFormat(p.FormatFlags);
-                        break;
-                    }
-                }
+                info.Path = tex.TexturePath;
+                info.Format = GetFormat(tex.Sampler.FormatFlags);
+                info.Usage = tex.Usage;
 
                 if (tokenize)
                 {
@@ -1182,7 +952,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
 
             // Include the colorset as its own texture if we have one.
-            if (ColorSetCount > 0 && ColorSetData.Count > 0)
+            if (ColorsetStrings.Count > 0 && ColorSetData.Count > 0)
             {
                 ttp = new TexTypePath
                 {
@@ -1438,21 +1208,71 @@ namespace xivModdingFramework.Materials.DataContainers
 
     }
 
+    public class MtrlString : ICloneable
+    {
+        public string Value;
+        public ushort Flags;
+
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
+    }
+
+    /// <summary>
+    /// Class representing the sum of information used as a texture reference in a material.
+    /// </summary>
+    public class MtrlTexture : ICloneable
+    {
+        public string TexturePath;
+
+        public ushort Flags;
+
+        public TextureSampler Sampler;
+
+        /// <summary>
+        /// Retrieves this texture's usage type based on the sampler id.
+        /// </summary>
+        public XivTexType Usage
+        {
+            get
+            {
+                if(Sampler == null || !Mtrl.TextureSamplerIds.ContainsValue(Sampler.SamplerId))
+                {
+                    return XivTexType.Other;
+                }
+                return Mtrl.TextureSamplerIds.First(x => x.Value == Sampler.SamplerId).Key;
+            }
+        }
+
+        public object Clone()
+        {
+            var clone = (MtrlTexture) MemberwiseClone();
+            clone.Sampler = (TextureSampler) Sampler.Clone();
+            return clone;
+        }
+    }
+
     /// <summary>
     /// This class contains the information for the shader keys.
     /// Primarily these enable/disable shader functionality at large.
     /// </summary>
-    public class ShaderKey
+    public class ShaderKey : ICloneable
     {
         public uint Category; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
 
         public uint Value;
+
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
     }
 
     /// <summary>
     /// This class contains the information for the shader parameters at the end the MTRL File
     /// </summary>
-    public class ShaderConstant
+    public class ShaderConstant : ICloneable
     {
         public MtrlShaderConstantId ConstantId
         {
@@ -1474,21 +1294,30 @@ namespace xivModdingFramework.Materials.DataContainers
 
         // The actual data (after extraction).
         public List<float> Values;
+
+        public object Clone()
+        {
+            var clone = (ShaderConstant)MemberwiseClone();
+            clone.Values = Values.ToList();
+            return clone;
+        }
     }
 
     /// <summary>
     /// This class contains the information for MTRL texture samplers.
     /// These determine how each texture is used.
     /// </summary>
-    public class TextureSampler
+    public class TextureSampler : ICloneable
     {
         public uint SamplerId; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
 
         public short FormatFlags; // Mappings for this FileFormat value to MtrlTextureDescriptorFormat value are available in Mtrl.cs 
 
         public short UnknownFlags;   // Always seems to be [15]?
-
-        public uint TextureIndex; // Index to the texture this sampler applies to.
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
     }
 
     // Enum representation of the format map data is used as.
