@@ -488,8 +488,8 @@ namespace xivModdingFramework.Materials.DataContainers
                 return;
             }
 
-            RegenerateTextureUsageList(info);
-            RegenerateShaderParameterList(info);
+            RegenerateShaderKeys(info);
+            RegenerateShaderConstants(info);
 
             switch (info.Shader)
             {
@@ -811,7 +811,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Regenerates/Cleans up the texture usage list based on the 
         /// Texture Maps that are set in the Texture Description Fields.
         /// </summary>
-        private void RegenerateTextureUsageList(ShaderInfo info)
+        private void RegenerateShaderKeys(ShaderInfo info)
         {
             ShaderKeys.Clear();
 
@@ -886,7 +886,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// Regenerates the Shader Parameter list based on shader and texture information.
         /// </summary>
-        private void RegenerateShaderParameterList(ShaderInfo info)
+        private void RegenerateShaderConstants(ShaderInfo info)
         {
             var args = new Dictionary<MtrlShaderConstantId, List<float>>();
 
@@ -972,7 +972,7 @@ namespace xivModdingFramework.Materials.DataContainers
             foreach(var kv in args)
             {
                 // Nulls use defaults.
-                SetShaderParameter(kv.Key, kv.Value);
+                SetShaderConstant(kv.Key, kv.Value);
             }
         }
 
@@ -982,7 +982,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="parameterId"></param>
         /// <returns></returns>
-        private ShaderConstant GetShaderParameter(MtrlShaderConstantId parameterId)
+        private ShaderConstant GetShaderConstant(MtrlShaderConstantId parameterId)
         {
             return ShaderConstants.FirstOrDefault(x => x.ConstantId == parameterId);
         }
@@ -992,7 +992,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="parameterId"></param>
         /// <param name="data"></param>
-        private void SetShaderParameter(MtrlShaderConstantId parameterId, List<float> data = null)
+        private void SetShaderConstant(MtrlShaderConstantId parameterId, List<float> data = null)
         {
             try
             {
