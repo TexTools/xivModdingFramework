@@ -671,11 +671,25 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class TextureSampler : ICloneable
     {
+        /// <summary>
+        /// 2-Bit UV Tiling Mode Identifer.
+        /// </summary>
+        public enum ETilingMode
+        {
+            Wrap,
+            Mirror,
+            Clamp,
+            Border
+        };
+
+        /// <summary>
+        /// The core Texture Sampler this object refers to.
+        /// </summary>
         public ESamplerId SamplerId
         {
             get
             {
-                if(Enum.IsDefined(typeof(ESamplerId), SamplerIdRaw))
+                if (Enum.IsDefined(typeof(ESamplerId), SamplerIdRaw))
                 {
                     return (ESamplerId)SamplerIdRaw;
                 }
@@ -687,6 +701,10 @@ namespace xivModdingFramework.Materials.DataContainers
             }
         }
 
+        /// <summary>
+        /// The rough 'TexTools' style human-readable approximate texture usage of this texture.
+        /// Not 1:1 with SamplerID, since multiple sampler IDs can feed into single TexTools categories.
+        /// </summary>
         public XivTexType TexType
         {
             get {
@@ -694,12 +712,184 @@ namespace xivModdingFramework.Materials.DataContainers
             }
         }
 
-        public uint SamplerIdRaw; 
+        /// <summary>
+        /// U Direction UV Tiling Mode.
+        /// </summary>
+        public ETilingMode UTilingMode {
+            get
+            {
+                var mode = (((byte)SamplerSettingsRaw) >> 2) & 0xfc;
+                return (ETilingMode)mode;
+            }
+            set
+            {
 
-        // Bit field of sampler flags, not all of them are known.
-        public short FormatFlags; 
+                unchecked
+                {
+                    SamplerSettingsRaw &= ~((uint)3 << 2);
+                    SamplerSettingsRaw |= ((uint)value << 2);
+                }
+            }
+        }
 
-        public short UnknownFlags;
+        /// <summary>
+        /// V Direction UV Tiling Mode.
+        /// </summary>
+        public ETilingMode VTilingMode
+        {
+            get
+            {
+                var mode = (((byte)SamplerSettingsRaw)) & 0xfc;
+                return (ETilingMode)mode;
+            }
+            set
+            {
+
+                unchecked
+                {
+                    SamplerSettingsRaw &= ~((uint)3 << 2);
+                    SamplerSettingsRaw |= ((uint)value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Minimum MipMap to use.
+        /// Typically this should just be 0, but it's an option if you want blurry textures I guess.
+        /// </summary>
+        public byte MinimumLoDLevel
+        {
+            get
+            {
+                var val = SamplerSettingsRaw >> 20;
+                val &= 0xF;
+                return (byte)val;
+            }
+            set
+            {
+                if(value > 15)
+                {
+                    value = 15;
+                }
+
+                unchecked
+                {
+                    SamplerSettingsRaw &= ~((uint)0xF << 20);
+                    SamplerSettingsRaw |= (((uint)value) << 20);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Bytes 4-10 of the Sampler Settings
+        /// Unknown Usage, but sometimes have actual values.
+        /// </summary>
+        public byte SamplerSettingsLowUnknown
+        {
+            get
+            {
+                var val = (((byte)SamplerSettingsRaw) >> 4) & 0x3f;
+                return (byte)val;
+            }
+            set
+            {
+                unchecked
+                {
+                    SamplerSettingsRaw &= ~((uint)0x3f << 4);
+                    SamplerSettingsRaw |= ((uint)value << 4);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Bytes 24-31 of the Sampler Settings
+        /// </summary>
+        public byte SamplerSettingsHighByte
+        {
+            get
+            {
+                var val = SamplerSettingsRaw >> 24;
+                return (byte)val;
+            }
+            set
+            {
+                unchecked
+                {
+                    SamplerSettingsRaw &= ~((uint)0xFF << 24);
+                    SamplerSettingsRaw |= ((uint)value << 24);
+                }
+            }
+        }
+
+        /// <summary>
+        /// LoD Bias.  Lower will make a texture sharper (use higher MipMap levels), but can cause flickering/shimmering.
+        /// Higher will make a texture blurrier, but reduce flickering/shimmering.
+        /// This is only used with respect to Bilinear/Trilinear filtering, so it's mostly moot on anyone with modern hardware,
+        /// since Anisotropic filtering exists.
+        /// 
+        /// This has a range of -8 to ~+8 since it's a 9 bit value / 64 and signed (And there's 16 MipMap levels.  What a twist.)
+        /// </summary>
+        public float LoDBias
+        {
+            get
+            {
+                // 10 bit signed int.  We need to bit shift off the sign first.
+                uint unsigned = (SamplerSettingsRaw & (0x1ff << 10)) >> 10;
+
+                // Then get the sign
+                uint signVal = (SamplerSettingsRaw >> 19) & 1;
+
+                int res = 0;
+                if(signVal > 0)
+                {
+                    // If it's negative, we need to interpret it as two's complement.
+                    res = (int) (0xFFFFFe00 | unsigned);
+                } else
+                {
+                    // Positive is fine as is.
+                    res = (int) unsigned;
+                }
+
+                // Then 64 divisor and apply sign.
+                var val = res / 64.0f;
+                return val;
+            }
+            set
+            {
+                // Clamp
+                var val = Math.Min(Math.Max(value, -8.0f), 7.984375f);
+
+                // Split into sign and integer body.
+                uint x64 = (uint) (val * 64.0f);
+                
+
+                // Limit to 9 bits and sign.
+                var limited = ((uint)x64 & 0x1FF);
+                var shiftedSign = (((uint)x64) >> 31) << 9;
+                var combined = limited | shiftedSign;
+                unchecked
+                {
+                    SamplerSettingsRaw &= ~((uint)0x3FF << 10);
+                    SamplerSettingsRaw |= ((uint)combined << 10);
+                }
+            }
+        }
+
+        /// <summary>
+        /// CRC Identifier for a Texture Sampler.
+        /// As of DT Benchmark release, these values and their
+        /// string names are all currently known.
+        /// </summary>
+        public uint SamplerIdRaw;
+
+        // Bitwise field of sampler settings
+        // Low 4 bits are V and U tiling mode, 2 each 
+        //      wrap, mirror, clamp, border in order.
+        // 6 Bytes unknown(?)
+        // 10 bits LoD Bias
+        // 4 Bits for Minimum LoD level
+        // 8 Bits Unknown
+        public uint SamplerSettingsRaw;
         public object Clone()
         {
             return MemberwiseClone();

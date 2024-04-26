@@ -468,18 +468,17 @@ namespace xivModdingFramework.Materials.FileTypes
                     }
                 }
 
-                var originalShaderConstantsDataSize = br.ReadUInt16();
+                var shaderConstantsDataSize = br.ReadUInt16();
 
-                var originalShaderKeyCount = br.ReadUInt16();
+                var shaderKeysCount = br.ReadUInt16();
+                var shaderConstantsCount = br.ReadUInt16();
+                var textureSamplerCount = br.ReadUInt16();
 
-                var originalShaderParameterCount = br.ReadUInt16();
-
-                var originalTextureSamplerCount = br.ReadUInt16();
                 xivMtrl.MaterialFlags = br.ReadUInt16();
                 xivMtrl.MaterialFlags2 = br.ReadUInt16();
 
-                xivMtrl.ShaderKeys = new List<ShaderKey>((int)originalShaderKeyCount);
-                for (var i = 0; i < originalShaderKeyCount; i++)
+                xivMtrl.ShaderKeys = new List<ShaderKey>((int)shaderKeysCount);
+                for (var i = 0; i < shaderKeysCount; i++)
                 {
                     xivMtrl.ShaderKeys.Add(new ShaderKey
                     {
@@ -488,10 +487,10 @@ namespace xivModdingFramework.Materials.FileTypes
                     });
                 }
 
-                xivMtrl.ShaderConstants = new List<ShaderConstant>(originalShaderParameterCount);
+                xivMtrl.ShaderConstants = new List<ShaderConstant>(shaderConstantsCount);
                 var constantOffsets = new List<short>();
                 var constantSizes = new List<short>();
-                for (var i = 0; i < originalShaderParameterCount; i++)
+                for (var i = 0; i < shaderConstantsCount; i++)
                 {
                     xivMtrl.ShaderConstants.Add(new ShaderConstant
                     {
@@ -501,13 +500,12 @@ namespace xivModdingFramework.Materials.FileTypes
                     constantSizes.Add(br.ReadInt16());
                 }
 
-                for (var i = 0; i < originalTextureSamplerCount; i++)
+                for (var i = 0; i < textureSamplerCount; i++)
                 {
                     var sampler = new TextureSampler
                     {
                         SamplerIdRaw = br.ReadUInt32(),
-                        FormatFlags = br.ReadInt16(),
-                        UnknownFlags = br.ReadInt16(),
+                        SamplerSettingsRaw = br.ReadUInt32(),
                     };
 
                     var textureIndex = br.ReadByte();
@@ -524,7 +522,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     var offset = constantOffsets[i];
                     var size = constantSizes[i];
                     shaderConstant.Values = new List<float>();
-                    if (bytesRead + size <= originalShaderConstantsDataSize)
+                    if (bytesRead + size <= shaderConstantsDataSize)
                     {
                         for (var idx = offset; idx < offset + size; idx += 4)
                         {
@@ -541,7 +539,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
 
                 // Chew through any remaining padding.
-                while (bytesRead < originalShaderConstantsDataSize)
+                while (bytesRead < shaderConstantsDataSize)
                 {
                     br.ReadByte();
                     bytesRead++;
@@ -800,9 +798,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 tex.TexturePath = idPath;
                 tex.Sampler = new TextureSampler()
                 {
-                    FormatFlags = -32768,
+                    // TODO: Fix with correct default value.
+                    SamplerSettingsRaw = 0,
                     SamplerIdRaw = 1449103320,
-                    UnknownFlags = 15,
                 };
                 mtrl.Textures.Add(tex);
 
@@ -1027,8 +1025,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 if (tex.Sampler != null)
                 {
                     mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerIdRaw));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.FormatFlags));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.UnknownFlags));
+                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerSettingsRaw));
                     mtrlBytes.Add((byte)i);
                     mtrlBytes.AddRange(new byte[3]);
                 }
