@@ -603,6 +603,12 @@ namespace xivModdingFramework.Materials.DataContainers
             return await _tex.GetTexData(this);
         }
 
+        public MtrlTexture()
+        {
+            TexturePath = "";
+            Sampler = new TextureSampler();
+        }
+
         /// <summary>
         /// Retrieves this texture's usage type based on the sampler id.
         /// </summary>
