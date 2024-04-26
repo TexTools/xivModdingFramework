@@ -50,6 +50,7 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Bmp;
+using xivModdingFramework.Models.DataContainers;
 
 namespace xivModdingFramework.Materials.FileTypes
 {
@@ -207,7 +208,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 return null;
             }
 
-            var mtrlData = await GetMtrlData(mtrlOffset, mtrlPath, dxVersion);
+            var mtrlData = await GetMtrlData(mtrlOffset, mtrlPath);
 
             return mtrlData;
         }
@@ -318,13 +319,245 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
+        public XivMtrl GetMtrlData(byte[] bytes, string internalMtrlPath = "")
+        {
+            var xivMtrl = new XivMtrl();
+            using (var br = new BinaryReader(new MemoryStream(bytes)))
+            {
+                xivMtrl = new XivMtrl
+                {
+                    MTRLPath = internalMtrlPath,
+                    Signature = br.ReadInt32(),
+                    FileSize = br.ReadInt16(),
+                };
+
+                var colorSetDataSize = br.ReadUInt16();
+                var stringBlockSize = br.ReadUInt16();
+                var shaderNameOffset = br.ReadUInt16();
+                var texCount = br.ReadByte();
+                var mapCount = br.ReadByte();
+                var colorsetCount = br.ReadByte();
+                var additionalDataSize = br.ReadByte();
+
+
+                xivMtrl.Textures = new List<MtrlTexture>();
+
+
+                // Texture String Information.
+                var texPathOffsets = new List<int>(texCount);
+                var texFlags = new List<short>(texCount);
+                for (var i = 0; i < texCount; i++)
+                {
+                    var tex = new MtrlTexture();
+                    texPathOffsets.Add(br.ReadInt16());
+
+                    var flags = br.ReadInt16();
+                    texFlags.Add(flags);
+                    tex.Flags = (ushort)flags;
+                    xivMtrl.Textures.Add(tex);
+                }
+
+                // Map String Information.
+                var mapOffset = new List<int>(mapCount);
+                xivMtrl.MapStrings = new List<MtrlString>();
+                for (var i = 0; i < mapCount; i++)
+                {
+                    mapOffset.Add(br.ReadInt16());
+
+                    var map = new MtrlString();
+                    map.Flags = br.ReadUInt16();
+                    xivMtrl.MapStrings.Add(map);
+                }
+
+                // Colorset String Information.
+                var colorsetOffsets = new List<int>(colorsetCount);
+                xivMtrl.ColorsetStrings = new List<MtrlString>();
+                for (var i = 0; i < colorsetCount; i++)
+                {
+                    colorsetOffsets.Add(br.ReadInt16());
+
+                    var colorset = new MtrlString();
+                    colorset.Flags = br.ReadUInt16();
+                    xivMtrl.ColorsetStrings.Add(colorset);
+                }
+
+                var stringBlockStart = br.BaseStream.Position;
+                for (var i = 0; i < texCount; i++)
+                {
+                    br.BaseStream.Seek(stringBlockStart + texPathOffsets[i], SeekOrigin.Begin);
+                    var path = Dat.ReadNullTerminatedString(br);
+                    xivMtrl.Textures[i].TexturePath = path;
+                }
+
+                for (var i = 0; i < xivMtrl.MapStrings.Count; i++)
+                {
+                    br.BaseStream.Seek(stringBlockStart + mapOffset[i], SeekOrigin.Begin);
+                    var st = Dat.ReadNullTerminatedString(br);
+                    xivMtrl.MapStrings[i].Value = st;
+                }
+
+                for (var i = 0; i < xivMtrl.ColorsetStrings.Count; i++)
+                {
+                    br.BaseStream.Seek(stringBlockStart + colorsetOffsets[i], SeekOrigin.Begin);
+                    var st = Dat.ReadNullTerminatedString(br);
+                    xivMtrl.ColorsetStrings[i].Value = st;
+                }
+
+                br.BaseStream.Seek(stringBlockStart + shaderNameOffset, SeekOrigin.Begin);
+                xivMtrl.ShaderPackRaw = Dat.ReadNullTerminatedString(br);
+
+                br.BaseStream.Seek(stringBlockStart + stringBlockSize, SeekOrigin.Begin);
+
+                xivMtrl.AdditionalData = br.ReadBytes(additionalDataSize);
+
+                xivMtrl.ColorSetData = new List<Half>();
+                xivMtrl.ColorSetDyeData = null;
+                if (colorSetDataSize > 0)
+                {
+                    // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
+                    // DT: Color Data is always 2048 instead
+                    var colorDataSize = (colorSetDataSize >= 2048) ? 2048 : 512;
+
+                    for (var i = 0; i < colorDataSize / 2; i++)
+                    {
+                        xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
+                    }
+
+                    // If the color set is 544 (DT: 2080) in length, it has an extra 32 bytes at the end
+                    if (colorSetDataSize == colorDataSize + 32)
+                    {
+                        // Endwalker style Dye Data
+                        // ( 2 Bytes per Row )
+                        // 5 Bits flags
+                        // Flags :
+                        // 0 - Copies Diffuse Color (bytes 0/1/2)
+                        // 1 - Copies Spec Color (bytes 4/5/6)
+                        // 2 - Glow Color (Bytes 8/9/10)
+                        // 3 - Spec Power (Byte 3)
+                        // 4 - Gloss (Byte 7)
+                        // Some template ID bits
+                        // idk
+
+                        xivMtrl.ColorSetDyeData = br.ReadBytes(32);
+                    }
+                    if (colorSetDataSize == colorDataSize + 128)
+                    {
+                        // Dawntrail style Dye Data
+                        // ( 4 bytes per row )
+                        // 12 Bits Flags - Determines what to copy
+
+                        // 4 Bits Unknown
+                        // 11 Bits Template ID
+                        // 2 Bits Dye Channel Selector
+                        // 3 Bits Unknown.
+
+                        // 0 - Copies Diffuse Color (bytes 0/1/2)
+                        // 1 - Copies Spec Color (bytes 4/5/6)
+                        // 2 - Glow Color (Bytes 8/9/10)
+                        // 3 - ??? (Byte 11)
+                        // 4 - ??? (Byte 18)
+                        // 5 - ??? (Byte 16)
+                        // 6 - ??? (Byte 12)
+                        // 7 - ??? (Byte 13)
+                        // 8 - ??? (Byte 14)
+                        // 9 - ??? (Byte 19)
+                        //10 - ??? (Byte 27)
+                        //11 - ??? (Byte 21)
+
+                        xivMtrl.ColorSetDyeData = br.ReadBytes(128);
+                    }
+                }
+
+                var originalShaderConstantsDataSize = br.ReadUInt16();
+
+                var originalShaderKeyCount = br.ReadUInt16();
+
+                var originalShaderParameterCount = br.ReadUInt16();
+
+                var originalTextureSamplerCount = br.ReadUInt16();
+                xivMtrl.MaterialFlags = br.ReadUInt16();
+                xivMtrl.MaterialFlags2 = br.ReadUInt16();
+
+                xivMtrl.ShaderKeys = new List<ShaderKey>((int)originalShaderKeyCount);
+                for (var i = 0; i < originalShaderKeyCount; i++)
+                {
+                    xivMtrl.ShaderKeys.Add(new ShaderKey
+                    {
+                        Category = br.ReadUInt32(),
+                        Value = br.ReadUInt32()
+                    });
+                }
+
+                xivMtrl.ShaderConstants = new List<ShaderConstant>(originalShaderParameterCount);
+                var constantOffsets = new List<short>();
+                var constantSizes = new List<short>();
+                for (var i = 0; i < originalShaderParameterCount; i++)
+                {
+                    xivMtrl.ShaderConstants.Add(new ShaderConstant
+                    {
+                        ConstantId = br.ReadUInt32()
+                    });
+                    constantOffsets.Add(br.ReadInt16());
+                    constantSizes.Add(br.ReadInt16());
+                }
+
+                for (var i = 0; i < originalTextureSamplerCount; i++)
+                {
+                    var sampler = new TextureSampler
+                    {
+                        SamplerIdRaw = br.ReadUInt32(),
+                        FormatFlags = br.ReadInt16(),
+                        UnknownFlags = br.ReadInt16(),
+                    };
+
+                    var textureIndex = br.ReadByte();
+                    var padding = br.ReadBytes(3);
+
+                    xivMtrl.Textures[textureIndex].Sampler = sampler;
+                }
+
+
+                var bytesRead = 0;
+                for (int i = 0; i < xivMtrl.ShaderConstants.Count; i++)
+                {
+                    var shaderConstant = xivMtrl.ShaderConstants[i];
+                    var offset = constantOffsets[i];
+                    var size = constantSizes[i];
+                    shaderConstant.Values = new List<float>();
+                    if (bytesRead + size <= originalShaderConstantsDataSize)
+                    {
+                        for (var idx = offset; idx < offset + size; idx += 4)
+                        {
+                            var arg = br.ReadSingle();
+                            shaderConstant.Values.Add(arg);
+                            bytesRead += 4;
+                        }
+                    }
+                    else
+                    {
+                        // Just use a blank array if we have missing/invalid shader data.
+                        shaderConstant.Values = new List<float>(new float[size / 4]);
+                    }
+                }
+
+                // Chew through any remaining padding.
+                while (bytesRead < originalShaderConstantsDataSize)
+                {
+                    br.ReadByte();
+                    bytesRead++;
+                }
+            }
+
+            return xivMtrl;
+        }
+
         /// <summary>
         /// Gets the MTRL data for the given offset and path
         /// </summary>
         /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
         /// <param name="mtrlPath">The full internal game path for the mtrl</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(long mtrlOffset, string mtrlPath, int dxVersion)
+        public async Task<XivMtrl> GetMtrlData(long mtrlOffset, string mtrlPath)
         {
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
@@ -334,243 +567,10 @@ namespace xivModdingFramework.Materials.FileTypes
             var mtrlData = await dat.GetType2Data(mtrlOffset, df);
 
             XivMtrl xivMtrl = null;
-            try
+            await Task.Run((Func<Task>)(async () =>
             {
-                await Task.Run((Func<Task>)(async () =>
-                {
-                    using (var br = new BinaryReader(new MemoryStream(mtrlData)))
-                    {
-                        xivMtrl = new XivMtrl
-                        {
-                            MTRLPath = mtrlPath,
-                            Signature = br.ReadInt32(),
-                            FileSize = br.ReadInt16(),
-                        };
-
-                        var colorSetDataSize = br.ReadUInt16();
-                        var stringBlockSize = br.ReadUInt16();
-                        var shaderNameOffset = br.ReadUInt16();
-                        var texCount = br.ReadByte();
-                        var mapCount = br.ReadByte();
-                        var colorsetCount = br.ReadByte();
-                        var additionalDataSize = br.ReadByte();
-
-
-                        xivMtrl.Textures = new List<MtrlTexture>();
-
-
-                        // Texture String Information.
-                        var texPathOffsets = new List<int>(texCount);
-                        var texFlags = new List<short>(texCount);
-                        for (var i = 0; i < texCount; i++)
-                        {
-                            var tex = new MtrlTexture();
-                            texPathOffsets.Add(br.ReadInt16());
-
-                            var flags = br.ReadInt16();
-                            texFlags.Add(flags);
-                            tex.Flags = (ushort) flags;
-                            xivMtrl.Textures.Add(tex);
-                        }
-
-                        // Map String Information.
-                        var mapOffset = new List<int>(mapCount);
-                        xivMtrl.MapStrings = new List<MtrlString>();
-                        for (var i = 0; i < mapCount; i++)
-                        {
-                            mapOffset.Add(br.ReadInt16());
-
-                            var map = new MtrlString();
-                            map.Flags = br.ReadUInt16();
-                            xivMtrl.MapStrings.Add(map);
-                        }
-
-                        // Colorset String Information.
-                        var colorsetOffsets = new List<int>(colorsetCount);
-                        xivMtrl.ColorsetStrings = new List<MtrlString>();
-                        for (var i = 0; i < colorsetCount; i++)
-                        {
-                            colorsetOffsets.Add(br.ReadInt16());
-
-                            var colorset = new MtrlString();
-                            colorset.Flags = br.ReadUInt16();
-                            xivMtrl.ColorsetStrings.Add(colorset);
-                        }
-
-                        var stringBlockStart = br.BaseStream.Position;
-                        for (var i = 0; i < texCount; i++)
-                        {
-                            br.BaseStream.Seek(stringBlockStart + texPathOffsets[i], SeekOrigin.Begin);
-                            var path = Dat.ReadNullTerminatedString(br);
-                            xivMtrl.Textures[i].TexturePath = path;
-                        }
-
-                        for (var i = 0; i < xivMtrl.MapStrings.Count; i++)
-                        {
-                            br.BaseStream.Seek(stringBlockStart + mapOffset[i], SeekOrigin.Begin);
-                            var st = Dat.ReadNullTerminatedString(br);
-                            xivMtrl.MapStrings[i].Value = st;
-                        }
-
-                        for (var i = 0; i < xivMtrl.ColorsetStrings.Count; i++)
-                        {
-                            br.BaseStream.Seek(stringBlockStart + colorsetOffsets[i], SeekOrigin.Begin);
-                            var st = Dat.ReadNullTerminatedString(br);
-                            xivMtrl.ColorsetStrings[i].Value = st;
-                        }
-
-                        br.BaseStream.Seek(stringBlockStart + shaderNameOffset, SeekOrigin.Begin);
-                        xivMtrl.ShaderPackRaw = Dat.ReadNullTerminatedString(br);
-
-                        br.BaseStream.Seek(stringBlockStart + stringBlockSize, SeekOrigin.Begin);
-
-                        xivMtrl.AdditionalData = br.ReadBytes(additionalDataSize);
-
-                        xivMtrl.ColorSetData = new List<Half>();
-                        xivMtrl.ColorSetDyeData = null;
-                        if (colorSetDataSize > 0)
-                        {
-                            // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
-                            // DT: Color Data is always 2048 instead
-                            var colorDataSize = (colorSetDataSize >= 2048) ? 2048 : 512;
-
-                            for (var i = 0; i < colorDataSize / 2; i++)
-                            {
-                                xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
-                            }
-
-                            // If the color set is 544 (DT: 2080) in length, it has an extra 32 bytes at the end
-                            if (colorSetDataSize == colorDataSize + 32)
-                            {
-                                // Endwalker style Dye Data
-                                // ( 2 Bytes per Row )
-                                // 5 Bits flags
-                                    // Flags :
-                                    // 0 - Copies Diffuse Color (bytes 0/1/2)
-                                    // 1 - Copies Spec Color (bytes 4/5/6)
-                                    // 2 - Glow Color (Bytes 8/9/10)
-                                    // 3 - Spec Power (Byte 3)
-                                    // 4 - Gloss (Byte 7)
-                                // Some template ID bits
-                                // idk
-
-                                xivMtrl.ColorSetDyeData = br.ReadBytes(32);
-                            }
-                            if (colorSetDataSize == colorDataSize + 128)
-                            {
-                                // Dawntrail style Dye Data
-                                // ( 4 bytes per row )
-                                // 12 Bits Flags - Determines what to copy
-
-                                // 4 Bits Unknown
-                                // 11 Bits Template ID
-                                // 2 Bits Dye Channel Selector
-                                // 3 Bits Unknown.
-
-                                // 0 - Copies Diffuse Color (bytes 0/1/2)
-                                // 1 - Copies Spec Color (bytes 4/5/6)
-                                // 2 - Glow Color (Bytes 8/9/10)
-                                // 3 - ??? (Byte 11)
-                                // 4 - ??? (Byte 18)
-                                // 5 - ??? (Byte 16)
-                                // 6 - ??? (Byte 12)
-                                // 7 - ??? (Byte 13)
-                                // 8 - ??? (Byte 14)
-                                // 9 - ??? (Byte 19)
-                                //10 - ??? (Byte 27)
-                                //11 - ??? (Byte 21)
-
-                                xivMtrl.ColorSetDyeData = br.ReadBytes(128);
-                            }
-                        }
-
-                        var originalShaderConstantsDataSize = br.ReadUInt16();
-
-                        var originalShaderKeyCount = br.ReadUInt16();
-
-                        var originalShaderParameterCount = br.ReadUInt16();
-
-                        var originalTextureSamplerCount = br.ReadUInt16();
-
-                        xivMtrl.ShaderFlags = br.ReadUInt16();
-
-                        xivMtrl.ShaderUnknown = br.ReadUInt16();
-
-                        xivMtrl.ShaderKeys = new List<ShaderKey>((int)originalShaderKeyCount);
-                        for (var i = 0; i < originalShaderKeyCount; i++)
-                        {
-                            xivMtrl.ShaderKeys.Add(new ShaderKey
-                            {
-                                Category = br.ReadUInt32(),
-                                Value = br.ReadUInt32()
-                            });
-                        }
-
-                        xivMtrl.ShaderConstants = new List<ShaderConstant>(originalShaderParameterCount);
-                        var constantOffsets = new List<short>();
-                        var constantSizes = new List<short>();
-                        for (var i = 0; i < originalShaderParameterCount; i++)
-                        {
-                            xivMtrl.ShaderConstants.Add(new ShaderConstant
-                            {
-                                ConstantId = br.ReadUInt32()
-                            });
-                            constantOffsets.Add(br.ReadInt16());
-                            constantSizes.Add(br.ReadInt16());
-                        }
-
-                        for (var i = 0; i < originalTextureSamplerCount; i++)
-                        {
-                            var sampler = new TextureSampler
-                            {
-                                SamplerIdRaw = br.ReadUInt32(),
-                                FormatFlags = br.ReadInt16(),
-                                UnknownFlags = br.ReadInt16(),
-                            };
-
-                            var textureIndex = br.ReadByte();
-                            var padding = br.ReadBytes(3);
-
-                            xivMtrl.Textures[textureIndex].Sampler = sampler;
-                        }
-
-
-                        var bytesRead = 0;
-                        for(int i = 0; i < xivMtrl.ShaderConstants.Count; i++)
-                        {
-                            var shaderConstant = xivMtrl.ShaderConstants[i];
-                            var offset = constantOffsets[i];
-                            var size = constantSizes[i];
-                            shaderConstant.Values = new List<float>();
-                            if (bytesRead + size <= originalShaderConstantsDataSize)
-                            {
-                                for (var idx = offset; idx < offset + size; idx+=4)
-                                {
-                                    var arg = br.ReadSingle();
-                                    shaderConstant.Values.Add(arg);
-                                    bytesRead += 4;
-                                }
-                            } else
-                            {
-                                // Just use a blank array if we have missing/invalid shader data.
-                                shaderConstant.Values = new List<float>(new float[size / 4]);
-                            }
-                        }
-
-                        // Chew through any remaining padding.
-                        while(bytesRead < originalShaderConstantsDataSize)
-                        {
-                            br.ReadByte();
-                            bytesRead++;
-                        }
-
-
-                    }
-                }));
-            }
-            finally
-            {
-            }
+                xivMtrl = GetMtrlData(mtrlData, mtrlPath);
+            }));
 
             return xivMtrl;
         }
@@ -1000,8 +1000,8 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderConstantsCount));
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort) xivMtrl.Textures.Count(x => x.Sampler != null)));
 
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderFlags));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderUnknown));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialFlags));
+            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialFlags2));
 
             foreach (var dataStruct1 in xivMtrl.ShaderKeys)
             {

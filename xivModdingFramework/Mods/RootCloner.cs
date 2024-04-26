@@ -313,7 +313,7 @@ namespace xivModdingFramework.Mods
                     {
                         var offset = index.Get8xDataOffset(src);
                         if (offset == 0) continue;
-                        var xivMtrl = await _mtrl.GetMtrlData(offset, src, 11);
+                        var xivMtrl = await _mtrl.GetMtrlData(offset, src);
                         xivMtrl.MTRLPath = dst;
 
                         for (int i = 0; i < xivMtrl.Textures.Count; i++)

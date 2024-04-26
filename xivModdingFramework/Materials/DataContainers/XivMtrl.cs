@@ -170,12 +170,12 @@ namespace xivModdingFramework.Materials.DataContainers
         /// 0x4000
         /// 0x8000
         /// </remarks>
-        public ushort ShaderFlags { get; set; }
+        public ushort MaterialFlags { get; set; }
 
         /// <summary>
         /// Unknown Value
         /// </summary>
-        public ushort ShaderUnknown { get; set; }
+        public ushort MaterialFlags2 { get; set; }
 
         /// <summary>
         /// The list of Type 1 data structures
@@ -544,24 +544,34 @@ namespace xivModdingFramework.Materials.DataContainers
             clone.Textures = new List<MtrlTexture>();
             for (int i = 0; i < Textures.Count; i++)
             {
-                clone.Textures[i] = (MtrlTexture)Textures[i].Clone();
+                clone.Textures.Add((MtrlTexture)Textures[i].Clone());
             }
 
             clone.ShaderConstants= new List<ShaderConstant>();
             for (int i = 0; i < ShaderConstants.Count; i++)
             {
-                clone.ShaderConstants[i] = (ShaderConstant)ShaderConstants[i].Clone();
+                clone.ShaderConstants.Add((ShaderConstant)ShaderConstants[i].Clone());
             }
 
             clone.ShaderKeys = new List<ShaderKey>();
             for (int i = 0; i < ShaderKeys.Count; i++)
             {
-                clone.ShaderKeys[i] = (ShaderKey)ShaderKeys[i].Clone();
+                clone.ShaderKeys.Add((ShaderKey)ShaderKeys[i].Clone());
             }
 
-            clone.AdditionalData = (byte[]) AdditionalData.Clone();
-            clone.ColorSetData = ColorSetData.ToList();
-            clone.ColorSetDyeData = (byte[]) ColorSetDyeData.Clone();
+            if (AdditionalData != null)
+            {
+                clone.AdditionalData = (byte[])AdditionalData.Clone();
+            }
+
+            if (ColorSetData != null)
+            {
+                clone.ColorSetData = ColorSetData.ToList();
+            }
+            if (ColorSetDyeData != null)
+            {
+                clone.ColorSetDyeData = (byte[])ColorSetDyeData.Clone();
+            }
 
 
             return clone;
@@ -585,11 +595,11 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class MtrlTexture : ICloneable
     {
-        public string TexturePath;
+        public string TexturePath { get; set; }
 
-        public ushort Flags;
+        public ushort Flags { get; set; }
 
-        public TextureSampler Sampler;
+        public TextureSampler Sampler { get; set; }
 
         // Shortcut accessor for the texture data.
         public async Task<XivTex> GetTexData()
