@@ -389,7 +389,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
             // Followed by the material identifier, if above [a].
             var identifier = GetMaterialIdentifier();
-            if(identifier != 'a')
+            if(identifier != "a")
             {
                 ret += "_" + identifier;
             }
@@ -432,14 +432,14 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Gets the Material/Part identifier letter based on the file path.
         /// </summary>
         /// <returns></returns>
-        public char GetMaterialIdentifier()
+        public string GetMaterialIdentifier()
         {
-            var match = Regex.Match(MTRLPath, "_([a-z0-9])\\.mtrl");
+            var match = Regex.Match(MTRLPath, "_([a-z0-9])+\\.mtrl");
             if(match.Success)
             {
-                return match.Groups[1].Value[0];
+                return match.Groups[1].Value;
             }
-            return 'a';
+            return "a";
         }
 
         public string GetItemTypeIdentifier()
@@ -501,8 +501,8 @@ namespace xivModdingFramework.Materials.DataContainers
                 path = path.Replace(version, XivMtrl.VariantToken);
             }
 
-            var texName = GetDefaultTexureName(usage, false);
-            path = path.Replace(texName, XivMtrl.TextureNameToken);
+            //var texName = GetDefaultTexureName(usage, false);
+            //path = path.Replace(texName, XivMtrl.TextureNameToken);
             return path;
         }
 
@@ -515,23 +515,18 @@ namespace xivModdingFramework.Materials.DataContainers
         public string DetokenizePath(string path, XivTexType usage)
         {
             var rootPath = GetTextureRootDirectoy();
-            var defaultFileName = GetDefaultTexureName(usage);
 
             // No path, assign it by default.
             if (path == "")
             {
-                path = rootPath + "/" + defaultFileName;
+                path = rootPath + "/" + GetDefaultTexureName(usage);
                 return path;
             }
-
-            var rootPathWithVersion = rootPath;
             var variantString = GetVariantString();
 
 
-            var defaultFileNameWithoutVersion = GetDefaultTexureName(usage, false);
             path = path.Replace(ItemPathToken, rootPath);
             path = path.Replace(VariantToken, variantString);
-            path = path.Replace(TextureNameToken, defaultFileNameWithoutVersion);
             path = path.Replace(CommonPathToken, GetCommonTextureDirectory());
             return path;
         }
@@ -718,12 +713,12 @@ namespace xivModdingFramework.Materials.DataContainers
         public ETilingMode UTilingMode {
             get
             {
-                var mode = (((byte)SamplerSettingsRaw) >> 2) & 0xfc;
+                uint shifted = (SamplerSettingsRaw >> 2);
+                uint mode = (shifted & ((uint)0x3));
                 return (ETilingMode)mode;
             }
             set
             {
-
                 unchecked
                 {
                     SamplerSettingsRaw &= ~((uint)3 << 2);
@@ -739,7 +734,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                var mode = (((byte)SamplerSettingsRaw)) & 0xfc;
+                var mode = (((byte)SamplerSettingsRaw)) & 0x3;
                 return (ETilingMode)mode;
             }
             set
@@ -747,7 +742,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
                 unchecked
                 {
-                    SamplerSettingsRaw &= ~((uint)3 << 2);
+                    SamplerSettingsRaw &= ~((uint)3);
                     SamplerSettingsRaw |= ((uint)value);
                 }
             }

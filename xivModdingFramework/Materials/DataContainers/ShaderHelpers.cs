@@ -236,6 +236,9 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public enum ESamplerId : uint
         {
+            // This isn't ALL samplers in existence in FFXIV,
+            // But it is all the samplers used with Material Textures,
+            // So they're the only ones we care about.
             Unknown = 0,
             tPerlinNoise2D = 0xC06FEB5B,
             g_SamplerNormal = 0x0C5EC1F1,
