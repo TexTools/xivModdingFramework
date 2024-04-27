@@ -84,11 +84,17 @@ namespace xivModdingFramework.Items.Enums
                 if (attribute.Length > 0 && attribute[0].Description.Length > 0)
                 {
                     var systemName = attribute[0].Description;
-                    systemPrefixToTypeDict[systemName[0]] = type;
                     if (systemName == "human")
+                    {
                         systemPrefixToTypeDict['c'] = type;
-                    typeToSystemNameDict[type] = systemName;
-                    systemNameToTypeDict[systemName] = type;
+                        systemNameToTypeDict[systemName] = type;
+                        typeToSystemNameDict[type] = systemName;
+                    } else
+                    {
+                        systemPrefixToTypeDict[systemName[0]] = type;
+                        typeToSystemNameDict[type] = systemName;
+                        systemNameToTypeDict[systemName] = type;
+                    }
                 }
                 else
                 {

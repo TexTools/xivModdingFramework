@@ -364,13 +364,13 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Gets the default texture name for this material for a given texture type.
         /// </summary>
         /// <returns></returns>
-        public string GetDefaultTexureName(XivTexType texType, bool includeVersion = true)
+        public string GetDefaultTexureName(XivTexType texType, bool includeVariant = true)
         {
 
             var ret = "";
 
             // When available, version number prefixes the texture name.
-            if (includeVersion)
+            if (includeVariant && (MTRLPath.StartsWith("chara/equipment/") || MTRLPath.StartsWith("chara/accessory/")))
             {
                 ret += GetVariantString() + "_";
             }
@@ -398,28 +398,25 @@ namespace xivModdingFramework.Materials.DataContainers
 
             if(texType == XivTexType.Normal)
             {
-                ret += "_n";
+                ret += MTRLPath.Contains("chara/human/c") ? "_n" : "_norm";
             } else if(texType == XivTexType.Specular)
             {
-                ret += "_s";
+                ret += MTRLPath.Contains("chara/human/c") ? "_s" : "_spec";
             }
             else if (texType == XivTexType.Mask)
             {
-                var path = MTRLPath;
-                if (path.Contains("chara/human/c"))
-                {
-                    // The character folder uses _s instead of _m despite the textures being multis.
-                    ret += "_s";
-                }
-                else
-                {
-                    ret += "_m";
-                }
+                // Not a Typo.  SE is dumb.
+                ret += MTRLPath.Contains("chara/human/c") ? "_s" : "_mask";
             }
             else if (texType == XivTexType.Diffuse)
             {
-                ret += "_d";
-            } else
+                ret += MTRLPath.Contains("chara/human/c") ? "_d" : "_diff";
+            }
+            else if (texType == XivTexType.Index)
+            {
+                ret += MTRLPath.Contains("chara/human/c") ? "_id" : "_id";
+            }
+            else
             {
                 ret += "_o";
             }
@@ -434,7 +431,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public string GetMaterialIdentifier()
         {
-            var match = Regex.Match(MTRLPath, "_([a-z0-9])+\\.mtrl");
+            var match = Regex.Match(MTRLPath, "_([a-z0-9]+)\\.mtrl");
             if(match.Success)
             {
                 return match.Groups[1].Value;
