@@ -81,20 +81,18 @@ namespace xivModdingFramework.Items.Enums
             {
                 var field = type.GetType().GetField(type.ToString());
                 var attribute = (DescriptionAttribute[])field.GetCustomAttributes(typeof(DescriptionAttribute), false);
-                if (attribute.Length > 0 && attribute[0].Description.Length > 0)
+                if (attribute.Length > 0)
                 {
                     var systemName = attribute[0].Description;
-                    if (systemName == "human")
+                    if (systemName.Length > 0)
                     {
-                        systemPrefixToTypeDict['c'] = type;
-                        systemNameToTypeDict[systemName] = type;
-                        typeToSystemNameDict[type] = systemName;
-                    } else
-                    {
-                        systemPrefixToTypeDict[systemName[0]] = type;
-                        typeToSystemNameDict[type] = systemName;
-                        systemNameToTypeDict[systemName] = type;
+                        if (systemName == "human")
+                            systemPrefixToTypeDict['c'] = type;
+                        else
+                            systemPrefixToTypeDict[systemName[0]] = type;
                     }
+                    typeToSystemNameDict[type] = systemName;
+                    systemNameToTypeDict[systemName] = type;
                 }
                 else
                 {

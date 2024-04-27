@@ -438,7 +438,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
             if (width > 4000 || height > 4000)
             {
-                scale = 4;
+                scale = 2;
                 scaleDown = true;
             }
             //else if (width > 2000 || height > 2000)
@@ -453,13 +453,13 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
-                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
+                if (texMapData.Normal != null && (largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown))
                     ResizeTexture(texMapData.Normal, width, height);
 
-                if (texMapData.Diffuse != null && largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown)
+                if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
                     ResizeTexture(texMapData.Diffuse, width, height);
 
-                if (texMapData.Specular != null && largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown)
+                if (texMapData.Specular != null && (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
                     ResizeTexture(texMapData.Specular, width, height);
             });
 
@@ -476,6 +476,8 @@ namespace xivModdingFramework.Models.ModelTextures
         delegate ColorMapperResult ShaderColorMapperDelegate(Color4 diffuse, Color4 normal, Color4 specular);
         private static ShaderColorMapperDelegate GetShaderColorMapper(CustomModelColors colors, XivMtrl mtrl)
         {
+            // This is basically codifying this document: https://docs.google.com/spreadsheets/d/1kIKvVsW3fOnVeTi9iZlBDqJo6GWVn6K6BCUIRldEjhw/edit#gid=2112506802
+
             // This var is technically defined in the Shaders parameters.
             // But we can use a constant copy of it for now, since it's largely non-changeable.
             const float PlayerColorMultiplier = 1.4f;
@@ -488,7 +490,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     return (Color4 diffuse, Color4 normal, Color4 specular) => {
                         return new ColorMapperResult()
                         {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, diffuse.Blue),
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
                             Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                             Specular = specular,
                             Opacity = normal.Blue
@@ -500,9 +502,9 @@ namespace xivModdingFramework.Models.ModelTextures
                     return (Color4 diffuse, Color4 normal, Color4 specular) => {
                         return new ColorMapperResult()
                         {
-                            Diffuse = diffuse,
-                            Normal = new Color(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = specular,
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
                             Opacity = normal.Blue
                         };
                     };
