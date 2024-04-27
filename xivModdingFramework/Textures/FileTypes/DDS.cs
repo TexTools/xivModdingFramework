@@ -394,6 +394,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 uint dxgiFormat = 0;
                 if (format == XivTexFormat.DXT1) {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM;
+                } else if (format == XivTexFormat.DXT3)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM;
                 } else if (format == XivTexFormat.DXT5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
@@ -516,7 +519,11 @@ namespace xivModdingFramework.Textures.FileTypes
                     mipLength = (newWidth * newHeight) / 2;
                     break;
                 case XivTexFormat.DXT5:
+                case XivTexFormat.BC5:
+                case XivTexFormat.BC7:
                 case XivTexFormat.A8:
+                    mipLength = newWidth * newHeight;
+                    break;
                     mipLength = newWidth * newHeight;
                     break;
                 case XivTexFormat.A1R5G5B5:
@@ -538,7 +545,15 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
             }
 
-            br.BaseStream.Seek(128, SeekOrigin.Begin);
+            br.BaseStream.Seek(80, SeekOrigin.Begin);
+
+            br.ReadInt32();
+            var texType = br.ReadInt32();
+
+            // DX10 format magic number
+            const uint fourccDX10 = 0x30315844;
+            var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
+            br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
 
             for (var i = 0; i < newMipCount; i++)
             {

@@ -663,6 +663,9 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns></returns>
         public XivTexFormat GetDDSTexFormat(BinaryReader ddsStream)
         {
+            // DX10 format magic number
+            const uint fourccDX10 = 0x30315844;
+
             ddsStream.BaseStream.Seek(12, SeekOrigin.Begin);
 
             var newHeight = ddsStream.ReadInt32();
@@ -679,9 +682,24 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var textureFlags = ddsStream.ReadInt32();
             var texType = ddsStream.ReadInt32();
+
             XivTexFormat textureType;
 
-            if (DDSType.ContainsKey(texType))
+            if (texType == fourccDX10)
+            {
+                ddsStream.BaseStream.Seek(128, SeekOrigin.Begin);
+                var dxgiTexType = ddsStream.ReadInt32();
+
+                if (DXGIType.ContainsKey(dxgiTexType))
+                {
+                    textureType = DXGIType[dxgiTexType];
+                }
+                else
+                {
+                    throw new Exception($"DXGI format ({dxgiTexType}) not recognized.");
+                }
+            }
+            else if (DDSType.ContainsKey(texType))
             {
                 textureType = DDSType[texType];
             }
@@ -1056,7 +1074,10 @@ namespace xivModdingFramework.Textures.FileTypes
                     }
                     else
                     {
-                        br.BaseStream.Seek(128, SeekOrigin.Begin);
+                        // DX10 format magic number
+                        const uint fourccDX10 = 0x30315844;
+                        var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
+                        br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
                         newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
                         newTex.AddRange(br.ReadBytes((int)uncompressedLength));
                         var data = await _dat.CreateType2Data(newTex.ToArray());
@@ -1348,12 +1369,29 @@ namespace xivModdingFramework.Textures.FileTypes
             //DXT5
             {894720068, XivTexFormat.DXT5 },
 
+            //ATI2 (BC5)
+            {843666497, XivTexFormat.BC5 },
+
             //ARGB 16F
             {113, XivTexFormat.A16B16G16R16F },
 
             //Uncompressed RGBA
             {0, XivTexFormat.A8R8G8B8 }
 
+        };
+
+        /// <summary>
+        /// A dictionary containing the int represntations of known DXGI formats for DDS
+        /// </summary>
+        private static readonly Dictionary<int, XivTexFormat> DXGIType = new Dictionary<int, XivTexFormat>
+        {
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, XivTexFormat.DXT1 },
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM, XivTexFormat.DXT3 },
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM, XivTexFormat.DXT5 },
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM, XivTexFormat.BC5 },
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM, XivTexFormat.BC7 },
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
+            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, XivTexFormat.A8R8G8B8 }
         };
 
         /// <summary>
