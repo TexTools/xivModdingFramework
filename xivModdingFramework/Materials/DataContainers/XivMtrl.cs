@@ -635,9 +635,19 @@ namespace xivModdingFramework.Materials.DataContainers
     /// </summary>
     public class ShaderKey : ICloneable
     {
-        public uint Category; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
+        public uint KeyId; // Mappings for this TextureType value to XivTexType value are available in Mtrl.cs
 
         public uint Value;
+
+        public ShaderKeyInfo? GetKeyInfo(EShaderPack shpk)
+        {
+            if (!ShaderHelpers.ShaderKeys[shpk].ContainsKey(KeyId))
+            {
+                return null;
+            }
+
+            return ShaderKeys[shpk][KeyId];
+        }
 
         public object Clone()
         {
@@ -654,6 +664,17 @@ namespace xivModdingFramework.Materials.DataContainers
 
         // The actual data (after extraction).
         public List<float> Values;
+
+        public ShaderConstantInfo? GetConstantInfo(EShaderPack shpk)
+        {
+            if (!ShaderHelpers.ShaderConstants[shpk].ContainsKey(ConstantId))
+            {
+                return null;
+            }
+
+            return ShaderConstants[shpk][ConstantId];
+        }
+
 
         public object Clone()
         {

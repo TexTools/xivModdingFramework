@@ -53,25 +53,38 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public struct ShaderKeyInfo
         {
+            public uint Key;
             public string Name;
             public List<uint> KnownValues;
+            public uint DefaultValue;
 
-            public uint DefaultValue
+            public ShaderKeyInfo(uint key, string name, List<uint> values, uint defaultValue)
             {
-                get
-                {
-                    return KnownValues[0];
-                }
-            }
-
-            public ShaderKeyInfo(string name, List<uint> values)
-            {
+                Key = key;
                 if(values == null || values.Count == 0)
                 {
                     values = new List<uint> { 0 };
                 }
                 Name = name;
                 KnownValues = values;
+                DefaultValue = defaultValue;
+            }
+
+
+            /// <summary>
+            /// Returns a slightly prettier UI friendly version of the name that also includes the key.
+            /// </summary>
+            public string UIName
+            {
+                get
+                {
+                    if(String.IsNullOrWhiteSpace(Name))
+                    {
+                        return Key.ToString("X8");
+                    }
+
+                    return Key.ToString("X8") + " - " + Name;
+                }
             }
         }
 
@@ -92,6 +105,23 @@ namespace xivModdingFramework.Materials.DataContainers
             ShaderConstants = new Dictionary<EShaderPack, Dictionary<uint, ShaderConstantInfo>>();
             ShaderKeys = new Dictionary<EShaderPack, Dictionary<uint, ShaderKeyInfo>>();
 
+            foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+            {
+                if (!ShaderConstants.ContainsKey(shpk))
+                {
+                    ShaderConstants.Add(shpk, new Dictionary<uint, ShaderConstantInfo>());
+                }
+            }
+
+            foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+            {
+                if (!ShaderKeys.ContainsKey(shpk))
+                {
+                    ShaderKeys.Add(shpk, new Dictionary<uint, ShaderKeyInfo>());
+                }
+            }
+
+
             // Build our shader constants dictionaries.
             var files = Directory.GetFiles("./Resources/ShaderConstants");
             foreach (var file in files)
@@ -100,7 +130,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     var shpkString = Path.GetFileNameWithoutExtension(file) + ".shpk";
                     var shpk = GetShpkFromString(shpkString);
-                    ShaderConstants.Add(shpk, new Dictionary<uint, ShaderConstantInfo>());
 
                     var dict = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(File.ReadAllText(file));
                     foreach(var kv in dict)
@@ -109,9 +138,9 @@ namespace xivModdingFramework.Materials.DataContainers
                         var name = (string) kv.Value["name"];
                         var valueArr = (JArray)kv.Value["value"];
                         var values = new List<float>();
-                        foreach(var v in valueArr)
+                        for(int i = 0; i < valueArr.Count; i++)
                         {
-                            values.Add((float)v);
+                            values.Add((float)valueArr[i]);
                         }
                         var info = new ShaderConstantInfo(name, values);
                         ShaderConstants[shpk].Add(key, info);
@@ -128,21 +157,26 @@ namespace xivModdingFramework.Materials.DataContainers
                 foreach (var shpKv in dict)
                 {
                     var shpk = GetShpkFromString(shpKv.Key + ".shpk");
-                    ShaderKeys.Add(shpk, new Dictionary<uint, ShaderKeyInfo>());
-
                     var name = "";
                     var keyDict = shpKv.Value;
-                    var knownValues = new List<uint>();
                     foreach(var kv in keyDict)
                     {
                         var key = UInt32.Parse(kv.Key);
                         var valueArr = (JArray)kv.Value;
-                        var values = new List<uint>();
-                        foreach (var v in valueArr)
-                        {
+                        var values = new HashSet<uint>();
+
+                        uint def = 0;
+                        for(int i =0; i < valueArr.Count; i++) {
+                            var v = valueArr[i];
+                            if(i == 0)
+                            {
+                                def = (uint)v;
+                            }
                             values.Add((uint)v);
                         }
-                        var info = new ShaderKeyInfo(name, knownValues);
+                        var list = values.ToList();
+                        list.Sort();
+                        var info = new ShaderKeyInfo(key, name, list, def);
                         ShaderKeys[shpk].Add(key, info);
                     }
                 }
@@ -151,6 +185,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 Debug.WriteLine(e.ToString());
             }
             AddCustomNamesAndValues();
+
         }
 
         /// Updates a given Shader Constant name if it exists and doesn't already have a name.
@@ -327,12 +362,6 @@ namespace xivModdingFramework.Materials.DataContainers
 
             return value.ToString();
         }
-
-        public enum EShaderKeyId : uint
-        {
-
-        }
-
 
 
     }

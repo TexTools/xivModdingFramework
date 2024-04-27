@@ -482,7 +482,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     xivMtrl.ShaderKeys.Add(new ShaderKey
                     {
-                        Category = br.ReadUInt32(),
+                        KeyId = br.ReadUInt32(),
                         Value = br.ReadUInt32()
                     });
                 }
@@ -783,7 +783,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             mtrl.ShaderKeys.Add(new ShaderKey()
             {
-                Category = 4113354501,
+                KeyId = 4113354501,
                 Value = 2815623008,
             });
 
@@ -1003,7 +1003,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             foreach (var dataStruct1 in xivMtrl.ShaderKeys)
             {
-                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Category));
+                mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.KeyId));
                 mtrlBytes.AddRange(BitConverter.GetBytes(dataStruct1.Value));
             }
 
