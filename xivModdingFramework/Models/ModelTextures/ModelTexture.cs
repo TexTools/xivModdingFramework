@@ -438,7 +438,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
             if (width > 4000 || height > 4000)
             {
-                scale = 4;
+                scale = 2;
                 scaleDown = true;
             }
             //else if (width > 2000 || height > 2000)
@@ -453,13 +453,13 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
-                if (texMapData.Normal != null && largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown)
+                if (texMapData.Normal != null && (largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown))
                     ResizeTexture(texMapData.Normal, width, height);
 
-                if (texMapData.Diffuse != null && largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown)
+                if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
                     ResizeTexture(texMapData.Diffuse, width, height);
 
-                if (texMapData.Specular != null && largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown)
+                if (texMapData.Specular != null && (largestSize > texMapData.Specular.Width * texMapData.Specular.Height || scaleDown))
                     ResizeTexture(texMapData.Specular, width, height);
             });
 
