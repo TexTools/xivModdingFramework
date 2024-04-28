@@ -698,20 +698,31 @@ namespace xivModdingFramework.Materials.FileTypes
             await FixPreDawntrailMaterial(data, updateShaders, source);
         }
 
+
         public async Task FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
                 return;
             }
-            if(mtrl.ShaderPackRaw != "character.shpk")
+            if(mtrl.ShaderPackRaw == "character.shpk")
             {
+                await FixPreDawntrailCharacterMaterial(mtrl, updateShaders, source);
                 return;
             }
+            if(mtrl.ShaderPackRaw == "hair.shpk")
+            {
+
+            }
+        }
+
+
+        private async Task FixPreDawntrailCharacterMaterial(XivMtrl mtrl, bool updateShaders, string source)
+        {
 
             if (!updateShaders)
             {
-                mtrl.ShaderPackRaw = "characterlegacy.shpk";
+                mtrl.ShaderPack = ShaderHelpers.EShaderPack.CharacterLegacy;
             }
 
             // Wipe Dye data b/c we don't know how to handle it atm.
@@ -720,7 +731,7 @@ namespace xivModdingFramework.Materials.FileTypes
             List<Half> newData = new List<Half>();
 
             // Going by rows.
-            for (int i = 0; i < mtrl.ColorSetData.Count; i+= 16)
+            for (int i = 0; i < mtrl.ColorSetData.Count; i += 16)
             {
                 var pixel = i + 0;
 
@@ -728,7 +739,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 newData.Add(mtrl.ColorSetData[pixel + 0]);
                 newData.Add(mtrl.ColorSetData[pixel + 1]);
                 newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel + 3]);
+                newData.Add(mtrl.ColorSetData[pixel + 7]);  // SE flipped Specular Power and Gloss values for some reason.
 
                 pixel += 4;
 
@@ -736,7 +747,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 newData.Add(mtrl.ColorSetData[pixel + 0]);
                 newData.Add(mtrl.ColorSetData[pixel + 1]);
                 newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel + 3]);
+                newData.Add(mtrl.ColorSetData[pixel - 1]);  // SE flipped Specular Power and Gloss values for some reason.
 
                 pixel += 4;
                 // Emissive Pixel
@@ -780,6 +791,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 newData.AddRange(GetDefaultColorsetRow());
             }
             mtrl.ColorSetData = newData;
+            // Wipe Dye data b/c we don't know how to handle it atm.
+            mtrl.ColorSetDyeData = null;
 
             mtrl.ShaderKeys.Add(new ShaderKey()
             {
@@ -790,7 +803,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             // Create an _id texture if we can pull the information off the normal map.
             var normalTexPath = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Normal);
-            if(normalTexPath != null)
+            if (normalTexPath != null)
             {
                 var idPath = normalTexPath.TexturePath.Replace("_n.tex", "_id.tex");
 
@@ -798,8 +811,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 tex.TexturePath = idPath;
                 tex.Sampler = new TextureSampler()
                 {
-                    // TODO: Fix with correct default value.
-                    SamplerSettingsRaw = 0,
+                    SamplerSettingsRaw = 0x000F8340,
                     SamplerIdRaw = 1449103320,
                 };
                 mtrl.Textures.Add(tex);
@@ -846,7 +858,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 try
                 {
                     await _tex.ImportTex(idPath, tempFile, null, source, null, null, XivTexFormat.A8R8G8B8, true);
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     throw ex;
                 }
 
@@ -854,6 +868,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             await ImportMtrl(mtrl, null, source);
+
 
 
         }
@@ -952,7 +967,7 @@ namespace xivModdingFramework.Materials.FileTypes
             stringBlock.AddRange(Encoding.UTF8.GetBytes(xivMtrl.ShaderPackRaw));
             stringBlock.Add(0);
 
-            Dat.Pad(stringBlock, 8);
+            Dat.Pad(stringBlock, 4);
 
 
             // Write the new offset list.
@@ -1011,12 +1026,12 @@ namespace xivModdingFramework.Materials.FileTypes
             foreach (var parameter in xivMtrl.ShaderConstants)
             {
                 // Ensure we're writing correctly calculated data.
-                offset += parameter.Values.Count * 4;
                 short byteSize = (short)(parameter.Values.Count * 4);
 
                 mtrlBytes.AddRange(BitConverter.GetBytes((uint)parameter.ConstantId));
                 mtrlBytes.AddRange(BitConverter.GetBytes((ushort)offset));
                 mtrlBytes.AddRange(BitConverter.GetBytes((ushort)byteSize));
+                offset += parameter.Values.Count * 4;
             }
 
             for(int i = 0; i < xivMtrl.Textures.Count; i++)

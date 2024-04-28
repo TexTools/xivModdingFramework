@@ -207,7 +207,7 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
         /// Updates a given Shader Constant name if it exists and doesn't already have a name.
-        private static void UpdateName(EShaderPack shpk, uint constantId, string name) {
+        private static void UpdateConstantName(EShaderPack shpk, uint constantId, string name) {
             if(ShaderConstants.ContainsKey(shpk) && ShaderConstants[shpk].ContainsKey(constantId) && ShaderConstants[shpk][constantId].Name == "")
             {
                 var sc = ShaderConstants[shpk][constantId];
@@ -241,13 +241,14 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyName(shKv.Key, 3054951514, "Use Diffuse Map");
                 UpdateKeyName(shKv.Key, 3367837167, "Use Specular Map");
                 UpdateKeyName(shKv.Key, 940355280, "Skin Settings");
+                UpdateConstantName(EShaderPack.Character, 0x36080AD0, "Dither?");
             }
 
-            UpdateName(EShaderPack.Skin, 1659128399, "Skin Fresnel");
-            UpdateName(EShaderPack.Skin, 778088561, "Skin Tile Multiplier");
-            UpdateName(EShaderPack.Skin, 740963549, "Skin Color");
-            UpdateName(EShaderPack.Skin, 2569562539, "Skin Wetness Lerp");
-            UpdateName(EShaderPack.Skin, 1112929012, "Skin Tile Material");
+            UpdateConstantName(EShaderPack.Skin, 1659128399, "Skin Fresnel");
+            UpdateConstantName(EShaderPack.Skin, 778088561, "Skin Tile Multiplier");
+            UpdateConstantName(EShaderPack.Skin, 740963549, "Skin Color");
+            UpdateConstantName(EShaderPack.Skin, 2569562539, "Skin Wetness Lerp");
+            UpdateConstantName(EShaderPack.Skin, 1112929012, "Skin Tile Material");
 
         }
 
