@@ -323,7 +323,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public enum EShaderPack
         {
             [Description("INVALID")]
-            Other,
+            Invalid,
             [Description("character.shpk")]
             Character,
             [Description("characterlegacy.shpk")]

@@ -483,7 +483,7 @@ namespace xivModdingFramework.Models.ModelTextures
             const float PlayerColorMultiplier = 1.4f;
             const float BrightPlayerColorMultiplier = 3.0f;
 
-            if (mtrl.Shader == ShaderHelpers.EShaderPack.Character || mtrl.Shader == ShaderHelpers.EShaderPack.CharacterGlass)
+            if (mtrl.ShaderPack == ShaderHelpers.EShaderPack.Character || mtrl.ShaderPack == ShaderHelpers.EShaderPack.CharacterGlass)
             {
                 if (mtrl.Textures.Any(x => x.Usage == XivTexType.Diffuse))
                 {
@@ -522,7 +522,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 }
             }
-            else if (mtrl.Shader == EShaderPack.Furniture)
+            else if (mtrl.ShaderPack == EShaderPack.Furniture)
             {
                 return (Color4 diffuse, Color4 normal, Color4 specular) => {
                     return new ColorMapperResult()
@@ -534,7 +534,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (mtrl.Shader == EShaderPack.DyeableFurniture)
+            else if (mtrl.ShaderPack == EShaderPack.DyeableFurniture)
             {
                 Color4 furnitureColor = colors.FurnitureColor;
                 return (Color4 diffuse, Color4 normal, Color4 specular) => {
@@ -548,7 +548,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (mtrl.Shader == EShaderPack.Skin)
+            else if (mtrl.ShaderPack == EShaderPack.Skin)
             {
                 var skinColor = colors.SkinColor;
                 var lipColor = colors.LipColor;
@@ -597,12 +597,12 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                 // TODO: Need to fix this based on Shader Key settings
-                if (mtrl.Shader == EShaderPack.Skin)
+                if (mtrl.ShaderPack == EShaderPack.Skin)
                     return faceShader;
                 else
                     return skinShader;
             }
-            else if (mtrl.Shader == EShaderPack.Hair)
+            else if (mtrl.ShaderPack == EShaderPack.Hair)
             {
                 var hairHighlightColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
                 var hairTargetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
@@ -648,7 +648,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (mtrl.Shader == EShaderPack.Iris)
+            else if (mtrl.ShaderPack == EShaderPack.Iris)
             {
                 return (Color4 diffuse, Color4 normal, Color4 specular) =>
                 {

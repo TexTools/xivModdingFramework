@@ -73,7 +73,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
         public List<MtrlString> ColorsetStrings { get; set; }
 
-        public EShaderPack Shader
+        public EShaderPack ShaderPack
         {
             get
             {
