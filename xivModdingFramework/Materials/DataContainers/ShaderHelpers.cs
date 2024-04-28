@@ -236,11 +236,11 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             foreach(var shKv in ShaderKeys)
             {
-                UpdateKeyName(shKv.Key, 4113354501, "Use Normal Map");
+                UpdateKeyName(shKv.Key, 4113354501, "Normal Map Settings");
                 UpdateKeyName(shKv.Key, 3531043187, "Use Decal Map");
                 UpdateKeyName(shKv.Key, 3054951514, "Use Diffuse Map");
                 UpdateKeyName(shKv.Key, 3367837167, "Use Specular Map");
-                UpdateKeyName(shKv.Key, 940355280, "Is Skin");
+                UpdateKeyName(shKv.Key, 940355280, "Skin Settings");
             }
 
             UpdateName(EShaderPack.Skin, 1659128399, "Skin Fresnel");
