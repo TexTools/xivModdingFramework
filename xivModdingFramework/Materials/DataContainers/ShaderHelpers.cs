@@ -25,8 +25,9 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             public string Name;
             public Dictionary<string, List<float>> KnownValues;
+            public uint Id;
 
-            public List<float> DefaultValue
+            public List<float> DefaultValues
             {
                 get
                 {
@@ -38,13 +39,30 @@ namespace xivModdingFramework.Materials.DataContainers
                 }
             }
 
-            public ShaderConstantInfo(string name, List<float> defaultValue)
+            public ShaderConstantInfo(uint key, string name, List<float> defaultValue)
             {
+                Id = key;
                 Name = name;
                 KnownValues = new Dictionary<string, List<float>>()
                 {
                     { _Default, defaultValue }
                 };
+            }
+
+            /// <summary>
+            /// Returns a slightly prettier UI friendly version of the name that also includes the key.
+            /// </summary>
+            public string UIName
+            {
+                get
+                {
+                    if (String.IsNullOrWhiteSpace(Name))
+                    {
+                        return Id.ToString("X8");
+                    }
+
+                    return Id.ToString("X8") + " - " + Name;
+                }
             }
         }
 
@@ -142,7 +160,7 @@ namespace xivModdingFramework.Materials.DataContainers
                         {
                             values.Add((float)valueArr[i]);
                         }
-                        var info = new ShaderConstantInfo(name, values);
+                        var info = new ShaderConstantInfo(key, name, values);
                         ShaderConstants[shpk].Add(key, info);
                     }
                 } catch(Exception e)
@@ -324,6 +342,10 @@ namespace xivModdingFramework.Materials.DataContainers
             Furniture,
             [Description("bgcolorchange.shpk")]
             DyeableFurniture,
+            [Description("charactertattoo.shpk")]
+            CharacterTatoo,
+            [Description("characterocclusion.shpk")]
+            CharacterOcclusion,
         };
 
         public static EShaderPack GetShpkFromString(string s)
