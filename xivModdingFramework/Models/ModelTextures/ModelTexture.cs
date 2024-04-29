@@ -19,6 +19,7 @@ using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -38,6 +39,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using static xivModdingFramework.Models.DataContainers.ShapeData;
 using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
+using xivModdingFramework.Textures.DataContainers;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -240,43 +242,46 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
-                for (var i = 0; i < dataLength - 3; i += 4)
+                Parallel.ForEach(Partitioner.Create(0, dataLength / 4), range =>
                 {
-                    // Load the individual pixels into memory.
-                    Color4 baseDiffuseColor = readInputPixel(diffusePixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
-                    Color4 baseNormalColor = readInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-                    Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
-
-                    if (invertNormalGreen)
-                        baseNormalColor.Green = 1.0f - baseNormalColor.Green;
-
-                    var shaderResult = shaderFn(baseDiffuseColor, baseNormalColor, baseMultiColor);
-                    Color4 diffuseColor = shaderResult.Diffuse;
-                    Color4 normalColor = shaderResult.Normal;
-                    Color4 specularColor = shaderResult.Specular;
-                    Color4 alphaColor = shaderResult.Alpha;
-                    Color4 emissiveColor = Color4.Black;
-
-                    // Apply colorset if needed.
-                    if (colorSetFn != null)
+                    for (int i = range.Item1 * 4; i < range.Item2 * 4; i += 4)
                     {
-                        var (rowNumber, blendAmount) = readColorIndex(i);
-                        var colorSetMapResult = colorSetFn(rowNumber, blendAmount, diffuseColor, specularColor);
-                        diffuseColor = colorSetMapResult.Diffuse;
-                        specularColor = colorSetMapResult.Specular;
-                        emissiveColor = colorSetMapResult.Emissive;
+                        // Load the individual pixels into memory.
+                        Color4 baseDiffuseColor = readInputPixel(diffusePixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
+                        Color4 baseNormalColor = readInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 0.5f, 1.0f));
+                        Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
+
+                        if (invertNormalGreen)
+                            baseNormalColor.Green = 1.0f - baseNormalColor.Green;
+
+                        var shaderResult = shaderFn(baseDiffuseColor, baseNormalColor, baseMultiColor);
+                        Color4 diffuseColor = shaderResult.Diffuse;
+                        Color4 normalColor = shaderResult.Normal;
+                        Color4 specularColor = shaderResult.Specular;
+                        Color4 alphaColor = shaderResult.Alpha;
+                        Color4 emissiveColor = Color4.Black;
+
+                        // Apply colorset if needed.
+                        if (colorSetFn != null)
+                        {
+                            var (rowNumber, blendAmount) = readColorIndex(i);
+                            var colorSetMapResult = colorSetFn(rowNumber, blendAmount, diffuseColor, specularColor);
+                            diffuseColor = colorSetMapResult.Diffuse;
+                            specularColor = colorSetMapResult.Specular;
+                            emissiveColor = colorSetMapResult.Emissive;
+                        }
+
+                        // White out the opacity channels where appropriate.
+                        specularColor.Alpha = 1.0f;
+                        normalColor.Alpha = 1.0f;
+
+                        EncodeColorBytes(result.Diffuse, i, diffuseColor);
+                        EncodeColorBytes(result.Normal, i, normalColor);
+                        EncodeColorBytes(result.Specular, i, specularColor);
+                        EncodeColorBytes(result.Alpha, i, alphaColor);
+                        EncodeColorBytes(result.Emissive, i, emissiveColor);
                     }
-
-                    // White out the opacity channels where appropriate.
-                    specularColor.Alpha = 1.0f;
-                    normalColor.Alpha = 1.0f;
-
-                    EncodeColorBytes(result.Diffuse, i, diffuseColor);
-                    EncodeColorBytes(result.Normal, i, normalColor);
-                    EncodeColorBytes(result.Specular, i, specularColor);
-                    EncodeColorBytes(result.Alpha, i, alphaColor);
-                    EncodeColorBytes(result.Emissive, i, emissiveColor);
-                }
+                });
             });
 
             return result;
@@ -293,13 +298,22 @@ namespace xivModdingFramework.Models.ModelTextures
             // Use the function that returns proper sane reuslts.
             var ttps = mtrl.GetTextureTypePathList();
 
+            // Decode compressed textures in parallel
+            // GetTexData acceses data files so it is kept serial
+            List<Task> tasks = new();
+
+            int taskNo = 0;
             foreach (var ttp in ttps)
             {
-                if (ttp.Type != XivTexType.ColorSet)
-                {
-                    var texData = await tex.GetTexData(ttp.Path, ttp.Type);
-                    var imageData = await tex.GetImageData(texData);
+                if (ttp.Type == XivTexType.ColorSet)
+                    continue;
 
+                var texData = await tex.GetTexData(ttp.Path, ttp.Type);
+                var thisTaskNo = ++taskNo;
+                var xthreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                var task = tex.GetImageData(texData).ContinueWith(imageDataResult => {
+                    var threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    var imageData = imageDataResult.Result;
                     switch (ttp.Type)
                     {
                         case XivTexType.Diffuse:
@@ -320,7 +334,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             // Do not render textures that we do not know how to use
                             break;
                     }
-                }
+                });
+                tasks.Add(task);
             }
 
             if (mtrl.ColorSetDataSize > 0)
@@ -346,6 +361,8 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 texMapData.ColorSet = colorSetInfo;
             }
+
+            Task.WaitAll(tasks.ToArray());
 
             return texMapData;
         }
@@ -464,17 +481,19 @@ namespace xivModdingFramework.Models.ModelTextures
 
             await Task.Run(() =>
             {
-                if (texMapData.Normal != null && (largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown))
-                    ResizeTexture(texMapData.Normal, width, height);
-
-                if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
-                    ResizeTexture(texMapData.Diffuse, width, height);
-
-                if (texMapData.Multi != null && (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
-                    ResizeTexture(texMapData.Multi, width, height);
-
-                if (texMapData.Index != null && (largestSize > texMapData.Index.Width * texMapData.Index.Height || scaleDown))
-                    ResizeTexture(texMapData.Index, width, height);
+                Parallel.Invoke(() => {
+                    if (texMapData.Normal != null && (largestSize > texMapData.Normal.Width * texMapData.Normal.Height || scaleDown))
+                        ResizeTexture(texMapData.Normal, width, height);
+                }, () => {
+                    if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
+                        ResizeTexture(texMapData.Diffuse, width, height);
+                }, () => {
+                    if (texMapData.Multi != null && (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
+                        ResizeTexture(texMapData.Multi, width, height);
+                }, () => {
+                    if (texMapData.Index != null && (largestSize > texMapData.Index.Width * texMapData.Index.Height || scaleDown))
+                        ResizeTexture(texMapData.Index, width, height);
+                });
             });
 
             return (width, height);
@@ -513,7 +532,6 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 // This is the most common family of shaders that appears on gear, monsters, etc.
                 // Many of its features should be controlled by shader parameters that aren't implemented
-                // Assumptions are made by the presence or absence of certain textures
 
                 if (hasMulti && shaderPack != EShaderPack.CharacterLegacy)
                 {
@@ -559,9 +577,8 @@ namespace xivModdingFramework.Models.ModelTextures
                         };
                     };
                 }
-                else if (hasSpecular)
+                else if (hasSpecular) // "Multi" is actually a full specular map
                 {
-                    // "Multi" is actually a full specular map
                     int multiAOChannel = shaderPack == EShaderPack.CharacterLegacy ? 0 : 2;
                     return (Color4 diffuse, Color4 normal, Color4 multi) => {
                         // Use AO as the diffuse if there is no diffuse texture
@@ -576,9 +593,8 @@ namespace xivModdingFramework.Models.ModelTextures
                         };
                     };
                 }
-                else
+                else // No mask or specular
                 {
-                    // No mask or specular
                     int multiAOChannel = shaderPack == EShaderPack.CharacterLegacy ? 0 : 2;
                     return (Color4 diffuse, Color4 normal, Color4 multi) => {
                         // Use AO as the diffuse if there is no diffuse texture
