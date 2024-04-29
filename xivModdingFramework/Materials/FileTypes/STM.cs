@@ -1,4 +1,5 @@
 ﻿using HelixToolkit.SharpDX.Core.Helper;
+using Newtonsoft.Json.Linq;
 using SharpDX;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
@@ -11,10 +12,12 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using static xivModdingFramework.Materials.FileTypes.STM;
 
 namespace xivModdingFramework.Materials.FileTypes
 {
@@ -23,37 +26,80 @@ namespace xivModdingFramework.Materials.FileTypes
     /// </summary>
     public static class STM
     {
-        public const string GearStainingTemplatePath = "chara/base_material/stainingtemplate.stm";
+        public enum EStainingTemplate
+        {
+            Endwalker,
+            Dawntrail
+        };
 
+        public static Dictionary<EStainingTemplate, string> STMFilePaths = new Dictionary<EStainingTemplate, string>()
+        {
+            { EStainingTemplate.Endwalker, "chara/base_material/stainingtemplate.stm" },
+            { EStainingTemplate.Dawntrail, "chara/base_material/stainingtemplate_gud.stm" },
+        };
+
+
+        public static ushort GetTemplateKeyFromMaterialData(XivMtrl mtrl, int row)
+        {
+            return GetTemplateKeyFromMaterialData(mtrl.ColorSetDyeData, row);
+        }
+        public static ushort GetTemplateKeyFromMaterialData(byte[] data, int row)
+        {
+            if(data == null)
+            {
+                return 0;
+            }
+
+            if(data.Length == 128)
+            {
+                // Dawntrail Style
+                var value = BitConverter.ToUInt32(data, row * 4);
+                return GetTemplateKeyFromMaterialData(value);
+
+            } else if(data.Length == 32)
+            {
+                // Endwalker Style
+                var value = BitConverter.ToUInt16(data, row * 2);
+                return GetTemplateKeyFromMaterialData(value);
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Retrieve template ID from Dawntrail Dye Data
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static ushort GetTemplateKeyFromMaterialData(uint data)
+        {
+            return (ushort)(data << 5 >> 21);
+        }
+
+        /// <summary>
+        /// Retrieve template ID from Endwalker Dye Data
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
         public static ushort GetTemplateKeyFromMaterialData(ushort data)
         {
             return (ushort)(data >> 5);
         }
 
-        public static async Task<StainingTemplateFile> GetStainingTemplateFile(bool forceOriginal = false, IndexFile index = null, ModList modlist = null)
+        public static async Task<StainingTemplateFile> GetStainingTemplateFile(EStainingTemplate template, bool forceOriginal = false, IndexFile index = null, ModList modlist = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
-            var data = await _dat.GetType2Data(GearStainingTemplatePath, forceOriginal, index, modlist);
+            var path = STMFilePaths[template];
 
-            var ret = new StainingTemplateFile(data);
+            var data = await _dat.GetType2Data(path, forceOriginal, index, modlist);
+
+            var ret = new StainingTemplateFile(data, template);
             return ret;
         }
 
         public static async Task SaveStainingTemplateFile(StainingTemplateFile file, string applicationSource, IndexFile index = null, ModList modlist = null)
         {
             throw new NotImplementedException();
-            var data = new byte[0];//file.GetBytes();
-
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-            var dummyItem = new XivGenericItemModel()
-            {
-                Name = "Equipment Staining Template",
-                SecondaryCategory = "Raw Files"
-            };
-
-            await _dat.ImportType2Data(data, GearStainingTemplatePath, applicationSource, null, index, modlist);
 
         }
         public static async Task<Dictionary<int, string>> GetDyeNames()
@@ -101,34 +147,100 @@ namespace xivModdingFramework.Materials.FileTypes
 
     public class StainingTemplateEntry
     {
-        public readonly List<Half[]> DiffuseEntries = new List<Half[]>();
-        public readonly List<Half[]> SpecularEntries = new List<Half[]>();
-        public readonly List<Half[]> EmissiveEntries = new List<Half[]>();
-        public readonly List<Half> SpecularPowerEntries = new List<Half>();
-        public readonly List<Half> GlossEntries = new List<Half>();
+        // Data Entries, in the format of
+        // [Data Offset] => [Dye Id] = Dye values
+        public readonly List<List<Half[]>> Entries = new List<List<Half[]>>();
 
-        public StainingTemplateEntry(byte[] data, int offset)
+        public Half[] GetDiffuseData(int dyeId = 0)
+        {
+            return GetData(0, dyeId);
+        }
+        public Half[] GetSpecularData(int dyeId = 0)
+        {
+            return GetData(1, dyeId);
+        }
+        public Half[] GetEmissiveData(int dyeId = 0)
+        {
+            return GetData(2, dyeId);
+        }
+        public Half[] GetSpecularPowerData(int dyeId = 0)
+        {
+            return GetData(3, dyeId);
+        }
+        public Half[] GetGlossData(int dyeId = 0)
+        {
+            return GetData(4, dyeId);
+        }
+
+        public Half[] GetData(int offset, int dyeId = 0)
+        {
+            if(offset >= Entries.Count)
+            {
+                return null;
+            }
+
+            if (Entries[offset].Count > dyeId)
+            {
+                return Entries[offset][dyeId];
+            }
+            return null;
+        }
+
+        public static Dictionary<EStainingTemplate, Dictionary<int, int>> TemplateEntryOffsetToColorsetOffset = new Dictionary<EStainingTemplate, Dictionary<int, int>>()
+        {
+            { EStainingTemplate.Endwalker, new Dictionary<int, int>() {
+                { 0, 0 },
+                { 1, 4 },
+                { 2, 8 },
+                { 3, 3 },
+                { 4, 7 },
+            }},
+            { EStainingTemplate.Dawntrail, new Dictionary<int, int>() {
+                { 0, 0 },
+                { 1, 4 },
+                { 2, 8 },
+                { 3, 11 },
+                { 4, 18 },
+                { 5, 16 },
+                { 6, 12 },
+                { 7, 13 },
+                { 8, 14 },
+                { 9, 19 },
+                { 10, 27 },
+                { 11, 21 }
+            }},
+        };
+
+        public StainingTemplateEntry(byte[] data, int offset, EStainingTemplate templateType)
         {
             var arrayEnds = new List<ushort>();
             var start = offset;
 
+            var _ItemCount = 12;
+            if(templateType == EStainingTemplate.Endwalker)
+            {
+                _ItemCount = 5;
+            }
+
 
             // This format sucks.
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < _ItemCount; i++)
             {
                 arrayEnds.Add(BitConverter.ToUInt16(data, offset));
                 offset += 2;
             }
-            const int headerSize = 10;
+            int headerSize = _ItemCount * 2;
 
 
             var lastOffset = 0;
-            for (int x = 0; x < 5; x++)
+            for (int x = 0; x < _ItemCount; x++)
             {
-                var elementSize = 3;
-                if(x > 2)
+                Entries.Add(new List<Half[]>());
+                var elementSize = 1;
+                if(x < 3)
                 {
-                    elementSize = 1;
+                    // First 3 entries are triple entries.
+                    elementSize = 3;
                 }
 
                 var arraySize = (arrayEnds[x] - lastOffset) / elementSize;
@@ -160,19 +272,17 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
 
                 var arrayStart = lastOffset;
-                var offsetStart = (start + 10 + (arrayStart * 2));
+                var offsetStart = (start + headerSize + (arrayStart * 2));
 
                 List<Half[]> halfData  = new List<Half[]>();
 
                 for (int i = 0; i < arraySize; i++)
                 {
 
-                    Half[] halfs = new Half[3];
+                    Half[] halfs = new Half[elementSize];
 
                     var elementStart = offsetStart + ((i * 2) * elementSize);
 
-                    var reversed = new byte[] { data[elementStart + 1], data[elementStart] };
-                    var test = new Half(BitConverter.ToUInt16(reversed, 0));
                     halfs[0] = new Half(BitConverter.ToUInt16(data, elementStart));
                     if (elementSize > 1)
                     {
@@ -228,27 +338,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 foreach (var arr in halfData)
                 {
-
-                    if (x == 0)
-                    {
-                        DiffuseEntries.Add(arr);
-                    }
-                    else if (x == 1)
-                    {
-                        SpecularEntries.Add(arr);
-                    }
-                    else if (x == 2)
-                    {
-                        EmissiveEntries.Add(arr);
-                    }
-                    else if (x == 3)
-                    {
-                        GlossEntries.Add(arr[0]);
-                    }
-                    else if (x == 4)
-                    {
-                        SpecularPowerEntries.Add(arr[0]);
-                    }
+                    Entries[x].Add(arr);
                 }
 
                 lastOffset = arrayEnds[x];
@@ -264,6 +354,7 @@ namespace xivModdingFramework.Materials.FileTypes
         private uint Header;
         private Dictionary<ushort, StainingTemplateEntry> Templates = new Dictionary<ushort, StainingTemplateEntry>();
 
+        public readonly EStainingTemplate TemplateType;
         public List<ushort> GetKeys()
         {
             return Templates.Keys.ToList();
@@ -288,38 +379,45 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             return null;
         }
-        public StainingTemplateFile(byte[] data)
+        public StainingTemplateFile(byte[] data, EStainingTemplate templateType)
         {
-            var Header = BitConverter.ToInt32(data, 0);
+            TemplateType = templateType;
+            // Get header size and # of entries.
+            var Header = BitConverter.ToUInt16(data, 0);
             var entryCount = BitConverter.ToUInt16(data, 4);
+            var unknown = BitConverter.ToUInt16(data, 6);
 
 
-            Dictionary<ushort, ushort> entries = new Dictionary<ushort, ushort>();
+            Dictionary<ushort, ushort> entryOffsets = new Dictionary<ushort, ushort>();
+
             List<ushort> keys = new List<ushort>();
             List<ushort> values = new List<ushort>();
             List<int> sizes = new List<int>();
             var offset = 8;
+
+            // Read template Ids
             for (int i = 0; i < entryCount; i++)
             {
                 var key = BitConverter.ToUInt16(data, offset);
-                entries.Add(key, 0);
+                entryOffsets.Add(key, 0);
                 keys.Add(key);
                 offset += 2;
             }
 
-            var endOfHeader = (8 + (4 * entryCount));
+            const int _headerEntrySize = 4;
+            var endOfHeader = (8 + (_headerEntrySize * entryCount));
 
             for (int i = 0; i < entryCount; i++)
             {
-                entries[keys[i]] = (ushort) ((BitConverter.ToUInt16(data, offset) * 2) + endOfHeader);
+                entryOffsets[keys[i]] = (ushort) ((BitConverter.ToUInt16(data, offset) * 2) + endOfHeader);
                 offset += 2;
             }
 
 
             var idx = 0;
-            foreach (var kv in entries)
+            foreach (var kv in entryOffsets)
             {
-                var entry = new StainingTemplateEntry(data, kv.Value);
+                var entry = new StainingTemplateEntry(data, kv.Value, templateType);
                 Templates.Add(kv.Key, entry);
                 idx++;
             }

@@ -267,7 +267,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             foreach(var shKv in ShaderKeys)
             {
-                // Observation based key names.
+                // Names based on user observation.
                 UpdateKeyName(shKv.Key, 0xD2777173, "Decal Map Settings?", true);
                 UpdateKeyName(shKv.Key, 0xB616DC5A, "Diffuse Map Settings?", true);
                 UpdateKeyName(shKv.Key, 0xC8BD1DEF, "Specular Map Settings?", true);
@@ -275,8 +275,11 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyName(shKv.Key, 0x40D1481E, "Index Map Settings?", true);
                 UpdateKeyName(shKv.Key, 0x380CAED0, "Skin Settings?", true);
 
-                // Observation based names.
+                // Names based on user observation.
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
+                UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
+
+                // Names based on analyzing shader code.
                 UpdateConstantName(shKv.Key, 1659128399, "Skin Fresnel");
                 UpdateConstantName(shKv.Key, 778088561, "Skin Tile Multiplier");
                 UpdateConstantName(shKv.Key, 740963549, "Skin Color");
