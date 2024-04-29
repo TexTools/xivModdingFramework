@@ -24,6 +24,7 @@ using System.Resources;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using HelixToolkit.SharpDX.Core.Helper;
 using Lumina.Data;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General;
@@ -459,6 +460,53 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetType2Data(offset, dataFile);
         }
 
+        public async Task<List<byte>> DecompressType2Data(BinaryReader br, long offset)
+        {
+            br.BaseStream.Seek(offset, SeekOrigin.Begin);
+
+            var headerLength = br.ReadInt32();
+            var fileType = br.ReadInt32();
+            if(fileType != 2)
+            {
+                return null;
+            }
+            var uncompSize = br.ReadInt32();
+            var bufferInfoA = br.ReadInt32();
+            var bufferInfoB = br.ReadInt32();
+
+            var dataBlockCount = br.ReadInt32();
+
+            var type2Bytes = new List<byte>(uncompSize);
+            for (var i = 0; i < dataBlockCount; i++)
+            {
+                br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
+
+                var dataBlockOffset = br.ReadInt32();
+
+                br.BaseStream.Seek(offset + headerLength + dataBlockOffset, SeekOrigin.Begin);
+
+                br.ReadBytes(8);
+
+                var compressedSize = br.ReadInt32();
+                var uncompressedSize = br.ReadInt32();
+
+                // When the compressed size of a data block shows 32000, it is uncompressed.
+                if (compressedSize == 32000)
+                {
+                    type2Bytes.AddRange(br.ReadBytes(uncompressedSize));
+                }
+                else
+                {
+                    var compressedData = br.ReadBytes(compressedSize);
+
+                    var decompressedData = await IOUtil.Decompressor(compressedData, uncompressedSize);
+
+                    type2Bytes.AddRange(decompressedData);
+                }
+            }
+            return type2Bytes;
+        }
+
         /// <summary>
         /// Gets the data for type 2 files.
         /// </summary>
@@ -484,56 +532,25 @@ namespace xivModdingFramework.SqPack.FileTypes
             var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
 
 
+            offset = OffsetCorrection(datNum, offset);
             await _lock.WaitAsync();
             try
             {
-                offset = OffsetCorrection(datNum, offset);
-
                 await Task.Run(async () =>
                 {
                     using (var br = new BinaryReader(File.OpenRead(datPath)))
                     {
-                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                        var headerLength = br.ReadInt32();
-
-                        br.ReadBytes(16);
-
-                        var dataBlockCount = br.ReadInt32();
-
-                        for (var i = 0; i < dataBlockCount; i++)
-                        {
-                            br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
-
-                            var dataBlockOffset = br.ReadInt32();
-
-                            br.BaseStream.Seek(offset + headerLength + dataBlockOffset, SeekOrigin.Begin);
-
-                            br.ReadBytes(8);
-
-                            var compressedSize = br.ReadInt32();
-                            var uncompressedSize = br.ReadInt32();
-
-                            // When the compressed size of a data block shows 32000, it is uncompressed.
-                            if (compressedSize == 32000)
-                            {
-                                type2Bytes.AddRange(br.ReadBytes(uncompressedSize));
-                            }
-                            else
-                            {
-                                var compressedData = br.ReadBytes(compressedSize);
-
-                                var decompressedData = await IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                                type2Bytes.AddRange(decompressedData);
-                            }
-                        }
+                        type2Bytes = await DecompressType2Data(br, offset);
                     }
                 });
             }
             finally
             {
                 _lock.Release();
+            }
+            if(type2Bytes == null)
+            {
+                return new byte[0]; 
             }
 
             return type2Bytes.ToArray();

@@ -4,13 +4,17 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data.SQLite;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
+using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Textures.Enums;
+using static xivModdingFramework.Cache.XivCache;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
@@ -120,92 +124,119 @@ namespace xivModdingFramework.Materials.DataContainers
         // Load our Shader Constants and Shader Keys from JSON.
         static ShaderHelpers()
         {
-            ShaderConstants = new Dictionary<EShaderPack, Dictionary<uint, ShaderConstantInfo>>();
-            ShaderKeys = new Dictionary<EShaderPack, Dictionary<uint, ShaderKeyInfo>>();
-
-            foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
-            {
-                if (!ShaderConstants.ContainsKey(shpk))
-                {
-                    ShaderConstants.Add(shpk, new Dictionary<uint, ShaderConstantInfo>());
-                }
-            }
-
-            foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
-            {
-                if (!ShaderKeys.ContainsKey(shpk))
-                {
-                    ShaderKeys.Add(shpk, new Dictionary<uint, ShaderKeyInfo>());
-                }
-            }
-
-
-            // Build our shader constants dictionaries.
-            var files = Directory.GetFiles("./Resources/ShaderConstants");
-            foreach (var file in files)
-            {
-                try
-                {
-                    var shpkString = Path.GetFileNameWithoutExtension(file) + ".shpk";
-                    var shpk = GetShpkFromString(shpkString);
-
-                    var dict = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(File.ReadAllText(file));
-                    foreach(var kv in dict)
-                    {
-                        var key = UInt32.Parse(kv.Key);
-                        var name = (string) kv.Value["name"];
-                        var valueArr = (JArray)kv.Value["value"];
-                        var values = new List<float>();
-                        for(int i = 0; i < valueArr.Count; i++)
-                        {
-                            values.Add((float)valueArr[i]);
-                        }
-                        var info = new ShaderConstantInfo(key, name, values);
-                        ShaderConstants[shpk].Add(key, info);
-                    }
-                } catch(Exception e)
-                {
-                    Debug.WriteLine(e.ToString());
-                }
-            }
-            try
-            {
-                var keyFile = "./Resources/ShaderKeys.json";
-                var dict = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(File.ReadAllText(keyFile));
-                foreach (var shpKv in dict)
-                {
-                    var shpk = GetShpkFromString(shpKv.Key + ".shpk");
-                    var name = "";
-                    var keyDict = shpKv.Value;
-                    foreach(var kv in keyDict)
-                    {
-                        var key = UInt32.Parse(kv.Key);
-                        var valueArr = (JArray)kv.Value;
-                        var values = new HashSet<uint>();
-
-                        uint def = 0;
-                        for(int i =0; i < valueArr.Count; i++) {
-                            var v = valueArr[i];
-                            if(i == 0)
-                            {
-                                def = (uint)v;
-                            }
-                            values.Add((uint)v);
-                        }
-                        var list = values.ToList();
-                        list.Sort();
-                        var info = new ShaderKeyInfo(key, name, list, def);
-                        ShaderKeys[shpk].Add(key, info);
-                    }
-                }
-            } catch(Exception e)
-            {
-                Debug.WriteLine(e.ToString());
-            }
-            AddCustomNamesAndValues();
-
+            // Kick this off asynchronously so we don't block.
+            Task.Run(LoadShaderInfo);
         }
 
+
+        /// <summary>
+        /// Asynchronously (re)loads all shader reference info from the Shader DB.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task LoadShaderInfo()
+        {
+            await Task.Run(() =>
+            {
+                ShaderConstants = new Dictionary<EShaderPack, Dictionary<uint, ShaderConstantInfo>>();
+                ShaderKeys = new Dictionary<EShaderPack, Dictionary<uint, ShaderKeyInfo>>();
+
+                foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+                {
+                    if (!ShaderConstants.ContainsKey(shpk))
+                    {
+                        ShaderConstants.Add(shpk, new Dictionary<uint, ShaderConstantInfo>());
+                    }
+                }
+
+                foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+                {
+                    if (!ShaderKeys.ContainsKey(shpk))
+                    {
+                        ShaderKeys.Add(shpk, new Dictionary<uint, ShaderKeyInfo>());
+                    }
+                }
+
+                try
+                {
+                    const string _dbPath = "./Resources/DB/shader_info.db";
+                    var connectionString = "Data Source=" + _dbPath + ";Pooling=False;";
+
+                    // Spawn a DB connection to do the raw queries.
+                    using (var db = new SQLiteConnection(connectionString))
+                    {
+                        db.Open();
+                        // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+
+                        // Create Default value entries first.
+                        var query = "select * from view_shader_key_defaults;";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            using (var reader = new CacheReader(cmd.ExecuteReader()))
+                            {
+                                while (reader.NextRow())
+                                {
+
+                                    var shpk = GetShpkFromString(reader.GetString("shader_pack"));
+                                    var key = reader.GetInt64("key_id");
+                                    var def = reader.GetInt64("value");
+                                    var name = reader.GetString("name");
+
+                                    var info = new ShaderKeyInfo((uint)key, name, new List<uint>(), (uint)def);
+                                    ShaderKeys[shpk].Add((uint)key, info);
+                                }
+                            }
+                        }
+
+                        // Then load full corpus of possible values..
+                        query = "select * from view_shader_keys_reference;";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            using (var reader = new CacheReader(cmd.ExecuteReader()))
+                            {
+                                while (reader.NextRow())
+                                {
+
+                                    var shpk = GetShpkFromString(reader.GetString("shader_pack"));
+                                    var key = reader.GetInt64("key_id");
+                                    var value = reader.GetInt64("value");
+                                    ShaderKeys[shpk][(uint)key].KnownValues.Add((uint)value);
+                                }
+                            }
+                        }
+
+
+                        // Constants
+                        query = "select * from view_shader_constant_defaults;";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            using (var reader = new CacheReader(cmd.ExecuteReader()))
+                            {
+                                while (reader.NextRow())
+                                {
+
+                                    var shpk = GetShpkFromString(reader.GetString("shader_pack"));
+                                    var key = reader.GetInt64("constant_id");
+                                    var len = reader.GetInt64("length");
+                                    var name = reader.GetString("name");
+
+                                    var info = new ShaderConstantInfo((uint)key, name, new List<float>());
+                                    ShaderConstants[shpk].Add((uint)key, info);
+                                }
+                            }
+                        }
+
+                    }
+
+
+                    AddCustomNamesAndValues();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
+
+            });
+        }
         /// Updates a given Shader Constant name if it exists and doesn't already have a name.
         private static void UpdateConstantName(EShaderPack shpk, uint constantId, string name) {
             if(ShaderConstants.ContainsKey(shpk) && ShaderConstants[shpk].ContainsKey(constantId) && ShaderConstants[shpk][constantId].Name == "")
@@ -241,9 +272,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyName(shKv.Key, 3054951514, "Use Diffuse Map");
                 UpdateKeyName(shKv.Key, 3367837167, "Use Specular Map");
                 UpdateKeyName(shKv.Key, 940355280, "Skin Settings");
-                UpdateConstantName(EShaderPack.Character, 0x36080AD0, "Dither?");
             }
 
+            UpdateConstantName(EShaderPack.Character, 0x36080AD0, "Dither?");
             UpdateConstantName(EShaderPack.Skin, 1659128399, "Skin Fresnel");
             UpdateConstantName(EShaderPack.Skin, 778088561, "Skin Tile Multiplier");
             UpdateConstantName(EShaderPack.Skin, 740963549, "Skin Color");
@@ -331,6 +362,8 @@ namespace xivModdingFramework.Materials.DataContainers
             CharacterLegacy,
             [Description("characterglass.shpk")]
             CharacterGlass,
+            [Description("characterinc.shpk")]
+            CharacterInc,
             [Description("skin.shpk")]
             Skin,
             [Description("skinlegacy.shpk")]
@@ -341,12 +374,22 @@ namespace xivModdingFramework.Materials.DataContainers
             Iris,
             [Description("bg.shpk")]
             Furniture,
+            [Description("bgprop.shpk")]
+            Prop,
             [Description("bgcolorchange.shpk")]
             DyeableFurniture,
             [Description("charactertattoo.shpk")]
             CharacterTatoo,
             [Description("characterocclusion.shpk")]
             CharacterOcclusion,
+            [Description("characterscroll.shpk")]
+            CharactScroll,
+            [Description("water.shpk")]
+            Water,
+            [Description("river.shpk")]
+            River,
+            [Description("crystal.shpk")]
+            Crystal,
         };
 
         public static EShaderPack GetShpkFromString(string s)

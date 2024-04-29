@@ -713,7 +713,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
                         {
-                            index = new IndexFile(dataFile, index1Stream, null);
+                            using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
+                            {
+                                index = new IndexFile(dataFile, index1Stream, index2Stream);
+                            }
                         }
 
                         _ReadOnlyIndexLastModifiedTime[dataFile] = lastTime;

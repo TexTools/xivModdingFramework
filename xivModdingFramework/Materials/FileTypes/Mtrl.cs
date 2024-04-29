@@ -14,21 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using HelixToolkit.SharpDX.Core.Utilities;
 using SharpDX;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using TeximpNet.Compression;
-using TeximpNet.DDS;
-using TeximpNet;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -43,14 +42,8 @@ using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
-
+using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
-using SixLabors.ImageSharp.Memory;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Bmp;
-using xivModdingFramework.Models.DataContainers;
 
 namespace xivModdingFramework.Materials.FileTypes
 {
@@ -511,7 +504,10 @@ namespace xivModdingFramework.Materials.FileTypes
                     var textureIndex = br.ReadByte();
                     var padding = br.ReadBytes(3);
 
-                    xivMtrl.Textures[textureIndex].Sampler = sampler;
+                    if (xivMtrl.Textures.Count > textureIndex)
+                    {
+                        xivMtrl.Textures[textureIndex].Sampler = sampler;
+                    }
                 }
 
 
@@ -1343,6 +1339,363 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
         }
+
+
+        public async Task UpdateShaderDB(bool useIndex2 = false)
+        {
+            const string _ShaderDbFilePath = "./Resources/DB/shader_info.db";
+            const string _ShaderDbCreationScript = "CreateShaderDB.sql";
+
+            var materials = await GetAllMtrlInfo(useIndex2);
+            //var materials = new List<SimplifiedMtrlInfo>();
+
+            try
+            {
+                // Spawn a DB connection to do the raw queries.
+                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+                var connectionString = "Data Source=" + _ShaderDbFilePath + ";Pooling=False;";
+                if (File.Exists(_ShaderDbFilePath))
+                {
+                    File.Delete(_ShaderDbFilePath);
+                }
+
+                using (var db = new SQLiteConnection(connectionString))
+                {
+                    db.Open();
+
+                    // Create the DB
+                    var lines = File.ReadAllLines("Resources\\SQL\\" + _ShaderDbCreationScript);
+                    var sqlCmd = String.Join("\n", lines);
+
+                    using (var cmd = new SQLiteCommand(sqlCmd, db))
+                    {
+                        cmd.ExecuteScalar();
+                    }
+
+                    // Write the Data.
+                    using (var transaction = db.BeginTransaction())
+                    {
+                        // Base Material Table.
+                        var query = @"insert into materials values ($db_key, $data_file, $file_offset, $file_hash, $folder_hash, $full_hash, $file_path, $shader_pack)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var m in materials)
+                            {
+                                cmd.Parameters.AddWithValue("db_key", m.DbKey);
+                                cmd.Parameters.AddWithValue("data_file", m.DataFile);
+                                cmd.Parameters.AddWithValue("file_offset", (ulong) m.FileOffset);
+                                cmd.Parameters.AddWithValue("file_hash", (ulong)m.FileHash);
+                                cmd.Parameters.AddWithValue("folder_hash", (ulong)m.FolderHash);
+                                cmd.Parameters.AddWithValue("full_hash", (ulong)m.FullHash);
+                                cmd.Parameters.AddWithValue("file_path", m.FilePath);
+                                cmd.Parameters.AddWithValue("shader_pack", m.ShaderPackRaw);
+                                cmd.ExecuteScalar();
+                            }
+                        }
+
+                        query = @"insert into shader_keys values ($db_key, $key_id, $value, $name)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var m in materials)
+                            {
+                                foreach(var sk in m.ShaderKeys)
+                                {
+                                    var info = sk.GetKeyInfo(m.ShaderPack);
+                                    string name = null;
+                                    if(info != null)
+                                    {
+                                        name = String.IsNullOrWhiteSpace(info.Value.Name) ? null : info.Value.Name;
+                                    }
+                                    cmd.Parameters.AddWithValue("db_key", m.DbKey);
+                                    cmd.Parameters.AddWithValue("key_id", (ulong)sk.KeyId);
+                                    cmd.Parameters.AddWithValue("value", (ulong)sk.Value);
+                                    cmd.Parameters.AddWithValue("name", name);
+                                    cmd.ExecuteScalar();
+                                }
+                            }
+                        }
+
+                        query = @"insert into shader_constants values ($db_key, $constant_id, $length, $value0, $value1, $value2, $value3, $name)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var m in materials)
+                            {
+                                foreach (var sc in m.ShaderConstants)
+                                {
+                                    var info = sc.GetConstantInfo(m.ShaderPack);
+                                    string name = null;
+                                    if (info != null)
+                                    {
+                                        name = String.IsNullOrWhiteSpace(info.Value.Name) ? null : info.Value.Name;
+                                    }
+
+                                    cmd.Parameters.AddWithValue("db_key", m.DbKey);
+                                    cmd.Parameters.AddWithValue("constant_id", (ulong)sc.ConstantId);
+                                    cmd.Parameters.AddWithValue("length", sc.Values.Count);
+                                    cmd.Parameters.AddWithValue("value0", sc.Values.Count > 0 ? sc.Values[0] : null);
+                                    cmd.Parameters.AddWithValue("value1", sc.Values.Count > 1 ? sc.Values[1] : null);
+                                    cmd.Parameters.AddWithValue("value2", sc.Values.Count > 2 ? sc.Values[2] : null);
+                                    cmd.Parameters.AddWithValue("value3", sc.Values.Count > 3 ? sc.Values[3] : null);
+                                    cmd.Parameters.AddWithValue("name", name);
+                                    cmd.ExecuteScalar();
+                                }
+                            }
+                        }
+
+                        transaction.Commit();
+                    }
+                }
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Retrieves simplified material info for ALL Materials in the entire game.
+        /// Used to collect data to store into SQLite DB or JSON.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
+        {
+            var materials = new List<SimplifiedMtrlInfo>();
+            foreach (XivDataFile dat in Enum.GetValues(typeof(XivDataFile)))
+            {
+                Console.WriteLine("Scanning DAT: " + dat.ToString() + "...");
+                var data = await GetAllMtrlInfo(dat, useIndex2);
+                materials = materials.Concat(data).ToList();
+            }
+            Console.WriteLine(materials.Count + " Total Materials Identified...");
+            return materials;
+        }
+
+        public async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(XivDataFile dataFile, bool useIndex2 = false)
+        {
+            const int _ThreadCount = 32;
+            const uint _DatCount = 8;
+
+            var OffsetToIndex1Dictionary = new Dictionary<uint, (uint FolderHash, uint FileHash)>();
+            var OffsetToIndex2Dictionary = new Dictionary<uint, uint>();
+            var gameDirectory = XivCache.GameInfo.GameDirectory;
+
+            var _index = new Index(gameDirectory);
+            var index = await _index.GetIndexFile(dataFile, false, true);
+
+
+            // Populate dictionaries.
+            Console.WriteLine("Creating offset dictionaries...");
+            var index1Entries = index.GetAllEntriesIndex1();
+            var index2Entries = index.GetAllEntriesIndex2();
+            foreach (var entry in index1Entries)
+            {
+                if (!OffsetToIndex1Dictionary.ContainsKey(entry.RawOffset))
+                {
+                    OffsetToIndex1Dictionary.Add(entry.RawOffset, (entry.FolderPathHash, entry.FileNameHash));
+                }
+            }
+            foreach (var entry in index2Entries)
+            {
+                if (!OffsetToIndex2Dictionary.ContainsKey(entry.RawOffset))
+                {
+                    OffsetToIndex2Dictionary.Add(entry.RawOffset, entry.FullPathHash);
+                }
+            }
+
+
+            // Select whether to scan by index 1 or index 2 here.
+            List<IndexEntry> data = new List<IndexEntry>(index1Entries);
+            if(useIndex2)
+            {
+                data = new List<IndexEntry>(index2Entries);
+            }
+
+            var EntriesByDat = new List<List<IndexEntry>>();
+            for (var i = 0; i < _DatCount; i++)
+            {
+                EntriesByDat.Add(new List<IndexEntry>());
+            }
+
+            // Group them by Dat.
+            foreach (var item in data)
+            {
+                EntriesByDat[(int)item.DatNum].Add(item);
+            }
+
+
+            IEnumerable<SimplifiedMtrlInfo> materials = new List<SimplifiedMtrlInfo>();
+            for (var i = 0; i < _DatCount; i++)
+            {
+                // Break the list into chunks for the threads.
+                var z = 0;
+                var parts = from item in EntriesByDat[i]
+                            group item by z++ % _ThreadCount into part
+                            select part.ToList();
+
+                var datPath = Path.Combine(gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Dat.DatExtension}{i}");
+                if (!File.Exists(datPath))
+                {
+                    continue;
+                }
+
+                // Fuck the RAM, load the entire 2GB DAT file into RAM to make this not take 8 years.
+                long length = new System.IO.FileInfo(datPath).Length;
+
+                byte[] datData = null;
+                if (length <= Int32.MaxValue && false)
+                {
+                    Console.WriteLine("Loading DAT" + i.ToString() + " into RAM...");
+                    datData = File.ReadAllBytes(datPath);
+                }
+                else
+                {
+                    Console.WriteLine("Retaining DAT" + i.ToString() + " on disc due to file size being too large...");
+                    // No-Op?
+                }
+
+                Console.WriteLine("Scanning " + EntriesByDat[i].Count + " index entries in Dat" + i.ToString() + "...");
+                var TaskList = new List<Task<List<SimplifiedMtrlInfo>>>();
+                foreach (var part in parts)
+                {
+                    // Spawn async tasks/threads to pull out the data.
+                    TaskList.Add(Task.Run(async () =>
+                    {
+                        return await GetMaterials(dataFile, part, datData, OffsetToIndex1Dictionary, OffsetToIndex2Dictionary);
+                    }));
+                }
+
+                await Task.WhenAll(TaskList);
+
+                var count = 0;
+                foreach (var task in TaskList)
+                {
+                    count += task.Result.Count;
+                    materials = materials.Concat(task.Result);
+                }
+
+                Console.WriteLine("Materials Located in DAT" + i.ToString() + ": " + count.ToString());
+
+                materials = materials.ToList();
+            }
+
+
+            Console.WriteLine("Total Materials Identified: " + materials.Count());
+            return materials.ToList();
+        }
+
+
+        private async Task<List<SimplifiedMtrlInfo>> GetMaterials(XivDataFile dataFile, List<IndexEntry> files, byte[] datData, Dictionary<uint, (uint FolderHash, uint FileHash)> index1Dict, Dictionary<uint, uint> index2Dict)
+        {
+            var materials = new List<SimplifiedMtrlInfo>();
+            var _Dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var count = 0;
+            var total = files.Count;
+
+
+            BinaryReader br;
+            if (datData == null)
+            {
+                var datPath = Path.Combine(XivCache.GameInfo.GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Dat.DatExtension}{files[0].DatNum}");
+                var file = File.Open(datPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                br = new BinaryReader(file);
+            }
+            else
+            {
+                var ms = new MemoryStream(datData);
+                br = new BinaryReader(ms);
+            }
+
+            //Console.WriteLine("Starting Chunk Scan: " + total.ToString() + " entries...");
+            foreach (var file in files)
+            {
+
+                var fileTypeOffset = file.DataOffset + 4;
+                br.BaseStream.Seek(fileTypeOffset, SeekOrigin.Begin);
+                var type = br.ReadByte();
+                if (type != 2)
+                {
+                    count++;
+                    continue;
+                }
+                try
+                {
+                    var mtrlData = (await _Dat.DecompressType2Data(br, file.DataOffset)).ToArray();
+                    if (mtrlData.Length < 4)
+                    {
+                        continue;
+                    }
+
+                    var signature = BitConverter.ToUInt32(mtrlData, 0);
+
+                    if (signature != 16973824)
+                    {
+                        // Invalid Signature
+                        continue;
+                    }
+
+                    var ff = file as FileIndex2Entry;
+
+                    var material = GetMtrlData(mtrlData);
+                    materials.Add(new SimplifiedMtrlInfo(dataFile, file, material, index1Dict, index2Dict));
+                    count++;
+                }
+                catch (Exception ex)
+                {
+                    // Don't care if it fails.
+                    count++;
+                }
+            }
+
+            //Console.WriteLine("Chunk scan completed " + total.ToString() + " entries. (" + materials.Count + " materials)");
+            return materials;
+        }
+        public struct SimplifiedMtrlInfo
+        {
+            public uint FullHash;
+            public uint FileHash;
+            public uint FolderHash;
+            public uint FileOffset;
+            public string FilePath;
+            public XivDataFile DataFile;
+
+            public string DbKey
+            {
+                get
+                {
+                    return DataFile.ToString() + "-" + FileOffset.ToString();
+                }
+            }
+
+            public EShaderPack ShaderPack;
+            public string ShaderPackRaw;
+            public List<MtrlTexture> Textures;
+            public List<ShaderKey> ShaderKeys;
+            public List<ShaderConstant> ShaderConstants;
+
+            public SimplifiedMtrlInfo(XivDataFile dataFile, IndexEntry index, XivMtrl material, Dictionary<uint, (uint FolderHash, uint FileHash)> index1Dict, Dictionary<uint, uint> index2Dict)
+            {
+                FileHash = index1Dict.ContainsKey(index.RawOffset) ? index1Dict[index.RawOffset].FileHash : 0;
+                FolderHash = index1Dict.ContainsKey(index.RawOffset) ? index1Dict[index.RawOffset].FolderHash : 0;
+                FullHash = index2Dict.ContainsKey(index.RawOffset) ? index2Dict[index.RawOffset] : 0;
+
+                FilePath = "";
+
+                ShaderPack = material.ShaderPack;
+                ShaderPackRaw = material.ShaderPackRaw;
+
+                FileOffset = index.RawOffset;
+                DataFile = dataFile;
+
+                Textures = material.Textures;
+                ShaderKeys = material.ShaderKeys;
+                ShaderConstants = material.ShaderConstants;
+            }
+        }
+
+
+
+
+
         public void Dipose()
         {
         }

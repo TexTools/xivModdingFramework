@@ -536,7 +536,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             var fullHash = (uint) HashGenerator.GetHash(filePath);
             if(Index2Entries.ContainsKey(fullHash))
             {
-                return Index2Entries[fullHash].RawFileOffset;
+                return Index2Entries[fullHash].RawOffset;
             }
 
             return 0;
@@ -568,7 +568,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             if (Index2Entries.ContainsKey(fullHash))
             {
                 var entry = Index2Entries[fullHash];
-                return entry.RawFileOffset;
+                return entry.RawOffset;
             }
 
             return 0;
@@ -719,7 +719,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                 {
                     Index2Entries.Remove(fullHash);
                 } else { 
-                    Index2Entries[fullHash].RawFileOffset = newRawOffsetWithDatNumEmbed;
+                    Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
                 }
             }
 
@@ -754,6 +754,55 @@ namespace xivModdingFramework.SqPack.DataContainers
                 foreach(var fileKv in folderKv.Value)
                 {
                     result[folderKv.Key].Add(fileKv.Key);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Clones the entire list of hashes in the index1 file.
+        /// Returns a safe cloned copy of the entries by default.
+        /// </summary>
+        /// <returns></returns>
+        public List<FileIndexEntry> GetAllEntriesIndex1(bool safe = true)
+        {
+            var result = new List<FileIndexEntry>();
+            foreach (var folderKv in Index1Entries)
+            {
+                foreach (var fileKv in folderKv.Value)
+                {
+                    if (!safe)
+                    {
+
+                        result.Add((FileIndexEntry)fileKv.Value);
+                    }
+                    else
+                    {
+                        result.Add((FileIndexEntry)fileKv.Value.Clone());
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Clones the entire list of hashes in the index1 file.
+        /// Returns a safe cloned copy of the entries by default.
+        /// </summary>
+        /// <returns></returns>
+        public List<FileIndex2Entry> GetAllEntriesIndex2(bool safe = true)
+        {
+            var result = new List<FileIndex2Entry>();
+            foreach (var kv in Index2Entries)
+            {
+                if (!safe)
+                {
+
+                    result.Add(kv.Value);
+                }
+                else
+                {
+                    result.Add((FileIndex2Entry)kv.Value.Clone());
                 }
             }
             return result;
@@ -797,11 +846,16 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// <summary>
     /// Class to represent a single entry in an index segment.
     /// </summary>
-    public abstract class IndexEntry : IComparable
+    public abstract class IndexEntry : IComparable, ICloneable
     {
         public abstract byte[] GetBytes();
         public abstract void SetBytes(byte[] b);
         public abstract int CompareTo(object obj);
+        public abstract object Clone();
+        public abstract uint DatNum { get; }
+        public abstract long DataOffset { get; }
+        public abstract long ModifiedOffset { get; }
+        public abstract uint RawOffset { get; set; }
     }
 
     public class FileIndex2Entry : IndexEntry
@@ -814,18 +868,6 @@ namespace xivModdingFramework.SqPack.DataContainers
             get
             {
                 return _fullPathHash;
-            }
-        }
-
-        public uint RawFileOffset
-        {
-            get
-            {
-                return _fileOffset;
-            }
-            set
-            {
-                _fileOffset = value;
             }
         }
 
@@ -843,7 +885,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Base data offset * 8.  Includes DAT number reference information still.
         /// </summary>
-        public long ModifiedOffset
+        public override long ModifiedOffset
         {
             get { return ((long)_fileOffset) * 8; }
         }
@@ -851,24 +893,36 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Dat Number this file's data resides in.
         /// </summary>
-        public int DatNum
+        public override uint DatNum
         {
             get
             {
-                return ((int)(_fileOffset & 0x0F) / 2);
+                return ((uint)(_fileOffset & 0x0F) / 2);
             }
         }
 
         /// <summary>
         /// Data offset within the containing Data File.
         /// </summary>
-        public long DataOffset
+        public override long DataOffset
         {
             get
             {
                 return (ModifiedOffset / 128) * 128;
             }
         }
+        public override uint RawOffset
+        {
+            get
+            {
+                return _fileOffset;
+            }
+            set
+            {
+                _fileOffset = value;
+            }
+        }
+
 
         public override byte[] GetBytes()
         {
@@ -898,6 +952,10 @@ namespace xivModdingFramework.SqPack.DataContainers
             if (mine == theirs) return 0;
             if (mine < theirs) return -1;
             return 1;
+        }
+        public override object Clone()
+        {
+            return MemberwiseClone();
         }
     }
 
@@ -939,7 +997,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Base data offset * 8.  Includes DAT number reference information still.
         /// </summary>
-        public long ModifiedOffset
+        public override long ModifiedOffset
         {
             get { return ((long)_fileOffset) * 8; }
         }
@@ -947,7 +1005,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Dat Number this file's data resides in.
         /// </summary>
-        public uint DatNum
+        public override uint DatNum
         {
             get
             {
@@ -958,7 +1016,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Data offset within the containing Data File.
         /// </summary>
-        public long DataOffset
+        public override long DataOffset
         {
             get
             {
@@ -966,7 +1024,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
         }
 
-        public uint RawOffset
+        public override uint RawOffset
         {
             get
             {
@@ -1020,6 +1078,11 @@ namespace xivModdingFramework.SqPack.DataContainers
                 if (mine < theirs) return -1;
                 return 1;
             }
+        }
+
+        public override object Clone()
+        {
+            return MemberwiseClone();
         }
     }
 
@@ -1100,34 +1163,20 @@ namespace xivModdingFramework.SqPack.DataContainers
             if (mine < theirs) return -1;
             return 1;
         }
-    }
 
 
-    /// <summary>
-    /// Raw unsortable type index entry.
-    /// </summary>
-    public class RawIndexEntry : IndexEntry
-    {
-        private byte[] bytes;
-        public override byte[] GetBytes()
+        // Inhereted/Interface members.
+        // DAT number might actually be resolveable? Not sure.
+        public override uint DatNum { get { return 0; } }
+        public override long DataOffset { get { return 0; } }
+        public override long ModifiedOffset { get { return 0; } }
+        public override uint RawOffset { get { return 0; } set { } }
+        public override object Clone()
         {
-            return bytes;
-        }
-
-        public override void SetBytes(byte[] b)
-        {
-            bytes = b;
-        }
-
-
-        public override int CompareTo(object obj)
-        {
-            if (obj == null) return 1;
-            if (obj.GetType() != typeof(RawIndexEntry)) throw new Exception("Invalid Index Data Comparison");
-
-            return 0;
+            return MemberwiseClone();
         }
     }
+
 
 
 }

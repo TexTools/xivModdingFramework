@@ -2665,6 +2665,14 @@ namespace xivModdingFramework.Cache
                 }
                 return _reader.GetInt32(_headers[fieldName]);
             }
+            public long GetInt64(string fieldName)
+            {
+                if (_reader[_headers[fieldName]].GetType() == NullType)
+                {
+                    return 0;
+                }
+                return _reader.GetInt64(_headers[fieldName]);
+            }
             public int? GetNullableInt32(string fieldName)
             {
                 if (_reader[_headers[fieldName]].GetType() == NullType)
