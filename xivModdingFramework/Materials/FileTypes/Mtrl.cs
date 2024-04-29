@@ -56,6 +56,8 @@ namespace xivModdingFramework.Materials.FileTypes
         private readonly DirectoryInfo _gameDirectory;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
+        public const string EmptySamplerPrefix = "_EMPTY_SAMPLER_";
+
         public Mtrl(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
@@ -404,7 +406,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 xivMtrl.AdditionalData = br.ReadBytes(additionalDataSize);
 
                 xivMtrl.ColorSetData = new List<Half>();
-                xivMtrl.ColorSetDyeData = null;
+
+
                 if (colorSetDataSize > 0)
                 {
                     // Color Data is always 512 (6 x 14 = 64 x 8bpp = 512)
@@ -428,8 +431,8 @@ namespace xivModdingFramework.Materials.FileTypes
                         // 2 - Glow Color (Bytes 8/9/10)
                         // 3 - Spec Power (Byte 3)
                         // 4 - Gloss (Byte 7)
-                        // Some template ID bits
-                        // idk
+                        // 
+                        // 11x Bits Template ID 
 
                         xivMtrl.ColorSetDyeData = br.ReadBytes(32);
                     }
@@ -444,18 +447,18 @@ namespace xivModdingFramework.Materials.FileTypes
                         // 2 Bits Dye Channel Selector
                         // 3 Bits Unknown.
 
-                        // 0 - Copies Diffuse Color (bytes 0/1/2)
-                        // 1 - Copies Spec Color (bytes 4/5/6)
-                        // 2 - Glow Color (Bytes 8/9/10)
-                        // 3 - ??? (Byte 11)
-                        // 4 - ??? (Byte 18)
-                        // 5 - ??? (Byte 16)
-                        // 6 - ??? (Byte 12)
-                        // 7 - ??? (Byte 13)
-                        // 8 - ??? (Byte 14)
-                        // 9 - ??? (Byte 19)
-                        //10 - ??? (Byte 27)
-                        //11 - ??? (Byte 21)
+                        // 0 - Copies Diffuse Color (half 0/1/2)
+                        // 1 - Copies Spec Color (half 4/5/6)
+                        // 2 - Glow Color (half 8/9/10)
+                        // 3 - ??? (half 11)
+                        // 4 - ??? (half 18)
+                        // 5 - ??? (half 16)
+                        // 6 - ??? (half 12)
+                        // 7 - ??? (half 13)
+                        // 8 - ??? (half 14)
+                        // 9 - ??? (half 19)
+                        //10 - ??? (half 27)
+                        //11 - ??? (half 21)
 
                         xivMtrl.ColorSetDyeData = br.ReadBytes(128);
                     }
@@ -507,6 +510,14 @@ namespace xivModdingFramework.Materials.FileTypes
                     if (xivMtrl.Textures.Count > textureIndex)
                     {
                         xivMtrl.Textures[textureIndex].Sampler = sampler;
+                    }
+                    else
+                    {
+                        // Create a fake texture to hold this sampler.
+                        var tex = new MtrlTexture();
+                        tex.TexturePath = EmptySamplerPrefix + sampler.SamplerId;
+                        tex.Sampler = sampler;
+                        xivMtrl.Textures.Add(tex);
                     }
                 }
 
@@ -650,6 +661,10 @@ namespace xivModdingFramework.Materials.FileTypes
                 foreach (var tex in xivMtrl.Textures)
                 {
                     var path = tex.TexturePath;
+
+                    // Ignore empty samplers.
+                    if (path.StartsWith(EmptySamplerPrefix)) continue;
+
                     bool exists = false;
                     if (cachedIndexFile != null)
                     {
@@ -790,11 +805,16 @@ namespace xivModdingFramework.Materials.FileTypes
             // Wipe Dye data b/c we don't know how to handle it atm.
             mtrl.ColorSetDyeData = null;
 
-            mtrl.ShaderKeys.Add(new ShaderKey()
+            // Not sure this is necessary?
+            if (!mtrl.ShaderKeys.Any(x => x.KeyId == 4113354501))
             {
-                KeyId = 4113354501,
-                Value = 2815623008,
-            });
+                mtrl.ShaderKeys.Add(new ShaderKey()
+                {
+                    KeyId = 4113354501,
+                    Value = 2815623008,
+                });
+            }
+
 
 
             // Create an _id texture if we can pull the information off the normal map.
@@ -901,8 +921,6 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new mtrl file byte data</returns>
         public byte[] CreateMtrlFile(XivMtrl xivMtrl)
         {
-            xivMtrl.ColorSetDyeData = null;
-
             var mtrlBytes = new List<byte>();
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
@@ -917,7 +935,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var shaderNamePointerPointer = mtrlBytes.Count;
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort)0)); // Shader Name Offset - Backfilled later
 
-            mtrlBytes.Add((byte)xivMtrl.Textures.Count);
+            mtrlBytes.Add((byte)xivMtrl.Textures.Count(x => !x.TexturePath.StartsWith(EmptySamplerPrefix)));
             mtrlBytes.Add((byte)xivMtrl.MapStrings.Count);
             mtrlBytes.Add((byte)xivMtrl.ColorsetStrings.Count);
             mtrlBytes.Add((byte)xivMtrl.AdditionalData.Length);
@@ -932,6 +950,9 @@ namespace xivModdingFramework.Materials.FileTypes
 
             foreach (var tex in xivMtrl.Textures)
             {
+                // Ignore placeholder textures for empty samplers.
+                if (tex.TexturePath.StartsWith(EmptySamplerPrefix)) continue;
+
                 textureOffsets.Add(stringBlock.Count);
                 var path = tex.TexturePath;
                 // This is an old style DX9/DX11 Mixed Texture reference, make sure to clean it up if needed.
@@ -969,6 +990,9 @@ namespace xivModdingFramework.Materials.FileTypes
             // Write the new offset list.
             for (var i = 0; i < xivMtrl.Textures.Count; i++)
             {
+                // Ignore placeholder textures for empty samplers.
+                if (xivMtrl.Textures[i].TexturePath.StartsWith(EmptySamplerPrefix)) continue;
+
                 mtrlBytes.AddRange(BitConverter.GetBytes((short)textureOffsets[i]));
                 mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.Textures[i].Flags));
             }
@@ -1059,10 +1083,21 @@ namespace xivModdingFramework.Materials.FileTypes
                 var tex = xivMtrl.Textures[i];
                 if (tex.Sampler != null)
                 {
-                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerIdRaw));
-                    mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerSettingsRaw));
-                    mtrlBytes.Add((byte)i);
-                    mtrlBytes.AddRange(new byte[3]);
+                    if(tex.TexturePath.StartsWith(EmptySamplerPrefix))
+                    {
+                        mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerIdRaw));
+                        mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerSettingsRaw));
+
+                        // Empty samplers use 255 for their texture index.
+                        mtrlBytes.Add((byte)255);
+                        mtrlBytes.AddRange(new byte[3]);
+                    } else
+                    {
+                        mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerIdRaw));
+                        mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerSettingsRaw));
+                        mtrlBytes.Add((byte)i);
+                        mtrlBytes.AddRange(new byte[3]);
+                    }
                 }
 
             }
@@ -1461,6 +1496,23 @@ namespace xivModdingFramework.Materials.FileTypes
                                     cmd.Parameters.AddWithValue("value2", sc.Values.Count > 2 ? sc.Values[2] : null);
                                     cmd.Parameters.AddWithValue("value3", sc.Values.Count > 3 ? sc.Values[3] : null);
                                     cmd.Parameters.AddWithValue("name", name);
+                                    cmd.ExecuteScalar();
+                                }
+                            }
+                        }
+
+                        query = @"insert into textures values ($db_key, $texture_path, $sampler_id, $sampler_settings, $name)";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var m in materials)
+                            {
+                                foreach (var tex in m.Textures)
+                                {
+                                    cmd.Parameters.AddWithValue("db_key", m.DbKey);
+                                    cmd.Parameters.AddWithValue("texture_path", tex.TexturePath);
+                                    cmd.Parameters.AddWithValue("sampler_id", (ulong) tex.Sampler.SamplerIdRaw);
+                                    cmd.Parameters.AddWithValue("sampler_settings",(ulong) tex.Sampler.SamplerSettingsRaw);
+                                    cmd.Parameters.AddWithValue("name", tex.Sampler.SamplerId.ToString());
                                     cmd.ExecuteScalar();
                                 }
                             }
