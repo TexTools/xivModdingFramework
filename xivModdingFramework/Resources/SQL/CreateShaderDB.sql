@@ -40,6 +40,14 @@ CREATE TABLE shader_constants (
 	"name" TEXT
 );
 
+CREATE TABLE textures (
+	"db_key" TEXT NOT NULL, 
+	"texture_path" STRING NOT NULL,
+	"sampler_id" INTEGER NOT NULL,
+	"sampler_settings" INTEGER NOT NULL,
+	"name" STRING
+);
+
 create view view_shader_keys_reference as
 select distinct shader_pack, key_id, value, name from materials m left 
 join shader_keys sk on sk.db_key = m.db_key

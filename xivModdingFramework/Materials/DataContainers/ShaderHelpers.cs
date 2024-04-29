@@ -238,8 +238,8 @@ namespace xivModdingFramework.Materials.DataContainers
             });
         }
         /// Updates a given Shader Constant name if it exists and doesn't already have a name.
-        private static void UpdateConstantName(EShaderPack shpk, uint constantId, string name) {
-            if(ShaderConstants.ContainsKey(shpk) && ShaderConstants[shpk].ContainsKey(constantId) && ShaderConstants[shpk][constantId].Name == "")
+        private static void UpdateConstantName(EShaderPack shpk, uint constantId, string name, bool overwrite = false) {
+            if(ShaderConstants.ContainsKey(shpk) && ShaderConstants[shpk].ContainsKey(constantId) && (overwrite || String.IsNullOrWhiteSpace(ShaderConstants[shpk][constantId].Name)))
             {
                 var sc = ShaderConstants[shpk][constantId];
                 sc.Name = name;
@@ -248,9 +248,9 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
         // Updates a given Shader Key name if it exists and doesn't already have a name.
-        private static void UpdateKeyName(EShaderPack shpk, uint keyId, string name)
+        private static void UpdateKeyName(EShaderPack shpk, uint keyId, string name, bool overwrite = false)
         {
-            if (ShaderKeys.ContainsKey(shpk) && ShaderKeys[shpk].ContainsKey(keyId) && ShaderKeys[shpk][keyId].Name == "")
+            if (ShaderKeys.ContainsKey(shpk) && ShaderKeys[shpk].ContainsKey(keyId) && (overwrite || String.IsNullOrWhiteSpace(ShaderKeys[shpk][keyId].Name)))
             {
                 var sc = ShaderKeys[shpk][keyId];
                 sc.Name = name;
@@ -267,19 +267,42 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             foreach(var shKv in ShaderKeys)
             {
-                UpdateKeyName(shKv.Key, 4113354501, "Normal Map Settings");
-                UpdateKeyName(shKv.Key, 3531043187, "Use Decal Map");
-                UpdateKeyName(shKv.Key, 3054951514, "Use Diffuse Map");
-                UpdateKeyName(shKv.Key, 3367837167, "Use Specular Map");
-                UpdateKeyName(shKv.Key, 940355280, "Skin Settings");
-            }
+                // Observation based key names.
+                UpdateKeyName(shKv.Key, 0xD2777173, "Decal Map Settings?", true);
+                UpdateKeyName(shKv.Key, 0xB616DC5A, "Diffuse Map Settings?", true);
+                UpdateKeyName(shKv.Key, 0xC8BD1DEF, "Specular Map Settings?", true);
+                UpdateKeyName(shKv.Key, 0xF52CCF05, "Normal Map Settings?", true);
+                UpdateKeyName(shKv.Key, 0x40D1481E, "Index Map Settings?", true);
+                UpdateKeyName(shKv.Key, 0x380CAED0, "Skin Settings?", true);
 
-            UpdateConstantName(EShaderPack.Character, 0x36080AD0, "Dither?");
-            UpdateConstantName(EShaderPack.Skin, 1659128399, "Skin Fresnel");
-            UpdateConstantName(EShaderPack.Skin, 778088561, "Skin Tile Multiplier");
-            UpdateConstantName(EShaderPack.Skin, 740963549, "Skin Color");
-            UpdateConstantName(EShaderPack.Skin, 2569562539, "Skin Wetness Lerp");
-            UpdateConstantName(EShaderPack.Skin, 1112929012, "Skin Tile Material");
+                // Observation based names.
+                UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
+                UpdateConstantName(shKv.Key, 1659128399, "Skin Fresnel");
+                UpdateConstantName(shKv.Key, 778088561, "Skin Tile Multiplier");
+                UpdateConstantName(shKv.Key, 740963549, "Skin Color");
+                UpdateConstantName(shKv.Key, 2569562539, "Skin Wetness Lerp");
+                UpdateConstantName(shKv.Key, 1112929012, "Skin Tile Material");
+
+                // Brute-Forced CRCs
+                UpdateConstantName(shKv.Key, 699138595, "g_AlphaThreshold", true);
+                UpdateConstantName(shKv.Key, 740963549, "g_DiffuseColor", true);
+                UpdateConstantName(shKv.Key, 298385553, "g_WhiteEyeColor", true);
+                UpdateConstantName(shKv.Key, 950420322, "g_EmissiveColor", true);
+                UpdateConstantName(shKv.Key, 3086627810, "g_SSAOMask", true);
+                UpdateConstantName(shKv.Key, 1112929012, "g_TileIndex", true);
+                UpdateConstantName(shKv.Key, 778088561, "g_TileScale", true);
+                UpdateConstantName(shKv.Key, 315010207, "g_TileAlpha", true);
+                UpdateConstantName(shKv.Key, 3042205627, "g_NormalScale", true);
+                UpdateConstantName(shKv.Key, 2148459359, "g_SheenRate", true);
+                UpdateConstantName(shKv.Key, 522602647, "g_SheenTintRate", true);
+                UpdateConstantName(shKv.Key, 4103141230, "g_SheenAperture", true);
+                UpdateConstantName(shKv.Key, 1357081942, "g_IrisRingColor", true);
+                UpdateConstantName(shKv.Key, 1724464446, "g_IrisThickness", true);
+                UpdateConstantName(shKv.Key, 3593204584, "g_AlphaAperture", true);
+                UpdateConstantName(shKv.Key, 3497683557, "g_AlphaOffset", true);
+                UpdateConstantName(shKv.Key, 1648149758, "g_OutlineColor", true);
+                UpdateConstantName(shKv.Key, 2289092920, "g_OutlineWidth", true);
+            }
 
         }
 
@@ -324,23 +347,36 @@ namespace xivModdingFramework.Materials.DataContainers
             // This isn't ALL samplers in existence in FFXIV,
             // But it is all the samplers used with Material Textures,
             // So they're the only ones we care about.
-            Unknown = 0,
-            tPerlinNoise2D = 0xC06FEB5B,
+            Invalid = 0,
             g_SamplerNormal = 0x0C5EC1F1,
+            g_SamplerNormalMap0 = 0xAAB4D9E9,
+            g_SamplerNormalMap1 = 0xDDB3E97F,
+            g_SamplerNormal2 = 0x0261CDCB,
+            g_SamplerSpecular = 0x2B99E025,
+            g_SamplerSpecularMap0 = 0x1BBC2F12,
+            g_SamplerSpecularMap1 = 0x6CBB1F84,
+            g_SamplerDiffuse = 0x115306BE,
             g_SamplerMask = 0x8A4E82B6,
             g_SamplerIndex = 0x565F8FD8,
-            g_SamplerTable = 0x2005679F,
-            g_SamplerTileOrb = 0x800BE99B,
-            g_SamplerGBuffer = 0xEBBB29BD,
-            g_SamplerSphereMap = 0x3334D3CA,
-            g_SamplerReflectionArray = 0xC5C4CB3C,
             g_SamplerOcclusion = 0x32667BD7,
-            g_SamplerDiffuse = 0x115306BE,
             g_SamplerFlow = 0xA7E197F6,
             g_SamplerDecal = 0x0237CB94,
             g_SamplerDither = 0x9F467267,
-            g_SamplerNormal2 = 0x0261CDCB,
+            g_SamplerColorMap0 = 0x1E6FEF9C,
+            g_SamplerColorMap1 = 0x6968DF0A,
             g_SamplerWrinklesMask = 0xB3F13975,
+            g_SamplerReflection = 0x87F6474D,
+            g_SamplerReflectionArray = 0xC5C4CB3C,
+            g_SamplerTileOrb = 0x800BE99B,
+            g_SamplerTileNormal = 0x92F03E53,
+            g_SamplerWaveMap = 0xE6321AFC,
+            g_SamplerWaveMap1 = 0xE5338C17,
+            g_SamplerWhitecapMap = 0x95E1F64D,
+            g_SamplerEnvMap = 0xF8D7957A,
+            g_SamplerTable = 0x2005679F,
+            g_SamplerGBuffer = 0xEBBB29BD,
+            g_SamplerSphereMap = 0x3334D3CA,
+            tPerlinNoise2D = 0xC06FEB5B,
         };
 
         // Enum representation of the format map data is used as.

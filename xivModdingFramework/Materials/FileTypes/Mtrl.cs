@@ -988,7 +988,31 @@ namespace xivModdingFramework.Materials.FileTypes
             // Add the actual string block.
             mtrlBytes.AddRange(stringBlock);
 
-            // Additional Data (What does this do? No one knows.)
+            // Set additional data flags as needed for colorset/dye information.
+            if (xivMtrl.ColorSetDyeData != null && xivMtrl.ColorSetDyeData.Length > 0)
+            {
+                xivMtrl.AdditionalData[0] |= 0x08;
+            }
+            else
+            {
+                unchecked
+                {
+                    xivMtrl.AdditionalData[0] &= (byte)(~0x08);
+                }
+            }
+            if (xivMtrl.ColorSetData != null && xivMtrl.ColorSetData.Count > 0)
+            {
+                xivMtrl.AdditionalData[0] |= 0x04;
+            }
+            else
+            {
+                unchecked
+                {
+                    xivMtrl.AdditionalData[0] &= (byte)(~0x04);
+                }
+            }
+
+
             mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
 
