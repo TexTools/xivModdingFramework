@@ -77,15 +77,15 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             public uint Key;
             public string Name;
-            public List<uint> KnownValues;
+            public Dictionary<uint, string> KnownValues;
             public uint DefaultValue;
 
-            public ShaderKeyInfo(uint key, string name, List<uint> values, uint defaultValue)
+            public ShaderKeyInfo(uint key, string name, Dictionary<uint, string> values, uint defaultValue)
             {
                 Key = key;
                 if(values == null || values.Count == 0)
                 {
-                    values = new List<uint> { 0 };
+                    values = new Dictionary<uint, string>();
                 }
                 Name = name;
                 KnownValues = values;
@@ -181,7 +181,7 @@ namespace xivModdingFramework.Materials.DataContainers
                                     var def = reader.GetInt64("value");
                                     var name = reader.GetString("name");
 
-                                    var info = new ShaderKeyInfo((uint)key, name, new List<uint>(), (uint)def);
+                                    var info = new ShaderKeyInfo((uint)key, name, null, (uint)def);
                                     ShaderKeys[shpk].Add((uint)key, info);
                                 }
                             }
@@ -199,7 +199,7 @@ namespace xivModdingFramework.Materials.DataContainers
                                     var shpk = GetShpkFromString(reader.GetString("shader_pack"));
                                     var key = reader.GetInt64("key_id");
                                     var value = reader.GetInt64("value");
-                                    ShaderKeys[shpk][(uint)key].KnownValues.Add((uint)value);
+                                    ShaderKeys[shpk][(uint)key].KnownValues.Add((uint)value, "");
                                 }
                             }
                         }
@@ -257,6 +257,21 @@ namespace xivModdingFramework.Materials.DataContainers
                 ShaderKeys[shpk][keyId] = sc;
             }
         }
+        // Updates a given Shader Key name if it exists and doesn't already have a name.
+        private static void UpdateKeyValueName(EShaderPack shpk, uint keyId, uint value, string name)
+        {
+            if (ShaderKeys.ContainsKey(shpk) && ShaderKeys[shpk].ContainsKey(keyId))
+            {
+                var sc = ShaderKeys[shpk][keyId];
+                if(sc.KnownValues.ContainsKey(value))
+                {
+                    sc.KnownValues[value] = name;
+                } else
+                {
+                    sc.KnownValues.Add(value, name);
+                }
+            }
+        }
 
         /// <summary>
         /// Adds custom hand-written names and values to shader keys/constants which
@@ -268,12 +283,41 @@ namespace xivModdingFramework.Materials.DataContainers
             foreach(var shKv in ShaderKeys)
             {
                 // Names based on user observation.
-                UpdateKeyName(shKv.Key, 0xD2777173, "Decal Map Settings?", true);
-                UpdateKeyName(shKv.Key, 0xB616DC5A, "Diffuse Map Settings?", true);
-                UpdateKeyName(shKv.Key, 0xC8BD1DEF, "Specular Map Settings?", true);
-                UpdateKeyName(shKv.Key, 0xF52CCF05, "Normal Map Settings?", true);
-                UpdateKeyName(shKv.Key, 0x40D1481E, "Index Map Settings?", true);
-                UpdateKeyName(shKv.Key, 0x380CAED0, "Skin Settings?", true);
+                UpdateKeyName(shKv.Key, 0xD2777173, "Decal Mode", true);
+                UpdateKeyName(shKv.Key, 0xB616DC5A, "Texture Mode", true);
+                UpdateKeyName(shKv.Key, 0xC8BD1DEF, "Specular Mode", true);
+                UpdateKeyName(shKv.Key, 0xF52CCF05, "Vertex Color Mode", true);
+                UpdateKeyName(shKv.Key, 0x40D1481E, "Index Mode?", true);
+                UpdateKeyName(shKv.Key, 0x380CAED0, "Skin Type", true);
+                UpdateKeyName(shKv.Key, 0x24826489, "Sub Color Mode", true);
+
+
+                // Texture Mode
+                UpdateKeyValueName(shKv.Key, 0xB616DC5A, 0x5CC605B5, "MODE_DEFAULT");
+                UpdateKeyValueName(shKv.Key, 0xB616DC5A, 0x22A4AABF, "MODE_SIMPLE");
+                UpdateKeyValueName(shKv.Key, 0xB616DC5A, 0x600EF9DF, "MODE_COMPATIBILITY");
+
+                // Sepcular Color
+                UpdateKeyValueName(shKv.Key, 0xC8BD1DEF, 0x198D11CD, "COMPAT_DEFAULT");
+                UpdateKeyValueName(shKv.Key, 0xC8BD1DEF, 0xA02F4828, "COMPAT_MASK");
+
+                // Decal Mode
+                UpdateKeyValueName(shKv.Key, 0xD2777173, 0x4242B842, "DECAL_OFF");
+                UpdateKeyValueName(shKv.Key, 0xD2777173, 0x584265DD, "DECAL_ALPHA");
+                UpdateKeyValueName(shKv.Key, 0xD2777173, 0xF35F5131, "DECAL_COLOR");
+
+                // Vertex Color
+                UpdateKeyValueName(shKv.Key, 0xF52CCF05, 0xF5673524, "VERTEX_COLOR");
+                UpdateKeyValueName(shKv.Key, 0xF52CCF05, 0xA7D2FF60, "VERTEX_MASK");
+
+                // Skin Values
+                UpdateKeyValueName(shKv.Key, 0x380CAED0, 0xF5673524, "PART_FACE");
+                UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x2BDB45F1, "PART_BODY");
+                UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x57FF3B64, "PART_BODY_HRO");
+
+                // Hair Values
+                UpdateKeyValueName(shKv.Key, 0x24826489, 0xF7B8956E, "PART_HAIR");
+                UpdateKeyValueName(shKv.Key, 0x24826489, 0x6E5B8F10, "PART_FACE");
 
                 // Names based on user observation.
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
@@ -285,6 +329,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 740963549, "Skin Color");
                 UpdateConstantName(shKv.Key, 2569562539, "Skin Wetness Lerp");
                 UpdateConstantName(shKv.Key, 1112929012, "Skin Tile Material");
+                UpdateConstantName(shKv.Key, 0x59BDA9B1, "Subsurface/Fur Index", true);
 
                 // Brute-Forced CRCs
                 UpdateConstantName(shKv.Key, 699138595, "g_AlphaThreshold", true);
