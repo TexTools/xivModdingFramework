@@ -768,56 +768,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             return data;
         }
 
-        public async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
-        {
-            if (offset > 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            }
-
-            var start = br.BaseStream.Position;
-
-
-            byte[] data;
-
-            // Some variety of magic numbers presumably?
-            var sixTeen = br.ReadInt32();
-            var zero = br.ReadInt32();
-
-            // Relevant info.
-            var partCompSize = br.ReadInt32();
-            var partDecompSize = br.ReadInt32();
-
-            if (partCompSize == 32000)
-            {
-                data = br.ReadBytes(partDecompSize);
-            }
-            else
-            {
-                data = await IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
-            }
-
-            var end = br.BaseStream.Position;
-            var length = end - start;
-
-            var target = Pad((int)length, 128);
-            var remaining = target - length;
-
-            var paddingData = br.ReadBytes((int) remaining);
-            if(paddingData.Any(x => x != 0))
-            {
-                throw new Exception("Unexpected real data in compressed data block padding section.");
-            }
-
-            return data;
-        }
-
-
-        public async Task<byte[]> ReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        // Begins decompressing a sequence of blocks in parallel
+        // Returns a list of tasks that should be passed to CompleteReadCompressedBlocks()
+        public List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
         {
             if(blockCount == 0)
             {
-                return new byte[0];
+                return new();
             }
 
             if (offset > 0)
@@ -825,12 +782,74 @@ namespace xivModdingFramework.SqPack.FileTypes
                 br.BaseStream.Seek(offset, SeekOrigin.Begin);
             }
 
-            var ret = (IEnumerable<byte>) new List<byte>();
-            for (int i = 0; i < blockCount; i++) {
-                var data = await ReadCompressedBlock(br);
-                ret = ret.Concat(data);
+            var tasks = new List<Task<byte[]>>();
+
+            for (int i = 0; i < blockCount; i++)
+            {
+                byte[] data;
+
+                var start = br.BaseStream.Position;
+
+                // Some variety of magic numbers presumably?
+                var sixTeen = br.ReadInt32();
+                var zero = br.ReadInt32();
+
+                // Relevant info.
+                var partCompSize = br.ReadInt32();
+                var partDecompSize = br.ReadInt32();
+
+                Task<byte[]> task;
+
+                void readBlockPadding()
+                {
+                    var end = br.BaseStream.Position;
+                    var length = end - start;
+                    var targetLength = Pad((int)length, 128);
+                    var remaining = targetLength - length;
+
+                    var paddingData = br.ReadBytes((int)remaining);
+                    if (paddingData.Any(x => x != 0))
+                    {
+                        throw new Exception("Unexpected real data in compressed data block padding section.");
+                    }
+                }
+
+                if (partCompSize == 32000)
+                {
+                    data = br.ReadBytes(partDecompSize);
+                    readBlockPadding();
+                    var completedTask = new TaskCompletionSource<byte[]>();
+                    completedTask.SetResult(data);
+                    task = completedTask.Task;
+                }
+                else
+                {
+                    data = br.ReadBytes(partCompSize);
+                    readBlockPadding();
+                    task = IOUtil.Decompressor(data, partDecompSize);
+                }
+
+                tasks.Add(task);
             }
-            return ret.ToArray();
+
+            return tasks;
+        }
+
+        // Completes all provided tasks from BeginReadCompressedBlocks and writes them sequentially in to destBuffer
+        // Returns the number of bytes written in to destBuffer
+        public int CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
+        {
+            int currentOffset = destOffset;
+
+            foreach (var task in tasks)
+            {
+                task.Wait();
+                var result = task.Result;
+                result.CopyTo(destBuffer, currentOffset);
+                currentOffset += result.Length;
+            }
+
+            return currentOffset - destOffset;
         }
 
         /// <summary>
@@ -858,7 +877,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var meshCount = 0;
             var materialCount = 0;
-            byte[] result = new byte[0];
+            byte[] result = null;
 
             var index = 0;
             await Task.Run(async () =>
@@ -870,6 +889,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
+                        const int baseHeaderLength = 68; // start of file until after "padding"
                         var headerLength = br.ReadInt32();
                         var fileType = br.ReadInt32();
                         var decompressedSize = br.ReadInt32();
@@ -943,30 +963,31 @@ namespace xivModdingFramework.SqPack.FileTypes
                         // These could technically be read as contiguous blocks typically,
                         // But it's safer to actually use their offsets and validate them in the process.
 
-                        var vertexInfoData = await ReadCompressedBlocks(br, vertexInfoBlockCount, endOfHeader + vertexInfoOffset);
-                        var modelInfoData = await ReadCompressedBlocks(br, modelDataBlockCount, endOfHeader + modelDataOffset);
+                        var vertexInfoData = BeginReadCompressedBlocks(br, vertexInfoBlockCount, endOfHeader + vertexInfoOffset);
+                        var modelInfoData = BeginReadCompressedBlocks(br, modelDataBlockCount, endOfHeader + modelDataOffset);
 
                         const int _VertexSegments = 3;
-                        byte[][] vertexBuffers = new byte[_VertexSegments][];
+                        var vertexBuffers = new List<Task<byte[]>>[_VertexSegments];
                         for(int i = 0; i < _VertexSegments; i++)
                         {
-                            vertexBuffers[i] = await ReadCompressedBlocks(br, (int) vertexBufferBlockCounts[i], endOfHeader + vertexBufferOffsets[i]);
+                            vertexBuffers[i] = BeginReadCompressedBlocks(br, (int) vertexBufferBlockCounts[i], endOfHeader + vertexBufferOffsets[i]);
                         }
 
-                        byte[][] edgeBuffers = new byte[_VertexSegments][];
+                        var edgeBuffers = new List<Task<byte[]>>[_VertexSegments];
                         for (int i = 0; i < _VertexSegments; i++)
                         {
-                            edgeBuffers[i] = await ReadCompressedBlocks(br, (int)edgeGeometryVertexBufferBlockCounts[i], endOfHeader + edgeGeometryVertexBufferOffsets[i]);
+                            edgeBuffers[i] = BeginReadCompressedBlocks(br, (int)edgeGeometryVertexBufferBlockCounts[i], endOfHeader + edgeGeometryVertexBufferOffsets[i]);
                         }
 
-                        byte[][] indexBuffers = new byte[_VertexSegments][];
+                        var indexBuffers = new List<Task<byte[]>>[_VertexSegments];
                         for (int i = 0; i < _VertexSegments; i++)
                         {
-                            indexBuffers[i] = await ReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i]);
+                            indexBuffers[i] = BeginReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i]);
                         }
 
-                        var byteList = new List<byte>();
-                        var decompressedData = (IEnumerable<byte>)byteList;
+                        // Reserve space at the start of the result for the header
+                        var decompressedData = new byte[baseHeaderLength + decompressedSize];
+                        int decompOffset = baseHeaderLength;
 
                         // Need to mark these as we unzip them.
                         var vertexBufferUncompressedOffsets = new uint[_VertexSegments];
@@ -975,28 +996,25 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var indexOffsetRealSizes = new uint[_VertexSegments];
 
                         // Vertex and Model Headers
-                        decompressedData = decompressedData.Concat(vertexInfoData);
-                        decompressedData = decompressedData.Concat(modelInfoData);
+                        decompOffset += CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
+                        decompOffset += CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
 
                         for(int i = 0; i < _VertexSegments; i++)
                         {
                             // Geometry data in LoD order.
                             // Mark the real uncompressed offsets and sizes on the way through.
-                            vertexBufferUncompressedOffsets[i] = (uint) decompressedData.Count();
-                            vertexBufferRealSizes[i] = (uint) vertexBuffers[i].Length;
-                            decompressedData = decompressedData.Concat(vertexBuffers[i]);
+                            vertexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
+                            vertexBufferRealSizes[i] = (uint)CompleteReadCompressedBlocks(vertexBuffers[i], decompressedData, decompOffset);
+                            decompOffset += (int)vertexBufferRealSizes[i];
 
+                            decompOffset += CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
 
-                            decompressedData = decompressedData.Concat(edgeBuffers[i]);
-
-
-                            indexBufferUncompressedOffsets[i] = (uint)decompressedData.Count();
-                            indexOffsetRealSizes[i] = (uint)indexBuffers[i].Length;
-                            decompressedData = decompressedData.Concat(indexBuffers[i]);
-
+                            indexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
+                            indexOffsetRealSizes[i] = (uint)CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
+                            decompOffset += (int)indexOffsetRealSizes[i];
                         }
 
-                        var header = new List<byte>();
+                        var header = new List<byte>(baseHeaderLength);
 
                         // Generated header for live/uncompressed MDL files.
                         header.AddRange(BitConverter.GetBytes(version));
@@ -1014,17 +1032,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                         header.Add(flags);
                         header.AddRange(padding);
 
-                        
+                        // Copy the header over the reserved space at the start of decompressedData
+                        header.CopyTo(decompressedData, 0);
 
-
-                        result = header.Concat(decompressedData).ToArray();
-
+                        result = decompressedData;
                     }
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine(index.ToString());
-
                 }
                 finally
                 {
@@ -1032,7 +1044,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             });
 
-            return (meshCount, materialCount, result);
+            return (meshCount, materialCount, result ?? new byte[0]);
         }
 
         public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offsetWithDatNumber)
@@ -1373,7 +1385,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var xivTex = new XivTex();
 
-            IEnumerable<byte> decompressedData = new List<byte>();
+            byte[] decompressedData = null;
 
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offset / 8) & 0x0F) / 2;
@@ -1417,11 +1429,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                         xivTex.Layers = br.ReadInt16();
                         var imageCount2 = br.ReadInt16();
 
-                        // Allocate memory
-                        decompressedData = new List<byte>(uncompressedFileSize);
+                        decompressedData = new byte[uncompressedFileSize];
+                        int decompOffset = 0;
+
+                        var mipData = new List<Task<byte[]>>[xivTex.MipMapCount];
 
                         // Each MipMap has a basic header of information, and a set of compressed data blocks of info.
-                        for (int i = 0;  i < xivTex.MipMapCount; i++)
+                        for (int i = 0; i < xivTex.MipMapCount; i++)
                         {
                             const int _MipMapHeaderSize = 20;
                             br.BaseStream.Seek(mipMapInfoOffset + (_MipMapHeaderSize * i), SeekOrigin.Begin);
@@ -1436,12 +1450,16 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
 
-                            var data = await ReadCompressedBlocks(br, mipMapParts);
-                            decompressedData = decompressedData.Concat(data);
+                            mipData[i] = BeginReadCompressedBlocks(br, mipMapParts);
+                        }
+
+                        for (int i = 0; i < xivTex.MipMapCount; i++)
+                        {
+                            decompOffset += CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
                         }
                     }
                 });
-                xivTex.TexData = decompressedData.ToArray();
+                xivTex.TexData = decompressedData ?? new byte[0];
             }
             finally
             {

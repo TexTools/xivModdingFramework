@@ -298,44 +298,36 @@ namespace xivModdingFramework.Models.ModelTextures
             // Use the function that returns proper sane reuslts.
             var ttps = mtrl.GetTextureTypePathList();
 
-            // Decode compressed textures in parallel
-            // GetTexData acceses data files so it is kept serial
-            List<Task> tasks = new();
-
-            int taskNo = 0;
+            // Decode compressed textures
             foreach (var ttp in ttps)
             {
-                if (ttp.Type == XivTexType.ColorSet)
+                // Skip loading textures that aren't supported in model previews
+                if (ttp.Type != XivTexType.Diffuse && ttp.Type != XivTexType.Specular && ttp.Type != XivTexType.Mask
+                 && ttp.Type != XivTexType.Skin && ttp.Type != XivTexType.Normal && ttp.Type != XivTexType.Index)
+                {
                     continue;
+                }
 
                 var texData = await tex.GetTexData(ttp.Path, ttp.Type);
-                var thisTaskNo = ++taskNo;
-                var xthreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                var task = tex.GetImageData(texData).ContinueWith(imageDataResult => {
-                    var threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    var imageData = imageDataResult.Result;
-                    switch (ttp.Type)
-                    {
-                        case XivTexType.Diffuse:
-                            texMapData.Diffuse = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
-                            break;
-                        case XivTexType.Specular:
-                        case XivTexType.Mask:
-                        case XivTexType.Skin:
-                            texMapData.Multi = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
-                            break;
-                        case XivTexType.Normal:
-                            texMapData.Normal = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
-                            break;
-                        case XivTexType.Index:
-                            texMapData.Index = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData }; ;
-                            break;
-                        default:
-                            // Do not render textures that we do not know how to use
-                            break;
-                    }
-                });
-                tasks.Add(task);
+                var imageData = await tex.GetImageData(texData);
+
+                switch (ttp.Type)
+                {
+                    case XivTexType.Diffuse:
+                        texMapData.Diffuse = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
+                        break;
+                    case XivTexType.Specular:
+                    case XivTexType.Mask:
+                    case XivTexType.Skin:
+                        texMapData.Multi = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
+                        break;
+                    case XivTexType.Normal:
+                        texMapData.Normal = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
+                        break;
+                    case XivTexType.Index:
+                        texMapData.Index = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
+                        break;
+                }
             }
 
             if (mtrl.ColorSetDataSize > 0)
@@ -361,8 +353,6 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 texMapData.ColorSet = colorSetInfo;
             }
-
-            Task.WaitAll(tasks.ToArray());
 
             return texMapData;
         }
