@@ -73,7 +73,7 @@ namespace xivModdingFramework.Mods
                 var df = IOUtil.GetDataFileFromPath(Source.ToString());
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, df);
+                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 var _index = new Index(XivCache.GameInfo.GameDirectory);
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
@@ -280,7 +280,7 @@ namespace xivModdingFramework.Mods
                     }
 
                     // Save new Model.
-                    var bytes = await _mdl.MakeNewMdlFile(tmdl, xmdl, null);
+                    var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl, null);
                     await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, index, modlist);
                 }
 

@@ -873,7 +873,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 try
                 {
-                    await _tex.ImportTex(idPath, tempFile, null, source, null, null, XivTexFormat.A8R8G8B8, true);
+                    await _tex.ImportTex(idPath, tempFile, null, source, null, null, XivTexFormat.A8R8G8B8);
                 }
                 catch (Exception ex)
                 {

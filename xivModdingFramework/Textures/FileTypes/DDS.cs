@@ -17,8 +17,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -497,19 +499,16 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
         /// <summary>
-        /// Reads and parses data from the DDS file to be imported.
+        /// Compresses a normal DDS File into just the core image data that FFXIV stores.
         /// </summary>
         /// <param name="br">The currently active BinaryReader.</param>
-        /// <param name="xivTex">The Texture data.</param>
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
-        /// <returns>A tuple containing the compressed DDS data, a list of offsets to the mipmap parts, a list with the number of parts per mipmap.</returns>
-        public static async Task<(List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts)> ReadDDS(BinaryReader br, XivTexFormat format, int newWidth, int newHeight, int newMipCount)
+        /// <returns>A List structure of the resulting binary data keyed on [MipMap#] => Compressed Data Parts</returns>
+        public static async Task<List<List<byte[]>>> CompressDDSBody(BinaryReader br, XivTexFormat format, int newWidth, int newHeight, int newMipCount)
         {
-            var compressedDDS = new List<byte>();
-            var mipPartOffsets = new List<short>();
-            var mipPartCount = new List<short>();
+            var ddsParts = new List<List<byte[]>>();
 
             int mipLength;
 
@@ -522,8 +521,6 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexFormat.BC5:
                 case XivTexFormat.BC7:
                 case XivTexFormat.A8:
-                    mipLength = newWidth * newHeight;
-                    break;
                     mipLength = newWidth * newHeight;
                     break;
                 case XivTexFormat.A1R5G5B5:
@@ -558,10 +555,6 @@ namespace xivModdingFramework.Textures.FileTypes
             for (var i = 0; i < newMipCount; i++)
             {
                 var mipParts = (int)Math.Ceiling(mipLength / 16000f);
-                mipPartCount.Add((short)mipParts);
-
-                if (mipParts > 1)
-                {
                     for (var j = 0; j < mipParts; j++)
                     {
                         int uncompLength;
@@ -577,70 +570,9 @@ namespace xivModdingFramework.Textures.FileTypes
                         }
 
                         var uncompBytes = br.ReadBytes(uncompLength);
-                        var compressed = await IOUtil.Compressor(uncompBytes);
-
-                        if (compressed.Length > uncompLength)
-                        {
-                            compressed = uncompBytes;
-                            comp = false;
-                        }
-
-                        compressedDDS.AddRange(BitConverter.GetBytes(16));
-                        compressedDDS.AddRange(BitConverter.GetBytes(0));
-
-                        compressedDDS.AddRange(!comp
-                            ? BitConverter.GetBytes(32000)
-                            : BitConverter.GetBytes(compressed.Length));
-
-                        compressedDDS.AddRange(BitConverter.GetBytes(uncompLength));
-                        compressedDDS.AddRange(compressed);
-
-                        var padding = 128 - (compressed.Length % 128);
-
-                        compressedDDS.AddRange(new byte[padding]);
-
-                        mipPartOffsets.Add((short)(compressed.Length + padding + 16));
+                        var mipData = await Dat.CompressData(uncompBytes.ToList());
+                        ddsParts.Add(mipData);
                     }
-                }
-                else
-                {
-                    int uncompLength;
-                    var comp = true;
-
-                    if (mipLength != 16000)
-                    {
-                        uncompLength = mipLength % 16000;
-                    }
-                    else
-                    {
-                        uncompLength = 16000;
-                    }
-
-                    var uncompBytes = br.ReadBytes(uncompLength);
-                    var compressed = await IOUtil.Compressor(uncompBytes);
-
-                    if (compressed.Length > uncompLength)
-                    {
-                        compressed = uncompBytes;
-                        comp = false;
-                    }
-
-                    compressedDDS.AddRange(BitConverter.GetBytes(16));
-                    compressedDDS.AddRange(BitConverter.GetBytes(0));
-
-                    compressedDDS.AddRange(!comp
-                        ? BitConverter.GetBytes(32000)
-                        : BitConverter.GetBytes(compressed.Length));
-
-                    compressedDDS.AddRange(BitConverter.GetBytes(uncompLength));
-                    compressedDDS.AddRange(compressed);
-
-                    var padding = 128 - (compressed.Length % 128);
-
-                    compressedDDS.AddRange(new byte[padding]);
-
-                    mipPartOffsets.Add((short)(compressed.Length + padding + 16));
-                }
 
                 if (mipLength > 32)
                 {
@@ -652,7 +584,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
-            return (compressedDDS, mipPartOffsets, mipPartCount);
+            return ddsParts;
         }
 
         public enum DXGI_FORMAT : uint

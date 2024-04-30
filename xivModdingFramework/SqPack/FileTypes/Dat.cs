@@ -585,7 +585,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var modding = new Modding(_gameDirectory);
 
             var modEntry = await modding.TryGetModEntry(internalPath);
-            var newData = (await CreateType2Data(dataToImport));
+            var newData = (await CompressType2Data(dataToImport));
 
             var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList);
 
@@ -600,11 +600,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Create any Type 2 data
+        /// Create compressed type 2 data from uncompressed binary data.
         /// </summary>
         /// <param name="dataToCreate">Bytes to Type 2data</param>
         /// <returns></returns>
-        public async Task<byte[]> CreateType2Data(byte[] dataToCreate)
+        public async Task<byte[]> CompressType2Data(byte[] dataToCreate)
         {
             var newData = new List<byte>();
             var headerData = new List<byte>();
@@ -1373,7 +1373,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var xivTex = new XivTex();
 
-            byte[] decompressedData = null;
+            IEnumerable<byte> decompressedData = new List<byte>();
 
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offset / 8) & 0x0F) / 2;
@@ -1392,11 +1392,17 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
+
+                        // Type 4 data is pretty simple.
+
+                        // Standard header.
                         var headerLength = br.ReadInt32();
                         var fileType = br.ReadInt32();
                         var uncompressedFileSize = br.ReadInt32();
                         var ikd1 = br.ReadInt32();
                         var ikd2 = br.ReadInt32();
+
+                        // Count of mipmaps.
                         xivTex.MipMapCount = br.ReadInt32();
 
                         var endOfHeader = offset + headerLength;
@@ -1404,19 +1410,21 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
 
+                        // DDS File Header
                         xivTex.TextureFormat = TextureTypeDictionary[br.ReadInt32()];
                         xivTex.Width = br.ReadInt16();
                         xivTex.Height = br.ReadInt16();
-                        var pos = br.BaseStream.Position;
                         xivTex.Layers = br.ReadInt16();
                         var imageCount2 = br.ReadInt16();
 
-                        decompressedData = new byte[uncompressedFileSize];
-                        int dataOffset = 0;
+                        // Allocate memory
+                        decompressedData = new List<byte>(uncompressedFileSize);
 
-                        for (int i = 0, j = 0; i < xivTex.MipMapCount; i++)
+                        // Each MipMap has a basic header of information, and a set of compressed data blocks of info.
+                        for (int i = 0;  i < xivTex.MipMapCount; i++)
                         {
-                            br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
+                            const int _MipMapHeaderSize = 20;
+                            br.BaseStream.Seek(mipMapInfoOffset + (_MipMapHeaderSize * i), SeekOrigin.Begin);
 
                             var offsetFromHeaderEnd = br.ReadInt32();
                             var mipMapLength = br.ReadInt32();
@@ -1428,75 +1436,12 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
 
-                            br.ReadBytes(8);
-                            var compressedSize = br.ReadInt32();
-                            var uncompressedSize = br.ReadInt32();
-
-                            if (mipMapParts > 1)
-                            {
-                                var compressedData = br.ReadBytes(compressedSize);
-
-                                var decompressedPartData = await IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                                decompressedPartData.CopyTo(decompressedData, dataOffset);
-                                dataOffset += decompressedPartData.Length;
-
-                                for (var k = 1; k < mipMapParts; k++)
-                                {
-                                    var check = br.ReadByte();
-                                    while (check != 0x10)
-                                    {
-                                        check = br.ReadByte();
-                                    }
-
-                                    br.ReadBytes(7);
-                                    compressedSize = br.ReadInt32();
-                                    uncompressedSize = br.ReadInt32();
-
-                                    // When the compressed size of a data block shows 32000, it is uncompressed.
-                                    if (compressedSize != 32000)
-                                    {
-                                        compressedData = br.ReadBytes(compressedSize);
-                                        decompressedPartData =
-                                            await IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                                        decompressedPartData.CopyTo(decompressedData, dataOffset);
-                                        dataOffset += decompressedPartData.Length;
-                                    }
-                                    else
-                                    {
-                                        decompressedPartData = br.ReadBytes(uncompressedSize);
-                                        decompressedPartData.CopyTo(decompressedData, dataOffset);
-                                        dataOffset += decompressedPartData.Length;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // When the compressed size of a data block shows 32000, it is uncompressed.
-                                if (compressedSize != 32000)
-                                {
-                                    var compressedData = br.ReadBytes(compressedSize);
-
-                                    var decompressedPartData = await IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                                    decompressedPartData.CopyTo(decompressedData, dataOffset);
-                                    dataOffset += decompressedPartData.Length;
-                                }
-                                else
-                                {
-                                    var decompressedPartData = br.ReadBytes(uncompressedSize);
-                                    decompressedPartData.CopyTo(decompressedData, dataOffset);
-                                    dataOffset += decompressedPartData.Length;
-                                }
-                            }
-
-                            j = j + 20;
+                            var data = await ReadCompressedBlocks(br, mipMapParts);
+                            decompressedData = decompressedData.Concat(data);
                         }
                     }
                 });
-
-                xivTex.TexData = decompressedData ?? new byte[0];
+                xivTex.TexData = decompressedData.ToArray();
             }
             finally
             {
@@ -1581,31 +1526,30 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Creates the header for the compressed texture data to be imported.
         /// </summary>
-        /// <param name="xivTex">Data for the currently displayed texture.</param>
-        /// <param name="mipPartOffsets">List of part offsets.</param>
-        /// <param name="mipPartCount">List containing the amount of parts per mipmap.</param>
         /// <param name="uncompressedLength">Length of the uncompressed texture file.</param>
         /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <returns>The created header data.</returns>
-        public byte[] MakeType4DatHeader(XivTexFormat format, List<short> mipPartOffsets, List<short> mipPartCount, int uncompressedLength, int newMipCount, int newWidth, int newHeight)
+        public byte[] MakeType4DatHeader(XivTexFormat format, List<List<byte[]>> ddsParts, int uncompressedLength, int newWidth, int newHeight)
         {
             var headerData = new List<byte>();
 
-            var headerSize = 24 + (newMipCount * 20) + (mipPartOffsets.Count * 2);
+            var mipCount = ddsParts.Count;
+            var totalParts = ddsParts.Sum(x => x.Count);
+            var headerSize = 24 + (mipCount * 20) + (totalParts * 2);
             var headerPadding = 128 - (headerSize % 128);
 
             headerData.AddRange(BitConverter.GetBytes(headerSize + headerPadding));
             headerData.AddRange(BitConverter.GetBytes(4));
             headerData.AddRange(BitConverter.GetBytes(uncompressedLength + 80));
-            headerData.AddRange(BitConverter.GetBytes(0));
-            headerData.AddRange(BitConverter.GetBytes(0));
-            headerData.AddRange(BitConverter.GetBytes(newMipCount));
+            headerData.AddRange(BitConverter.GetBytes(0)); // Buffer info 0 apparently works fine?
+            headerData.AddRange(BitConverter.GetBytes(0)); // Buffer info 0 apparently works fine?
+            headerData.AddRange(BitConverter.GetBytes(mipCount));
 
 
-            var partIndex = 0;
-            var mipOffsetIndex = 80;
+            var dataBlockOffset = 0;
+            var mipCompressedOffset = 80;
             var uncompMipSize = newHeight * newWidth;
 
             switch (format)
@@ -1636,35 +1580,40 @@ namespace xivModdingFramework.SqPack.FileTypes
                     break;
             }
 
-            for (var i = 0; i < newMipCount; i++)
+            for (var i = 0; i < mipCount; i++)
             {
-                headerData.AddRange(BitConverter.GetBytes(mipOffsetIndex));
+                // Compressed Offset (Starting after sqpack header)
+                headerData.AddRange(BitConverter.GetBytes(mipCompressedOffset));
 
-                var paddedSize = 0;
+                // Compressed Size
+                var compressedSize = ddsParts[i].Sum(x => x.Length);
+                headerData.AddRange(BitConverter.GetBytes(compressedSize));
+                
+                // Uncompressed Size
+                var uncompressedSize = uncompMipSize > 16 ? uncompMipSize : 16;
+                headerData.AddRange(BitConverter.GetBytes(uncompressedSize));
 
-                for (var j = 0; j < mipPartCount[i]; j++)
-                {
-                    paddedSize = paddedSize + mipPartOffsets[j + partIndex];
-                }
+                // Data Block Offset
+                headerData.AddRange(BitConverter.GetBytes(dataBlockOffset));
 
-                headerData.AddRange(BitConverter.GetBytes(paddedSize));
+                // Data Block Size
+                headerData.AddRange(BitConverter.GetBytes(ddsParts[i].Count));
 
-                headerData.AddRange(uncompMipSize > 16
-                    ? BitConverter.GetBytes(uncompMipSize)
-                    : BitConverter.GetBytes(16));
 
+                // Every MipMap is 1/4th the net size, so this is a easy way to recalculate it.
                 uncompMipSize = uncompMipSize / 4;
 
-                headerData.AddRange(BitConverter.GetBytes(partIndex));
-                headerData.AddRange(BitConverter.GetBytes((int)mipPartCount[i]));
-
-                partIndex = partIndex + mipPartCount[i];
-                mipOffsetIndex = mipOffsetIndex + paddedSize;
+                dataBlockOffset = dataBlockOffset + ddsParts[i].Count;
+                mipCompressedOffset = mipCompressedOffset + compressedSize;
             }
 
-            foreach (var part in mipPartOffsets)
+            // This seems to be (another) listing of part sizes?
+            foreach (var mip in ddsParts)
             {
-                headerData.AddRange(BitConverter.GetBytes(part));
+                foreach(var part in mip)
+                {
+                    headerData.AddRange(BitConverter.GetBytes((ushort) part.Length));
+                }
             }
 
             headerData.AddRange(new byte[headerPadding]);

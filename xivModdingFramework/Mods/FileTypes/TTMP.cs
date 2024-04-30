@@ -1203,7 +1203,7 @@ namespace xivModdingFramework.Mods.FileTypes
                             var indexFile = await _index.GetIndexFile(XivDataFile._04_Chara);
                             var modelCount = usableModels.Count;
                             progress.Report((0, modelCount, "Scanning and updating body models..."));
-                            var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory, XivDataFile._04_Chara);
+                            var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory);
 
                             // Loop them to perform heuristic check.
                             var anyChanges = false;
@@ -1362,7 +1362,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, XivDataFile._04_Chara);
+            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
 
             var idx = 0;
             var total = fixableMtrls.Count;

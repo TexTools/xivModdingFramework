@@ -53,6 +53,7 @@ using xivModdingFramework.Mods.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -60,8 +61,6 @@ namespace xivModdingFramework.Models.FileTypes
     {
         private const string MdlExtension = ".mdl";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly DirectoryInfo _modListDirectory;
-        private readonly XivDataFile _dataFile;
 
         // Simple internal use hashable pair of Halfs.
         private struct HalfUV
@@ -147,12 +146,9 @@ namespace xivModdingFramework.Models.FileTypes
             return null;
         }
 
-        public Mdl(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        public Mdl(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-
-            _dataFile = dataFile;
         }
 
         private byte[] _rawData;
@@ -2130,7 +2126,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new Exception($"Could not find offset for {mdlPath}");
             }
 
-            var mdlData = await dat.GetType3Data(offset, _dataFile);
+            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(mdlPath));
 
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
@@ -2335,32 +2331,91 @@ namespace xivModdingFramework.Models.FileTypes
                     throw new IOException("The file provided for import does not exist");
                 }
             }
+            #endregion
 
             var modding = new Modding(_gameDirectory);
             var dat = new Dat(_gameDirectory);
+            var mdlPath = await GetMdlPath(item, race);
 
-            // Resolve the current (possibly modded) Mdl.
+            var bytes = await FileToModelBytes(path, mdlPath, options, loggingFunction, intermediaryFunction, submeshId);
+            var compressed = await CompressMdlFile(bytes);
+            _rawData = compressed;
+
+            var modEntry = await modding.TryGetModEntry(mdlPath);
+            if (!rawDataOnly)
+            {
+                loggingFunction(false, "Writing MDL File to FFXIV File System...");
+                await dat.WriteModFile(compressed, mdlPath, source, item);
+            }
+
+            loggingFunction(false, "Job done!");
+            return;
+        }
+
+        /// <summary>
+        /// Takes an external FBX/DB file and converts it into an uncompressed MDL file.
+        /// Due to the nature of the external importers, it is required that the file exists on disk
+        /// and not just a byte array/stream.
+        /// </summary>
+        /// <param name="externalPath"></param>
+        /// <param name="internalPath"></param>
+        /// <param name="options"></param>
+        /// <param name="loggingFunction"></param>
+        /// <param name="intermediaryFunction"></param>
+        /// <param name="submeshId"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        /// <exception cref="InvalidDataException"></exception>
+        public async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string submeshId = null)
+        {
+
+            if (options == null)
+            {
+                options = new ModelModifierOptions();
+            }
+
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            var modding = new Modding(_gameDirectory);
+            var dat = new Dat(_gameDirectory);
+            var mod = await modding.TryGetModEntry(internalPath);
+
+            // Resolve the current (and possibly modded) Mdl.
             XivMdl currentMdl = null;
+            XivMdl originalMdl = null;
             try
             {
-                currentMdl = await this.GetRawMdlData(item, race, submeshId);
+                // Load the base game model.
+                // This is used for some model modifier options and the like.
+                // Some paths may not actually use this(?)
+                originalMdl = await GetRawMdlData(internalPath, true);
+            }
+            catch
+            {
+                throw new Exception("Unable to load base MDL file.");
+            }
+
+            try
+            {
+                if (mod != null)
+                {
+                    // If we have a modded base, we need to load that as well.
+                    currentMdl = await GetRawMdlData(internalPath);
+                } else
+                {
+                    currentMdl = originalMdl;
+                }
             }
             catch (Exception ex)
             {
-                // If we failed to load the MDL, see if we can get the unmodded MDL.
-                var mdlPath = await GetMdlPath(item, race);
-                var mod = await modding.TryGetModEntry(mdlPath);
-                if (mod != null)
-                {
-                    loggingFunction(true, "Unable to load current MDL file.  Attempting to use original MDL file...");
-                    currentMdl = await this.GetRawMdlData(item, race, submeshId, true);
-                }
-                else
-                {
-                    throw new Exception("Unable to load base MDL file.");
-                }
+                loggingFunction(true, "Unable to load current MDL file.  Using base game MDL file...");
+                currentMdl = originalMdl;
             }
-            #endregion
+
+            byte[] bytes = null;
 
             // Wrapping this in an await ensures we're run asynchronously on a new thread.
             await Task.Run(async () =>
@@ -2372,27 +2427,28 @@ namespace xivModdingFramework.Models.FileTypes
                 var mdlPath = currentMdl.MdlPath;
 
                 loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
-                loggingFunction(false, "Starting Import of file: " + path);
+                loggingFunction(false, "Starting Import of file: " + externalPath);
 
-                var suffix = path == null || path == "" ? null : Path.GetExtension(path).ToLower().Substring(1);
+                var suffix = externalPath == null || externalPath == "" ? null : Path.GetExtension(externalPath).ToLower().Substring(1);
                 TTModel ttModel = null;
 
 
                 // Loading and Running the actual Importers.
-                if (path == null || path == "")
+                if (externalPath == null || externalPath == "")
                 {
                     // If we were given no path, load the current model.
-                    ttModel = await GetModel(item, race, submeshId);
+                    ttModel = await GetModel(internalPath);
                 }
                 else if (suffix == "db")
                 {
-                    loggingFunction(false, "Loading intermediate file...");
                     // Raw already converted DB file, just load it.
-                    ttModel = TTModel.LoadFromFile(path, loggingFunction);
+                    loggingFunction(false, "Loading intermediate file...");
+                    ttModel = TTModel.LoadFromFile(externalPath, loggingFunction);
                 }
                 else
                 {
-                    var dbFile = await RunExternalImporter(suffix, path, loggingFunction);
+                    // External Importer converts the file to .db format.
+                    var dbFile = await RunExternalImporter(suffix, externalPath, loggingFunction);
                     loggingFunction(false, "Loading intermediate file...");
                     ttModel = TTModel.LoadFromFile(dbFile, loggingFunction);
                 }
@@ -2402,7 +2458,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var sane = TTModel.SanityCheck(ttModel, loggingFunction);
                 if (!sane)
                 {
-                    throw new InvalidDataException("Model was deemed invalid.");
+                    throw new InvalidDataException("Model is corrupt or otherwise invalid.");
                 }
 
 
@@ -2410,26 +2466,10 @@ namespace xivModdingFramework.Models.FileTypes
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
-
-
-                XivMdl ogMdl = null;
-
-                // Load the original model if we're actually going to need it.
-                var mod = await modding.TryGetModEntry(mdlPath);
-                if (mod != null)
-                {
-                    loggingFunction(false, "Loading original SE model...");
-                    var ogOffset = mod.data.originalOffset;
-                    ogMdl = await GetRawMdlData(item, IOUtil.GetRaceFromPath(mdlPath), submeshId, true);
-                } else
-                {
-                    ogMdl = currentMdl;
-                }
-
                 loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 // Apply our Model Modifier options to the model.
-                options.Apply(ttModel, currentMdl, ogMdl, loggingFunction);
+                options.Apply(ttModel, currentMdl, originalMdl, loggingFunction);
 
 
                 // Call the user function, if one was provided.
@@ -2438,7 +2478,7 @@ namespace xivModdingFramework.Models.FileTypes
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
-                    var oldModel = TTModel.FromRaw(ogMdl);
+                    var oldModel = TTModel.FromRaw(originalMdl);
                     bool cont = await intermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
@@ -2457,35 +2497,29 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");
-                var bytes = await MakeNewMdlFile(ttModel, currentMdl, loggingFunction);
-                if (rawDataOnly)
-                {
-                    _rawData = bytes;
-                    return;
-                }
-
-                var modEntry = await modding.TryGetModEntry(mdlPath);
-
-
-
-                if (!rawDataOnly)
-                {
-                    loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                    await dat.WriteModFile(bytes, filePath, source, item);
-                }
+                bytes = await MakeMdlFile(ttModel, currentMdl, loggingFunction);
 
                 loggingFunction(false, "Job done!");
-                return;
             });
+
+            return bytes;
         }
 
+        public async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        {
+            var mdl = await MakeMdlFile(ttModel, ogMdl, loggingFunction);
+            var compressed = await CompressMdlFile(mdl);
+            return compressed;
+        }
 
         /// <summary>
-        /// Creates a new Mdl file from the given data
+        /// Creates a new Uncompressed MDL file from the given information.
+        /// OGMdl is used to fill in gaps in data types we do not know about.
+        /// TODO: It should be possible at this point to adjust this function to accomodate [null] ogMDLs.
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        internal async Task<byte[]> MakeNewMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public async Task<byte[]> MakeMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
             ttModel.MdlVersion = mdlVersion;
@@ -3712,8 +3746,8 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-                // Compile the final product MDL file.
 
+                // Create the MDL Header and compile the final data.
                 #region MDL File Header Creation
                 var header = new List<byte>();
 
@@ -3766,8 +3800,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var mdlFile = header.Concat(vertexInfoBlock).Concat(modelDataBlock).Concat(vertexDataBlock).Concat(indexDataBlock).ToArray();
                 #endregion
 
-                return await CompressMdlFile(mdlFile);
-
+                return mdlFile;
             }
             catch (Exception ex)
             {
@@ -3780,7 +3813,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        private async Task<byte[]> CompressMdlFile(byte[] data)
+        public async Task<byte[]> CompressMdlFile(byte[] data)
         {
 
             #region MDL Header Reading
@@ -4579,7 +4612,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (anyChanges)
             {
 
-                var bytes = await MakeNewMdlFile(ttMdl, ogMdl);
+                var bytes = await MakeCompressedMdlFile(ttMdl, ogMdl);
 
                 // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
                 var modEntry = _modlist.Mods.First(x => x.fullPath == mdlPath);
@@ -5207,7 +5240,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             // Save the final modified mdl.
-            var data = await MakeNewMdlFile(model, xMdl);
+            var data = await MakeCompressedMdlFile(model, xMdl);
             offset = await _dat.WriteModFile(data, newPath, source, item, index, modlist);
 
             await _index.SaveIndexFile(index);
@@ -5226,7 +5259,7 @@ namespace xivModdingFramework.Models.FileTypes
             var ttMdl = await GetModel(path);
             var xivMdl = await GetRawMdlData(path);
 
-            var bytes = await MakeNewMdlFile(ttMdl, xivMdl);
+            var bytes = await MakeCompressedMdlFile(ttMdl, xivMdl);
             await _dat.WriteModFile(bytes, path, source);
 
 

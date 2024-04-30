@@ -935,24 +935,44 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="texFormat"></param>
         /// <returns></returns>
-        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, bool ?makeMips = null )
+        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID)
         {
             // Ensure file exists.
             if (!File.Exists(externalPath))
             {
                 throw new IOException($"Could not find file: {externalPath}");
             }
+            var ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat);
+            var data = await CompressDDS(ddsFilePath, internalPath);
+            return data;
+        }
 
-            bool useMips;
-            if(makeMips == null)
+        /// <summary>
+        /// Converts a given external image file to a DDS file, returning the resulting DDS File's filepath.
+        /// Requires an internal path in order to determine if mipmaps should be generated, and resolve default texture format.
+        /// </summary>
+        /// <param name="externalPath"></param>
+        /// <param name="internalPath"></param>
+        /// <returns></returns>
+        public async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID)
+        {
+            var root = await XivCache.GetFirstRoot(internalPath);
+            bool useMips = root != null;
+
+
+            // First of all, check if the file is a DDS file.
+            using(var f = File.OpenRead(externalPath))
             {
-                var root = await XivCache.GetFirstRoot(internalPath);
-                useMips = root != null;
-            } else
-            {
-                useMips = (bool) makeMips;
+                using(var br =  new BinaryReader(f))
+                {
+                    const uint _DDSMagic = 0x20534444;
+                    if(br.ReadUInt32() == _DDSMagic)
+                    {
+                        // If it is, we don't need to do anything.
+                        return externalPath;
+                    }
+                }
             }
-            bool isDds = Path.GetExtension(externalPath).ToLower() == ".dds";
 
             var ddsContainer = new DDSContainer();
             try
@@ -960,28 +980,13 @@ namespace xivModdingFramework.Textures.FileTypes
                 // If no format was specified...
                 if (texFormat == XivTexFormat.INVALID)
                 {
-                    if(isDds)
-                    {
-                        // If we're importing a DDS file, get the format from the incoming DDS file
-                        using (var fs = new FileStream(externalPath, FileMode.Open))
-                        {
-                            using (var sr = new BinaryReader(fs))
-                            {
-                                texFormat = GetDDSTexFormat(sr);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Otherwise use the current internal format.
-                        var xivt = await _dat.GetType4Data(internalPath, false);
-                        texFormat = xivt.TextureFormat;
-                    }
+                    // Use the current internal format.
+                    var xivt = await _dat.GetType4Data(internalPath, false);
+                    texFormat = xivt.TextureFormat;
                 }
 
-                // Check if the texture being imported has been imported before
+                // Ensure we're converting to a format we can actually process.
                 CompressionFormat compressionFormat = CompressionFormat.BGRA;
-
                 switch (texFormat)
                 {
                     case XivTexFormat.DXT1:
@@ -997,110 +1002,123 @@ namespace xivModdingFramework.Textures.FileTypes
                         compressionFormat = CompressionFormat.BGRA;
                         break;
                     default:
-                        if (!isDds)
-                        {
-                            throw new Exception($"Format {texFormat} is not currently supported for BMP import\n\nPlease use the DDS import option instead.");
-                        }
-                        break;
+                        throw new Exception($"Format {texFormat} is not currently supported for Non-DDS import\n\nPlease use the DDS import option instead.");
                 }
-
-                if (!isDds)
+                using (var surface = Surface.LoadFromFile(externalPath))
                 {
-                    using (var surface = Surface.LoadFromFile(externalPath))
+                    if (surface == null)
+                        throw new FormatException($"Unsupported texture format");
+
+                    surface.FlipVertically();
+
+                    var maxMipCount = 1;
+                    if (useMips)
                     {
-                        if (surface == null)
-                            throw new FormatException($"Unsupported texture format");
+                        // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
+                        // (Ex. The Default Mat-Add textures)
+                        maxMipCount = -1;
+                    }
 
-                        surface.FlipVertically();
-
-                        var maxMipCount = 1;
-                        if (useMips)
-                        {
-                            // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
-                            // (Ex. The Default Mat-Add textures)
-                            maxMipCount = -1;
-                        }
-
-                        using (var compressor = new Compressor())
-                        {
-                            // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
-                            compressor.Input.SetMipmapGeneration(true, maxMipCount);
-                            compressor.Input.SetData(surface);
-                            compressor.Compression.Format = compressionFormat;
-                            compressor.Compression.SetBGRAPixelFormat();
-
-                            compressor.Process(out ddsContainer);
-                        }
+                    using (var compressor = new Compressor())
+                    {
+                        // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
+                        compressor.Input.SetMipmapGeneration(true, maxMipCount);
+                        compressor.Input.SetData(surface);
+                        compressor.Compression.Format = compressionFormat;
+                        compressor.Compression.SetBGRAPixelFormat();
+                        compressor.Process(out ddsContainer);
                     }
                 }
 
-                // If we're not a DDS, write the DDS to file temporarily.
-                var ddsFilePath = externalPath;
-                if(!isDds)
-                {
-                    var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".dds");
-                    ddsContainer.Write(tempFile, DDSFlags.None);
-                    ddsFilePath = tempFile;
-                }
-
-                using (var br = new BinaryReader(File.OpenRead(ddsFilePath)))
-                {
-                    br.BaseStream.Seek(12, SeekOrigin.Begin);
-
-                    var newHeight = br.ReadInt32();
-                    var newWidth = br.ReadInt32();
-                    br.ReadBytes(8);
-                    var newMipCount = br.ReadInt32();
-
-                    if (newHeight % 2 != 0 || newWidth % 2 != 0)
-                    {
-                        throw new Exception("Resolution must be a multiple of 2");
-                    }
-
-                    br.BaseStream.Seek(80, SeekOrigin.Begin);
-
-                    var textureFlags = br.ReadInt32();
-                    var texType = br.ReadInt32();
-
-                    var uncompressedLength = (int)new FileInfo(ddsFilePath).Length - 128;
-                    var newTex = new List<byte>();
-
-                    if (!internalPath.Contains(".atex"))
-                    {
-                        var DDSInfo = await DDS.ReadDDS(br, texFormat, newWidth, newHeight, newMipCount);
-
-                        newTex.AddRange(_dat.MakeType4DatHeader(texFormat, DDSInfo.mipPartOffsets, DDSInfo.mipPartCounts, (int)uncompressedLength, newMipCount, newWidth, newHeight));
-                        newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
-                        newTex.AddRange(DDSInfo.compressedDDS);
-
-                        return newTex.ToArray();
-                    }
-                    else
-                    {
-                        // DX10 format magic number
-                        const uint fourccDX10 = 0x30315844;
-                        var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
-                        br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
-                        newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
-                        newTex.AddRange(br.ReadBytes((int)uncompressedLength));
-                        var data = await _dat.CreateType2Data(newTex.ToArray());
-                        return data;
-                    }
-                }
+                // Write the new DDS file to disk.
+                var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".dds");
+                ddsContainer.Write(tempFile, DDSFlags.None);
+                return tempFile;
             }
             finally
             {
+                // Has to be a try/finally instead of using block due to useage as an out/ref value.
                 ddsContainer.Dispose();
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, XivTexFormat format = XivTexFormat.INVALID, bool? createMipMaps = null)
+
+
+        /// <summary>
+        /// Compresses a DDS file into either a Type 4 (Texture)[.tex] file or Type 2 (Binary)[.atex] file depending on target file path.
+        /// </summary>
+        /// <param name="externalDdsPath"></param>
+        /// <param name="internalPath"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public async Task<byte[]> CompressDDS(string externalDdsPath, string internalPath)
+        {
+
+            using (var br = new BinaryReader(File.OpenRead(externalDdsPath)))
+            {
+                var texFormat = GetDDSTexFormat(br);
+                br.BaseStream.Seek(12, SeekOrigin.Begin);
+
+                var newHeight = br.ReadInt32();
+                var newWidth = br.ReadInt32();
+                br.ReadBytes(8);
+                var newMipCount = br.ReadInt32();
+
+                if (newHeight % 2 != 0 || newWidth % 2 != 0)
+                {
+                    throw new Exception("Resolution must be a multiple of 2");
+                }
+
+                br.BaseStream.Seek(80, SeekOrigin.Begin);
+
+                var textureFlags = br.ReadInt32();
+                var texType = br.ReadInt32();
+
+                var uncompressedLength = (int)new FileInfo(externalDdsPath).Length - 128;
+                var newTex = new List<byte>();
+
+                if (!internalPath.Contains(".atex"))
+                {
+                    var ddsParts = await DDS.CompressDDSBody(br, texFormat, newWidth, newHeight, newMipCount);
+
+                    // SQPack Header
+                    newTex.AddRange(_dat.MakeType4DatHeader(texFormat, ddsParts, (int)uncompressedLength, newWidth, newHeight));
+
+                    // DDS-ish file header that SE expects for type 4 files.
+                    newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
+
+                    // Actual file data.
+                    foreach(var mip in ddsParts)
+                    {
+                        foreach(var part in mip)
+                        {
+                            newTex.AddRange(part);
+                        }
+                    }
+
+                    return newTex.ToArray();
+                }
+                else
+                {
+                    // DX10 format magic number
+                    const uint fourccDX10 = 0x30315844;
+                    var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
+                    br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
+                    newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
+                    newTex.AddRange(br.ReadBytes((int)uncompressedLength));
+                    var data = await _dat.CompressType2Data(newTex.ToArray());
+                    return data;
+                }
+            }
+        }
+
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, XivTexFormat format = XivTexFormat.INVALID)
         {
             long offset = 0;
             var path = internalPath;
             var df = IOUtil.GetDataFileFromPath(path);
 
-            var data = await MakeTexData(path, externalPath, format, createMipMaps);
+            var data = await MakeTexData(path, externalPath, format);
             var modding = new Modding(_gameDirectory);
             Mod entry = null;
             if(cachedModList != null) 
