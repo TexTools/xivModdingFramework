@@ -418,11 +418,11 @@ namespace xivModdingFramework.Materials.DataContainers
             [Description("bgcolorchange.shpk")]
             DyeableFurniture,
             [Description("charactertattoo.shpk")]
-            CharacterTatoo,
+            CharacterTattoo,
             [Description("characterocclusion.shpk")]
             CharacterOcclusion,
             [Description("characterscroll.shpk")]
-            CharactScroll,
+            CharacterScroll,
             [Description("water.shpk")]
             Water,
             [Description("river.shpk")]
