@@ -53,8 +53,6 @@ using xivModdingFramework.Mods.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
-using xivModdingFramework.Materials.DataContainers;
-using HelixToolkit.SharpDX.Core.Helper;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -865,14 +863,17 @@ namespace xivModdingFramework.Models.FileTypes
                         br.BaseStream.Seek(j * _vertexDataHeaderSize + loDStructPos, SeekOrigin.Begin);
 
                         // If the first byte is 255, we reached the end of the Vertex Data Structs
-                        var dataBlockNum = br.ReadByte();
-                        while (dataBlockNum != 255)
+                        while(true)
                         {
                             // Vertex Header Reading
+                            var dataBlockNum = br.ReadByte();
+                            if (dataBlockNum == 255) break;
+
                             byte b1 = br.ReadByte();
                             byte b2 = br.ReadByte();
                             byte b3 = br.ReadByte();
                             byte b4 = br.ReadByte();
+                            var padding = br.ReadBytes(3);
                             var vertexDataStruct = new VertexDataStruct
                             {
                                 DataBlock = dataBlockNum,
@@ -890,11 +891,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 // (We could rip through the vertex list to see if any 5+ bone vertices exist, but that's expensive)
                                 xivMdl.LoDList[i].MeshDataList[j].VertexBoneArraySize = vertexDataStruct.DataType == VertexDataType.UByte8 ? 8 : 4;
                             }
-
-                            // padding between Vertex Data Structs
-                            br.ReadBytes(3);
-
-                            dataBlockNum = br.ReadByte();
                         }
                     }
 
@@ -3716,247 +3712,372 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-                // Data Compression
-                #region Final Data Compression
+                // Compile the final product MDL file.
 
-                var compressedMDLData = new List<byte>();
+                #region MDL File Header Creation
+                var header = new List<byte>();
 
-                // Vertex Info Compression
-                var compressedVertexInfo = await Dat.CompressSmallData(vertexInfoBlock.ToArray());
-                compressedMDLData.AddRange(compressedVertexInfo);
+                // Signature
+                header.AddRange(BitConverter.GetBytes((short)mdlVersion));
+                header.AddRange(BitConverter.GetBytes((short)256));
 
-                // Model Data Compression
-                List<byte[]> compressedModelDataParts = new List<byte[]>();
-                compressedModelDataParts = await Dat.CompressData(modelDataBlock);
+                // Model Data Stuff Sizes
+                header.AddRange(BitConverter.GetBytes(vertexInfoBlock.Count));
+                header.AddRange(BitConverter.GetBytes(modelDataBlock.Count));
 
-                foreach(var data in compressedModelDataParts) { 
-                    compressedMDLData.AddRange(data);
-                }
+                // Counts of stuff that goes in the Type3 file header.
+                header.AddRange(BitConverter.GetBytes((ushort)meshCount));
+                header.AddRange(BitConverter.GetBytes((ushort)ttModel.Materials.Count));
 
-                // Vertex Data Compression
-                var compressedVertexDataParts = await Dat.CompressData(vertexDataBlock);
-                foreach (var data in compressedVertexDataParts)
-                {
-                    compressedMDLData.AddRange(data);
-                }
+                var vBuffer0Offset = _MdlHeaderSize +  vertexInfoBlock.Count + modelDataBlock.Count;
+                var iBuffer0Offset = vBuffer0Offset + vertexDataBlock.Count;
+                var vBuffer1Offset = iBuffer0Offset + indexDataBlock.Count;
 
-                // Index Data Compression
-                var compressedIndexDataParts = await Dat.CompressData(indexDataBlock);
-                foreach (var data in compressedIndexDataParts)
-                {
-                    compressedMDLData.AddRange(data);
-                }
+                // Vertex Buffer Offsets
+                header.AddRange(BitConverter.GetBytes(vBuffer0Offset));
+                header.AddRange(BitConverter.GetBytes(vBuffer1Offset));
+                header.AddRange(BitConverter.GetBytes(vBuffer1Offset));
+
+                // Index Buffer Offsets
+                header.AddRange(BitConverter.GetBytes(iBuffer0Offset));
+                header.AddRange(BitConverter.GetBytes(vBuffer1Offset));
+                header.AddRange(BitConverter.GetBytes(vBuffer1Offset));
+
+                // Vertex Buffer Sizes
+                header.AddRange(BitConverter.GetBytes(vertexDataBlock.Count));
+                header.AddRange(BitConverter.GetBytes(0));
+                header.AddRange(BitConverter.GetBytes(0));
+
+                // Index Buffer Sizes
+                header.AddRange(BitConverter.GetBytes(indexDataBlock.Count));
+                header.AddRange(BitConverter.GetBytes(0));
+                header.AddRange(BitConverter.GetBytes(0));
+
+                // LoD
+                header.Add(_LoDCount);
+
+                // Flags - We typically just write flag 0x01 on (Index streaming).
+                header.Add((byte) 1);
+
+                // Standard padding bytes.
+                header.AddRange(new byte[2]);
+
+                // Final Uncompressed MDL File Compilation.
+                var mdlFile = header.Concat(vertexInfoBlock).Concat(modelDataBlock).Concat(vertexDataBlock).Concat(indexDataBlock).ToArray();
                 #endregion
 
-                // Header Creation
-                #region Dat Type 3 File Header Creation
+                return await CompressMdlFile(mdlFile);
 
-                var datHeader = new List<byte>();
-
-                // This is the most common size of header for models
-                var headerLength = 256;
-
-                // 1 Block for vertex info + model data + geometry data.
-                var blockCount = 1 + compressedModelDataParts.Count + compressedVertexDataParts.Count + compressedIndexDataParts.Count;
-
-                // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
-                if (blockCount > 24)
-                {
-                    var remainingBlocks = blockCount - 24;
-                    var bytesUsed = remainingBlocks * 2;
-                    var extensionNeeeded = (bytesUsed / 128) + 1;
-                    var newSize = 256 + (extensionNeeeded * 128);
-                    headerLength = newSize;
-                }
-
-                // Header Length
-                datHeader.AddRange(BitConverter.GetBytes(headerLength));
-                // Data Type (models are type 3 data)
-                datHeader.AddRange(BitConverter.GetBytes(3));
-
-                // Model files are comprised of a fixed length header +  The Vertex Headers/Infos Structures + the larger general model metadata block + the geometry data blocks.
-                var uncompressedSize = _MdlHeaderSize + vertexInfoBlock.Count + modelDataBlock.Count + vertexDataBlock.Count + indexDataBlock.Count;
-                datHeader.AddRange(BitConverter.GetBytes(uncompressedSize));
-
-                // Max Buffer Size?
-                datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128 + 16));
-                // Buffer Size
-                datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128));
-                // Mdl Version
-                datHeader.AddRange(BitConverter.GetBytes((short)mdlVersion));
-                // Presumably still part of the version flag, but we split it here for human readability.
-                datHeader.AddRange(BitConverter.GetBytes((short)256));
-
-
-                // Vertex Info Block Uncompressed Size
-                var datPadding = 128 - vertexInfoBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(vertexInfoBlock.Count + datPadding));
-                // Model Data Block Uncompressed Size
-                datPadding = 128 - modelDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(modelDataBlock.Count + datPadding));
-                // Vertex Data Block Uncompressed Sizes
-                datPadding = 128 - vertexDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock.Count + datPadding));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                // Edge Geometry Uncompressed Sizes
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                // Index Data Uncompressed Sizes
-                datPadding = 128 - indexDataBlock.Count % 128;
-                datPadding = datPadding == 128 ? 0 : datPadding;
-                datHeader.AddRange(BitConverter.GetBytes(indexDataBlock.Count + datPadding));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-
-                // Vertex Info Total Compressed Size
-                datHeader.AddRange(BitConverter.GetBytes(compressedVertexInfo.Length));
-                // Model Data Total Compressed Size
-                datHeader.AddRange(BitConverter.GetBytes(compressedModelDataParts.Sum(x => x.Length)));
-                // Vertex Data Total Compressed Sizes
-                datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts.Sum(x => x.Length)));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                // Edge Geometry Total Compressed Sizes
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                // Index Data Total Compressed Sizes
-                datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts.Sum(x => x.Length)));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-
-                var vertexInfoOffset = 0;
-                var modelDataOffset = compressedVertexInfo.Length;
-                var vertexDataBlock1Offset = modelDataOffset + compressedModelDataParts.Sum(x => x.Length);
-                var indexDataBlock1Offset = vertexDataBlock1Offset + compressedVertexDataParts.Sum(x => x.Length);
-                var vertexDataBlock2Offset = indexDataBlock1Offset + compressedIndexDataParts.Sum(x => x.Length);
-                var indexDataBlock2Offset = vertexDataBlock2Offset;
-                var vertexDataBlock3Offset = vertexDataBlock2Offset;
-                var indexDataBlock3Offset = vertexDataBlock2Offset;
-
-                // Vertex Info Compressed Offset
-                datHeader.AddRange(BitConverter.GetBytes(vertexInfoOffset));
-                // Model Data Compressed Offset
-                datHeader.AddRange(BitConverter.GetBytes(modelDataOffset));
-                // Vertex Data Compressed Offsets
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock1Offset));
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock2Offset));
-                datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock3Offset));
-                // Edge Geometry Compressed Offsets
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                datHeader.AddRange(BitConverter.GetBytes(0));
-                // Index Data Compressed Offsets
-                datHeader.AddRange(BitConverter.GetBytes(indexDataBlock1Offset));
-                datHeader.AddRange(BitConverter.GetBytes(indexDataBlock2Offset));
-                datHeader.AddRange(BitConverter.GetBytes(indexDataBlock3Offset));
-
-                var vertexDataBlock1 = 1 + compressedModelDataParts.Count;
-                var indexDataBlock1 = vertexDataBlock1 + compressedVertexDataParts.Count;
-                var vertexDataBlock2 = indexDataBlock1 + compressedIndexDataParts.Count;
-                var indexDataBlock2 = vertexDataBlock2;
-                var vertexDataBlock3 = vertexDataBlock2;
-                var indexDataBlock3 = vertexDataBlock2;
-
-                // Vertex Info Block Index
-                datHeader.AddRange(BitConverter.GetBytes((short)0));
-                // Model Data Block Index
-                datHeader.AddRange(BitConverter.GetBytes((short)1));
-                // Vertex Data Block LoD[0] Indexes
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock1));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock2));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock3));
-                // Edge Geometry Data Block Indexes
-                datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock3));
-                // Index Data Block Indexes
-                datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock3));
-
-
-                // Vertex Info Part Count
-                datHeader.AddRange(BitConverter.GetBytes((short)1));
-                // Model Data Part Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts.Count));
-                // Vertex Data Block LoD[0] part count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts.Count));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
-                // Edge Geometry Counts
-                datHeader.AddRange(BitConverter.GetBytes((short)0));
-                datHeader.AddRange(BitConverter.GetBytes((short)0));
-                datHeader.AddRange(BitConverter.GetBytes((short)0));
-
-                // Index Data Block Counts
-                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts.Count));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
-                datHeader.AddRange(BitConverter.GetBytes((ushort)0));
-
-
-                // Mesh Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)geometryData.Count));
-                // Material Count
-                datHeader.AddRange(BitConverter.GetBytes((ushort)ttModel.Materials.Count));
-                // LoD Count
-                datHeader.Add(_LoDCount);
-                // Flags, specifically flag 1 enables index streaming.
-                datHeader.Add(1);
-                // Padding
-                datHeader.AddRange(BitConverter.GetBytes((short)0));
-
-
-                // ==== Compressed Block Sizes in order go here ==== //
-
-                // Vertex Info Padded Size
-                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexInfo.Length));
-
-                // Model Data Padded Size
-                for (var i = 0; i < compressedModelDataParts.Count; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts[i].Length));
-                }
-
-                // Individual Vertex Data Block [LoD 0] Sizes (We only have one LoD)
-                for (var i = 0; i < compressedVertexDataParts.Count; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[i].Length));
-                }
-
-                // [ We don't have any Edge Geometry blocks, but their compressed block sizes would go here if we did. ]
-
-                // Individual Index Data Block Sizes [LoD 0] (We only have one LoD)
-                for (var i = 0; i < compressedIndexDataParts.Count; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[i].Length));
-                }
-                
-
-                // Pad out remaining header space.
-                if (datHeader.Count != headerLength)
-                {
-                    var headerEnd = headerLength - datHeader.Count % headerLength;
-                    datHeader.AddRange(new byte[headerEnd]);
-                }
-
-                // Prepend the header to the Compressed MDL data to create the final type3 File.
-                compressedMDLData.InsertRange(0, datHeader);
-
-                return compressedMDLData.ToArray();
-
-                #endregion
             }
             catch (Exception ex)
             {
                 throw;
             }
         }
+
+        /// <summary>
+        /// Compresses a MDL file into a valid Type3 datafile.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private async Task<byte[]> CompressMdlFile(byte[] data)
+        {
+
+            #region MDL Header Reading
+            // Read sizes and offsets.
+            const int _VertexInfoSizeOffset = 0x04;
+            const int _ModelDataSizeOffset = 0x08;
+            const ushort _MeshCountOffset = 12;
+            const ushort _MaterialCountOffset = 14;
+            const int _LodMax = 3;
+
+            var signature = BitConverter.ToUInt32(data, 0);
+
+            var vertexInfoUncompOffset = _MdlHeaderSize;
+            var vertexInfoUncompSize = BitConverter.ToInt32(data, _VertexInfoSizeOffset);
+
+            var modelUncompDataOffset = vertexInfoUncompOffset + vertexInfoUncompSize;
+            var modelUncompDataSize = BitConverter.ToInt32(data, _ModelDataSizeOffset);
+
+            var meshCount = BitConverter.ToUInt16(data, _MeshCountOffset);
+            var materialCount = BitConverter.ToUInt16(data, _MaterialCountOffset);
+
+            var offset = 16;
+
+            uint[] vertexDataOffsets = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+            uint[] indexDataOffsets = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+            uint[] vertexDataSizes = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+            uint[] indexDataSizes = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+
+            var lodCount = data[offset];
+            var flags = data[offset + 1];
+            #endregion
+
+            #region Data Compression
+            // We can now compress the data blocks.
+            var compressedMDLData = new List<byte>();
+
+            // Vertex Info Compression
+            var vertexInfoBlock = data.Skip(vertexInfoUncompOffset).Take(vertexInfoUncompSize).ToList();
+            var compressedVertexInfoParts = await Dat.CompressData(vertexInfoBlock);
+            foreach (var block in compressedVertexInfoParts)
+            {
+                compressedMDLData.AddRange(block);
+            }
+
+            // Model Data Compression
+            var modelDataBlock = data.Skip(modelUncompDataOffset).Take(modelUncompDataSize).ToList();
+            List<byte[]> compressedModelDataParts = new List<byte[]>();
+            compressedModelDataParts = await Dat.CompressData(modelDataBlock);
+            foreach (var block in compressedModelDataParts)
+            {
+                compressedMDLData.AddRange(block);
+            }
+
+            // Vertex & Index Data Compression
+            var compressedVertexDataParts = new List<List<byte[]>>();
+            var compressedIndexDataParts = new List<List<byte[]>>();
+            for (int i = 0; i < _LodMax; i++)
+            {
+                // Written as [Vertex Block LoD0] [Index Block Lod0] [Vertex LoD1] ....
+                var uncompressedVertex = data.Skip((int) vertexDataOffsets[i]).Take((int)vertexDataSizes[i]).ToList();
+                var compressedVertex = await Dat.CompressData(uncompressedVertex);
+                var uncompressedIndex = data.Skip((int)indexDataOffsets[i]).Take((int)indexDataSizes[i]).ToList();
+                var compressedIndex = await Dat.CompressData(uncompressedIndex);
+
+                foreach (var block in compressedVertex)
+                {
+                    compressedMDLData.AddRange(block);
+                }
+                foreach (var block in compressedIndex)
+                {
+                    compressedMDLData.AddRange(block);
+                }
+
+                compressedVertexDataParts.Add(compressedVertex);
+                compressedIndexDataParts.Add(compressedIndex);
+            }
+
+            #endregion
+
+            #region Type 3 Header Writing
+
+            var datHeader = new List<byte>();
+
+            // This is the most common size of header for models
+            var headerLength = 256;
+
+            // 1 Block for vertex info + model data + geometry data.
+            var blockCount = compressedVertexInfoParts.Count + compressedModelDataParts.Count + compressedVertexDataParts.Count + compressedIndexDataParts.Count;
+
+            // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
+            if (blockCount > 24)
+            {
+                var remainingBlocks = blockCount - 24;
+                var bytesUsed = remainingBlocks * 2;
+                var extensionNeeeded = (bytesUsed / 128) + 1;
+                var newSize = 256 + (extensionNeeeded * 128);
+                headerLength = newSize;
+            }
+
+            // Header Length
+            datHeader.AddRange(BitConverter.GetBytes(headerLength));
+
+            // Data Type (models are type 3 data)
+            datHeader.AddRange(BitConverter.GetBytes(3));
+
+            // Model files are comprised of a fixed length header +  The Vertex Headers/Infos Structures + the larger general model metadata block + the geometry data blocks.
+            var uncompressedSize = _MdlHeaderSize + vertexInfoBlock.Count + modelDataBlock.Count + vertexDataSizes.Sum(x => x) + indexDataSizes.Sum(x => x);
+            datHeader.AddRange(BitConverter.GetBytes((uint) uncompressedSize));
+
+            // Max Buffer Size?
+            datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128 + 16));
+            // Buffer Size
+            datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128));
+
+            // Mdl Version / Signature
+            datHeader.AddRange(BitConverter.GetBytes(signature));
+
+
+            // Vertex Info Block Uncompressed Size
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad(vertexInfoBlock.Count, 128)));
+            // Model Data Block Uncompressed Size
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad(modelDataBlock.Count, 128)));
+            // Vertex Data Block Uncompressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int) vertexDataSizes[0], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int) vertexDataSizes[1], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int) vertexDataSizes[2], 128)));
+            // Edge Geometry Uncompressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            // Index Data Uncompressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[0], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[1], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[2], 128)));
+
+            // Vertex Info Total Compressed Size
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexInfoParts.Sum(x => x.Length)));
+            // Model Data Total Compressed Size
+            datHeader.AddRange(BitConverter.GetBytes(compressedModelDataParts.Sum(x => x.Length)));
+            // Vertex Data Total Compressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[0].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[1].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[2].Sum(x => x.Length)));
+            // Edge Geometry Total Compressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            // Index Data Total Compressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[0].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[1].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[2].Sum(x => x.Length)));
+
+
+            // Compressed Offsets
+            var vertexInfoOffset = 0;
+            var modelDataOffset = vertexInfoOffset + compressedVertexInfoParts.Sum(x => x.Length);
+
+            var vertexDataBlock0Offset = modelDataOffset + compressedModelDataParts.Sum(x => x.Length);
+            var indexDataBlock0Offset = vertexDataBlock0Offset + compressedVertexDataParts[0].Sum(x => x.Length);
+
+            var vertexDataBlock1Offset = indexDataBlock0Offset + compressedIndexDataParts[0].Sum(x => x.Length);
+            var indexDataBlock1Offset = vertexDataBlock1Offset + compressedVertexDataParts[1].Sum(x => x.Length);
+
+            var vertexDataBlock2Offset = indexDataBlock1Offset + compressedIndexDataParts[1].Sum(x => x.Length);
+            var indexDataBlock2Offset = vertexDataBlock2Offset + compressedVertexDataParts[2].Sum(x => x.Length);
+            
+            // Vertex Info Compressed Offset
+            datHeader.AddRange(BitConverter.GetBytes(vertexInfoOffset));
+            // Model Data Compressed Offset
+            datHeader.AddRange(BitConverter.GetBytes(modelDataOffset));
+            // Vertex Data Compressed Offsets
+            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock0Offset));
+            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock1Offset));
+            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock2Offset));
+            // Edge Geometry Compressed Offsets
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            // Index Data Compressed Offsets
+            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock0Offset));
+            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock1Offset));
+            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock2Offset));
+
+            // Data Block Indexes
+            var vertexInfoDataBlockIndex = 0;
+            var modelDataBlockIndex = vertexInfoDataBlockIndex + compressedVertexInfoParts.Count;
+
+            var vertexDataBlock0 = modelDataBlockIndex + compressedModelDataParts.Count;
+            var indexDataBlock0 = vertexDataBlock0 + compressedVertexDataParts[0].Count;
+
+            var vertexDataBlock1 = indexDataBlock0 + compressedIndexDataParts[0].Count;
+            var indexDataBlock1 = vertexDataBlock1 + compressedVertexDataParts[1].Count;
+
+            var vertexDataBlock2 = indexDataBlock1 + compressedIndexDataParts[1].Count;
+            var indexDataBlock2 = vertexDataBlock2 + compressedVertexDataParts[2].Count;
+
+            // Vertex Info Block Index
+            datHeader.AddRange(BitConverter.GetBytes((short)vertexInfoDataBlockIndex));
+            // Model Data Block Index
+            datHeader.AddRange(BitConverter.GetBytes((short)modelDataBlockIndex));
+            // Vertex Data Block LoD[0] Indexes
+            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock0));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock1));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock2));
+            // Edge Geometry Data Block Indexes
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock0));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
+            // Index Data Block Indexes
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock0));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
+
+
+            // Data Block Counts
+            // Vertex Info Part Count
+            datHeader.AddRange(BitConverter.GetBytes((short)compressedVertexInfoParts.Count));
+            // Model Data Part Count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts.Count));
+            // Vertex Data Block LoD[0] part count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[0].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[1].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[2].Count));
+            // Edge Geometry Counts
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+
+            // Index Data Block Counts
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[0].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[1].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[2].Count));
+
+
+            // Mesh Count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)meshCount));
+            // Material Count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)materialCount));
+            // LoD Count
+            datHeader.Add(lodCount);
+            // Flags, specifically flag 1 enables index streaming.
+            datHeader.Add(flags);
+            // Padding
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+
+
+            // ==== Compressed Block Sizes in order go here ==== //
+
+            // Vertex Info Compressed Block Sizes
+            for (var i = 0; i < compressedVertexInfoParts.Count; i++)
+            {
+                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexInfoParts[i].Length));
+            }
+
+            // Model Data Padded Size
+            for (var i = 0; i < compressedModelDataParts.Count; i++)
+            {
+                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts[i].Length));
+            }
+
+            // Vertex/Index Info Compressed Block Sizes
+            for (var l = 0; l < _LodMax; l++)
+            {
+                for(int i = 0; i < compressedVertexDataParts[l].Count; i++)
+                {
+                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[l][i].Length));
+                }
+
+                // If we had edge geometry blocks, they would go here.
+
+                for (int i = 0; i < compressedIndexDataParts[l].Count; i++)
+                {
+                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[l][i].Length));
+                }
+            }
+
+
+            // Pad out remaining header space.
+            if (datHeader.Count != headerLength)
+            {
+                var headerEnd = headerLength - datHeader.Count % headerLength;
+                datHeader.AddRange(new byte[headerEnd]);
+            }
+
+            // Prepend the header to the Compressed MDL data to create the final type3 File.
+            compressedMDLData.InsertRange(0, datHeader);
+            #endregion
+
+            return compressedMDLData.ToArray();
+            
+        }
+
+
         /// <summary>
         /// Converts the TTTModel Geometry into the raw byte blocks FFXIV expects.
         /// </summary>
