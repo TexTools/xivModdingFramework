@@ -736,8 +736,11 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrl.ShaderPack = ShaderHelpers.EShaderPack.CharacterLegacy;
             }
 
-            // Wipe Dye data b/c we don't know how to handle it atm.
-            mtrl.ColorSetDyeData = null;
+            if(mtrl.ColorSetData.Count != 256)
+            {
+                // This is already upgraded.
+                return;
+            }
 
             List<Half> newData = new List<Half>();
 
@@ -788,7 +791,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 //Unknown + subsurface material id
                 newData.Add(0);
                 newData.Add(mtrl.ColorSetData[pixel + 3]);
-                newData.Add(1.0f);
+                newData.Add(1.0f);  //  Subsurface Material Alpha
                 newData.Add(0);
 
                 pixel += 4;
@@ -801,27 +804,41 @@ namespace xivModdingFramework.Materials.FileTypes
                 // Add a blank row after, since only populating every other row.
                 newData.AddRange(GetDefaultColorsetRow());
             }
+
             mtrl.ColorSetData = newData;
-            // Wipe Dye data b/c we don't know how to handle it atm.
-            mtrl.ColorSetDyeData = null;
-
-            // Not sure this is necessary?
-            if (!mtrl.ShaderKeys.Any(x => x.KeyId == 4113354501))
+            if (mtrl.ColorSetDyeData != null)
             {
-                mtrl.ShaderKeys.Add(new ShaderKey()
+                // Update Dye information.
+                var newDyeData = new byte[128];
+                // Update old dye information
+                for (int i = 0; i < 16; i++)
                 {
-                    KeyId = 4113354501,
-                    Value = 2815623008,
-                });
+                    var oldOffset = i * 2;
+                    var newOffset = (i * 2) * 4;
+
+                    var newDyeBlock = (uint)0;
+                    var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
+
+                    // Old dye bitmask was 5 bits long.
+                    uint dyeBits = (uint)(oldDyeBlock & 0x1F);
+                    uint oldTemplate = (uint)(oldDyeBlock >> 5);
+
+                    newDyeBlock |= (oldTemplate << 16);
+                    newDyeBlock |= dyeBits;
+
+                    var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
+
+                    Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                }
+
+                mtrl.ColorSetDyeData = newDyeData;
             }
-
-
 
             // Create an _id texture if we can pull the information off the normal map.
             var normalTexPath = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Normal);
             if (normalTexPath != null)
             {
-                var idPath = normalTexPath.TexturePath.Replace("_n.tex", "_id.tex");
+                var idPath = normalTexPath.TexturePath.Replace(".tex", "_id.tex");
 
                 var tex = new MtrlTexture();
                 tex.TexturePath = idPath;
@@ -833,6 +850,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrl.Textures.Add(tex);
 
                 var _tex = new Tex(_gameDirectory);
+                var _dat = new Dat(_gameDirectory);
                 var normalTex = await _tex.GetTexData(normalTexPath.TexturePath);
                 var texData = await _tex.GetImageData(normalTex);
 
@@ -848,32 +866,33 @@ namespace xivModdingFramework.Materials.FileTypes
                     idPixels = new byte[64 * 64 * 4];
                     for (int i = 0; i < idPixels.Length; i += 4)
                     {
-                        idPixels[i] = pix;
+                        // We're going from RGBA to BGRA here.
+                        idPixels[i] = 0;
                         idPixels[i + 1] = 255;
-                        idPixels[i + 2] = 0;
-                        idPixels[i + 3] = 0;
+                        idPixels[i + 2] = pix;
+                        idPixels[i + 3] = 255;
                     }
                 }
                 else
                 {
                     for (int i = 0; i < idPixels.Length; i += 4)
                     {
-                        idPixels[i] = texData[i + 3];
+                        // We're going from RGBA to BGRA here,
+                        // And trying to copy over data.
+                        byte src = texData[i + 3];
+                        
+                        idPixels[i] = 0;
                         idPixels[i + 1] = 255;
-                        idPixels[i + 2] = 0;
-                        idPixels[i + 3] = 0;
+                        idPixels[i + 2] = src;
+                        idPixels[i + 3] = 255;
                     }
-                }
-
-                var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".png");
-                using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(idPixels, width, height))
-                {
-                    img.Save(tempFile, new PngEncoder());
                 }
 
                 try
                 {
-                    await _tex.ImportTex(idPath, tempFile, null, source, null, null, XivTexFormat.A8R8G8B8);
+                    var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width);
+                    var compressedBytes = await _tex.CompressDDS(ddsBytes, idPath);
+                    await _dat.WriteModFile(compressedBytes, idPath, source);
                 }
                 catch (Exception ex)
                 {
