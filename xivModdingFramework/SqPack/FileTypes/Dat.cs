@@ -736,13 +736,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetType3Data(offset, dataFile);
         }
         
-        private void Write3IntBuffer(List<byte> bufferTarget, uint[] dataToAdd)
+        public static void Write3IntBuffer(List<byte> bufferTarget, uint[] dataToAdd)
         {
             bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[0]));
             bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[1]));
             bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[2]));
         }
-        private uint[] Read3IntBuffer(BinaryReader br, bool shortOnly = false)
+        public static uint[] Read3IntBuffer(BinaryReader br, bool shortOnly = false)
         {
             uint[] data = new uint[3];
             if (shortOnly)
@@ -757,6 +757,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                 data[1] = br.ReadUInt32();
                 data[2] = br.ReadUInt32();
             }
+            return data;
+        }
+        public static uint[] Read3IntBuffer(byte[] body, int offset)
+        {
+            uint[] data = new uint[3];
+            data[0] = BitConverter.ToUInt32(body, offset);
+            data[1] = BitConverter.ToUInt32(body, offset + 4);
+            data[2] = BitConverter.ToUInt32(body, offset + 8);
             return data;
         }
 
@@ -931,7 +939,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var extraData = br.ReadBytes((int)distanceToEndOfHeader);
 
 
-
                         // Read the compressed blocks.
                         // These could technically be read as contiguous blocks typically,
                         // But it's safer to actually use their offsets and validate them in the process.
@@ -959,25 +966,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                         }
 
                         var byteList = new List<byte>();
-                        // This header isn't actually written back to the game anywhere currently,
-                        // and is generated internally by FFXIV when loading type 3 files.
-                        // It's best for us to replicate it though.
-                        byteList.AddRange(BitConverter.GetBytes(version));
-                        byteList.AddRange(BitConverter.GetBytes(vertexInfoSize));
-                        byteList.AddRange(BitConverter.GetBytes(modelDataSize));
-                        byteList.AddRange(BitConverter.GetBytes((ushort)meshCount));
-                        byteList.AddRange(BitConverter.GetBytes((ushort)materialCount));
-
-                        Write3IntBuffer(byteList, vertexBufferOffsets);
-                        Write3IntBuffer(byteList, indexBufferOffsets);
-                        Write3IntBuffer(byteList, vertexBufferSizes);
-                        Write3IntBuffer(byteList, indexBufferSizes);
-
-                        byteList.Add(lodCount);
-                        byteList.Add(flags);
-                        byteList.AddRange(padding);
-
                         var decompressedData = (IEnumerable<byte>)byteList;
+
+                        // Need to mark these as we unzip them.
+                        var vertexBufferUncompressedOffsets = new uint[_VertexSegments];
+                        var indexBufferUncompressedOffsets = new uint[_VertexSegments];
+                        var vertexBufferRealSizes = new uint[_VertexSegments];
+                        var indexOffsetRealSizes = new uint[_VertexSegments];
 
                         // Vertex and Model Headers
                         decompressedData = decompressedData.Concat(vertexInfoData);
@@ -986,13 +981,43 @@ namespace xivModdingFramework.SqPack.FileTypes
                         for(int i = 0; i < _VertexSegments; i++)
                         {
                             // Geometry data in LoD order.
+                            // Mark the real uncompressed offsets and sizes on the way through.
+                            vertexBufferUncompressedOffsets[i] = (uint) decompressedData.Count();
+                            vertexBufferRealSizes[i] = (uint) vertexBuffers[i].Length;
                             decompressedData = decompressedData.Concat(vertexBuffers[i]);
+
+
                             decompressedData = decompressedData.Concat(edgeBuffers[i]);
+
+
+                            indexBufferUncompressedOffsets[i] = (uint)decompressedData.Count();
+                            indexOffsetRealSizes[i] = (uint)indexBuffers[i].Length;
                             decompressedData = decompressedData.Concat(indexBuffers[i]);
 
                         }
 
-                        result = decompressedData.ToArray();
+                        var header = new List<byte>();
+
+                        // Generated header for live/uncompressed MDL files.
+                        header.AddRange(BitConverter.GetBytes(version));
+                        header.AddRange(BitConverter.GetBytes(vertexInfoSize));
+                        header.AddRange(BitConverter.GetBytes(modelDataSize));
+                        header.AddRange(BitConverter.GetBytes((ushort)meshCount));
+                        header.AddRange(BitConverter.GetBytes((ushort)materialCount));
+
+                        Write3IntBuffer(header, vertexBufferUncompressedOffsets);
+                        Write3IntBuffer(header, indexBufferUncompressedOffsets);
+                        Write3IntBuffer(header, vertexBufferRealSizes);
+                        Write3IntBuffer(header, indexOffsetRealSizes);
+
+                        header.Add(lodCount);
+                        header.Add(flags);
+                        header.AddRange(padding);
+
+                        
+
+
+                        result = header.Concat(decompressedData).ToArray();
 
                     }
                 }
