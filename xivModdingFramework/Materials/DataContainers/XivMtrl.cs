@@ -260,7 +260,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     DataFile = IOUtil.GetDataFileFromPath(tex.TexturePath),
                     Path = tex.TexturePath,
-                    Type = tex.Usage,
+                    Type = ResolveFullUsage(tex),
                     Name = Path.GetFileNameWithoutExtension(tex.TexturePath)
                 };
                 list.Add(ttp);
@@ -295,15 +295,29 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         /// <param name="usage"></param>
         /// <returns></returns>
-        public MtrlTexture GetTexture(XivTexType usage, bool clone = true)
+        public MtrlTexture GetTexture(XivTexType usage, bool clone = false)
         {
 
-            var val = Textures.FirstOrDefault(x => x.Usage == usage);
+            var val = Textures.FirstOrDefault(x => ResolveFullUsage(x) == usage);
             if(val != null && clone)
             {
                 val = (MtrlTexture)val.Clone();
             }
             return val;
+        }
+
+        /// <summary>
+        /// Performs a better usage resolve than just MtrlTexture.Usage, properly accounting for shader keys.
+        /// </summary>
+        /// <param name="tex"></param>
+        /// <returns></returns>
+        public XivTexType ResolveFullUsage(MtrlTexture tex)
+        {
+            if(tex.Sampler == null)
+            {
+                return XivTexType.Other;
+            }
+            return ShaderHelpers.SamplerIdToTexUsage(tex.Sampler.SamplerId, this);
         }
 
         /// <summary>

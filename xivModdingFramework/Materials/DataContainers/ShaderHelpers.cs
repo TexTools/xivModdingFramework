@@ -361,10 +361,19 @@ namespace xivModdingFramework.Materials.DataContainers
         /// XiVTexType should primarily only be used for naive user display purposes.
         /// </summary>
         /// <param name="samplerId"></param>
+        /// <param name="mtrl">Option - Material that is using the texture.  Allows proper resolution for specular maps using mask sampler.</param>
         /// <returns></returns>
-        public static XivTexType SamplerIdToTexUsage(ESamplerId samplerId)
+        public static XivTexType SamplerIdToTexUsage(ESamplerId samplerId, XivMtrl mtrl = null)
         {
-            if(samplerId == ESamplerId.g_SamplerNormal || samplerId == ESamplerId.g_SamplerNormal2)
+            // Compatibility mode shader keys...
+            if(mtrl != null && mtrl.ShaderKeys.Any( x=> x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF)) {
+                if (samplerId == ESamplerId.g_SamplerMask)
+                {
+                    return XivTexType.Specular;
+                }
+            }
+
+            if(samplerId == ESamplerId.g_SamplerNormal || samplerId == ESamplerId.g_SamplerNormal2 || samplerId == ESamplerId.g_SamplerNormalMap0 || samplerId == ESamplerId.g_SamplerNormalMap1 || samplerId == ESamplerId.g_SamplerTileNormal)
             {
                 return XivTexType.Normal;
             } else if(samplerId == ESamplerId.g_SamplerMask || samplerId == ESamplerId.g_SamplerWrinklesMask || samplerId == ESamplerId.g_SamplerTileOrb)
@@ -382,6 +391,9 @@ namespace xivModdingFramework.Materials.DataContainers
             } else if(samplerId == ESamplerId.g_SamplerDecal)
             {
                 return XivTexType.Decal;
+            } else if(samplerId == ESamplerId.g_SamplerSpecularMap0 || samplerId == ESamplerId.g_SamplerSpecular || samplerId == ESamplerId.g_SamplerSpecularMap1)
+            {
+                return XivTexType.Specular;
             }
             return XivTexType.Other;
         }

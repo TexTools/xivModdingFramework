@@ -507,9 +507,9 @@ namespace xivModdingFramework.Models.ModelTextures
 
             var shaderPack = mtrl.ShaderPack;
 
-            bool hasDiffuse = mtrl.Textures.Any(x => x.Usage == XivTexType.Diffuse);
-            bool hasSpecular = mtrl.Textures.Any(x => x.Usage == XivTexType.Specular);
-            bool hasMulti = mtrl.Textures.Any(x => x.Usage == XivTexType.Mask);
+            bool hasDiffuse = mtrl.GetTexture(XivTexType.Diffuse) != null;
+            bool hasSpecular = mtrl.GetTexture(XivTexType.Specular) != null;
+            bool hasMulti = mtrl.GetTexture(XivTexType.Mask) != null;
 
             if (!thrownException1 && hasMulti && hasSpecular)
             {
