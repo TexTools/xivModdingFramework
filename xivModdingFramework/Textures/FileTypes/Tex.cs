@@ -1110,7 +1110,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public async Task<byte[]> CompressDDS(string externalDdsPath, string internalPath)
         {
-            var uncompressedLength = (int)new FileInfo(externalDdsPath).Length - 128;
+            var uncompressedLength = (int)new FileInfo(externalDdsPath).Length;
             using (var br = new BinaryReader(File.OpenRead(externalDdsPath)))
             {
                 return await CompressDDS(br, uncompressedLength, internalPath);
@@ -1119,7 +1119,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public async Task<byte[]> CompressDDS(byte[] data, string internalPath)
         {
-            var uncompressedLength = (int)data.Length - 128;
+            var uncompressedLength = data.Length;
             using (var ms = new MemoryStream(data)) 
             {
                 using (var br = new BinaryReader(ms))
@@ -1132,13 +1132,12 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <summary>
         /// Compresses a DDS file into either a Type 4 (Texture)[.tex] file or Type 2 (Binary)[.atex] file depending on target file path.
         /// </summary>
-        /// <param name="externalDdsPath"></param>
-        /// <param name="internalPath"></param>
+        /// <param name="br">Open binary reader positioned to the start of the binary DDS data (including header).</param>
+        /// <param name="br">Total size of the DDS Data (including header)</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public async Task<byte[]> CompressDDS(BinaryReader br, int uncompSize, string internalPath)
         {
-
             var texFormat = GetDDSTexFormat(br);
             br.BaseStream.Seek(12, SeekOrigin.Begin);
 
@@ -1157,9 +1156,10 @@ namespace xivModdingFramework.Textures.FileTypes
             var textureFlags = br.ReadInt32();
             var texType = br.ReadInt32();
 
-            var uncompressedLength = uncompSize;
-            var newTex = new List<byte>();
+            // DDS header is not included in the compressed data.
+            var uncompressedLength = uncompSize - 128;
 
+            var newTex = new List<byte>();
             if (!internalPath.Contains(".atex"))
             {
                 var ddsParts = await DDS.CompressDDSBody(br, texFormat, newWidth, newHeight, newMipCount);
