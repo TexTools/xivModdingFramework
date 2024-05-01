@@ -564,9 +564,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, ModPack modPack = null)
         {
-            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, cachedIndexFile, cachedModList);
+            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, cachedIndexFile, cachedModList,  modPack);
         }
 
         /// <summary>
@@ -579,7 +579,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="cachedIndexFile">Cached index file, if available</param>
         /// <param name="cachedModList">Cached modlist file, if available</param>
         /// <returns></returns>
-        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, ModPack modPack = null)
         {
             var dataFile = GetDataFileFromPath(internalPath);
             var modding = new Modding(_gameDirectory);
@@ -587,7 +587,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var modEntry = await modding.TryGetModEntry(internalPath);
             var newData = (await CompressType2Data(dataToImport));
 
-            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList);
+            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList, modPack);
 
             // This can be -1 after Lumina imports
             if (newOffset == 0)
@@ -1265,6 +1265,25 @@ namespace xivModdingFramework.SqPack.FileTypes
             data.AddRange(new T[pad]);
         }
 
+        /// <summary>
+        /// Pads a given byte array to the target padding interval with empty bytes.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="data"></param>
+        /// <param name="paddingTarget"></param>
+        /// <param name="forcePadding"></param>
+        public static T[] PadArray<T>(T[] data, int paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (data.Length % paddingTarget);
+            if (pad == paddingTarget && !forcePadding)
+            {
+                return data;
+            }
+            var res = new T[data.Length + pad];
+            data.CopyTo(res, 0);
+            return res;
+        }
+
 
         /// <summary>
         /// Pads a given int length to the next padding interval.
@@ -1280,9 +1299,23 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return size;
             }
             return size + pad;
-
         }
 
+        /// <summary>
+        /// Pads a given int length to the next padding interval.
+        /// </summary>
+        /// <param name="size"></param>
+        /// <param name="paddingTarget"></param>
+        /// <returns></returns>
+        public static long Pad(long size, long paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (size % paddingTarget);
+            if (pad == paddingTarget && !forcePadding)
+            {
+                return size;
+            }
+            return size + pad;
+        }
 
         /// <summary>
         /// Compresses a single data block, returning the singular compressed byte array.
@@ -1297,16 +1330,26 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("CompressSmallData() data is too large.");
             }
 
-            List<Byte> result = new List<byte>();
             // Vertex Info Compression
             var compressedData = await IOUtil.Compressor(data);
+
+            var pad = 128 - (compressedData.Length % 128);
+            if (pad == 128)
+            {
+                pad = 0;
+            }
+
+            var paddedSize = 16 + compressedData.Length + pad;
+
+            // Pre-allocate the array.
+            List<byte> result = new List<byte>(paddedSize);
             result.AddRange(BitConverter.GetBytes(16));
             result.AddRange(BitConverter.GetBytes(0));
             result.AddRange(BitConverter.GetBytes(compressedData.Length));
             result.AddRange(BitConverter.GetBytes(data.Length));
             result.AddRange(compressedData);
+            result.AddRange(new byte[pad]);
 
-            Pad(result, 128);
             return result.ToArray();
         }
 
@@ -1355,7 +1398,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return parts;
         }
-
         public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
         {
             if (offset <= 0)

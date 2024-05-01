@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core.Helper;
 using SharpDX;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
@@ -34,6 +36,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
@@ -645,7 +648,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool validateTextures = true, ModPack modPack = null)
         {
             try
             {
@@ -653,46 +656,51 @@ namespace xivModdingFramework.Materials.FileTypes
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList);
+                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList, modPack);
 
-                // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
-                var _index = new Index(_gameDirectory);
-                var _tex = new Tex(_gameDirectory);
-                foreach (var tex in xivMtrl.Textures)
+                if (validateTextures)
                 {
-                    var path = tex.TexturePath;
-
-                    // Ignore empty samplers.
-                    if (path.StartsWith(EmptySamplerPrefix)) continue;
-
-                    bool exists = false;
-                    if (cachedIndexFile != null)
+                    // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
+                    var _index = new Index(_gameDirectory);
+                    var _tex = new Tex(_gameDirectory);
+                    foreach (var tex in xivMtrl.Textures)
                     {
-                        exists = cachedIndexFile.FileExists(tex.TexturePath);
+                        var path = tex.TexturePath;
+
+                        // Ignore empty samplers.
+                        if (path.StartsWith(EmptySamplerPrefix)) continue;
+
+                        bool exists = false;
+                        if (cachedIndexFile != null)
+                        {
+                            exists = cachedIndexFile.FileExists(tex.TexturePath);
+                        }
+                        else
+                        {
+                            exists = await _index.FileExists(tex.TexturePath, IOUtil.GetDataFileFromPath(path));
+                        }
+
+                        if (exists)
+                        {
+                            continue;
+                        }
+
+                        var format = XivTexFormat.A8R8G8B8;
+
+                        var xivTex = new XivTex();
+                        xivTex.TextureTypeAndPath = new TexTypePath()
+                        {
+                            DataFile = IOUtil.GetDataFileFromPath(path),
+                            Path = path,
+                            Type = tex.Usage
+                        };
+                        xivTex.TextureFormat = format;
+
+                        var di = Tex.GetDefaultTexturePath(tex.Usage);
+
+                        var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList, modPack);
+
                     }
-                    else
-                    {
-                        exists = await _index.FileExists(tex.TexturePath, IOUtil.GetDataFileFromPath(path));
-                    }
-
-                    if(exists)
-                    {
-                        continue;
-                    }
-
-                    var format = XivTexFormat.A8R8G8B8;
-
-                    var xivTex = new XivTex();
-                    xivTex.TextureTypeAndPath = new TexTypePath()
-                    {
-                        DataFile = IOUtil.GetDataFileFromPath(path), Path = path, Type = tex.Usage
-                    };
-                    xivTex.TextureFormat = format;
-
-                    var di = Tex.GetDefaultTexturePath(tex.Usage);
-
-                    var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList);
-
                 }
 
                 return offset;
@@ -703,32 +711,118 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        public async Task FixPreDawntrailMaterial(string mtrlPath, bool updateShaders, string source)
+        public async Task FixPreDawntrailMaterials(List<string> paths, bool updateShaders, string source, IndexFile indexFile = null, ModList modList = null, ModPack modPack = null, IProgress<(int current, int total, string message)> progress = null)
         {
-            var data = await GetMtrlData(mtrlPath);
-            await FixPreDawntrailMaterial(data, updateShaders, source);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+
+            // Open Transaction
+            var transactionIndexFile = await _index.GetIndexFile(XivDataFile._04_Chara);
+            var transactionModList = await _modding.GetModListAsync();
+
+            var total = paths.Count;
+
+            progress?.Report((0, total, "Updating Materials..."));
+
+            // Alter the MTRLs.
+            var indexesToCreate = new List<(string indexTextureToCreate, string normalToCreateFrom)>();
+
+            var count = 0;
+            foreach (var path in paths)
+            {
+                var res = await FixPreDawntrailMaterial(await GetMtrlData(path), updateShaders, source, transactionIndexFile, transactionModList, modPack);
+                if(res.indexTextureToCreate != null)
+                {
+                    indexesToCreate.Add(res);
+                }
+                count++;
+                progress?.Report((count, total, "Updating Materials..."));
+            }
+
+            count = 0;
+            progress?.Report((0, total, "Creating Index Textures..."));
+            // Create the new Index DDS files.
+
+            // Max we allow to run at a time.
+            // This is a safety measure to prevent us nuking the user's RAM by loading a zillion textures into memory at once.
+            const int _SIMULTANEOUS_MAX = 10;
+
+            for(int i = 0; i < indexesToCreate.Count; i += _SIMULTANEOUS_MAX)
+            {
+                var subList = indexesToCreate.Skip(i).Take(_SIMULTANEOUS_MAX).ToList();
+                
+                /*
+                // Sequential version, useful for debugging.
+                foreach(var tup in subList)
+                {
+                    var start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                    var val = await CreateIndexFromNormal(tup.indexTextureToCreate, tup.normalToCreateFrom);
+                    await _dat.WriteModFile(val.data, val.indexFilePath, source, null, transactionIndexFile, transactionModList, modPack);
+                    var end = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                    var duration = end - start;
+                    Debug.WriteLine(duration);
+                }*/
+
+                var tasks = new List<Task<(string indexFilePath, byte[] data)>>();                
+                foreach (var tup in subList)
+                {
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        var val = await CreateIndexFromNormal(tup.indexTextureToCreate, tup.normalToCreateFrom);
+                        count++;
+                        progress?.Report((count, total, "Creating Index Textures..."));
+                        return val;
+                    }));
+                }
+
+                await Task.WhenAll(tasks);
+
+                // Write this chunk of files to disk.
+                var results = tasks.Select(x => x.Result).ToList();
+                foreach (var texData in results)
+                {
+                    await _dat.WriteModFile(texData.data, texData.indexFilePath, source, null, transactionIndexFile, transactionModList, modPack);
+                }
+            }
+
+            // Commit Transaction
+            await _index.SaveIndexFile(transactionIndexFile);
+            await _modding.SaveModListAsync(transactionModList);
         }
 
 
-        public async Task FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source)
+        public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source, IndexFile indexFile = null, ModList modList = null, ModPack modPack = null)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
-                return;
+                // Already updated or doesn't need updating.
+                return (null, null);
             }
+
             if(mtrl.ShaderPackRaw == "character.shpk")
             {
-                await FixPreDawntrailCharacterMaterial(mtrl, updateShaders, source);
-                return;
+                return await FixPreDawntrailCharacterMaterial(mtrl, updateShaders, source, indexFile, modList, modPack);
             }
+
             if(mtrl.ShaderPackRaw == "hair.shpk")
             {
 
             }
+            return (null, null);
         }
 
 
-        private async Task FixPreDawntrailCharacterMaterial(XivMtrl mtrl, bool updateShaders, string source)
+        /// <summary>
+        /// Updates a given Endwalker style Material to a Dawntrail style material, returning a tuple containing the Index Map that should be created after,
+        /// and the normal map that should be used in the creation.
+        /// </summary>
+        /// <param name="mtrl"></param>
+        /// <param name="updateShaders"></param>
+        /// <param name="source"></param>
+        /// <returns></returns>
+        private async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, bool updateShaders, string source, IndexFile indexFile = null, ModList modList = null, ModPack modPack = null)
         {
 
             if (!updateShaders)
@@ -739,7 +833,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if(mtrl.ColorSetData.Count != 256)
             {
                 // This is already upgraded.
-                return;
+                return (null, null);
             }
 
             List<Half> newData = new List<Half>();
@@ -833,12 +927,13 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 mtrl.ColorSetDyeData = newDyeData;
             }
-
-            // Create an _id texture if we can pull the information off the normal map.
-            var normalTexPath = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Normal);
-            if (normalTexPath != null)
+            var normalTex = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Normal);
+            string idPath = null;
+            string normalPath = null;
+            if (normalTex!= null)
             {
-                var idPath = normalTexPath.TexturePath.Replace(".tex", "_id.tex");
+                idPath = normalTex.TexturePath.Replace(".tex", "_id.tex");
+                normalPath = normalTex.TexturePath;
 
                 var tex = new MtrlTexture();
                 tex.TexturePath = idPath;
@@ -848,64 +943,69 @@ namespace xivModdingFramework.Materials.FileTypes
                     SamplerIdRaw = 1449103320,
                 };
                 mtrl.Textures.Add(tex);
-
-                var _tex = new Tex(_gameDirectory);
-                var _dat = new Dat(_gameDirectory);
-                var normalTex = await _tex.GetTexData(normalTexPath.TexturePath);
-                var texData = await _tex.GetImageData(normalTex);
-
-                // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
-                var idPixels = new byte[texData.Length];
-                var width = normalTex.Width;
-                var height = normalTex.Height;
-                if (height <= 32 || width <= 32)
-                {
-                    height = 64;
-                    width = 64;
-                    var pix = texData[3];
-                    idPixels = new byte[64 * 64 * 4];
-                    for (int i = 0; i < idPixels.Length; i += 4)
-                    {
-                        // We're going from RGBA to BGRA here.
-                        idPixels[i] = 0;
-                        idPixels[i + 1] = 255;
-                        idPixels[i + 2] = pix;
-                        idPixels[i + 3] = 255;
-                    }
-                }
-                else
-                {
-                    for (int i = 0; i < idPixels.Length; i += 4)
-                    {
-                        // We're going from RGBA to BGRA here,
-                        // And trying to copy over data.
-                        byte src = texData[i + 3];
-                        
-                        idPixels[i] = 0;
-                        idPixels[i + 1] = 255;
-                        idPixels[i + 2] = src;
-                        idPixels[i + 3] = 255;
-                    }
-                }
-
-                try
-                {
-                    var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width);
-                    var compressedBytes = await _tex.CompressDDS(ddsBytes, idPath);
-                    await _dat.WriteModFile(compressedBytes, idPath, source);
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
-
             }
 
+            await ImportMtrl(mtrl, null, source, indexFile, modList, false, modPack);
 
-            await ImportMtrl(mtrl, null, source);
+            return (idPath, normalPath);
+        }
 
 
+        private async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath)
+        {
+            var _tex = new Tex(_gameDirectory);
+            var _dat = new Dat(_gameDirectory);
 
+            // Read normal file.
+            var normalTex = await _tex.GetTexData(sourceNormalPath);
+            var texData = await _tex.GetImageData(normalTex);
+
+            // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
+            var idPixels = new byte[texData.Length];
+            var width = normalTex.Width;
+            var height = normalTex.Height;
+            
+            if (height <= 32 || width <= 32)
+            {
+                height = 64;
+                width = 64;
+                var pix = texData[3];
+                idPixels = new byte[64 * 64 * 4];
+                for (int i = 0; i < idPixels.Length; i += 4)
+                {
+                    // We're going from RGBA to BGRA here.
+                    idPixels[i] = 0;
+                    idPixels[i + 1] = 255;
+                    idPixels[i + 2] = pix;
+                    idPixels[i + 3] = 255;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < idPixels.Length; i += 4)
+                {
+                    // We're going from RGBA to BGRA here,
+                    // And trying to copy over data.
+                    byte src = texData[i + 3];
+
+                    idPixels[i] = 0;
+                    idPixels[i + 1] = 255;
+                    idPixels[i + 2] = src;
+                    idPixels[i + 3] = 255;
+                }
+            }
+
+            try
+            {
+                var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, false);
+                var compressedBytes = await _tex.CompressDDS(ddsBytes, indexPath);
+
+                return (indexPath, compressedBytes);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
         private Half[] GetDefaultColorsetRow()
         {

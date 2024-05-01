@@ -46,6 +46,8 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
+using System.Text;
+using System.Diagnostics;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -1042,13 +1044,20 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
+
         /// <summary>
         /// Convert a raw pixel byte array into a DDS data block.
         /// </summary>
         /// <param name="data">8.8.8.8 Pixel format data.</param>
+        /// <param name="allowNonsense">Cursed argument that allows generating fake DDS files for speed.</param>
         /// <returns></returns>
-        public async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int height, int width)
+        public async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int height, int width, bool allowFast8888 = true)
         {
+            if(allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
+            {
+                return CreateFast8888DDS(data, height, width);
+            }
+
             // Ensure we're converting to a format we can actually process.
             CompressionFormat compressionFormat = CompressionFormat.BGRA;
             switch (texFormat)
@@ -1086,18 +1095,23 @@ namespace xivModdingFramework.Textures.FileTypes
                 compressor.Input.SetData(mipData, true);
                 compressor.Compression.Format = compressionFormat;
                 compressor.Compression.SetBGRAPixelFormat();
-                compressor.Compression.Quality = CompressionQuality.Fastest;
+
+                //compressor.Compression.SetRGBAPixelFormat
+                //compressor.Compression.Quality = CompressionQuality.Fastest;
+
                 compressor.Output.OutputHeader = true;
                 byte[] ddsData = null;
 
-                //compressor.Compression.SetRGBAPixelFormat
+
+
+                // Normal, well-behaved DDS conversion.
                 await Task.Run(() =>
                 {
                     using (var ms = new MemoryStream())
                     {
                         if (!compressor.Process(ms))
                         {
-                            throw new ImageProcessingException("Compressor was unable to conver image to DDS format.");
+                            throw new ImageProcessingException("Compressor was unable to convert image to DDS format.");
                         }
                         ddsData = ms.ToArray();
                     }
@@ -1107,6 +1121,127 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
+
+        /// <summary>
+        /// Creates a valid DDS file from a 8.8.8.8 byte array...
+        /// By manually creating a DDS header and stapling it onto the end.
+        /// This is significantly faster than using the TexImpNet implementation for 8.8.8.8 writing.
+        /// The quality of the MipMaps it generates is quite bad though.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="height"></param>
+        /// <param name="width"></param>
+        /// <returns></returns>
+        private byte[] CreateFast8888DDS(byte[] data, int height, int width)
+        {
+            var header = new byte[128];
+            var pixelSizeBits = 32;
+
+            var minDim = Math.Min(height, width);
+            
+            // Minimum size mipmap we care about is 32x32, to simplify things.
+            var mipCount = (int) Math.Log(minDim, 2);
+            mipCount = Math.Max(mipCount, 1);
+
+            Encoding.ASCII.GetBytes("DDS ").CopyTo(header, 0);
+            BitConverter.GetBytes(124).CopyTo(header, 4);
+
+            // Flags?
+            BitConverter.GetBytes(0).CopyTo(header, 8);
+
+            // Size
+            BitConverter.GetBytes(height).CopyTo(header, 12);
+            BitConverter.GetBytes(width).CopyTo(header, 16);
+
+            // Pitch
+            BitConverter.GetBytes(width * 4).CopyTo(header, 20);
+
+            // Depth
+            BitConverter.GetBytes(0).CopyTo(header, 24);
+
+            // MipMap Count
+            BitConverter.GetBytes(mipCount).CopyTo(header, 28);
+
+            var startOfPixStruct = 76;
+            // Pixel struct size
+            BitConverter.GetBytes(32).CopyTo(header, startOfPixStruct);
+
+            // Pixel Flags.  In this case, uncompressed(64) + contains alpha(1).
+            BitConverter.GetBytes(65).CopyTo(header, startOfPixStruct + 4);
+
+            // DWFourCC, unused
+            BitConverter.GetBytes(0).CopyTo(header, startOfPixStruct + 8);
+
+            // Pixel size
+            BitConverter.GetBytes(pixelSizeBits).CopyTo(header, startOfPixStruct + 12);
+
+            // Red Mask
+            BitConverter.GetBytes(0x00ff0000).CopyTo(header, startOfPixStruct + 16);
+
+            // Green Mask
+            BitConverter.GetBytes(0x0000ff00).CopyTo(header, startOfPixStruct + 20);
+
+            // Blue Mask
+            BitConverter.GetBytes(0x000000ff).CopyTo(header, startOfPixStruct + 24);
+
+            // Alpha Mask
+            BitConverter.GetBytes(0xff000000).CopyTo(header, startOfPixStruct + 28);
+
+            var pixelSize = pixelSizeBits / 8;
+
+            try
+            {
+                var lastMipData = data;
+                var currentMipSize = data.Length;
+                var totalMipSize = data.Length;
+                var curw = width;
+                var curh = height;
+
+                var mipData = new List<byte[]>(mipCount);
+                mipData.Add(data);
+                for (int i = 1; i < mipCount; i++)
+                {
+                    // Each MipMap is 1/4 the net size of the last.
+                    currentMipSize /= 4;
+                    curw /= 2;
+                    curh /= 2;
+
+                    var mipArray = new byte[currentMipSize];
+
+                    // We are about to compute the world's singularly worst MipMaps in existence.
+                    // But it's going to be fast.
+                    for (int y = 0; y < curh; y++) { 
+                        for (int x = 0; x < curw; x++)
+                        {
+                            var destOffset = ((y * curw) + x) * pixelSize;
+                            var sourceOffset = (((y*2) * (curw*2)) + (x*2)) * pixelSize;
+
+                            // Copy one of the pixels into the mip data.
+                            Array.Copy(lastMipData, sourceOffset, mipArray, destOffset, pixelSize);
+                        }
+                    }
+                    mipData.Add(mipArray);
+                    lastMipData = mipArray;
+                    totalMipSize += mipArray.Length;
+                }
+
+                // Allocate final array and copy the data in.
+                var ret = new byte[header.Length + totalMipSize];
+                header.CopyTo(ret, 0);
+                var offset = header.Length;
+                for (int i = 0; i < mipCount; i++)
+                {
+                    mipData[i].CopyTo(ret, offset);
+                    offset += mipData[i].Length;
+                }
+
+                // And just like that, we have the world's worst Mip-Enabled DDS file.
+                return ret;
+            } catch(Exception ex)
+            {
+                throw;
+            }
+        }
 
         public async Task<byte[]> CompressDDS(string externalDdsPath, string internalPath)
         {
@@ -1170,16 +1305,18 @@ namespace xivModdingFramework.Textures.FileTypes
                 // DDS-ish file header that SE expects for type 4 files.
                 newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
 
+
                 // Actual file data.
-                foreach(var mip in ddsParts)
+                foreach (var mip in ddsParts)
                 {
                     foreach(var part in mip)
                     {
                         newTex.AddRange(part);
                     }
                 }
+                var ret = newTex.ToArray();
 
-                return newTex.ToArray();
+                return ret;
             }
             else
             {
@@ -1194,13 +1331,13 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, XivTexFormat format = XivTexFormat.INVALID)
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, ModPack modPack = null)
         {
             long offset = 0;
             var path = internalPath;
             var df = IOUtil.GetDataFileFromPath(path);
 
-            var data = await MakeTexData(path, externalPath, format);
+            var data = await MakeTexData(path, externalPath, XivTexFormat.INVALID);
             var modding = new Modding(_gameDirectory);
             Mod entry = null;
             if(cachedModList != null) 
@@ -1213,7 +1350,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var type = Path.GetExtension(path) == ".atex" ? 2 : 4;
 
-            offset = await _dat.WriteModFile(data, path, source, item, cachedIndexFile, cachedModList);
+            offset = await _dat.WriteModFile(data, path, source, item, cachedIndexFile, cachedModList, modPack);
             return offset;
         }
 
@@ -1433,12 +1570,12 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
             }
 
-            var combinedLength = 80;
+            var mipMapUncompressedOffset = 80;
 
             for (var i = 0; i < newMipCount; i++)
             {
-                headerData.AddRange(BitConverter.GetBytes(combinedLength));
-                combinedLength = combinedLength + mipLength;
+                headerData.AddRange(BitConverter.GetBytes(mipMapUncompressedOffset));
+                mipMapUncompressedOffset = mipMapUncompressedOffset + mipLength;
 
                 if (mipLength > 16)
                 {

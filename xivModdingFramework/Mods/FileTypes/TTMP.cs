@@ -1364,18 +1364,10 @@ namespace xivModdingFramework.Mods.FileTypes
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
 
+            await _mtrl.FixPreDawntrailMaterials(fixableMtrls, updateShaders, source, null, null, null, progress);
+
             var idx = 0;
-            var total = fixableMtrls.Count;
-            foreach(var path in fixableMtrls)
-            {
-
-                progress?.Report((idx, total, "Fixing Pre-Dawntrail Materials..."));
-                await _mtrl.FixPreDawntrailMaterial(path, updateShaders, source);
-                idx++;
-            }
-
-            idx = 0;
-            total = fixableMdls.Count;
+            var total = fixableMdls.Count;
             foreach (var path in fixableMdls)
             {
                 progress?.Report((idx, total, "Fixing Pre-Dawntrail Models..."));
