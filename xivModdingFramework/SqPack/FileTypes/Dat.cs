@@ -1335,11 +1335,24 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var parts = new List<byte[]>();
+
+            var compressionTasks = new List<Task<byte[]>>();
             for (var i = 0; i < partCount; i++)
             {
-                var part = await CompressSmallData(data.GetRange(i * 16000, partSizes[i]).ToArray());
-                parts.Add(part);
+                // Hand the compression task to the thread scheduler.
+                var start = i * 16000;
+                var size = partSizes[i];
+                compressionTasks.Add(Task.Run(async () => {
+                    return await CompressSmallData(data.GetRange(start, size).ToArray());
+                }));
             }
+            await Task.WhenAll(compressionTasks);
+
+            foreach(var task in compressionTasks)
+            {
+                parts.Add(task.Result);
+            }
+
             return parts;
         }
 
