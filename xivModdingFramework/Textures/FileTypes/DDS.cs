@@ -554,25 +554,9 @@ namespace xivModdingFramework.Textures.FileTypes
 
             for (var i = 0; i < newMipCount; i++)
             {
-                var mipParts = (int)Math.Ceiling(mipLength / 16000f);
-                    for (var j = 0; j < mipParts; j++)
-                    {
-                        int uncompLength;
-                        var comp = true;
-
-                        if (j == mipParts - 1)
-                        {
-                            uncompLength = mipLength % 16000;
-                        }
-                        else
-                        {
-                            uncompLength = 16000;
-                        }
-
-                        var uncompBytes = br.ReadBytes(uncompLength);
-                        var mipData = await Dat.CompressData(uncompBytes.ToList());
-                        ddsParts.Add(mipData);
-                    }
+                var uncompBytes = br.ReadBytes(mipLength);
+                var mipData = await Dat.CompressData(uncompBytes.ToList());
+                ddsParts.Add(mipData);
 
                 if (mipLength > 32)
                 {

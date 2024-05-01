@@ -1045,7 +1045,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <summary>
         /// Convert a raw pixel byte array into a DDS data block.
         /// </summary>
-        /// <param name="data">BGRA 8.8.8.8 Pixel format data, ready to be flipped and converted to DDS.</param>
+        /// <param name="data">8.8.8.8 Pixel format data.</param>
         /// <returns></returns>
         public async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int height, int width)
         {
@@ -1077,19 +1077,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var sizePerPixel = 4;
             var mipData = new MipData(width, height, width * sizePerPixel);
-
-            for(int rowIdx = 0; rowIdx < height; rowIdx++)
-            {
-                // The image needs to be flipped vertically, so write it in reverse order by rows.
-
-                var sizePerRow = width * sizePerPixel;
-                var targetOffset = rowIdx * sizePerRow;
-                var sourceOffset = (height - rowIdx - 1) * sizePerRow;
-
-                IntPtr tOffset = mipData.Data + targetOffset;
-
-                Marshal.Copy(data, sourceOffset, tOffset, sizePerRow);
-            }
+            Marshal.Copy(data, 0, mipData.Data, data.Length);
 
             using (var compressor = new Compressor())
             {
@@ -1098,13 +1086,19 @@ namespace xivModdingFramework.Textures.FileTypes
                 compressor.Input.SetData(mipData, true);
                 compressor.Compression.Format = compressionFormat;
                 compressor.Compression.SetBGRAPixelFormat();
+                compressor.Compression.Quality = CompressionQuality.Fastest;
+                compressor.Output.OutputHeader = true;
                 byte[] ddsData = null;
 
+                //compressor.Compression.SetRGBAPixelFormat
                 await Task.Run(() =>
                 {
                     using (var ms = new MemoryStream())
                     {
-                        compressor.Process(ms);
+                        if (!compressor.Process(ms))
+                        {
+                            throw new ImageProcessingException("Compressor was unable to conver image to DDS format.");
+                        }
                         ddsData = ms.ToArray();
                     }
                 });
@@ -1125,11 +1119,12 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public async Task<byte[]> CompressDDS(byte[] data, string internalPath)
         {
+            var uncompressedLength = (int)data.Length - 128;
             using (var ms = new MemoryStream(data)) 
             {
                 using (var br = new BinaryReader(ms))
                 {
-                    return await CompressDDS(br, data.Length, internalPath);
+                    return await CompressDDS(br, uncompressedLength, internalPath);
                 }
             }
         }
