@@ -12,18 +12,20 @@ using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods
 {
-    public class ModTransaction
+    public class ModTransaction : IDisposable
     {
         private Dictionary<XivDataFile, IndexFile> _IndexFiles = new Dictionary<XivDataFile, IndexFile>();
         private ModList _ModList;
         private ModPack _ModPack;
         private bool _ReadOnly = false;
+        private bool _Finished = false;
 
         private SqPack.FileTypes.Index __Index;
         private Modding __Modding;
 
         private static ModTransaction _OpenTransaction = null;
         private static bool _WorkerStatus = false;
+        private bool _Disposed;
 
         public List<XivDataFile> ActiveDataFiles
         {
@@ -109,6 +111,7 @@ namespace xivModdingFramework.Mods
             finally
             {
                 _OpenTransaction = null;
+                tx._Finished = true;
                 XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
             }
         }
@@ -121,6 +124,7 @@ namespace xivModdingFramework.Mods
             finally
             {
                 _OpenTransaction = null;
+                tx._Finished = true;
                 XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
             }
         }
@@ -155,6 +159,25 @@ namespace xivModdingFramework.Mods
             _IndexFiles = null;
             _ModList = null;
             _ModPack = null;
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_Disposed)
+            {
+                if (!_Finished)
+                {
+                    // If we haven't been cancelled or committed, do so.
+                    ModTransaction.CancelTransaction(this);
+                }
+
+                _Disposed = true;
+            }
+        }
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
     }
 }
