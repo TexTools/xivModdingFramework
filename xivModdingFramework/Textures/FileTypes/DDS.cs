@@ -552,12 +552,12 @@ namespace xivModdingFramework.Textures.FileTypes
             var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
             br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
 
+            // Queue all the compression tasks.
+            var mipTasks = new List<Task<List<byte[]>>>();
             for (var i = 0; i < newMipCount; i++)
             {
                 var uncompBytes = br.ReadBytes(mipLength);
-                var mipData = await Dat.CompressData(uncompBytes.ToList());
-                ddsParts.Add(mipData);
-
+                mipTasks.Add(Dat.CompressData(uncompBytes.ToList()));
                 if (mipLength > 32)
                 {
                     mipLength = mipLength / 4;
@@ -568,6 +568,15 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
+            // Wait for them to finish.
+            await Task.WhenAll(mipTasks);
+            foreach(var task in mipTasks)
+            {
+                ddsParts.Add(task.Result);
+            }
+
+
+            // Return parts.
             return ddsParts;
         }
 
