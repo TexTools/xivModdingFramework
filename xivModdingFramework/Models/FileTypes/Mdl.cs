@@ -3904,8 +3904,8 @@ namespace xivModdingFramework.Models.FileTypes
             // This is the most common size of header for models
             var headerLength = 256;
 
-            // 1 Block for vertex info + model data + geometry data.
-            var blockCount = compressedVertexInfoParts.Count + compressedModelDataParts.Count + compressedVertexDataParts.Count + compressedIndexDataParts.Count;
+            // Total # of blocks.
+            var blockCount = compressedVertexInfoParts.Count + compressedModelDataParts.Count + compressedVertexDataParts.Sum(x => x.Count) + compressedIndexDataParts.Sum(x => x.Count);
 
             // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
             if (blockCount > 24)
