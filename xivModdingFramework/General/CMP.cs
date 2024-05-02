@@ -69,7 +69,7 @@ namespace xivModdingFramework.General
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
 
-            var modlist = await _modding.GetModListAsync();
+            var modlist = await _modding.GetModList();
             var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == path);
             if (mod != null && mod.enabled)
             {

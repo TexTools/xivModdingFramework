@@ -663,7 +663,7 @@ namespace xivModdingFramework.Cache
                 var _index = new Index(XivCache.GameInfo.GameDirectory);
                 var _modding = new Modding(XivCache.GameInfo.GameDirectory);
                 index = await _index.GetIndexFile(df, false, true);
-                modlist = _modding.GetModList();
+                modlist = await _modding.GetModList();
             }
 
             var materials = new HashSet<string>();

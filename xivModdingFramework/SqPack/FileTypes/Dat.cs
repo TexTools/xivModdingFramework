@@ -430,7 +430,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (forceOriginal)
             {
-                ModList modlist = tx == null ? await _modding.GetModListAsync() : await tx.GetModList();
+                ModList modlist = tx == null ? await _modding.GetModList() : await tx.GetModList();
                 // Checks if the item being imported already exists in the modlist
                 var modEntry = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
 
@@ -2483,7 +2483,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var moddedDats = await _dat.GetModdedDatList(df);
 
             var slots = new Dictionary<long, long>();
-            var modlist = await _modding.GetModListAsync();
+            var modlist = await _modding.GetModList();
 
             var modsByFile = modlist.Mods.Where(x => !String.IsNullOrWhiteSpace(x.fullPath) && x.datFile == df.GetDataFileName()).GroupBy(x => {
                 long offset = x.data.modOffset;

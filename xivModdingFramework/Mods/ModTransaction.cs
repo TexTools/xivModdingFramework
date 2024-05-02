@@ -98,7 +98,7 @@ namespace xivModdingFramework.Mods
             if(_ModList == null)
             {
                 _ModListModifiedTime = File.GetLastWriteTimeUtc(__Modding.ModListDirectory.FullName);
-                _ModList = await __Modding.GetModListAsync();
+                _ModList = await __Modding.GetModList();
             }
             return _ModList;
         }

@@ -68,31 +68,9 @@ namespace xivModdingFramework.Mods
 
         }
 
-        public ModList GetModList()
-        {
-            ModList val = null;
-            _modlistSemaphore.Wait();
-            try
-            {
-                var modlistText = File.ReadAllText(ModListDirectory.FullName);
-                val = JsonConvert.DeserializeObject<ModList>(modlistText);
-            }
-            finally
-            {
-                _modlistSemaphore.Release();
-            }
-
-            if(val == null)
-            {
-                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
-            }
-
-            return val;
-        }
-
         private ModList _CachedModList;
         private DateTime _ModListLastModifiedTime;
-        public async Task<ModList> GetModListAsync()
+        public async Task<ModList> GetModList()
         {
             await _modlistSemaphore.WaitAsync();
             try
@@ -153,7 +131,7 @@ namespace xivModdingFramework.Mods
 
         public async Task DeleteAllFilesAddedByTexTools()
         {
-            var modList = GetModList();
+            var modList = await GetModList();
             var modsToRemove = modList.Mods.Where(x => x.data.modOffset == x.data.originalOffset);
 
             // Delete user files first.
@@ -208,7 +186,7 @@ namespace xivModdingFramework.Mods
                 {
                     internalFilePath = internalFilePath.Replace("\\", "/");
 
-                    var modList = await GetModListAsync();
+                    var modList = await GetModList();
 
                     if (modList == null) return null;
 
@@ -301,7 +279,7 @@ namespace xivModdingFramework.Mods
             {
                 throw new Exception("File Path missing, unable to toggle mod.");
             }
-            var modList = GetModList();
+            var modList = await GetModList();
 
             var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
@@ -333,7 +311,7 @@ namespace xivModdingFramework.Mods
 
             var index = new Index(_gameDirectory);
 
-            var modList = GetModList();
+            var modList = await GetModList();
             var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
             List<Mod> mods = null;
 
@@ -490,7 +468,7 @@ namespace xivModdingFramework.Mods
             {
                 throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
             }
-            var modList = await GetModListAsync();
+            var modList = await GetModList();
             await ToggleMods(enable, modList.Mods.Select(x => x.fullPath), progress);
         }
 
@@ -503,7 +481,7 @@ namespace xivModdingFramework.Mods
 
             var _index = new Index(_gameDirectory);
 
-            var modList = await GetModListAsync();
+            var modList = await GetModList();
 
             if (modList == null || modList.Mods.Count == 0) return;
 
@@ -632,7 +610,7 @@ namespace xivModdingFramework.Mods
         public async Task<int> PurgeInvalidEmptyBlocks()
         {
             int removed = 0;
-            var modList = await GetModListAsync();
+            var modList = await GetModList();
             var emptyBlocks = modList.Mods.Where(x => x.name == string.Empty);
             var toRemove = emptyBlocks.Where(x => x.data.modOffset <= 0).ToList();
 
@@ -726,7 +704,7 @@ namespace xivModdingFramework.Mods
                 throw new Exception("TexTools mods cannot be altered in Lumina mode.");
             }
 
-            var modList = GetModList();
+            var modList = await GetModList();
 
             var modPackItem = (from modPack in modList.ModPacks
                 where modPack.name.Equals(modPackName)
@@ -772,7 +750,7 @@ namespace xivModdingFramework.Mods
             }
 
             progressReporter?.Report((0, 0, "Loading Modlist file..."));
-            var modlist = await GetModListAsync();
+            var modlist = await GetModList();
 
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
 
@@ -962,7 +940,7 @@ namespace xivModdingFramework.Mods
                 throw new Exception("TexTools mods cannot be altered in Lumina mode.");
             }
 
-            var modlist = await GetModListAsync();
+            var modlist = await GetModList();
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
 

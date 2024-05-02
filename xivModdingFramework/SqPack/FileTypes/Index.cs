@@ -637,7 +637,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static Dictionary<XivDataFile, long> _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
         private static Dictionary<XivDataFile, IndexFile> _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
 
-        public async Task ClearIndexCache()
+        public void ClearIndexCache()
         {
             _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
             _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();

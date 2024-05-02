@@ -1990,7 +1990,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var _index = new Index(_gameDirectory);
                 var _modding = new Modding(_gameDirectory);
                 index = await _index.GetIndexFile(dataFile, false, true);
-                modlist = await _modding.GetModListAsync();
+                modlist = await _modding.GetModList();
             } else
             {
                 index = await tx.GetIndexFile(dataFile);
@@ -2141,7 +2141,7 @@ namespace xivModdingFramework.Models.FileTypes
                 ModList modlist;
                 if(tx == null)
                 {
-                    modlist = await modding.GetModListAsync();
+                    modlist = await modding.GetModList();
                 } else
                 {
                     modlist = await tx.GetModList();

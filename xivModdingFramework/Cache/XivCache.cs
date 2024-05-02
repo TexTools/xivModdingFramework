@@ -469,7 +469,7 @@ namespace xivModdingFramework.Cache
             // but I think this is one of the only places that this can go
             if (lastCacheVersion < new Version(1, 0, 2, 2)) {
 	            var m = new Modding(_gameInfo.GameDirectory);
-	            var modList = m.GetModList();
+	            var modList = await m.GetModList();
 	            foreach (var mod in modList.Mods) {
 		            if (mod.data.dataType != 4) continue;
 
@@ -871,7 +871,7 @@ namespace xivModdingFramework.Cache
         private static async Task BuildModdedItemDependencies()
         {
             var _modding = new Modding(GameInfo.GameDirectory);
-            var modList = _modding.GetModList();
+            var modList = await _modding.GetModList();
 
             var paths = new List<string>(modList.Mods.Count);
             foreach (var m in modList.Mods)
@@ -1723,10 +1723,10 @@ namespace xivModdingFramework.Cache
         /// <param name="files"></param>
         /// <param name="cachedOnly"></param>
         /// <returns></returns>
-        public static Dictionary<string, List<string>> GetModListParents()
+        public static async Task<Dictionary<string, List<string>>> GetModListParents()
         {
             var modding = new Modding(GameInfo.GameDirectory);
-            var modList = modding.GetModList();
+            var modList = await modding.GetModList();
             var dict = new Dictionary<string, List<string>>(modList.Mods.Count);
             if(modList.Mods.Count == 0)
             {
