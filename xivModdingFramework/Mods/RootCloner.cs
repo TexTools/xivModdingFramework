@@ -79,7 +79,7 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 doSave = true;
-                tx = ModTransaction.BeginTransaction(modPack);
+                tx = ModTransaction.BeginTransaction(false, modPack);
             }
 
 

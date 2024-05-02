@@ -201,7 +201,11 @@ namespace xivModdingFramework.Items.Enums
 
         public static XivDataFile GetDataFile(this XivItemType type)
         {
-            // TODO - Fix this up properly
+            if(type == XivItemType.furniture || type == XivItemType.indoor || type == XivItemType.outdoor)
+            {
+                return XivDataFile._01_Bgcommon;
+            }
+
             return XivDataFile._04_Chara;
         }
     }

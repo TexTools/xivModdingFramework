@@ -89,26 +89,41 @@ namespace xivModdingFramework.Mods
 
             return val;
         }
+
+        private ModList _CachedModList;
+        private DateTime _ModListLastModifiedTime;
         public async Task<ModList> GetModListAsync()
         {
-            ModList val = null;
             await _modlistSemaphore.WaitAsync();
             try
             {
-                var modlistText = File.ReadAllText(ModListDirectory.FullName);
-                val = JsonConvert.DeserializeObject<ModList>(modlistText);
+                var lastUpdatedTime = new FileInfo(ModListDirectory.FullName).LastWriteTimeUtc;
+
+                if (_CachedModList == null)
+                {
+                    // First access
+                    var modlistText = File.ReadAllText(ModListDirectory.FullName);
+                    _CachedModList = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    _ModListLastModifiedTime = lastUpdatedTime;
+                } else if (lastUpdatedTime > _ModListLastModifiedTime)
+                {
+                    // Cache is stale.
+                    var modlistText = File.ReadAllText(ModListDirectory.FullName);
+                    _CachedModList = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    _ModListLastModifiedTime = lastUpdatedTime;
+                }
             }
             finally
             {
                 _modlistSemaphore.Release();
             }
 
-            if (val == null)
+            if (_CachedModList == null)
             {
                 throw new InvalidOperationException("GetModlist returned NULL Mod List.");
             }
 
-            return val;
+            return _CachedModList;
         }
 
         public void SaveModList(ModList ml)
@@ -180,7 +195,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="internalFilePath">The internal file path to find</param>
         /// <returns>The mod entry if found, null otherwise</returns>
-        public Task<Mod> TryGetModEntry(string internalFilePath)
+        public async Task<Mod> TryGetModEntry(string internalFilePath)
         {
             try
             {
@@ -189,11 +204,11 @@ namespace xivModdingFramework.Mods
                     return null;
                 }
 
-                return Task.Run(() =>
+                return await Task.Run(async () =>
                 {
                     internalFilePath = internalFilePath.Replace("\\", "/");
 
-                    var modList = GetModList();
+                    var modList = await GetModListAsync();
 
                     if (modList == null) return null;
 
@@ -387,7 +402,7 @@ namespace xivModdingFramework.Mods
             bool commit = tx == null;
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction(mod.modPack);
+                tx = ModTransaction.BeginTransaction(false, mod.modPack);
             }
             try
             {

@@ -163,7 +163,7 @@ namespace xivModdingFramework.Mods
             _ModPack = modpack;
         }
 
-        private ModTransaction(ModPack modpack = null, bool readOnly = false)
+        private ModTransaction(bool readOnly = false, ModPack modpack = null)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             _ModPack = modpack;
@@ -236,8 +236,16 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(ModPack modpack = null, bool readOnly = false)
+        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack modpack = null)
         {
+            if (readOnly)
+            {
+                // Read-Only Transactions don't block anything else, and really just serve as
+                // caches for index/modlist data.
+                var readonlyTx = new ModTransaction(readOnly, modpack);
+                return readonlyTx;
+            }
+
             if (OpenTransaction)
             {
                 throw new Exception("Cannot have two open mod transactions simultaneously.");
@@ -247,7 +255,7 @@ namespace xivModdingFramework.Mods
             _WorkerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
-            var tx = new ModTransaction(modpack, readOnly);
+            var tx = new ModTransaction(readOnly, modpack);
             _OpenTransaction = tx;
             return tx;
         }
@@ -283,6 +291,15 @@ namespace xivModdingFramework.Mods
         /// <param name="tx"></param>
         public static void CancelTransaction(ModTransaction tx)
         {
+
+            // Readonly transactions don't really have a true cancel, but we can at least mark them done.
+            if(tx._ReadOnly)
+            {
+                tx.CancelTransaction();
+                tx._Finished = true;
+                return;
+            }
+
             if (tx != _OpenTransaction)
             {
                 throw new Exception("Attempted to cancel transaction other than the current open mod transation.");
