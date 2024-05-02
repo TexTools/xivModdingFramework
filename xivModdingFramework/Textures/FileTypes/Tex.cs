@@ -48,6 +48,10 @@ using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
 using System.Text;
 using System.Diagnostics;
+using Lumina.Extensions;
+using Lumina.Models.Models;
+using HelixToolkit.SharpDX.Core;
+using HelixToolkit.SharpDX.Core.Helper;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -292,7 +296,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 version = (await imc.GetImcInfo(itemModel)).MaterialSet.ToString().PadLeft(4, '0');
             }
 
-            var parts = Constants.Alphabet;
+            var parts = Helpers.Constants.Alphabet;
             var race = xivRace.GetRaceCode();
 
             string mtrlFolder = "", mtrlFile = "";
@@ -424,11 +428,11 @@ namespace xivModdingFramework.Textures.FileTypes
             SaveTexAsDDS(savePath, xivTex);
         }
 
-
         public void SaveTexAsDDS(string path, XivTex xivTex)
         {
             DDS.MakeDDS(xivTex, path);
         }
+
 
         /// <summary>
         /// Gets the raw pixel data for the texture
@@ -949,7 +953,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new IOException($"Could not find file: {externalPath}");
             }
             var ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat, tx);
-            var data = await CompressDDS(ddsFilePath, internalPath);
+            var data = await DDSToDatReady(ddsFilePath, internalPath);
             return data;
         }
 
@@ -1085,7 +1089,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var maxMipCount = 1;
             if (useMipMaps)
             {
-                maxMipCount = -1;
+                maxMipCount = 13;
             }
 
             var sizePerPixel = 4;
@@ -1124,6 +1128,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 return ddsData;
             }
         }
+
+        const uint _DDSHeaderSize = 128;
+        const uint _TexHeaderSize = 80;
 
 
         /// <summary>
@@ -1247,36 +1254,83 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<byte[]> CompressDDS(string externalDdsPath, string internalPath)
+        public async Task<byte[]> DDSToDatReady(string externalDdsPath, string internalPath)
         {
-            var uncompressedLength = (int)new FileInfo(externalDdsPath).Length;
-            using (var br = new BinaryReader(File.OpenRead(externalDdsPath)))
-            {
-                return await CompressDDS(br, uncompressedLength, internalPath);
-            }
-        }
+            var ddsSize = (uint) (new FileInfo(externalDdsPath).Length);
+            byte[] uncompTex; 
 
-        public async Task<byte[]> CompressDDS(byte[] data, string internalPath)
-        {
-            var uncompressedLength = data.Length;
-            using (var ms = new MemoryStream(data)) 
+            // Stream the file in to replace the header...
+            using (var fs = File.OpenRead(externalDdsPath))
+            {
+                using (var fileBr = new BinaryReader(fs))
+                {
+                    // Could use a file stream here instead..?
+                    // Less RAM, but slower..?
+                    using (var uncompTexMs = new MemoryStream())
+                    {
+                        using (var uncompTexWriter = new BinaryWriter(uncompTexMs))
+                        {
+                            DDSToUncompressedTex(fileBr, uncompTexWriter, ddsSize);
+                        }
+
+                        //uncompTexMs.Position = 0;
+                        uncompTex = uncompTexMs.ToArray();
+                    }
+                }
+            }
+
+            using (var ms = new MemoryStream(uncompTex))
             {
                 using (var br = new BinaryReader(ms))
                 {
-                    return await CompressDDS(br, uncompressedLength, internalPath);
+                    return await CompressTexFile(br, (uint) uncompTex.Length, internalPath);
                 }
             }
         }
 
+        public async Task<byte[]> DDSToUncompressedTex(byte[] data)
+        {
+            // Set up streams to pass down to the lower level functions.
+            return await Task.Run(() =>
+            {
+                var uncompressedLength = data.Length;
+                using (var ms = new MemoryStream(data))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        using (var msOut = new MemoryStream())
+                        {
+                            using (var bw = new BinaryWriter(msOut))
+                            {
+                                DDSToUncompressedTex(br, bw, (uint)uncompressedLength);
+                                return ms.ToArray();
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        public void DDSToUncompressedTex(BinaryReader br, BinaryWriter bw, uint ddsSize)
+        {
+            var uncompressedLength = ddsSize;
+            var header = DDSHeaderToTexHeader(br);
+            uncompressedLength -= header.DDSHeaderSize;
+            bw.Write(header.TexHeader);
+            bw.Write(br.ReadBytes((int)uncompressedLength));
+        }
+
         /// <summary>
-        /// Compresses a DDS file into either a Type 4 (Texture)[.tex] file or Type 2 (Binary)[.atex] file depending on target file path.
+        /// Replaces the DDS File header with a TexFile header.
+        /// Reads the incoming Binary Reader stream to the end of the DDS Header.
         /// </summary>
         /// <param name="br">Open binary reader positioned to the start of the binary DDS data (including header).</param>
         /// <param name="br">Total size of the DDS Data (including header)</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<byte[]> CompressDDS(BinaryReader br, int uncompSize, string internalPath)
+        public (byte[] TexHeader, uint DDSHeaderSize) DDSHeaderToTexHeader(BinaryReader br, long offset = -1)
         {
+            // DDS Header Reference: https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header
             var texFormat = GetDDSTexFormat(br);
             br.BaseStream.Seek(12, SeekOrigin.Begin);
 
@@ -1289,48 +1343,81 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 throw new Exception("Resolution must be a multiple of 2");
             }
+            
+            if(offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
 
             br.BaseStream.Seek(80, SeekOrigin.Begin);
-
-            var textureFlags = br.ReadInt32();
             var texType = br.ReadInt32();
 
-            // DDS header is not included in the compressed data.
-            var uncompressedLength = uncompSize - 128;
+            var headerLength = _DDSHeaderSize;
 
-            var newTex = new List<byte>();
-            if (!internalPath.Contains(".atex"))
+            // DX10 DDS Files have a 20 byte header extension.
+            const uint fourccDX10 = 0x30315844;
+            uint extraHeaderBytes = (uint)(texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
+            headerLength += extraHeaderBytes;
+
+            br.Seek(headerLength);
+
+            // Write header.
+            var texHeader = CreateTexFileHeader(texFormat, newWidth, newHeight, newMipCount).ToArray();
+            return (texHeader, headerLength);
+        }
+
+        /// <summary>
+        /// Compress a given uncompressed TEX file into a type 2 or type 4 file ready to be added to the DATs.
+        /// Takes a file extension (or internal path with file extension) in order to determine
+        /// if the file should be compressed into Type4(.tex) or Type2(.atex)
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="extentionOrInternalPath"></param>
+        /// <returns></returns>
+        public async Task<byte[]> CompressTexFile(BinaryReader br, uint lengthIncludingHeader, string extentionOrInternalPath = ".tex", long offset = -1)
+        {
+            if(offset >= 0)
             {
-                var ddsParts = await DDS.CompressDDSBody(br, texFormat, newWidth, newHeight, newMipCount);
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            } else
+            {
+                offset = br.BaseStream.Position;
+            }
+            var header = TexHeader.ReadTexHeader(br);
 
-                // SQPack Header
-                newTex.AddRange(_dat.MakeType4DatHeader(texFormat, ddsParts, (int)uncompressedLength, newWidth, newHeight));
+            List<byte> newTex = new List<byte>();
+            // Here we need to read the texture header.
+            if (!extentionOrInternalPath.Contains(".atex"))
+            {
+                var ddsParts = await DDS.CompressDDSBody(br, (XivTexFormat) header.TextureFormat, header.Width, header.Height, header.MipCount);
+                var uncompLength = lengthIncludingHeader - _TexHeaderSize;
 
-                // DDS-ish file header that SE expects for type 4 files.
-                newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
 
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
-                // Actual file data.
+                // Type 4 Header
+                newTex.AddRange(_dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
+
+                // Texture file header.
+                newTex.AddRange(br.ReadBytes((int)_TexHeaderSize));
+
+                // Compressed pixel data.
                 foreach (var mip in ddsParts)
                 {
-                    foreach(var part in mip)
+                    foreach (var part in mip)
                     {
                         newTex.AddRange(part);
                     }
                 }
+
                 var ret = newTex.ToArray();
 
                 return ret;
             }
             else
             {
-                // DX10 format magic number
-                const uint fourccDX10 = 0x30315844;
-                var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
-                br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
-                newTex.AddRange(MakeTextureInfoHeader(texFormat, newWidth, newHeight, newMipCount));
-                newTex.AddRange(br.ReadBytes((int)uncompressedLength));
-                var data = await _dat.CompressType2Data(newTex.ToArray());
+                // ATex are just compressed as a Type 2(Binary) file.
+                var data = await _dat.CompressType2Data(br.ReadAllBytes());
                 return data;
             }
         }
@@ -1344,6 +1431,68 @@ namespace xivModdingFramework.Textures.FileTypes
             var offset = await _dat.WriteModFile(data, path, source, item, tx);
             return offset;
         }
+
+        private struct TexHeader
+        {
+            // Bitflags
+            public uint Attributes = 0;
+
+            // Texture Format
+            public uint TextureFormat = 0;
+
+            public ushort Width = 0;
+            public ushort Height = 0;
+
+            public ushort Depth = 1;
+
+            // This is technically 2 fields smooshed together,
+            // Mip Count and ArraySize for image arrays.
+            // Can deal with that later though, TexTools already chokes on those files for multiple reasons.
+            public ushort MipCount = 1;
+
+            uint[] LoDMips = new uint[3];
+
+            uint[] MipMapOffsets = new uint[13];
+
+            public TexHeader()
+            {
+
+            }
+
+            /// <summary>
+            /// Reads a .tex file header (80 bytes) from the given stream.
+            /// </summary>
+            /// <param name="br"></param>
+            internal static TexHeader ReadTexHeader(BinaryReader br, long offset = -1)
+            {
+                var header = new TexHeader();
+                if (offset >= 0)
+                {
+                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                }
+
+                header.Attributes = br.ReadUInt32();
+                header.TextureFormat = br.ReadUInt32();
+
+                header.Width = br.ReadUInt16();
+                header.Height = br.ReadUInt16();
+
+                header.Depth = br.ReadUInt16();
+                header.MipCount = br.ReadUInt16();
+
+                for(int i = 0; i < header.LoDMips.Length; i++)
+                {
+                    header.LoDMips[i] = br.ReadUInt32();
+                }
+
+                for (int i = 0; i < header.MipMapOffsets.Length; i++)
+                {
+                    header.MipMapOffsets[i] = br.ReadUInt32();
+                }
+                return header;
+            }
+        }
+
 
 
         /// <summary>
@@ -1513,7 +1662,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
         /// <returns>The created header data.</returns>
-        private static List<byte> MakeTextureInfoHeader(XivTexFormat format, int newWidth, int newHeight, int newMipCount)
+        private static List<byte> CreateTexFileHeader(XivTexFormat format, int newWidth, int newHeight, int newMipCount)
         {
             var headerData = new List<byte>();
             

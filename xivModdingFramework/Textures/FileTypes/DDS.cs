@@ -500,6 +500,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         /// <summary>
         /// Compresses a normal DDS File into just the core image data that FFXIV stores.
+        /// This assumes the Binary Reader is already positioned at the end of whatever header there is (.DDS or .Tex)
         /// </summary>
         /// <param name="br">The currently active BinaryReader.</param>
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
@@ -542,21 +543,14 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
             }
 
-            br.BaseStream.Seek(80, SeekOrigin.Begin);
-
-            br.ReadInt32();
-            var texType = br.ReadInt32();
-
-            // DX10 format magic number
-            const uint fourccDX10 = 0x30315844;
-            var extraHeaderBytes = (texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
-            br.BaseStream.Seek(128 + extraHeaderBytes, SeekOrigin.Begin);
-
             // Queue all the compression tasks.
+            var totalBytesRead = 0;
             var mipTasks = new List<Task<List<byte[]>>>();
             for (var i = 0; i < newMipCount; i++)
             {
                 var uncompBytes = br.ReadBytes(mipLength);
+                totalBytesRead += uncompBytes.Length;
+
                 mipTasks.Add(Dat.CompressData(uncompBytes.ToList()));
                 if (mipLength > 32)
                 {

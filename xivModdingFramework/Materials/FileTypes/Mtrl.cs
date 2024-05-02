@@ -991,10 +991,10 @@ namespace xivModdingFramework.Materials.FileTypes
 
             try
             {
-                var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, false);
-                var compressedBytes = await _tex.CompressDDS(ddsBytes, indexPath);
-
-                return (indexPath, compressedBytes);
+                //var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, false);
+                //var compressedBytes = await _tex.DDSToDatReady(ddsBytes, indexPath);
+                //return (indexPath, compressedBytes);
+                throw new NotImplementedException();
             }
             catch (Exception ex)
             {

@@ -1622,8 +1622,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                         br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
 
-                        // DDS File Header
-                        xivTex.TextureFormat = TextureTypeDictionary[br.ReadInt32()];
+                        // Tex File Header
+                        var format = br.ReadInt32();
+                        xivTex.TextureFormat = TextureTypeDictionary[format];
                         xivTex.Width = br.ReadInt16();
                         xivTex.Height = br.ReadInt16();
                         xivTex.Layers = br.ReadInt16();
