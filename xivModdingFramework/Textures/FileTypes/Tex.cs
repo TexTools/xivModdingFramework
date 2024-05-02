@@ -1527,9 +1527,9 @@ namespace xivModdingFramework.Textures.FileTypes
             headerData.AddRange(BitConverter.GetBytes((short)newMipCount));
 
 
-            headerData.AddRange(BitConverter.GetBytes(0));
-            headerData.AddRange(BitConverter.GetBytes(1));
-            headerData.AddRange(BitConverter.GetBytes(2));
+            headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
+            headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
+            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
 
             int mipLength;
 

@@ -31,7 +31,7 @@ namespace xivModdingFramework.Mods
         /// <param name="cachedIndexFile"></param>
         /// <param name="cachedModList"></param>
         /// <returns></returns>
-        public static async Task Import(string externalPath, string internalPath, string sourceApplication = "Unknown", ModPack modPackBinding = null, ModTransaction tx = null)
+        public static async Task Import(string externalPath, string internalPath, string sourceApplication = "Unknown", ModTransaction tx = null)
         {
             if (!File.Exists(externalPath))
             {
