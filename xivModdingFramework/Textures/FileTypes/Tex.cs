@@ -1330,7 +1330,7 @@ namespace xivModdingFramework.Textures.FileTypes
                             using (var bw = new BinaryWriter(msOut))
                             {
                                 DDSToUncompressedTex(br, bw, (uint)uncompressedLength);
-                                return ms.ToArray();
+                                return msOut.ToArray();
                             }
                         }
                     }

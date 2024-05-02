@@ -90,16 +90,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 throw new Exception("Cannot import multiple Modpacks simultaneously.");
             }
 
-            var imported = 0;
+            var files = new HashSet<string>();
             try
             {
                 _ImportActive = true;
                 _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
+                path = await ResolvePMPBasePath(path);
+                var pmp = await LoadPMP(path);
+
                 using (var tx = ModTransaction.BeginTransaction())
                 {
-                    path = await ResolvePMPBasePath(path);
-                    var pmp = await LoadPMP(path);
 
                     var res = PreviewMeta?.Invoke(pmp.Meta);
                     if (res == false)
@@ -111,7 +112,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     if (pmp.Groups == null || pmp.Groups.Count == 0)
                     {
                         // No options, just default.
-                        imported += await ImportOption(pmp.DefaultMod, path, tx);
+                        files.UnionWith(await ImportOption(pmp.DefaultMod, path, tx));
                     }
                     else
                     {
@@ -143,10 +144,21 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 selected = value;
                             }
 
-                            imported += await ImportOption(group.Options[selected], path, tx);
+                            files.UnionWith(await ImportOption(group.Options[selected], path, tx));
                         }
                     }
                     await ModTransaction.CommitTransaction(tx);
+                }
+
+                // Pre-Dawntrail Modpack.
+                if (pmp.Meta.FileVersion <= 3)
+                {
+                    // Transaction for fixing up our files.
+                    using (var tx = ModTransaction.BeginTransaction())
+                    {
+                        await TTMP.FixPreDawntrailImports(files, true, sourceApplication, null, tx);
+                        await ModTransaction.CommitTransaction(tx);
+                    }
                 }
             }
             finally
@@ -156,12 +168,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
             // Successful Import.
-            return imported;
+            return files.Count;
         }
 
-        private static async Task<int> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx)
+        private static async Task<HashSet<string>> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx)
         {
-            var imports = 0;
+            var imported = new HashSet<string>();
             foreach(var file in option.Files)
             {
                 var internalPath = file.Key;
@@ -181,13 +193,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     // Import the file...
                     await SmartImport.Import(externalPath, internalPath, _Source, tx);
-                    imports++;
+                    imported.Add(internalPath);
                 } catch (Exception ex) {
                     // If we failed to import a file, just continue.
                     continue;
                 }
             }
-            return imports;
+            return imported;
         }
 
         private static bool CanImport(string internalFilePath)

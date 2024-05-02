@@ -1239,7 +1239,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
 
-        private async Task FixPreDawntrailImports(HashSet<string> filePaths, bool updateShaders, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task FixPreDawntrailImports(HashSet<string> filePaths, bool updateShaders, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
             var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
             var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
