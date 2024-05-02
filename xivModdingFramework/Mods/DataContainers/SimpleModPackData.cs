@@ -16,10 +16,11 @@
 
 using System;
 using System.Collections.Generic;
+using xivModdingFramework.Mods.Interfaces;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
-    public class SimpleModPackData
+    public class SimpleModPackData : IModPackData
     {
         /// <summary>
         /// The name of the mod pack
@@ -39,7 +40,7 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The modpack Url
         /// </summary>
-        public string Url = "";
+        public string Url { get; set; } = "";
 
         /// <summary>
         /// The description for the mod pack
