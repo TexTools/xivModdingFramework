@@ -56,6 +56,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var groups = new List<PMPGroupJson>();
 
             var files = Directory.GetFiles(path);
+
             foreach (var file in files)
             {
                 if (Path.GetFileName(file).StartsWith("group_"))
@@ -95,53 +96,57 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 _ImportActive = true;
                 _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
-                path = await ResolvePMPBasePath(path);
-                var pmp = await LoadPMP(path);
+                using (var tx = ModTransaction.BeginTransaction())
+                {
+                    path = await ResolvePMPBasePath(path);
+                    var pmp = await LoadPMP(path);
 
-                var res = PreviewMeta?.Invoke(pmp.Meta);
-                if (res == false)
-                {
-                    // User cancelled import.
-                    return -1;
-                }
-
-                if (pmp.Groups == null || pmp.Groups.Count == 0)
-                {
-                    // No options, just default.
-                    imported += await ImportOption(pmp.DefaultMod, path);
-                }
-                else
-                {
-                    foreach (var group in pmp.Groups)
+                    var res = PreviewMeta?.Invoke(pmp.Meta);
+                    if (res == false)
                     {
-                        if (group.Options == null || group.Options.Count == 0)
-                        {
-                            // No valid options.
-                            continue;
-                        }
+                        // User cancelled import.
+                        return -1;
+                    }
 
-                        // Get Default selection.
-                        var selected = group.DefaultSettings;
-                        if (selected < 0 || selected >= group.Options.Count)
+                    if (pmp.Groups == null || pmp.Groups.Count == 0)
+                    {
+                        // No options, just default.
+                        imported += await ImportOption(pmp.DefaultMod, path, tx);
+                    }
+                    else
+                    {
+                        foreach (var group in pmp.Groups)
                         {
-                            selected = 0;
-                        }
-
-
-                        if (SelectOption != null)
-                        {
-                            var value = SelectOption.Invoke(group, selected);
-                            if (value < 0 || value >= group.Options.Count)
+                            if (group.Options == null || group.Options.Count == 0)
                             {
-                                // User cancelled import.
-                                return -1;
+                                // No valid options.
+                                continue;
                             }
 
-                            selected = value;
-                        }
+                            // Get Default selection.
+                            var selected = group.DefaultSettings;
+                            if (selected < 0 || selected >= group.Options.Count)
+                            {
+                                selected = 0;
+                            }
 
-                        imported += await ImportOption(group.Options[selected], path);
+
+                            if (SelectOption != null)
+                            {
+                                var value = SelectOption.Invoke(group, selected);
+                                if (value < 0 || value >= group.Options.Count)
+                                {
+                                    // User cancelled import.
+                                    return -1;
+                                }
+
+                                selected = value;
+                            }
+
+                            imported += await ImportOption(group.Options[selected], path, tx);
+                        }
                     }
+                    await ModTransaction.CommitTransaction(tx);
                 }
             }
             finally
@@ -154,7 +159,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return imported;
         }
 
-        private static async Task<int> ImportOption(PMPOptionJson option, string basePath)
+        private static async Task<int> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx)
         {
             var imports = 0;
             foreach(var file in option.Files)
@@ -175,7 +180,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 try
                 {
                     // Import the file...
-                    await SmartImport.Import(externalPath, internalPath, _Source);
+                    await SmartImport.Import(externalPath, internalPath, _Source, tx);
                     imports++;
                 } catch (Exception ex) {
                     // If we failed to import a file, just continue.
