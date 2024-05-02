@@ -15,12 +15,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using Newtonsoft.Json;
+using SharpDX.Direct3D11;
 using SharpDX.Text;
 using SharpDX.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -353,7 +355,7 @@ namespace xivModdingFramework.Mods
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, IndexFile cachedIndex = null, ModList cachedModlist = null)
+        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
@@ -380,68 +382,64 @@ namespace xivModdingFramework.Mods
                 return false;
             }
 
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
+            var df = IOUtil.GetDataFileFromPath(mod.fullPath);
 
-            // Added file.
-            if (enable)
+
+            bool commit = tx == null;
+            if(tx == null)
             {
-                if (cachedIndex != null)
-                {
-                    cachedIndex.SetDataOffset(mod.fullPath, mod.data.modOffset);
-                }
-                else
-                {
-                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, false);
-                }
-                mod.enabled = true;
+                tx = ModTransaction.BeginTransaction(mod.modPack);
+            }
+            try
+            {
+                var index = await tx.GetIndexFile(df);
 
-                if (cachedIndex == null)
+                // Added file.
+                if (enable)
                 {
-                    // Check if we're re-enabling a metadata mod.
-                    var ext = Path.GetExtension(mod.fullPath);
-                    if (ext == ".meta")
+                    index.SetDataOffset(mod.fullPath, mod.data.modOffset);
+                    mod.enabled = true;
+
+                    if (commit)
                     {
-                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
-                        // Retreive the uncompressed meta entry we just enabled.
-                        var data = await dat.GetType2Data(mod.data.modOffset, df);
-                        var meta = await ItemMetadata.Deserialize(data);
-
-                        meta.Validate(mod.fullPath);
-
-                        // And write that metadata to the actual constituent files.
-                        await ItemMetadata.ApplyMetadata(meta, cachedIndex, cachedModlist);
-                    } else if(ext == ".rgsp")
-                    {
-                        await CMP.ApplyRgspFile(mod.fullPath, cachedIndex, cachedModlist);
+                        // Check if we're re-enabling a metadata mod.
+                        var ext = Path.GetExtension(mod.fullPath);
+                        if (ext == ".meta")
+                        {
+                            await ItemMetadata.ApplyMetadata(mod.fullPath, false, tx);
+                        }
+                        else if (ext == ".rgsp")
+                        {
+                            await CMP.ApplyRgspFile(mod.fullPath, tx);
+                        }
                     }
+                }
+                else if (!enable)
+                {
+                    // Removing a file.
+                    if (mod.IsCustomFile())
+                    {
+                        index.SetDataOffset(mod.fullPath, 0);
+                    }
+                    else
+                    {
+                        index.SetDataOffset(mod.fullPath, mod.data.originalOffset);
+                    }
+                    mod.enabled = false;
+                }
+
+                if (commit)
+                {
+                    await ModTransaction.CommitTransaction(tx);
                 }
             }
-            else if (!enable)
+            catch(Exception ex)
             {
-                if (mod.IsCustomFile())
+                if (commit)
                 {
-                    // Delete file descriptor handles removing metadata as needed on its own.
-                    if (cachedIndex != null)
-                    {
-                        cachedIndex.SetDataOffset(mod.fullPath, 0);
-                    }
-                    else
-                    {
-                        await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), false);
-                    }
-                } else
-                {
-                    if (cachedIndex != null)
-                    {
-                        cachedIndex.SetDataOffset(mod.fullPath, mod.data.originalOffset);
-                    }
-                    else
-                    {
-                        await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, false);
-                    }
+                    ModTransaction.CancelTransaction(tx);
                 }
-                mod.enabled = false;
+                throw;
             }
 
             if (updateCache)
@@ -496,25 +494,13 @@ namespace xivModdingFramework.Mods
             // If we're disabling all of our standard files, then this is a full toggle.
             var fullToggle = mods.Count >= modList.Mods.Count(x => !String.IsNullOrWhiteSpace(x.fullPath) && !x.IsInternal());
 
-            // Pause cache worker
-            var workerState = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
-
-            try
+            using (var tx = ModTransaction.BeginTransaction())
             {
                 foreach (var modEntry in mods)
                 {
                     // Save disabling these for last.
                     if (modEntry.IsInternal()) continue;
-
-                    var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
-                    if (!indexFiles.ContainsKey(df))
-                    {
-                        indexFiles.Add(df, await _index.GetIndexFile(df));
-                    }
-
-
-                    await ToggleModUnsafe(enable, modEntry, false, false, indexFiles[df], modList);
+                    await ToggleModUnsafe(enable, modEntry, false, false, tx);
                     progress?.Report((++modNum, modList.Mods.Count, string.Empty));
                 }
 
@@ -525,11 +511,11 @@ namespace xivModdingFramework.Mods
                     foreach (var modEntry in internalEntries)
                     {
                         var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
-                        await ToggleModUnsafe(enable, modEntry, true, false, indexFiles[df], modList);
+                        await ToggleModUnsafe(enable, modEntry, true, false, tx);
                         modList.Mods.Remove(modEntry);
                     }
                 }
-                else if(enable)
+                else if (enable)
                 {
                     progress?.Report((0, 0, "Expanding Metadata Entries..."));
 
@@ -556,15 +542,16 @@ namespace xivModdingFramework.Mods
                     foreach (var dkv in metadata)
                     {
                         var df = dkv.Key;
-                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
+                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, tx);
                     }
 
                     var rgspEntries = mods.Where(x => x.fullPath.EndsWith(".rgsp")).ToList();
                     foreach (var mod in rgspEntries)
                     {
-                        await CMP.ApplyRgspFile(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
+                        await CMP.ApplyRgspFile(mod.fullPath, tx);
                     }
-                } else
+                }
+                else
                 {
                     progress?.Report((0, 0, "Restoring Metadata Entries..."));
                     var metadataEntries = mods.Where(x => x.fullPath.EndsWith(".meta")).ToList();
@@ -586,31 +573,23 @@ namespace xivModdingFramework.Mods
                     foreach (var dkv in metadata)
                     {
                         var df = dkv.Key;
-                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
+                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, tx);
                     }
 
                     var rgspEntries = mods.Where(x => x.fullPath.EndsWith(".rgsp")).ToList();
                     foreach (var mod in rgspEntries)
                     {
-                        await CMP.RestoreDefaultScaling(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
+                        await CMP.RestoreDefaultScaling(mod.fullPath, tx);
                     }
 
                 }
 
-                foreach (var kv in indexFiles)
-                {
-                    await _index.SaveIndexFile(kv.Value);
-                }
-
-                SaveModList(modList);
+                await ModTransaction.CommitTransaction(tx);
 
                 // Do these as a batch query at the end.
                 progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
                 var allPaths = mods.Select(x => x.fullPath).ToList();
                 XivCache.QueueDependencyUpdate(allPaths);
-            } finally
-            {
-                XivCache.CacheWorkerEnabled = workerState;
             }
 
 
@@ -644,7 +623,7 @@ namespace xivModdingFramework.Mods
         /// Deletes a mod from the modlist
         /// </summary>
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
-        public async Task DeleteMod(string modItemPath, bool allowInternal = false, IndexFile index = null, ModList modList = null)
+        public async Task DeleteMod(string modItemPath, bool allowInternal = false, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
@@ -653,46 +632,56 @@ namespace xivModdingFramework.Mods
 
             var doSave = false;
             var _index = new Index(_gameDirectory);
-            if (modList == null)
+            if (tx == null)
             {
                 doSave = true;
-                modList = GetModList();
-                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(modItemPath));
+                tx = ModTransaction.BeginTransaction();
             }
-
-            var modToRemove = (from mod in modList.Mods
-                where mod.fullPath.Equals(modItemPath)
-                select mod).FirstOrDefault();
-
-            // Mod doesn't exist in the modlist.
-            if (modToRemove == null) return;
-
-            if(modToRemove.IsInternal() && !allowInternal)
+            try
             {
-                throw new Exception("Cannot delete internal data without explicit toggle.");
+                var modList = await tx.GetModList();
+
+                var modToRemove = (from mod in modList.Mods
+                                   where mod.fullPath.Equals(modItemPath)
+                                   select mod).FirstOrDefault();
+
+                // Mod doesn't exist in the modlist.
+                if (modToRemove == null) return;
+
+                if (modToRemove.IsInternal() && !allowInternal)
+                {
+                    throw new Exception("Cannot delete internal data without explicit toggle.");
+                }
+
+                await ToggleModUnsafe(false, modToRemove, allowInternal, true, tx);
+
+
+                // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
+                if (modToRemove.fullPath.EndsWith(".meta"))
+                {
+                    var root = await XivCache.GetFirstRoot(modToRemove.fullPath);
+                    await ItemMetadata.RestoreDefaultMetadata(root, tx);
+                }
+
+                if (modToRemove.fullPath.EndsWith(".rgsp"))
+                {
+                    await CMP.RestoreDefaultScaling(modToRemove.fullPath, tx);
+                }
+
+                modList.Mods.Remove(modToRemove);
+
+                if (doSave)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
             }
-
-            await ToggleModUnsafe(false, modToRemove, allowInternal, true, index, modList);
-
-
-            // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
-            if (modToRemove.fullPath.EndsWith(".meta"))
+            catch
             {
-                var root = await XivCache.GetFirstRoot(modToRemove.fullPath);
-                await ItemMetadata.RestoreDefaultMetadata(root, index, modList);
-            }
-
-            if (modToRemove.fullPath.EndsWith(".rgsp"))
-            {
-                await CMP.RestoreDefaultScaling(modToRemove.fullPath, index, modList);
-            }
-
-            modList.Mods.Remove(modToRemove);
-
-            if (doSave)
-            {
-                await _index.SaveIndexFile(index);
-                await SaveModListAsync(modList);
+                if (doSave)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
             }
         }
 

@@ -85,19 +85,19 @@ namespace xivModdingFramework.Materials.FileTypes
             return (ushort)(data >> 5);
         }
 
-        public static async Task<StainingTemplateFile> GetStainingTemplateFile(EStainingTemplate template, bool forceOriginal = false, IndexFile index = null, ModList modlist = null)
+        public static async Task<StainingTemplateFile> GetStainingTemplateFile(EStainingTemplate template, bool forceOriginal = false, ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             var path = STMFilePaths[template];
 
-            var data = await _dat.GetType2Data(path, forceOriginal, index, modlist);
+            var data = await _dat.GetType2Data(path, forceOriginal, tx);
 
             var ret = new StainingTemplateFile(data, template);
             return ret;
         }
 
-        public static async Task SaveStainingTemplateFile(StainingTemplateFile file, string applicationSource, IndexFile index = null, ModList modlist = null)
+        public static async Task SaveStainingTemplateFile(StainingTemplateFile file, string applicationSource, ModTransaction tx = null)
         {
             throw new NotImplementedException();
 

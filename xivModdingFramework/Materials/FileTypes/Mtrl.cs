@@ -136,7 +136,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="race">The race for the requested data</param>
         /// <param name="mtrlFile">The Mtrl file</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(IItemModel item, string mtrlFile, int dxVersion = 11, IndexFile cachedIndexFile = null)
+        public async Task<XivMtrl> GetMtrlData(IItemModel item, string mtrlFile, int dxVersion = 11, ModTransaction tx = null)
         {
 
             var imc = new Imc(_gameDirectory);
@@ -156,7 +156,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            return await GetMtrlData(mtrlFile, materialSet, dxVersion, cachedIndexFile);
+            return await GetMtrlData(mtrlFile, materialSet, dxVersion, tx);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="materialSet"></param>
         /// <param name="dxVersion"></param>
         /// <returns></returns>
-        public async Task<XivMtrl> GetMtrlData(string mtrlFile, int materialSet = -1, int dxVersion = 11, IndexFile cachedIndexFile = null) { 
+        public async Task<XivMtrl> GetMtrlData(string mtrlFile, int materialSet = -1, int dxVersion = 11, ModTransaction tx = null) { 
             string mtrlPath = "";
             long mtrlOffset = 0;
             var index = new Index(_gameDirectory);
@@ -199,7 +199,15 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            mtrlOffset = await index.GetDataOffset(mtrlPath, cachedIndexFile);
+            if (tx != null)
+            {
+                var df = IOUtil.GetDataFileFromPath(mtrlPath);
+                mtrlOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(mtrlPath);
+            }
+            else
+            {
+                mtrlOffset = await index.GetDataOffset(mtrlPath);
+            }
 
             if(mtrlOffset == 0)
             {
@@ -218,10 +226,10 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="mtrlPath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, IndexFile index = null, ModList modlist = null)
+        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, ModTransaction tx = null)
         {
             var dat = new Dat(_gameDirectory);
-            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal, index, modlist);
+            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal, tx);
             var uniqueTextures = new HashSet<string>();
             var texRegex = new Regex(".*\\.tex$");
 
@@ -648,7 +656,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, bool validateTextures = true, ModPack modPack = null)
+        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, bool validateTextures = true, ModTransaction tx = null)
         {
             try
             {
@@ -656,13 +664,17 @@ namespace xivModdingFramework.Materials.FileTypes
                 var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, cachedIndexFile, cachedModList, modPack);
+                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, tx);
 
                 if (validateTextures)
                 {
                     // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
                     var _index = new Index(_gameDirectory);
                     var _tex = new Tex(_gameDirectory);
+
+                    var dataFile = IOUtil.GetDataFileFromPath(xivMtrl.MTRLPath);
+                    IndexFile index = tx == null ? await _index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
+
                     foreach (var tex in xivMtrl.Textures)
                     {
                         var path = tex.TexturePath;
@@ -670,16 +682,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         // Ignore empty samplers.
                         if (path.StartsWith(EmptySamplerPrefix)) continue;
 
-                        bool exists = false;
-                        if (cachedIndexFile != null)
-                        {
-                            exists = cachedIndexFile.FileExists(tex.TexturePath);
-                        }
-                        else
-                        {
-                            exists = await _index.FileExists(tex.TexturePath, IOUtil.GetDataFileFromPath(path));
-                        }
-
+                        var exists = index.FileExists(tex.TexturePath);
                         if (exists)
                         {
                             continue;
@@ -698,7 +701,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         var di = Tex.GetDefaultTexturePath(tex.Usage);
 
-                        var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, cachedIndexFile, cachedModList, modPack);
+                        var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, tx);
 
                     }
                 }
@@ -711,16 +714,11 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        public async Task FixPreDawntrailMaterials(List<string> paths, bool updateShaders, string source, IndexFile indexFile = null, ModList modList = null, ModPack modPack = null, IProgress<(int current, int total, string message)> progress = null)
+        public async Task FixPreDawntrailMaterials(List<string> paths, bool updateShaders, string source, ModTransaction tx = null, IProgress<(int current, int total, string message)> progress = null)
         {
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-
-            // Open Transaction
-            var transactionIndexFile = await _index.GetIndexFile(XivDataFile._04_Chara);
-            var transactionModList = await _modding.GetModListAsync();
 
             var total = paths.Count;
 
@@ -732,7 +730,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var count = 0;
             foreach (var path in paths)
             {
-                var res = await FixPreDawntrailMaterial(await GetMtrlData(path), updateShaders, source, transactionIndexFile, transactionModList, modPack);
+                var res = await FixPreDawntrailMaterial(await GetMtrlData(path), updateShaders, source, tx);
                 if(res.indexTextureToCreate != null)
                 {
                     indexesToCreate.Add(res);
@@ -783,17 +781,13 @@ namespace xivModdingFramework.Materials.FileTypes
                 var results = tasks.Select(x => x.Result).ToList();
                 foreach (var texData in results)
                 {
-                    await _dat.WriteModFile(texData.data, texData.indexFilePath, source, null, transactionIndexFile, transactionModList, modPack);
+                    await _dat.WriteModFile(texData.data, texData.indexFilePath, source, null, tx);
                 }
             }
-
-            // Commit Transaction
-            await _index.SaveIndexFile(transactionIndexFile);
-            await _modding.SaveModListAsync(transactionModList);
         }
 
 
-        public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source, IndexFile indexFile = null, ModList modList = null, ModPack modPack = null)
+        public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source, ModTransaction tx = null)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
@@ -803,7 +797,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if(mtrl.ShaderPackRaw == "character.shpk")
             {
-                return await FixPreDawntrailCharacterMaterial(mtrl, updateShaders, source, indexFile, modList, modPack);
+                return await FixPreDawntrailCharacterMaterial(mtrl, updateShaders, source, tx);
             }
 
             if(mtrl.ShaderPackRaw == "hair.shpk")
@@ -822,7 +816,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="updateShaders"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        private async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, bool updateShaders, string source, IndexFile indexFile = null, ModList modList = null, ModPack modPack = null)
+        private async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, bool updateShaders, string source, ModTransaction tx = null)
         {
 
             if (!updateShaders)
@@ -945,7 +939,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mtrl.Textures.Add(tex);
             }
 
-            await ImportMtrl(mtrl, null, source, indexFile, modList, false, modPack);
+            await ImportMtrl(mtrl, null, source, false, tx);
 
             return (idPath, normalPath);
         }
@@ -1268,9 +1262,9 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="textureType">The texture type within the material to replace.</param>
         /// <param name="index">Cached Index File</param>
         /// <param name="modList">Cached Modlist File</param>
-        public async Task<string> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
+        public async Task<string> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, ModTransaction tx = null)
         {
-            var mtrl = await GetMtrlData(mtrlPath, -1, 11, index);
+            var mtrl = await GetMtrlData(mtrlPath, -1, 11);
 
             var tex = mtrl.Textures.FirstOrDefault(x => x.Usage == textureType);
 
@@ -1282,7 +1276,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var texData = await _Tex.GetTexData(tex);
 
-            await _Tex.ApplyOverlay(texData, overlayStream, source, index, modList);
+            await _Tex.ApplyOverlay(texData, overlayStream, source, tx);
 
             return texPath;
         }

@@ -17,6 +17,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using xivModdingFramework.General.Enums;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.Enums
@@ -195,6 +197,12 @@ namespace xivModdingFramework.Items.Enums
             {
                 return new List<string>();
             }
+        }
+
+        public static XivDataFile GetDataFile(this XivItemType type)
+        {
+            // TODO - Fix this up properly
+            return XivDataFile._04_Chara;
         }
     }
 }

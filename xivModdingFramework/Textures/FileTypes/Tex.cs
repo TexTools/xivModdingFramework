@@ -97,16 +97,16 @@ namespace xivModdingFramework.Textures.FileTypes
             _dataFile = dataFile;
         }
 
-        public async Task<XivTex> GetTexData(MtrlTexture tex)
+        public async Task<XivTex> GetTexData(MtrlTexture tex, ModTransaction tx = null)
         {
-            return await GetTexData(tex.TexturePath, tex.Usage);
+            return await GetTexData(tex.TexturePath, tex.Usage, tx);
         }
 
-        public async Task<XivTex> GetTexData(TexTypePath ttp)
+        public async Task<XivTex> GetTexData(TexTypePath ttp, ModTransaction tx = null)
         {
-            return await GetTexData(ttp.Path, ttp.Type);
+            return await GetTexData(ttp.Path, ttp.Type, tx);
         }
-        public async Task<XivTex> GetTexData(string path, XivTexType usage)
+        public async Task<XivTex> GetTexData(string path, XivTexType usage, ModTransaction tx = null)
         {
             var dataFile = IOUtil.GetDataFileFromPath(path);
             var ttp = new TexTypePath()
@@ -115,11 +115,11 @@ namespace xivModdingFramework.Textures.FileTypes
                 Path = path,
                 Type = usage
             };
-            var xivTex = await GetTexData(ttp.Path);
+            var xivTex = await GetTexData(ttp.Path, tx);
             xivTex.TextureTypeAndPath = ttp;
             return xivTex;
         }
-        public async Task<XivTex> GetTexData(string path)
+        public async Task<XivTex> GetTexData(string path, ModTransaction tx = null)
         {
             var folder = Path.GetDirectoryName(path);
             folder = folder.Replace("\\", "/");
@@ -134,7 +134,14 @@ namespace xivModdingFramework.Textures.FileTypes
             hashedfile = HashGenerator.GetHash(file);
             var df = IOUtil.GetDataFileFromPath(path);
 
-            offset = await _index.GetDataOffset(path);
+            if (tx != null)
+            {
+                offset = (await tx.GetIndexFile(df)).Get8xDataOffset(path);
+            }
+            else
+            {
+                offset = await _index.GetDataOffset(path);
+            }
 
             if (offset == 0)
             {
@@ -232,17 +239,14 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
 
-        public async Task<XivTex> GetTexDataPreFetchedIndex(TexTypePath ttp)
+        public async Task<XivTex> GetTexDataByOffset(TexTypePath ttp, long offset)
         {
-            var offset = await _index.GetDataOffset(ttp.Path);
-
             if (offset == 0)
             {
                 throw new Exception($"Could not find offset for {ttp.Path}");
             }
 
             XivTex xivTex;
-
             try
             {
                 if (ttp.Path.Contains(".atex"))
@@ -819,14 +823,14 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="baseTex"></param>
         /// <param name="overlayStream"></param>
         /// <returns></returns>
-        public async Task ApplyOverlay(XivTex baseTex, Stream overlayStream, string source, IndexFile index = null, ModList modList = null)
+        public async Task ApplyOverlay(XivTex baseTex, Stream overlayStream, string source, ModTransaction tx = null)
         {
             var pngPath = await CreateMergedOverlayFile(baseTex, overlayStream);
 
             var root = await XivCache.GetFirstRoot(baseTex.TextureTypeAndPath.Path);
             var item = root.GetFirstItem();
 
-            await ImportTex(baseTex.TextureTypeAndPath.Path, pngPath, item, source, index, modList);
+            await ImportTex(baseTex.TextureTypeAndPath.Path, pngPath, item, source, tx);
 
             try
             {
@@ -937,14 +941,14 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="texFormat"></param>
         /// <returns></returns>
-        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID)
+        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
             // Ensure file exists.
             if (!File.Exists(externalPath))
             {
                 throw new IOException($"Could not find file: {externalPath}");
             }
-            var ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat);
+            var ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat, tx);
             var data = await CompressDDS(ddsFilePath, internalPath);
             return data;
         }
@@ -956,7 +960,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="internalPath"></param>
         /// <returns></returns>
-        public async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID)
+        public async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
             var root = await XivCache.GetFirstRoot(internalPath);
             bool useMips = root != null;
@@ -983,7 +987,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 if (texFormat == XivTexFormat.INVALID)
                 {
                     // Use the current internal format.
-                    var xivt = await _dat.GetType4Data(internalPath, false);
+                    var xivt = await _dat.GetType4Data(internalPath, false, tx);
                     texFormat = xivt.TextureFormat;
                 }
 
@@ -1331,26 +1335,13 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, IndexFile cachedIndexFile = null, ModList cachedModList = null, ModPack modPack = null)
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, ModTransaction tx = null)
         {
-            long offset = 0;
             var path = internalPath;
-            var df = IOUtil.GetDataFileFromPath(path);
 
-            var data = await MakeTexData(path, externalPath, XivTexFormat.INVALID);
-            var modding = new Modding(_gameDirectory);
-            Mod entry = null;
-            if(cachedModList != null) 
-            {
-                entry = cachedModList.Mods.FirstOrDefault(x => x.fullPath == path);
-            } else
-            {
-                entry = await modding.TryGetModEntry(path);
-            }
+            var data = await MakeTexData(path, externalPath, XivTexFormat.INVALID, tx);
 
-            var type = Path.GetExtension(path) == ".atex" ? 2 : 4;
-
-            offset = await _dat.WriteModFile(data, path, source, item, cachedIndexFile, cachedModList, modPack);
+            var offset = await _dat.WriteModFile(data, path, source, item, tx);
             return offset;
         }
 

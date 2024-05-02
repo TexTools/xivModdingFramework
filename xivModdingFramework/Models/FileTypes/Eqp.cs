@@ -12,6 +12,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
@@ -120,7 +121,7 @@ namespace xivModdingFramework.Models.FileTypes
             _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
         }
 
-        public async Task SaveGmpEntries(List<(uint PrimaryId, GimmickParameter GmpData)> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
+        public async Task SaveGmpEntries(List<(uint PrimaryId, GimmickParameter GmpData)> entries, IItem referenceItem, ModTransaction tx = null)
         {
             foreach (var tuple in entries)
             {
@@ -130,7 +131,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            var file = await LoadGimmickParameterFile(false, cachedIndexFile);
+            var file = await LoadGimmickParameterFile(false, tx);
 
 
             var offsets = new Dictionary<uint, int>();
@@ -172,18 +173,18 @@ namespace xivModdingFramework.Models.FileTypes
                 IOUtil.ReplaceBytesAt(file, tuple.GmpData.GetBytes(), offset);
             }
 
-            await SaveGimmickParameterFile(file, referenceItem, cachedIndexFile, cachedModList);
+            await SaveGimmickParameterFile(file, referenceItem, tx);
 
         }
 
-        public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task SaveGimmickParameter(int equipmentId, GimmickParameter param, IItem referenceItem = null, ModTransaction tx = null)
         {
             if (equipmentId == 0)
             {
                 throw new InvalidDataException("Cannot write GMP data for Set 0. (Use Set 1)");
             }
 
-            var data = await LoadGimmickParameterFile(false);
+            var data = await LoadGimmickParameterFile(false, tx);
 
             var offset = ResolveEqpEntryOffset(data, equipmentId);
 
@@ -202,45 +203,45 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(data, param.GetBytes(), offset);
 
-            await SaveGimmickParameterFile(data, referenceItem, cachedIndexFile, cachedModList);
+            await SaveGimmickParameterFile(data, referenceItem, tx);
         }
 
-        public async Task<GimmickParameter> GetGimmickParameter(IItem item, bool forceDefault = false)
+        public async Task<GimmickParameter> GetGimmickParameter(IItem item, bool forceDefault = false, ModTransaction tx = null)
         {
             if (item == null)
             {
                 return null;
             }
 
-            return await GetGimmickParameter(item.GetRoot(), forceDefault);
+            return await GetGimmickParameter(item.GetRoot(), forceDefault, tx);
         }
-        public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRoot root, bool forceDefault = false)
+        public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
             if (root == null)
             {
                 return null;
             }
 
-            return await GetGimmickParameter(root.Info, forceDefault);
+            return await GetGimmickParameter(root.Info, forceDefault, tx);
 
         }
-        public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRootInfo root, bool forceDefault = false) {
+        public async Task<GimmickParameter> GetGimmickParameter(XivDependencyRootInfo root, bool forceDefault = false, ModTransaction tx = null) {
 
             if (root.PrimaryType != XivItemType.equipment || root.Slot != "met")
             {
                 return null;
             }
 
-            return await GetGimmickParameter(root.PrimaryId, forceDefault);
+            return await GetGimmickParameter(root.PrimaryId, forceDefault, tx);
         }
-        public async Task<GimmickParameter> GetGimmickParameter(int equipmentId, bool forceDefault = false)
+        public async Task<GimmickParameter> GetGimmickParameter(int equipmentId, bool forceDefault = false, ModTransaction tx = null)
         {
             if (equipmentId < 0 || equipmentId > 10000)
             {
                 throw new InvalidDataException("Unable to resolve GMP information for invalid equipment ID.");
             }
 
-            var data = await LoadGimmickParameterFile(forceDefault);
+            var data = await LoadGimmickParameterFile(forceDefault, tx);
 
             // The GMP files use the same format as the EQP files.
             var offset = ResolveEqpEntryOffset(data, equipmentId);
@@ -258,13 +259,13 @@ namespace xivModdingFramework.Models.FileTypes
             return param;
         }
 
-        private async Task SaveGimmickParameterFile(byte[] bytes, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        private async Task SaveGimmickParameterFile(byte[] bytes, IItem referenceItem = null, ModTransaction tx = null)
         {
-            await _dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            await _dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, tx);
         }
-        private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false, IndexFile cachedIndexFile = null)
+        private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false, ModTransaction tx = null)
         {
-            return await _dat.GetType2Data(GimmickParameterFile, forceDefault, cachedIndexFile);
+            return await _dat.GetType2Data(GimmickParameterFile, forceDefault, tx);
         }
 
         /// <summary>
@@ -272,10 +273,8 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="entries"></param>
         /// <param name="referenceItem"></param>
-        /// <param name="cachedIndexFile"></param>
-        /// <param name="cachedModList"></param>
         /// <returns></returns>
-        public async Task SaveEqpEntries(List<(uint PrimaryId, EquipmentParameter EqpData)> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
+        public async Task SaveEqpEntries(List<(uint PrimaryId, EquipmentParameter EqpData)> entries, IItem referenceItem, ModTransaction tx = null)
         {
             foreach (var tuple in entries)
             {
@@ -285,7 +284,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            var file = await LoadEquipmentParameterFile(false, cachedIndexFile);
+            var file = await LoadEquipmentParameterFile(false, tx);
 
 
             var offsets = new Dictionary<uint, int>();
@@ -332,7 +331,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, tx);
         }
 
         /// <summary>
@@ -341,7 +340,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task SaveEqpEntry(int equipmentId, EquipmentParameter data, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task SaveEqpEntry(int equipmentId, EquipmentParameter data, IItem referenceItem = null, ModTransaction tx = null)
         {
             if (equipmentId < 0)
             {
@@ -353,7 +352,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new InvalidDataException("Cannot write EQP data for Set 0. (Use Set 1)");
             }
 
-            var file = (await LoadEquipmentParameterFile(false));
+            var file = (await LoadEquipmentParameterFile(false, tx));
             var offset = ResolveEqpEntryOffset(file, equipmentId);
 
             if (offset < 0)
@@ -378,14 +377,14 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(file, bytes, offset);
 
-            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, tx);
         }
 
 
         /// <summary>
         /// Retrieves the EQP Entry for a given Item.
         /// </summary>
-        public async Task<EquipmentParameter> GetEqpEntry(IItem item, bool forceDefault = false)
+        public async Task<EquipmentParameter> GetEqpEntry(IItem item, bool forceDefault = false, ModTransaction tx = null)
         {
             if (item == null)
             {
@@ -398,33 +397,33 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
-            return await GetEqpEntry(root, forceDefault);
+            return await GetEqpEntry(root, forceDefault, tx);
         }
 
         /// <summary>
         /// Retrieves the EQP Entry for a given Root.
         /// </summary>
-        public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRoot root, bool forceDefault = false)
+        public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
             if (root == null)
             {
                 return null;
             }
 
-            return await GetEqpEntry(root.Info, forceDefault);
+            return await GetEqpEntry(root.Info, forceDefault, tx);
         }
 
         /// <summary>
         /// Retrieves the EQP Entry for a given Root.
         /// </summary>
-        public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRootInfo root, bool forceDefault = false)
+        public async Task<EquipmentParameter> GetEqpEntry(XivDependencyRootInfo root, bool forceDefault = false, ModTransaction tx = null)
         {
             if (root.PrimaryType != XivItemType.equipment)
             {
                 return null;
             }
 
-            return await GetEqpEntry(root.PrimaryId, root.Slot, forceDefault);
+            return await GetEqpEntry(root.PrimaryId, root.Slot, forceDefault, tx);
         }
 
         /// <summary>
@@ -434,7 +433,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="slot"></param>
         /// <param name="forceDefault"></param>
         /// <returns></returns>
-        public async Task<EquipmentParameter> GetEqpEntry(int equipmentId, string slot, bool forceDefault = false)
+        public async Task<EquipmentParameter> GetEqpEntry(int equipmentId, string slot, bool forceDefault = false, ModTransaction tx = null)
         {
 
             if (!EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot))
@@ -456,7 +455,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
 
-            var file = await LoadEquipmentParameterFile(forceDefault);
+            var file = await LoadEquipmentParameterFile(forceDefault, tx);
 
             var offset = ResolveEqpEntryOffset(file, equipmentId);
 
@@ -482,9 +481,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="equipmentId"></param>
         /// <returns></returns>
-        public async Task<BitArray> GetRawEquipmentParameters(int equipmentId)
+        public async Task<BitArray> GetRawEquipmentParameters(int equipmentId, ModTransaction tx = null)
         {
-            var data = await LoadEquipmentParameterFile();
+            var data = await LoadEquipmentParameterFile(false, tx);
             var start = (equipmentId * EquipmentParameterEntrySize);
             var parameters = new byte[EquipmentParameterEntrySize];
 
@@ -508,28 +507,28 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment parameter file.
         /// </summary>
         /// <returns></returns>
-        private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false, IndexFile cachedIndexFile = null)
+        private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false, ModTransaction tx = null)
         {
-            return await _dat.GetType2Data(EquipmentParameterFile, forceDefault, cachedIndexFile);
+            return await _dat.GetType2Data(EquipmentParameterFile, forceDefault, tx);
         }
 
 
-        public async Task SaveRawEquipmentParameters(int equipmentId, BitArray entry) {
-            var file = new List<byte>(await _dat.GetType2Data(EquipmentParameterFile, false)).ToArray();
+        public async Task SaveRawEquipmentParameters(int equipmentId, BitArray entry, ModTransaction tx = null) {
+            var file = new List<byte>(await _dat.GetType2Data(EquipmentParameterFile, false, tx)).ToArray();
 
 
             var start = (equipmentId * EquipmentParameterEntrySize);
             entry.CopyTo(file, start);
 
-            await SaveEquipmentParameterFile(file);
+            await SaveEquipmentParameterFile(file, tx);
 
 
         }
 
-        private async Task SaveEquipmentParameterFile(byte[] file)
+        private async Task SaveEquipmentParameterFile(byte[] file, ModTransaction tx = null)
         {
 
-            await _dat.ImportType2Data(file, EquipmentParameterFile, Constants.InternalModSourceName);
+            await _dat.ImportType2Data(file, EquipmentParameterFile, Constants.InternalModSourceName, null, tx);
 
             return;
         }
@@ -682,10 +681,8 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="entries"></param>
         /// <param name="referenceItem"></param>
-        /// <param name="cachedIndexFile"></param>
-        /// <param name="cachedModList"></param>
         /// <returns></returns>
-        public async Task SaveEqdpEntries(Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> entries, IItem referenceItem, IndexFile cachedIndexFile, ModList cachedModList)
+        public async Task SaveEqdpEntries(Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> entries, IItem referenceItem, ModTransaction tx = null)
         {
             // Group entries into Accessories and Non-Accessories.
             var accessories = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
@@ -733,7 +730,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var race = raceKv.Key;
                 var fileName = EquipmentDeformerParameterRootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-                var data = await LoadEquipmentDeformationFile(race, false, false, cachedIndexFile);
+                var data = await LoadEquipmentDeformationFile(race, false, false, tx);
 
                 // Loop through until we've expanded all of the data entries that we need in order to write the data.
                 bool clean = false;
@@ -799,7 +796,7 @@ namespace xivModdingFramework.Models.FileTypes
                     data[offset + byteOffset] = byteToModify;
                 }
 
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
             }
 
             // Loop Accessories
@@ -872,14 +869,14 @@ namespace xivModdingFramework.Models.FileTypes
 
                     data[offset + byteOffset] = byteToModify;
                 }
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
 
             }
 
 
         }
 
-        public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public async Task SaveEqdpEntries(uint primaryId, string slot, Dictionary<XivRace, EquipmentDeformationParameter> parameters, IItem referenceItem = null, ModTransaction tx = null)
         {
             var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
 
@@ -957,7 +954,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 data[offset + byteOffset] = byteToModify;
 
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
             }
         }
 
@@ -1037,7 +1034,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves the raw EQDP entries for a given root with slot.
         /// </summary>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(IItem item, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(IItem item, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             var root = item.GetRoot();
 
@@ -1047,34 +1044,34 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            return await GetEquipmentDeformationParameters(root.Info, forceDefault, includeNPCs);
+            return await GetEquipmentDeformationParameters(root.Info, forceDefault, includeNPCs, tx);
         }
 
         /// <summary>
         /// Retrieves the raw EQDP entries for a given root with slot.
         /// </summary>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(XivDependencyRoot root, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(XivDependencyRoot root, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
-            return await GetEquipmentDeformationParameters(root.Info, forceDefault, includeNPCs);
+            return await GetEquipmentDeformationParameters(root.Info, forceDefault, includeNPCs, tx);
         }
 
         /// <summary>
         /// Retrieves the raw EQDP entries for a given root with slot.
         /// </summary>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(XivDependencyRootInfo root, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(XivDependencyRootInfo root, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             if (root.PrimaryType != XivItemType.equipment && root.PrimaryType != XivItemType.accessory)
             {
                 return new Dictionary<XivRace, EquipmentDeformationParameter>();
             }
 
-            return await GetEquipmentDeformationParameters(root.PrimaryId, root.Slot, root.PrimaryType == XivItemType.accessory, forceDefault, includeNPCs);
+            return await GetEquipmentDeformationParameters(root.PrimaryId, root.Slot, root.PrimaryType == XivItemType.accessory, forceDefault, includeNPCs, tx);
         }
 
         /// <summary>
         /// Retrieves the raw EQDP entries for a given root with slot.
         /// </summary>
-        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(int equipmentId, string slot, bool isAccessory, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<Dictionary<XivRace, EquipmentDeformationParameter>> GetEquipmentDeformationParameters(int equipmentId, string slot, bool isAccessory, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             var slotOK = false;
             if (isAccessory)
@@ -1089,7 +1086,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            var sets = await GetAllEquipmentDeformationSets(equipmentId, isAccessory, forceDefault, includeNPCs);
+            var sets = await GetAllEquipmentDeformationSets(equipmentId, isAccessory, forceDefault, includeNPCs, tx);
             var races = new List<XivRace>();
 
             Dictionary<XivRace, EquipmentDeformationParameter> ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
@@ -1121,18 +1118,31 @@ namespace xivModdingFramework.Models.FileTypes
             { false, new Dictionary<XivRace, bool>() }
         };
 
-        private static async Task<bool> EqdpFileExists(XivRace race, bool accessory)
+        private static async Task<bool> EqdpFileExists(XivRace race, bool accessory, ModTransaction tx = null)
         {
             if(_eqdpFileExistsCache[accessory].ContainsKey(race))
             {
                 return _eqdpFileExistsCache[accessory][race];
             }
 
-            var index = new Index(XivCache.GameInfo.GameDirectory);
-            var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
-            var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            var exists = await index.FileExists(fileName);
+            bool exists = false;
+            if (tx == null)
+            {
+                var index = new Index(XivCache.GameInfo.GameDirectory);
+                var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
+                var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+                exists = await index.FileExists(fileName);
+            }
+            else
+            {
+                var index = await tx.GetIndexFile(XivDataFile._04_Chara);
+                var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
+                var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+                index.FileExists(fileName);
 
+            }
+            // EQDP files are just keyed by race, and typically all exist, unless it's for some unusual NPC race.
+            // As such, there's no real penalty to retaining this cache indefinitely, regardless of mod status.
             _eqdpFileExistsCache[accessory].Add(race, exists);
 
             return exists;
@@ -1144,7 +1154,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="accessory"></param>
         /// <returns></returns>
-        private async Task<Dictionary<XivRace, EquipmentDeformationParameterSet>> GetAllEquipmentDeformationSets(int equipmentId, bool accessory, bool forceDefault = false, bool includeNPCs = false)
+        private async Task<Dictionary<XivRace, EquipmentDeformationParameterSet>> GetAllEquipmentDeformationSets(int equipmentId, bool accessory, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             var sets = new Dictionary<XivRace, EquipmentDeformationParameterSet>();
 
@@ -1152,7 +1162,7 @@ namespace xivModdingFramework.Models.FileTypes
             foreach (var race in races)
             {
                 if (!await EqdpFileExists(race, accessory)) continue;
-                var result = await GetEquipmentDeformationSet(equipmentId, race, accessory, forceDefault);
+                var result = await GetEquipmentDeformationSet(equipmentId, race, accessory, forceDefault, tx);
                 sets.Add(race, result);
             }
 
@@ -1167,9 +1177,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="race"></param>
         /// <param name="accessory"></param>
         /// <returns></returns>
-        private async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
+        private async Task<EquipmentDeformationParameterSet> GetEquipmentDeformationSet(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false, ModTransaction tx = null)
         {
-            var raw = await GetRawEquipmentDeformationParameters(equipmentId, race, accessory, forceDefault);
+            var raw = await GetRawEquipmentDeformationParameters(equipmentId, race, accessory, forceDefault, tx);
 
             var set = new EquipmentDeformationParameterSet(accessory);
 
@@ -1200,9 +1210,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="equipmentId"></param>
         /// <param name="race"></param>
         /// <returns></returns>
-        private async Task<ushort> GetRawEquipmentDeformationParameters(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false)
+        private async Task<ushort> GetRawEquipmentDeformationParameters(int equipmentId, XivRace race, bool accessory = false, bool forceDefault = false, ModTransaction tx = null)
         {
-            var data = (await LoadEquipmentDeformationFile(race, accessory, forceDefault)).ToArray();
+            var data = (await LoadEquipmentDeformationFile(race, accessory, forceDefault, tx)).ToArray();
 
             var offset = ResolveEqdpEntryOffset(data, equipmentId);
 
@@ -1227,11 +1237,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// Gets the raw equipment or accessory deformation parameters file for a given race.
         /// </summary>
         /// <returns></returns>
-        private async Task<byte[]> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false, IndexFile cachedIndexFile = null)
+        private async Task<byte[]> LoadEquipmentDeformationFile(XivRace race, bool accessory = false, bool forceDefault = false, ModTransaction tx = null)
         {
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            return await _dat.GetType2Data(fileName, forceDefault, cachedIndexFile);
+            return await _dat.GetType2Data(fileName, forceDefault, tx);
         }
 
         /// <summary>
@@ -1242,9 +1252,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="accessory"></param>
         /// <param name="forceDefault"></param>
         /// <returns></returns>
-        private async Task<int> ResolveEqdpEntryOffset(XivRace race, int setId, bool accessory = false, bool forceDefault = false)
+        private async Task<int> ResolveEqdpEntryOffset(XivRace race, int setId, bool accessory = false, bool forceDefault = false, ModTransaction tx = null)
         {
-            var data = await LoadEquipmentDeformationFile(race, accessory, forceDefault);
+            var data = await LoadEquipmentDeformationFile(race, accessory, forceDefault, tx);
             return ResolveEqdpEntryOffset(data.ToArray(), setId);
 
         }

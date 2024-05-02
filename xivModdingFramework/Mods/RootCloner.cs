@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -45,7 +46,7 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns>Returns a Dictionary of all the file conversion</returns>
-        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null, ModPack modPack = null)
+        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, ModTransaction tx = null)
         {
             if(!IsSupported(Source) || !IsSupported(Destination))
             {
@@ -66,11 +67,27 @@ namespace xivModdingFramework.Mods
             {
                 ProgressReporter.Report("Stopping Cache Worker...");
             }
-            var workerStatus = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
+
+            var destItem = Destination.GetFirstItem();
+            var srcItem = (await Source.GetAllItems(singleVariant))[0];
+            var iCat = destItem.SecondaryCategory;
+            var iName = destItem.Name;
+
+            var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+
+            var doSave = false;
+            if (tx == null)
+            {
+                doSave = true;
+                tx = ModTransaction.BeginTransaction(modPack);
+            }
+
+
             try
             {
                 var df = IOUtil.GetDataFileFromPath(Source.ToString());
+                var index = await tx.GetIndexFile(df);
+                var modlist = await tx.GetModList();
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
@@ -78,14 +95,6 @@ namespace xivModdingFramework.Mods
                 var _index = new Index(XivCache.GameInfo.GameDirectory);
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
                 var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-
-                var doSave = false;
-                if (index == null)
-                {
-                    doSave = true;
-                    index = await _index.GetIndexFile(df);
-                    modlist = await _modding.GetModListAsync();
-                }
 
 
                 bool locked = _index.IsIndexLocked(df);
@@ -104,9 +113,9 @@ namespace xivModdingFramework.Mods
                 ItemMetadata originalMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
 
 
-                var originalModelPaths = await Source.GetModelFiles(index, modlist);
-                var originalMaterialPaths = await Source.GetMaterialFiles(-1, index, modlist);
-                var originalTexturePaths = await Source.GetTextureFiles(-1, index, modlist);
+                var originalModelPaths = await Source.GetModelFiles(tx);
+                var originalMaterialPaths = await Source.GetMaterialFiles(-1, tx);
+                var originalTexturePaths = await Source.GetTextureFiles(-1, tx);
 
                 var originalVfxPaths = new HashSet<string>();
                 if (Imc.UsesImc(Source))
@@ -199,10 +208,6 @@ namespace xivModdingFramework.Mods
                     newAvfxPaths.Add(path, UpdatePath(Source, Destination, path));
                 }
 
-                var destItem = Destination.GetFirstItem();
-                var srcItem = (await Source.GetAllItems(singleVariant))[0];
-                var iCat = destItem.SecondaryCategory;
-                var iName = destItem.Name;
 
 
                 var files = newModelPaths.Select(x => x.Value).Union(
@@ -238,13 +243,13 @@ namespace xivModdingFramework.Mods
                             if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
                             {
                                 // If this is a slotless root, purge everything.
-                                await _modding.DeleteMod(mod.fullPath, false, index, modlist);
+                                await _modding.DeleteMod(mod.fullPath, false, tx);
                             }
                             else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.GetBaseFileName(true)))
                             {
                                 // Otherwise, only purge the files we're replacing, and anything else that
                                 // contains our slot name.
-                                await _modding.DeleteMod(mod.fullPath, false, index, modlist);
+                                await _modding.DeleteMod(mod.fullPath, false, tx);
                             }
                         }
                     }
@@ -261,7 +266,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
                     var offset = index.Get8xDataOffset(src);
-                    var xmdl = await _mdl.GetRawMdlData(src, false, offset);
+                    var xmdl = await _mdl.GetRawMdlData(offset, src);
                     var tmdl = TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
@@ -280,8 +285,8 @@ namespace xivModdingFramework.Mods
                     }
 
                     // Save new Model.
-                    var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl, null);
-                    await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, index, modlist);
+                    var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl);
+                    await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
@@ -295,7 +300,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, index, modlist);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
                 }
 
 
@@ -324,7 +329,7 @@ namespace xivModdingFramework.Mods
                             }
                         }
 
-                        await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, index, modlist);
+                        await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, false, tx);
                         CopiedMaterials.Add(dst);
                     }
                     catch (Exception ex)
@@ -343,7 +348,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, index, modlist);
+                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
@@ -408,10 +413,10 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource, index, modlist);
+                await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource, tx);
 
                 // Save the new Metadata file via the batch function so that it's only written to the memory cache for now.
-                await ItemMetadata.ApplyMetadataBatched(new List<ItemMetadata>() { newMetadata }, index, modlist, false);
+                await ItemMetadata.ApplyMetadataBatched(new List<ItemMetadata>() { newMetadata }, tx);
 
                 if (ProgressReporter != null)
                 {
@@ -450,7 +455,7 @@ namespace xivModdingFramework.Mods
                             if (existentCopy == null) continue;
 
                             // Copy the material over.
-                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, index, modlist);
+                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, tx);
                         }
                     }
                 }
@@ -460,10 +465,6 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Updating modlist...");
                 }
 
-                if (modPack == null)
-                {
-                    modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
-                }
 
                 List<Mod> mods = new List<Mod>();
                 foreach (var mod in modlist.Mods)
@@ -485,12 +486,13 @@ namespace xivModdingFramework.Mods
                     modlist.ModPacks.Add(modPack);
                 }
 
-                if(doSave)
+                // Commit our transaction.
+                if (doSave)
                 {
-                    // Save everything.
-                    await _index.SaveIndexFile(index);
-                    await _modding.SaveModListAsync(modlist);
+                    await ModTransaction.CommitTransaction(tx);
                 }
+
+
 
                 XivCache.QueueDependencyUpdate(allFiles.ToList());
 
@@ -544,9 +546,13 @@ namespace xivModdingFramework.Mods
                 dict.Add(Source.Info.GetRootFile(), Destination.Info.GetRootFile());
                 return dict;
 
-            } finally
+            } catch
             {
-                XivCache.CacheWorkerEnabled = workerStatus;
+                if (doSave)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
             }
         }
 

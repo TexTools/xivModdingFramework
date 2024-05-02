@@ -196,15 +196,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            if (enableCacheWorker)
-            {
-                CacheWorkerEnabled = true;
-            } else
-            {
-                // Explicitly shut down the cache worker if not allowed.
-                // This is potentially necessary if a cache rebuild automatically started it.
-                CacheWorkerEnabled = false;
-            }
+            CacheWorkerEnabled = enableCacheWorker;
 
         }
 
@@ -284,75 +276,83 @@ namespace xivModdingFramework.Cache
         /// </summary>
         public static void RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
         {
-            CacheWorkerEnabled = false;
+            var workerStatus = CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
             _REBUILDING = true;
-
-            if (CacheRebuilding != null)
+            try
             {
-                // If there are any event listeners, invoke them.
-                CacheRebuilding.Invoke(null, reason);
-            }
 
-            Task.Run(async () =>
-            {
-                if (_gameInfo.GameLanguage == XivLanguage.None)
+                if (CacheRebuilding != null)
                 {
-                    throw new NotSupportedException("A valid language must be specified when rebuilding the Cache.");
+                    // If there are any event listeners, invoke them.
+                    CacheRebuilding.Invoke(null, reason);
                 }
 
-                try
+                Task.Run(async () =>
                 {
-                    CreateCache();
+                    if (_gameInfo.GameLanguage == XivLanguage.None)
+                    {
+                        throw new NotSupportedException("A valid language must be specified when rebuilding the Cache.");
+                    }
 
-                    var tasks = new List<Task>();
-
-                    var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-                    tasks.Add(RebuildItemsCache());
-                    tasks.Add(RebuildCharactersCache());
-                    tasks.Add(RebuildMonstersCache());
-                    tasks.Add(RebuildUiCache());
-                    tasks.Add(RebuildFurnitureCache());
-                    tasks.Add(BuildModdedItemDependencies());
-
-                    // This was originally running only if the reason was cache update,
-                    // but if the cache gets messed up in one way or another, and has to
-                    // rebuild on a new TT version for any reason other than CacheUpdate
-                    // or whatever, it will prevent the migration from occurring properly
-	                tasks.Add(MigrateCache(previousVersion));
-
-	                await Task.WhenAll(tasks);
-
-                    var post = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-
-                    var result = post - pre;
-
-                    SetMetaValue("cache_version", CacheVersion.ToString());
-                    SetMetaValue("ffxiv_version", _gameInfo.GameVersion.ToString());
-                    SetMetaValue("language", _gameInfo.GameLanguage.ToString());
-                    SetMetaValue("build_time", result.ToString());
-
-                } catch (Exception Ex)
-                {
                     try
                     {
-                        // If we failed an update due to a post-patch error, keep us stuck in that state
-                        // until a TexTools update and a proper completed rebuild.
-                        if (reason == CacheRebuildReason.FFXIVUpdate)
-                        {
-                            SetMetaValue("ffxiv_version", new Version(0, 0, 0, 0).ToString());
-                        }
+                        CreateCache();
 
-                        SetMetaValue("needs_rebuild", "1");
+                        var tasks = new List<Task>();
+
+                        var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                        tasks.Add(RebuildItemsCache());
+                        tasks.Add(RebuildCharactersCache());
+                        tasks.Add(RebuildMonstersCache());
+                        tasks.Add(RebuildUiCache());
+                        tasks.Add(RebuildFurnitureCache());
+                        tasks.Add(BuildModdedItemDependencies());
+
+                        // This was originally running only if the reason was cache update,
+                        // but if the cache gets messed up in one way or another, and has to
+                        // rebuild on a new TT version for any reason other than CacheUpdate
+                        // or whatever, it will prevent the migration from occurring properly
+                        tasks.Add(MigrateCache(previousVersion));
+
+                        await Task.WhenAll(tasks);
+
+                        var post = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+
+                        var result = post - pre;
+
+                        SetMetaValue("cache_version", CacheVersion.ToString());
+                        SetMetaValue("ffxiv_version", _gameInfo.GameVersion.ToString());
+                        SetMetaValue("language", _gameInfo.GameLanguage.ToString());
+                        SetMetaValue("build_time", result.ToString());
+
                     }
-                    catch {
-                        // No-op.  We're pretty fucked at this point.
+                    catch (Exception Ex)
+                    {
+                        try
+                        {
+                            // If we failed an update due to a post-patch error, keep us stuck in that state
+                            // until a TexTools update and a proper completed rebuild.
+                            if (reason == CacheRebuildReason.FFXIVUpdate)
+                            {
+                                SetMetaValue("ffxiv_version", new Version(0, 0, 0, 0).ToString());
+                            }
+
+                            SetMetaValue("needs_rebuild", "1");
+                        }
+                        catch
+                        {
+                            // No-op.  We're pretty fucked at this point.
+                        }
+                        _REBUILDING = false;
+                        throw;
                     }
-                    _REBUILDING = false;
-                    throw;
-                }
-            }).Wait();
-            _REBUILDING = false;
-            CacheWorkerEnabled = true;
+                }).Wait();
+            } finally
+            {
+                _REBUILDING = false;
+                XivCache.CacheWorkerEnabled = workerStatus;
+            }
         }
 
         #region Cache Rebuilding

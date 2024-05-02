@@ -190,78 +190,85 @@ namespace xivModdingFramework.Helpers
 
         public Task PerformStartOver(DirectoryInfo backupsDirectory, IProgress<string> progress = null, XivLanguage language = XivLanguage.None)
         {
-            return Task.Run(async () =>
+            var workerStatus = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
+            try
             {
-                var modding = new Modding(_gameDirectory);
-                var backupsRestored = false;
-
-                // Stop the cache worker since we're blowing up the entire index file and db anyways.
-                // The cache rebuild will start it up again after the cache is rebuilt.
-                XivCache.CacheWorkerEnabled = false;
-
-                try
+                return Task.Run(async () =>
                 {
-                    // Try restoring the indexes FIRST.
-                    backupsRestored = await RestoreBackups(backupsDirectory);
-                    progress?.Report("Restoring index file backups...");
+                    var modding = new Modding(_gameDirectory);
+                    var backupsRestored = false;
 
-                    if (!backupsRestored)
-                    {
-                        throw new Exception("Start Over Failed: Index backups missing/outdated.");
-                    }
-                }
-                catch(Exception ex)
-                {
+
                     try
                     {
-                        // If the index restore failed, try just disabling.
-                        await modding.DeleteAllFilesAddedByTexTools();
-                        await modding.ToggleAllMods(false);
-                        progress?.Report("Index restore failed, attempting to delete all mods instead...");
-                    } catch
-                    {
-                        throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Disable all mods.");
-                    }
-                }
-                finally
-                {
-                    progress?.Report("Deleting modded dat files...");
+                        // Try restoring the indexes FIRST.
+                        backupsRestored = await RestoreBackups(backupsDirectory);
+                        progress?.Report("Restoring index file backups...");
 
-                    var dat = new Dat(_gameDirectory);
-
-                    // Delete modded dat files
-                    foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
-                    {
-                        var datFiles = await dat.GetModdedDatList(xivDataFile);
-
-                        foreach (var datFile in datFiles)
+                        if (!backupsRestored)
                         {
-                            File.Delete(datFile);
-                        }
-
-                        if (datFiles.Count > 0)
-                        {
-                            await RepairIndexDatCounts(xivDataFile);
+                            throw new Exception("Start Over Failed: Index backups missing/outdated.");
                         }
                     }
-
-                    progress?.Report("Cleaning up mod list...");
-
-                    var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-
-                    // Delete mod list
-                    File.Delete(modListDirectory.FullName);
-
-                    modding.CreateModlist();
-
-                    progress?.Report("Rebuilding Cache...");
-
-                    await Task.Run(async () =>
+                    catch (Exception ex)
                     {
-                        XivCache.RebuildCache(XivCache.CacheVersion);
-                    });
-                }
-            });
+                        try
+                        {
+                            // If the index restore failed, try just disabling.
+                            await modding.DeleteAllFilesAddedByTexTools();
+                            await modding.ToggleAllMods(false);
+                            progress?.Report("Index restore failed, attempting to delete all mods instead...");
+                        }
+                        catch
+                        {
+                            throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Disable all mods.");
+                        }
+                    }
+                    finally
+                    {
+                        progress?.Report("Deleting modded dat files...");
+
+                        var dat = new Dat(_gameDirectory);
+
+                        // Delete modded dat files
+                        foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
+                        {
+                            var datFiles = await dat.GetModdedDatList(xivDataFile);
+
+                            foreach (var datFile in datFiles)
+                            {
+                                File.Delete(datFile);
+                            }
+
+                            if (datFiles.Count > 0)
+                            {
+                                await RepairIndexDatCounts(xivDataFile);
+                            }
+                        }
+
+                        progress?.Report("Cleaning up mod list...");
+
+                        var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+
+                        // Delete mod list
+                        File.Delete(modListDirectory.FullName);
+
+                        modding.CreateModlist();
+
+                        progress?.Report("Rebuilding Cache...");
+
+                        await Task.Run(async () =>
+                        {
+                            XivCache.RebuildCache(XivCache.CacheVersion);
+                        });
+                    }
+                });
+            }
+            finally
+            {
+                XivCache.CacheWorkerEnabled = workerStatus;
+            }
         }
 
         public Task BackupIndexFiles(DirectoryInfo backupsDirectory)

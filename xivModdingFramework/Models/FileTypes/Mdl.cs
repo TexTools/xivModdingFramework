@@ -471,31 +471,32 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="submeshId"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<TTModel> GetModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false)
+        public async Task<TTModel> GetModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
-            var mdl = await GetRawMdlData(item, race, submeshId, getOriginal);
+            var mdl = await GetRawMdlData(item, race, submeshId, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
             return ttModel;
         }
-        public async Task<TTModel> GetModel(string mdlPath, bool getOriginal = false)
+        public async Task<TTModel> GetModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
-            var mdl = await GetRawMdlData(mdlPath, getOriginal);
+            var mdl = await GetRawMdlData(mdlPath, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
             return ttModel;
         }
 
-        public async Task<XivMdl> GetRawMdlData(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false)
+        public async Task<XivMdl> GetRawMdlData(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdlPath = await GetMdlPath(item, race, submeshId);
-            return await GetRawMdlData(mdlPath, getOriginal);
+            return await GetRawMdlData(mdlPath, getOriginal, tx);
         }
 
         // Some constant pointers/sizes
         private const int _MdlHeaderSize = 0x44; // 68 Decimal
         private const int _vertexDataHeaderSize = 0x88; // 136 Decimal
+
 
 
         /// <summary>
@@ -504,41 +505,66 @@ namespace xivModdingFramework.Models.FileTypes
         /// If it an explicit offset is provided, it will be used over path or mod offset resolution.
         /// </summary>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false, long offset = 0)
+        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
+            long offset = 0;
+            var df = IOUtil.GetDataFileFromPath(mdlPath);
 
-            var dat = new Dat(_gameDirectory);
-            var modding = new Modding(_gameDirectory);
-            var mod = await modding.TryGetModEntry(mdlPath);
-            var modded = mod != null && mod.enabled;
-            var getShapeData = true;
+            if(tx != null)
+            {
+                var index = await tx.GetIndexFile(df);
+                offset = index.Get8xDataOffset(mdlPath);
 
-
-            if (offset == 0)
+                if(getOriginal)
+                {
+                    var modlist = await tx.GetModList();
+                    var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == mdlPath);
+                    if(mod != null)
+                    {
+                        offset = mod.data.originalOffset;
+                    }
+                }
+            }
+            else
             {
                 var index = new Index(_gameDirectory);
                 offset = await index.GetDataOffset(mdlPath);
 
                 if (getOriginal)
                 {
+                    var modding = new Modding(_gameDirectory);
+                    var mod = await modding.TryGetModEntry(mdlPath);
+                    var modded = mod != null && mod.enabled;
                     if (modded)
                     {
                         offset = mod.data.originalOffset;
-                        modded = false;
                     }
                 }
             }
+            return await GetRawMdlData(offset, mdlPath);
+        }
 
+        /// <summary>
+        /// Retrieves the MDL data at a given offset.
+        /// String name is only used to identify data file and attach the internal name to the resulting data.
+        /// It can be set to empty-string if truly needed, though the resulting MDL will be treated as if it is an externally imported model.
+        /// </summary>
+        /// <param name="offset"></param>
+        /// <param name="internalPathName"></param>
+        /// <returns></returns>
+        public async Task<XivMdl> GetRawMdlData(long offset, string internalPathName)
+        {
+            var getShapeData = true;
+            var dat = new Dat(_gameDirectory);
 
             if (offset == 0)
             {
                 return null;
             }
 
-            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(mdlPath));
-            //File.WriteAllBytes("D:\\aaaa.mdl", mdlData.Data);
+            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(internalPathName));
 
-            var xivMdl = new XivMdl { MdlPath = mdlPath };
+            var xivMdl = new XivMdl { MdlPath = internalPathName };
             int totalNonNullMaterials = 0;
 
 
@@ -781,13 +807,6 @@ namespace xivModdingFramework.Models.FileTypes
                     if (i == 0 && lod.MeshCount == 0)
                     {
                         lod.MeshCount = 1;
-                    }
-
-                    // This is a simple check to identify old mods that may have broken shape data.
-                    // Old mods still have LoD 1+ data.
-                    if (modded  && i > 0 && lod.MeshCount > 0)
-                    {
-                        getShapeData = false;
                     }
 
                     //Adding to xivMdl
@@ -1955,26 +1974,33 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, IndexFile index = null, ModList modlist = null)
+        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, ModTransaction tx = null)
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(_gameDirectory);
             var useCached = true;
-            if (index == null)
+
+            IndexFile index;
+            ModList modlist;
+            if (tx == null)
             {
                 useCached = false;
                 var _index = new Index(_gameDirectory);
                 var _modding = new Modding(_gameDirectory);
                 index = await _index.GetIndexFile(dataFile, false, true);
                 modlist = await _modding.GetModListAsync();
+            } else
+            {
+                index = await tx.GetIndexFile(dataFile);
+                modlist = await tx.GetModList();
             }
 
             var materials = new List<string>();
 
             // Read the raw Material names from the file.
-            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, index, modlist);
+            var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, tx);
             var root = await XivCache.GetFirstRoot(mdlPath);
             if(materialNames.Count == 0)
             {
@@ -1990,7 +2016,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else if(useCached && root != null)
             {
-                var metadata = await ItemMetadata.GetFromCachedIndex(root, index);
+                var metadata = await ItemMetadata.GetFromCachedIndex(root, tx);
                 if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
                 {
                     materialVariants.Add(1);
@@ -2019,7 +2045,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
                     try
                     {
-                        var info = await _imc.GetFullImcInfo(imcPath, index, modlist);
+                        var info = await _imc.GetFullImcInfo(imcPath, tx);
                         var slotRegex = new Regex("_([a-z]{3}).mdl$");
                         var slot = "";
                         var m = slotRegex.Match(mdlPath);
@@ -2092,26 +2118,33 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, IndexFile index = null, ModList modlist = null)
+        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             var materials = new List<string>();
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
 
 
-            if (index == null)
+            IndexFile index = null;
+            if (tx == null)
             {
                 var _index = new Index(_gameDirectory);
                 index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath), false, true);
-                
+            } else
+            {
+                index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath));
             }
 
             var offset = index.Get8xDataOffset(mdlPath);
             if (getOriginal)
             {
-                if(modlist == null)
+                ModList modlist;
+                if(tx == null)
                 {
                     modlist = await modding.GetModListAsync();
+                } else
+                {
+                    modlist = await tx.GetModList();
                 }
 
                 var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == mdlPath);
@@ -2366,7 +2399,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="InvalidDataException"></exception>
-        public async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string submeshId = null)
+        public async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string submeshId = null, ModTransaction tx = null)
         {
 
             if (options == null)
@@ -2379,9 +2412,17 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction = NoOp;
             }
 
-            var modding = new Modding(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
-            var mod = await modding.TryGetModEntry(internalPath);
+            Mod mod = null;
+            if(tx != null)
+            {
+                var modlist = await tx.GetModList();
+                mod = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+            } else
+            {
+                var modding = new Modding(_gameDirectory);
+                var dat = new Dat(_gameDirectory);
+                mod = await modding.TryGetModEntry(internalPath);
+            }
 
             // Resolve the current (and possibly modded) Mdl.
             XivMdl currentMdl = null;
@@ -2391,7 +2432,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Load the base game model.
                 // This is used for some model modifier options and the like.
                 // Some paths may not actually use this(?)
-                originalMdl = await GetRawMdlData(internalPath, true);
+                originalMdl = await GetRawMdlData(internalPath, true, tx);
             }
             catch
             {
@@ -2403,7 +2444,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mod != null)
                 {
                     // If we have a modded base, we need to load that as well.
-                    currentMdl = await GetRawMdlData(internalPath);
+                    currentMdl = await GetRawMdlData(internalPath, false, tx);
                 } else
                 {
                     currentMdl = originalMdl;
@@ -4585,18 +4626,21 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="mdlPath"></param>
         /// <returns></returns>
-        public async Task<bool> CheckSkinAssignment(string mdlPath, IndexFile _index, ModList _modlist)
+        public async Task<bool> CheckSkinAssignment(string mdlPath, ModTransaction tx)
         {
             if(!IsAutoAssignableModel(mdlPath))
             {
                 return false;
             }
 
-            var ogMdl = await GetRawMdlData(mdlPath);
+            var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath));
+            var modlist = await tx.GetModList();
+
+            var ogMdl = await GetRawMdlData(mdlPath, false, tx);
             var ttMdl = TTModel.FromRaw(ogMdl);
 
             bool anyChanges = false;
-            anyChanges = SkinCheckBibo(ttMdl, _index);
+            anyChanges = SkinCheckBibo(ttMdl, index);
 
             if(!anyChanges)
             {
@@ -4615,10 +4659,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var bytes = await MakeCompressedMdlFile(ttMdl, ogMdl);
 
                 // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
-                var modEntry = _modlist.Mods.First(x => x.fullPath == mdlPath);
+                var modEntry = modlist.Mods.First(x => x.fullPath == mdlPath);
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 
-                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, _index, _modlist, modEntry.modPack);
+                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, tx);
 
             }
 
@@ -4632,29 +4676,26 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<int> CheckAllModsSkinAssignments()
         {
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var modList = await _modding.GetModListAsync();
+            using (var tx = ModTransaction.BeginTransaction())
+            { 
+                var modList = await tx.GetModList();
 
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-            var index = await _index.GetIndexFile(XivDataFile._04_Chara);
-
-            int count = 0;
-            foreach(var mod in modList.Mods)
-            {
-                var changed = await CheckSkinAssignment(mod.fullPath, index, modList);
-                if(changed)
+                int count = 0;
+                foreach (var mod in modList.Mods)
                 {
-                    count++;
+                    var changed = await CheckSkinAssignment(mod.fullPath, tx);
+                    if (changed)
+                    {
+                        count++;
+                    }
                 }
-            }
 
-            if(count > 0)
-            {
-                await _index.SaveIndexFile(index);
-                await _modding.SaveModListAsync(modList);
+                if (count > 0)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+                return count;
             }
-
-            return count;
         }
         private bool SkinCheckGen2()
         {
@@ -5097,170 +5138,173 @@ namespace xivModdingFramework.Models.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(originalPath);
 
-            var index = await _index.GetIndexFile(df);
-            var modlist = await _modding.GetModListAsync();
-
-            var offset = index.Get8xDataOffset(originalPath);
-            var xMdl = await GetRawMdlData(originalPath, false, offset);
-            var model = TTModel.FromRaw(xMdl);
-
-
-            if (model == null)
-            {
-                throw new InvalidDataException("Source model file does not exist.");
-            }
-            var allFiles = new HashSet<string>() { newPath };
-
-            var originalRace = IOUtil.GetRaceFromPath(originalPath);
-            var newRace = IOUtil.GetRaceFromPath(newPath);
-
-
-            if(originalRace != newRace)
-            {
-                // Convert the model to the new race.
-                ModelModifiers.RaceConvert(model, originalRace, newPath);
-                ModelModifiers.FixUpSkinReferences(model, newPath);
-            }
-
-            // Language is irrelevant here.
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-
-            // Get all variant materials.
-            var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false, index, modlist);
-
-            
-            var _raceRegex = new Regex("c[0-9]{4}");
-
-            Dictionary<string, string> validNewMaterials = new Dictionary<string, string>();
-            HashSet<string> copiedPaths = new HashSet<string>();
-            // Update Material References and clone materials.
-            foreach (var material in materialPaths)
+            using (var tx = ModTransaction.BeginTransaction())
             {
 
-                // Get the new path.
-                var path = RootCloner.UpdatePath(fromRoot, toRoot, material);
+                var index = await tx.GetIndexFile(df);
+                var modlist = await tx.GetModList();
 
-                // Adjust race code entries if needed.
-                if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
+                var offset = index.Get8xDataOffset(originalPath);
+                var xMdl = await GetRawMdlData(offset, originalPath);
+                var model = TTModel.FromRaw(xMdl);
+
+
+                if (model == null)
                 {
-                    path = _raceRegex.Replace(path, "c" + newRace.GetRaceCode());
+                    throw new InvalidDataException("Source model file does not exist.");
+                }
+                var allFiles = new HashSet<string>() { newPath };
+
+                var originalRace = IOUtil.GetRaceFromPath(originalPath);
+                var newRace = IOUtil.GetRaceFromPath(newPath);
+
+
+                if (originalRace != newRace)
+                {
+                    // Convert the model to the new race.
+                    ModelModifiers.RaceConvert(model, originalRace, newPath);
+                    ModelModifiers.FixUpSkinReferences(model, newPath);
                 }
 
-                // Get file names.
-                var io = material.LastIndexOf("/", StringComparison.Ordinal);
-                var originalMatName = material.Substring(io, material.Length - io);
+                // Language is irrelevant here.
+                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
-                io = path.LastIndexOf("/", StringComparison.Ordinal);
-                var newMatName = path.Substring(io, path.Length - io);
+                // Get all variant materials.
+                var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false, tx);
 
 
-                // Time to copy the materials!
-                try
+                var _raceRegex = new Regex("c[0-9]{4}");
+
+                Dictionary<string, string> validNewMaterials = new Dictionary<string, string>();
+                HashSet<string> copiedPaths = new HashSet<string>();
+                // Update Material References and clone materials.
+                foreach (var material in materialPaths)
                 {
-                    offset = index.Get8xDataOffset(material);
-                    var mtrl = await _mtrl.GetMtrlData(offset, material);
 
-                    if (copyTextures)
+                    // Get the new path.
+                    var path = RootCloner.UpdatePath(fromRoot, toRoot, material);
+
+                    // Adjust race code entries if needed.
+                    if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
                     {
-                        for(int i = 0; i < mtrl.Textures.Count; i++)
+                        path = _raceRegex.Replace(path, "c" + newRace.GetRaceCode());
+                    }
+
+                    // Get file names.
+                    var io = material.LastIndexOf("/", StringComparison.Ordinal);
+                    var originalMatName = material.Substring(io, material.Length - io);
+
+                    io = path.LastIndexOf("/", StringComparison.Ordinal);
+                    var newMatName = path.Substring(io, path.Length - io);
+
+
+                    // Time to copy the materials!
+                    try
+                    {
+                        offset = index.Get8xDataOffset(material);
+                        var mtrl = await _mtrl.GetMtrlData(offset, material);
+
+                        if (copyTextures)
                         {
-                            var tex = mtrl.Textures[i].TexturePath;
-                            var ntex = RootCloner.UpdatePath(fromRoot, toRoot, tex);
-                            if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
+                            for (int i = 0; i < mtrl.Textures.Count; i++)
                             {
-                                ntex = _raceRegex.Replace(ntex, "c" + newRace.GetRaceCode());
-                            }
+                                var tex = mtrl.Textures[i].TexturePath;
+                                var ntex = RootCloner.UpdatePath(fromRoot, toRoot, tex);
+                                if (toRoot.Info.PrimaryType == XivItemType.equipment || toRoot.Info.PrimaryType == XivItemType.accessory)
+                                {
+                                    ntex = _raceRegex.Replace(ntex, "c" + newRace.GetRaceCode());
+                                }
 
-                            mtrl.Textures[i].TexturePath = ntex;
+                                mtrl.Textures[i].TexturePath = ntex;
 
-                            allFiles.Add(ntex);
-                            await _dat.CopyFile(tex, ntex, source, true, item, index, modlist);
-                        }
-                    }
-
-                    mtrl.MTRLPath = path;
-                    allFiles.Add(mtrl.MTRLPath);
-                    await _mtrl.ImportMtrl(mtrl, item, source, index, modlist);
-
-                    if(!validNewMaterials.ContainsKey(newMatName))
-                    {
-                        validNewMaterials.Add(newMatName, path);
-                    }
-                    copiedPaths.Add(path);
-
-
-                    // Switch out any material references to the material in the model file.
-                    foreach (var m in model.MeshGroups)
-                    {
-                        if(m.Material == originalMatName)
-                        {
-                            m.Material = newMatName;
-                        }
-                    }
-
-                } catch(Exception ex)
-                {
-                    // Hmmm.  The original material didn't exist.   This is pretty not awesome, but I guess a non-critical error...?
-                }
-            }
-
-            if (Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
-            {
-                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-
-                var toEntries = await _imc.GetEntries(await toRoot.GetImcEntryPaths(), false, index, modlist);
-                var fromEntries = await _imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, index, modlist);
-
-                var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
-                var fromSets = fromEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
-
-                if(fromSets.Count > 0 && toSets.Count > 0)
-                {
-                    var vReplace = new Regex("/v[0-9]{4}/");
-
-                    // Validate that sufficient material sets have been created at the destination root.
-                    foreach(var mkv in validNewMaterials)
-                    {
-                        var validPath = mkv.Value;
-                        foreach(var msetId in toSets)
-                        {
-                            var testPath = vReplace.Replace(validPath, "/v" + msetId.ToString().PadLeft(4, '0') + "/");
-                            var copied = copiedPaths.Contains(testPath);
-
-                            // Missing a material set, copy in the known valid material.
-                            if(!copied)
-                            {
-                                allFiles.Add(testPath);
-                                await _dat.CopyFile(validPath, testPath, source, true, item, index, modlist);
+                                allFiles.Add(ntex);
+                                await _dat.CopyFile(tex, ntex, source, true, item, tx);
                             }
                         }
+
+                        mtrl.MTRLPath = path;
+                        allFiles.Add(mtrl.MTRLPath);
+                        await _mtrl.ImportMtrl(mtrl, item, source, false, tx);
+
+                        if (!validNewMaterials.ContainsKey(newMatName))
+                        {
+                            validNewMaterials.Add(newMatName, path);
+                        }
+                        copiedPaths.Add(path);
+
+
+                        // Switch out any material references to the material in the model file.
+                        foreach (var m in model.MeshGroups)
+                        {
+                            if (m.Material == originalMatName)
+                            {
+                                m.Material = newMatName;
+                            }
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        // Hmmm.  The original material didn't exist.   This is pretty not awesome, but I guess a non-critical error...?
                     }
                 }
+
+                if (Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
+                {
+                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+
+                    var toEntries = await _imc.GetEntries(await toRoot.GetImcEntryPaths(), false, tx);
+                    var fromEntries = await _imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, tx);
+
+                    var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
+                    var fromSets = fromEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
+
+                    if (fromSets.Count > 0 && toSets.Count > 0)
+                    {
+                        var vReplace = new Regex("/v[0-9]{4}/");
+
+                        // Validate that sufficient material sets have been created at the destination root.
+                        foreach (var mkv in validNewMaterials)
+                        {
+                            var validPath = mkv.Value;
+                            foreach (var msetId in toSets)
+                            {
+                                var testPath = vReplace.Replace(validPath, "/v" + msetId.ToString().PadLeft(4, '0') + "/");
+                                var copied = copiedPaths.Contains(testPath);
+
+                                // Missing a material set, copy in the known valid material.
+                                if (!copied)
+                                {
+                                    allFiles.Add(testPath);
+                                    await _dat.CopyFile(validPath, testPath, source, true, item, tx);
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                // Save the final modified mdl.
+                var data = await MakeCompressedMdlFile(model, xMdl);
+                offset = await _dat.WriteModFile(data, newPath, source, item, tx);
+
+                await ModTransaction.CommitTransaction(tx);
+                XivCache.QueueDependencyUpdate(allFiles.ToList());
+                return offset;
             }
-
-
-            // Save the final modified mdl.
-            var data = await MakeCompressedMdlFile(model, xMdl);
-            offset = await _dat.WriteModFile(data, newPath, source, item, index, modlist);
-
-            await _index.SaveIndexFile(index);
-            await _modding.SaveModListAsync(modlist);
-            XivCache.QueueDependencyUpdate(allFiles.ToList());
-
-            return offset;
         }
 
 
-        public async Task FixPreDawntrailMdl(string path, string source = "Unknown")
+        public async Task FixPreDawntrailMdl(string path, string source = "Unknown", ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             // HACKHACK: This is going to be extremely inefficient, but works for the moment.
-            var ttMdl = await GetModel(path);
-            var xivMdl = await GetRawMdlData(path);
+            var ttMdl = await GetModel(path, false, tx);
+            var xivMdl = await GetRawMdlData(path, false, tx);
 
             var bytes = await MakeCompressedMdlFile(ttMdl, xivMdl);
-            await _dat.WriteModFile(bytes, path, source);
+            await _dat.WriteModFile(bytes, path, source, null, tx);
 
 
         }

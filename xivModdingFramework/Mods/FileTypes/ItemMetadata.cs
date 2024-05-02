@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -177,36 +178,28 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
-        /// <summary>
-        /// Retrieves the item metadata from a cached index setup (or raw)
-        /// </summary>
-        /// <param name="root"></param>
-        /// <param name="index"></param>
-        /// <returns></returns>
-        public static async Task<ItemMetadata> GetFromCachedIndex(XivDependencyRoot root, IndexFile index)
+
+        public static async Task<ItemMetadata> GetFromCachedIndex(XivDependencyRoot root, ModTransaction tx)
         {
 
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(root.Info.GetRootFile());
-
-            long offset = 0;
-            if (index != null)
-            {
-                offset = index.Get8xDataOffset(root.Info.GetRootFile());
-            }
+            long offset = (await tx.GetIndexFile(df)).Get8xDataOffset(root.Info.GetRootFile());
 
             ItemMetadata mData = null;
             if (offset == 0)
             {
+                // Custom metadata doesn't exist, generate standard metadata.s
                 mData = await ItemMetadata.GetMetadata(root);
             }
             else
             {
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 var data = await _dat.GetType2Data(offset, df);
                 mData = await ItemMetadata.Deserialize(data);
             }
             return mData;
         }
+
 
         /// <summary>
         /// Creates a new ItemMetaData entry from the constituent files around the FFXIV file system.
@@ -246,7 +239,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="meta"></param>
         /// <returns></returns>
-        public static async Task SaveMetadata(ItemMetadata meta, string source, IndexFile index = null, ModList modlist = null)
+        public static async Task SaveMetadata(ItemMetadata meta, string source, ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -254,7 +247,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            await _dat.ImportType2Data(await Serialize(meta), path, source, item, index, modlist);
+            await _dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
         }
 
         /// <summary>
@@ -264,13 +257,11 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist, bool save = true)
+        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, ModTransaction tx)
         {
             if (data == null || data.Count == 0) return;
 
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
 
             var dummyItem = new XivGenericItemModel();
             dummyItem.Name = Constants.InternalModSourceName;
@@ -317,18 +308,18 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
 
-            if (index.DataFile == XivDataFile._04_Chara)
+            if (tx.ActiveDataFiles.Contains(XivDataFile._04_Chara))
             {
                 // Batch install functions for these three.
-                await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
-                await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
-                await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
+                await _eqp.SaveEqpEntries(eqpEntries, dummyItem, tx);
+                await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, tx);
+                await _eqp.SaveGmpEntries(gmpEntries, dummyItem, tx);
 
                 // The EST function already does batch applications by nature of how it works,
                 // so just call it once for each of the four EST types represented.
                 foreach (var kv in estEntries)
                 {
-                    await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
+                    await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, tx);
                 }
             }
 
@@ -341,26 +332,29 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
                     var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                     var imcPath = meta.Root.GetRawImcFilePath();
-                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, index, modlist);
+                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, tx);
                 }
             }
+        }
 
-            if (save)
-            {
-                await _index.SaveIndexFile(index);
-                await _modding.SaveModListAsync(modlist);
-            }
+        internal static async Task ApplyMetadata(string internalPath, bool forceOriginal, ModTransaction tx)
+        {
+            var dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var data = await dat.GetType2Data(internalPath, forceOriginal, tx);
+            var meta = await ItemMetadata.Deserialize(data);
+
+            meta.Validate(internalPath);
+
+            await ApplyMetadata(meta, tx);
         }
 
         /// <summary>
         /// Applies this Metadata object to the FFXIV file system.
         /// This should only called by Dat.WriteToDat() / RestoreDefaultMetadata()
         /// </summary>
-        internal static async Task ApplyMetadata(ItemMetadata meta, IndexFile index = null, ModList modlist = null)
+        internal static async Task ApplyMetadata(ItemMetadata meta, ModTransaction tx)
         {
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(meta.Root.Info.GetRootFile());
 
             var dummyItem = new XivGenericItemModel();
@@ -370,48 +364,64 @@ namespace xivModdingFramework.Mods.FileTypes
 
             // Beep boop
             bool doSave = false;
-            if (index == null)
+            if (tx == null)
             {
                 doSave = true;
-                index = await _index.GetIndexFile(df);
-                modlist = await _modding.GetModListAsync();
+                tx = ModTransaction.BeginTransaction();
             }
-
-
-            if (meta.ImcEntries.Count > 0)
+            try
             {
-                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var imcPath = meta.Root.GetRawImcFilePath();
-                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, index, modlist);
+                var index = await tx.GetIndexFile(df);
+                var modlist = await tx.GetModList();
+
+
+                if (meta.ImcEntries.Count > 0)
+                {
+                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+                    var imcPath = meta.Root.GetRawImcFilePath();
+                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, tx);
+                }
+
+                var preOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
+                // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
+                if (meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
+                {
+                    await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, tx);
+                }
+
+                var postOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
+                if (meta.EqdpEntries.Count > 0)
+                {
+                    await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, tx);
+                }
+
+                if (meta.EstEntries.Count > 0)
+                {
+                    var type = Est.GetEstType(meta.Root);
+                    var entries = meta.EstEntries.Values.ToList();
+                    await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, tx);
+                }
+
+                if (meta.GmpEntry != null)
+                {
+                    await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, tx);
+                }
+
+                if (doSave)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                    var _index = new Index(XivCache.GameInfo.GameDirectory);
+                    var finalOffset = _index.GetDataOffset(Eqp.EquipmentParameterFile);
+                    Debug.Write("BBBB");
+                }
             }
-
-            // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
-            if(meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
+            catch
             {
-                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, index, modlist);
-            }
-
-            if(meta.EqdpEntries.Count > 0)
-            {
-                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, index, modlist);
-            }
-
-            if (meta.EstEntries.Count > 0)
-            {
-                var type = Est.GetEstType(meta.Root);
-                var entries = meta.EstEntries.Values.ToList();
-                await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, index, modlist);
-            }
-
-            if(meta.GmpEntry != null)
-            {
-                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist);
-            }
-
-            if (doSave && !XivCache.GameInfo.UseLumina)
-            {
-                await _index.SaveIndexFile(index);
-                await _modding.SaveModListAsync(modlist);
+                if (doSave)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
             }
         }
 
@@ -420,10 +430,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// Restores the original SE metadata for this root.
         /// This should only be called by Index.DeleteFileDescriptor().
         /// </summary>
-        public static async Task RestoreDefaultMetadata(XivDependencyRoot root, IndexFile index = null, ModList modlist = null)
+        public static async Task RestoreDefaultMetadata(XivDependencyRoot root, ModTransaction tx = null)
         {
             var original = await ItemMetadata.CreateFromRaw(root, true);
-            await ApplyMetadata(original, index, modlist);
+            await ApplyMetadata(original, tx);
         }
 
 

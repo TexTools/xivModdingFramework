@@ -31,7 +31,7 @@ namespace xivModdingFramework.Mods
         /// <param name="cachedIndexFile"></param>
         /// <param name="cachedModList"></param>
         /// <returns></returns>
-        public static async Task Import(string externalPath, string internalPath, string sourceApplication = "Unknown", ModPack modPackBinding = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public static async Task Import(string externalPath, string internalPath, string sourceApplication = "Unknown", ModPack modPackBinding = null, ModTransaction tx = null)
         {
             if (!File.Exists(externalPath))
             {
@@ -50,7 +50,7 @@ namespace xivModdingFramework.Mods
                     item = root.GetFirstItem();
                 }
 
-                await _dat.WriteModFile(data, internalPath, sourceApplication, item, cachedIndexFile, cachedModList, modPackBinding);
+                await _dat.WriteModFile(data, internalPath, sourceApplication, item, tx);
             });
         }
 
@@ -60,10 +60,11 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="externalPath"></param>
         /// <param name="internalPath"></param>
+        /// <param name="tx">Active transaction.  Used down in the guts of texture generation to match DDS type to the current modded file.</param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateCompressedFile(string externalPath, string internalPath)
+        public static async Task<byte[]> CreateCompressedFile(string externalPath, string internalPath, ModTransaction tx = null)
         {
-            return await CreateCompressedFile(await CreateUncompressedFile(externalPath, internalPath));
+            return await CreateCompressedFile(await CreateUncompressedFile(externalPath, internalPath, tx));
         }
 
         /// <summary>
@@ -75,7 +76,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath)
+        public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath, ModTransaction tx = null)
         {
             ulong magic;
             uint magic32;
@@ -104,7 +105,7 @@ namespace xivModdingFramework.Mods
             if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic)
             {
                 // Convert the image to DDS if necessary.
-                return await _tex.MakeTexData(internalPath, externalPath);
+                return await _tex.MakeTexData(internalPath, externalPath, Textures.Enums.XivTexFormat.INVALID, tx);
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.

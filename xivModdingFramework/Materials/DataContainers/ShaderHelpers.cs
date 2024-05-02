@@ -367,7 +367,7 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             // Compatibility mode shader keys...
             if (mtrl != null && mtrl.ShaderPack == EShaderPack.CharacterLegacy && mtrl.ShaderKeys.Any(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF)) {
-                if (mtrl.ShaderKeys.Any(x => x.KeyId == 0xC8BD1DEF && x.Value == 0xA02F4828)) {
+                if (!mtrl.ShaderKeys.Any(x => x.KeyId == 0xC8BD1DEF && x.Value == 0xA02F4828)) {
                     if (samplerId == ESamplerId.g_SamplerMask)
                     {
                         return XivTexType.Specular;

@@ -37,8 +37,8 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// </summary>
     public class Index
     {
-        private const string IndexExtension = ".win32.index";
-        private const string Index2Extension = ".win32.index2";
+        public const string IndexExtension = ".win32.index";
+        public const string Index2Extension = ".win32.index2";
         private readonly DirectoryInfo _gameDirectory;
         private static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
@@ -217,22 +217,22 @@ namespace xivModdingFramework.SqPack.FileTypes
             return sha1Bytes;
         }
 
-        public async Task<long> GetDataOffset(string fullPath, IndexFile cachedIndexFile = null)
+        /// <summary>
+        /// TRANSACTION-UNSAFE
+        /// Gets the current live index state of a path, returning the 8xDataOffset (with DAT # embed) value.
+        /// </summary>
+        /// <param name="fullPath"></param>
+        /// <returns></returns>
+        public async Task<long> GetDataOffset(string fullPath)
         {
-            if (cachedIndexFile == null)
+            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
+            var indexFile = await GetIndexFile(dataFile, false, true);
+            var offset = indexFile.Get8xDataOffset(fullPath);
+            if (offset != 0)
             {
-                var dataFile = IOUtil.GetDataFileFromPath(fullPath);
-                cachedIndexFile = await GetIndexFile(dataFile, false, true);
-                var offset = cachedIndexFile.Get8xDataOffset(fullPath);
-                if (offset != 0)
-                {
-                    return offset;
-                }
-                return 0;
-            } else
-            {
-                return cachedIndexFile.Get8xDataOffset(fullPath);
+                return offset;
             }
+            return 0;
         }
 
         /// <summary>

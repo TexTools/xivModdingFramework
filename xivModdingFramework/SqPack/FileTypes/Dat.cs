@@ -147,9 +147,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
 
-            var index = new Index(_gameDirectory);
-            index.UpdateIndexDatCount(dataFile, nextDatNumber, alreadyLocked);
-
             return nextDatNumber;
         }
 
@@ -422,21 +419,18 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> GetType2Data(string internalPath, bool forceOriginal, IndexFile index = null, ModList modlist = null)
+        public async Task<byte[]> GetType2Data(string internalPath, bool forceOriginal, ModTransaction tx = null)
         {
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
 
-            if (index == null)
-            {
+            var _index = new Index(_gameDirectory);
+            var _modding = new Modding(_gameDirectory);
 
-                var _index = new Index(_gameDirectory);
-                index = await _index.GetIndexFile(dataFile, false, true);
-            }
+            IndexFile index = tx == null ? await _index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
 
             if (forceOriginal)
             {
-                var _modding = new Modding(_gameDirectory);
-                modlist = await _modding.GetModListAsync();
+                ModList modlist = tx == null ? await _modding.GetModListAsync() : await tx.GetModList();
                 // Checks if the item being imported already exists in the modlist
                 var modEntry = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
 
@@ -460,7 +454,17 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetType2Data(offset, dataFile);
         }
 
-        public async Task<List<byte>> DecompressType2Data(BinaryReader br, long offset)
+        public async Task<List<byte>> DecompressType2Data(byte[] data, long offset = 0)
+        {
+            using (var ms = new MemoryStream(data))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    return await DecompressType2Data(br, 0);
+                }
+            }
+        }
+        public async Task<List<byte>> DecompressType2Data(BinaryReader br, long offset = 0)
         {
             br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
@@ -564,9 +568,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, ModPack modPack = null)
+        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
-            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, cachedIndexFile, cachedModList,  modPack);
+            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, tx);
         }
 
         /// <summary>
@@ -579,15 +583,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="cachedIndexFile">Cached index file, if available</param>
         /// <param name="cachedModList">Cached modlist file, if available</param>
         /// <returns></returns>
-        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null, ModPack modPack = null)
+        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var dataFile = GetDataFileFromPath(internalPath);
-            var modding = new Modding(_gameDirectory);
 
-            var modEntry = await modding.TryGetModEntry(internalPath);
             var newData = (await CompressType2Data(dataToImport));
-
-            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, cachedIndexFile, cachedModList, modPack);
+            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, tx);
 
             // This can be -1 after Lumina imports
             if (newOffset == 0)
@@ -700,18 +700,25 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(string internalPath, bool forceOriginal)
+        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(string internalPath, bool forceOriginal, ModTransaction tx = null)
         {
-            var index = new Index(_gameDirectory);
-            var modding = new Modding(_gameDirectory);
 
             var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
+                var modding = new Modding(_gameDirectory);
                 // Checks if the item being imported already exists in the modlist
-
-                var modEntry = await modding.TryGetModEntry(internalPath);
+                Mod modEntry = null;
+                if (tx != null)
+                {
+                    var modList = await tx.GetModList();
+                    modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                }
+                else
+                {
+                    modEntry = await modding.TryGetModEntry(internalPath);
+                }
 
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
@@ -726,7 +733,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
-            var offset = await index.GetDataOffset(internalPath);
+            long offset = 0;
+            if(tx != null)
+            {
+                offset = (await tx.GetIndexFile(dataFile)).Get8xDataOffset(internalPath);
+            } else
+            {
+                var index = new Index(_gameDirectory);
+                offset = await index.GetDataOffset(internalPath);
+            }
 
             if (offset == 0)
             {
@@ -1212,17 +1227,23 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetType4Data(string internalPath, bool forceOriginal)
+        public async Task<XivTex> GetType4Data(string internalPath, bool forceOriginal, ModTransaction tx = null)
         {
-            var index = new Index(_gameDirectory);
-            var modding = new Modding(_gameDirectory);
 
             var dataFile = GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                var modEntry = await modding.TryGetModEntry(internalPath);
+                Mod modEntry = null;
+                if(tx != null)
+                {
+                    modEntry = (await tx.GetModList()).Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                } else
+                {
+                    var modding = new Modding(_gameDirectory);
+                    modEntry = await modding.TryGetModEntry(internalPath);
+                }
 
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
@@ -1238,7 +1259,16 @@ namespace xivModdingFramework.SqPack.FileTypes
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
-            var offset = await index.GetDataOffset(internalPath);
+            long offset = 0;
+            if (tx != null)
+            {
+                offset = (await tx.GetIndexFile(dataFile)).Get8xDataOffset(internalPath);
+            }
+            else
+            {
+                var index = new Index(_gameDirectory);
+                offset = await index.GetDataOffset(internalPath);
+            }
 
             if (offset == 0)
             {
@@ -1333,7 +1363,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Vertex Info Compression
             var compressedData = await IOUtil.Compressor(data);
 
-            var pad = 128 - (compressedData.Length % 128);
+            var pad = 128 - ((compressedData.Length + 16) % 128);
             if (pad == 128)
             {
                 pad = 0;
@@ -1892,13 +1922,15 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null)
+        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
         {
             var _index = new Index(_gameDirectory);
             long offset = 0;
-            if (cachedIndexFile != null)
+            if (tx != null)
             {
-                offset = cachedIndexFile.Get8xDataOffset(sourcePath);
+                var df = IOUtil.GetDataFileFromPath(sourcePath);
+                var indexFile = await tx.GetIndexFile(df);
+                offset = indexFile.Get8xDataOffset(sourcePath);
             }
             else
             {
@@ -1910,7 +1942,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem, cachedIndexFile, cachedModlist);
+            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem, tx);
         }
 
         /// <summary>
@@ -1924,7 +1956,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="targetPath"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModlist = null)
+        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
         {
             var _modding = new Modding(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -1933,9 +1965,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             if(exists && !overwrite)
             {
                 long offset = 0;
-                if (cachedIndexFile != null)
+                if (tx != null)
                 {
-                    offset = cachedIndexFile.Get8xDataOffset(targetPath);
+                    var df = IOUtil.GetDataFileFromPath(targetPath);
+                    var indexFile = await tx.GetIndexFile(df);
+                    offset = indexFile.Get8xDataOffset(targetPath);
                 }
                 else
                 {
@@ -1982,7 +2016,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
 
-            return await WriteModFile(data, targetPath, source, referenceItem, cachedIndexFile, cachedModlist);
+            return await WriteModFile(data, targetPath, source, referenceItem, tx);
         }
 
 
@@ -2133,32 +2167,33 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="sourceApplication"></param>
         /// <param name="retainModpack"></param>
         /// <returns></returns>
-        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, IndexFile index = null, ModList modList = null, ModPack modpackBinding = null)
+        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
         {
+
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
-            var doLumina = XivCache.GameInfo.UseLumina;
-            var luminaOutDir = XivCache.GameInfo.LuminaDirectory;
-            if (doLumina && luminaOutDir == null)
+
+            var doDatSave = tx == null;
+
+
+            if (XivCache.GameInfo.UseLumina)
             {
-                throw new InvalidDataException("Cannot perform Lumina imports without valid Lumina directory.");
+                return await DoLuminaWrite(fileData, internalFilePath, doDatSave);
             }
 
-            if (doLumina && (luminaOutDir == null || !luminaOutDir.Exists))
-                throw new ArgumentException("No valid lumina output path was specified.", nameof(luminaOutDir));
-
-            if((index == null && modList != null ) || (index != null && modList == null))
+            // Open a transaction if we don't have one.
+            if(tx == null)
             {
-                throw new InvalidDataException("Index and Modlist must both be null or both be non-null.");
+                tx = ModTransaction.BeginTransaction();
             }
 
-            var doDatSave = index == null;
-
-            modList ??= _modding.GetModList();
+            var modList = await tx.GetModList();
+            var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(internalFilePath));
 
             var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
 
+            // Resolve Item to attach to.
             string itemName = "Unknown";
             string category = "Unknown";
             if (referenceItem == null)
@@ -2194,152 +2229,149 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Update the DAT files.
             uint rawOffset = 0;
+            long retOffset = -1;
 
-            if (!doLumina)
+            if (mod != null && mod.data.modSize >= size && doDatSave)
             {
-                if (mod != null && mod.data.modSize >= size && doDatSave)
+                // If our existing mod slot is large enough to hold us, keep using it.
+                // *only* if we're going to immediately save the modlist though.
+                // Otherwise it's possible this index update may get rolled back, so it would be unsafe
+                // to overwrite any data.
+                rawOffset = await WriteToDat(fileData, df, mod.data.modOffset);
+
+            }
+            else if (index == null && doDatSave)
+            {
+                // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
+                var slots = await Dat.ComputeOpenSlots(df);
+                var slot = slots.FirstOrDefault(x => x.Value >= size);
+
+                if (slot.Key >= 2048)
                 {
-                    // If our existing mod slot is large enough to hold us, keep using it.
-                    // *only* if we're going to immediately save the modlist though.
-                    // Otherwise it's possible this index update may get rolled back, so it would be unsafe
-                    // to overwrite any data.
-                    rawOffset = await WriteToDat(fileData, df, mod.data.modOffset);
-
-                }
-                else if (index == null && doDatSave)
-                {
-                    // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
-
-                    var slots = await Dat.ComputeOpenSlots(df);
-                    var slot = slots.FirstOrDefault(x => x.Value >= size);
-
-                    if (slot.Key >= 2048)
-                    {
-                        rawOffset = await WriteToDat(fileData, df, slot.Key);
-                    }
-                    else
-                    {
-                        rawOffset = await WriteToDat(fileData, df);
-                    }
+                    rawOffset = await WriteToDat(fileData, df, slot.Key);
                 }
                 else
                 {
-                    // If we're doing a batch update, or a transaction type update, just write to the end of the file.
                     rawOffset = await WriteToDat(fileData, df);
                 }
             }
+            else
+            {
+                // If we're part of a larger transaction, just write to the end of the file.
+                rawOffset = await WriteToDat(fileData, df);
+            }
 
-            var retOffset = ((long)rawOffset) * 8L;
+            retOffset = ((long)rawOffset) * 8L;
             uint originalOffset = 0;
 
-            // Only update the index files if we actually wrote to the dat.
-            if (!doLumina)
-            {
-                // Update the Index files.
-
-                if (doDatSave)
-                {
-                    originalOffset = await _index.UpdateDataOffset(retOffset, internalFilePath, true);
-                }
-                else
-                {
-                    originalOffset = index.SetDataOffset(internalFilePath, retOffset);
-                }
-
-            }
+            // Update the Index files.
+            originalOffset = index.SetDataOffset(internalFilePath, retOffset);
 
             var longOriginal = ((long)originalOffset) * 8L;
             var fileType = BitConverter.ToInt32(fileData, 4);
 
-            // Update the Mod List file if we actually wrote to the dat.
-            if (!doLumina)
+            if (mod == null)
             {
-                if (mod == null)
-                {
-                    // Determine if this is an original game file or not.
-                    var fileAdditionMod = originalOffset == 0;
+                // Determine if this is an original game file or not.
+                var fileAdditionMod = originalOffset == 0;
 
-                    mod = new Mod()
-                    {
-                        name = itemName,
-                        category = category,
-                        datFile = df.GetDataFileName(),
-                        source = sourceApplication,
-                        fullPath = internalFilePath,
-                        data = new Data()
-                    };
-                    mod.data.modOffset = retOffset;
-                    mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
-                    mod.data.modSize = size;
-                    mod.data.dataType = fileType;
-                    mod.enabled = true;
-                    mod.modPack = modpackBinding;
-                    modList.Mods.Add(mod);
-                }
-                else
+                mod = new Mod()
                 {
-                    var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
-                    if (fileAdditionMod)
-                    {
-                        mod.data.originalOffset = retOffset;
-                    }
-
-                    mod.data.modOffset = retOffset;
-                    mod.enabled = true;
-                    mod.modPack = modpackBinding;
-                    mod.data.modSize = size;
-                    mod.data.dataType = fileType;
-                    mod.name = itemName;
-                    mod.category = category;
-                    mod.source = sourceApplication;
+                    name = itemName,
+                    category = category,
+                    datFile = df.GetDataFileName(),
+                    source = sourceApplication,
+                    fullPath = internalFilePath,
+                    data = new Data()
+                };
+                mod.data.modOffset = retOffset;
+                mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
+                mod.data.modSize = size;
+                mod.data.dataType = fileType;
+                mod.enabled = true;
+                mod.modPack = tx.GetModPack();
+                modList.Mods.Add(mod);
+            }
+            else
+            {
+                var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
+                if (fileAdditionMod)
+                {
+                    mod.data.originalOffset = retOffset;
                 }
+
+                mod.data.modOffset = retOffset;
+                mod.enabled = true;
+                mod.modPack = tx.GetModPack();
+                mod.data.modSize = size;
+                mod.data.dataType = fileType;
+                mod.name = itemName;
+                mod.category = category;
+                mod.source = sourceApplication;
             }
 
-            if (doLumina)
+            if (doDatSave)
             {
-                WriteWithLumina(fileData, luminaOutDir, internalFilePath);
-                retOffset = -1;
-            }
-
-            if (doDatSave) {
-                if (!doLumina)
-                {
-                    await _modding.SaveModListAsync(modList);
-                }
-
-                // Perform metadata expansion if needed.
-                var ext = Path.GetExtension(internalFilePath);
-                if (ext == ".meta")
-                {
-                    byte[] metaRaw;
-                    if (!doLumina)
-                        metaRaw = await GetType2Data(retOffset, df);
-                    else
-                        metaRaw = ReadWithLumina(fileData);
-
-                    var meta = await ItemMetadata.Deserialize(metaRaw);
-
-                    meta.Validate(internalFilePath);
-
-                    await ItemMetadata.ApplyMetadata(meta);
-                }
-                else if (ext == ".rgsp")
-                {
-                    byte[] rgspRaw;
-                    if (!doLumina)
-                        rgspRaw = await GetType2Data(retOffset, df);
-                    else
-                        rgspRaw = ReadWithLumina(fileData);
-
-                    // Expand the racial scaling file.
-                    await CMP.ApplyRgspFile(rgspRaw);
-                }
-
+                // Commit the transaction if we're doing a single file save.
+                await ExpandMetadata(fileData, internalFilePath, tx);
+                await ModTransaction.CommitTransaction(tx);
                 XivCache.QueueDependencyUpdate(internalFilePath);
             }
 
             // Job done.
             return retOffset;
+        }
+
+        /// <summary>
+        /// Expands the given .meta or .rgsp file.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="internalPath"></param>
+        /// <returns></returns>
+        private async Task ExpandMetadata(byte[] data, string internalPath, ModTransaction tx = null)
+        {
+            // Perform metadata expansion if needed.
+            var ext = Path.GetExtension(internalPath);
+
+            if (ext == ".meta")
+            {
+                byte[] metaRaw;
+                metaRaw = (await DecompressType2Data(data)).ToArray();
+
+                var meta = await ItemMetadata.Deserialize(metaRaw);
+                meta.Validate(internalPath);
+
+                await ItemMetadata.ApplyMetadata(meta, tx);
+            }
+            else if (ext == ".rgsp")
+            {
+                byte[] rgspRaw;
+                rgspRaw = (await DecompressType2Data(data)).ToArray();
+                // Expand the racial scaling file.
+                await CMP.ApplyRgspFile(rgspRaw, tx);
+            }
+
+        }
+
+        private async Task<long> DoLuminaWrite(byte[] fileData, string internalFilePath, bool expandMetadata)
+        {
+            var doLumina = XivCache.GameInfo.UseLumina;
+            var luminaOutDir = XivCache.GameInfo.LuminaDirectory;
+            if (doLumina && luminaOutDir == null)
+            {
+                throw new InvalidDataException("Cannot perform Lumina imports without valid Lumina directory.");
+            }
+
+            if (doLumina && (luminaOutDir == null || !luminaOutDir.Exists))
+                throw new ArgumentException("No valid lumina output path was specified.", nameof(luminaOutDir));
+
+            WriteWithLumina(fileData, luminaOutDir, internalFilePath);
+            if (expandMetadata)
+            {
+                await ExpandMetadata(fileData, internalFilePath);
+            }
+
+            return -1;
         }
 
         /// <summary>

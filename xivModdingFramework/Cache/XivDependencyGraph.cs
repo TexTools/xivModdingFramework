@@ -499,7 +499,7 @@ namespace xivModdingFramework.Cache
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        public async Task<SortedSet<string>> GetAllFiles(IndexFile index = null, ModList modlist = null)
+        public async Task<SortedSet<string>> GetAllFiles(ModTransaction tx = null)
         {
 
             var df = IOUtil.GetDataFileFromPath(Info.GetRootFile());
@@ -514,17 +514,21 @@ namespace xivModdingFramework.Cache
 
             var files = new HashSet<string>();
 
-            if (index == null)
+            IndexFile index;
+            if (tx == null)
             {
                 index = await _index.GetIndexFile(df);
-                modlist = await _modding.GetModListAsync();
+            }
+            else
+            {
+                index = await tx.GetIndexFile(df);
             }
 
-            ItemMetadata originalMetadata = await ItemMetadata.GetFromCachedIndex(this, index);
+            ItemMetadata originalMetadata = await ItemMetadata.GetFromCachedIndex(this, tx);
 
-            var originalModelPaths = await GetModelFiles(index, modlist);
-            var originalMaterialPaths = await GetMaterialFiles(-1, index, modlist);
-            var originalTexturePaths = await GetTextureFiles(-1, index, modlist);
+            var originalModelPaths = await GetModelFiles(tx);
+            var originalMaterialPaths = await GetMaterialFiles(-1, tx);
+            var originalTexturePaths = await GetTextureFiles(-1, tx);
 
             var originalVfxPaths = new HashSet<string>();
             if (Imc.UsesImc(this))
@@ -568,7 +572,7 @@ namespace xivModdingFramework.Cache
         /// Gets all the model files in this dependency chain.
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetModelFiles(IndexFile index = null, ModList modlist = null)
+        public async Task<List<string>> GetModelFiles(ModTransaction tx = null)
         {
             // Some chains have no meta entries, and jump straight to models.
             // Try to resolve Meta files first.
@@ -577,9 +581,9 @@ namespace xivModdingFramework.Cache
                 var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
 
                 List<XivRace> races = null;
-                if (index != null)
+                if (tx != null)
                 {
-                    var metadata = await ItemMetadata.GetFromCachedIndex(this, index);
+                    var metadata = await ItemMetadata.GetFromCachedIndex(this, tx);
                     races = metadata.EqdpEntries.Where(x => x.Value.bit1).Select(x => x.Key).ToList();
                 }
                 else
@@ -610,10 +614,14 @@ namespace xivModdingFramework.Cache
                 if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair && Info.SecondaryId / 100 >= 1)
                 {
                     // For human types, if their model is missing, the version 00xx is used instead.
-                    if(index == null)
+                    IndexFile index;
+                    if(tx == null)
                     {
                         var _index = new Index(XivCache.GameInfo.GameDirectory);
                         index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(modelPath), false, true);
+                    } else
+                    {
+                        index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(modelPath));
                     }
 
                     if(!(index.FileExists(modelPath)))
@@ -621,7 +629,7 @@ namespace xivModdingFramework.Cache
                         var replacementNumber = (Info.SecondaryId % 100);
                         var alteredRoot = new XivDependencyRoot(Info.PrimaryType, Info.PrimaryId, Info.SecondaryType, replacementNumber, Info.Slot);
 
-                        return await alteredRoot.GetModelFiles();
+                        return await alteredRoot.GetModelFiles(tx);
                     }
 
                 }
@@ -638,9 +646,25 @@ namespace xivModdingFramework.Cache
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1, IndexFile index = null, ModList modlist = null)
+        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1, ModTransaction tx = null)
         {
-            var useCache = index == null;
+            var useCache = tx != null;
+
+            var df = Info.PrimaryType.GetDataFile();
+            IndexFile index;
+            ModList modlist;
+            if (useCache)
+            {
+                index = await tx.GetIndexFile(df);
+                modlist = await tx.GetModList();
+            }
+            else
+            {
+                var _index = new Index(XivCache.GameInfo.GameDirectory);
+                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
+                index = await _index.GetIndexFile(df, false, true);
+                modlist = _modding.GetModList();
+            }
 
             var materials = new HashSet<string>();
             if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
@@ -653,12 +677,7 @@ namespace xivModdingFramework.Cache
                 var path= $"chara/human/c{primary}/obj/body/b{body}/material/v0001/mt_c{primary}b{body}_a.mtrl";
 
                 // Just validate it exists and call it a day.
-                if (index == null)
-                {
-                    var _index = new Index(XivCache.GameInfo.GameDirectory);
-                    index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(path), false, true);
-                }
-
+                 
                 var exists = index.FileExists(path);
                 if(exists)
                 {
@@ -681,7 +700,7 @@ namespace xivModdingFramework.Cache
             }
             else
             {
-                var models = await GetModelFiles(index, modlist);
+                var models = await GetModelFiles(tx);
                 if (models != null && models.Count > 0)
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(models[0]);
@@ -705,7 +724,7 @@ namespace xivModdingFramework.Cache
                         {
                             if (index.Get8xDataOffset(model) != 0)
                             {
-                                mdlMats = await _mdl.GetReferencedMaterialPaths(model, -1, false, false, index, modlist);
+                                mdlMats = await _mdl.GetReferencedMaterialPaths(model, -1, false, false, tx);
                             }
                         }
 
@@ -750,12 +769,6 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-            // Here we get to get a little fancy.
-            if (modlist == null)
-            {
-                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-                modlist = _modding.GetModList();
-            }
 
             var rootFolder = Info.GetRootFolder();
             var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
@@ -790,26 +803,27 @@ namespace xivModdingFramework.Cache
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetTextureFiles(int materialVariant = -1, IndexFile index = null, ModList modlist = null)
+        public async Task<List<string>> GetTextureFiles(int materialVariant = -1, ModTransaction tx = null)
         {
-            var materials = await GetMaterialFiles(materialVariant, index, modlist);
+            var materials = await GetMaterialFiles(materialVariant, tx);
             var textures = new HashSet<string>();
             if (materials != null && materials.Count > 0)
             {
                 foreach (var mat in materials)
                 {
                     List<string> mtrlTexs = new List<string>();
-                    if (index == null)
+                    if (tx == null)
                     {
                         mtrlTexs = await XivCache.GetChildFiles(mat);
                     } else
                     {
                         var dataFile = IOUtil.GetDataFileFromPath(mat);
+                        var index = await tx.GetIndexFile(dataFile);
 
                         if (index.Get8xDataOffset(mat) != 0)
                         {
                             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-                            mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, index, modlist);
+                            mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, tx);
                         }
                     }
 
@@ -853,7 +867,7 @@ namespace xivModdingFramework.Cache
         /// Gets all IMC Entries associated with this root node.
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetImcEntryPaths()
+        public async Task<List<string>> GetImcEntryPaths(ModTransaction tx = null)
         {
             // We need to locate and open the IMC file, and then check how many
             // actual sets are in it, and calculate the pointers to our associated
@@ -870,9 +884,18 @@ namespace xivModdingFramework.Cache
 
 
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
-            var imcOffset = await index.GetDataOffset(imcPath);
+
+            long imcOffset = 0;
+            if (tx != null)
+            {
+                var df = IOUtil.GetDataFileFromPath(imcPath);
+                imcOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(imcPath);
+            } else
+            {
+                var index = new Index(_gameDirectory);
+                imcOffset = await index.GetDataOffset(imcPath);
+            }
 
             if (imcOffset == 0)
             {
@@ -1918,82 +1941,96 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static async Task CacheAllRealRoots()
         {
-            ResetRootCache();
-            var index = new Index(XivCache.GameInfo.GameDirectory);
+            var workerStatus = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
 
-            var hashes = await index.GetAllHashes(XivDataFile._04_Chara);
-            var bgcHashes = await index.GetAllHashes(XivDataFile._01_Bgcommon);
-
-
-            var types = new Dictionary<XivItemType, List<XivItemType>>();
-            foreach (var type in DependencySupportedTypes)
-            {
-                types.Add(type, new List<XivItemType>());
-            }
-            types[XivItemType.monster].Add(XivItemType.body);
-            types[XivItemType.weapon].Add(XivItemType.body);
-            types[XivItemType.human].Add(XivItemType.body);
-            types[XivItemType.human].Add(XivItemType.face);
-            types[XivItemType.human].Add(XivItemType.hair);
-            types[XivItemType.human].Add(XivItemType.tail);
-            types[XivItemType.human].Add(XivItemType.ear);
-            types[XivItemType.demihuman].Add(XivItemType.equipment);
-            types[XivItemType.equipment].Add(XivItemType.none);
-            types[XivItemType.accessory].Add(XivItemType.none);
-            types[XivItemType.outdoor].Add(XivItemType.none);
-            types[XivItemType.indoor].Add(XivItemType.none);
-
-            var tasks = new List<Task<List<XivDependencyRootInfo>>>();
-            foreach (var kv in types)
-            {
-                var primary = kv.Key;
-                foreach (var secondary in kv.Value)
-                {
-                    if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
-                    {
-                        tasks.Add(TestAllRoots(bgcHashes,  primary, secondary));
-                    }
-                    else
-                    {
-                        tasks.Add(TestAllRoots(hashes,  primary, secondary));
-                    }
-                }
-            }
             try
             {
-                await Task.WhenAll(tasks.ToArray());
 
-            } catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                throw;
-            }
+                ResetRootCache();
+                // Stop the worker, in case it was reading from the file for some reason.
 
-            Console.WriteLine("Compiling final root list...");
-            List<XivDependencyRootInfo> allRoots = new List<XivDependencyRootInfo>();
-            foreach(var t in tasks)
-            {
-                allRoots.AddRange(t.Result);
-            }
+                var index = new Index(XivCache.GameInfo.GameDirectory);
+
+                var hashes = await index.GetAllHashes(XivDataFile._04_Chara);
+                var bgcHashes = await index.GetAllHashes(XivDataFile._01_Bgcommon);
 
 
-            Console.WriteLine("Saving all valid roots...");
-            using (var db = new SQLiteConnection(RootsCacheConnectionString))
-            {
-                db.Open();
-
-                using (var transaction = db.BeginTransaction())
+                var types = new Dictionary<XivItemType, List<XivItemType>>();
+                foreach (var type in DependencySupportedTypes)
                 {
-                    var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
-                    using (var cmd = new SQLiteCommand(query, db))
+                    types.Add(type, new List<XivItemType>());
+                }
+                types[XivItemType.monster].Add(XivItemType.body);
+                types[XivItemType.weapon].Add(XivItemType.body);
+                types[XivItemType.human].Add(XivItemType.body);
+                types[XivItemType.human].Add(XivItemType.face);
+                types[XivItemType.human].Add(XivItemType.hair);
+                types[XivItemType.human].Add(XivItemType.tail);
+                types[XivItemType.human].Add(XivItemType.ear);
+                types[XivItemType.demihuman].Add(XivItemType.equipment);
+                types[XivItemType.equipment].Add(XivItemType.none);
+                types[XivItemType.accessory].Add(XivItemType.none);
+                types[XivItemType.outdoor].Add(XivItemType.none);
+                types[XivItemType.indoor].Add(XivItemType.none);
+
+                var tasks = new List<Task<List<XivDependencyRootInfo>>>();
+                foreach (var kv in types)
+                {
+                    var primary = kv.Key;
+                    foreach (var secondary in kv.Value)
                     {
-                        foreach(var root in allRoots)
+                        if (primary == XivItemType.indoor || primary == XivItemType.outdoor)
                         {
-                            XivCache.CacheRoot(root, db, cmd);
+                            tasks.Add(TestAllRoots(bgcHashes, primary, secondary));
+                        }
+                        else
+                        {
+                            tasks.Add(TestAllRoots(hashes, primary, secondary));
                         }
                     }
-                    transaction.Commit();
                 }
+                try
+                {
+                    await Task.WhenAll(tasks.ToArray());
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                    throw;
+                }
+
+                Console.WriteLine("Compiling final root list...");
+                List<XivDependencyRootInfo> allRoots = new List<XivDependencyRootInfo>();
+                foreach (var t in tasks)
+                {
+                    allRoots.AddRange(t.Result);
+                }
+
+
+                Console.WriteLine("Saving all valid roots...");
+                using (var db = new SQLiteConnection(RootsCacheConnectionString))
+                {
+                    db.Open();
+
+                    using (var transaction = db.BeginTransaction())
+                    {
+                        var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var root in allRoots)
+                            {
+                                XivCache.CacheRoot(root, db, cmd);
+                            }
+                        }
+                        transaction.Commit();
+                    }
+                }
+            }
+            finally
+            {
+                XivCache.CacheWorkerEnabled = workerStatus;
             }
         }
 

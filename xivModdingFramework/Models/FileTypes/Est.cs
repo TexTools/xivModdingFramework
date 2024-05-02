@@ -12,6 +12,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -132,7 +133,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<XivRace, HashSet<int>>> GetAllExtraSkeletons(EstType type, XivRace raceFilter = XivRace.All_Races, bool includeNpcs = false)
+        public static async Task<Dictionary<XivRace, HashSet<int>>> GetAllExtraSkeletons(EstType type, XivRace raceFilter = XivRace.All_Races, bool includeNpcs = false, ModTransaction tx = null)
         {
             var ret = new Dictionary<XivRace, HashSet<int>>();
             var races = includeNpcs ? Eqp.PlayableRacesWithNPCs : Eqp.PlayableRaces;
@@ -143,7 +144,7 @@ namespace xivModdingFramework.Models.FileTypes
                 races.Add(raceFilter);
             }
 
-            var entries = await GetEstFile(type, true);
+            var entries = await GetEstFile(type, false, tx);
 
             foreach (var race in races)
             {
@@ -167,9 +168,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="type"></param>
         /// <param name="modifiedEntries"></param>
         /// <returns></returns>
-        public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var entries = await GetEstFile(type, false, cachedIndexFile);
+            var entries = await GetEstFile(type, false, tx);
 
             // Add/Remove entries.
             foreach (var entry in modifiedEntries)
@@ -200,28 +201,28 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             // Save file.
-            await SaveEstFile(type, entries, referenceItem, cachedIndexFile, cachedModList);
+            await SaveEstFile(type, entries, referenceItem, tx);
         }
 
-        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(IItem item, bool forceDefault = false)
+        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(IItem item, bool forceDefault = false, ModTransaction tx = null)
         {
             if (item == null)
             {
                 return new Dictionary<XivRace, ExtraSkeletonEntry>();
             }
 
-            return await GetExtraSkeletonEntries(item.GetRoot(), forceDefault);
+            return await GetExtraSkeletonEntries(item.GetRoot(), forceDefault, tx);
         }
-        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(XivDependencyRoot root, bool forceDefault = false)
+        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
             if(root == null)
             {
                 return new Dictionary<XivRace, ExtraSkeletonEntry>();
             }
 
-            return await GetExtraSkeletonEntries(root.Info, forceDefault);
+            return await GetExtraSkeletonEntries(root.Info, forceDefault, tx);
         }
-        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(XivDependencyRootInfo root, bool forceDefault = false)
+        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(XivDependencyRootInfo root, bool forceDefault = false, ModTransaction tx = null)
         {
             var type = GetEstType(root);
             if(type == EstType.Invalid)
@@ -233,7 +234,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (type == EstType.Face || type == EstType.Hair) {
                 id = (ushort)root.SecondaryId;
             }
-            var entries = await GetExtraSkeletonEntries(type, id, forceDefault);
+            var entries = await GetExtraSkeletonEntries(type, id, forceDefault, false, tx);
 
 
             // Hair and Faces have to be further trimmed down to only the entries associated with their root.
@@ -262,14 +263,14 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="setId"></param>
         /// <param name="forceDefault"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(EstType type, ushort setId, bool forceDefault = false, bool includeNpcs = false)
+        public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(EstType type, ushort setId, bool forceDefault = false, bool includeNpcs = false, ModTransaction tx = null)
         {
             if (type == EstType.Invalid)
             {
                 return new Dictionary<XivRace, ExtraSkeletonEntry>();
             }
 
-            var entries = await GetEstFile(type, forceDefault);
+            var entries = await GetEstFile(type, forceDefault, tx);
             
             var races = Eqp.PlayableRaces;
             if(includeNpcs)
@@ -307,10 +308,10 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="setId"></param>
         /// <param name="forceDefault"></param>
         /// <returns></returns>
-        public static async Task<ExtraSkeletonEntry> GetExtraSkeletonEntry(EstType type, XivRace race, ushort setId, bool forceDefault = false)
+        public static async Task<ExtraSkeletonEntry> GetExtraSkeletonEntry(EstType type, XivRace race, ushort setId, bool forceDefault = false, ModTransaction tx = null)
         {
             
-            var entries = await GetEstFile(type, forceDefault);
+            var entries = await GetEstFile(type, forceDefault, tx);
 
             if(!entries.ContainsKey(race)) {
                 return new ExtraSkeletonEntry(race, setId);
@@ -324,10 +325,10 @@ namespace xivModdingFramework.Models.FileTypes
             return entries[race][setId];
         }
 
-        private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false, IndexFile cachedIndexFile = null)
+        private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false, ModTransaction tx = null)
         {
             var _dat = new Dat(_gameDirectory);
-            var data = await _dat.GetType2Data(EstFiles[type], forceDefault, cachedIndexFile);
+            var data = await _dat.GetType2Data(EstFiles[type], forceDefault, tx);
 
             var count = BitConverter.ToUInt32(data, 0);
 
@@ -351,7 +352,7 @@ namespace xivModdingFramework.Models.FileTypes
             return entries;
         }
 
-        private static async Task SaveEstFile(EstType type, Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>> entries, IItem referenceItem = null, IndexFile cachedIndexFile = null, ModList cachedModList = null)
+        private static async Task SaveEstFile(EstType type, Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>> entries, IItem referenceItem = null, ModTransaction tx = null)
         {
             var count = entries.Select(x => x.Value.Count).Aggregate((x, y) => x + y);
 
@@ -377,7 +378,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             var _dat = new Dat(_gameDirectory);
-            await _dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, cachedIndexFile, cachedModList);
+            await _dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, tx);
         }
 
     }
