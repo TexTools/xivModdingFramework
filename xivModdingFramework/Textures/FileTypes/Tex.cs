@@ -1287,6 +1287,33 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
         }
+        public byte[] DDSToUncompressedTex(string externalDdsPath)
+        {
+            var ddsSize = (uint)(new FileInfo(externalDdsPath).Length);
+            byte[] uncompTex;
+
+            // Stream the file in to replace the header...
+            using (var fs = File.OpenRead(externalDdsPath))
+            {
+                using (var fileBr = new BinaryReader(fs))
+                {
+                    // Could use a file stream here instead..?
+                    // Less RAM, but slower..?
+                    using (var uncompTexMs = new MemoryStream())
+                    {
+                        using (var uncompTexWriter = new BinaryWriter(uncompTexMs))
+                        {
+                            DDSToUncompressedTex(fileBr, uncompTexWriter, ddsSize);
+                        }
+
+                        //uncompTexMs.Position = 0;
+                        uncompTex = uncompTexMs.ToArray();
+                    }
+                }
+            }
+            return uncompTex;
+        }
+
 
         public async Task<byte[]> DDSToUncompressedTex(byte[] data)
         {
@@ -1364,6 +1391,25 @@ namespace xivModdingFramework.Textures.FileTypes
             // Write header.
             var texHeader = CreateTexFileHeader(texFormat, newWidth, newHeight, newMipCount).ToArray();
             return (texHeader, headerLength);
+        }
+
+
+        /// <summary>
+        /// Compress a given uncompressed TEX file into a type 2 or type 4 file ready to be added to the DATs.
+        /// Takes a file extension (or internal path with file extension) in order to determine
+        /// if the file should be compressed into Type4(.tex) or Type2(.atex)
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="extentionOrInternalPath"></param>
+        /// <returns></returns>
+        public async Task<byte[]> CompressTexFile(byte[] data, string extentionOrInternalPath = ".tex")
+        {
+            using (var ms = new MemoryStream(data)) {
+                using (var br = new BinaryReader(ms))
+                {
+                    return await CompressTexFile(br, (uint) data.Length, extentionOrInternalPath);
+                }
+            }
         }
 
         /// <summary>

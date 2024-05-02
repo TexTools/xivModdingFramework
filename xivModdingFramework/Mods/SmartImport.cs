@@ -13,6 +13,7 @@ using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.Mods
@@ -64,7 +65,10 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task<byte[]> CreateCompressedFile(string externalPath, string internalPath, ModTransaction tx = null)
         {
-            return await CreateCompressedFile(await CreateUncompressedFile(externalPath, internalPath, tx));
+            // ATex files are just .tex files but forced into a type 2 wrapper.
+            var forceType2 = internalPath.EndsWith(".atex");
+
+            return await CreateCompressedFile(await CreateUncompressedFile(externalPath, internalPath, tx), forceType2);
         }
 
         /// <summary>
@@ -104,8 +108,14 @@ namespace xivModdingFramework.Mods
             byte[] result = null;
             if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic)
             {
-                // Convert the image to DDS if necessary.
-                return await _tex.MakeTexData(internalPath, externalPath, Textures.Enums.XivTexFormat.INVALID, tx);
+                var ddsPath = externalPath;
+                if (magic32 != DDSMagic)
+                {
+                    // Our DDS Converter can't operate on Streams, so...
+                    ddsPath = await _tex.ConvertToDDS(externalPath, internalPath, XivTexFormat.INVALID, tx);
+                }
+
+                return _tex.DDSToUncompressedTex(ddsPath);
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.
@@ -124,7 +134,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateCompressedFile(byte[] data)
+        public static async Task<byte[]> CreateCompressedFile(byte[] data, bool forceType2 = false)
         {
             const uint _SaneHeaderMaximum = 128 * 100;
 
@@ -132,7 +142,6 @@ namespace xivModdingFramework.Mods
             const uint _SaneFileSizeMaximum = 500000000;
 
             uint[] _ValidFileTypes = new uint[] { 1, 2, 3, 4 };
-
             var possiblyHeaderSize = BitConverter.ToUInt32(data, 0);
             var possiblyFileType = BitConverter.ToUInt32(data, 4);
             var possiblyFileSize = BitConverter.ToUInt32(data, 8);
@@ -151,17 +160,26 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-
             var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(XivCache.GameInfo.GameDirectory);
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
+            if (forceType2)
+            {
+                return await _dat.CompressType2Data(data);
+            }
+
+
             // At this point, there's only 2 file types that fall through.
-            // Uncompressed .MDL data, and binary files. (Type 2)
+            // This is either... 
+            // - An uncompressed MDL File (Easy to check)
+            // - An uncompressed Texture File (Kind of hard to check)
+            // - An uncompressed Binary File (Impossible to check)
+            // So we go in order.
 
             // So just confirm if it's an MDL.
             var possiblySignatureA = BitConverter.ToUInt16(data, 0);
-            var possiblySignatureB = BitConverter.ToUInt16(data, 0);
+            var possiblySignatureB = BitConverter.ToUInt16(data, 2);
 
             // Signatures for MDL version 5 and 6.
             if(possiblySignatureB == 256 && (possiblySignatureA == 5 || possiblySignatureA == 6))
@@ -169,8 +187,32 @@ namespace xivModdingFramework.Mods
                 return await _mdl.CompressMdlFile(data);
             }
 
+            // Try our best to tell if it's an uncompressed Texture.
+            var possiblyFormat = BitConverter.ToInt32(data, 4);
+            var possiblyWidth = BitConverter.ToUInt16(data, 8);
+            var possiblyHeight = BitConverter.ToUInt16(data, 10);
+
+            const ushort _SaneMaxImageSize = 16384;
+
+            if (Enum.IsDefined(typeof(XivTexFormat), possiblyFormat)) {
+                if(IsPowerOfTwo(possiblyWidth) && possiblyWidth <= _SaneMaxImageSize)
+                {
+                    if (IsPowerOfTwo(possiblyHeight) && possiblyHeight <= _SaneMaxImageSize)
+                    {
+                        // There's an extremely high chance this is an uncompressed tex file.
+                        return await _tex.CompressTexFile(data);
+                    }
+                }
+            }
+
+
             // This some kind of binary data to get type 2 compressed.
             return await _dat.CompressType2Data(data);
+        }
+
+        private static bool IsPowerOfTwo(ulong x)
+        {
+            return (x != 0) && ((x & (x - 1)) == 0);
         }
 
 

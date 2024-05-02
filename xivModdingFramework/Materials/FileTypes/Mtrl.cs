@@ -991,10 +991,17 @@ namespace xivModdingFramework.Materials.FileTypes
 
             try
             {
-                //var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, false);
-                //var compressedBytes = await _tex.DDSToDatReady(ddsBytes, indexPath);
-                //return (indexPath, compressedBytes);
-                throw new NotImplementedException();
+                // This is very RAM heavy, given we're looping through 4 phases of alteration.
+                // - Original Normal Map
+                // - Altered Pixel Data
+                // - DDS Format Pixel Data
+                // - Uncompressed Tex Format Pixel Data
+                // - Compressed Tex (Type4) Data
+
+                var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, true);
+                ddsBytes = await _tex.DDSToUncompressedTex(ddsBytes);
+                ddsBytes = await _tex.CompressTexFile(ddsBytes);
+                return (indexPath, ddsBytes);
             }
             catch (Exception ex)
             {
