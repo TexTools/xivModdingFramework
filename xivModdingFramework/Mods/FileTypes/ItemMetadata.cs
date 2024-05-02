@@ -308,19 +308,16 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
 
-            if (tx.ActiveDataFiles.Contains(XivDataFile._04_Chara))
-            {
-                // Batch install functions for these three.
-                await _eqp.SaveEqpEntries(eqpEntries, dummyItem, tx);
-                await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, tx);
-                await _eqp.SaveGmpEntries(gmpEntries, dummyItem, tx);
+            // Batch install functions for these three.
+            await _eqp.SaveEqpEntries(eqpEntries, dummyItem, tx);
+            await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, tx);
+            await _eqp.SaveGmpEntries(gmpEntries, dummyItem, tx);
 
-                // The EST function already does batch applications by nature of how it works,
-                // so just call it once for each of the four EST types represented.
-                foreach (var kv in estEntries)
-                {
-                    await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, tx);
-                }
+            // The EST function already does batch applications by nature of how it works,
+            // so just call it once for each of the four EST types represented.
+            foreach (var kv in estEntries)
+            {
+                await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, tx);
             }
 
 
@@ -428,7 +425,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
         /// <summary>
         /// Restores the original SE metadata for this root.
-        /// This should only be called by Index.DeleteFileDescriptor().
+        /// This should be called when setting the offset to 0 for a file.
         /// </summary>
         public static async Task RestoreDefaultMetadata(XivDependencyRoot root, ModTransaction tx = null)
         {

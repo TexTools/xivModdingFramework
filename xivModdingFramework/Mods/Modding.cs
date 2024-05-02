@@ -349,8 +349,7 @@ namespace xivModdingFramework.Mods
         /// ergo this should only be called by functions which will handle saving the modlist after
         /// they're done performing all modlist operations.
         /// 
-        /// If the Index and modlist are provided, the actions are only applied to those cached entries, rather
-        /// than to the live files.
+        /// NOTE: If a transaction is supplied, metadata files will not be expanded/reset, as it is assumed the higher level function will handle it.
         /// </summary>
         /// <param name="enable"></param>
         /// <param name="mod"></param>
@@ -425,6 +424,22 @@ namespace xivModdingFramework.Mods
                     {
                         index.SetDataOffset(mod.fullPath, mod.data.originalOffset);
                     }
+
+                    if(commit)
+                    {
+                        // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
+                        if (mod.fullPath.EndsWith(".meta"))
+                        {
+                            var root = await XivCache.GetFirstRoot(mod.fullPath);
+                            await ItemMetadata.RestoreDefaultMetadata(root, tx);
+                        }
+
+                        if (mod.fullPath.EndsWith(".rgsp"))
+                        {
+                            await CMP.RestoreDefaultScaling(mod.fullPath, tx);
+                        }
+                    }
+
                     mod.enabled = false;
                 }
 

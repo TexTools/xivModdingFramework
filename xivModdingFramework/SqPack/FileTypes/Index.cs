@@ -634,38 +634,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        /// <summary>
-        /// Deletes a file descriptor/stub from the Index files.
-        /// </summary>
-        /// <param name="fullPath">Full internal file path to the file that should be deleted.</param>
-        /// <param name="dataFile">Which data file to use</param>
-        /// <returns></returns>
-        public async Task<bool> DeleteFileDescriptor(string fullPath, XivDataFile dataFile, bool updateCache = true)
-        {
-            await UpdateDataOffset(0, fullPath, false, true);
-
-            // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
-            if (fullPath.EndsWith(".meta"))
-            {
-                var root = await XivCache.GetFirstRoot(fullPath);
-                await ItemMetadata.RestoreDefaultMetadata(root);
-            }
-
-            if (fullPath.EndsWith(".rgsp"))
-            {
-                await CMP.RestoreDefaultScaling(fullPath);
-            }
-
-            if (updateCache)
-            {
-                // Queue us for updating, *after* updating the associated metadata files.
-                XivCache.QueueDependencyUpdate(fullPath);
-            }
-
-            return true;
-        }
-
-
         private static Dictionary<XivDataFile, long> _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
         private static Dictionary<XivDataFile, IndexFile> _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
 
