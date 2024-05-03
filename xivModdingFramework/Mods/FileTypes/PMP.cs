@@ -3,12 +3,15 @@ using Newtonsoft.Json.Linq;
 using SharpDX.D3DCompiler;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Mods.Interfaces;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -50,8 +53,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var metaPath = Path.Combine(path, "meta.json");
 
             var text = File.ReadAllText(metaPath);
-            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text);
-            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath));
+            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text, new PMPMetaManipulationConverter());
+            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath), new PMPMetaManipulationConverter());
 
             var groups = new List<PMPGroupJson>();
 
@@ -221,6 +224,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             return true;
         }
+
+        /// <summary>
+        /// Write 
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public static Task CreatePMP(string destination, IModPackData data)
+        {
+            // PMPs are either composed of a single option as a 'DefaultMod'
+            // or a collection of Groups, which each 
+            throw new NotImplementedException();
+        }
     }
 
     public class PMPJson
@@ -239,8 +255,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Version;
         public string Website;
 
-        // Not sure what data format these are yet.
-        List<object> Tags;
+
+        // These exist.
+        List<string> Tags;
     }
 
     public class PMPGroupJson
@@ -249,10 +266,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Description;
         public int Priority;
 
-        // Enum?
+        // "Multi" or "Single"
         public string Type;
 
-        // Index
+        // Either single Index or Bitflag.
         public int DefaultSettings;
         
         public List<PMPOptionJson> Options = new List<PMPOptionJson>();
@@ -271,6 +288,104 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PMPMetaManipulationJson
     {
         public string Type;
-        public Dictionary<string, object> Manipuation;
+        public object Manipulation;
     }
+
+    public class PMPMetaManipulationConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+        {
+            Debug.WriteLine(objectType.FullName);
+            if(objectType == typeof(PMPMetaManipulationJson))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            if (reader.TokenType == JsonToken.Null)
+            {
+                return null;
+            }
+            JObject jo = JObject.Load(reader);
+
+            var obj = new PMPMetaManipulationJson();
+
+            obj.Type = (string) jo.Properties().FirstOrDefault(x => x.Name == "Type");
+            
+
+            return obj;
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class PMPEstManipulationJson
+    {
+        uint Entry = 0;
+        string Gender;
+        string Race;
+        uint SetId;
+        string Slot;
+    }
+    public class PMPImcManipulationJson
+    {
+        public struct PMPImcEntry
+        {
+            uint AttributeAndSound;
+            uint MaterialId;
+            uint DecalId;
+            uint VfxId;
+            uint MaterialAnimationId;
+            uint AttributeMask;
+            uint SoundId;
+        }
+        PMPImcEntry Entry;
+        uint PrimaryId;
+        uint SecondaryId;
+        uint Variant;
+        string ObjectType;
+        string EquipSlot;
+        string BodySlot;
+    }
+    public class PMPEqdpManipulationJson
+    {
+        uint Entry;
+        string Gender;
+        string Race;
+        uint SetId;
+        string Slot;
+    }
+    public class PMPEqpManipulationJson
+    {
+        ulong Entry;
+        uint SetId;
+        string Slot;
+    }
+    public class PMPGmpManipulationJson
+    {
+        public bool Enabled;
+        public bool Animated;
+        float RotationA;
+        float RotationB;
+        float RotationC;
+
+        // Not sure data sizes on these.
+        uint UnknownA;
+        uint UnknownB;
+        uint UnknownTotal;
+        ulong Value;
+    }
+    public class PMPRspManipulationJson
+    {
+        public float Entry;
+        public string SubRace;
+        public string Attribute;
+    }
+
 }

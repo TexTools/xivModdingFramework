@@ -2,7 +2,7 @@
 
 namespace xivModdingFramework.Mods.Interfaces
 {
-    internal interface IModPackData
+    public interface IModPackData
     {
         /// <summary>
         /// The name of the mod pack
