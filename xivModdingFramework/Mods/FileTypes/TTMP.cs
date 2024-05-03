@@ -35,6 +35,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -53,10 +54,13 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
-        private readonly string _currentWizardTTMPVersion = "2.0w";
-        private readonly string _currentSimpleTTMPVersion = "2.0s";
-        private readonly string _currentBackupTTMPVersion = "2.0b";
-        private const string _minimumAssembly = "1.3.0.0";
+        internal const string _currentTTMPVersion = "2.0";
+
+        internal const char _typeCodeSimple = 's';
+        internal const char _typeCodeWizard = 'w';
+        internal const char _typeCodeBackup = 'b';
+
+        internal const string _minimumAssembly = "1.3.0.0";
 
         private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;
@@ -67,6 +71,23 @@ namespace xivModdingFramework.Mods.FileTypes
             _source = source;
         }
 
+        // Adapts the progress updates from TTMPWriter to one that is compatible with the pre-existing CreateWizardModPack API
+        private class WizardProgressWrapper : IProgress<(int current, int total, string message)>
+        {
+            IProgress<double> _adaptedProgress;
+
+            public WizardProgressWrapper(IProgress<double> adaptedProgress)
+            {
+                _adaptedProgress = adaptedProgress;
+            }
+
+            public void Report((int current, int total, string message) value)
+            {
+                if (_adaptedProgress != null)
+                    _adaptedProgress.Report((double)value.current / (double)value.total);
+            }
+        }
+
         /// <summary>
         /// Creates a mod pack that uses a wizard for installation
         /// </summary>
@@ -75,149 +96,30 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns>The number of pages created for the mod pack</returns>
         public async Task<int> CreateWizardModPack(ModPackData modPackData, IProgress<double> progress, bool overwriteModpack)
         {
-            var processCount = await Task.Run<int>(() =>
+            return await Task.Run(() =>
             {
-                var guid = Guid.NewGuid();
+                using var ttmpWriter = new TTMPWriter(modPackData, _typeCodeWizard);
 
-                var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
-                Directory.CreateDirectory(dir);
-
-                _tempMPD = Path.Combine(dir, "TTMPD.mpd");
-                _tempMPL = Path.Combine(dir, "TTMPL.mpl");
-
-                var imageList = new HashSet<string>();
-                var pageCount = 1;
-
-                Version version = modPackData.Version == null ? new Version(1, 0, 0, 0) : modPackData.Version;
-                var modPackJson = new ModPackJson
+                // Build the JSON representation of the modpack
+                foreach (var modPackPage in modPackData.ModPackPages)
                 {
-                    TTMPVersion = _currentWizardTTMPVersion,
-                    MinimumFrameworkVersion = _minimumAssembly,
-                    Name = modPackData.Name,
-                    Author = modPackData.Author,
-                    Version = version.ToString(),
-                    Description = modPackData.Description,
-                    Url = modPackData.Url,
-                    ModPackPages = new List<ModPackPageJson>()
-                };
-
-                using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Create)))
-                {
-                    foreach (var modPackPage in modPackData.ModPackPages)
+                    var page = ttmpWriter.AddPage(modPackPage);
+                    foreach (var modGroup in modPackPage.ModGroups)
                     {
-                        var modPackPageJson = new ModPackPageJson
+                        var group = ttmpWriter.AddGroup(page, modGroup);
+                        foreach (var modOption in modGroup.OptionList)
                         {
-                            PageIndex = modPackPage.PageIndex,
-                            ModGroups = new List<ModGroupJson>()
-                        };
-
-                        modPackJson.ModPackPages.Add(modPackPageJson);
-
-                        foreach (var modGroup in modPackPage.ModGroups)
-                        {
-                            var modGroupJson = new ModGroupJson
-                            {
-                                GroupName = modGroup.GroupName,
-                                SelectionType = modGroup.SelectionType,
-                                OptionList = new List<ModOptionJson>()
-                            };
-
-                            modPackPageJson.ModGroups.Add(modGroupJson);
-
-                            foreach (var modOption in modGroup.OptionList)
-                            {
-                                var imageFileName = "";
-                                if (modOption.Image != null)
-                                {
-                                    var fname = Path.GetFileName(modOption.ImageFileName);
-                                    imageFileName = Path.Combine(dir, fname);
-                                    File.Copy(modOption.ImageFileName, imageFileName, true);
-                                    imageList.Add(imageFileName);
-                                }
-
-                                var fn = imageFileName == "" ? "" : "images/" + Path.GetFileName(imageFileName);
-                                var modOptionJson = new ModOptionJson
-                                {
-                                    Name = modOption.Name,
-                                    Description = modOption.Description,
-                                    ImagePath = fn,
-                                    GroupName = modOption.GroupName,
-                                    SelectionType = modOption.SelectionType,
-                                    IsChecked=modOption.IsChecked,
-                                    ModsJsons = new List<ModsJson>()
-                                };
-
-                                modGroupJson.OptionList.Add(modOptionJson);
-
-                                foreach (var modOptionMod in modOption.Mods)
-                                {
-                                    var dataFile = GetDataFileFromPath(modOptionMod.Key);
-
-                                    if (ForbiddenModTypes.Contains(Path.GetExtension(modOptionMod.Key))) continue;
-                                    var modsJson = new ModsJson
-                                    {
-                                        Name = modOptionMod.Value.Name,
-                                        Category = modOptionMod.Value.Category.GetEnDisplayName(),
-                                        FullPath = modOptionMod.Key,
-                                        IsDefault = modOptionMod.Value.IsDefault,
-                                        ModSize = modOptionMod.Value.ModDataBytes.Length,
-                                        ModOffset = binaryWriter.BaseStream.Position,
-                                        DatFile = dataFile.GetDataFileName(),
-                                    };
-
-                                    binaryWriter.Write(modOptionMod.Value.ModDataBytes);
-
-                                    modOptionJson.ModsJsons.Add(modsJson);
-                                }
-                            }
+                            var option = ttmpWriter.AddOption(group, modOption);
+                            foreach (var modOptionMod in modOption.Mods)
+                                ttmpWriter.AddFile(option, modOptionMod.Key, modOptionMod.Value);
                         }
-
-                        progress?.Report((double)pageCount / modPackData.ModPackPages.Count);
-
-                        pageCount++;
                     }
                 }
 
-                File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
-
-                var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
-
-                if (File.Exists(modPackPath) && !overwriteModpack)
-                {
-                    var fileNum = 1;
-                    modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
-                    while (File.Exists(modPackPath))
-                    {
-                        fileNum++;
-                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
-                    }
-                }
-                else if (File.Exists(modPackPath) && overwriteModpack)
-                {
-                    File.Delete(modPackPath);
-                }
-
-                var zf = new ZipFile();
-                zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
-                zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
-                zf.AddFile(_tempMPL, "");
-                zf.AddFile(_tempMPD, "");
-                zf.Save(modPackPath);
-
-                foreach (var image in imageList)
-                {
-                    zf.AddFile(image, "images");
-                }
-                zf.Save(modPackPath);
-
-
-                File.Delete(_tempMPD);
-                File.Delete(_tempMPL);
-
-                return pageCount;
+                // Actually executes the work of deduplicating mods and writing the TTMP file
+                ttmpWriter.Write(new WizardProgressWrapper(progress), _modPackDirectory, overwriteModpack);
+                return ttmpWriter.PageCount;
             });
-
-            return processCount;
         }
 
         /// <summary>
@@ -229,116 +131,30 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns>The number of mods processed for the mod pack</returns>
         public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress, bool overwriteModpack)
         {
-            var processCount = await Task.Run<int>(() =>
+            return await Task.Run(() =>
             {
                 var dat = new Dat(gameDirectory);
+                using var writer = new TTMPWriter(modPackData, _typeCodeSimple);
 
-                var guid = Guid.NewGuid();
-
-                var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
-                Directory.CreateDirectory(dir);
-
-
-                _tempMPD = Path.Combine(dir, "TTMPD.mpd");
-                _tempMPL = Path.Combine(dir, "TTMPL.mpl");
-
-                var modCount = 0;
-
-                var modPackJson = new ModPackJson
+                var mp = new ModPack
                 {
-                    TTMPVersion = _currentSimpleTTMPVersion,
-                    Name = modPackData.Name,
-                    Author = modPackData.Author,
-                    Version = modPackData.Version.ToString(),
-                    MinimumFrameworkVersion = _minimumAssembly,
-                    Url = modPackData.Url,
-                    Description = modPackData.Description,
-                    SimpleModsList = new List<ModsJson>()
+                    name = modPackData.Name,
+                    author = modPackData.Author,
+                    version = modPackData.Version.ToString(),
+                    url = modPackData.Url
                 };
 
-                try
+                foreach (var mod in modPackData.SimpleModDataList)
                 {
-                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Create)))
-                    {
-                        foreach (var simpleModData in modPackData.SimpleModDataList)
-                        {
-                            if (ForbiddenModTypes.Contains(Path.GetExtension(simpleModData.FullPath))) continue;
-
-                            var modsJson = new ModsJson
-                            {
-                                Name = simpleModData.Name,
-                                Category = simpleModData.Category.GetEnDisplayName(),
-                                FullPath = simpleModData.FullPath,
-                                ModSize = simpleModData.ModSize,
-                                DatFile = simpleModData.DatFile,
-                                IsDefault = simpleModData.IsDefault,
-                                ModOffset = binaryWriter.BaseStream.Position,
-                                ModPackEntry = new ModPack
-                                {
-                                    name =  modPackData.Name,
-                                    author = modPackData.Author,
-                                    version = modPackData.Version.ToString(),
-                                    url = modPackData.Url
-                                }
-                            };
-
-                            var rawData = dat.GetRawData(simpleModData.ModOffset,
-                                XivDataFiles.GetXivDataFile(simpleModData.DatFile),
-                                simpleModData.ModSize);
-
-                            if (rawData == null)
-                            {
-                                throw new Exception("Unable to obtain data for the following mod\n\n" +
-                                                    $"Name: {simpleModData.Name}\nFull Path: {simpleModData.FullPath}\n" +
-                                                    $"Mod Offset: {simpleModData.ModOffset}\nData File: {simpleModData.DatFile}\n\n" +
-                                                    $"Unselect the above mod and try again.");
-                            }
-
-                            binaryWriter.Write(rawData);
-
-                            modPackJson.SimpleModsList.Add(modsJson);
-
-                            progress?.Report((++modCount, modPackData.SimpleModDataList.Count, string.Empty));
-                        }
-                    }
-
-                    progress?.Report((0, modPackData.SimpleModDataList.Count, GeneralStrings.TTMP_Creating));
-
-                    File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
-
-                    var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}.ttmp2");
-
-                    if (File.Exists(modPackPath) && !overwriteModpack)
-                    {
-                        var fileNum = 1;
-                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
-                        while (File.Exists(modPackPath))
-                        {
-                            fileNum++;
-                            modPackPath = Path.Combine(_modPackDirectory.FullName, $"{modPackData.Name}({fileNum}).ttmp2");
-                        }
-                    }
-                    else if (File.Exists(modPackPath) && overwriteModpack)
-                    {
-                        File.Delete(modPackPath);
-                    }
-
-                    var zf = new ZipFile();
-                    zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
-                    zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
-                    zf.AddFile(_tempMPL, "");
-                    zf.AddFile(_tempMPD, "");
-                    zf.Save(modPackPath);
-                }
-                finally
-                {
-                    Directory.Delete(dir, true);
+                    var modJson = writer.AddFile(mod, dat);
+                    // This field is intended for backup modpacks, but TexTools started writing it in to simple modpacks as well at some point
+                    if (modJson != null)
+                        modJson.ModPackEntry = mp;
                 }
 
-                return modCount;
+                writer.Write(progress, _modPackDirectory, overwriteModpack);
+                return writer.ModCount;
             });
-
-            return processCount;
         }
 
         /// <summary>
@@ -351,110 +167,21 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns>The number of mods processed for the mod pack</returns>
         public async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress, bool overwriteModpack)
         {
-            var processCount = await Task.Run<int>(() =>
+            return await Task.Run(() =>
             {
                 var dat = new Dat(gameDirectory);
+                using var writer = new TTMPWriter(backupModpackData, _typeCodeBackup);
 
-                var guid = Guid.NewGuid();
-
-                var dir = Path.Combine(Path.GetTempPath(), guid.ToString());
-                Directory.CreateDirectory(dir);
-
-
-                _tempMPD = Path.Combine(dir, "TTMPD.mpd");
-                _tempMPL = Path.Combine(dir, "TTMPL.mpl");
-
-                var modCount = 0;
-
-                var modPackJson = new ModPackJson
+                foreach (var mod in backupModpackData.ModsToBackup)
                 {
-                    TTMPVersion = _currentBackupTTMPVersion,
-                    Name = backupModpackData.Name,
-                    Author = backupModpackData.Author,
-                    Version = backupModpackData.Version.ToString(),
-                    MinimumFrameworkVersion = _minimumAssembly,
-                    Url = backupModpackData.Url,
-                    Description = backupModpackData.Description,
-                    SimpleModsList = new List<ModsJson>()
-                };
-
-                try
-                {
-                    using (var binaryWriter = new BinaryWriter(File.Open(_tempMPD, FileMode.Create)))
-                    {
-                        foreach (var backupModData in backupModpackData.ModsToBackup)
-                        {
-                            if (ForbiddenModTypes.Contains(Path.GetExtension(backupModData.SimpleModData.FullPath))) continue;
-
-                            var modsJson = new ModsJson
-                            {
-                                Name = backupModData.SimpleModData.Name,
-                                Category = backupModData.SimpleModData.Category.GetEnDisplayName(),
-                                FullPath = backupModData.SimpleModData.FullPath,
-                                ModSize = backupModData.SimpleModData.ModSize,
-                                DatFile = backupModData.SimpleModData.DatFile,
-                                IsDefault = backupModData.SimpleModData.IsDefault,
-                                ModOffset = binaryWriter.BaseStream.Position,
-                                ModPackEntry = backupModData.ModPack,
-                            };
-
-                            var rawData = dat.GetRawData(backupModData.SimpleModData.ModOffset,
-                                XivDataFiles.GetXivDataFile(backupModData.SimpleModData.DatFile),
-                                backupModData.SimpleModData.ModSize);
-
-                            if (rawData == null)
-                            {
-                                throw new Exception("Unable to obtain data for the following mod\n\n" +
-                                                    $"Name: {backupModData.SimpleModData.Name}\nFull Path: {backupModData.SimpleModData.FullPath}\n" +
-                                                    $"Mod Offset: {backupModData.SimpleModData.ModOffset}\nData File: {backupModData.SimpleModData.DatFile}\n\n" +
-                                                    $"Unselect the above mod and try again.");
-                            }
-
-                            binaryWriter.Write(rawData);
-
-                            modPackJson.SimpleModsList.Add(modsJson);
-
-                            progress?.Report((++modCount, backupModpackData.ModsToBackup.Count, string.Empty));
-                        }
-                    }
-
-                    progress?.Report((0, backupModpackData.ModsToBackup.Count, GeneralStrings.TTMP_Creating));
-
-                    File.WriteAllText(_tempMPL, JsonConvert.SerializeObject(modPackJson));
-
-                    var modPackPath = Path.Combine(_modPackDirectory.FullName, $"{backupModpackData.Name}.ttmp2");
-
-                    if (File.Exists(modPackPath) && !overwriteModpack)
-                    {
-                        var fileNum = 1;
-                        modPackPath = Path.Combine(_modPackDirectory.FullName, $"{backupModpackData.Name}({fileNum}).ttmp2");
-                        while (File.Exists(modPackPath))
-                        {
-                            fileNum++;
-                            modPackPath = Path.Combine(_modPackDirectory.FullName, $"{backupModpackData.Name}({fileNum}).ttmp2");
-                        }
-                    }
-                    else if (File.Exists(modPackPath) && overwriteModpack)
-                    {
-                        File.Delete(modPackPath);
-                    }
-
-                    var zf = new ZipFile();
-                    zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
-                    zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
-                    zf.AddFile(_tempMPL, "");
-                    zf.AddFile(_tempMPD, "");
-                    zf.Save(modPackPath);
-                }
-                finally
-                {
-                    Directory.Delete(dir, true);
+                    var modJson = writer.AddFile(mod.SimpleModData, dat);
+                    if (modJson != null)
+                        modJson.ModPackEntry = mod.ModPack;
                 }
 
-                return modCount;
+                writer.Write(progress, _modPackDirectory, overwriteModpack);
+                return writer.ModCount;
             });
-
-            return processCount;
         }
 
         /// <summary>
@@ -1214,27 +941,6 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
             return 2;
-        }
-
-
-        /// <summary>
-        /// Gets a XivDataFile category for the specified path.
-        /// </summary>
-        /// <param name="internalPath">The internal file path</param>
-        /// <returns>A XivDataFile entry for the needed dat category</returns>
-        private XivDataFile GetDataFileFromPath(string internalPath)
-        {
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/", StringComparison.Ordinal));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var cat in cats)
-            {
-                if (cat.GetFolderKey() == folderKey)
-                    return cat;
-            }
-
-            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
         }
 
 
