@@ -83,10 +83,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// Triggers various callbacks during the process to allow displaying data to users or otherwise altering results.
         /// </summary>
         /// <param name="path">System path to .PMP, .JSON, or Folder</param>
-        /// <param name="PreviewMeta">Function to preview the modpack.  Return FALSE to cancel import.</param>
-        /// <param name="SelectOption">Function select option index.  Return negative value to cancel import.</param>
+        /// <param name="SelectOptions">Function called to select the desired options from the PMP's available ones.  Should set SelectedOption on each option parameter, if desired.  Return false to cancel import.</param>
         /// <returns></returns>
-        public static async Task<int> ImportPMP(string path, Func<PMPMetaJson, bool> PreviewMeta = null, Func<PMPGroupJson, int, int> SelectOption = null, string sourceApplication = "Unknown")
+        public static async Task<int> ImportPMP(string path, Func<PMPJson, bool> SelectOptions = null, string sourceApplication = "Unknown")
         {
             if (_ImportActive)
             {
@@ -105,7 +104,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 using (var tx = ModTransaction.BeginTransaction())
                 {
 
-                    var res = PreviewMeta?.Invoke(pmp.Meta);
+                    var res = SelectOptions?.Invoke(pmp);
                     if (res == false)
                     {
                         // User cancelled import.
@@ -134,17 +133,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 selected = 0;
                             }
 
-
-                            if (SelectOption != null)
+                            // If the user selected custom settings, use those.
+                            if(group.SelectedSettings >= 0)
                             {
-                                var value = SelectOption.Invoke(group, selected);
-                                if (value < 0 || value >= group.Options.Count)
-                                {
-                                    // User cancelled import.
-                                    return -1;
-                                }
-
-                                selected = value;
+                                selected = group.SelectedSettings;
                             }
 
                             files.UnionWith(await ImportOption(group.Options[selected], path, tx));
@@ -269,6 +261,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         // "Multi" or "Single"
         public string Type;
 
+        // Only used internally when the user is selecting options during install/application.
+        [JsonIgnore] public int SelectedSettings = -1;
+
         // Either single Index or Bitflag.
         public int DefaultSettings;
         
@@ -314,7 +309,34 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var obj = new PMPMetaManipulationJson();
 
             obj.Type = (string) jo.Properties().FirstOrDefault(x => x.Name == "Type");
-            
+
+            var manip = jo.Properties().FirstOrDefault(x => x.Name == "Manipulation").Value as JObject;
+
+            var parent = manip.Parent as JObject;
+
+
+            // Convert the manipulation to the appropriate internal type.
+            switch (obj.Type)
+            {
+                case "Eqp":
+                    obj.Manipulation = manip.ToObject<PMPEqpManipulationJson>();
+                    break;
+                case "Eqdp":
+                    obj.Manipulation = manip.ToObject<PMPEqdpManipulationJson>();
+                    break;
+                case "Gmp":
+                    obj.Manipulation = manip.ToObject<PMPGmpManipulationJson>();
+                    break;
+                case "Imc":
+                    obj.Manipulation = manip.ToObject<PMPImcManipulationJson>();
+                    break;
+                case "Est":
+                    obj.Manipulation = manip.ToObject<PMPEstManipulationJson>();
+                    break;
+                case "Rsp":
+                    obj.Manipulation = manip.ToObject<PMPRspManipulationJson>();
+                    break;
+            }
 
             return obj;
         }
@@ -327,59 +349,59 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     public class PMPEstManipulationJson
     {
-        uint Entry = 0;
-        string Gender;
-        string Race;
-        uint SetId;
-        string Slot;
+        public uint Entry = 0;
+        public string Gender;
+        public string Race;
+        public uint SetId;
+        public string Slot;
     }
     public class PMPImcManipulationJson
     {
         public struct PMPImcEntry
         {
-            uint AttributeAndSound;
-            uint MaterialId;
-            uint DecalId;
-            uint VfxId;
-            uint MaterialAnimationId;
-            uint AttributeMask;
-            uint SoundId;
+            public uint AttributeAndSound;
+            public uint MaterialId;
+            public uint DecalId;
+            public uint VfxId;
+            public uint MaterialAnimationId;
+            public uint AttributeMask;
+            public uint SoundId;
         }
-        PMPImcEntry Entry;
-        uint PrimaryId;
-        uint SecondaryId;
-        uint Variant;
-        string ObjectType;
-        string EquipSlot;
-        string BodySlot;
+        public PMPImcEntry Entry;
+        public uint PrimaryId;
+        public uint SecondaryId;
+        public uint Variant;
+        public string ObjectType;
+        public string EquipSlot;
+        public string BodySlot;
     }
     public class PMPEqdpManipulationJson
     {
-        uint Entry;
-        string Gender;
-        string Race;
-        uint SetId;
-        string Slot;
+        public uint Entry;
+        public string Gender;
+        public string Race;
+        public uint SetId;
+        public string Slot;
     }
     public class PMPEqpManipulationJson
     {
-        ulong Entry;
-        uint SetId;
-        string Slot;
+        public ulong Entry;
+        public uint SetId;
+        public string Slot;
     }
     public class PMPGmpManipulationJson
     {
         public bool Enabled;
         public bool Animated;
-        float RotationA;
-        float RotationB;
-        float RotationC;
+        public float RotationA;
+        public float RotationB;
+        public float RotationC;
 
         // Not sure data sizes on these.
-        uint UnknownA;
-        uint UnknownB;
-        uint UnknownTotal;
-        ulong Value;
+        public uint UnknownA;
+        public uint UnknownB;
+        public uint UnknownTotal;
+        public ulong Value;
     }
     public class PMPRspManipulationJson
     {
