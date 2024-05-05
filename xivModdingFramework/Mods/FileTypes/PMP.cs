@@ -10,8 +10,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods.Interfaces;
+using xivModdingFramework.Variants.DataContainers;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -343,7 +346,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            throw new NotImplementedException();
+            // Just use normal JSON writer, don't use this converter for JSON writing.
+            throw new NotImplementedException("Use standard JSON Converter for writing PMP files, not PMPMetaManipulationConverter.");
         }
     }
 
@@ -354,6 +358,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Race;
         public uint SetId;
         public string Slot;
+        
+        public ExtraSkeletonEntry ToExtraSkeletonEntry()
+        {
+            throw new NotImplementedException();
+        }
+        public static PMPEstManipulationJson FromEstEntry(ExtraSkeletonEntry entry)
+        {
+            throw new NotImplementedException();
+        }
     }
     public class PMPImcManipulationJson
     {
@@ -374,6 +387,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string ObjectType;
         public string EquipSlot;
         public string BodySlot;
+
+        public XivImc ToImcEntry()
+        {
+            throw new NotImplementedException();
+        }
+        public static PMPImcManipulationJson FromImcEntry(XivImc entry)
+        {
+            throw new NotImplementedException();
+        }
     }
     public class PMPEqdpManipulationJson
     {
@@ -382,12 +404,30 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Race;
         public uint SetId;
         public string Slot;
+
+        public EquipmentDeformationParameter ToEqdpEntry()
+        {
+            throw new NotImplementedException();
+        }
+        public static PMPEqdpManipulationJson FromEqdpEntry(EquipmentDeformationParameter entry)
+        {
+            throw new NotImplementedException();
+        }
     }
     public class PMPEqpManipulationJson
     {
         public ulong Entry;
         public uint SetId;
         public string Slot;
+
+        public EquipmentParameter ToEqpEntry()
+        {
+            throw new NotImplementedException();
+        }
+        public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry)
+        {
+            throw new NotImplementedException();
+        }
     }
     public class PMPGmpManipulationJson
     {
@@ -402,12 +442,31 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public uint UnknownB;
         public uint UnknownTotal;
         public ulong Value;
+
+        public GimmickParameter ToGmpEntry()
+        {
+            throw new NotImplementedException();
+        }
+        public static PMPGmpManipulationJson FromGmpEntry(GimmickParameter entry)
+        {
+            throw new NotImplementedException();
+        }
     }
     public class PMPRspManipulationJson
     {
         public float Entry;
         public string SubRace;
         public string Attribute;
+
+        public RacialGenderScalingParameter ToRgspEntry()
+        {
+            throw new NotImplementedException();
+        }
+
+        public static PMPRspManipulationJson FromRgspEntry(RacialGenderScalingParameter entry)
+        {
+            throw new NotImplementedException();
+        }
     }
 
 }
