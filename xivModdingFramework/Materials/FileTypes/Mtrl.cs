@@ -714,7 +714,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        public async Task FixPreDawntrailMaterials(List<string> paths, bool updateShaders, string source, ModTransaction tx = null, IProgress<(int current, int total, string message)> progress = null)
+        public async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx = null, IProgress<(int current, int total, string message)> progress = null)
         {
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -730,7 +730,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var count = 0;
             foreach (var path in paths)
             {
-                var res = await FixPreDawntrailMaterial(await GetMtrlData(path), updateShaders, source, tx);
+                var res = await FixPreDawntrailMaterial(await GetMtrlData(path), source, tx);
                 if(res.indexTextureToCreate != null)
                 {
                     indexesToCreate.Add(res);
@@ -787,7 +787,7 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
-        public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, bool updateShaders, string source, ModTransaction tx = null)
+        public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
@@ -797,7 +797,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if(mtrl.ShaderPackRaw == "character.shpk")
             {
-                return await FixPreDawntrailCharacterMaterial(mtrl, updateShaders, source, tx);
+                return await FixPreDawntrailCharacterMaterial(mtrl, source, tx);
             }
 
             if(mtrl.ShaderPackRaw == "hair.shpk")
@@ -816,115 +816,127 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="updateShaders"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        private async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, bool updateShaders, string source, ModTransaction tx = null)
+        private async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
         {
-
-            if (!updateShaders)
-            {
-                mtrl.ShaderPack = ShaderHelpers.EShaderPack.CharacterLegacy;
-            }
-
             if(mtrl.ColorSetData.Count != 256)
             {
                 // This is already upgraded.
                 return (null, null);
             }
 
-            List<Half> newData = new List<Half>();
-
-            // Going by rows.
-            for (int i = 0; i < mtrl.ColorSetData.Count; i += 16)
+            if (mtrl.ShaderPack == EShaderPack.Character)
             {
-                var pixel = i + 0;
-
-                // Diffuse Pixel
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel + 7]);  // SE flipped Specular Power and Gloss values for some reason.
-
-                pixel += 4;
-
-                // Specular Pixel
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel - 1]);  // SE flipped Specular Power and Gloss values for some reason.
-
-                pixel += 4;
-                // Emissive Pixel
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(1.0f);
-
-                //Unknown1
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(2.0f);
-                newData.Add(0);
-
-                //Unknown2
-                newData.Add(0.5f);
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-
-                //Unknown3
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-
-                //Unknown + subsurface material id
-                newData.Add(0);
-                newData.Add(mtrl.ColorSetData[pixel + 3]);
-                newData.Add(1.0f);  //  Subsurface Material Alpha
-                newData.Add(0);
-
-                pixel += 4;
-                //Subsurface scaling data.
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel + 3]);
-
-                // Add a blank row after, since only populating every other row.
-                newData.AddRange(GetDefaultColorsetRow());
+                mtrl.ShaderPack = EShaderPack.CharacterLegacy;
+            } else if(mtrl.ShaderPack == EShaderPack.Skin)
+            {
+                mtrl.ShaderPack = EShaderPack.SkinLegacy;
+            } else
+            {
+                // No upgrade protocol for other shaders.
+                return (null, null);
             }
 
-            mtrl.ColorSetData = newData;
-            if (mtrl.ColorSetDyeData != null)
+            if (mtrl.ColorSetData != null)
             {
-                // Update Dye information.
-                var newDyeData = new byte[128];
-                // Update old dye information
-                for (int i = 0; i < 16; i++)
+                // Update Colorset
+                List<Half> newData = new List<Half>();
+                for (int i = 0; i < mtrl.ColorSetData.Count; i += 16)
                 {
-                    var oldOffset = i * 2;
-                    var newOffset = (i * 2) * 4;
+                    var pixel = i + 0;
 
-                    var newDyeBlock = (uint)0;
-                    var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
+                    // Diffuse Pixel
+                    newData.Add(mtrl.ColorSetData[pixel + 0]);
+                    newData.Add(mtrl.ColorSetData[pixel + 1]);
+                    newData.Add(mtrl.ColorSetData[pixel + 2]);
+                    newData.Add(mtrl.ColorSetData[pixel + 7]);  // SE flipped Specular Power and Gloss values for some reason.
 
-                    // Old dye bitmask was 5 bits long.
-                    uint dyeBits = (uint)(oldDyeBlock & 0x1F);
-                    uint oldTemplate = (uint)(oldDyeBlock >> 5);
+                    pixel += 4;
 
-                    newDyeBlock |= (oldTemplate << 16);
-                    newDyeBlock |= dyeBits;
+                    // Specular Pixel
+                    newData.Add(mtrl.ColorSetData[pixel + 0]);
+                    newData.Add(mtrl.ColorSetData[pixel + 1]);
+                    newData.Add(mtrl.ColorSetData[pixel + 2]);
+                    newData.Add(mtrl.ColorSetData[pixel - 1]);  // SE flipped Specular Power and Gloss values for some reason.
 
-                    var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
+                    pixel += 4;
+                    // Emissive Pixel
+                    newData.Add(mtrl.ColorSetData[pixel + 0]);
+                    newData.Add(mtrl.ColorSetData[pixel + 1]);
+                    newData.Add(mtrl.ColorSetData[pixel + 2]);
+                    newData.Add(1.0f);
 
-                    Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                    //Unknown1
+                    newData.Add(0);
+                    newData.Add(0);
+                    newData.Add(2.0f);
+                    newData.Add(0);
+
+                    //Unknown2
+                    newData.Add(0.5f);
+                    newData.Add(0);
+                    newData.Add(0);
+                    newData.Add(0);
+
+                    //Unknown3
+                    newData.Add(0);
+                    newData.Add(0);
+                    newData.Add(0);
+                    newData.Add(0);
+
+                    //Unknown + subsurface material id
+                    newData.Add(0);
+                    newData.Add(mtrl.ColorSetData[pixel + 3]);
+                    newData.Add(1.0f);  //  Subsurface Material Alpha
+                    newData.Add(0);
+
+                    pixel += 4;
+                    //Subsurface scaling data.
+                    newData.Add(mtrl.ColorSetData[pixel + 0]);
+                    newData.Add(mtrl.ColorSetData[pixel + 1]);
+                    newData.Add(mtrl.ColorSetData[pixel + 2]);
+                    newData.Add(mtrl.ColorSetData[pixel + 3]);
+
+                    // Add a blank row after, since only populating every other row.
+                    newData.AddRange(GetDefaultColorsetRow());
                 }
 
-                mtrl.ColorSetDyeData = newDyeData;
+                mtrl.ColorSetData = newData;
+                if (mtrl.ColorSetDyeData != null)
+                {
+                    // Update Dye information.
+                    var newDyeData = new byte[128];
+                    // Update old dye information
+                    for (int i = 0; i < 16; i++)
+                    {
+                        var oldOffset = i * 2;
+                        var newOffset = (i * 2) * 4;
+
+                        var newDyeBlock = (uint)0;
+                        var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
+
+                        // Old dye bitmask was 5 bits long.
+                        uint dyeBits = (uint)(oldDyeBlock & 0x1F);
+                        uint oldTemplate = (uint)(oldDyeBlock >> 5);
+
+                        newDyeBlock |= (oldTemplate << 16);
+                        newDyeBlock |= dyeBits;
+
+                        var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
+
+                        Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                    }
+
+                    mtrl.ColorSetDyeData = newDyeData;
+                }
             }
+
             var normalTex = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Normal);
+            var idTex = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Index);
             string idPath = null;
             string normalPath = null;
-            if (normalTex!= null)
+
+            // If we don't have an ID Texture, and we have a colorset + normal map, create one.
+            if (normalTex != null && idTex == null && mtrl.ColorSetData != null && mtrl.ColorSetData.Count > 0)
             {
                 idPath = normalTex.TexturePath.Replace(".tex", "_id.tex");
                 normalPath = normalTex.TexturePath;
@@ -1008,6 +1020,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw ex;
             }
         }
+
         private Half[] GetDefaultColorsetRow()
         {
             var row = new Half[32];
@@ -1888,43 +1901,8 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-
-
-
-
         public void Dipose()
         {
         }
-
-        /// <summary>
-        /// A dictionary containing the slot abbreviations in the format [equipment slot, slot abbreviation]
-        /// </summary>
-        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
-        {
-            {XivStrings.Head, "met"},
-            {XivStrings.Hands, "glv"},
-            {XivStrings.Legs, "dwn"},
-            {XivStrings.Feet, "sho"},
-            {XivStrings.Body, "top"},
-            {XivStrings.Earring, "ear"},
-            {XivStrings.Neck, "nek"},
-            {XivStrings.Rings, "rir"},
-            {XivStrings.Wrists, "wrs"},
-            {XivStrings.Head_Body, "top"},
-            {XivStrings.Body_Hands, "top"},
-            {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "top"},
-            {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "top"},
-            {XivStrings.All, "top"},
-            {XivStrings.Face, "fac"},
-            {XivStrings.Iris, "iri"},
-            {XivStrings.Etc, "etc"},
-            {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"},
-            {XivStrings.Ear, "zer"},
-            {XivStrings.InnerEar, "fac_"},
-            {XivStrings.OuterEar, ""}
-        };
     }
 }
