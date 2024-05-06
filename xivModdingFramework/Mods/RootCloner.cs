@@ -481,11 +481,6 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                if (!modlist.ModPacks.Any(x => x.name == modPack.name))
-                {
-                    modlist.ModPacks.Add(modPack);
-                }
-
                 // Commit our transaction.
                 if (doSave)
                 {

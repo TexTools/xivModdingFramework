@@ -2299,7 +2299,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.data.modSize = size;
                 mod.data.dataType = fileType;
                 mod.enabled = true;
-                mod.modPack = tx.GetModPack();
+                mod.modPack = mod.IsInternal() ? null : tx.ModPack;
                 modList.Mods.Add(mod);
             }
             else
@@ -2309,10 +2309,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     mod.data.originalOffset = retOffset;
                 }
-
                 mod.data.modOffset = retOffset;
                 mod.enabled = true;
-                mod.modPack = tx.GetModPack();
+                mod.modPack = mod.IsInternal() ? null : tx.ModPack;
                 mod.data.modSize = size;
                 mod.data.dataType = fileType;
                 mod.name = itemName;

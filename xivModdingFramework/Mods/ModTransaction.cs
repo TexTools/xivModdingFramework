@@ -29,7 +29,7 @@ namespace xivModdingFramework.Mods
         private DateTime _ModListModifiedTime;
 
         private ModList _ModList;
-        private ModPack _ModPack;
+        public ModPack ModPack { get; set; }
         private bool _ReadOnly = false;
         private bool _Finished = false;
 
@@ -159,11 +159,6 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        public ModPack GetModPack()
-        {
-            return _ModPack;
-        }
-
         /// <summary>
         /// Sets the internal ModPack object.
         /// This is used as a default modpack to list as the owner of any file changes.
@@ -173,13 +168,13 @@ namespace xivModdingFramework.Mods
         /// <param name="modpack"></param>
         private void SetModPack(ModPack modpack)
         {
-            _ModPack = modpack;
+            ModPack = modpack;
         }
 
         private ModTransaction(bool readOnly = false, ModPack modpack = null)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
-            _ModPack = modpack;
+            ModPack = modpack;
             __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
             __Modding = new Modding(XivCache.GameInfo.GameDirectory);
             _ReadOnly = readOnly;
@@ -222,7 +217,7 @@ namespace xivModdingFramework.Mods
 
             _IndexFiles = null;
             _ModList = null;
-            _ModPack = null;
+            ModPack = null;
         }
         protected virtual void Dispose(bool disposing)
         {

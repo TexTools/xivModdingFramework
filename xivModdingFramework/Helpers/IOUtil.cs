@@ -296,5 +296,42 @@ namespace xivModdingFramework.Helpers
             }
 
         }
+
+        /// <summary>
+        /// Safely checks if the given directory is a temporary directory, and deletes it IF and only IF it is a temporary file directory.
+        /// </summary>
+        /// <param name="dir"></param>
+        public static void DeleteTempDirectory(string dir)
+        {
+            if (dir.StartsWith(Path.GetTempPath()))
+            {
+                RecursiveDelete(dir);
+            }
+        }
+        public static void RecursiveDelete(string dir)
+        {
+            RecursiveDelete(new DirectoryInfo(dir));
+        }
+        public static void RecursiveDelete(DirectoryInfo baseDir)
+        {
+            if (!baseDir.Exists)
+                return;
+
+            foreach (var dir in baseDir.EnumerateDirectories())
+            {
+                RecursiveDelete(dir);
+            }
+            baseDir.Delete(true);
+        }
+
+
+
+        /// <summary>
+        /// Simple no-op import progress handler
+        /// </summary>
+        public static IProgress<(int current, int total, string message)> NoOpImportProgress = new Progress<(int current, int total, string message)>((update) =>
+        {
+            //No-Op
+        });
     }
 }

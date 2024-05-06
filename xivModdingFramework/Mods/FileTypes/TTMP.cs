@@ -46,6 +46,16 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class TTMP
     {
+        public enum EModpackType
+        {
+            Invalid,
+            TtmpOriginal,
+            TtmpSimple,
+            TtmpWizard,
+            TtmpBackup,
+            Pmp
+        };
+
         // These file types are forbidden from being included in Modpacks or being imported via modpacks.
         // This is because these file types are re-built from constituent smaller files, and thus importing
         // a complete file would bash the user's current file state in unpredictable ways.
@@ -62,13 +72,66 @@ namespace xivModdingFramework.Mods.FileTypes
 
         internal const string _minimumAssembly = "1.3.0.0";
 
-        private string _tempMPD, _tempMPL, _source;
         private readonly DirectoryInfo _modPackDirectory;
 
         public TTMP(DirectoryInfo modPackDirectory, string source)
         {
             _modPackDirectory = modPackDirectory;
-            _source = source;
+        }
+
+        public static EModpackType GetModpackType(string path)
+        {
+            if (path.EndsWith(".pmp") || path.EndsWith(".json"))
+            {
+                return EModpackType.Pmp;
+            }
+            else if (path.EndsWith(".ttmp"))
+            {
+                return EModpackType.TtmpOriginal;
+            }
+            else if (!path.EndsWith(".ttmp2")) {
+                return EModpackType.Invalid;
+            }
+
+            // Deserialize the mpl from the .ttmp2 file and check the type.
+            using (var zf = ZipFile.Read(path))
+            {
+
+                var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
+                using (var streamReader = new StreamReader(mpl.OpenReader()))
+                {
+                    var mpj = JsonConvert.DeserializeObject<ModPackJson>(streamReader.ReadToEnd());
+
+                    // Sanity Check
+                    if (mpj == null)
+                    {
+                        return EModpackType.Invalid; 
+                    }
+
+                    // Version Check
+                    Version ver;
+                    bool success = Version.TryParse(mpj.MinimumFrameworkVersion, out ver);
+                    if (!success)
+                    {
+                        // Versions from before this variable existed are fine.
+                        var frameworkVersion = typeof(XivCache).Assembly.GetName().Version;
+                        if (ver > frameworkVersion)
+                        {
+                            return EModpackType.Invalid;
+                        }
+                    }
+
+                    // Modpack Type
+                    if (mpj.TTMPVersion.EndsWith("w")) {
+                        return EModpackType.TtmpWizard;
+                    } else if(mpj.TTMPVersion.EndsWith("s")) {
+                        return EModpackType.TtmpSimple;
+                    } else if (mpj.TTMPVersion.EndsWith("b")) {
+                        return EModpackType.TtmpBackup;
+                    }
+                    return EModpackType.Invalid;
+                }
+            }
         }
 
         // Adapts the progress updates from TTMPWriter to one that is compatible with the pre-existing CreateWizardModPack API
@@ -185,11 +248,59 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
         /// <summary>
+        /// Retrieves the deserialized MPL file from a modpack.
+        /// </summary>
+        /// <param name="modPackDirectory"></param>
+        /// <returns></returns>
+        public static async Task<ModPackJson> GetModpackList(string path)
+        {
+            return await Task.Run(() =>
+            {
+                ModPackJson modPackJson = null;
+                using (var zf = ZipFile.Read(path))
+                {
+                    var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
+                    using (var streamReader = new StreamReader(mpl.OpenReader()))
+                    {
+                        var jsonString = streamReader.ReadToEnd();
+
+                        modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
+                    }
+                }
+
+                return modPackJson;
+            });
+        }
+        /// <summary>
+        /// Unzips the images from a zip/modpack file, unloading them into a temporary directory and returning the path.
+        /// File paths match their modpack path structure.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<string> GetModpackImages(string path)
+        {
+            return await Task.Run(() =>
+            {
+                var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                using (var zf = ZipFile.Read(path))
+                {
+                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.EndsWith(".jpg") || x.FileName.EndsWith(".bmp") || x.FileName.EndsWith(".jpeg") || x.FileName.EndsWith(".gif"));
+                    foreach(var image in images)
+                    {
+                        image.Extract(tempFolder);
+                    }
+                }
+
+                return tempFolder;
+            });
+        }
+
+        /// <summary>
+        /// LEGACY: Only used by the Create Modpack Wizard in TT, which should be reworked to not rely on these pre-read image files.
         /// Gets the data from a mod pack including images if present
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public static Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> GetModPackJsonData(DirectoryInfo modPackDirectory)
+        public static Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> LEGACY_GetModPackJsonData(DirectoryInfo modPackDirectory)
         {
             return Task.Run(() =>
             {
@@ -333,18 +444,16 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <summary>
         /// Imports a mod pack asynchronously 
         /// </summary>
-        /// <param name="modPackDirectory">The directory of the mod pack</param>
+        /// <param name="modpackPath">The directory of the mod pack</param>
         /// <param name="modsJson">The list of mods to be imported</param>
-        /// <param name="gameDirectory">The game directory</param>
-        /// <param name="modListDirectory">The mod list directory</param>
         /// <param name="progress">The progress of the import</param>
         /// <param name="GetRootConversionsFunction">Function called part-way through import to resolve rood conversions, if any are desired.  Function takes a List of files, the in-progress modified index and modlist files, and returns a dictionary of conversion data.  If this function throws and OperationCancelledException, the import is cancelled.</param>
         /// <param name="AutoAssignBodyMaterials">Whether models should be scanned for auto material assignment or not.</param>
         /// <returns>The number of total mods imported</returns>
-        public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(
-            DirectoryInfo modPackDirectory, List<ModsJson> modsJson, DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, 
+        public static async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(
+            string modpackPath, List<ModsJson> modsJson, string sourceApplication, IProgress<(int current, int total, string message)> progress = null, 
             Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null,
-            bool AutoAssignBodyMaterials = false, ModPackJson ModPackData = null, bool fixPreDawntrailMods = true)
+            bool AutoAssignBodyMaterials = false, bool fixPreDawntrailMods = true)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
@@ -353,13 +462,22 @@ namespace xivModdingFramework.Mods.FileTypes
                 throw new Exception("Cannot import modpacks via TexTools in Lumina mode.");
             }
 
+            if(progress == null)
+            {
+                progress = IOUtil.NoOpImportProgress;
+            }
+
+            // Get the MPL
+            var modpackMpl = await GetModpackList(modpackPath);
+
             var startTime = DateTime.Now.Ticks;
             long endTime = 0;
             long part1Duration = 0;
             long part2Duration = 0;
+            string _tempMPD, _tempMPL;
 
-            var dat = new Dat(gameDirectory);
-            var modding = new Modding(gameDirectory);
+            var dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var modding = new Modding(XivCache.GameInfo.GameDirectory);
             var importErrors = "";
 
             // Disable the cache woker while we're installing multiple items at once, so that we don't process queue items mid-import.
@@ -419,10 +537,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                     var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-                    var needsTexFix = DoesTexNeedFixing(modPackDirectory);
+                    var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
 
                     // 0 - Extract the MPD file.
-                    using (var zf = ZipFile.Read(modPackDirectory.FullName))
+                    using (var zf = ZipFile.Read(modpackPath))
                     {
                         progress.Report((0, 0, "Unzipping TTMP File..."));
                         var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
@@ -554,19 +672,6 @@ namespace xivModdingFramework.Mods.FileTypes
                             progress.Report((count, totalFiles, "Updating Index file references..."));
                         }
 
-                        // Add entries for new modpacks to the mod list 
-                        foreach (var modsJson in filteredModsJson)
-                        {
-                            if (modsJson.ModPackEntry == null) continue;
-
-                            var modPackExists = modList.ModPacks.Any(modpack => modpack.name == modsJson.ModPackEntry.name);
-
-                            if (!modPackExists)
-                            {
-                                modList.ModPacks.Add(modsJson.ModPackEntry);
-                            }
-                        }
-
 
                         // Root Alterations/Item Conversion
                         if (GetRootConversionsFunction != null)
@@ -619,7 +724,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                         var destination = conversion.Value.Root;
                                         var variant = conversion.Value.Variant;
 
-                                        var convertedFiles = await RootCloner.CloneRoot(source, destination, _source, variant, null, null, tx);
+                                        var convertedFiles = await RootCloner.CloneRoot(source, destination, sourceApplication, variant, null, null, tx);
 
                                         // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
                                         foreach (var fileKv in convertedFiles)
@@ -707,7 +812,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                         name = json.Name,
                                         category = json.Category,
                                         datFile = df.GetDataFileName(),
-                                        source = _source,
+                                        source = sourceApplication,
                                         fullPath = file,
                                         data = new Data()
                                     };
@@ -736,7 +841,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                     mod.data.dataType = fileType;
                                     mod.name = json.Name;
                                     mod.category = json.Category;
-                                    mod.source = _source;
+                                    mod.source = sourceApplication;
                                 }
                             }
                             catch (Exception ex)
@@ -842,7 +947,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     // If we have a Pre Dawntrail Modpack, we need to fix things up.
                     if (fixPreDawntrailMods)
                     {
-                        if (ModPackData != null && Int32.Parse(ModPackData.TTMPVersion.Substring(0, 1)) <= 1)
+                        if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
                         {
                             await FixPreDawntrailImports(filePaths, "DawntrailFix", progress);
                         }
@@ -920,30 +1025,6 @@ namespace xivModdingFramework.Mods.FileTypes
 	        tex[10] = buffer[2];
 	        tex[11] = buffer[3];
         }
-
-        /// <summary>
-        /// Gets the data type from an item path
-        /// </summary>
-        /// <param name="path">The path of the item</param>
-        /// <returns>The data type</returns>
-        private int GetDataType(string path)
-        {
-            if (String.IsNullOrEmpty(path)) return 0;
-
-            if (path.Contains(".tex"))
-            {
-                return 4;
-            }
-
-            if (path.Contains(".mdl"))
-            {
-                return 3;
-            }
-
-            return 2;
-        }
-
-
 
         public static async Task FixPreDawntrailImports(HashSet<string> filePaths, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {

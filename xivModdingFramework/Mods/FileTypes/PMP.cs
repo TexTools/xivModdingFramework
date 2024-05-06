@@ -22,6 +22,9 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Variants.DataContainers;
+using Ionic.Zip;
+using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.DataContainers;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -33,7 +36,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         private static bool _ImportActive = false;
         private static string _Source = null;
 
-        private static async Task<string> ResolvePMPBasePath(string path)
+        // Number of files that were not imported due to TT not knowing what to do with them.
+        // Ex. Stuff in non-existent fake DATs, or Metadata entries TT Doesn't know how to parse.
+        private static int _NoImportCount = 0;
+
+        private static async Task<string> ResolvePMPBasePath(string path, bool jsonsOnly = false)
         {
             if (path.EndsWith(".json"))
             {
@@ -48,18 +55,32 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 // Run Zip extract on a new thread.
                 await Task.Run(async () =>
                 {
-                    ZipFile.ExtractToDirectory(path, tempFolder);
+                    if (!jsonsOnly)
+                    {
+                        // Extract everything.
+                        System.IO.Compression.ZipFile.ExtractToDirectory(path, tempFolder);
+                    } else
+                    {
+                        // Just JSON files.
+                        using(var zip = new Ionic.Zip.ZipFile(path)) {
+                            var jsons = zip.Entries.Where(x => x.FileName.ToLower().EndsWith(".json"));
+                            foreach(var e in jsons)
+                            {
+                                e.Extract(tempFolder);
+                            }
+                        }
+                    }
                 });
                 path = tempFolder;
             }
             return path;
         }
-        public static async Task<PMPJson> LoadPMP(string path)
+
+        public static async Task<(PMPJson pmp, string path)> LoadPMP(string path, bool jsonOnly = false)
         {
             var gameDir = XivCache.GameInfo.GameDirectory;
 
-            path = await ResolvePMPBasePath(path);
-
+            path = await ResolvePMPBasePath(path, jsonOnly);
             var defModPath = Path.Combine(path, "default_mod.json");
             var metaPath = Path.Combine(path, "meta.json");
 
@@ -86,46 +107,67 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 Groups = groups
             };
 
-            return pmp;
+            return (pmp, path);
         }
 
         /// <summary>
         /// Imports a given PMP File, Penumbra Folder, or Penumbra Folder Root JSON into the game files.
-        /// Triggers various callbacks during the process to allow displaying data to users or otherwise altering results.
         /// </summary>
         /// <param name="path">System path to .PMP, .JSON, or Folder</param>
-        /// <param name="SelectOptions">Function called to select the desired options from the PMP's available ones.  Should set SelectedOption on each option parameter, if desired.  Return false to cancel import.</param>
         /// <returns></returns>
-        public static async Task<int> ImportPMP(string path, Func<PMPJson, bool> SelectOptions = null, string sourceApplication = "Unknown")
+        public static async Task<int> ImportPMP(string path, string sourceApplication = "Unknown")
+        {
+            path = await ResolvePMPBasePath(path);
+            var pmpData = await LoadPMP(path);
+            try
+            {
+                return await ImportPMP(pmpData.pmp, pmpData.path, sourceApplication);
+            }
+            finally
+            {
+                IOUtil.DeleteTempDirectory(pmpData.path);
+            }
+        }
+
+        /// <summary>
+        /// Imports a given PMP File into the game.
+        /// Requires unzipping the corpus of the PMP data to the given unzip path before hand (Ex. By calling LoadPMP)
+        /// 
+        /// Will automatically clean up unzippedPath after if it is in the user's TEMP directory.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<int> ImportPMP(PMPJson pmp, string unzippedPath, string sourceApplication = "Unknown")
         {
             if (_ImportActive)
             {
                 throw new Exception("Cannot import multiple Modpacks simultaneously.");
             }
+            _NoImportCount = 0;
+
+            if (unzippedPath.EndsWith(".json"))
+            {
+                unzippedPath = Path.GetDirectoryName(unzippedPath);
+            }
 
             var files = new HashSet<string>();
+            _ImportActive = true;
+            _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
+
+            var modPack = new ModPack();
+
+            modPack.name = pmp.Meta.Name;
+            modPack.author = pmp.Meta.Author;
+            modPack.version = pmp.Meta.Version;
+            modPack.url = pmp.Meta.Website;
+
             try
             {
-                _ImportActive = true;
-                _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
-
-                path = await ResolvePMPBasePath(path);
-                var pmp = await LoadPMP(path);
-
-                using (var tx = ModTransaction.BeginTransaction())
+                using (var tx = ModTransaction.BeginTransaction(false, modPack))
                 {
-
-                    var res = SelectOptions?.Invoke(pmp);
-                    if (res == false)
-                    {
-                        // User cancelled import.
-                        return -1;
-                    }
-
                     if (pmp.Groups == null || pmp.Groups.Count == 0)
                     {
                         // No options, just default.
-                        files.UnionWith(await ImportOption(pmp.DefaultMod, path, tx));
+                        files.UnionWith(await ImportOption(pmp.DefaultMod, unzippedPath, tx));
                     }
                     else
                     {
@@ -152,17 +194,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 selected = group.SelectedSettings;
                             }
 
-                            files.UnionWith(await ImportOption(group.Options[selected], path, tx));
+                            files.UnionWith(await ImportOption(group.Options[selected], unzippedPath, tx));
                         }
                     }
                     await ModTransaction.CommitTransaction(tx);
                 }
 
-                // Pre-Dawntrail Modpack.
+                    // Pre-Dawntrail Modpack.
                 if (pmp.Meta.FileVersion <= 3)
                 {
                     // Transaction for fixing up our files.
-                    using (var tx = ModTransaction.BeginTransaction())
+                    using (var tx = ModTransaction.BeginTransaction(false, modPack))
                     {
                         await TTMP.FixPreDawntrailImports(files, sourceApplication, null, tx);
                         await ModTransaction.CommitTransaction(tx);
@@ -192,6 +234,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 // Safety checks.
                 if (!CanImport(file.Key))
                 {
+                    _NoImportCount++;
                     continue;
                 }
                 if (!File.Exists(externalPath))

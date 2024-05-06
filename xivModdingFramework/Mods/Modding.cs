@@ -119,6 +119,9 @@ namespace xivModdingFramework.Mods
         public async Task SaveModListAsync(ModList ml)
         {
             await _modlistSemaphore.WaitAsync();
+
+            // Calling this property automatically crunches the listed modpacks down based on name.
+            var z = ml.ModPacks;
             try
             {
                 File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
@@ -161,7 +164,6 @@ namespace xivModdingFramework.Mods
             var modList = new ModList
             {
                 version = _modlistVersion.ToString(),
-                ModPacks = new List<ModPack>(),
                 Mods = new List<Mod>()
             };
 
@@ -729,15 +731,6 @@ namespace xivModdingFramework.Mods
 
             var modList = await GetModList();
 
-            var modPackItem = (from modPack in modList.ModPacks
-                where modPack.name.Equals(modPackName)
-                select modPack).FirstOrDefault();
-
-            // Modpack doesn't exist in the modlist.
-            if (modPackItem == null) return;
-
-            modList.ModPacks.Remove(modPackItem);
-
             var modsToRemove = (from mod in modList.Mods
                                 where mod.modPack != null && mod.modPack.name.Equals(modPackName)
                                 select mod).ToList();
@@ -871,13 +864,6 @@ namespace xivModdingFramework.Mods
             {
                 modlist.Mods.Remove(mod);
             }
-
-            progressReporter?.Report((0, 0, "Removing empty modpacks..."));
-
-            modlist.ModPacks.RemoveAll(modpack => {
-                var anyMods = modlist.Mods.Any(mod => mod.modPack != null && mod.modPack.name == modpack.name);
-                return !anyMods;
-            });
 
             progressReporter?.Report((0, 0, "Saving Modlist file..."));
 

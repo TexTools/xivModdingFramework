@@ -18,6 +18,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using xivModdingFramework.General.Enums;
@@ -35,7 +36,32 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The list of ModPacks currently installed
         /// </summary>
-        public List<ModPack> ModPacks { get; set; }
+        public IEnumerable<ModPack> ModPacks { get
+            {
+                if (Mods == null) { 
+                    return new List<ModPack>();
+                }
+
+                var modPacks = new Dictionary<string, ModPack>();
+                foreach (var m in Mods)
+                {
+                    if(m.modPack == null)
+                    {
+                        continue;
+                    }
+
+                    if (modPacks.ContainsKey(m.modPack.name))
+                    {
+                        m.modPack = modPacks[m.modPack.name];
+                    }
+                    else
+                    {
+                        modPacks.Add(m.modPack.name, m.modPack);
+                    }
+                }
+                return modPacks.Select(x => x.Value);
+            }
+        }
 
         /// <summary>
         /// The list of Mods
