@@ -266,7 +266,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="internalFilePath">The internal file path of the mod</param>
         /// <param name="enable">The status of the mod</param>
-        public async Task<bool> ToggleModStatus(string internalFilePath, bool enable)
+        public async Task<bool> ToggleModStatus(string internalFilePath, bool enable, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
@@ -279,22 +279,46 @@ namespace xivModdingFramework.Mods
             {
                 throw new Exception("File Path missing, unable to toggle mod.");
             }
-            var modList = await GetModList();
 
-            var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
-
-            var result = await ToggleModUnsafe(enable, modEntry, false, true);
-            if(!result)
+            var doSave = false;
+            if (tx == null)
             {
-                return result;
+                tx = ModTransaction.BeginTransaction();
+                doSave = true;
             }
+            try
+            {
+                var modList = await tx.GetModList();
+                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
+                var result = await ToggleModUnsafe(enable, modEntry, false, true, tx);
 
-            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+                // If we were unable to toggle the mod, and we have a local transaction...
+                if(!result)
+                {
+                    if (doSave)
+                    {
+                        // Cancel and return;
+                        ModTransaction.CancelTransaction(tx);
+                    }
 
+                    return false;
+                }
 
-            SaveModList(modList);
-
-            return result;
+                // Successfully toggled mod.
+                if (doSave)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+                return true;
+            }
+            catch
+            {
+                if (doSave)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
         }
 
         /// <summary>
@@ -607,10 +631,10 @@ namespace xivModdingFramework.Mods
         /// Purges any invalid empty mod blocks from the modlist.
         /// </summary>
         /// <returns></returns>
-        public async Task<int> PurgeInvalidEmptyBlocks()
+        public async Task<int> PurgeInvalidEmptyBlocks(ModTransaction tx)
         {
             int removed = 0;
-            var modList = await GetModList();
+            var modList = await tx.GetModList();
             var emptyBlocks = modList.Mods.Where(x => x.name == string.Empty);
             var toRemove = emptyBlocks.Where(x => x.data.modOffset <= 0).ToList();
 
@@ -620,10 +644,6 @@ namespace xivModdingFramework.Mods
                 removed++;
             }
 
-            if (removed > 0)
-            {
-                SaveModList(modList);
-            }
             return removed;
         } 
 
@@ -1021,7 +1041,7 @@ namespace xivModdingFramework.Mods
 
                 foreach (var dKv in modsByDf)
                 {
-                    await _index.SaveIndexFile(indexFiles[dKv.Key]);
+                    indexFiles[dKv.Key].Save();
                 }
 
                 progressReporter?.Report((0, 0, "Saving updated Modlist..."));

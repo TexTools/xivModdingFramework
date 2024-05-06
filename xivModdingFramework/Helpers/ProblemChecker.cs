@@ -134,9 +134,8 @@ namespace xivModdingFramework.Helpers
         {
             return Task.Run(() =>
             {
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile);
-
-                _index.UpdateIndexDatCount(dataFile, largestDatNum);
+                //var largestDatNum = _dat.GetLargestDatNumber(dataFile);
+                //_index.UpdateIndexDatCount(dataFile, largestDatNum);
             });
         }
 
@@ -356,7 +355,12 @@ namespace xivModdingFramework.Helpers
                     }
 
                     // Update all the index counts to be safe, in case the user's index backups were generated when some mod dats existed.
-                    _index.UpdateAllIndexDatCounts();
+                    // This can be done just by opening and committing a blank transaction.
+                    using (var tx = ModTransaction.BeginTransaction())
+                    {
+                        await ModTransaction.CommitTransaction(tx);
+                    }
+
                     return true;
                 }
                 return false;

@@ -1198,6 +1198,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
+        /// <summary>
+        /// WARNING: DOES NOT USE/RESPECT TRANSACTIONS
+        /// This is a very specific fixer-function designed to handle a very specific error caused by old TexTools builds that would
+        /// generate invalid file sizes.
+        /// </summary>
+        /// <param name="df"></param>
+        /// <param name="offsetWithDatNumber"></param>
+        /// <param name="correctedFileSize"></param>
+        /// <returns></returns>
         public async Task UpdateType4UncompressedSize(XivDataFile df, long offsetWithDatNumber, uint correctedFileSize)
         {
             // This formula is used to obtain the dat number in which the offset is located

@@ -129,7 +129,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
                     else
                     {
-                        foreach (var group in pmp.Groups)
+                        // Order groups by Priority, Lowest => Highest, tiebreaker default order
+                        var orderedGroups = pmp.Groups.OrderBy(x => x.Priority);
+                        foreach (var group in orderedGroups)
                         {
                             if (group.Options == null || group.Options.Count == 0)
                             {
@@ -162,7 +164,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     // Transaction for fixing up our files.
                     using (var tx = ModTransaction.BeginTransaction())
                     {
-                        await TTMP.FixPreDawntrailImports(files, true, sourceApplication, null, tx);
+                        await TTMP.FixPreDawntrailImports(files, sourceApplication, null, tx);
                         await ModTransaction.CommitTransaction(tx);
                     }
                 }

@@ -4,11 +4,15 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.SqPack.DataContainers
 {
@@ -63,16 +67,11 @@ namespace xivModdingFramework.SqPack.DataContainers
         // The data file this Index file refers to.
         public readonly XivDataFile DataFile;
 
-        public IndexFile(XivDataFile dataFile, byte[] index1Data, byte[] index2Data) : this(dataFile, new BinaryReader(new MemoryStream(index1Data)), new BinaryReader(new MemoryStream(index2Data)), true)
-        {
-
-        }
 
         /// <summary>
         /// Standard constructor.
-        /// If disposeStreams is set to true, the binary streams will be disposed after use.
         /// </summary>
-        public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream, bool disposeStreams = false)
+        public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream)
         {
             DataFile = dataFile;
 
@@ -86,32 +85,40 @@ namespace xivModdingFramework.SqPack.DataContainers
             {
                 ReadOnlyMode = true;
             }
+        }
 
-            if(disposeStreams)
+        public virtual void Save() {
+
+            var dir = XivCache.GameInfo.GameDirectory;
+            var index1Path = Path.Combine(dir.FullName, $"{DataFile.GetDataFileName()}{FileTypes.Index.IndexExtension}");
+            var index2Path = Path.Combine(dir.FullName, $"{DataFile.GetDataFileName()}{FileTypes.Index.Index2Extension}");
+            using (var index1Stream = new BinaryWriter(File.OpenWrite(index1Path)))
             {
-                index1Stream.Dispose();
-                if (index2Stream != null)
+                using (var index2Stream = new BinaryWriter(File.OpenWrite(index2Path)))
                 {
-                    index2Stream.Dispose();
+                    Save(index1Stream, index2Stream);
                 }
             }
         }
 
-        public void Save(BinaryWriter index1Stream, BinaryWriter index2Stream, bool disposeStreams = false)
+        public virtual void Save(BinaryWriter index1Stream, BinaryWriter index2Stream)
         {
             if (ReadOnlyMode) throw new InvalidDataException("Index Files loaded in Read Only Mode cannot be saved to file.");
 
             WriteIndex1File(index1Stream);
             WriteIndex2File(index2Stream);
 
-            if (disposeStreams)
-            {
-                index1Stream.Dispose();
-                index2Stream.Dispose();
-            }
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var datCount = _dat.GetLargestDatNumber(DataFile) + 1;
+
+            // Update Dat Counts.
+            index1Stream.BaseStream.Seek(1104, SeekOrigin.Begin);
+            index1Stream.Write(datCount);
+            index2Stream.BaseStream.Seek(1104, SeekOrigin.Begin);
+            index2Stream.Write(datCount);
         }
 
-        private void ReadIndex1File(BinaryReader stream)
+        protected virtual void ReadIndex1File(BinaryReader stream)
         {
             stream.BaseStream.Seek(12, SeekOrigin.Begin);
             int headerSize = stream.ReadInt32();
@@ -136,7 +143,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                 int segmentSize = stream.ReadInt32();
 
                 // Next 20 bytes is the SHA-1 of the segment header.
-                // (Don't need to read b/c we recalculat it on writing anyways)
+                // (Don't need to read b/c we recalculate it on writing anyways)
 
                 // Time to read the actual segment data.
                 stream.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
@@ -158,9 +165,6 @@ namespace xivModdingFramework.SqPack.DataContainers
                         if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
                         {
                             Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
-                        } else
-                        {
-                            var z = "z";
                         }
                     }
                 } else if(segmentId == 1 || segmentId == 2)
@@ -176,7 +180,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             Index1Header = header;
         }
-        private void ReadIndex2File(BinaryReader stream)
+        protected virtual void ReadIndex2File(BinaryReader stream)
         {
             stream.BaseStream.Seek(12, SeekOrigin.Begin);
             int headerSize = stream.ReadInt32();
@@ -235,7 +239,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             Index2Header = header;
         }
 
-        private void WriteIndex1File(BinaryWriter stream)
+        protected virtual void WriteIndex1File(BinaryWriter stream)
         {
             var sh = SHA1.Create();
 
@@ -392,7 +396,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                 stream.Write(SegmentData[i]);
             }
         }
-        private void WriteIndex2File(BinaryWriter stream)
+        protected virtual void WriteIndex2File(BinaryWriter stream)
         {
             var sh = SHA1.Create();
 
@@ -518,7 +522,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public uint GetRawDataOffset(string filePath)
+        public virtual uint GetRawDataOffset(string filePath)
         {
 
             var fileName = Path.GetFileName(filePath);
@@ -549,7 +553,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public long Get8xDataOffset(string filePath)
+        public virtual long Get8xDataOffset(string filePath)
         {
             return ((long) GetRawDataOffset(filePath)) * 8L;
         }
@@ -560,7 +564,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public uint GetRawDataOffsetIndex2(string filePath)
+        public virtual uint GetRawDataOffsetIndex2(string filePath)
         {
 
             var fullHash = (uint)HashGenerator.GetHash(filePath);
@@ -581,11 +585,11 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public long Get8xDataOffsetIndex2(string filePath)
+        public virtual long Get8xDataOffsetIndex2(string filePath)
         {
             return ((long)GetRawDataOffsetIndex2(filePath)) * 8L;
         }
-        public (uint DatNumber, long DataOffset) GetDataOffsetComplete(string filePath)
+        public virtual (uint DatNumber, long DataOffset) GetDataOffsetComplete(string filePath)
         {
             var raw = GetRawDataOffset(filePath);
             var datNum = (uint)((raw & 0x0F) / 2);
@@ -606,7 +610,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// 
         /// Setting a value of 0 or negative for the offset will remove the file pointer.
         /// </summary>
-        public uint SetDataOffset(string filePath, long new8xOffset, uint datNumber)
+        public virtual uint SetDataOffset(string filePath, long new8xOffset, uint datNumber)
         {
 
             if (new8xOffset <= 0)
@@ -626,7 +630,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// 
         /// Setting a value of 0 for the offset will remove the file pointer.
         /// </summary>
-        public uint SetDataOffset(string filePath, uint newRawOffset, uint datNumber)
+        public virtual uint SetDataOffset(string filePath, uint newRawOffset, uint datNumber)
         {
             if(newRawOffset % 8 != 0)
             {
@@ -651,7 +655,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// 
         /// Setting a value of 0 or negative for the offset will remove the file pointer.
         /// </summary>
-        public uint SetDataOffset(string filePath, long new8xOffsetWithDatNumEmbed)
+        public virtual uint SetDataOffset(string filePath, long new8xOffsetWithDatNumEmbed)
         {
             if (new8xOffsetWithDatNumEmbed <= 0)
             {
@@ -670,7 +674,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// 
         /// Setting a value of 0 for the offset will remove the file pointer.
         /// </summary>
-        public uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        public virtual uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
         {
             var fileName = Path.GetFileName(filePath);
             var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
@@ -734,7 +738,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="folderHash"></param>
         /// <returns></returns>
-        public List<FileIndexEntry> GetEntriesInFolder(uint folderHash)
+        public virtual List<FileIndexEntry> GetEntriesInFolder(uint folderHash)
         {
             if (!Index1Entries.ContainsKey(folderHash)) return new List<FileIndexEntry>();
             return Index1Entries[folderHash].Values.ToList();
@@ -745,7 +749,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// Retrieves the entire universe of folder => file hashes in the index.
         /// </summary>
         /// <returns></returns>
-        public Dictionary<uint, HashSet<uint>> GetAllHashes()
+        public virtual Dictionary<uint, HashSet<uint>> GetAllHashes()
         {
             var result = new Dictionary<uint, HashSet<uint>>();
             foreach(var folderKv in Index1Entries)
@@ -764,7 +768,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// Returns a safe cloned copy of the entries by default.
         /// </summary>
         /// <returns></returns>
-        public List<FileIndexEntry> GetAllEntriesIndex1(bool safe = true)
+        public virtual List<FileIndexEntry> GetAllEntriesIndex1(bool safe = true)
         {
             var result = new List<FileIndexEntry>();
             foreach (var folderKv in Index1Entries)
@@ -790,7 +794,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// Returns a safe cloned copy of the entries by default.
         /// </summary>
         /// <returns></returns>
-        public List<FileIndex2Entry> GetAllEntriesIndex2(bool safe = true)
+        public virtual List<FileIndex2Entry> GetAllEntriesIndex2(bool safe = true)
         {
             var result = new List<FileIndex2Entry>();
             foreach (var kv in Index2Entries)
@@ -809,7 +813,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
 
-        public bool FileExists(string fullPath)
+        public virtual bool FileExists(string fullPath)
         {
             var fileName = Path.GetFileName(fullPath);
             var folderName = fullPath.Substring(0, fullPath.LastIndexOf('/'));
@@ -824,7 +828,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             return false;
         }
 
-        public bool FolderExists(uint folderHash)
+        public virtual bool FolderExists(uint folderHash)
         {
             if (Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].Count != 0)
             {
@@ -832,7 +836,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
             return false;
         }
-        public bool FolderExists(string folderPath)
+        public virtual bool FolderExists(string folderPath)
         {
             var folderHash = (uint)HashGenerator.GetHash(folderPath);
             if (Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].Count != 0)

@@ -1549,14 +1549,10 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item</param>
         /// <param name="source">The source importing the file</param>
         /// <returns>The new offset</returns>
-        public async Task<long> TexColorImporter(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang)
+        public async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang, ModTransaction tx = null)
         {
-            var colorSetData = new List<Half>();
-            byte[] colorSetExtraData = null;
-
-
-            colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
-            colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
+            var colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
+            var colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
@@ -1567,8 +1563,35 @@ namespace xivModdingFramework.Textures.FileTypes
                 xivMtrl.AdditionalData[0] = 12;
             }
 
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            return await _mtrl.ImportMtrl(xivMtrl, item, source);
+            var doSave = false;
+            if(tx == null)
+            {
+                doSave = true;
+                // Open a transaction if needed since we're performing multiple operations.
+                tx = ModTransaction.BeginTransaction();
+            }
+            try
+            {
+                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+                if (xivMtrl.ColorSetData.Count < 1024)
+                {
+                    await _mtrl.FixPreDawntrailMaterial(xivMtrl, source, tx);
+                }
+
+                var offset = await _mtrl.ImportMtrl(xivMtrl, item, source, false, tx);
+                if (doSave)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+                return offset;
+            }
+            catch
+            {
+                if (doSave) {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
         }
 
 

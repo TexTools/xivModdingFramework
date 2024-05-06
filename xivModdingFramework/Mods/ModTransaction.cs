@@ -189,7 +189,7 @@ namespace xivModdingFramework.Mods
 
             foreach (var index in _IndexFiles)
             {
-                await __Index.SaveIndexFile(index.Value);
+                index.Value.Save();
             }
             if (_ModList != null)
             {
@@ -292,7 +292,7 @@ namespace xivModdingFramework.Mods
         public static void CancelTransaction(ModTransaction tx)
         {
 
-            // Readonly transactions don't really have a true cancel, but we can at least mark them done.
+            // Readonly transactions don't really have a true cancel, or need to be cancelled, but we can at least mark them done.
             if(tx._ReadOnly)
             {
                 tx.CancelTransaction();

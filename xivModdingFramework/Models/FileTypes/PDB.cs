@@ -54,8 +54,10 @@ namespace xivModdingFramework.Models.FileTypes
 
         public static async Task<Dictionary<ushort, BoneDeformSet>> GetBoneDeformSets(ModTransaction tx = null)
         {
+            var ownTx = false;
             if (tx == null)
             {
+                ownTx = true;
                 tx = ModTransaction.BeginTransaction(true);
             }
             try
@@ -170,7 +172,10 @@ namespace xivModdingFramework.Models.FileTypes
             }
             finally
             {
-                ModTransaction.CancelTransaction(tx);
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
             }
 
         }

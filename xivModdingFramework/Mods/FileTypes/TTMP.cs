@@ -344,7 +344,7 @@ namespace xivModdingFramework.Mods.FileTypes
         public async Task<(int ImportCount, int ErrorCount, string Errors, float Duration)> ImportModPackAsync(
             DirectoryInfo modPackDirectory, List<ModsJson> modsJson, DirectoryInfo gameDirectory, DirectoryInfo modListDirectory, IProgress<(int current, int total, string message)> progress, 
             Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null,
-            bool AutoAssignBodyMaterials = false, ModPackJson ModPackData = null, bool fixPreDawntrailMods = true, bool updateShaders = false)
+            bool AutoAssignBodyMaterials = false, ModPackJson ModPackData = null, bool fixPreDawntrailMods = true)
         {
             if (modsJson == null || modsJson.Count == 0) return (0, 0, "", 0);
 
@@ -844,7 +844,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         if (ModPackData != null && Int32.Parse(ModPackData.TTMPVersion.Substring(0, 1)) <= 1)
                         {
-                            await FixPreDawntrailImports(filePaths, updateShaders, "DawntrailFix", progress);
+                            await FixPreDawntrailImports(filePaths, "DawntrailFix", progress);
                         }
                     }
 
@@ -945,7 +945,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
 
-        public static async Task FixPreDawntrailImports(HashSet<string> filePaths, bool updateShaders, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task FixPreDawntrailImports(HashSet<string> filePaths, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
             var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
             var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
@@ -956,7 +956,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
 
-            await _mtrl.FixPreDawntrailMaterials(fixableMtrls, updateShaders, source, tx, progress);
+            await _mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
 
             var idx = 0;
             var total = fixableMdls.Count;
