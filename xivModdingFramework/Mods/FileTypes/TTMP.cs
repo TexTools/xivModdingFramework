@@ -674,11 +674,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                         // Root Alterations/Item Conversion
-                        if (GetRootConversionsFunction != null)
+                        if (GetRootConversionsFunction != null && filteredModsJson.Count > 0)
                         {
                             // Get the modpack to list the conversions under, this is the just the modpack entry of the first modsJson since they're all the same unless it's a backup
                             // However, this code shouldn't be used when importing backup modpacks since they already had the choice to change the destination item after the initial import
-                            var modPack = modList.ModPacks.First(x => x.name == filteredModsJson[0].ModPackEntry?.name);
+                            var modPack = filteredModsJson[0].ModPackEntry;
 
                             Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
                             try
@@ -739,6 +739,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                             filePaths.Remove(fileKv.Key);
 
+                                            // Assign modpack value for the newly moved file.
                                             var mod = modList.Mods.FirstOrDefault(x => x.fullPath == fileKv.Value);
                                             if (mod != null)
                                             {
