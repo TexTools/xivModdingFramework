@@ -41,7 +41,8 @@ namespace xivModdingFramework.General.Enums
 
     public enum XivSubRace : byte
     {
-        Hyur_Midlander = 0,
+        Invalid = 0,
+        Hyur_Midlander,
         Hyur_Highlander,
         Elezen_Wildwood,
         Elezen_Duskwight,
@@ -56,7 +57,7 @@ namespace xivModdingFramework.General.Enums
         Hrothgar_Helion,
         Hrothgar_Lost,
         Viera_Rava,
-        Viera_Veena
+        Viera_Veena,
     };
     public enum XivGender : byte
     {
