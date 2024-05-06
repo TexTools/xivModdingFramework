@@ -19,6 +19,7 @@ using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Variants.DataContainers;
 
@@ -500,9 +501,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             // We can get a little cheesy here.
             var rGenderSt = race.ToString() + gender.ToString();
             var rGender = Enum.Parse(typeof(PMPGenderRace), rGenderSt);
+            var intVal = (int)((ushort)rGender);
 
             // Can just direct cast this now.
-            return (XivRace)rGender;
+            return (XivRace)intVal;
         }
 
         public static (PMPModelRace Race, PMPGender Gender) GetPMPRaceGenderFromXivRace(XivRace xivRace)
@@ -709,7 +711,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     public class PMPEstManipulationJson : IPMPItemMetadata
     {
-        public uint Entry = 0;
+        public ushort Entry = 0;
         public PMPGender Gender;
         public PMPModelRace Race;
         public uint SetId;
@@ -722,7 +724,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
         public void ApplyToMetadata(ItemMetadata metadata)
         {
-            throw new NotImplementedException();
+            if (Gender == PMPGender.MaleNpc || Gender == PMPGender.FemaleNpc || Gender == PMPGender.Unknown)
+            {
+                // TexTools doesn't have handling/setup for NPC RGSP entries.
+                // Could be added, but seems not worth the effort for how niche it is.
+                return;
+            }
+
+            var race = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
+            var entry = metadata.EstEntries[race];
+
+            // EST Entries are simple, they're just a single UShort value for a skel ID.
+            // Penumbra and TT represent it identically.
+            entry.SkelId = Entry;
         }
 
         public static PMPEstManipulationJson FromEstEntry(ExtraSkeletonEntry entry, XivDependencyRootInfo root, XivRace race)
@@ -734,13 +748,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public struct PMPImcEntry
         {
-            public uint AttributeAndSound;
-            public uint MaterialId;
-            public uint DecalId;
-            public uint VfxId;
-            public uint MaterialAnimationId;
-            public uint AttributeMask;
-            public uint SoundId;
+            public byte MaterialId;
+            public byte DecalId;
+            public byte VfxId;
+            public byte MaterialAnimationId;
+
+            // Are these redundantly stored?
+            public ushort AttributeAndSound;
+            public ushort AttributeMask;
+            public byte SoundId;
         }
         public PMPImcEntry Entry;
         public uint PrimaryId;
@@ -757,7 +773,31 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
         public void ApplyToMetadata(ItemMetadata metadata)
         {
-            throw new NotImplementedException();
+            // This one's a little funky.
+            // Variants are really just an index into the IMC List.
+            // If we're shallow, we have to add extras.
+            // But there's no strictly defined behavior for what to do with the extras.
+            // Technically speaking, Penumbra doesn't even allow users to add IMC entries, but TexTools does.
+            while(Variant >= metadata.ImcEntries.Count)
+            {
+                if (metadata.ImcEntries.Count > 0)
+                {
+                    // Clone Group 0 if we have one.
+                    metadata.ImcEntries.Add((XivImc) metadata.ImcEntries[0].Clone());
+                }
+                else
+                {
+                    // Add a blank otherwise.
+                    metadata.ImcEntries.Add(new XivImc());
+                }
+            }
+
+            // Outside of variant shenanigans, TT and Penumbra store these identically.
+            var imc = metadata.ImcEntries[(int) Variant];
+            imc.Decal = Entry.DecalId;
+            imc.Animation = Entry.MaterialAnimationId;
+            imc.MaterialSet = Entry.MaterialId;
+            imc.Mask = Entry.AttributeAndSound;
         }
         public static PMPImcManipulationJson FromImcEntry(XivImc entry, XivDependencyRootInfo root)
         {
@@ -766,7 +806,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     }
     public class PMPEqdpManipulationJson : IPMPItemMetadata
     {
-        public byte Entry;
+        public ushort Entry;
         public PMPGender Gender;
         public PMPModelRace Race;
         public uint SetId;
@@ -779,22 +819,32 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
         public void ApplyToMetadata(ItemMetadata metadata)
         {
-            throw new NotImplementedException();
+            if (Gender == PMPGender.MaleNpc || Gender == PMPGender.FemaleNpc || Gender == PMPGender.Unknown)
+            {
+                // TexTools doesn't have handling/setup for NPC RGSP entries.
+                // Could be added, but seems not worth the effort for how niche it is.
+                return;
+            }
+
+            // Get Race.
+            var xivRace = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
+
+            // Get the slot number.
+            var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+            var isAccessory = EquipmentDeformationParameterSet.IsAccessory(slot);
+            var slotNum = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot);
+
+            // Penumbra stores the data masked in-place.  We need to shift it over.
+            var shift = slotNum * 2;
+            var shifted = Entry >> shift;
+
+            // Tag bits.
+            metadata.EqdpEntries[xivRace].bit0 = (shifted & 0x01) > 0;
+            metadata.EqdpEntries[xivRace].bit1 = (shifted & 0x02) > 0;
         }
 
         public static PMPEqdpManipulationJson FromEqdpEntry(EquipmentDeformationParameter entry, XivDependencyRootInfo root, XivRace race)
         {
-            var pmp = new PMPEqdpManipulationJson();
-            pmp.Entry = entry.GetByte();
-
-            //pmp.Slot = PMP.PenumbraSlotToGameSlot.First(x => x.Value == root.Slot).Key;
-            pmp.SetId = (uint) root.PrimaryId;
-
-            // Penumbra uses the same race enum names as TT.
-            ///pmp.Race = race.ToString();
-
-            //pmp.Gender = 
-
             throw new NotImplementedException();
         }
     }
@@ -811,7 +861,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
         public void ApplyToMetadata(ItemMetadata metadata)
         {
-            throw new NotImplementedException();
+            // Like with EQDP data, Penumbra stores EQP data in-place, masked.
+            // TT stores the data sliced up and bit shifted down to LSB.
+            // So we need to determine data size, shift it down, and slice out the bytes we want.
+
+            var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+            var offset = EquipmentParameterSet.EntryOffsets[slot];
+            var size = EquipmentParameterSet.EntrySizes[slot];
+
+            var shifted = Entry >> (offset * 8);
+            var shiftedBytes = BitConverter.GetBytes(shifted);
+
+            var data = new byte[size];
+            Array.Copy(shiftedBytes, 0, data, 0, size);
+
+            var eqp = metadata.EqpEntry;
+            eqp.SetBytes(data);
         }
 
         public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry, XivDependencyRootInfo root)
@@ -825,15 +890,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         {
             public bool Enabled;
             public bool Animated;
-            public float RotationA;
-            public float RotationB;
-            public float RotationC;
+            public ushort RotationA;
+            public ushort RotationB;
+            public ushort RotationC;
 
-            // Not sure data sizes on these.
-            public uint UnknownA;
-            public uint UnknownB;
-            public uint UnknownTotal;
-            public ulong Value;
+            public byte UnknownA;
+            public byte UnknownB;
+            public ushort UnknownTotal;
+
+            // Full Value
+            public uint Value;
         }
 
         public PMPGmpEntry Entry;
@@ -847,7 +913,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         public void ApplyToMetadata(ItemMetadata metadata)
         {
-            throw new NotImplementedException();
+            // We could bind the data individually...
+            // Or we could just copy in the full uint Value since it's stored here.
+
+            var gmp = new GimmickParameter(BitConverter.GetBytes(Entry.Value));
+            metadata.GmpEntry = gmp;
         }
         public static PMPGmpManipulationJson FromGmpEntry(GimmickParameter entry, XivDependencyRootInfo root)
         {

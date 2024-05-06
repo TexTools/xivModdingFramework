@@ -915,7 +915,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
 
                 // Load the file and flip the bits as needed.
-                var data = await LoadEquipmentDeformationFile(race, isAccessory, false);
+                var data = await LoadEquipmentDeformationFile(race, isAccessory, false, tx);
 
                 var offset = ResolveEqdpEntryOffset(data, (int)primaryId);
 

@@ -475,6 +475,16 @@ namespace xivModdingFramework.Models.DataContainers
             }
         }
 
+        public static bool IsAccessory(string slot)
+        {
+            var accessories = new List<string>() { "ear", "nek", "wrs", "rir", "ril" };
+            if (accessories.Contains(slot))
+            {
+                return true;
+            }
+            return false;
+        }
+
         public static List<string> SlotsAsList(bool accessory)
         {
             if(accessory)

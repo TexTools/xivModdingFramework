@@ -125,9 +125,9 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(IItem item, bool forceDefault = false)
+        public static async Task<ItemMetadata> GetMetadata(IItem item, bool forceDefault = false, ModTransaction tx = null)
         {
-            return await GetMetadata(item.GetRoot(), forceDefault);
+            return await GetMetadata(item.GetRoot(), forceDefault, tx);
         }
 
         /// <summary>
@@ -136,10 +136,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(string internalFilePath, bool forceDefault = false )
+        public static async Task<ItemMetadata> GetMetadata(string internalFilePath, bool forceDefault = false, ModTransaction tx = null)
         {
             var root = await XivCache.GetFirstRoot(internalFilePath);
-            return await GetMetadata(root, forceDefault);
+            return await GetMetadata(root, forceDefault, tx);
         }
 
         /// <summary>
@@ -147,7 +147,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="root"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceDefault = false)
+        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
             if(root == null)
             {
@@ -156,26 +156,9 @@ namespace xivModdingFramework.Mods.FileTypes
 
             Mod mod = null;
             var filePath = root.Info.GetRootFile();
-            if (!forceDefault)
-            {
-                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-                mod = await _modding.TryGetModEntry(filePath);
-            }
 
-            if(mod != null && mod.enabled)
-            {
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                // We have modded metadata stored in the .meta file in the DAT we can use.
-                var data = await _dat.GetType2Data(filePath, false);
-
-                // Run it through the binary deserializer and we're good.
-                //return await Deserialize(data);
-                return await CreateFromRaw(root, forceDefault);
-            } else
-            {
-                // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.
-                return await CreateFromRaw(root, forceDefault);
-            }
+            // Just always create from the constituent files.
+            return await CreateFromRaw(root, forceDefault, tx);
         }
 
 
@@ -206,7 +189,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="root"></param>
         /// <returns></returns>
-        private static async Task<ItemMetadata> CreateFromRaw(XivDependencyRoot root, bool forceDefault = false)
+        private static async Task<ItemMetadata> CreateFromRaw(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
 
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
@@ -220,16 +203,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
             if (imcPaths.Count > 0)
             {
-                ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault);
+                ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault, tx);
             }
 
-            ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault);
+            ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault, tx);
 
-            ret.EqdpEntries = await _eqp.GetEquipmentDeformationParameters(root.Info, forceDefault);
+            ret.EqdpEntries = await _eqp.GetEquipmentDeformationParameters(root.Info, forceDefault, false, tx);
 
-            ret.EstEntries = await Est.GetExtraSkeletonEntries(root, forceDefault);
+            ret.EstEntries = await Est.GetExtraSkeletonEntries(root, forceDefault, tx);
 
-            ret.GmpEntry = await _eqp.GetGimmickParameter(root, forceDefault);
+            ret.GmpEntry = await _eqp.GetGimmickParameter(root, forceDefault, tx);
 
             return ret;
         }
@@ -386,7 +369,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, tx);
                 }
 
-                var postOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
+                //var postOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
                 if (meta.EqdpEntries.Count > 0)
                 {
                     await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, tx);
@@ -738,6 +721,48 @@ namespace xivModdingFramework.Mods.FileTypes
             return bytes.ToArray();
         }
 
+        /// <summary>
+        /// Deserializes the binary EQDP data into a dictionary of EQDP entries.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private static Dictionary<XivRace, EquipmentDeformationParameter> DeserializeEqdpData(byte[] data, XivDependencyRoot root, uint dataVersion)
+        {
+            const int eqdpEntrySize = 5;
+            var entries = data.Length / eqdpEntrySize;
+
+            var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
+
+            var read = 0;
+            using (var reader = new BinaryReader(new MemoryStream(data)))
+            {
+                while (read < entries)
+                {
+                    var raceCode = reader.ReadInt32();
+                    var race = XivRaces.GetXivRace(raceCode.ToString().PadLeft(4, '0'));
+
+                    var eqpByte = reader.ReadByte();
+                    var entry = EquipmentDeformationParameter.FromByte(eqpByte);
+
+                    ret.Add(race, entry);
+
+                    read++;
+                }
+            }
+
+            // Catch for cases where for some reason the EQP doesn't have all races,
+            // for example, SE adding more races in the future, and we're
+            // reading old metadata entries.
+            foreach (var race in Eqp.PlayableRaces)
+            {
+                if (!ret.ContainsKey(race))
+                {
+                    ret.Add(race, new EquipmentDeformationParameter());
+                }
+            }
+
+            return ret;
+        }
 
         /// <summary>
         /// Deserializes the binary EQP data into a EQP entry.
@@ -765,47 +790,6 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
 
-        /// <summary>
-        /// Deserializes the binary EQDP data into a dictionary of EQDP entries.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        private static Dictionary<XivRace, EquipmentDeformationParameter> DeserializeEqdpData(byte[] data, XivDependencyRoot root, uint dataVersion)
-        {
-            const int eqdpEntrySize = 5;
-            var entries = data.Length / eqdpEntrySize;
-
-            var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
-
-            var read = 0;
-            using (var reader = new BinaryReader(new MemoryStream(data)))
-            {
-                while(read < entries)
-                {
-                    var raceCode = reader.ReadInt32();
-                    var race = XivRaces.GetXivRace(raceCode.ToString().PadLeft(4, '0'));
-
-                    var eqpByte = reader.ReadByte();
-                    var entry = EquipmentDeformationParameter.FromByte(eqpByte);
-
-                    ret.Add(race, entry);
-
-                    read++;
-                }
-            }
-
-            // Catch for cases where for some reason the EQP doesn't have all races,
-            // for example, SE adding more races in the future, and we're
-            // reading old metadata entries.
-            foreach (var race in Eqp.PlayableRaces) {
-                if(!ret.ContainsKey(race))
-                {
-                    ret.Add(race, new EquipmentDeformationParameter());
-                }
-            }
-
-            return ret;
-        }
 
         private static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> DeserializeEstData(byte[] data, XivDependencyRoot root, uint dataVersion)
         {
