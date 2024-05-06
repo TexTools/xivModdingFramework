@@ -390,9 +390,6 @@ namespace xivModdingFramework.Mods.FileTypes
                 if (doSave)
                 {
                     await ModTransaction.CommitTransaction(tx);
-                    var _index = new Index(XivCache.GameInfo.GameDirectory);
-                    var finalOffset = _index.GetDataOffset(Eqp.EquipmentParameterFile);
-                    Debug.Write("BBBB");
                 }
             }
             catch

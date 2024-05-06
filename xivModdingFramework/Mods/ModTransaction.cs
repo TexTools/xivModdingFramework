@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -92,6 +93,18 @@ namespace xivModdingFramework.Mods
             }
             return _IndexFiles[dataFile];
         } 
+
+        /// <summary>
+        /// Syntactic shortcut for retrieving the 8x Data offset from the index files.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<long> Get8xDataOffset(string path)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return idx.Get8xDataOffset(path);
+        }
 
         public async Task<ModList> GetModList()
         {

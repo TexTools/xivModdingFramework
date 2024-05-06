@@ -213,19 +213,23 @@ namespace xivModdingFramework.Mods
         /// <param name="dataFile">The data file to check in</param>
         /// <param name="indexCheck">Flag to determine whether to check the index file or just the modlist</param>
         /// <returns></returns>
-        public async Task<XivModStatus> IsModEnabled(string internalPath, bool indexCheck)
+        public async Task<XivModStatus> IsModEnabled(string internalPath, bool indexCheck, ModTransaction tx = null)
         {
             if (!File.Exists(ModListDirectory.FullName))
             {
                 return XivModStatus.Original;
             }
 
+            if(tx == null)
+            {
+                // Read only TX so we can be lazy about manually disposing it.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            var modList = await tx.GetModList();
+
             if (indexCheck)
             {
-                var index = new Index(_gameDirectory);
-
-                var modEntry = await TryGetModEntry(internalPath);
-
+                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
                 if (modEntry == null)
                 {
                     return XivModStatus.Original;
@@ -233,8 +237,7 @@ namespace xivModdingFramework.Mods
 
                 var originalOffset = modEntry.data.originalOffset;
                 var moddedOffset = modEntry.data.modOffset;
-
-                var offset = await index.GetDataOffset(internalPath);
+                var offset = await tx.Get8xDataOffset(internalPath);
 
                 if (offset.Equals(originalOffset))
                 {
@@ -250,7 +253,7 @@ namespace xivModdingFramework.Mods
             }
             else
             {
-                var modEntry = await TryGetModEntry(internalPath);
+                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
 
                 if (modEntry == null)
                 {

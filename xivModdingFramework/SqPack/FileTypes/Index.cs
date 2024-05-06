@@ -174,6 +174,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task<long> GetDataOffset(string fullPath)
         {
+            // Current List of things using this still in the Framework itself:
+            // - All of the Cache generation functions/EXD reading
+            // - Skeleton resolution
+            // - Exporting model maps
+            // - Furniture sub-mesh resolution 
+            // - ATex Path resolution
+            // + A bunch of places TexTools UI uses it.
+
             var dataFile = IOUtil.GetDataFileFromPath(fullPath);
             var indexFile = await GetIndexFile(dataFile, false, true);
             var offset = indexFile.Get8xDataOffset(fullPath);
@@ -494,23 +502,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-
-        /// <summary>
-        /// Tests if a given file path in FFXIV's internal directory structure
-        /// is one that ships with FFXIV, or something added by the framework.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<bool> IsDefaultFilePath(string fullPath)
-        {
-            // The framework adds flag files alongside every custom created file.
-            // This lets you check for them even if the Modlist gets corrupted/lost.
-            var exists = await FileExists(fullPath);
-            var hasFlag = await FileExists(fullPath + ".flag");
-
-            // In order to be considered a DEFAULT file, the file must both EXIST *and* not have a flag.
-            var stockFile = exists && !hasFlag;
-            return stockFile;
-        }
 
         public async Task<bool> FileExists(string fullPath)
         {
