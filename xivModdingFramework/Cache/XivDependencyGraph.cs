@@ -148,7 +148,7 @@ namespace xivModdingFramework.Cache
     // File System.  Provides basic calculated fields, however, more extensive
     // calculations expect this item to be fully qualified and properly contained
     // in an actual dependency root object, accessible via .ToRoot()
-    public struct XivDependencyRootInfo :ICloneable
+    public struct XivDependencyRootInfo : ICloneable
     {
         // Only types with actual dependency structures are supported.
         // This means Equipment, Accessory, Monster, and Demihuman.
@@ -306,7 +306,7 @@ namespace xivModdingFramework.Cache
             }
 
             var slotFake = PrimaryType == XivItemType.indoor ? "fun" : "gar";
-                
+
             var assetFile = $"{slotFake}_b0_m{PrimaryId.ToString().PadLeft(4, '0')}.sgb";
             return assetFile;
         }
@@ -377,7 +377,6 @@ namespace xivModdingFramework.Cache
         {
             return XivDependencyGraph.CreateDependencyRoot(this);
         }
-
     }
 
     /// <summary>

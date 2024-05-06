@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using Lumina.Data.Parsing.Layer;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using SharpDX.D3DCompiler;
 using System;
@@ -7,11 +9,13 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Variants.DataContainers;
@@ -47,7 +51,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
             return path;
         }
-        public static async Task<PMPJson> LoadPMP(string path) {
+        public static async Task<PMPJson> LoadPMP(string path)
+        {
             var gameDir = XivCache.GameInfo.GameDirectory;
 
             path = await ResolvePMPBasePath(path);
@@ -137,7 +142,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             }
 
                             // If the user selected custom settings, use those.
-                            if(group.SelectedSettings >= 0)
+                            if (group.SelectedSettings >= 0)
                             {
                                 selected = group.SelectedSettings;
                             }
@@ -172,7 +177,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         private static async Task<HashSet<string>> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx)
         {
             var imported = new HashSet<string>();
-            foreach(var file in option.Files)
+            foreach (var file in option.Files)
             {
                 var internalPath = file.Key;
                 var externalPath = Path.Combine(basePath, file.Value);
@@ -192,7 +197,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     // Import the file...
                     await SmartImport.Import(externalPath, internalPath, _Source, tx);
                     imported.Add(internalPath);
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     // If we failed to import a file, just continue.
                     continue;
                 }
@@ -232,7 +239,288 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             // or a collection of Groups, which each 
             throw new NotImplementedException();
         }
+
+
     }
+
+    public static class PMPExtensions
+    {
+        public static Dictionary<string, string> PenumbraTypeToGameType = new Dictionary<string, string>();
+
+        public static XivDependencyRootInfo GetRootFromPenumbraValues(PMPObjectType objectType, uint primaryId, PMPObjectType bodySlot, uint secondaryId, PMPEquipSlot slot)
+        {
+            var info = new XivDependencyRootInfo();
+            info.PrimaryId = (int)primaryId;
+            info.SecondaryId = (int)secondaryId;
+
+            if (objectType != PMPObjectType.Unknown)
+            {
+                info.PrimaryType = XivItemTypes.FromSystemName(objectType.ToString().ToLower());
+            }
+
+            if (bodySlot != PMPObjectType.Unknown)
+            {
+                info.SecondaryType = XivItemTypes.FromSystemName(bodySlot.ToString().ToLower());
+            }
+
+            info.Slot = PenumbraSlotToGameSlot[slot];
+
+            return info;
+        }
+
+
+        // We only really care about the ones used in IMC entries here.
+        public static Dictionary<PMPEquipSlot, string> PenumbraSlotToGameSlot = new Dictionary<PMPEquipSlot, string>()
+        {
+            // Main
+            { PMPEquipSlot.Head, "met" },
+            { PMPEquipSlot.Body, "top" },
+            { PMPEquipSlot.Hands, "glv" },
+            { PMPEquipSlot.Legs, "dwn" },
+            { PMPEquipSlot.Feet, "sho" },
+
+            // Accessory
+            { PMPEquipSlot.Ears, "ear" },
+            { PMPEquipSlot.Neck, "nek" },
+            { PMPEquipSlot.Wrists, "wri" },
+            { PMPEquipSlot.RFinger, "rir" },
+            { PMPEquipSlot.LFinger, "ril" },
+        };
+
+        public static XivRace GetRaceFromPenumbraValue(PMPModelRace race, PMPGender gender)
+        {
+            // We can get a little cheesy here.
+            var rGenderSt = race.ToString() + gender.ToString();
+            var rGender = Enum.Parse(typeof(PMPGenderRace), rGenderSt);
+
+            // Can just direct cast this now.
+            return (XivRace)rGender;
+        }
+
+        public static (PMPModelRace Race, PMPGender Gender) GetPMPRaceGenderFromXivRace(XivRace xivRace)
+            => xivRace switch
+            {
+                XivRace.Hyur_Midlander_Male => (PMPModelRace.Midlander, PMPGender.Male),
+                _ => (PMPModelRace.Unknown, PMPGender.Unknown)
+            };
+
+
+        public static Dictionary<PMPGender, XivGender> PMPGenderToXivGender = new Dictionary<PMPGender, XivGender>()
+        {
+            { PMPGender.Male, XivGender.Male },
+            { PMPGender.Female, XivGender.Female }
+        };
+
+        public static Dictionary<PMPSubRace, XivSubRace> PMPSubraceToXivSubrace= new Dictionary<PMPSubRace, XivSubRace>()
+        {
+            { PMPSubRace.Midlander, XivSubRace.Hyur_Midlander },
+            { PMPSubRace.Highlander, XivSubRace.Hyur_Highlander },
+
+            { PMPSubRace.SeekerOfTheSun, XivSubRace.Miqote_Seeker },
+            { PMPSubRace.KeeperOfTheMoon, XivSubRace.Miqote_Keeper },
+
+            { PMPSubRace.Wildwood, XivSubRace.Elezen_Wildwood },
+            { PMPSubRace.Duskwight, XivSubRace.Elezen_Duskwight },
+
+            { PMPSubRace.Seawolf, XivSubRace.Roegadyn_SeaWolf},
+            { PMPSubRace.Hellsguard, XivSubRace.Roegadyn_Hellsguard },
+
+            { PMPSubRace.Dunesfolk, XivSubRace.Lalafell_Dunesfolk },
+            { PMPSubRace.Plainsfolk, XivSubRace.Lalafell_Plainsfolk },
+
+            { PMPSubRace.Raen, XivSubRace.AuRa_Raen },
+            { PMPSubRace.Xaela, XivSubRace.AuRa_Xaela },
+
+            { PMPSubRace.Veena, XivSubRace.Viera_Veena },
+            { PMPSubRace.Rava, XivSubRace.Viera_Rava },
+
+            { PMPSubRace.Lost, XivSubRace.Hrothgar_Lost },
+            { PMPSubRace.Helion, XivSubRace.Hrothgar_Helion },
+        };
+
+
+        public static PMPGender ToPMPGender(this RspAttribute attribute)
+            => attribute switch
+            {
+                RspAttribute.MaleMinSize => PMPGender.Male,
+                RspAttribute.MaleMaxSize => PMPGender.Male,
+                RspAttribute.MaleMinTail => PMPGender.Male,
+                RspAttribute.MaleMaxTail => PMPGender.Male,
+                RspAttribute.FemaleMinSize => PMPGender.Female,
+                RspAttribute.FemaleMaxSize => PMPGender.Female,
+                RspAttribute.FemaleMinTail => PMPGender.Female,
+                RspAttribute.FemaleMaxTail => PMPGender.Female,
+                RspAttribute.BustMinX => PMPGender.Female,
+                RspAttribute.BustMinY => PMPGender.Female,
+                RspAttribute.BustMinZ => PMPGender.Female,
+                RspAttribute.BustMaxX => PMPGender.Female,
+                RspAttribute.BustMaxY => PMPGender.Female,
+                RspAttribute.BustMaxZ => PMPGender.Female,
+                _ => PMPGender.Unknown,
+            };
+    }
+
+    #region Penumbra Enums
+    // https://github.com/Ottermandias/Penumbra.GameData/blob/main/Enums/Race.cs
+    // Penumbra Enums are all serialized as strings.
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum PMPObjectType : byte
+    {
+        Unknown,
+        Vfx,
+        DemiHuman,
+        Accessory,
+        World,
+        Housing,
+        Monster,
+        Icon,
+        LoadingScreen,
+        Map,
+        Interface,
+        Equipment,
+        Character,
+        Weapon,
+        Font,
+    }
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum PMPModelRace : byte
+    {
+        Unknown,
+        Midlander,
+        Highlander,
+        Elezen,
+        Lalafell,
+        Miqote,
+        Roegadyn,
+        AuRa,
+        Hrothgar,
+        Viera,
+    }
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum PMPSubRace : byte
+    {
+        Unknown,
+        Midlander,
+        Highlander,
+        Wildwood,
+        Duskwight,
+        Plainsfolk,
+        Dunesfolk,
+        SeekerOfTheSun,
+        KeeperOfTheMoon,
+        Seawolf,
+        Hellsguard,
+        Raen,
+        Xaela,
+        Helion,
+        Lost,
+        Rava,
+        Veena,
+    }
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum PMPGender : byte
+    {
+        Unknown,
+        Male,
+        Female,
+        MaleNpc,
+        FemaleNpc,
+    }
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum PMPGenderRace : ushort
+    {
+        Unknown = 0,
+        MidlanderMale = 0101,
+        MidlanderMaleNpc = 0104,
+        MidlanderFemale = 0201,
+        MidlanderFemaleNpc = 0204,
+        HighlanderMale = 0301,
+        HighlanderMaleNpc = 0304,
+        HighlanderFemale = 0401,
+        HighlanderFemaleNpc = 0404,
+        ElezenMale = 0501,
+        ElezenMaleNpc = 0504,
+        ElezenFemale = 0601,
+        ElezenFemaleNpc = 0604,
+        MiqoteMale = 0701,
+        MiqoteMaleNpc = 0704,
+        MiqoteFemale = 0801,
+        MiqoteFemaleNpc = 0804,
+        RoegadynMale = 0901,
+        RoegadynMaleNpc = 0904,
+        RoegadynFemale = 1001,
+        RoegadynFemaleNpc = 1004,
+        LalafellMale = 1101,
+        LalafellMaleNpc = 1104,
+        LalafellFemale = 1201,
+        LalafellFemaleNpc = 1204,
+        AuRaMale = 1301,
+        AuRaMaleNpc = 1304,
+        AuRaFemale = 1401,
+        AuRaFemaleNpc = 1404,
+        HrothgarMale = 1501,
+        HrothgarMaleNpc = 1504,
+        HrothgarFemale = 1601,
+        HrothgarFemaleNpc = 1604,
+        VieraMale = 1701,
+        VieraMaleNpc = 1704,
+        VieraFemale = 1801,
+        VieraFemaleNpc = 1804,
+        UnknownMaleNpc = 9104,
+        UnknownFemaleNpc = 9204,
+    }
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum PMPEquipSlot : byte
+    {
+        Unknown = 0,
+        MainHand = 1,
+        OffHand = 2,
+        Head = 3,
+        Body = 4,
+        Hands = 5,
+        Belt = 6,
+        Legs = 7,
+        Feet = 8,
+        Ears = 9,
+        Neck = 10,
+        Wrists = 11,
+        RFinger = 12,
+        BothHand = 13,
+        LFinger = 14, // Not officially existing, means "weapon could be equipped in either hand" for the game.
+        HeadBody = 15,
+        BodyHandsLegsFeet = 16,
+        SoulCrystal = 17,
+        LegsFeet = 18,
+        FullBody = 19,
+        BodyHands = 20,
+        BodyLegsFeet = 21,
+        ChestHands = 22,
+        Nothing = 23,
+        All = 24, // Not officially existing
+    }
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum RspAttribute : byte
+    {
+        MaleMinSize,
+        MaleMaxSize,
+        MaleMinTail,
+        MaleMaxTail,
+        FemaleMinSize,
+        FemaleMaxSize,
+        FemaleMinTail,
+        FemaleMaxTail,
+        BustMinX,
+        BustMinY,
+        BustMinZ,
+        BustMaxX,
+        BustMaxY,
+        BustMaxZ,
+        NumAttributes,
+    }
+    #endregion
+
+
 
     public class PMPJson
     {
@@ -289,6 +577,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public object Manipulation;
     }
 
+    /// <summary>
+    /// Simple JSON converter that dynamically converts the meta entries to the correct object type.
+    /// </summary>
     public class PMPMetaManipulationConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
@@ -354,16 +645,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PMPEstManipulationJson
     {
         public uint Entry = 0;
-        public string Gender;
-        public string Race;
+        public PMPGender Gender;
+        public PMPModelRace Race;
         public uint SetId;
-        public string Slot;
+        public PMPEquipSlot Slot;
         
-        public ExtraSkeletonEntry ToExtraSkeletonEntry()
+        public (ExtraSkeletonEntry Entry, XivDependencyRootInfo Root, XivRace Race) ToExtraSkeletonEntry()
         {
+            var root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, Slot);
+            //var race = PMP.GetRaceFromPenumbraValue(Race);
             throw new NotImplementedException();
         }
-        public static PMPEstManipulationJson FromEstEntry(ExtraSkeletonEntry entry)
+        public static PMPEstManipulationJson FromEstEntry(ExtraSkeletonEntry entry, XivDependencyRootInfo root, XivRace race)
         {
             throw new NotImplementedException();
         }
@@ -384,33 +677,52 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public uint PrimaryId;
         public uint SecondaryId;
         public uint Variant;
-        public string ObjectType;
-        public string EquipSlot;
-        public string BodySlot;
+        public PMPObjectType ObjectType;
+        public PMPEquipSlot EquipSlot;
+        public PMPObjectType BodySlot;
 
-        public XivImc ToImcEntry()
+        public (XivImc Entry, XivDependencyRootInfo Root) ToImcEntry()
         {
+            var root = PMPExtensions.GetRootFromPenumbraValues(ObjectType, PrimaryId, BodySlot, SecondaryId, EquipSlot);
             throw new NotImplementedException();
         }
-        public static PMPImcManipulationJson FromImcEntry(XivImc entry)
+        public static PMPImcManipulationJson FromImcEntry(XivImc entry, XivDependencyRootInfo root)
         {
             throw new NotImplementedException();
         }
     }
     public class PMPEqdpManipulationJson
     {
-        public uint Entry;
-        public string Gender;
-        public string Race;
+        public byte Entry;
+        public PMPGender Gender;
+        public PMPModelRace Race;
         public uint SetId;
-        public string Slot;
+        public PMPEquipSlot Slot;
 
-        public EquipmentDeformationParameter ToEqdpEntry()
+        public (EquipmentDeformationParameter Entry, XivDependencyRootInfo Root, XivRace Race) ToEqdpEntry()
         {
+            var root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, Slot);
+
+
+            //var entry = EquipmentDeformationParameter.FromByte(Entry);
+            //var race = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
+
+            //return (entry, root, race);
             throw new NotImplementedException();
         }
-        public static PMPEqdpManipulationJson FromEqdpEntry(EquipmentDeformationParameter entry)
+        public static PMPEqdpManipulationJson FromEqdpEntry(EquipmentDeformationParameter entry, XivDependencyRootInfo root, XivRace race)
         {
+            var pmp = new PMPEqdpManipulationJson();
+            pmp.Entry = entry.GetByte();
+
+            //pmp.Slot = PMP.PenumbraSlotToGameSlot.First(x => x.Value == root.Slot).Key;
+            pmp.SetId = (uint) root.PrimaryId;
+
+            // Penumbra uses the same race enum names as TT.
+            ///pmp.Race = race.ToString();
+
+            //pmp.Gender = 
+
             throw new NotImplementedException();
         }
     }
@@ -418,36 +730,44 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public ulong Entry;
         public uint SetId;
-        public string Slot;
+        public PMPEquipSlot Slot;
 
-        public EquipmentParameter ToEqpEntry()
+        public (EquipmentParameter Entry, XivDependencyRootInfo Root) ToEqpEntry()
         {
+            var root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, Slot);
             throw new NotImplementedException();
         }
-        public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry)
+        public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry, XivDependencyRootInfo root)
         {
             throw new NotImplementedException();
         }
     }
     public class PMPGmpManipulationJson
     {
-        public bool Enabled;
-        public bool Animated;
-        public float RotationA;
-        public float RotationB;
-        public float RotationC;
-
-        // Not sure data sizes on these.
-        public uint UnknownA;
-        public uint UnknownB;
-        public uint UnknownTotal;
-        public ulong Value;
-
-        public GimmickParameter ToGmpEntry()
+        public struct PMPGmpEntry
         {
+            public bool Enabled;
+            public bool Animated;
+            public float RotationA;
+            public float RotationB;
+            public float RotationC;
+
+            // Not sure data sizes on these.
+            public uint UnknownA;
+            public uint UnknownB;
+            public uint UnknownTotal;
+            public ulong Value;
+        }
+
+        public PMPGmpEntry Entry;
+        public uint SetId;
+
+        public (GimmickParameter Entry, XivDependencyRootInfo Root) ToGmpEntry()
+        {
+            var root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, PMPEquipSlot.Head);
             throw new NotImplementedException();
         }
-        public static PMPGmpManipulationJson FromGmpEntry(GimmickParameter entry)
+        public static PMPGmpManipulationJson FromGmpEntry(GimmickParameter entry, XivDependencyRootInfo root)
         {
             throw new NotImplementedException();
         }
@@ -455,18 +775,37 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PMPRspManipulationJson
     {
         public float Entry;
-        public string SubRace;
-        public string Attribute;
+        public PMPSubRace SubRace;
+        public RspAttribute Attribute;
 
         public RacialGenderScalingParameter ToRgspEntry()
         {
+            var pmpGen = Attribute.ToPMPGender();
+
+            if(pmpGen == PMPGender.MaleNpc || pmpGen == PMPGender.FemaleNpc || pmpGen == PMPGender.Unknown)
+            {
+                // TexTools doesn't have handling/setup for NPC RGSP entries.
+                // Could be added, but seems not worth the effort for how niche it is.
+                return null;
+            }
+
+            var xivRace = PMPExtensions.PMPSubraceToXivSubrace[SubRace];
+            var xivGen = PMPExtensions.PMPGenderToXivGender[pmpGen];
+
+            var entry = new RacialScalingParameter();
+
+            // TODO: Pull default values and merge in stuff?
             throw new NotImplementedException();
+
+            var fullEntry = new RacialGenderScalingParameter(entry, xivRace, xivGen);
+            return fullEntry;
         }
 
-        public static PMPRspManipulationJson FromRgspEntry(RacialGenderScalingParameter entry)
+        public static List<PMPRspManipulationJson> FromRgspEntry(RacialGenderScalingParameter entry)
         {
             throw new NotImplementedException();
         }
     }
+
 
 }
