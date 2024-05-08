@@ -2301,12 +2301,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 mod.enabled = true;
 
                 // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
-                var mPack = tx.ModPack == null ? mod.modPack : tx.ModPack;
-                mod.modPack = mod.IsInternal() ? null : mPack;
+                mod.modPack = mod.IsInternal() ? null : tx.ModPack;
                 modList.Mods.Add(mod);
             }
             else
             {
+                var mPack = tx.ModPack == null ? mod.modPack : tx.ModPack;
                 var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                 if (fileAdditionMod)
                 {
@@ -2314,7 +2314,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 mod.data.modOffset = retOffset;
                 mod.enabled = true;
-                mod.modPack = mod.IsInternal() ? null : tx.ModPack;
+                mod.modPack = mod.IsInternal() ? null : mPack;
                 mod.data.modSize = size;
                 mod.data.dataType = fileType;
                 mod.name = itemName;
@@ -2327,8 +2327,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Commit the transaction if we're doing a single file save.
                 await ExpandMetadata(fileData, internalFilePath, tx);
                 await ModTransaction.CommitTransaction(tx);
-                XivCache.QueueDependencyUpdate(internalFilePath);
             }
+            XivCache.QueueDependencyUpdate(internalFilePath);
 
             // Job done.
             return retOffset;

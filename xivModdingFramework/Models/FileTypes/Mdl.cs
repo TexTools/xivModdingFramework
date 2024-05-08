@@ -1980,21 +1980,14 @@ namespace xivModdingFramework.Models.FileTypes
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(_gameDirectory);
-            var useCached = true;
+            var useCached = false;
 
-            IndexFile index;
-            ModList modlist;
             if (tx == null)
             {
-                useCached = false;
-                var _index = new Index(_gameDirectory);
-                var _modding = new Modding(_gameDirectory);
-                index = await _index.GetIndexFile(dataFile, false, true);
-                modlist = await _modding.GetModList();
-            } else
-            {
-                index = await tx.GetIndexFile(dataFile);
-                modlist = await tx.GetModList();
+                // If TX is null, this is probably coming from the internal mod cache resolver.
+                // Just use a readonly transaction.
+                useCached = true;
+                tx = ModTransaction.BeginTransaction(true);
             }
 
             var materials = new List<string>();
@@ -2016,7 +2009,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             else if(useCached && root != null)
             {
-                var metadata = await ItemMetadata.GetFromCachedIndex(root, tx);
+                var metadata = await ItemMetadata.GetMetadata(root, false, tx);
                 if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
                 {
                     materialVariants.Add(1);
@@ -2122,45 +2115,14 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var materials = new List<string>();
             var dat = new Dat(_gameDirectory);
-            var modding = new Modding(_gameDirectory);
 
-
-            IndexFile index = null;
             if (tx == null)
             {
-                var _index = new Index(_gameDirectory);
-                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath), false, true);
-            } else
-            {
-                index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath));
+                // No Tx, use a simple readonly one.
+                tx = ModTransaction.BeginTransaction(true);
             }
 
-            var offset = index.Get8xDataOffset(mdlPath);
-            if (getOriginal)
-            {
-                ModList modlist;
-                if(tx == null)
-                {
-                    modlist = await modding.GetModList();
-                } else
-                {
-                    modlist = await tx.GetModList();
-                }
-
-                var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == mdlPath);
-                if(mod != null)
-                {
-                    offset = mod.data.originalOffset;
-                }
-            }
-
-            if (offset == 0)
-            {
-                throw new Exception($"Could not find offset for {mdlPath}");
-            }
-
-            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(mdlPath));
-
+            var mdlData = await dat.GetType3Data(mdlPath, getOriginal, tx);
 
             using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
             {
@@ -2571,14 +2533,12 @@ namespace xivModdingFramework.Models.FileTypes
             // Not really much reason to ever use lower precision other than file size/perf though.
             bool _UpgradePrecision = true;
 
-            // Arbitrarily long distance that we use for LoD distance.
-            // If this is too high the game explodes. 500 Meters seems ok.  1000 Crashes.
-            // Maybe it's at some point capped to 512? /Random Guess.
-            float _ReallyLongDistance = 500.0f;
+            // Distance used for model LoD settings. 0 is infinite.
+            float _ModelLoDDistance = 0.0f;
 
             // Mildly long distance used for Texture LoD levels.
             // The default is around 50 meters.  We bump it up to about double.
-            float _KindOfLongDistance = 100.0f;
+            float _TextureLoDDistance = 100.0f;
 
             if (loggingFunction == null)
             {
@@ -3716,8 +3676,8 @@ namespace xivModdingFramework.Models.FileTypes
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
 
                     // Distances to kick in LoD effects
-                    lodDataBlock.AddRange(BitConverter.GetBytes(_ReallyLongDistance * (l + 1))); // Model LoD
-                    lodDataBlock.AddRange(BitConverter.GetBytes(_KindOfLongDistance * (l + 1))); // Texture LoD - We're actually okay with this one since we have MipMaps.
+                    lodDataBlock.AddRange(BitConverter.GetBytes(_ModelLoDDistance)); // Model LoD
+                    lodDataBlock.AddRange(BitConverter.GetBytes(_TextureLoDDistance * (l + 1))); // Texture LoD - We're actually okay with this one since we have MipMaps.
 
                     // Water Mesh Index and Count.
                     lodDataBlock.AddRange(BitConverter.GetBytes((short)(totalMeshes)));

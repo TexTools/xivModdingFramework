@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpDX.Win32;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -110,7 +111,7 @@ namespace xivModdingFramework.Mods
                 }
 
                 // First, try to get everything, to ensure it's all valid.
-                ItemMetadata originalMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
+                ItemMetadata originalMetadata = await GetCachedMetadata(Source, tx);
 
 
                 var originalModelPaths = await Source.GetModelFiles(tx);
@@ -137,12 +138,12 @@ namespace xivModdingFramework.Mods
                 // Time to start editing things.
 
                 // First, get a new, clean copy of the metadata, pointed at the new root.
-                var newMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
+                var newMetadata = await GetCachedMetadata(Source, tx);
                 newMetadata.Root = Destination.Info.ToFullRoot();
                 ItemMetadata originalDestinationMetadata = null;
                 try
                 {
-                    originalDestinationMetadata = await GetCachedMetadata(index, modlist, Destination, df, _dat);
+                    originalDestinationMetadata = await GetCachedMetadata(Destination, tx);
                 } catch
                 {
                     originalDestinationMetadata = new ItemMetadata(Destination);
@@ -152,7 +153,7 @@ namespace xivModdingFramework.Mods
                 if(Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
                 {
                     var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
-                    var set1Metadata = await GetCachedMetadata(index, modlist, set1Root, df, _dat);
+                    var set1Metadata = await GetCachedMetadata(set1Root, tx);
 
                     newMetadata.EqpEntry = set1Metadata.EqpEntry;
 
@@ -286,7 +287,7 @@ namespace xivModdingFramework.Mods
 
                     // Save new Model.
                     var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl);
-                    await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
+                    var newMdlOffset = await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
@@ -413,15 +414,15 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
+                // Save and apply metadata
                 await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource, tx);
-
-                // Save the new Metadata file via the batch function so that it's only written to the memory cache for now.
-                await ItemMetadata.ApplyMetadataBatched(new List<ItemMetadata>() { newMetadata }, tx);
+                await ItemMetadata.ApplyMetadata(newMetadata, tx);
 
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Filling in missing material sets...");
                 }
+
                 // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
                 if (Imc.UsesImc(Destination))
                 {
@@ -475,7 +476,14 @@ namespace xivModdingFramework.Mods
                         mod.name = iName;
                         mod.category = iCat;
                         mod.source = ApplicationSource;
-                        mod.modPack = modPack;
+
+                        if (tx.ModPack != null)
+                        {
+                            mod.modPack = tx.ModPack;
+                        } else
+                        {
+                            mod.modPack = modPack;
+                        }
 
                         mods.Add(mod);
                     }
@@ -551,9 +559,16 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        private static async Task<ItemMetadata> GetCachedMetadata(IndexFile index, ModList modlist, XivDependencyRoot root, XivDataFile df, Dat _dat)
+        private static async Task<ItemMetadata> GetCachedMetadata(XivDependencyRoot root, ModTransaction tx)
         {
+            var metaName = root.Info.GetRootFile();
+            var df = IOUtil.GetDataFileFromPath(metaName);
+            var index = await tx.GetIndexFile(df);
             var originalMetadataOffset = index.Get8xDataOffset(root.Info.GetRootFile());
+
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+
             ItemMetadata originalMetadata = null;
             if (originalMetadataOffset == 0)
             {
@@ -676,6 +691,82 @@ namespace xivModdingFramework.Mods
             }
 
             return file;
+        }
+
+
+        /// <summary>
+        /// Clones a set of roots to a set of destination roots, in order, as part of a larger mod import transaction.
+        /// The source roots are reset back to their original offsets after cloning.
+        /// </summary>
+        /// <param name="roots"></param>
+        /// <param name="importedFiles"></param>
+        /// <param name="tx"></param>
+        /// <param name="readTx"></param>
+        /// <param name="sourceApplication"></param>
+        /// <returns></returns>
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, uint> originalOffsets, string sourceApplication)
+        {
+            // We currently have all the files loaded into our in-memory indices in their default locations.
+            var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
+            var newModList = await tx.GetModList();
+
+            HashSet<string> clearedFiles = new HashSet<string>();
+            foreach (var dfe in conversionsByDf)
+            {
+                HashSet<string> filesToReset = new HashSet<string>();
+                var df = dfe.Key;
+                var newIndex = await tx.GetIndexFile(df);
+
+                foreach (var conversion in dfe)
+                {
+                    var source = conversion.Key;
+                    var destination = conversion.Value.Root;
+                    var variant = conversion.Value.Variant;
+
+
+                    var convertedFiles = await RootCloner.CloneRoot(source, destination, sourceApplication, variant, null, null, tx);
+
+                    // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
+                    foreach (var fileKv in convertedFiles)
+                    {
+                        // Remove the file from our json list, the conversion already handled everything we needed to do with it.
+
+                        if (fileKv.Key != fileKv.Value)
+                        {
+                            importedFiles.Add(fileKv.Value);
+                            filesToReset.Add(fileKv.Key);
+                        }
+
+                    }
+
+                    // Remove any remaining lingering files which belong to this root.
+                    // Ex. Extraneous unused files in the modpack.  This helps keep
+                    // any unnecessary files from poluting the original destination item post conversion.
+                    foreach (var file in importedFiles.ToList())
+                    {
+                        var root = XivDependencyGraph.ExtractRootInfo(file);
+                        if (root == source.Info)
+                        {
+                            importedFiles.Remove(file);
+                            filesToReset.Add(file);
+                        }
+                    }
+
+                }
+
+                // Reset the index pointers back to previous.
+                // This can only be done once we've finished moving all of the roots,
+                // as some of the modded roots may be co-dependent.
+                foreach (var file in filesToReset)
+                {
+                    var oldOffset = originalOffsets[file];
+                    var index = await tx.GetIndexFile(df);
+                    index.SetDataOffset(file, oldOffset);
+                    importedFiles.Remove(file);
+                }
+                clearedFiles.UnionWith(filesToReset);
+            }
+            return clearedFiles;
         }
     }
 }

@@ -154,33 +154,33 @@ namespace xivModdingFramework.Mods.FileTypes
                 return null;
             }
 
-            Mod mod = null;
-            var filePath = root.Info.GetRootFile();
 
-            // Just always create from the constituent files.
-            return await CreateFromRaw(root, forceDefault, tx);
-        }
-
-
-        public static async Task<ItemMetadata> GetFromCachedIndex(XivDependencyRoot root, ModTransaction tx)
-        {
-
-            var df = IOUtil.GetDataFileFromPath(root.Info.GetRootFile());
-            long offset = (await tx.GetIndexFile(df)).Get8xDataOffset(root.Info.GetRootFile());
-
-            ItemMetadata mData = null;
-            if (offset == 0)
+            if(tx != null)
             {
-                // Custom metadata doesn't exist, generate standard metadata.s
-                mData = await ItemMetadata.GetMetadata(root);
+                // If we're within a transaction, load based the .meta file, if it exists.
+                // This is mostly because it's possible we may have loaded .meta files in, but not expanded them yet.
+                // (Ex. During root conversion during TTMP import)
+
+                var filePath = root.Info.GetRootFile();
+                var df = IOUtil.GetDataFileFromPath(filePath);
+                var index = await tx.GetIndexFile(df);
+                if (index.FileExists(filePath))
+                {
+                    var dat = new Dat(XivCache.GameInfo.GameDirectory);
+                    var data = await dat.GetType2Data(filePath, false, tx);
+                    return await ItemMetadata.Deserialize(data);
+                } else
+                {
+                    // Unmodified root, create from file state.
+                    return await CreateFromRaw(root, forceDefault, tx);
+                }
             }
             else
             {
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                var data = await _dat.GetType2Data(offset, df);
-                mData = await ItemMetadata.Deserialize(data);
+                // If we're not in a transaction, retrieve state based on live files.
+                return await CreateFromRaw(root, forceDefault, tx);
             }
-            return mData;
+
         }
 
 

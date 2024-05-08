@@ -714,10 +714,8 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        public async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx = null, IProgress<(int current, int total, string message)> progress = null)
+        public async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress = null)
         {
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             var total = paths.Count;
@@ -726,6 +724,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             // Alter the MTRLs.
             var indexesToCreate = new List<(string indexTextureToCreate, string normalToCreateFrom)>();
+            var indexToMtrlDictionary = new Dictionary<string, string>();
 
             var count = 0;
             foreach (var path in paths)
@@ -734,6 +733,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 if(res.indexTextureToCreate != null)
                 {
                     indexesToCreate.Add(res);
+                    indexToMtrlDictionary.Add(res.indexTextureToCreate, path);
                 }
                 count++;
                 progress?.Report((count, total, "Updating Materials..."));
@@ -751,18 +751,6 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 var subList = indexesToCreate.Skip(i).Take(_SIMULTANEOUS_MAX).ToList();
                 
-                /*
-                // Sequential version, useful for debugging.
-                foreach(var tup in subList)
-                {
-                    var start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-                    var val = await CreateIndexFromNormal(tup.indexTextureToCreate, tup.normalToCreateFrom);
-                    await _dat.WriteModFile(val.data, val.indexFilePath, source, null, transactionIndexFile, transactionModList, modPack);
-                    var end = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-                    var duration = end - start;
-                    Debug.WriteLine(duration);
-                }*/
-
                 var tasks = new List<Task<(string indexFilePath, byte[] data)>>();                
                 foreach (var tup in subList)
                 {
@@ -783,6 +771,21 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     await _dat.WriteModFile(texData.data, texData.indexFilePath, source, null, tx);
                 }
+
+                // Fix their modpack references.
+                var modList = await tx.GetModList();
+
+                foreach(var kv in indexToMtrlDictionary)
+                {
+                    var mtrlMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Value);
+
+                    if (mtrlMod == null)
+                        continue;
+
+                    var indexMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Key);
+
+                    indexMod.modPack = mtrlMod.modPack;
+                }
             }
         }
 
@@ -795,12 +798,12 @@ namespace xivModdingFramework.Materials.FileTypes
                 return (null, null);
             }
 
-            if(mtrl.ShaderPackRaw == "character.shpk")
+            if(mtrl.ShaderPack == EShaderPack.Character || mtrl.ShaderPack == EShaderPack.Skin)
             {
                 return await FixPreDawntrailCharacterMaterial(mtrl, source, tx);
             }
 
-            if(mtrl.ShaderPackRaw == "hair.shpk")
+            if(mtrl.ShaderPack== EShaderPack.Hair)
             {
 
             }

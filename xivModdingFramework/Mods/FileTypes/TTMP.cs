@@ -561,6 +561,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     var count = 0;
+
                     // Begin CORE TRANSACTION
                     using (var tx = ModTransaction.BeginTransaction())
                     {
@@ -676,10 +677,6 @@ namespace xivModdingFramework.Mods.FileTypes
                         // Root Alterations/Item Conversion
                         if (GetRootConversionsFunction != null && filteredModsJson.Count > 0)
                         {
-                            // Get the modpack to list the conversions under, this is the just the modpack entry of the first modsJson since they're all the same unless it's a backup
-                            // However, this code shouldn't be used when importing backup modpacks since they already had the choice to change the destination item after the initial import
-                            var modPack = filteredModsJson[0].ModPackEntry;
-
                             Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
                             try
                             {
@@ -708,67 +705,15 @@ namespace xivModdingFramework.Mods.FileTypes
 
                             if (rootConversions != null && rootConversions.Count > 0)
                             {
+                                // Modpack to list conversions under.
+                                var modPack = filteredModsJson[0].ModPackEntry;
+
+                                // If we have any roots to move, move them over now.
                                 progress.Report((0, 0, "Updating Destination Items..."));
-                                // If we have roots to convert, we get to do some extra work here.
 
-                                // We currently have all the files loaded into our in-memory indices in their default locations.
-                                var conversionsByDf = rootConversions.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
-
-                                HashSet<string> filesToReset = new HashSet<string>();
-                                foreach (var dfe in conversionsByDf)
-                                {
-                                    var df = dfe.Key;
-                                    foreach (var conversion in dfe)
-                                    {
-                                        var source = conversion.Key;
-                                        var destination = conversion.Value.Root;
-                                        var variant = conversion.Value.Variant;
-
-                                        var convertedFiles = await RootCloner.CloneRoot(source, destination, sourceApplication, variant, null, null, tx);
-
-                                        // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
-                                        foreach (var fileKv in convertedFiles)
-                                        {
-                                            // Remove the file from our json list, the conversion already handled everything we needed to do with it.
-                                            var json = filteredModsJson.RemoveAll(x => x.FullPath == fileKv.Key);
-
-                                            if (fileKv.Key != fileKv.Value)
-                                            {
-                                                filesToReset.Add(fileKv.Key);
-                                            }
-
-                                            filePaths.Remove(fileKv.Key);
-
-                                            // Assign modpack value for the newly moved file.
-                                            var mod = modList.Mods.FirstOrDefault(x => x.fullPath == fileKv.Value);
-                                            if (mod != null)
-                                            {
-                                                mod.modPack = modPack;
-                                            }
-                                        }
-
-                                        // Remove any remaining lingering files which belong to this root.
-                                        // Ex. Extraneous unused files in the modpack.  This helps keep
-                                        // any unnecessary files from poluting the original destination item post conversion.
-                                        foreach (var file in filePaths.ToList())
-                                        {
-                                            var root = XivDependencyGraph.ExtractRootInfo(file);
-                                            if (root == source.Info)
-                                            {
-                                                filePaths.Remove(file);
-                                                filesToReset.Add(file);
-                                            }
-                                        }
-                                    }
-
-                                    // Reset the index pointers back to previous.
-                                    foreach (var file in filesToReset)
-                                    {
-                                        var oldOffset = OriginalOffsets[file];
-                                        var index = await tx.GetIndexFile(df);
-                                        index.SetDataOffset(file, oldOffset);
-                                    }
-                                }
+                                tx.ModPack = modPack;
+                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, OriginalOffsets, sourceApplication);
+                                tx.ModPack = null;
                             }
                         }
 
@@ -786,6 +731,8 @@ namespace xivModdingFramework.Mods.FileTypes
                             try
                             {
                                 var json = filteredModsJson.FirstOrDefault(x => x.FullPath == file);
+
+                                // Files moved by the root converter will miss here, which is fine, since the root converter updates the mod info for them.
                                 if (json == null) continue;
 
 
@@ -874,15 +821,13 @@ namespace xivModdingFramework.Mods.FileTypes
                         {
                             if (ErroneousFiles.Contains(file)) continue;
 
-                            var longOffset = ((long)DatOffsets[file]) * 8L;
                             var ext = Path.GetExtension(file);
                             if (ext == ".meta")
                             {
                                 try
                                 {
                                     // Load all the files we just wrote and validate them.
-                                    var df = IOUtil.GetDataFileFromPath(file);
-                                    var metaRaw = await dat.GetType2Data(longOffset, df);
+                                    var metaRaw = await dat.GetType2Data(file, false, tx);
                                     var meta = await ItemMetadata.Deserialize(metaRaw);
 
                                     meta.Validate(file);
@@ -939,25 +884,28 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                         }
 
+                        // If we have a Pre Dawntrail Modpack, we need to fix things up.
+                        if (fixPreDawntrailMods)
+                        {
+                            if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
+                            {
+                                var modPack = filteredModsJson[0].ModPackEntry;
+                                await FixPreDawntrailImports(filePaths, sourceApplication, progress, tx);
+                            }
+                        }
+
                         // Commit the metadata transaction
                         await ModTransaction.CommitTransaction(tx);
                     }
 
 
 
-                    // If we have a Pre Dawntrail Modpack, we need to fix things up.
-                    if (fixPreDawntrailMods)
-                    {
-                        if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
-                        {
-                            await FixPreDawntrailImports(filePaths, "DawntrailFix", progress);
-                        }
-                    }
 
                     count = 0;
                     progress.Report((0, 0, "Queuing Cache Updates..."));
+
                     // Metadata files expanded, last thing is to queue everthing up for the Cache.
-                    var files = filteredModsJson.Select(x => x.FullPath).ToList();
+                    var files = filePaths.Select(x => x).ToList();
                     try
                     {
                         XivCache.QueueDependencyUpdate(files);

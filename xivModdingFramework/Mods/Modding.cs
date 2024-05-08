@@ -107,6 +107,7 @@ namespace xivModdingFramework.Mods
         public void SaveModList(ModList ml)
         {
             _modlistSemaphore.Wait();
+
             try
             {
                 File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
@@ -120,8 +121,6 @@ namespace xivModdingFramework.Mods
         {
             await _modlistSemaphore.WaitAsync();
 
-            // Calling this property automatically crunches the listed modpacks down based on name.
-            var z = ml.ModPacks;
             try
             {
                 File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));

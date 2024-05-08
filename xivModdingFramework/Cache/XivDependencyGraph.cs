@@ -523,7 +523,7 @@ namespace xivModdingFramework.Cache
                 index = await tx.GetIndexFile(df);
             }
 
-            ItemMetadata originalMetadata = await ItemMetadata.GetFromCachedIndex(this, tx);
+            ItemMetadata originalMetadata = await ItemMetadata.GetMetadata(this, false, tx);
 
             var originalModelPaths = await GetModelFiles(tx);
             var originalMaterialPaths = await GetMaterialFiles(-1, tx);
@@ -582,7 +582,7 @@ namespace xivModdingFramework.Cache
                 List<XivRace> races = null;
                 if (tx != null)
                 {
-                    var metadata = await ItemMetadata.GetFromCachedIndex(this, tx);
+                    var metadata = await ItemMetadata.GetMetadata(this, false, tx);
                     races = metadata.EqdpEntries.Where(x => x.Value.bit1).Select(x => x.Key).ToList();
                 }
                 else
@@ -647,23 +647,20 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public async Task<List<string>> GetMaterialFiles(int materialVariant = -1, ModTransaction tx = null)
         {
-            var useCache = tx != null;
-
             var df = Info.PrimaryType.GetDataFile();
             IndexFile index;
             ModList modlist;
-            if (useCache)
+            bool useCache = false;
+            if(tx == null)
             {
-                index = await tx.GetIndexFile(df);
-                modlist = await tx.GetModList();
+                // Use a read only transaction if we don't have an open one.
+                // If we're not transacting that also means we can just use whatever's in the main state cache.
+                tx = ModTransaction.BeginTransaction(true);
+                useCache = true;
             }
-            else
-            {
-                var _index = new Index(XivCache.GameInfo.GameDirectory);
-                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-                index = await _index.GetIndexFile(df, false, true);
-                modlist = await _modding.GetModList();
-            }
+
+            index = await tx.GetIndexFile(df);
+            modlist = await tx.GetModList();
 
             var materials = new HashSet<string>();
             if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
@@ -721,7 +718,7 @@ namespace xivModdingFramework.Cache
                             mdlMats = await XivCache.GetChildFiles(model);
                         } else
                         {
-                            if (index.Get8xDataOffset(model) != 0)
+                            if (index.FileExists(model))
                             {
                                 mdlMats = await _mdl.GetReferencedMaterialPaths(model, -1, false, false, tx);
                             }

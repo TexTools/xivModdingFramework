@@ -332,13 +332,15 @@ namespace xivModdingFramework.Models.Helpers
                 if (rawMdl.MeshBoneSets != null && rawMdl.MeshBoneSets.Count > 0)
                 {
                     var meshBoneSet = rawMdl.MeshBoneSets[baseMesh.MeshInfo.BoneSetIndex];
+                    var boneHash = new HashSet<string>();
                     for (var bi = 0; bi < meshBoneSet.BoneIndexCount; bi++)
                     {
                         // This is an index into the main bone paths list.
                         var boneIndex = meshBoneSet.BoneIndices[bi];
                         var boneName = rawMdl.PathData.BoneList[boneIndex];
-                        ttMesh.Bones.Add(boneName);
+                        boneHash.Add(boneName);
                     }
+                    ttMesh.Bones = boneHash.ToList();
                 }
 
                 var partIdx = 0;

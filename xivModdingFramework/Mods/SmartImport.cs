@@ -52,6 +52,7 @@ namespace xivModdingFramework.Mods
                 }
 
                 await _dat.WriteModFile(data, internalPath, sourceApplication, item, tx);
+                XivCache.QueueDependencyUpdate(internalPath);
             });
         }
 
