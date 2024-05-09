@@ -974,7 +974,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             // Read normal file.
             var normalTex = await _tex.GetTexData(sourceNormalPath);
-            var texData = await _tex.GetImageData(normalTex);
+            var texData = await _tex.GetRawPixels(normalTex);
 
             // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
             var idPixels = new byte[texData.Length];
@@ -1013,13 +1013,16 @@ namespace xivModdingFramework.Materials.FileTypes
 
             try
             {
-                // This is very RAM heavy, given we're looping through 4 phases of alteration.
-                // - Original Normal Map
+                // This is very RAM heavy, given we're looping through many phases of alteration of the same pixel data.
+                // - Original Normal Map Compressed TEX Data.
+                // - Original Normal Map Uncompressed TEX Data.
+                // - Original Normal Map 8.8.8.8 format Pixel Data.
                 // - Altered Pixel Data
                 // - DDS Format Pixel Data
                 // - Uncompressed Tex Format Pixel Data
                 // - Compressed Tex (Type4) Data
 
+                // In theory, a streamlined function could be created to combine some of these steps.
                 var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, true);
                 ddsBytes = await _tex.DDSToUncompressedTex(ddsBytes);
                 ddsBytes = await _tex.CompressTexFile(ddsBytes);
@@ -1281,35 +1284,6 @@ namespace xivModdingFramework.Materials.FileTypes
         private static readonly Regex _bodyRegex = new Regex("(b[0-9]{4})");
         private static readonly Regex _skinRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
 
-
-        /// <summary>
-        /// Applies a given texture overlay onto the given texture type of the given material.
-        /// the texture overlay stream must be a PNG or DDS file stream.
-        /// 
-        /// Returns the internal file path that was modified.
-        /// </summary>
-        /// <param name="mtrlPath">The path to the material to modify</param>
-        /// <param name="textureType">The texture type within the material to replace.</param>
-        /// <param name="index">Cached Index File</param>
-        /// <param name="modList">Cached Modlist File</param>
-        public async Task<string> ApplyOverlayToMaterial(string mtrlPath, XivTexType textureType, Stream overlayStream, string source, ModTransaction tx = null)
-        {
-            var mtrl = await GetMtrlData(mtrlPath, -1, 11);
-
-            var tex = mtrl.Textures.FirstOrDefault(x => x.Usage == textureType);
-
-            if (tex == null) return null;
-
-            var texPath = tex.TexturePath;
-
-            var _Tex = new Tex(_gameDirectory);
-
-            var texData = await _Tex.GetTexData(tex);
-
-            await _Tex.ApplyOverlay(texData, overlayStream, source, tx);
-
-            return texPath;
-        }
 
         /// <summary>
         /// Resolves the MTRL path for a given MDL path.

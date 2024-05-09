@@ -691,6 +691,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             newData.AddRange(dataBlocks);
             return newData.ToArray();
         }
+
+
         /// <summary>
         /// Retrieves the uncompressed data for an SQPack type 3 file from the given path.
         /// </summary>
@@ -1235,7 +1237,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
-
         /// <summary>
         /// Gets the original or modded data for type 4 files based on the path specified.
         /// </summary>
@@ -1398,7 +1399,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return finalbytes;
         }
-
 
 
         /// <summary>

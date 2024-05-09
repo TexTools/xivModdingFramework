@@ -50,6 +50,7 @@ using System.Text;
 using System.Diagnostics;
 using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Helper;
+using xivModdingFramework.Exd.Enums;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -123,17 +124,7 @@ namespace xivModdingFramework.Textures.FileTypes
         }
         public async Task<XivTex> GetTexData(string path, ModTransaction tx = null)
         {
-            var folder = Path.GetDirectoryName(path);
-            folder = folder.Replace("\\", "/");
-            var file = Path.GetFileName(path);
-
             long offset = 0;
-
-            var hashedfolder = 0;
-            var hashedfile = 0;
-
-            hashedfolder = HashGenerator.GetHash(folder);
-            hashedfile = HashGenerator.GetHash(file);
             var df = IOUtil.GetDataFileFromPath(path);
 
             if (tx != null)
@@ -433,13 +424,13 @@ namespace xivModdingFramework.Textures.FileTypes
 
 
         /// <summary>
-        /// Gets the raw pixel data for the texture
+        /// Converts the DDS-Format pixel data in a given XivTex to 8.8.8.8 RGBA Pixel data and returns it.
         /// </summary>
         /// <param name="xivTex">The texture data</param>
         /// <returns>A byte array with the image data</returns>
-        public Task<byte[]> GetImageData(XivTex xivTex, int layer = -1)
+        public async Task<byte[]> GetRawPixels(XivTex xivTex, int layer = -1)
         {
-            return Task.Run(async () =>
+            return await Task.Run(async () =>
             {
                 byte[] imageData = null;
 
@@ -745,193 +736,6 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
             }
             return textureType;
-        }
-
-
-        /// <summary>
-        /// Applies an overlay texture onto a base texture.
-        /// Overlays must be either DDS or PNG file streams.
-        /// Stores the output as a PNG file in the temporary files directory and returns the path.
-        /// 
-        /// This does NOT modify the game dats or indexes.
-        /// </summary>
-        /// <param name="baseData"></param>
-        /// <param name="overlayData"></param>
-        /// <returns></returns>
-        public async Task<string> CreateMergedOverlayFile(XivTex baseTex, Stream overlayStream)
-        {
-
-            // Get both images in pixel format.
-            var basePixelData = await GetImageData(baseTex);
-            var baseImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(basePixelData, baseTex.Width, baseTex.Height);
-
-            Image overlayImage;
-
-
-            // Check if it's a PNG or DDS stream.
-            var isPng = true;
-            var position = overlayStream.Position;
-            var buff = new byte[8];
-            overlayStream.Read(buff, 0, 8);
-
-            for(int i = 0; i < _PNG_MAGIC.Length; i++)
-            {
-                if(_PNG_MAGIC[i] != buff[i])
-                {
-                    isPng = false;
-                }
-            }
-
-            // Rewind stream.
-            overlayStream.Seek(position, SeekOrigin.Begin);
-
-            if(isPng)
-            {
-                // If it's a PNG stream, imagesharp should be able to just directly load it.
-                overlayImage = Image.Load(overlayStream);
-
-            } else
-            {
-                // Read DDS data, then pump the raw pixels into ImageSharp.
-                var overlayPixelData = await DDStoPixel(overlayStream);
-                overlayImage = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Rgba32>(overlayPixelData.Item1, overlayPixelData.Item2, overlayPixelData.Item3);
-            }
-
-            if(baseImage.Width != overlayImage.Width || baseImage.Height != overlayImage.Height)
-            {
-                // Resize the overlay to match.
-                overlayImage.Mutate(x => x.Resize(baseImage.Width, baseImage.Height));
-            }
-
-            // Merge Images
-            baseImage.Mutate(x =>
-            {
-                x.DrawImage(overlayImage, 1.0f);
-            });
-
-            var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".png");
-            baseImage.SaveAsPng(tempFile);
-
-
-            return tempFile;
-        }
-
-        /// <summary>
-        /// Applies an overlay texture onto a base texture.
-        /// Overlays must be either DDS or PNG file streams.
-        /// 
-        /// Writes the resulting file to the Dats/Indexes.
-        /// </summary>
-        /// <param name="baseTex"></param>
-        /// <param name="overlayStream"></param>
-        /// <returns></returns>
-        public async Task ApplyOverlay(XivTex baseTex, Stream overlayStream, string source, ModTransaction tx = null)
-        {
-            var pngPath = await CreateMergedOverlayFile(baseTex, overlayStream);
-
-            var root = await XivCache.GetFirstRoot(baseTex.TextureTypeAndPath.Path);
-            var item = root.GetFirstItem();
-
-            await ImportTex(baseTex.TextureTypeAndPath.Path, pngPath, item, source, tx);
-
-            try
-            {
-                // Clear out temp files.
-                File.Delete(pngPath);
-            }
-            catch
-            {
-
-            }
-        }
-
-        /// <summary>
-        /// Takes a raw DDS Data block and decodes it into pixel data.
-        /// Only works with single layer DDS files.
-        /// 
-        /// Return Pixel Data, Width, Height, Original DDS format.
-        /// </summary>
-        /// <param name="ddsData"></param>
-        /// <returns></returns>
-        public async Task<Tuple<byte[], int, int, XivTexFormat>> DDStoPixel(byte [] rawDdsData)
-        {
-            using (var mStream = new MemoryStream(rawDdsData))
-            {
-                return await DDStoPixel(mStream);
-            }
-        }
-
-        /// <summary>
-        /// Takes a raw DDS Data block and decodes it into pixel data.
-        /// Only works with single layer DDS files.
-        /// 
-        /// Return Pixel Data, Width, Height, Original DDS format.
-        /// </summary>
-        /// <param name="ddsData"></param>
-        /// <returns></returns>
-        public async Task<Tuple<byte[], int, int, XivTexFormat>> DDStoPixel(Stream ddsStream)
-        {
-            using (var reader = new BinaryReader(ddsStream))
-            {
-                var format = GetDDSTexFormat(reader);
-                var ddsContainer = new DDSContainer();
-
-                reader.BaseStream.Seek(12, SeekOrigin.Begin);
-
-                var height = reader.ReadInt32();
-                var width = reader.ReadInt32();
-
-                byte[] imageData = null;
-                var layers = 1;
-
-
-                reader.BaseStream.Seek(0, SeekOrigin.Begin);
-                var rawData = IOUtil.ReadAllBytes(reader);
-
-                switch (format)
-                {
-                    case XivTexFormat.DXT1:
-                        imageData = DxtUtil.DecompressDxt1(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.DXT3:
-                        imageData = DxtUtil.DecompressDxt3(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.DXT5:
-                        imageData = DxtUtil.DecompressDxt5(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.BC5:
-                        imageData = DxtUtil.DecompressBc5(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.BC7:
-                        imageData = DxtUtil.DecompressBc7(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.A4R4G4B4:
-                        imageData = await Read4444Image(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.A1R5G5B5:
-                        imageData = await Read5551Image(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.A8R8G8B8:
-                        imageData = await SwapRBColors(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.L8:
-                    case XivTexFormat.A8:
-                        imageData = await Read8bitImage(rawData, width, height * layers);
-                        break;
-                    case XivTexFormat.X8R8G8B8:
-                    case XivTexFormat.R32F:
-                    case XivTexFormat.G16R16F:
-                    case XivTexFormat.G32R32F:
-                    case XivTexFormat.A16B16G16R16F:
-                    case XivTexFormat.A32B32G32R32F:
-                    case XivTexFormat.D16:
-                    default:
-                        imageData = rawData;
-                        break;
-                }
-
-                return new Tuple<byte[], int, int, XivTexFormat>(imageData, width, height, format);
-            }
         }
 
         /// <summary>
