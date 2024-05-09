@@ -148,6 +148,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 unzippedPath = Path.GetDirectoryName(unzippedPath);
             }
 
+            var needsCleanup = false;
+            if(unzippedPath.EndsWith(".pmp"))
+            {
+                // File was not fully unzipped, and needs to be unzipped still.
+                needsCleanup = true;
+                var info = await LoadPMP(unzippedPath);
+                unzippedPath = info.path;
+            }
+
             var imported = new HashSet<string>();
             var notImported = new HashSet<string>();
             _ImportActive = true;
@@ -243,6 +252,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
             finally
             {
+                if(needsCleanup)
+                {
+                    IOUtil.DeleteTempDirectory(unzippedPath);
+                }
                 _Source = null;
                 _ImportActive = false;
             }

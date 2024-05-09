@@ -929,7 +929,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
             var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
 
-            var fixableMtrlsRegex = new Regex("chara\\/(equipment|weapon)\\/.*\\.mtrl");
+            var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);

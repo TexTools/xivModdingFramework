@@ -775,21 +775,24 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     await _dat.WriteModFile(texData.data, texData.indexFilePath, source, null, tx);
                 }
+            }
 
-                // Fix their modpack references.
-                var modList = await tx.GetModList();
 
-                foreach(var kv in indexToMtrlDictionary)
-                {
-                    var mtrlMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Value);
+            // Fix their modpack references.
+            var modList = await tx.GetModList();
+            foreach (var kv in indexToMtrlDictionary)
+            {
+                var mtrlMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Value);
 
-                    if (mtrlMod == null)
-                        continue;
+                if (mtrlMod == null)
+                    continue;
 
-                    var indexMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Key);
+                var indexMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Key);
 
-                    indexMod.modPack = mtrlMod.modPack;
-                }
+                if (indexMod == null)
+                    continue; // We -SHOULD- never hit this, but...
+
+                indexMod.modPack = mtrlMod.modPack;
             }
         }
 

@@ -330,39 +330,58 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="internalFilePath">The internal file path of the mod</param>
         /// <param name="enable">The status of the mod</param>
-        public async Task ToggleModPackStatus(string modPackName, bool enable)
+        public async Task ToggleModPackStatus(string modPackName, bool enable, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
                 throw new Exception("TexTools mods cannot be altered in Lumina mode.");
             }
 
-            var index = new Index(_gameDirectory);
-
-            var modList = await GetModList();
-            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-            List<Mod> mods = null;
-
-            if (modPackName.Equals("Standalone (Non-ModPack)"))
+            var ownTransaction = false;
+            if(tx == null)
             {
-                mods = (from mod in modList.Mods
-                        where mod.modPack == null
-                        select mod).ToList();
+                ownTransaction = true;
+                tx = ModTransaction.BeginTransaction();
             }
-            else
+            try
             {
-                mods = (from mod in modList.Mods
-                        where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                        select mod).ToList();
+
+                var modList = await tx.GetModList();
+                List<Mod> mods = null;
+
+                if (modPackName.Equals("Standalone (Non-ModPack)"))
+                {
+                    mods = (from mod in modList.Mods
+                            where mod.modPack == null
+                            select mod).ToList();
+                }
+                else
+                {
+                    mods = (from mod in modList.Mods
+                            where mod.modPack != null && mod.modPack.name.Equals(modPackName)
+                            select mod).ToList();
+                }
+
+
+                if (mods == null)
+                {
+                    throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
+                }
+
+                await ToggleMods(enable, mods.Select(x => x.fullPath), null, tx);
+
+                if (ownTransaction)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
             }
-
-
-            if (mods == null)
+            catch
             {
-                throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
+                if(ownTransaction)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
             }
-
-            await ToggleMods(enable, mods.Select(x => x.fullPath));
         }
 
         /// <summary>
@@ -490,17 +509,38 @@ namespace xivModdingFramework.Mods
         /// Toggles all mods on or off
         /// </summary>
         /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
-        public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null)
+        public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
             if(XivCache.GameInfo.UseLumina)
             {
                 throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
             }
-            var modList = await GetModList();
-            await ToggleMods(enable, modList.Mods.Select(x => x.fullPath), progress);
+
+            var ownTransaction = false;
+            if (tx == null)
+            {
+                ownTransaction = true;
+                tx = ModTransaction.BeginTransaction();
+            }
+            try
+            {
+                var modList = await tx.GetModList();
+                await ToggleMods(enable, modList.Mods.Select(x => x.fullPath), progress, tx);
+
+                if(ownTransaction)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+            } catch
+            {
+                if(ownTransaction)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+            }
         }
 
-        public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null)
+        public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
@@ -530,8 +570,13 @@ namespace xivModdingFramework.Mods
             // If we're disabling all of our standard files, then this is a full toggle.
             var fullToggle = mods.Count >= modList.Mods.Count(x => !String.IsNullOrWhiteSpace(x.fullPath) && !x.IsInternal());
 
-            using (var tx = ModTransaction.BeginTransaction())
+            var ownTransaction = false;
+            if(tx == null)
             {
+                ownTransaction = true;
+                tx = ModTransaction.BeginTransaction();
+            }
+            try { 
                 foreach (var modEntry in mods)
                 {
                     // Save disabling these for last.
@@ -620,12 +665,22 @@ namespace xivModdingFramework.Mods
 
                 }
 
-                await ModTransaction.CommitTransaction(tx);
+                if (ownTransaction)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
 
                 // Do these as a batch query at the end.
                 progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
                 var allPaths = mods.Select(x => x.fullPath).ToList();
                 XivCache.QueueDependencyUpdate(allPaths);
+            }
+            catch
+            {
+                if (ownTransaction)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
             }
 
 
@@ -728,24 +783,27 @@ namespace xivModdingFramework.Mods
                 throw new Exception("TexTools mods cannot be altered in Lumina mode.");
             }
 
-            var modList = await GetModList();
 
-            var modsToRemove = (from mod in modList.Mods
-                                where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                                select mod).ToList();
-
-            var modRemoveCount = modsToRemove.Count;
-
-            // Disable all the mods.
-            await ToggleMods(false, modsToRemove.Select(x => x.fullPath));
-
-            // Then remove them from the modlist.
-            foreach(var mod in modsToRemove)
+            using (var tx = ModTransaction.BeginTransaction())
             {
-                modList.Mods.Remove(mod);
-            }
+                var modList = await tx.GetModList();
+                var modsToRemove = (from mod in modList.Mods
+                                    where mod.modPack != null && mod.modPack.name.Equals(modPackName)
+                                    select mod).ToList();
 
-            SaveModList(modList);
+                var modRemoveCount = modsToRemove.Count;
+
+                // Disable all the mods.
+                await ToggleMods(false, modsToRemove.Select(x => x.fullPath), null, tx);
+
+                // Then remove them from the modlist.
+                foreach (var mod in modsToRemove)
+                {
+                    modList.Mods.Remove(mod);
+                }
+
+                await ModTransaction.CommitTransaction(tx);
+            }
         }
 
 
@@ -757,7 +815,7 @@ namespace xivModdingFramework.Mods
         /// 
         /// </summary>
         /// <returns></returns>
-        public async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        public async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
@@ -765,110 +823,130 @@ namespace xivModdingFramework.Mods
             }
 
             progressReporter?.Report((0, 0, "Loading Modlist file..."));
-            var modlist = await GetModList();
 
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-
-            // IMC entries cache so we're not having to constantly re-load the IMC data.
-            Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
-
-            var totalMods = modlist.Mods.Count;
-
-
-            var count = 0;
-            List<Mod> toRemove = new List<Mod>();
-            foreach(var mod in modlist.Mods)
+            var ownTransaction = false;
+            if (tx == null)
             {
-                progressReporter?.Report((count, totalMods, "Fixing up item names..."));
-                count++;
+                ownTransaction = true;
+                tx = ModTransaction.BeginTransaction();
+            }
+            try
+            {
+                var modlist = await tx.GetModList();
 
-                if (String.IsNullOrWhiteSpace(mod.fullPath)) {
-                    toRemove.Add(mod);
-                    continue;
-                }
+                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
 
-                if (mod.IsInternal()) continue;
+                // IMC entries cache so we're not having to constantly re-load the IMC data.
+                Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
 
-                XivDependencyRoot root = null;
-                try
+                var totalMods = modlist.Mods.Count;
+
+
+                var count = 0;
+                List<Mod> toRemove = new List<Mod>();
+                foreach (var mod in modlist.Mods)
                 {
-                    root = await XivCache.GetFirstRoot(mod.fullPath);
-                    if(root == null)
+                    progressReporter?.Report((count, totalMods, "Fixing up item names..."));
+                    count++;
+
+                    if (String.IsNullOrWhiteSpace(mod.fullPath))
                     {
-                        var cmpName = CMP.GetModFileNameFromRgspPath(mod.fullPath);
-                        if (cmpName != null)
-                        {
-                            mod.name = cmpName;
-                            mod.category = "Racial Scaling";
-                        }
-                        else if (mod.fullPath.StartsWith("ui/"))
-                        {
-                            mod.name = Path.GetFileName(mod.fullPath);
-                            mod.category = "UI";
-                        }
-                        else
-                        {
-                            mod.name = Path.GetFileName(mod.fullPath);
-                            mod.category = "Raw Files";
-                        }
+                        toRemove.Add(mod);
                         continue;
                     }
 
-                    var ext = Path.GetExtension(mod.fullPath);
-                    IItem item = null;
-                    if (Imc.UsesImc(root) && ext == ".mtrl")
-                    {
-                        var data = await ResolveMtrlModInfo(_imc, mod.fullPath, root, ImcEntriesCache);
-                        mod.name = data.Name;
-                        mod.category = data.Category;
+                    if (mod.IsInternal()) continue;
 
-                    } else if(Imc.UsesImc(root) && ext == ".tex")
+                    XivDependencyRoot root = null;
+                    try
                     {
-                        // For textures, get the first material using them, and list them under that material's item.
-                        var parents = await XivCache.GetParentFiles(mod.fullPath);
-                        if(parents.Count == 0)
+                        root = await XivCache.GetFirstRoot(mod.fullPath);
+                        if (root == null)
+                        {
+                            var cmpName = CMP.GetModFileNameFromRgspPath(mod.fullPath);
+                            if (cmpName != null)
+                            {
+                                mod.name = cmpName;
+                                mod.category = "Racial Scaling";
+                            }
+                            else if (mod.fullPath.StartsWith("ui/"))
+                            {
+                                mod.name = Path.GetFileName(mod.fullPath);
+                                mod.category = "UI";
+                            }
+                            else
+                            {
+                                mod.name = Path.GetFileName(mod.fullPath);
+                                mod.category = "Raw Files";
+                            }
+                            continue;
+                        }
+
+                        var ext = Path.GetExtension(mod.fullPath);
+                        IItem item = null;
+                        if (Imc.UsesImc(root) && ext == ".mtrl")
+                        {
+                            var data = await ResolveMtrlModInfo(_imc, mod.fullPath, root, ImcEntriesCache, tx);
+                            mod.name = data.Name;
+                            mod.category = data.Category;
+
+                        }
+                        else if (Imc.UsesImc(root) && ext == ".tex")
+                        {
+                            // For textures, get the first material using them, and list them under that material's item.
+                            var parents = await XivCache.GetParentFiles(mod.fullPath);
+                            if (parents.Count == 0)
+                            {
+                                item = root.GetFirstItem();
+                                mod.name = item.GetModlistItemName();
+                                mod.category = item.GetModlistItemCategory();
+                                continue;
+                            }
+
+                            var parent = parents[0];
+
+                            var data = await ResolveMtrlModInfo(_imc, parent, root, ImcEntriesCache, tx);
+                            mod.name = data.Name;
+                            mod.category = data.Category;
+                        }
+                        else
                         {
                             item = root.GetFirstItem();
                             mod.name = item.GetModlistItemName();
                             mod.category = item.GetModlistItemCategory();
                             continue;
                         }
-
-                        var parent = parents[0];
-
-                        var data = await ResolveMtrlModInfo(_imc, parent, root, ImcEntriesCache);
-                        mod.name = data.Name;
-                        mod.category = data.Category;
                     }
-                    else
+                    catch
                     {
-                        item = root.GetFirstItem();
-                        mod.name = item.GetModlistItemName();
-                        mod.category = item.GetModlistItemCategory();
+                        mod.name = Path.GetFileName(mod.fullPath);
+                        mod.category = "Raw Files";
                         continue;
                     }
-                } catch
+                }
+
+
+                progressReporter?.Report((0, 0, "Removing empty mod slots..."));
+
+                // Remove all empty mod frames.
+                foreach (var mod in toRemove)
                 {
-                    mod.name = Path.GetFileName(mod.fullPath);
-                    mod.category = "Raw Files";
-                    continue;
+                    modlist.Mods.Remove(mod);
+                }
+
+                progressReporter?.Report((0, 0, "Saving Modlist file..."));
+
+                await ModTransaction.CommitTransaction(tx);
+            }
+            catch
+            {
+                if (ownTransaction)
+                {
+                    ModTransaction.CancelTransaction(tx);
                 }
             }
-
-
-            progressReporter?.Report((0,0, "Removing empty mod slots..."));
-
-            // Remove all empty mod frames.
-            foreach (var mod in toRemove)
-            {
-                modlist.Mods.Remove(mod);
-            }
-
-            progressReporter?.Report((0, 0, "Saving Modlist file..."));
-
-            await SaveModListAsync(modlist);
         }
-        private async Task<(string Name, string Category)> ResolveMtrlModInfo(Imc _imc, string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache)
+        private async Task<(string Name, string Category)> ResolveMtrlModInfo(Imc _imc, string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache, ModTransaction tx = null)
         {
             IItem item;
             var mSetRegex = new Regex("/v([0-9]{4})/");
@@ -883,7 +961,13 @@ namespace xivModdingFramework.Mods
                 }
                 else
                 {
-                    imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
+                    if (tx == null)
+                    {
+                        // Read only TX if none supplied.
+                        tx = ModTransaction.BeginTransaction(true);
+                    }
+
+                    imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths(), false, tx);
                     ImcEntriesCache.Add(root, imcEntries);
                 }
                 var mSetId = Int32.Parse(match.Groups[1].Value);
@@ -939,6 +1023,8 @@ namespace xivModdingFramework.Mods
         /// <summary>
         /// This function will rewrite all the mod files to new DAT entries, replacing the existing modded DAT files with new, defragmented ones.
         /// Returns the total amount of bytes recovered.
+        /// 
+        /// NOT TRANSACTION SAFE.
         /// </summary>
         /// <returns></returns>
         public async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)

@@ -2024,6 +2024,7 @@ namespace xivModdingFramework.Cache
             // 2. Purge our own child file references.
             // 3. Add this file to both dependency queues.
             // 4. Add our affected children to the parent queue.
+            // 5. Add this root to the items sets file if it didn't already exist.
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -2093,6 +2094,38 @@ namespace xivModdingFramework.Cache
                             }
                         }
 
+                    }
+                    transaction.Commit();
+                }
+            }
+
+            // Now connect to the root cache and inject our roots.
+            using (var db = new SQLiteConnection(RootsCacheConnectionString))
+            {
+                db.Open();
+                using (var transaction = db.BeginTransaction())
+                {
+                    HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
+                    var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
+                    using (var cmd = new SQLiteCommand(query, db))
+                    {
+                        foreach (var file in files)
+                        {
+                            var root = XivDependencyGraph.ExtractRootInfo(file);
+                            if (root == null || root.PrimaryId < 0)
+                            {
+                                continue;
+                            }
+                            if (roots.Contains(root))
+                                continue;
+
+                            var fullRoot = XivDependencyGraph.CreateDependencyRoot(root);
+                            if (fullRoot == null)
+                                continue;
+
+                            roots.Add(root);
+                            XivCache.CacheRoot(root, db, cmd);
+                        }
                     }
                     transaction.Commit();
                 }
