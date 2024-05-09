@@ -1488,7 +1488,19 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Use simple readonly tx if we don't have one.
                 tx = ModTransaction.BeginTransaction(true);
             }
+
             var offset8x = await tx.Get8xDataOffset(internalPath);
+            if (forceOriginal)
+            {
+                // Checks if the item being imported already exists in the modlist
+                var modEntry = (await tx.GetModList()).Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                // If the file exists in the modlist, get the data from the original data
+                if (modEntry != null)
+                {
+                    offset8x = modEntry.data.originalOffset;
+                }
+            }
+
             var df = IOUtil.GetDataFileFromPath(internalPath);
 
             var parts = Dat.Offset8xToParts(offset8x);
