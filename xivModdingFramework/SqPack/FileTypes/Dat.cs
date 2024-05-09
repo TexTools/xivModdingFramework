@@ -25,8 +25,9 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using HelixToolkit.SharpDX.Core.Helper;
-using Lumina.Data;
+using SharpDX;
 using xivModdingFramework.Cache;
+using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -39,6 +40,7 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
+using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -410,7 +412,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> GetType2Data(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal, ModTransaction tx = null)
         {
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
 
@@ -428,7 +430,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
-                    return await GetType2Data(modEntry.data.originalOffset, dataFile);
+                    return await ReadSqPackType2(modEntry.data.originalOffset, dataFile);
                 }
             }
 
@@ -442,22 +444,77 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception($"Could not find offset for {internalPath}");
             }
 
-            return await GetType2Data(offset, dataFile);
+            return await ReadSqPackType2(offset, dataFile);
         }
 
-        public async Task<List<byte>> DecompressType2Data(byte[] data, long offset = 0)
+        /// <summary>
+        /// Gets the data for type 2 files.
+        /// </summary>
+        /// <remarks>
+        /// Type 2 files vary in content.
+        /// </remarks>
+        /// <param name="offset">The offset where the data is located.</param>
+        /// <param name="dataFile">The data file that contains the data.</param>
+        /// <returns>Byte array containing the decompressed type 2 data.</returns>
+        public async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile)
+        {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file data without valid offset.");
+            }
+
+
+            byte[] type2Bytes = null;
+
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
+
+            var datPath = Dat.GetDatPath(dataFile, datNum);
+
+
+            offset = OffsetCorrection(datNum, offset);
+            await _lock.WaitAsync();
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    using (var br = new BinaryReader(File.OpenRead(datPath)))
+                    {
+                        type2Bytes = await ReadSqPackType2(br, offset);
+                    }
+                });
+            }
+            finally
+            {
+                _lock.Release();
+            }
+            if (type2Bytes == null)
+            {
+                return new byte[0];
+            }
+
+            return type2Bytes;
+        }
+
+        public async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
         {
             using (var ms = new MemoryStream(data))
             {
                 using (var br = new BinaryReader(ms))
                 {
-                    return await DecompressType2Data(br, 0);
+                    return await ReadSqPackType2(br, offset);
                 }
             }
         }
-        public async Task<List<byte>> DecompressType2Data(BinaryReader br, long offset = 0)
+        public async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
         {
-            br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            if(offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            } else
+            {
+                offset = br.BaseStream.Position;
+            }
 
             var headerLength = br.ReadInt32();
             var fileType = br.ReadInt32();
@@ -499,57 +556,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                     type2Bytes.AddRange(decompressedData);
                 }
             }
-            return type2Bytes;
-        }
-
-        /// <summary>
-        /// Gets the data for type 2 files.
-        /// </summary>
-        /// <remarks>
-        /// Type 2 files vary in content.
-        /// </remarks>
-        /// <param name="offset">The offset where the data is located.</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> GetType2Data(long offset, XivDataFile dataFile)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file data without valid offset.");
-            }
-
-
-            var type2Bytes = new List<byte>();
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int) ((offset / 8) & 0x0F) / 2;
-
-            var datPath = Dat.GetDatPath(dataFile, datNum);
-
-
-            offset = OffsetCorrection(datNum, offset);
-            await _lock.WaitAsync();
-            try
-            {
-                await Task.Run(async () =>
-                {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        type2Bytes = await DecompressType2Data(br, offset);
-                    }
-                });
-            }
-            finally
-            {
-                _lock.Release();
-            }
-            if(type2Bytes == null)
-            {
-                return new byte[0]; 
-            }
-
             return type2Bytes.ToArray();
         }
+
 
         /// <summary>
         /// Imports any Type 2 data
@@ -683,7 +692,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return newData.ToArray();
         }
         /// <summary>
-        /// Gets the original or modded data for type 3 files based on the path specified.
+        /// Retrieves the uncompressed data for an SQPack type 3 file from the given path.
         /// </summary>
         /// <remarks>
         /// Type 3 files are used for models
@@ -691,7 +700,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal, ModTransaction tx = null)
         {
 
             var dataFile = GetDataFileFromPath(internalPath);
@@ -714,7 +723,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
-                    return await GetType3Data(modEntry.data.originalOffset, dataFile);
+                    return await ReadSqPackType3(modEntry.data.originalOffset, dataFile);
                 }
             }
 
@@ -739,9 +748,213 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception($"Could not find offset for {internalPath}");
             }
 
-            return await GetType3Data(offset, dataFile);
+            return await ReadSqPackType3(offset, dataFile);
         }
-        
+        /// <summary>
+        /// Gets the data for Type 3 (Model) files
+        /// </summary>
+        /// <remarks>
+        /// Type 3 files are used for models
+        /// </remarks>
+        /// <param name="offset">Offset to the type 3 data</param>
+        /// <param name="dataFile">The data file that contains the data.</param>
+        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
+        public async Task<byte[]> ReadSqPackType3(long offset, XivDataFile dataFile)
+        {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file data without valid offset.");
+            }
+
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
+
+            offset = OffsetCorrection(datNum, offset);
+
+            var datPath = Dat.GetDatPath(dataFile, datNum);
+
+            var meshCount = 0;
+            var materialCount = 0;
+            byte[] result = null;
+
+            var index = 0;
+            return await Task.Run(async () =>
+            {
+                await _lock.WaitAsync();
+                try
+                {
+                    using (var br = new BinaryReader(File.OpenRead(datPath)))
+                    {
+                        return await ReadSqPackType3(br, offset);
+                    }
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            });
+        }
+
+        public async Task<byte[]> ReadSqPackType3(BinaryReader br, long offset = -1)
+        {
+            if (offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = br.BaseStream.Position;
+            }
+
+            const int baseHeaderLength = 68; // start of file until after "padding"
+            var headerLength = br.ReadInt32();
+            var fileType = br.ReadInt32();
+            var decompressedSize = br.ReadInt32();
+            var buffer1 = br.ReadInt32();
+            var buffer2 = br.ReadInt32();
+            var version = br.ReadInt32();
+
+
+            var endOfHeader = offset + headerLength;
+
+            // Uncompressed...
+            var vertexInfoSize = br.ReadInt32();
+            var modelDataSize = br.ReadInt32();
+            var vertexBufferSizes = Read3IntBuffer(br);
+            var edgeGeometryVertexBufferSizes = Read3IntBuffer(br);
+            var indexBufferSizes = Read3IntBuffer(br);
+
+            // Compressed...
+            var vertexInfoCompressedSize = br.ReadInt32();
+            var modelDataCompressedSize = br.ReadInt32();
+            var compressedvertexBufferSizes = Read3IntBuffer(br);
+            var compressededgeGeometryVertexBufferSizes = Read3IntBuffer(br);
+            var compressedindexBufferSizes = Read3IntBuffer(br);
+
+            // Offsets....
+            var vertexInfoOffset = br.ReadInt32();
+            var modelDataOffset = br.ReadInt32();
+            var vertexBufferOffsets = Read3IntBuffer(br);
+            var edgeGeometryVertexBufferOffsets = Read3IntBuffer(br);
+            var indexBufferOffsets = Read3IntBuffer(br);
+
+            // Block Indexes....
+            var vertexInfoBlockIndex = br.ReadInt16();
+            var modelDataBLockIndex = br.ReadInt16();
+            var vertexBufferBlockIndexs = Read3IntBuffer(br, true);
+            var edgeGeometryVertexBufferBlockIndexs = Read3IntBuffer(br, true);
+            var indexBufferBlockIndexs = Read3IntBuffer(br, true);
+
+            // Block Counts....
+            var vertexInfoBlockCount = br.ReadInt16();
+            var modelDataBlockCount = br.ReadInt16();
+            var vertexBufferBlockCounts = Read3IntBuffer(br, true);
+            var edgeGeometryVertexBufferBlockCounts = Read3IntBuffer(br, true);
+            var indexBufferBlockCounts = Read3IntBuffer(br, true);
+
+            var meshCount = br.ReadUInt16();
+            var materialCount = br.ReadUInt16();
+
+            var lodCount = br.ReadByte();
+            var flags = br.ReadByte();
+
+            var padding = br.ReadBytes(2);
+
+            var totalBlocks = vertexInfoBlockCount + modelDataBlockCount;
+            totalBlocks += vertexBufferBlockCounts.Sum(x => (int)x);
+            totalBlocks += edgeGeometryVertexBufferBlockCounts.Sum(x => (int)x);
+            totalBlocks += indexBufferBlockCounts.Sum(x => (int)x);
+
+            var blockSizes = new int[totalBlocks];
+
+            for (var i = 0; i < totalBlocks; i++)
+            {
+                blockSizes[i] = br.ReadUInt16();
+            }
+
+            var distanceToEndOfHeader = endOfHeader - br.BaseStream.Position;
+            var extraData = br.ReadBytes((int)distanceToEndOfHeader);
+
+
+            // Read the compressed blocks.
+            // These could technically be read as contiguous blocks typically,
+            // But it's safer to actually use their offsets and validate them in the process.
+
+            var vertexInfoData = BeginReadCompressedBlocks(br, vertexInfoBlockCount, endOfHeader + vertexInfoOffset);
+            var modelInfoData = BeginReadCompressedBlocks(br, modelDataBlockCount, endOfHeader + modelDataOffset);
+
+            const int _VertexSegments = 3;
+            var vertexBuffers = new List<Task<byte[]>>[_VertexSegments];
+            for (int i = 0; i < _VertexSegments; i++)
+            {
+                vertexBuffers[i] = BeginReadCompressedBlocks(br, (int)vertexBufferBlockCounts[i], endOfHeader + vertexBufferOffsets[i]);
+            }
+
+            var edgeBuffers = new List<Task<byte[]>>[_VertexSegments];
+            for (int i = 0; i < _VertexSegments; i++)
+            {
+                edgeBuffers[i] = BeginReadCompressedBlocks(br, (int)edgeGeometryVertexBufferBlockCounts[i], endOfHeader + edgeGeometryVertexBufferOffsets[i]);
+            }
+
+            var indexBuffers = new List<Task<byte[]>>[_VertexSegments];
+            for (int i = 0; i < _VertexSegments; i++)
+            {
+                indexBuffers[i] = BeginReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i]);
+            }
+
+            // Reserve space at the start of the result for the header
+            var decompressedData = new byte[baseHeaderLength + decompressedSize];
+            int decompOffset = baseHeaderLength;
+
+            // Need to mark these as we unzip them.
+            var vertexBufferUncompressedOffsets = new uint[_VertexSegments];
+            var indexBufferUncompressedOffsets = new uint[_VertexSegments];
+            var vertexBufferRealSizes = new uint[_VertexSegments];
+            var indexOffsetRealSizes = new uint[_VertexSegments];
+
+            // Vertex and Model Headers
+            decompOffset += await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
+            decompOffset += await CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
+
+            for (int i = 0; i < _VertexSegments; i++)
+            {
+                // Geometry data in LoD order.
+                // Mark the real uncompressed offsets and sizes on the way through.
+                vertexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
+                vertexBufferRealSizes[i] = (uint)await CompleteReadCompressedBlocks(vertexBuffers[i], decompressedData, decompOffset);
+                decompOffset += (int)vertexBufferRealSizes[i];
+
+                decompOffset += await CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
+
+                indexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
+                indexOffsetRealSizes[i] = (uint)await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
+                decompOffset += (int)indexOffsetRealSizes[i];
+            }
+
+            var header = new List<byte>(baseHeaderLength);
+
+            // Generated header for live/uncompressed MDL files.
+            header.AddRange(BitConverter.GetBytes(version));
+            header.AddRange(BitConverter.GetBytes(vertexInfoSize));
+            header.AddRange(BitConverter.GetBytes(modelDataSize));
+            header.AddRange(BitConverter.GetBytes((ushort)meshCount));
+            header.AddRange(BitConverter.GetBytes((ushort)materialCount));
+
+            Write3IntBuffer(header, vertexBufferUncompressedOffsets);
+            Write3IntBuffer(header, indexBufferUncompressedOffsets);
+            Write3IntBuffer(header, vertexBufferRealSizes);
+            Write3IntBuffer(header, indexOffsetRealSizes);
+
+            header.Add(lodCount);
+            header.Add(flags);
+            header.AddRange(padding);
+
+            // Copy the header over the reserved space at the start of decompressedData
+            header.CopyTo(decompressedData, 0);
+
+            return decompressedData;
+        }
+
         public static void Write3IntBuffer(List<byte> bufferTarget, uint[] dataToAdd)
         {
             bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[0]));
@@ -973,201 +1186,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             return ret.ToArray();
         }
-        /// <summary>
-        /// Gets the data for Type 3 (Model) files
-        /// </summary>
-        /// <remarks>
-        /// Type 3 files are used for models
-        /// </remarks>
-        /// <param name="offset">Offset to the type 3 data</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<(int MeshCount, int MaterialCount, byte[] Data)> GetType3Data(long offset, XivDataFile dataFile)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file data without valid offset.");
-            }
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int) ((offset / 8) & 0x0F) / 2;
-
-            offset = OffsetCorrection(datNum, offset);
-
-            var datPath = Dat.GetDatPath(dataFile, datNum);
-
-            var meshCount = 0;
-            var materialCount = 0;
-            byte[] result = null;
-
-            var index = 0;
-            await Task.Run(async () =>
-            {
-                await _lock.WaitAsync();
-                try
-                {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                        const int baseHeaderLength = 68; // start of file until after "padding"
-                        var headerLength = br.ReadInt32();
-                        var fileType = br.ReadInt32();
-                        var decompressedSize = br.ReadInt32();
-                        var buffer1 = br.ReadInt32();
-                        var buffer2 = br.ReadInt32();
-                        var version = br.ReadInt32();
-
-
-                        var endOfHeader = offset + headerLength;
-
-                        // Uncompressed...
-                        var vertexInfoSize = br.ReadInt32();
-                        var modelDataSize = br.ReadInt32();
-                        var vertexBufferSizes = Read3IntBuffer(br);
-                        var edgeGeometryVertexBufferSizes = Read3IntBuffer(br);
-                        var indexBufferSizes = Read3IntBuffer(br);
-
-                        // Compressed...
-                        var vertexInfoCompressedSize = br.ReadInt32();
-                        var modelDataCompressedSize = br.ReadInt32();
-                        var compressedvertexBufferSizes = Read3IntBuffer(br);
-                        var compressededgeGeometryVertexBufferSizes = Read3IntBuffer(br);
-                        var compressedindexBufferSizes = Read3IntBuffer(br);
-
-                        // Offsets....
-                        var vertexInfoOffset = br.ReadInt32();
-                        var modelDataOffset = br.ReadInt32();
-                        var vertexBufferOffsets = Read3IntBuffer(br);
-                        var edgeGeometryVertexBufferOffsets = Read3IntBuffer(br);
-                        var indexBufferOffsets = Read3IntBuffer(br);
-
-                        // Block Indexes....
-                        var vertexInfoBlockIndex = br.ReadInt16();
-                        var modelDataBLockIndex = br.ReadInt16();
-                        var vertexBufferBlockIndexs = Read3IntBuffer(br, true);
-                        var edgeGeometryVertexBufferBlockIndexs = Read3IntBuffer(br, true);
-                        var indexBufferBlockIndexs = Read3IntBuffer(br, true);
-
-                        // Block Counts....
-                        var vertexInfoBlockCount = br.ReadInt16();
-                        var modelDataBlockCount = br.ReadInt16();
-                        var vertexBufferBlockCounts = Read3IntBuffer(br, true);
-                        var edgeGeometryVertexBufferBlockCounts = Read3IntBuffer(br, true);
-                        var indexBufferBlockCounts = Read3IntBuffer(br, true);
-
-                        meshCount = br.ReadUInt16();
-                        materialCount = br.ReadUInt16();
-
-                        var lodCount = br.ReadByte();
-                        var flags = br.ReadByte();
-
-                        var padding = br.ReadBytes(2);
-
-                        var totalBlocks = vertexInfoBlockCount + modelDataBlockCount;
-                        totalBlocks += vertexBufferBlockCounts.Sum(x => (int) x);
-                        totalBlocks += edgeGeometryVertexBufferBlockCounts.Sum(x => (int)x);
-                        totalBlocks += indexBufferBlockCounts.Sum(x => (int)x);
-
-                        var blockSizes = new int[totalBlocks];
-
-                        for (var i = 0; i < totalBlocks; i++)
-                        {
-                            blockSizes[i] = br.ReadUInt16();
-                        }
-
-                        var distanceToEndOfHeader = endOfHeader - br.BaseStream.Position;
-                        var extraData = br.ReadBytes((int)distanceToEndOfHeader);
-
-
-                        // Read the compressed blocks.
-                        // These could technically be read as contiguous blocks typically,
-                        // But it's safer to actually use their offsets and validate them in the process.
-
-                        var vertexInfoData = BeginReadCompressedBlocks(br, vertexInfoBlockCount, endOfHeader + vertexInfoOffset);
-                        var modelInfoData = BeginReadCompressedBlocks(br, modelDataBlockCount, endOfHeader + modelDataOffset);
-
-                        const int _VertexSegments = 3;
-                        var vertexBuffers = new List<Task<byte[]>>[_VertexSegments];
-                        for(int i = 0; i < _VertexSegments; i++)
-                        {
-                            vertexBuffers[i] = BeginReadCompressedBlocks(br, (int) vertexBufferBlockCounts[i], endOfHeader + vertexBufferOffsets[i]);
-                        }
-
-                        var edgeBuffers = new List<Task<byte[]>>[_VertexSegments];
-                        for (int i = 0; i < _VertexSegments; i++)
-                        {
-                            edgeBuffers[i] = BeginReadCompressedBlocks(br, (int)edgeGeometryVertexBufferBlockCounts[i], endOfHeader + edgeGeometryVertexBufferOffsets[i]);
-                        }
-
-                        var indexBuffers = new List<Task<byte[]>>[_VertexSegments];
-                        for (int i = 0; i < _VertexSegments; i++)
-                        {
-                            indexBuffers[i] = BeginReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i]);
-                        }
-
-                        // Reserve space at the start of the result for the header
-                        var decompressedData = new byte[baseHeaderLength + decompressedSize];
-                        int decompOffset = baseHeaderLength;
-
-                        // Need to mark these as we unzip them.
-                        var vertexBufferUncompressedOffsets = new uint[_VertexSegments];
-                        var indexBufferUncompressedOffsets = new uint[_VertexSegments];
-                        var vertexBufferRealSizes = new uint[_VertexSegments];
-                        var indexOffsetRealSizes = new uint[_VertexSegments];
-
-                        // Vertex and Model Headers
-                        decompOffset += await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
-                        decompOffset += await CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
-
-                        for(int i = 0; i < _VertexSegments; i++)
-                        {
-                            // Geometry data in LoD order.
-                            // Mark the real uncompressed offsets and sizes on the way through.
-                            vertexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
-                            vertexBufferRealSizes[i] = (uint) await CompleteReadCompressedBlocks(vertexBuffers[i], decompressedData, decompOffset);
-                            decompOffset += (int)vertexBufferRealSizes[i];
-
-                            decompOffset += await CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
-
-                            indexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
-                            indexOffsetRealSizes[i] = (uint) await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
-                            decompOffset += (int)indexOffsetRealSizes[i];
-                        }
-
-                        var header = new List<byte>(baseHeaderLength);
-
-                        // Generated header for live/uncompressed MDL files.
-                        header.AddRange(BitConverter.GetBytes(version));
-                        header.AddRange(BitConverter.GetBytes(vertexInfoSize));
-                        header.AddRange(BitConverter.GetBytes(modelDataSize));
-                        header.AddRange(BitConverter.GetBytes((ushort)meshCount));
-                        header.AddRange(BitConverter.GetBytes((ushort)materialCount));
-
-                        Write3IntBuffer(header, vertexBufferUncompressedOffsets);
-                        Write3IntBuffer(header, indexBufferUncompressedOffsets);
-                        Write3IntBuffer(header, vertexBufferRealSizes);
-                        Write3IntBuffer(header, indexOffsetRealSizes);
-
-                        header.Add(lodCount);
-                        header.Add(flags);
-                        header.AddRange(padding);
-
-                        // Copy the header over the reserved space at the start of decompressedData
-                        header.CopyTo(decompressedData, 0);
-
-                        result = decompressedData;
-                    }
-                }
-                finally
-                {
-                    _lock.Release();
-                }
-            });
-
-            return (meshCount, materialCount, result ?? new byte[0]);
-        }
-
         public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offsetWithDatNumber)
         {
             // This formula is used to obtain the dat number in which the offset is located
@@ -1227,7 +1245,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetType4Data(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<XivTex> GetTexFromDat(string internalPath, bool forceOriginal, ModTransaction tx = null)
         {
 
             var dataFile = GetDataFileFromPath(internalPath);
@@ -1248,7 +1266,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
-                    return await GetType4Data(modEntry.data.originalOffset, dataFile);
+                    return await GetTexFromDat(modEntry.data.originalOffset, dataFile);
                 }
             }
 
@@ -1275,7 +1293,265 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception($"Could not find offset for {internalPath}");
             }
 
-            return await GetType4Data(offset, dataFile);
+            return await GetTexFromDat(offset, dataFile);
+        }
+
+        /// <summary>
+        /// Gets the data for Type 4 (Texture) files.
+        /// </summary>
+        /// <remarks>
+        /// Type 4 files are used for Textures
+        /// </remarks>
+        /// <param name="offset">Offset to the texture data.</param>
+        /// <param name="dataFile">The data file that contains the data.</param>
+        /// <returns>An XivTex containing all the type 4 texture data</returns>
+        public async Task<XivTex> GetTexFromDat(long offset, XivDataFile dataFile)
+        {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file size data without valid offset.");
+            }
+
+            var xivTex = new XivTex();
+
+            byte[] decompressedData = null;
+
+            // This formula is used to obtain the dat number in which the offset is located
+            var datNum = (int)((offset / 8) & 0x0F) / 2;
+
+            await _lock.WaitAsync();
+
+            try
+            {
+                offset = OffsetCorrection(datNum, offset);
+
+                var datPath = Dat.GetDatPath(dataFile, datNum);
+
+                await Task.Run(async () =>
+                {
+                    using (var br = new BinaryReader(File.OpenRead(datPath)))
+                    {
+                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
+
+
+                        // Type 4 data is pretty simple.
+
+                        // Standard SQPack header.
+                        var headerLength = br.ReadInt32();
+                        var fileType = br.ReadInt32();
+                        var uncompressedFileSize = br.ReadInt32();
+                        var ikd1 = br.ReadInt32();
+                        var ikd2 = br.ReadInt32();
+
+                        // Count of mipmaps.
+                        xivTex.MipMapCount = br.ReadInt32();
+
+                        var endOfHeader = offset + headerLength;
+                        var mipMapInfoOffset = offset + 24;
+
+                        br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+
+                        // Tex File Header
+                        var format = br.ReadInt32();
+                        xivTex.TextureFormat = TextureTypeDictionary[format];
+                        xivTex.Width = br.ReadInt16();
+                        xivTex.Height = br.ReadInt16();
+                        xivTex.Layers = br.ReadInt16();
+                        var imageCount2 = br.ReadInt16();
+
+                        decompressedData = new byte[uncompressedFileSize];
+                        int decompOffset = 0;
+
+                        var mipData = new List<Task<byte[]>>[xivTex.MipMapCount];
+
+                        // Each MipMap has a basic header of information, and a set of compressed data blocks of info.
+                        for (int i = 0; i < xivTex.MipMapCount; i++)
+                        {
+                            const int _MipMapHeaderSize = 20;
+                            br.BaseStream.Seek(mipMapInfoOffset + (_MipMapHeaderSize * i), SeekOrigin.Begin);
+
+                            var offsetFromHeaderEnd = br.ReadInt32();
+                            var mipMapLength = br.ReadInt32();
+                            var mipMapSize = br.ReadInt32();
+                            var mipMapStart = br.ReadInt32();
+                            var mipMapParts = br.ReadInt32();
+
+                            var mipMapPartOffset = endOfHeader + offsetFromHeaderEnd;
+
+                            br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
+
+                            mipData[i] = BeginReadCompressedBlocks(br, mipMapParts);
+                        }
+
+                        for (int i = 0; i < xivTex.MipMapCount; i++)
+                        {
+                            decompOffset += await CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
+                        }
+                    }
+                });
+                xivTex.TexData = decompressedData ?? new byte[0];
+            }
+            finally
+            {
+                _lock.Release();
+            }
+
+            return xivTex;
+        }
+
+        /// <summary>
+        /// Reads and decompresses an SQPack type 4 file from the given data stream.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="offset"></param>
+        /// <returns></returns>
+        public async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
+        {
+            if (offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            } else
+            {
+                offset = br.BaseStream.Position;
+            }
+
+            // Type 4 data is pretty simple.
+
+            // Standard SQPack header.
+            var headerLength = br.ReadInt32();
+            var fileType = br.ReadInt32();
+            var uncompressedFileSize = br.ReadInt32();
+            var ikd1 = br.ReadInt32();
+            var ikd2 = br.ReadInt32();
+
+            // Count of mipmaps.
+            var mipCount = br.ReadInt32();
+
+            var endOfHeader = offset + headerLength;
+            var mipMapInfoOffset = offset + 24;
+
+
+            // Tex File Header
+            br.BaseStream.Seek(endOfHeader, SeekOrigin.Begin);
+            var texHeader = br.ReadBytes((int)Tex._TexHeaderSize);
+
+            // Decompress Mipmap blocks ...
+            var decompressedData = new byte[uncompressedFileSize];
+            int decompOffset = 0;
+
+            var mipData = new List<Task<byte[]>>[mipCount];
+
+            // Each MipMap has a basic header of information, and a set of compressed data blocks of info.
+            for (int i = 0; i < mipCount; i++)
+            {
+                const int _MipMapHeaderSize = 20;
+                br.BaseStream.Seek(mipMapInfoOffset + (_MipMapHeaderSize * i), SeekOrigin.Begin);
+
+                var offsetFromHeaderEnd = br.ReadInt32();
+                var mipMapLength = br.ReadInt32();
+                var mipMapSize = br.ReadInt32();
+                var mipMapStart = br.ReadInt32();
+                var mipMapParts = br.ReadInt32();
+
+                var mipMapPartOffset = endOfHeader + offsetFromHeaderEnd;
+
+                br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
+
+                mipData[i] = BeginReadCompressedBlocks(br, mipMapParts);
+            }
+
+            for (int i = 0; i < mipCount; i++)
+            {
+                decompOffset += await CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
+            }
+
+            byte[] finalbytes = new byte[texHeader.Length + decompressedData.Length];
+            Array.Copy(texHeader, 0, finalbytes, 0, texHeader.Length);
+            Array.Copy(decompressedData, 0, finalbytes, texHeader.Length, decompressedData.Length);
+
+            return finalbytes;
+        }
+
+
+
+        /// <summary>
+        /// Retrieves the raw uncompressed/De-SQPacked bytes for a given file.
+        /// </summary>
+        /// <param name="internalPath"></param>
+        /// <param name="forceOriginal"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public async Task<byte[]> GetUncompressedData(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Use simple readonly tx if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            var offset8x = await tx.Get8xDataOffset(internalPath);
+            var df = IOUtil.GetDataFileFromPath(internalPath);
+
+            var parts = Dat.Offset8xToParts(offset8x);
+            var datPath = GetDatPath(df, parts.DatNum);
+
+            int type = -1;
+            using (var br = new BinaryReader(File.OpenRead(datPath)))
+            {
+                return await GetUncompressedData(br, parts.Offset);
+            }
+        }
+
+        /// <summary>
+        /// Decompresses (De-SqPacks) a given block of data.
+        /// </summary>
+        /// <param name="sqpackData"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public async Task<byte[]> GetUncompressedData(byte[] sqpackData)
+        {
+            using (var ms = new MemoryStream(sqpackData))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    return await GetUncompressedData(br);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reads an SQPack file from the given data stream.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <returns></returns>
+        public async Task<byte[]> GetUncompressedData(BinaryReader br, long offset = -1)
+        {
+            if(offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = br.BaseStream.Position;
+            }
+            int type = -1;
+
+            br.BaseStream.Seek(offset + 4, SeekOrigin.Begin);
+            type = br.ReadInt32();
+
+            br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            if (type == 2)
+            {
+                return await ReadSqPackType2(br, offset);
+            }
+            else if (type == 3)
+            {
+                return await ReadSqPackType3(br, offset);
+            }
+            else if (type == 4)
+            {
+                return await ReadSqPackType4(br, offset);
+            }
+            throw new NotImplementedException("Unable to read invalid SQPack File Type.");
         }
 
         /// <summary>
@@ -1574,109 +1850,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 _lock.Release();
             }
-        }
-
-        /// <summary>
-        /// Gets the data for Type 4 (Texture) files.
-        /// </summary>
-        /// <remarks>
-        /// Type 4 files are used for Textures
-        /// </remarks>
-        /// <param name="offset">Offset to the texture data.</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetType4Data(long offset, XivDataFile dataFile)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file size data without valid offset.");
-            }
-
-            var xivTex = new XivTex();
-
-            byte[] decompressedData = null;
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
-
-            await _lock.WaitAsync();
-
-            try
-            {
-                offset = OffsetCorrection(datNum, offset);
-
-                var datPath = Dat.GetDatPath(dataFile, datNum);
-
-                await Task.Run(async () =>
-                {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-
-                        // Type 4 data is pretty simple.
-
-                        // Standard header.
-                        var headerLength = br.ReadInt32();
-                        var fileType = br.ReadInt32();
-                        var uncompressedFileSize = br.ReadInt32();
-                        var ikd1 = br.ReadInt32();
-                        var ikd2 = br.ReadInt32();
-
-                        // Count of mipmaps.
-                        xivTex.MipMapCount = br.ReadInt32();
-
-                        var endOfHeader = offset + headerLength;
-                        var mipMapInfoOffset = offset + 24;
-
-                        br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-
-                        // Tex File Header
-                        var format = br.ReadInt32();
-                        xivTex.TextureFormat = TextureTypeDictionary[format];
-                        xivTex.Width = br.ReadInt16();
-                        xivTex.Height = br.ReadInt16();
-                        xivTex.Layers = br.ReadInt16();
-                        var imageCount2 = br.ReadInt16();
-
-                        decompressedData = new byte[uncompressedFileSize];
-                        int decompOffset = 0;
-
-                        var mipData = new List<Task<byte[]>>[xivTex.MipMapCount];
-
-                        // Each MipMap has a basic header of information, and a set of compressed data blocks of info.
-                        for (int i = 0; i < xivTex.MipMapCount; i++)
-                        {
-                            const int _MipMapHeaderSize = 20;
-                            br.BaseStream.Seek(mipMapInfoOffset + (_MipMapHeaderSize * i), SeekOrigin.Begin);
-
-                            var offsetFromHeaderEnd = br.ReadInt32();
-                            var mipMapLength = br.ReadInt32();
-                            var mipMapSize = br.ReadInt32();
-                            var mipMapStart = br.ReadInt32();
-                            var mipMapParts = br.ReadInt32();
-
-                            var mipMapPartOffset = endOfHeader + offsetFromHeaderEnd;
-
-                            br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
-
-                            mipData[i] = BeginReadCompressedBlocks(br, mipMapParts);
-                        }
-
-                        for (int i = 0; i < xivTex.MipMapCount; i++)
-                        {
-                            decompOffset += await CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
-                        }
-                    }
-                });
-                xivTex.TexData = decompressedData ?? new byte[0];
-            }
-            finally
-            {
-                _lock.Release();
-            }
-
-            return xivTex;
         }
 
         public static string ReadNullTerminatedString(BinaryReader br)
@@ -2342,7 +2515,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (ext == ".meta")
             {
                 byte[] metaRaw;
-                metaRaw = (await DecompressType2Data(data)).ToArray();
+                metaRaw = (await ReadSqPackType2(data)).ToArray();
 
                 var meta = await ItemMetadata.Deserialize(metaRaw);
                 meta.Validate(internalPath);
@@ -2352,7 +2525,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             else if (ext == ".rgsp")
             {
                 byte[] rgspRaw;
-                rgspRaw = (await DecompressType2Data(data)).ToArray();
+                rgspRaw = (await ReadSqPackType2(data)).ToArray();
                 // Expand the racial scaling file.
                 await CMP.ApplyRgspFile(rgspRaw, tx);
             }
@@ -2371,7 +2544,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (doLumina && (luminaOutDir == null || !luminaOutDir.Exists))
                 throw new ArgumentException("No valid lumina output path was specified.", nameof(luminaOutDir));
 
-            WriteWithLumina(fileData, luminaOutDir, internalFilePath);
+            DecompressAndWrite(fileData, luminaOutDir, internalFilePath);
             if (expandMetadata)
             {
                 await ExpandMetadata(fileData, internalFilePath);
@@ -2381,61 +2554,19 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Write out the specified SqPack data at the specified location in Lumina/Umbra/Penumbra compatible formats.
+        /// Write the uncompressed SQPack file to the given file directory.
         /// </summary>
         /// <param name="data">The modded data.</param>
         /// <param name="outDirectory">The output folder to write to.</param>
         /// <param name="internalPath"></param>
-        private void WriteWithLumina(byte[] data, DirectoryInfo outDirectory, string internalPath)
+        private async Task DecompressAndWrite(byte[] data, DirectoryInfo outDirectory, string internalPath)
         {
-            Debug.WriteLine($"[LUMINA] Export START for {internalPath}");
-
-
             var extractedFile = new FileInfo(Path.Combine(outDirectory.FullName, internalPath));
             extractedFile.Directory?.Create();
-
-            var gameData = ReadWithLumina(data);
-
-            if (extractedFile.FullName.EndsWith("mdl"))
-            {
-                FixupTextoolsMdl(gameData);
-            }
-
-            File.WriteAllBytes(extractedFile.FullName, gameData);
+            var uncompressedData = await GetUncompressedData(data);
+            File.WriteAllBytes(extractedFile.FullName, uncompressedData);
         }
 
-        /// <summary>
-        /// Read a FFXIV game file from SqPack data using Lumina.
-        /// </summary>
-        /// <param name="data">SqPack data to read from.</param>
-        /// <param name="offset"></param>
-        /// <returns>Decompressed deserialized data.</returns>
-        private static byte[] ReadWithLumina(byte[] data, long offset = 0)
-        {
-            using var dataStream = new SqPackStream(new MemoryStream(data));
-            var gameFile = dataStream.ReadFile<FileResource>(offset);
-
-            return gameFile.Data;
-        }
-
-        /// <summary>
-        /// Fix xivModdingFramework MDL quirks.
-        /// </summary>
-        /// <param name="mdl">The MDL data to be fixed up.</param>
-        private static void FixupTextoolsMdl(byte[] mdl)
-        {
-            // Model file header LOD num
-            mdl[64] = 1;
-
-            // Model header LOD num
-            var stackSize = BitConverter.ToUInt32(mdl, 4);
-            var runtimeBegin = stackSize + 0x44;
-            var stringsLengthOffset = runtimeBegin + 4;
-            var stringsLength = BitConverter.ToUInt32(mdl, (int)stringsLengthOffset);
-            var modelHeaderStart = stringsLengthOffset + stringsLength + 4;
-            var modelHeaderLodOffset = 22;
-            mdl[modelHeaderStart + modelHeaderLodOffset] = 1;
-        }
 
         /// <summary>
         /// Dictionary that holds [Texture Code, Texture Format] data

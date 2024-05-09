@@ -60,7 +60,7 @@ namespace xivModdingFramework.HUD.FileTypes
                 byte[] uldData;
                 try
                 {
-                    uldData = dat.GetType2Data(offset, XivDataFile._06_Ui).Result;
+                    uldData = dat.ReadSqPackType2(offset, XivDataFile._06_Ui).Result;
                 }
                 catch (Exception ex)
                 {

@@ -576,7 +576,7 @@ namespace xivModdingFramework.Mods
             }
             else
             {
-                var data = await _dat.GetType2Data(originalMetadataOffset, df);
+                var data = await _dat.ReadSqPackType2(originalMetadataOffset, df);
                 originalMetadata = await ItemMetadata.Deserialize(data);
             }
             return originalMetadata;

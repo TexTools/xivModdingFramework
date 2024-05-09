@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpDX;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -44,11 +45,7 @@ namespace xivModdingFramework.Models.FileTypes
         public struct BoneDeform
         {
             public string Name;
-            public float[] Matrix = new float[16];
-            public BoneDeform()
-            {
-
-            }
+            public float[] Matrix;
         }
         public const string BoneDeformFile = "chara/xls/bonedeformer/human.pbd";
 
@@ -63,7 +60,7 @@ namespace xivModdingFramework.Models.FileTypes
             try
             {
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                var data = await _dat.GetType2Data(BoneDeformFile, false, tx);
+                var data = await _dat.ReadSqPackType2(BoneDeformFile, false, tx);
 
                 var result = new BoneDeform();
                 var numSets = 0;

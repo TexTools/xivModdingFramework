@@ -167,7 +167,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 if (index.FileExists(filePath))
                 {
                     var dat = new Dat(XivCache.GameInfo.GameDirectory);
-                    var data = await dat.GetType2Data(filePath, false, tx);
+                    var data = await dat.ReadSqPackType2(filePath, false, tx);
                     return await ItemMetadata.Deserialize(data);
                 } else
                 {
@@ -320,7 +320,7 @@ namespace xivModdingFramework.Mods.FileTypes
         internal static async Task ApplyMetadata(string internalPath, bool forceOriginal, ModTransaction tx)
         {
             var dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var data = await dat.GetType2Data(internalPath, forceOriginal, tx);
+            var data = await dat.ReadSqPackType2(internalPath, forceOriginal, tx);
             var meta = await ItemMetadata.Deserialize(data);
 
             meta.Validate(internalPath);

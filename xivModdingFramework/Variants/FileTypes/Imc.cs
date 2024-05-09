@@ -206,7 +206,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 // Only reload this data if we need to.
                 if (path != lastPath)
                 {
-                    imcByteData = await dat.GetType2Data(path, forceDefault, tx);
+                    imcByteData = await dat.ReadSqPackType2(path, forceDefault, tx);
                 }
                 lastPath = path;
 
@@ -355,7 +355,7 @@ namespace xivModdingFramework.Variants.FileTypes
         {
 
             var dat = new Dat(_gameDirectory);
-            var imcByteData = await dat.GetType2Data(path, false, tx);
+            var imcByteData = await dat.ReadSqPackType2(path, false, tx);
 
             return await Task.Run(() =>
             {

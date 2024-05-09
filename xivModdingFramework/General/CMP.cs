@@ -38,7 +38,7 @@ namespace xivModdingFramework.General
         internal static async Task ApplyRgspFile(string filePath, ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var rgspData = await _dat.GetType2Data(filePath, false, tx);
+            var rgspData = await _dat.ReadSqPackType2(filePath, false, tx);
 
             await ApplyRgspFile(rgspData, tx);
         }
@@ -178,7 +178,7 @@ namespace xivModdingFramework.General
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
-            var data = await _dat.GetType2Data(HumanCmpPath, forceOriginal, tx);
+            var data = await _dat.ReadSqPackType2(HumanCmpPath, forceOriginal, tx);
             var cmp = new CharaMakeParameterSet(data);
 
 

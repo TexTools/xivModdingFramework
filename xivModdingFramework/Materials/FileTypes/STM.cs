@@ -91,7 +91,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var path = STMFilePaths[template];
 
-            var data = await _dat.GetType2Data(path, forceOriginal, tx);
+            var data = await _dat.ReadSqPackType2(path, forceOriginal, tx);
 
             var ret = new StainingTemplateFile(data, template);
             return ret;

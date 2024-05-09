@@ -48,8 +48,6 @@ using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
 using System.Text;
 using System.Diagnostics;
-using Lumina.Extensions;
-using Lumina.Models.Models;
 using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Helper;
 
@@ -163,7 +161,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
                 else
                 {
-                    xivTex = await _dat.GetType4Data(offset, df);
+                    xivTex = await _dat.GetTexFromDat(offset, df);
                 }
             }
             catch (Exception ex)
@@ -260,7 +258,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
                 else
                 {
-                    xivTex = await _dat.GetType4Data(offset, ttp.DataFile);
+                    xivTex = await _dat.GetTexFromDat(offset, ttp.DataFile);
                 }
             }
             catch (Exception ex)
@@ -991,7 +989,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 if (texFormat == XivTexFormat.INVALID)
                 {
                     // Use the current internal format.
-                    var xivt = await _dat.GetType4Data(internalPath, false, tx);
+                    var xivt = await _dat.GetTexFromDat(internalPath, false, tx);
                     texFormat = xivt.TextureFormat;
                 }
 
@@ -1129,8 +1127,8 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        const uint _DDSHeaderSize = 128;
-        const uint _TexHeaderSize = 80;
+        public const uint _DDSHeaderSize = 128;
+        public const uint _TexHeaderSize = 80;
 
 
         /// <summary>
@@ -1386,7 +1384,7 @@ namespace xivModdingFramework.Textures.FileTypes
             uint extraHeaderBytes = (uint)(texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
             headerLength += extraHeaderBytes;
 
-            br.Seek(headerLength);
+            br.BaseStream.Seek(headerLength, SeekOrigin.Begin);
 
             // Write header.
             var texHeader = CreateTexFileHeader(texFormat, newWidth, newHeight, newMipCount).ToArray();
@@ -1481,29 +1479,24 @@ namespace xivModdingFramework.Textures.FileTypes
         private struct TexHeader
         {
             // Bitflags
-            public uint Attributes = 0;
+            public uint Attributes;
 
             // Texture Format
-            public uint TextureFormat = 0;
+            public uint TextureFormat;
 
-            public ushort Width = 0;
-            public ushort Height = 0;
+            public ushort Width;
+            public ushort Height;
 
-            public ushort Depth = 1;
+            public ushort Depth;
 
             // This is technically 2 fields smooshed together,
             // Mip Count and ArraySize for image arrays.
             // Can deal with that later though, TexTools already chokes on those files for multiple reasons.
-            public ushort MipCount = 1;
+            public ushort MipCount;
 
-            uint[] LoDMips = new uint[3];
+            uint[] LoDMips;
 
-            uint[] MipMapOffsets = new uint[13];
-
-            public TexHeader()
-            {
-
-            }
+            uint[] MipMapOffsets;
 
             /// <summary>
             /// Reads a .tex file header (80 bytes) from the given stream.
@@ -1526,11 +1519,13 @@ namespace xivModdingFramework.Textures.FileTypes
                 header.Depth = br.ReadUInt16();
                 header.MipCount = br.ReadUInt16();
 
-                for(int i = 0; i < header.LoDMips.Length; i++)
+                header.LoDMips = new uint[3];
+                for (int i = 0; i < header.LoDMips.Length; i++)
                 {
                     header.LoDMips[i] = br.ReadUInt32();
                 }
 
+                header.MipMapOffsets = new uint[13];
                 for (int i = 0; i < header.MipMapOffsets.Length; i++)
                 {
                     header.MipMapOffsets[i] = br.ReadUInt32();

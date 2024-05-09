@@ -899,7 +899,7 @@ namespace xivModdingFramework.Cache
                 return imcEntries;
             } 
 
-            var imcByteData = await dat.GetType2Data(imcOffset, IOUtil.GetDataFileFromPath(imcPath));
+            var imcByteData = await dat.ReadSqPackType2(imcOffset, IOUtil.GetDataFileFromPath(imcPath));
 
             var subsetCount = 0;
             ImcType identifier = ImcType.Unknown;

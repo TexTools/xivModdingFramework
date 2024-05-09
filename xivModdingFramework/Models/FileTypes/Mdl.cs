@@ -562,16 +562,17 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
-            var mdlData = await dat.GetType3Data(offset, IOUtil.GetDataFileFromPath(internalPathName));
+            var mdlData = await dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(internalPathName));
 
             var xivMdl = new XivMdl { MdlPath = internalPathName };
             int totalNonNullMaterials = 0;
 
+            var meshCount = BitConverter.ToUInt16(mdlData, 12);
 
             // Calculated offsets
-            int _endOfVertexDataHeaders = _MdlHeaderSize + (_vertexDataHeaderSize * mdlData.MeshCount);
+            int _endOfVertexDataHeaders = _MdlHeaderSize + (_vertexDataHeaderSize * meshCount);
 
-            using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
+            using (var br = new BinaryReader(new MemoryStream(mdlData)))
             {
                 var version = br.ReadUInt16();
                 var val2 = br.ReadUInt16();
@@ -2122,13 +2123,14 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginTransaction(true);
             }
 
-            var mdlData = await dat.GetType3Data(mdlPath, getOriginal, tx);
+            var mdlData = await dat.ReadSqPackType3(mdlPath, getOriginal, tx);
+            var meshCount = BitConverter.ToUInt16(mdlData, 12);
 
-            using (var br = new BinaryReader(new MemoryStream(mdlData.Data)))
+            using (var br = new BinaryReader(new MemoryStream(mdlData)))
             {
                 // We skip the Vertex Data Structures for now
                 // This is done so that we can get the correct number of meshes per LoD first
-                br.BaseStream.Seek(64 + 136 * mdlData.MeshCount + 4, SeekOrigin.Begin);
+                br.BaseStream.Seek(64 + 136 * meshCount + 4, SeekOrigin.Begin);
 
                 var PathCount = br.ReadInt32();
                 var PathBlockSize = br.ReadInt32();

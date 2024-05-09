@@ -5,7 +5,7 @@
     <AssemblyVersion>1.6.0.0</AssemblyVersion>
     <Version>1.6.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>9.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,7 +25,6 @@
     <PackageReference Include="HelixToolkit" Version="2.25.0" />
     <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.25.0" />
     <PackageReference Include="JeremyAnsel.BcnSharp" Version="1.0.6" />
-    <PackageReference Include="Lumina" Version="3.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="SharpDX" Version="4.2.0" />
     <PackageReference Include="SharpDX.Mathematics" Version="4.2.0" />

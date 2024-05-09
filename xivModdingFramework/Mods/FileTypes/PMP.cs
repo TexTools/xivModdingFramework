@@ -1,5 +1,4 @@
 ﻿using HelixToolkit.SharpDX.Core.Model;
-using Lumina.Data.Parsing.Layer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;

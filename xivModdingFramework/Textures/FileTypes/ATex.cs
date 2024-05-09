@@ -111,7 +111,7 @@ namespace xivModdingFramework.Textures.FileTypes
         public async Task<XivTex> GetATexData(long offset)
         {
             var dat = new Dat(_gameDirectory);
-            var atexData = await dat.GetType2Data(offset, _dataFile);
+            var atexData = await dat.ReadSqPackType2(offset, _dataFile);
 
             var xivTex = new XivTex();
             xivTex.Layers = 1;

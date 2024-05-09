@@ -229,7 +229,7 @@ namespace xivModdingFramework.Materials.FileTypes
         public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, ModTransaction tx = null)
         {
             var dat = new Dat(_gameDirectory);
-            var mtrlData = await dat.GetType2Data(mtrlPath, forceOriginal, tx);
+            var mtrlData = await dat.ReadSqPackType2(mtrlPath, forceOriginal, tx);
             var uniqueTextures = new HashSet<string>();
             var texRegex = new Regex(".*\\.tex$");
 
@@ -580,7 +580,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             // Get uncompressed mtrl data
             var df = IOUtil.GetDataFileFromPath(mtrlPath);
-            var mtrlData = await dat.GetType2Data(mtrlOffset, df);
+            var mtrlData = await dat.ReadSqPackType2(mtrlOffset, df);
 
             XivMtrl xivMtrl = null;
             await Task.Run((Func<Task>)(async () =>
@@ -1838,7 +1838,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
                 try
                 {
-                    var mtrlData = (await _Dat.DecompressType2Data(br, file.DataOffset)).ToArray();
+                    var mtrlData = (await _Dat.ReadSqPackType2(br, file.DataOffset)).ToArray();
                     if (mtrlData.Length < 4)
                     {
                         continue;

@@ -786,7 +786,7 @@ namespace xivModdingFramework.Mods.FileTypes
                             if (ext == ".meta")
                             {
                                 // Load all the files we just wrote and validate them.
-                                var metaRaw = await dat.GetType2Data(file, false, tx);
+                                var metaRaw = await dat.ReadSqPackType2(file, false, tx);
                                 var meta = await ItemMetadata.Deserialize(metaRaw);
 
                                 meta.Validate(file);

@@ -463,7 +463,7 @@ namespace xivModdingFramework.Items.Categories
 
             var assetOffset = await index.GetDataOffset(assetFolder + "/" + assetFile);
 
-            var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
+            var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon);
 
             var housingAssets = new HousingAssets();
 
@@ -562,7 +562,7 @@ namespace xivModdingFramework.Items.Categories
 
                 var assetOffset = await index.GetDataOffset(additionalAsset);
 
-                var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
+                var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon);
 
                 await Task.Run(() =>
                 {
