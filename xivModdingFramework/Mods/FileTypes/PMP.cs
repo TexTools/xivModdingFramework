@@ -36,10 +36,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         private static bool _ImportActive = false;
         private static string _Source = null;
 
-        // Number of files that were not imported due to TT not knowing what to do with them.
-        // Ex. Stuff in non-existent fake DATs, or Metadata entries TT Doesn't know how to parse.
-        private static int _NoImportCount = 0;
-
         private static async Task<string> ResolvePMPBasePath(string path, bool jsonsOnly = false)
         {
             if (path.EndsWith(".json"))
@@ -115,7 +111,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// </summary>
         /// <param name="path">System path to .PMP, .JSON, or Folder</param>
         /// <returns></returns>
-        public static async Task<int> ImportPMP(string path, string sourceApplication = "Unknown")
+        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(string path, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress1 = null)
         {
             path = await ResolvePMPBasePath(path);
             var pmpData = await LoadPMP(path);
@@ -136,20 +132,24 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// Will automatically clean up unzippedPath after if it is in the user's TEMP directory.
         /// </summary>
         /// <returns></returns>
-        public static async Task<int> ImportPMP(PMPJson pmp, string unzippedPath, string sourceApplication = "Unknown")
+        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(PMPJson pmp, string unzippedPath, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress = null)
         {
             if (_ImportActive)
             {
                 throw new Exception("Cannot import multiple Modpacks simultaneously.");
             }
-            _NoImportCount = 0;
+
+            progress?.Report((0, 0, "Loading Modpack..."));
+
+            var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
             if (unzippedPath.EndsWith(".json"))
             {
                 unzippedPath = Path.GetDirectoryName(unzippedPath);
             }
 
-            var files = new HashSet<string>();
+            var imported = new HashSet<string>();
+            var notImported = new HashSet<string>();
             _ImportActive = true;
             _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
@@ -167,12 +167,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     if (pmp.Groups == null || pmp.Groups.Count == 0)
                     {
                         // No options, just default.
-                        files.UnionWith(await ImportOption(pmp.DefaultMod, unzippedPath, tx));
+                        var groupRes = await ImportOption(pmp.DefaultMod, unzippedPath, tx, progress);
+                        imported.UnionWith(groupRes.Imported);
+                        notImported.UnionWith(groupRes.NotImported);
                     }
                     else
                     {
                         // Order groups by Priority, Lowest => Highest, tiebreaker default order
                         var orderedGroups = pmp.Groups.OrderBy(x => x.Priority);
+                        var optionIdx = 0;
                         foreach (var group in orderedGroups)
                         {
                             if (group.Options == null || group.Options.Count == 0)
@@ -194,9 +197,34 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 selected = group.SelectedSettings;
                             }
 
-                            files.UnionWith(await ImportOption(group.Options[selected], unzippedPath, tx));
+                            if (group.Type == "Single")
+                            {
+                                var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, optionIdx);
+                                imported.UnionWith(groupRes.Imported);
+                                notImported.UnionWith(groupRes.NotImported);
+                            }
+                            else
+                            {
+                                // Bitmask options.
+                                for(int i = 0; i < group.Options.Count; i++)
+                                {
+                                    var value = 1 << i;
+                                    if((selected & value) > 0)
+                                    {
+                                        var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, optionIdx);
+                                        imported.UnionWith(groupRes.Imported);
+                                        notImported.UnionWith(groupRes.NotImported);
+                                        optionIdx++;
+                                    }
+                                }
+
+                            }
+
                         }
                     }
+
+
+                    progress?.Report((0,0, "Saving Changes..."));
                     await ModTransaction.CommitTransaction(tx);
                 }
 
@@ -206,7 +234,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     // Transaction for fixing up our files.
                     using (var tx = ModTransaction.BeginTransaction(false, modPack))
                     {
-                        await TTMP.FixPreDawntrailImports(files, sourceApplication, null, tx);
+
+                        progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
+                        await TTMP.FixPreDawntrailImports(imported, sourceApplication, progress, tx);
                         await ModTransaction.CommitTransaction(tx);
                     }
                 }
@@ -217,28 +247,40 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 _ImportActive = false;
             }
 
+            progress?.Report((0, 0, "Job Done!"));
+
             // Successful Import.
-            return files.Count;
+            var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            var duration = (endTime - startTime) / 1000.0f;
+
+            var res = (imported.ToList(), notImported.ToList(), duration);
+            return res;
         }
 
-        private static async Task<HashSet<string>> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx)
+        private static async Task<(HashSet<string> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int optionIdx = 0)
         {
             var imported = new HashSet<string>();
+            var notImported = new HashSet<string>();
 
             // Import files.
+            var i = 0;
             foreach (var file in option.Files)
             {
                 var internalPath = file.Key;
                 var externalPath = Path.Combine(basePath, file.Value);
+                progress?.Report((i, option.Files.Count, "Importing Files for Option " + (optionIdx+1) + "..."));
 
                 // Safety checks.
                 if (!CanImport(file.Key))
                 {
-                    _NoImportCount++;
+                    notImported.Add(file.Key);
+                    i++;
                     continue;
                 }
                 if (!File.Exists(externalPath))
                 {
+                    notImported.Add(file.Key);
+                    i++;
                     continue;
                 }
 
@@ -247,10 +289,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     // Import the file...
                     await SmartImport.Import(externalPath, internalPath, _Source, tx);
                     imported.Add(internalPath);
+                    i++;
                 }
                 catch (Exception ex)
                 {
                     // If we failed to import a file, just continue.
+                    notImported.Add(file.Key);
+                    i++;
                     continue;
                 }
             }
@@ -298,7 +343,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
             }
 
-            return imported;
+            return (imported, notImported);
         }
 
         private static bool CanImport(string internalFilePath)

@@ -733,7 +733,11 @@ namespace xivModdingFramework.Materials.FileTypes
                 if(res.indexTextureToCreate != null)
                 {
                     indexesToCreate.Add(res);
-                    indexToMtrlDictionary.Add(res.indexTextureToCreate, path);
+
+                    if (!indexToMtrlDictionary.ContainsKey(res.indexTextureToCreate))
+                    {
+                        indexToMtrlDictionary.Add(res.indexTextureToCreate, path);
+                    }
                 }
                 count++;
                 progress?.Report((count, total, "Updating Materials..."));
