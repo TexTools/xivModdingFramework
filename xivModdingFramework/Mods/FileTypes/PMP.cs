@@ -35,6 +35,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         private static bool _ImportActive = false;
         private static string _Source = null;
 
+
+        // List of meta files that have already been loaded from source during import.
+        // Used for metadata compilation.
+        private static HashSet<string> _MetaFiles;
+
         private static async Task<string> ResolvePMPBasePath(string path, bool jsonsOnly = false)
         {
             if (path.EndsWith(".json"))
@@ -159,6 +164,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var imported = new HashSet<string>();
             var notImported = new HashSet<string>();
             _ImportActive = true;
+            _MetaFiles = new HashSet<string>();
             _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
             var modPack = new ModPack();
@@ -255,6 +261,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     IOUtil.DeleteTempDirectory(unzippedPath);
                 }
+                _MetaFiles = null;
                 _Source = null;
                 _ImportActive = false;
             }
@@ -341,9 +348,20 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 foreach(var group in byRoot)
                 {
                     var root = group.Key;
-                    var metaData = await ItemMetadata.GetMetadata(root);
+                    var metaPath = root.Info.GetRootFile();
+                    ItemMetadata metaData;
+                    if (!_MetaFiles.Contains(metaPath))
+                    {
+                        // If this is the first time we're seeing the metadata entry during this import sequence, then start from the clean base game version.
+                        metaData = await ItemMetadata.GetMetadata(metaPath, true, tx);
+                        _MetaFiles.Add(metaPath);
+                    } else
+                    {
+                        // Otherwise use the current transaction metadata state for metadata compilation.
+                        metaData = await ItemMetadata.GetMetadata(metaPath, false, tx);
+                    }
 
-                    foreach(var meta in group)
+                    foreach (var meta in group)
                     {
                         meta.ApplyToMetadata(metaData);
                     }
