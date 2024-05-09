@@ -1312,91 +1312,18 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new InvalidDataException("Cannot get file size data without valid offset.");
             }
 
-            var xivTex = new XivTex();
-
-            byte[] decompressedData = null;
-
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
+            var parts = Dat.Offset8xToParts(offset);
+            var datFile = Dat.GetDatPath(dataFile, parts.DatNum);
 
-            await _lock.WaitAsync();
-
-            try
+            // Get the uncompressed .tex file.
+            byte[] data = null;
+            using (var br = new BinaryReader(File.OpenRead(datFile)))
             {
-                offset = OffsetCorrection(datNum, offset);
-
-                var datPath = Dat.GetDatPath(dataFile, datNum);
-
-                await Task.Run(async () =>
-                {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-
-                        // Type 4 data is pretty simple.
-
-                        // Standard SQPack header.
-                        var headerLength = br.ReadInt32();
-                        var fileType = br.ReadInt32();
-                        var uncompressedFileSize = br.ReadInt32();
-                        var ikd1 = br.ReadInt32();
-                        var ikd2 = br.ReadInt32();
-
-                        // Count of mipmaps.
-                        xivTex.MipMapCount = br.ReadInt32();
-
-                        var endOfHeader = offset + headerLength;
-                        var mipMapInfoOffset = offset + 24;
-
-                        br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-
-                        // Tex File Header
-                        var format = br.ReadInt32();
-                        xivTex.TextureFormat = TextureTypeDictionary[format];
-                        xivTex.Width = br.ReadInt16();
-                        xivTex.Height = br.ReadInt16();
-                        xivTex.Layers = br.ReadInt16();
-                        var imageCount2 = br.ReadInt16();
-
-                        decompressedData = new byte[uncompressedFileSize];
-                        int decompOffset = 0;
-
-                        var mipData = new List<Task<byte[]>>[xivTex.MipMapCount];
-
-                        // Each MipMap has a basic header of information, and a set of compressed data blocks of info.
-                        for (int i = 0; i < xivTex.MipMapCount; i++)
-                        {
-                            const int _MipMapHeaderSize = 20;
-                            br.BaseStream.Seek(mipMapInfoOffset + (_MipMapHeaderSize * i), SeekOrigin.Begin);
-
-                            var offsetFromHeaderEnd = br.ReadInt32();
-                            var mipMapLength = br.ReadInt32();
-                            var mipMapSize = br.ReadInt32();
-                            var mipMapStart = br.ReadInt32();
-                            var mipMapParts = br.ReadInt32();
-
-                            var mipMapPartOffset = endOfHeader + offsetFromHeaderEnd;
-
-                            br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
-
-                            mipData[i] = BeginReadCompressedBlocks(br, mipMapParts);
-                        }
-
-                        for (int i = 0; i < xivTex.MipMapCount; i++)
-                        {
-                            decompOffset += await CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
-                        }
-                    }
-                });
-                xivTex.TexData = decompressedData ?? new byte[0];
-            }
-            finally
-            {
-                _lock.Release();
+                data = await ReadSqPackType4(br, parts.Offset);
             }
 
-            return xivTex;
+            return XivTex.FromUncompressedTex(data);
         }
 
         /// <summary>

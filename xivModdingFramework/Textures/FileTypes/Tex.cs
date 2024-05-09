@@ -1476,7 +1476,7 @@ namespace xivModdingFramework.Textures.FileTypes
             return offset;
         }
 
-        private struct TexHeader
+        public struct TexHeader
         {
             // Bitflags
             public uint Attributes;
