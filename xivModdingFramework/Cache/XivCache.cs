@@ -476,9 +476,9 @@ namespace xivModdingFramework.Cache
 		            var datNum = (int)((mod.data.modOffset / 8) & 0x0F) / 2;
 		            var dat = XivDataFiles.GetXivDataFile(mod.datFile);
 
-		            var datPath = $"{_gameInfo.GameDirectory}/{dat.GetDataFileName()}{Dat.DatExtension}{datNum}";
+                    var datPath = Dat.GetDatPath(dat, datNum);
 
-		            int uncompressedSize = -1;
+                    int uncompressedSize = -1;
                     long seekTo = Dat.OffsetCorrection(datNum, mod.data.modOffset) + 8;
 
                     // Seek to and read the uncompressed texture size catching any exceptions

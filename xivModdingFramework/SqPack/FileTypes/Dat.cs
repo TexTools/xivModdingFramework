@@ -47,18 +47,13 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// </summary>
     public class Dat
     {
-        public const string DatExtension = ".win32.dat";
+        private const string DatExtension = ".win32.dat";
         private readonly DirectoryInfo _gameDirectory;
-        private readonly DirectoryInfo _modListDirectory;
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
 
         public Dat(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-
-            var modding = new Modding(_gameDirectory);
-            modding.CreateModlist();
-            _modListDirectory = modding.ModListDirectory;
         }
 
         public static long GetMaximumDatSize()
@@ -136,7 +131,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return 8;
             }
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{nextDatNumber}");
+            var datPath = Dat.GetDatPath(dataFile, nextDatNumber);
 
             using (var fs = File.Create(datPath))
             {
@@ -219,9 +214,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var unmoddedList = await GetUnmoddedDatList(dataFile, alreadyLocked);
-            var datPath = $"{dataFile.GetDataFileName()}{DatExtension}{datNum}";
+            var datPath = Dat.GetDatPath(dataFile, datNum);
 
-            for(int i = 0; i < unmoddedList.Count; i++)
+            for (int i = 0; i < unmoddedList.Count; i++)
             {
                 unmoddedList[i] = Path.GetFileName(unmoddedList[i]);
             }
@@ -251,7 +246,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     for (var i = 0; i < 20; i++)
                     {
-                        var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
+                        var datFilePath = Dat.GetDatPath(dataFile, i);
 
                         if (File.Exists(datFilePath))
                         {
@@ -299,15 +294,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     for (var i = 1; i < 20; i++)
                     {
-                        var datFilePath = $"{_gameDirectory}/{dataFile.GetDataFileName()}.win32.dat{i}";
+                        var datFilePath = Dat.GetDatPath(dataFile, i);
 
                         if (File.Exists(datFilePath))
                         {
-                            // Due to an issue where 060000 dat1 gets deleted, we are skipping it here
-                            if (datFilePath.Contains("060000.win32.dat1"))
-                            {
-                                continue;
-                            }
+
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
                                 binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
@@ -533,7 +524,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int) ((offset / 8) & 0x0F) / 2;
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+            var datPath = Dat.GetDatPath(dataFile, datNum);
 
 
             offset = OffsetCorrection(datNum, offset);
@@ -1003,7 +994,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             offset = OffsetCorrection(datNum, offset);
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+            var datPath = Dat.GetDatPath(dataFile, datNum);
 
             var meshCount = 0;
             var materialCount = 0;
@@ -1184,7 +1175,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var offset = OffsetCorrection(datNum, offsetWithDatNumber);
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{df.GetDataFileName()}{DatExtension}{datNum}");
+            var datPath = Dat.GetDatPath(df, datNum);
 
             return await Task.Run(async () =>
             {
@@ -1214,7 +1205,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var offset = OffsetCorrection(datNum, offsetWithDatNumber);
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{df.GetDataFileName()}{DatExtension}{datNum}");
+            var datPath = Dat.GetDatPath(df, datNum);
 
             await Task.Run(async () =>
             {
@@ -1437,6 +1428,14 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return parts;
         }
+
+        public async Task<int> GetCompressedFileSize(string path, ModTransaction tx)
+        {
+            var offset8x = await tx.Get8xDataOffset(path);
+            var df = IOUtil.GetDataFileFromPath(path);
+            return await GetCompressedFileSize(offset8x, df);
+        }
+
         public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
         {
             if (offset <= 0)
@@ -1448,15 +1447,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             var xivTex = new XivTex();
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
+            var offsetParts = Offset8xToParts(offset);
+            offset = offsetParts.Offset;
 
             await _lock.WaitAsync();
 
             try
             {
-                offset = OffsetCorrection(datNum, offset);
-
-                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+                var datPath = Dat.GetDatPath(dataFile, offsetParts.DatNum);
 
                 return await Task.Run(async () =>
                 {
@@ -1478,6 +1476,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         }
 
                         int compSize = 0;
+
                         // Ok, time to parse the block headers and figure out how long the compressed data runs.
                         if(fileType == 2)
                         {
@@ -1510,6 +1509,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             var totalBlocks = 0;
                             for (var i = 0; i < 11; i++)
                             {
+                                // 11 Segments.  Vertex Info, Model Data, [Vertex Data x3], [Edge Data x3], [Index Data x3]
                                 totalBlocks += br.ReadUInt16();
                             }
 
@@ -1605,7 +1605,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 offset = OffsetCorrection(datNum, offset);
 
-                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+                var datPath = Dat.GetDatPath(dataFile, datNum);
 
                 await Task.Run(async () =>
                 {
@@ -1704,7 +1704,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             offset = OffsetCorrection(datNum, offset);
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+            var datPath = Dat.GetDatPath(dataFile, datNum);
 
             if (File.Exists(datPath))
             {
@@ -1722,20 +1722,45 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
-        public byte[] GetRawData(long offset, XivDataFile dataFile, int dataSize)
+        public static string GetDatPath(XivDataFile dataFile, int datNumber)
         {
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
+            var datPath = $"{XivCache.GameInfo.GameDirectory}/{dataFile.GetDataFileName()}{Dat.DatExtension}{datNumber}";
+            return datPath;
+        }
 
-            offset = OffsetCorrection(datNum, offset);
+        public async Task<byte[]> GetCompressedData(string path, ModTransaction tx)
+        {
+            var dataSize = await GetCompressedFileSize(path, tx);
 
-            var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+            var offset8x = await tx.Get8xDataOffset(path);
+            var df = IOUtil.GetDataFileFromPath(path);
+            var offsetParts = Offset8xToParts(offset8x);
+            var datPath = GetDatPath(df, offsetParts.DatNum);
 
             using (var br = new BinaryReader(File.OpenRead(datPath)))
             {
                 try
                 {
-                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                    br.BaseStream.Seek(offsetParts.Offset, SeekOrigin.Begin);
+                    return br.ReadBytes(dataSize);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+        }
+
+        public byte[] GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
+        {
+            var offsetParts = Offset8xToParts(offset8xWithDatEmbed);
+            var datPath = GetDatPath(dataFile, offsetParts.DatNum);
+
+            using (var br = new BinaryReader(File.OpenRead(datPath)))
+            {
+                try
+                {
+                    br.BaseStream.Seek(offsetParts.Offset, SeekOrigin.Begin);
 
                     return br.ReadBytes(dataSize);
                 }
@@ -1881,7 +1906,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Don't let us inject to original dat files.
                 if (original) continue;
 
-                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{i}");
+                var datPath = Dat.GetDatPath(dataFile, i);
 
 
                 var fInfo = new FileInfo(datPath);
@@ -1923,89 +1948,55 @@ namespace xivModdingFramework.SqPack.FileTypes
             return targetDat;
         }
 
+
         /// <summary>
-        /// Copies a given file to a new location in the game files.
+        /// Copies a file from a given offset to a new path in the game files.
         /// </summary>
-        /// <param name="sourcePath"></param>
         /// <param name="targetPath"></param>
-        /// <param name="category"></param>
-        /// <param name="itemName"></param>
         /// <param name="source"></param>
         /// <returns></returns>
         public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var _index = new Index(_gameDirectory);
-            long offset = 0;
-            if (tx != null)
+            var ownTx = false;
+            if(tx == null)
             {
-                var df = IOUtil.GetDataFileFromPath(sourcePath);
-                var indexFile = await tx.GetIndexFile(df);
-                offset = indexFile.Get8xDataOffset(sourcePath);
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction();
             }
-            else
+            try
             {
-                offset = await _index.GetDataOffset(sourcePath);
-            }
-            if(offset == 0)
-            {
-                return 0;
-            }
-
-            var dataFile = IOUtil.GetDataFileFromPath(sourcePath);
-            return await CopyFile(offset, dataFile, targetPath, source, overwrite, referenceItem, tx);
-        }
-
-        /// <summary>
-        /// Copies a file from a given offset to a new path in the game files.
-        ///
-        /// If the Index File and Modlist are provided, the actions will only be wrtiten to memory,
-        /// and not to the live Index Files/ModList.
-        /// </summary>
-        /// <param name="originalOffset"></param>
-        /// <param name="originalDataFile"></param>
-        /// <param name="targetPath"></param>
-        /// <param name="source"></param>
-        /// <returns></returns>
-        public async Task<long> CopyFile(long originalOffset, XivDataFile originalDataFile, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
-        {
-            var _modding = new Modding(_gameDirectory);
-            var _index = new Index(_gameDirectory);
-
-            var exists = await _index.FileExists(targetPath);
-            if(exists && !overwrite)
-            {
-                long offset = 0;
-                if (tx != null)
+                var exists = await tx.FileExists(targetPath);
+                if (exists && !overwrite)
                 {
-                    var df = IOUtil.GetDataFileFromPath(targetPath);
-                    var indexFile = await tx.GetIndexFile(df);
-                    offset = indexFile.Get8xDataOffset(targetPath);
+                    return await tx.Get8xDataOffset(targetPath);
                 }
-                else
+
+                var data = await GetCompressedData(sourcePath, tx);
+
+
+                XivDependencyRoot root = null;
+
+                if (referenceItem == null)
                 {
-                    offset = await _index.GetDataOffset(targetPath);
-                }
-                return offset;
-            }
-
-            var size = await GetCompressedFileSize(originalOffset, originalDataFile);
-            var data = GetRawData(originalOffset, originalDataFile, size);
-
-
-            XivDependencyRoot root = null;
-
-            if (referenceItem == null)
-            {
-                try
-                {
-                    root = await XivCache.GetFirstRoot(targetPath);
-                    if (root != null)
+                    try
                     {
-                        var item = root.GetFirstItem();
+                        root = await XivCache.GetFirstRoot(targetPath);
+                        if (root != null)
+                        {
+                            var item = root.GetFirstItem();
 
-                        referenceItem = item;
+                            referenceItem = item;
+                        }
+                        else
+                        {
+                            referenceItem = new XivGenericItemModel()
+                            {
+                                Name = Path.GetFileName(targetPath),
+                                SecondaryCategory = "Raw File Copy"
+                            };
+                        }
                     }
-                    else
+                    catch
                     {
                         referenceItem = new XivGenericItemModel()
                         {
@@ -2014,19 +2005,22 @@ namespace xivModdingFramework.SqPack.FileTypes
                         };
                     }
                 }
-                catch
+
+                var newOffset = await WriteModFile(data, targetPath, source, referenceItem, tx);
+                if (ownTx)
                 {
-                    referenceItem = new XivGenericItemModel()
-                    {
-                        Name = Path.GetFileName(targetPath),
-                        SecondaryCategory = "Raw File Copy"
-                    };
+                    await ModTransaction.CommitTransaction(tx);
                 }
+                return newOffset;
             }
-
-
-
-            return await WriteModFile(data, targetPath, source, referenceItem, tx);
+            catch
+            {
+                if(ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
         }
 
 
@@ -2090,7 +2084,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
                 }
 
-                var datPath = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{DatExtension}{datNum}");
+                var datPath = Dat.GetDatPath(dataFile, datNum);
 
                 // Copy the data into the file.
                 BinaryWriter bw = null;
@@ -2466,6 +2460,19 @@ namespace xivModdingFramework.SqPack.FileTypes
             {25136, XivTexFormat.BC5 },
             {25650, XivTexFormat.BC7 }
         };
+
+
+        /// <summary>
+        /// Takes an 8x Dat Embeded offset, returning the constituent parts.
+        /// </summary>
+        /// <param name="offset8xWithDatNumEmbed"></param>
+        /// <returns></returns>
+        public static (long Offset, int DatNum) Offset8xToParts(long offset8xWithDatNumEmbed)
+        {
+            var datNum = (int)((offset8xWithDatNumEmbed / 8) & 0x0F) / 2;
+            var offset = OffsetCorrection(datNum, offset8xWithDatNumEmbed);
+            return (offset, datNum);
+        }
 
         /// <summary>
         /// Changes the offset to the correct location based on .dat number.

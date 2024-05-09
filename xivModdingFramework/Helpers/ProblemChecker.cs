@@ -80,7 +80,8 @@ namespace xivModdingFramework.Helpers
 
                 for (var i = 0; i < largestDatNum; i++)
                 {
-                    var fileInfo = new FileInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.dat{i}"));
+                    var datPath = Dat.GetDatPath(dataFile, i);
+                    var fileInfo = new FileInfo(datPath);
 
                     if (fileInfo.Length == 0)
                     {
@@ -106,7 +107,8 @@ namespace xivModdingFramework.Helpers
 
                 for (var i = 0; i < largestDatNum; i++)
                 {
-                    var fileInfo = new FileInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.dat{i}"));
+                    var datPath = Dat.GetDatPath(dataFile, i);
+                    var fileInfo = new FileInfo(datPath);
 
                     try
                     {

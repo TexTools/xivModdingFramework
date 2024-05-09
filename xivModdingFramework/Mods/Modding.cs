@@ -66,6 +66,8 @@ namespace xivModdingFramework.Mods
             _gameDirectory = gameDirectory;
             ModListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
+            // Create modlist if we don't already have one.
+            CreateModlist();
         }
 
         private ModList _CachedModList;
@@ -151,7 +153,7 @@ namespace xivModdingFramework.Mods
             }
         }
         /// <summary>
-        /// Creates the Mod List that is used to keep track of mods.
+        /// Creates a blank ModList file if one does not already exist.
         /// </summary>
         public void CreateModlist()
         {
@@ -1070,7 +1072,7 @@ namespace xivModdingFramework.Mods
 
                             if (size % 256 != 0) throw new Exception("Dicks");
 
-                            var data = _dat.GetRawData(mod.data.modOffset, df, size);
+                            var data = _dat.GetCompressedData(mod.data.modOffset, df, size);
                             var newOffset = await WriteToTempDat(_dat, data, df);
 
                             if (mod.IsCustomFile())

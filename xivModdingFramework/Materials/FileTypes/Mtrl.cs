@@ -1751,7 +1751,7 @@ namespace xivModdingFramework.Materials.FileTypes
                             group item by z++ % _ThreadCount into part
                             select part.ToList();
 
-                var datPath = Path.Combine(gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Dat.DatExtension}{i}");
+                var datPath = Dat.GetDatPath(dataFile, i);
                 if (!File.Exists(datPath))
                 {
                     continue;
@@ -1814,7 +1814,7 @@ namespace xivModdingFramework.Materials.FileTypes
             BinaryReader br;
             if (datData == null)
             {
-                var datPath = Path.Combine(XivCache.GameInfo.GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Dat.DatExtension}{files[0].DatNum}");
+                var datPath = Dat.GetDatPath(dataFile, (int) files[0].DatNum);
                 var file = File.Open(datPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 br = new BinaryReader(file);
             }

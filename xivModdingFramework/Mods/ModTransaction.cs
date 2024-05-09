@@ -76,7 +76,7 @@ namespace xivModdingFramework.Mods
                     _DatFileSizes.Add(dataFile, new List<long>());
                     for (int i = 0; i < _MAX_DATS; i++)
                     {
-                        var datPath = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Dat.DatExtension}{i}");
+                        var datPath = Dat.GetDatPath(dataFile, i);
                         if (!File.Exists(datPath))
                         {
                             break;
@@ -104,6 +104,17 @@ namespace xivModdingFramework.Mods
             var df = IOUtil.GetDataFileFromPath(path);
             var idx = await GetIndexFile(df);
             return idx.Get8xDataOffset(path);
+        }
+        /// <summary>
+        /// Syntactic shortcut for validating a file exists.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<bool> FileExists(string path)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return idx.FileExists(path);
         }
 
         public async Task<ModList> GetModList()
@@ -147,7 +158,7 @@ namespace xivModdingFramework.Mods
                 var dataFile = kv.Key;
                 for (int i = 0; i < _MAX_DATS; i++)
                 {
-                    var datPath = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Dat.DatExtension}{i}");
+                    var datPath = Dat.GetDatPath(dataFile, i);
                     if (File.Exists(datPath) && _DatFileSizes[dataFile].Count > i)
                     {
                         using (var fs = File.Open(datPath, FileMode.Open))
