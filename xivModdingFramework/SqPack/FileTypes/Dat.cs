@@ -384,26 +384,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Gets a XivDataFile category for the specified path.
-        /// </summary>
-        /// <param name="internalPath">The internal file path</param>
-        /// <returns>A XivDataFile entry for the needed dat category</returns>
-        private XivDataFile GetDataFileFromPath(string internalPath)
-        {
-            var folderKey = internalPath.Substring(0, internalPath.IndexOf("/", StringComparison.Ordinal));
-
-            var cats = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            foreach (var cat in cats)
-            {
-                if (cat.GetFolderKey() == folderKey)
-                    return cat;
-            }
-
-            throw new ArgumentException("[Dat] Could not find category for path: " + internalPath);
-        }
-
-        /// <summary>
         /// Gets the original or modded data for type 2 files based on the path specified.
         /// </summary>
         /// <remarks>
@@ -412,39 +392,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
-            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
-
-            var _index = new Index(_gameDirectory);
-            var _modding = new Modding(_gameDirectory);
-
-            IndexFile index = tx == null ? await _index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
-
-            if (forceOriginal)
-            {
-                ModList modlist = tx == null ? await _modding.GetModList() : await tx.GetModList();
-                // Checks if the item being imported already exists in the modlist
-                var modEntry = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
-
-                // If the file exists in the modlist, get the data from the original data
-                if (modEntry != null)
-                {
-                    return await ReadSqPackType2(modEntry.data.originalOffset, dataFile);
-                }
-            }
-
-            // If it doesn't exist in the modlist(the item is not modded) or force original is false,
-            // grab the data directly from them index file.
-
-            var offset = index.Get8xDataOffset(internalPath);
-
-            if (offset == 0)
-            {
-                throw new Exception($"Could not find offset for {internalPath}");
-            }
-
-            return await ReadSqPackType2(offset, dataFile);
+            var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
+            return await ReadSqPackType2(info.Offset, info.DataFile);
         }
 
         /// <summary>
@@ -456,13 +407,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">The offset where the data is located.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile)
+        internal async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile)
         {
             if (offset <= 0)
             {
                 throw new InvalidDataException("Cannot get file data without valid offset.");
             }
-
 
             byte[] type2Bytes = null;
 
@@ -496,7 +446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return type2Bytes;
         }
 
-        public async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
+        internal async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
         {
             using (var ms = new MemoryStream(data))
             {
@@ -506,7 +456,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
         }
-        public async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
+        internal async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
         {
             if(offset >= 0)
             {
@@ -694,6 +644,47 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
+        /// Boilerplate condenser for resolving offset information retrieval and null transaction handling.
+        /// </summary>
+        /// <param name="internalPath"></param>
+        /// <param name="forceOriginal"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        /// <exception cref="FileNotFoundException"></exception>
+        private async Task<(long Offset, XivDataFile DataFile)> ResolveOffsetAndDataFile(string internalPath, bool forceOriginal, ModTransaction tx)
+        {
+            if (tx == null)
+            {
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
+
+            long offset = 0;
+            if (forceOriginal)
+            {
+                var modList = await tx.GetModList();
+                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+
+                // If the file exists in the modlist, get the data from the original data
+                if (modEntry != null)
+                {
+                    offset = modEntry.data.originalOffset;
+                }
+            }
+
+            if (offset == 0)
+            {
+                offset = await tx.Get8xDataOffset(internalPath);
+            }
+
+            if (offset == 0)
+            {
+                throw new FileNotFoundException($"Could not find offset for {internalPath}");
+            }
+            return (offset, dataFile);
+        }
+
+        /// <summary>
         /// Retrieves the uncompressed data for an SQPack type 3 file from the given path.
         /// </summary>
         /// <remarks>
@@ -702,55 +693,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
-
-            var dataFile = GetDataFileFromPath(internalPath);
-
-            if (forceOriginal)
-            {
-                var modding = new Modding(_gameDirectory);
-                // Checks if the item being imported already exists in the modlist
-                Mod modEntry = null;
-                if (tx != null)
-                {
-                    var modList = await tx.GetModList();
-                    modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
-                }
-                else
-                {
-                    modEntry = await modding.TryGetModEntry(internalPath);
-                }
-
-                // If the file exists in the modlist, get the data from the original data
-                if (modEntry != null)
-                {
-                    return await ReadSqPackType3(modEntry.data.originalOffset, dataFile);
-                }
-            }
-
-            // If it doesn't exist in the modlist(the item is not modded) or force original is false,
-            // grab the data directly from them index file.
-            var folder = Path.GetDirectoryName(internalPath);
-            folder = folder.Replace("\\", "/");
-            var file = Path.GetFileName(internalPath);
-
-            long offset = 0;
-            if(tx != null)
-            {
-                offset = (await tx.GetIndexFile(dataFile)).Get8xDataOffset(internalPath);
-            } else
-            {
-                var index = new Index(_gameDirectory);
-                offset = await index.GetDataOffset(internalPath);
-            }
-
-            if (offset == 0)
-            {
-                throw new Exception($"Could not find offset for {internalPath}");
-            }
-
-            return await ReadSqPackType3(offset, dataFile);
+            var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
+            return await ReadSqPackType3(info.Offset, info.DataFile);
         }
         /// <summary>
         /// Gets the data for Type 3 (Model) files
@@ -768,18 +714,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new InvalidDataException("Cannot get file data without valid offset.");
             }
 
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
-
-            offset = OffsetCorrection(datNum, offset);
-
-            var datPath = Dat.GetDatPath(dataFile, datNum);
-
-            var meshCount = 0;
-            var materialCount = 0;
-            byte[] result = null;
-
-            var index = 0;
+            var parts = Offset8xToParts(offset);
+            var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
             return await Task.Run(async () =>
             {
                 await _lock.WaitAsync();
@@ -787,7 +723,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     using (var br = new BinaryReader(File.OpenRead(datPath)))
                     {
-                        return await ReadSqPackType3(br, offset);
+                        return await ReadSqPackType3(br, parts.Offset);
                     }
                 }
                 finally
@@ -797,6 +733,16 @@ namespace xivModdingFramework.SqPack.FileTypes
             });
         }
 
+        public async Task<byte[]> ReadSqPackType3(byte[] data)
+        {
+            using (var ms = new MemoryStream(data))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    return await ReadSqPackType3(br);
+                }
+            }
+        }
         public async Task<byte[]> ReadSqPackType3(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
@@ -915,20 +861,22 @@ namespace xivModdingFramework.SqPack.FileTypes
             var indexOffsetRealSizes = new uint[_VertexSegments];
 
             // Vertex and Model Headers
-            decompOffset += await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
-            decompOffset += await CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
+            var vInfoRealSize = await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
+            decompOffset += vInfoRealSize;
+            var mInfoRealSize = await CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
+            decompOffset += mInfoRealSize;
 
             for (int i = 0; i < _VertexSegments; i++)
             {
                 // Geometry data in LoD order.
                 // Mark the real uncompressed offsets and sizes on the way through.
-                vertexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
+                vertexBufferUncompressedOffsets[i] = (uint)decompOffset;
                 vertexBufferRealSizes[i] = (uint)await CompleteReadCompressedBlocks(vertexBuffers[i], decompressedData, decompOffset);
                 decompOffset += (int)vertexBufferRealSizes[i];
 
                 decompOffset += await CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
 
-                indexBufferUncompressedOffsets[i] = (uint)decompOffset - (uint)baseHeaderLength;
+                indexBufferUncompressedOffsets[i] = (uint)decompOffset;
                 indexOffsetRealSizes[i] = (uint)await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
                 decompOffset += (int)indexOffsetRealSizes[i];
             }
@@ -937,8 +885,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Generated header for live/uncompressed MDL files.
             header.AddRange(BitConverter.GetBytes(version));
-            header.AddRange(BitConverter.GetBytes(vertexInfoSize));
-            header.AddRange(BitConverter.GetBytes(modelDataSize));
+            header.AddRange(BitConverter.GetBytes(vInfoRealSize));
+            header.AddRange(BitConverter.GetBytes(mInfoRealSize));
             header.AddRange(BitConverter.GetBytes((ushort)meshCount));
             header.AddRange(BitConverter.GetBytes((ushort)materialCount));
 
@@ -1246,10 +1194,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetTexFromDat(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<XivTex> GetTexFromDat(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
 
-            var dataFile = GetDataFileFromPath(internalPath);
+            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
 
             if (forceOriginal)
             {
@@ -1327,13 +1275,57 @@ namespace xivModdingFramework.SqPack.FileTypes
             return XivTex.FromUncompressedTex(data);
         }
 
+        public async Task<byte[]> ReadSqPackType4(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
+        {
+            var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
+            return await ReadSqPackType4(info.Offset, info.DataFile);
+        }
+
+
+        internal async Task<byte[]> ReadSqPackType4(long offset, XivDataFile dataFile)
+        {
+            if (offset <= 0)
+            {
+                throw new InvalidDataException("Cannot get file data without valid offset.");
+            }
+
+            var parts = Offset8xToParts(offset);
+            var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
+            return await Task.Run(async () =>
+            {
+                await _lock.WaitAsync();
+                try
+                {
+                    using (var br = new BinaryReader(File.OpenRead(datPath)))
+                    {
+                        return await ReadSqPackType4(br, parts.Offset);
+                    }
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            });
+        }
+
+        internal async Task<byte[]> ReadSqPackType4(byte[] data)
+        {
+            using (var ms = new MemoryStream(data))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    return await ReadSqPackType4(br);
+                }
+            }
+        }
+
         /// <summary>
         /// Reads and decompresses an SQPack type 4 file from the given data stream.
         /// </summary>
         /// <param name="br"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        public async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
+        internal async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
             {
@@ -1408,7 +1400,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="forceOriginal"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public async Task<byte[]> GetUncompressedData(string internalPath, bool forceOriginal, ModTransaction tx = null)
+        public async Task<byte[]> GetUncompressedData(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             if (tx == null)
             {
@@ -1840,8 +1832,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             return datPath;
         }
 
-        public async Task<byte[]> GetCompressedData(string path, ModTransaction tx)
+        public async Task<byte[]> GetCompressedData(string path, ModTransaction tx = null)
         {
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction(true);
+            }
             var dataSize = await GetCompressedFileSize(path, tx);
 
             var offset8x = await tx.Get8xDataOffset(path);
