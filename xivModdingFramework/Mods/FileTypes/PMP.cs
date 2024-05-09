@@ -39,6 +39,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         // List of meta files that have already been loaded from source during import.
         // Used for metadata compilation.
         private static HashSet<string> _MetaFiles;
+        private static HashSet<uint> _RgspRaceGenders;
 
         private static async Task<string> ResolvePMPBasePath(string path, bool jsonsOnly = false)
         {
@@ -165,6 +166,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var notImported = new HashSet<string>();
             _ImportActive = true;
             _MetaFiles = new HashSet<string>();
+            _RgspRaceGenders = new HashSet<uint>();
             _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
             var modPack = new ModPack();
@@ -262,6 +264,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     IOUtil.DeleteTempDirectory(unzippedPath);
                 }
                 _MetaFiles = null;
+                _RgspRaceGenders = null;
                 _Source = null;
                 _ImportActive = false;
             }
@@ -329,7 +332,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 foreach (var group in byRg)
                 {
                     var rg = group.First().GetRaceGender();
-                    var cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, false, tx);
+                    RacialGenderScalingParameter cmp;
+                    if (_RgspRaceGenders.Contains(group.Key))
+                    {
+                        // If this our first time seeing this race/gender pairing in this import sequence, use the original game clean version of the file.
+                        cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, true, tx);
+                        _RgspRaceGenders.Add(group.Key);
+                    } else
+                    {
+                        cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, false, tx);
+                    }
                     foreach(var effect in group)
                     {
                         effect.ApplyScaling(cmp);

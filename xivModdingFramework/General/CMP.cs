@@ -153,7 +153,7 @@ namespace xivModdingFramework.General
 
 
 
-        public  static async Task<RacialGenderScalingParameter> GetScalingParameter(XivSubRace race, XivGender gender, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<RacialGenderScalingParameter> GetScalingParameter(XivSubRace race, XivGender gender, bool forceOriginal = false, ModTransaction tx = null)
         {
             var cmp = await GetCharaMakeParameterSet(forceOriginal, tx);
 
