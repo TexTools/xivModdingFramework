@@ -663,7 +663,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
 
-        protected virtual uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        public virtual uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
         {
             return INTERNAL_SetDataOffset(filePath, newRawOffsetWithDatNumEmbed, false);
         }
@@ -697,8 +697,6 @@ namespace xivModdingFramework.SqPack.DataContainers
             {
                 Index1Entries.Add(folderHash, new Dictionary<uint, FileIndexEntry>());
             }
-
-
 
             if (!existsInIndex1 && Index1Entries[folderHash].ContainsKey(fileHash))
             {
