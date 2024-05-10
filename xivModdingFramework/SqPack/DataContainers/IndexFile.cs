@@ -692,14 +692,27 @@ namespace xivModdingFramework.SqPack.DataContainers
             bool index1Syn = Index1Synonyms.ContainsKey(key);
             bool index2Syn = Index2Synonyms.ContainsKey(fullHash);
 
-
             // Create folder hash if needed.
             if (newRawOffsetWithDatNumEmbed > 0 && !Index1Entries.ContainsKey(folderHash))
             {
                 Index1Entries.Add(folderHash, new Dictionary<uint, FileIndexEntry>());
             }
-            
-            if(originalOffsetIndex1 == originalOffsetIndex2 && (!index1Syn && !index2Syn))
+
+
+
+            if (!existsInIndex1 && Index1Entries[folderHash].ContainsKey(fileHash))
+            {
+                // 0 Offset value in the index table.  Remove it.
+                Index1Entries[folderHash].Remove(fileHash);
+            }
+            if(!existsInIndex2 && Index2Entries.ContainsKey(fullHash))
+            {
+                // 0 Offset value in the index table.  Remove it.
+                Index2Entries.Remove(fullHash);
+            }
+
+
+            if (originalOffsetIndex1 == originalOffsetIndex2 && (!index1Syn && !index2Syn))
             {
                 // This is the typical case for updating, adding, or removing a file.
                 // It exists in the same state in both indexes, with no colisions.
