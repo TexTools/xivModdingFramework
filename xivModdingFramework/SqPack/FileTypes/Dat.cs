@@ -49,7 +49,7 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// </summary>
     public class Dat
     {
-        private const string DatExtension = ".win32.dat";
+        internal const string DatExtension = ".win32.dat";
         private readonly DirectoryInfo _gameDirectory;
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
 

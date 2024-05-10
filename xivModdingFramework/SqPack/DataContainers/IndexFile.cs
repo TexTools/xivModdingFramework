@@ -35,34 +35,34 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
         // Header bytes (1024 in length usually)
-        private byte[] Index1Header;
+        protected byte[] Index1Header;
 
         // Header bytes (1024 in length usually)
-        private byte[] Index2Header;
+        protected byte[] Index2Header;
 
         // Total size of the segment header block (usually 1024)
-        private uint Index1TotalSegmentHeaderSize;
+        protected uint Index1TotalSegmentHeaderSize;
 
         // Total size of the segment header block (usually 1024)
-        private uint Index2TotalSegmentHeaderSize;
+        protected uint Index2TotalSegmentHeaderSize;
 
         // The segment blocks we should copy/paste as-is into the file, which have unknown purpose.
-        private List<byte[]> Index1ExtraSegments = new List<byte[]>();
+        protected List<byte[]> Index1ExtraSegments = new List<byte[]>();
 
         // The segment blocks we should copy/paste as-is into the file, which have unknown purpose.
-        private List<byte[]> Index2ExtraSegments = new List<byte[]>();
+        protected List<byte[]> Index2ExtraSegments = new List<byte[]>();
 
         // The unknown ints in the segment headers.
-        private List<int> Index1SegmentUnknowns = new List<int>();
+        protected List<int> Index1SegmentUnknowns = new List<int>();
 
         // The unknown ints in the segment headers.
-        private List<int> Index2SegmentUnknowns = new List<int>();
+        protected List<int> Index2SegmentUnknowns = new List<int>();
 
         // Index1 entries.  Keyed by [Folder Hash, File Hash] => Entry
-        private Dictionary<uint, Dictionary<uint, FileIndexEntry>> Index1Entries = new Dictionary<uint, Dictionary<uint, FileIndexEntry>>();
+        protected Dictionary<uint, Dictionary<uint, FileIndexEntry>> Index1Entries = new Dictionary<uint, Dictionary<uint, FileIndexEntry>>();
 
         // Index2 entries.  Keyed by [Full Hash] => Entry
-        private Dictionary<uint, FileIndex2Entry> Index2Entries = new Dictionary<uint, FileIndex2Entry>();
+        protected Dictionary<uint, FileIndex2Entry> Index2Entries = new Dictionary<uint, FileIndex2Entry>();
 
         // The data file this Index file refers to.
         public readonly XivDataFile DataFile;
