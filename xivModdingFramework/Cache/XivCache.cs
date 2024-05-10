@@ -479,7 +479,7 @@ namespace xivModdingFramework.Cache
                     var datPath = Dat.GetDatPath(dat, datNum);
 
                     int uncompressedSize = -1;
-                    long seekTo = Dat.OffsetCorrection(datNum, mod.data.modOffset) + 8;
+                    long seekTo = Dat.OffsetCorrection(mod.data.modOffset) + 8;
 
                     // Seek to and read the uncompressed texture size catching any exceptions
                     // because we handle further processing with the initial value of -1

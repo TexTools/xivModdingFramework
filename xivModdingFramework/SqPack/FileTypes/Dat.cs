@@ -413,12 +413,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             byte[] type2Bytes = null;
 
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
+            var originalOffset = (offset / 8);
+            var bot4 = (int)(originalOffset & 0x0F);
+            var datNum = bot4 / 2;
 
             var datPath = Dat.GetDatPath(dataFile, datNum);
 
 
-            offset = OffsetCorrection(datNum, offset);
+            offset = OffsetCorrection(offset);
             await _lock.WaitAsync();
             try
             {
@@ -1137,7 +1139,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
 
-            var offset = OffsetCorrection(datNum, offsetWithDatNumber);
+            var offset = OffsetCorrection(offsetWithDatNumber);
 
             var datPath = Dat.GetDatPath(df, datNum);
 
@@ -1167,7 +1169,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
 
-            var offset = OffsetCorrection(datNum, offsetWithDatNumber);
+            var offset = OffsetCorrection(offsetWithDatNumber);
 
             var datPath = Dat.GetDatPath(df, datNum);
 
@@ -1816,7 +1818,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offset / 8) & 0x0F) / 2;
 
-            offset = OffsetCorrection(datNum, offset);
+            offset = OffsetCorrection(offset);
 
             var datPath = Dat.GetDatPath(dataFile, datNum);
 
@@ -2501,7 +2503,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (doLumina && (luminaOutDir == null || !luminaOutDir.Exists))
                 throw new ArgumentException("No valid lumina output path was specified.", nameof(luminaOutDir));
 
-            DecompressAndWrite(fileData, luminaOutDir, internalFilePath);
+            await DecompressAndWrite(fileData, luminaOutDir, internalFilePath);
             if (expandMetadata)
             {
                 await ExpandMetadata(fileData, internalFilePath);
@@ -2558,23 +2560,29 @@ namespace xivModdingFramework.SqPack.FileTypes
         public static (long Offset, int DatNum) Offset8xToParts(long offset8xWithDatNumEmbed)
         {
             var datNum = (int)((offset8xWithDatNumEmbed / 8) & 0x0F) / 2;
-            var offset = OffsetCorrection(datNum, offset8xWithDatNumEmbed);
+            var offset = OffsetCorrection(offset8xWithDatNumEmbed);
             return (offset, datNum);
         }
 
         /// <summary>
-        /// Changes the offset to the correct location based on .dat number.
+        /// Takes a uint 32 Embeded offset, returning the constituent parts.
         /// </summary>
-        /// <remarks>
-        /// The dat files offset their data by 16 * dat number
-        /// </remarks>
-        /// <param name="datNum">The .dat number being used.</param>
-        /// <param name="offset">The offset to correct.</param>
-        /// <returns>The corrected offset.</returns>
-        public static long OffsetCorrection(int datNum, long offset)
+        /// <param name="offset8xWithDatNumEmbed"></param>
+        /// <returns></returns>
+        public static (long Offset, int DatNum) OffsetToParts(uint sqpackOffset)
         {
-            var ret = offset - (16 * datNum);
-            return ret;
+            return Offset8xToParts(sqpackOffset * 8L);
+        }
+
+        /// <summary>
+        /// Wipes the bottom 7 bits the given offset, matching it to SE style expected file increments.
+        /// </summary>
+        /// <param name="offset"></param>
+        /// <returns></returns>
+        public static long OffsetCorrection(long offset)
+        {
+            offset = offset & ~(0b1111111);
+            return offset;
         }
 
         /// <summary>
