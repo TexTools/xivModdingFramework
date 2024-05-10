@@ -1668,113 +1668,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     using (var br = new BinaryReader(File.OpenRead(datPath)))
                     {
-                        br.BaseStream.Seek(offset, SeekOrigin.Begin);
-                        var headerLength = br.ReadInt32();
-                        var fileType = br.ReadInt32();
-                        var uncompSize = br.ReadInt32();
-                        var unknown = br.ReadInt32();
-                        var maxBufferSize = br.ReadInt32();
-                        var blockCount = br.ReadInt16();
-
-                        var endOfHeader = offset + headerLength;
-
-                        if (fileType != 2 && fileType != 3 && fileType != 4)
-                        {
-                            throw new NotSupportedException("Cannot get compressed file size of unknown type.");
-                        }
-
-                        int compSize = 0;
-
-                        // Ok, time to parse the block headers and figure out how long the compressed data runs.
-                        if(fileType == 2)
-                        {
-                            br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-                            var lastSize = 0;
-                            var lastOffset = 0;
-                            for(int i = 0; i < blockCount; i++)
-                            {
-                                br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
-                                var blockOffset = br.ReadInt32();
-                                var blockCompressedSize = br.ReadUInt16();
-
-                                lastOffset = blockOffset;
-                                lastSize = blockCompressedSize + 16;    // 16 bytes of header data per block.
-                            }
-
-                            // Pretty straight forward.  Header + Total size of the compressed data.
-                            compSize = headerLength + lastOffset + lastSize;
-
-                        } else if(fileType == 3)
-                        {
-
-                            // 24 byte header, then 88 bytes to the first chunk offset.
-                            br.BaseStream.Seek(offset + 112, SeekOrigin.Begin);
-                            var firstOffset = br.ReadInt32();
-
-                            // 24 byte header, then 178 bytes to the start of the block count.
-                            br.BaseStream.Seek(offset + 178, SeekOrigin.Begin);
-
-                            var totalBlocks = 0;
-                            for (var i = 0; i < 11; i++)
-                            {
-                                // 11 Segments.  Vertex Info, Model Data, [Vertex Data x3], [Edge Data x3], [Index Data x3]
-                                totalBlocks += br.ReadUInt16();
-                            }
-
-
-                            // 24 byte header, then 208 bytes to the list of block sizes.
-                            br.BaseStream.Seek(offset + 208, SeekOrigin.Begin);
-
-                            var blockSizes = new int[totalBlocks];
-                            for (var i = 0; i < totalBlocks; i++)
-                            {
-                                blockSizes[i] = br.ReadUInt16();
-                            }
-
-                            int totalCompressedSize = 0;
-                            foreach(var size in blockSizes)
-                            {
-                                totalCompressedSize += size;
-                            }
-
-
-                            // Header + Chunk headers + compressed data.
-                            compSize = headerLength + firstOffset + totalCompressedSize;
-                        } else if(fileType == 4)
-                        {
-                            br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-                            // Textures.
-                            var lastOffset = 0;
-                            var lastSize = 0;
-                            var mipMapInfoOffset = offset + 24;
-                            for (int i = 0, j = 0; i < blockCount; i++)
-                            {
-                                br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
-
-                                j = j + 20;
-
-                                var offsetFromHeaderEnd = br.ReadInt32();
-                                var mipMapCompressedSize = br.ReadInt32();
-
-
-                                lastOffset = offsetFromHeaderEnd;
-                                lastSize = mipMapCompressedSize;
-                            }
-
-                            // Pretty straight forward.  Header + Total size of the compressed data.
-                            compSize = headerLength + lastOffset + lastSize;
-
-                        }
-
-
-                        // Round out to the nearest 256 bytes.
-                        if (compSize % 256 != 0)
-                        {
-                            var padding = 256 - (compSize % 256);
-                            compSize += padding;
-                        }
-                        return compSize;
-
+                        return GetCompressedFileSize(br, offset);
                     }
                 });
             }
@@ -1782,6 +1676,126 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 _lock.Release();
             }
+        }
+        public int GetCompressedFileSize(BinaryReader br, long offset = -1)
+        {
+            if (offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = br.BaseStream.Position;
+            }
+
+            var headerLength = br.ReadInt32();
+            var fileType = br.ReadInt32();
+            var uncompSize = br.ReadInt32();
+            var unknown = br.ReadInt32();
+            var maxBufferSize = br.ReadInt32();
+            var blockCount = br.ReadInt16();
+
+            var endOfHeader = offset + headerLength;
+
+            if (fileType != 2 && fileType != 3 && fileType != 4)
+            {
+                throw new NotSupportedException("Cannot get compressed file size of unknown type.");
+            }
+
+            int compSize = 0;
+
+            // Ok, time to parse the block headers and figure out how long the compressed data runs.
+            if (fileType == 2)
+            {
+                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+                var lastSize = 0;
+                var lastOffset = 0;
+                for (int i = 0; i < blockCount; i++)
+                {
+                    br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
+                    var blockOffset = br.ReadInt32();
+                    var blockCompressedSize = br.ReadUInt16();
+
+                    lastOffset = blockOffset;
+                    lastSize = blockCompressedSize + 16;    // 16 bytes of header data per block.
+                }
+
+                // Pretty straight forward.  Header + Total size of the compressed data.
+                compSize = headerLength + lastOffset + lastSize;
+
+            }
+            else if (fileType == 3)
+            {
+
+                // 24 byte header, then 88 bytes to the first chunk offset.
+                br.BaseStream.Seek(offset + 112, SeekOrigin.Begin);
+                var firstOffset = br.ReadInt32();
+
+                // 24 byte header, then 178 bytes to the start of the block count.
+                br.BaseStream.Seek(offset + 178, SeekOrigin.Begin);
+
+                var totalBlocks = 0;
+                for (var i = 0; i < 11; i++)
+                {
+                    // 11 Segments.  Vertex Info, Model Data, [Vertex Data x3], [Edge Data x3], [Index Data x3]
+                    totalBlocks += br.ReadUInt16();
+                }
+
+
+                // 24 byte header, then 208 bytes to the list of block sizes.
+                br.BaseStream.Seek(offset + 208, SeekOrigin.Begin);
+
+                var blockSizes = new int[totalBlocks];
+                for (var i = 0; i < totalBlocks; i++)
+                {
+                    blockSizes[i] = br.ReadUInt16();
+                }
+
+                int totalCompressedSize = 0;
+                foreach (var size in blockSizes)
+                {
+                    totalCompressedSize += size;
+                }
+
+
+                // Header + Chunk headers + compressed data.
+                compSize = headerLength + firstOffset + totalCompressedSize;
+            }
+            else if (fileType == 4)
+            {
+                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+                // Textures.
+                var lastOffset = 0;
+                var lastSize = 0;
+                var mipMapInfoOffset = offset + 24;
+                for (int i = 0, j = 0; i < blockCount; i++)
+                {
+                    br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
+
+                    j = j + 20;
+
+                    var offsetFromHeaderEnd = br.ReadInt32();
+                    var mipMapCompressedSize = br.ReadInt32();
+
+
+                    lastOffset = offsetFromHeaderEnd;
+                    lastSize = mipMapCompressedSize;
+                }
+
+                // Pretty straight forward.  Header + Total size of the compressed data.
+                compSize = headerLength + lastOffset + lastSize;
+
+            }
+
+
+            // Round out to the nearest 256 bytes.
+            if (compSize % 256 != 0)
+            {
+                var padding = 256 - (compSize % 256);
+                compSize += padding;
+            }
+            return compSize;
+
         }
 
         public static string ReadNullTerminatedString(BinaryReader br)
@@ -2043,7 +2057,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 targetDat = i;
                 break;
             }
-            //sound/battle/enpc/se_enpc_alchemist_goblin_a.scd
             // Didn't find a DAT file with space, gotta create a new one.
             if (targetDat < 0)
             {
@@ -2287,154 +2300,167 @@ namespace xivModdingFramework.SqPack.FileTypes
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
 
+
+
             var doDatSave = tx == null;
-
-
             if (XivCache.GameInfo.UseLumina)
             {
                 return await DoLuminaWrite(fileData, internalFilePath, doDatSave);
             }
 
             // Open a transaction if we don't have one.
-            if(tx == null)
+            if (tx == null)
             {
                 tx = ModTransaction.BeginTransaction();
             }
-
-            var modList = await tx.GetModList();
-            var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(internalFilePath));
-
-            var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
-
-            // Resolve Item to attach to.
-            string itemName = "Unknown";
-            string category = "Unknown";
-            if (referenceItem == null)
+            try
             {
-                try
+
+                var modList = await tx.GetModList();
+                var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(internalFilePath));
+
+                var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
+
+                // Resolve Item to attach to.
+                string itemName = "Unknown";
+                string category = "Unknown";
+                if (referenceItem == null)
                 {
-                    var root = await XivCache.GetFirstRoot(internalFilePath);
-                    if (root != null)
+                    try
                     {
-                        var item = root.GetFirstItem();
+                        var root = await XivCache.GetFirstRoot(internalFilePath);
+                        if (root != null)
+                        {
+                            var item = root.GetFirstItem();
 
-                        referenceItem = item;
-                        itemName = referenceItem.GetModlistItemName();
-                        category = referenceItem.GetModlistItemCategory();
+                            referenceItem = item;
+                            itemName = referenceItem.GetModlistItemName();
+                            category = referenceItem.GetModlistItemCategory();
+                        }
                     }
-                }
-                catch
-                {
-                    itemName = Path.GetFileName(internalFilePath);
-                    category = "Raw File";
-                }
-            } else
-            {
-                itemName = referenceItem.GetModlistItemName();
-                category = referenceItem.GetModlistItemCategory();
-            }
-
-            var size = fileData.Length;
-            if(size % 256 != 0)
-            {
-                size += 256 - (size % 256);
-            }
-
-            // Update the DAT files.
-            uint rawOffset = 0;
-            long retOffset = -1;
-
-            if (mod != null && mod.data.modSize >= size && doDatSave)
-            {
-                // If our existing mod slot is large enough to hold us, keep using it.
-                // *only* if we're going to immediately save the modlist though.
-                // Otherwise it's possible this index update may get rolled back, so it would be unsafe
-                // to overwrite any data.
-                rawOffset = await Unsafe_WriteToDat(fileData, df, mod.data.modOffset);
-
-            }
-            else if (index == null && doDatSave)
-            {
-                // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
-                var slots = await Dat.ComputeOpenSlots(df);
-                var slot = slots.FirstOrDefault(x => x.Value >= size);
-
-                if (slot.Key >= 2048)
-                {
-                    rawOffset = await Unsafe_WriteToDat(fileData, df, slot.Key);
+                    catch
+                    {
+                        itemName = Path.GetFileName(internalFilePath);
+                        category = "Raw File";
+                    }
                 }
                 else
                 {
+                    itemName = referenceItem.GetModlistItemName();
+                    category = referenceItem.GetModlistItemCategory();
+                }
+
+                var size = fileData.Length;
+                if (size % 256 != 0)
+                {
+                    size += 256 - (size % 256);
+                }
+
+                // Update the DAT files.
+                uint rawOffset = 0;
+                long retOffset = -1;
+
+                if (mod != null && mod.data.modSize >= size && doDatSave)
+                {
+                    // If our existing mod slot is large enough to hold us, keep using it.
+                    // *only* if we're going to immediately save the modlist though.
+                    // Otherwise it's possible this index update may get rolled back, so it would be unsafe
+                    // to overwrite any data.
+                    rawOffset = await Unsafe_WriteToDat(fileData, df, mod.data.modOffset);
+
+                }
+                else if (index == null && doDatSave)
+                {
+                    // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
+                    var slots = await Dat.ComputeOpenSlots(df);
+                    var slot = slots.FirstOrDefault(x => x.Value >= size);
+
+                    if (slot.Key >= 2048)
+                    {
+                        rawOffset = await Unsafe_WriteToDat(fileData, df, slot.Key);
+                    }
+                    else
+                    {
+                        rawOffset = await Unsafe_WriteToDat(fileData, df);
+                    }
+                }
+                else
+                {
+                    // If we're part of a larger transaction, write to the transaction data store.
+                    //tx.WriteData()
                     rawOffset = await Unsafe_WriteToDat(fileData, df);
                 }
-            }
-            else
-            {
-                // If we're part of a larger transaction, just write to the end of the file.
-                rawOffset = await Unsafe_WriteToDat(fileData, df);
-            }
 
-            retOffset = ((long)rawOffset) * 8L;
-            uint originalOffset = 0;
+                retOffset = ((long)rawOffset) * 8L;
+                uint originalOffset = 0;
 
-            // Update the Index files.
-            originalOffset = index.SetDataOffset(internalFilePath, retOffset);
+                // Update the Index files.
+                originalOffset = index.SetDataOffset(internalFilePath, retOffset);
 
-            var longOriginal = ((long)originalOffset) * 8L;
-            var fileType = BitConverter.ToInt32(fileData, 4);
+                var longOriginal = ((long)originalOffset) * 8L;
+                var fileType = BitConverter.ToInt32(fileData, 4);
 
-            if (mod == null)
-            {
-                // Determine if this is an original game file or not.
-                var fileAdditionMod = originalOffset == 0;
-
-                mod = new Mod()
+                if (mod == null)
                 {
-                    name = itemName,
-                    category = category,
-                    datFile = df.GetDataFileName(),
-                    source = sourceApplication,
-                    fullPath = internalFilePath,
-                    data = new Data()
-                };
-                mod.data.modOffset = retOffset;
-                mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
-                mod.data.modSize = size;
-                mod.data.dataType = fileType;
-                mod.enabled = true;
+                    // Determine if this is an original game file or not.
+                    var fileAdditionMod = originalOffset == 0;
 
-                // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
-                mod.modPack = mod.IsInternal() ? null : tx.ModPack;
-                modList.Mods.Add(mod);
-            }
-            else
-            {
-                var mPack = tx.ModPack == null ? mod.modPack : tx.ModPack;
-                var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
-                if (fileAdditionMod)
-                {
-                    mod.data.originalOffset = retOffset;
+                    mod = new Mod()
+                    {
+                        name = itemName,
+                        category = category,
+                        datFile = df.GetDataFileName(),
+                        source = sourceApplication,
+                        fullPath = internalFilePath,
+                        data = new Data()
+                    };
+                    mod.data.modOffset = retOffset;
+                    mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
+                    mod.data.modSize = size;
+                    mod.data.dataType = fileType;
+                    mod.enabled = true;
+
+                    // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
+                    mod.modPack = mod.IsInternal() ? null : tx.ModPack;
+                    modList.Mods.Add(mod);
                 }
-                mod.data.modOffset = retOffset;
-                mod.enabled = true;
-                mod.modPack = mod.IsInternal() ? null : mPack;
-                mod.data.modSize = size;
-                mod.data.dataType = fileType;
-                mod.name = itemName;
-                mod.category = category;
-                mod.source = sourceApplication;
-            }
+                else
+                {
+                    var mPack = tx.ModPack == null ? mod.modPack : tx.ModPack;
+                    var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
+                    if (fileAdditionMod)
+                    {
+                        mod.data.originalOffset = retOffset;
+                    }
+                    mod.data.modOffset = retOffset;
+                    mod.enabled = true;
+                    mod.modPack = mod.IsInternal() ? null : mPack;
+                    mod.data.modSize = size;
+                    mod.data.dataType = fileType;
+                    mod.name = itemName;
+                    mod.category = category;
+                    mod.source = sourceApplication;
+                }
 
-            if (doDatSave)
+                if (doDatSave)
+                {
+                    // Commit the transaction if we're doing a single file save.
+                    await ExpandMetadata(fileData, internalFilePath, tx);
+                    await ModTransaction.CommitTransaction(tx);
+                }
+                XivCache.QueueDependencyUpdate(internalFilePath);
+
+                // Job done.
+                return retOffset;
+            }
+            catch
             {
-                // Commit the transaction if we're doing a single file save.
-                await ExpandMetadata(fileData, internalFilePath, tx);
-                await ModTransaction.CommitTransaction(tx);
+                if (doDatSave)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
             }
-            XivCache.QueueDependencyUpdate(internalFilePath);
-
-            // Job done.
-            return retOffset;
         }
 
         /// <summary>

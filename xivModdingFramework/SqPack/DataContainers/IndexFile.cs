@@ -35,6 +35,7 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public class IndexFile
     {
+        public const bool _BENCHMARK_HACK = true;
         public bool ReadOnlyMode
         {
             get; private set;
@@ -471,13 +472,44 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
         }
 
+
+        /// <summary>
+        /// Gets the raw uint data offset from the index files, with DatNumber embeded.
+        /// Or 0 if the file does not exist.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public virtual uint GetRawDataOffset(string filePath)
+        {
+            // Check Index1
+            var offset = GetRawDataOffsetIndex1(filePath);
+            if(offset == 0)
+            {
+                // Check Index2.
+                offset = GetRawDataOffsetIndex2(filePath);
+            }
+            return offset;
+        }
+
+        /// <summary>
+        /// Gets the 8x multiplied data offset from the index files, with DatNumber embeded.
+        /// Or 0 if the file does not exist.  
+        /// This is primarily useful for legacy functionality.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public virtual long Get8xDataOffset(string filePath)
+        {
+            return ((long)GetRawDataOffset(filePath)) * 8L;
+        }
+
         /// <summary>
         /// Gets the raw uint data offset from the index file, with DatNumber embeded.
         /// Or 0 if the file does not exist.
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public virtual uint GetRawDataOffset(string filePath)
+        public virtual uint GetRawDataOffsetIndex1(string filePath)
         {
 
             var fileName = Path.GetFileName(filePath);
@@ -485,20 +517,28 @@ namespace xivModdingFramework.SqPack.DataContainers
             var fileHash = (uint) HashGenerator.GetHash(fileName);
             var folderHash = (uint) HashGenerator.GetHash(folderName);
 
+            uint offset = 0;
+            // Do we have a base table entry?
             if (Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].ContainsKey(fileHash))
             {
                 var entry = Index1Entries[folderHash][fileHash];
-                return entry.RawOffset;
+                offset = entry.RawOffset;
             }
 
-            // BENCHMARK ONLY -- Fallback for Index 2 Reads?
-            var fullHash = (uint) HashGenerator.GetHash(filePath);
-            if(Index2Entries.ContainsKey(fullHash))
+            // Do we have a synonym table entry?
+            ulong key = fileHash;
+            key = key << 32;
+            key |= folderHash;
+            if (Index1Synonyms.ContainsKey(key))
             {
-                return Index2Entries[fullHash].RawOffset;
+                var entry = Index1Synonyms[key].FirstOrDefault(x => x.FilePath == filePath);
+                if (entry != null)
+                {
+                    offset = entry.Offset;
+                }
             }
 
-            return 0;
+            return offset;
         }
 
         /// <summary>
@@ -508,9 +548,9 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public virtual long Get8xDataOffset(string filePath)
+        public virtual long Get8xDataOffsetIndex1(string filePath)
         {
-            return ((long) GetRawDataOffset(filePath)) * 8L;
+            return ((long) GetRawDataOffsetIndex1(filePath)) * 8L;
         }
 
         /// <summary>
@@ -524,13 +564,26 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             var fullHash = (uint)HashGenerator.GetHash(filePath);
 
+            uint offset = 0;
+
+            // Do we have a base entry?
             if (Index2Entries.ContainsKey(fullHash))
             {
                 var entry = Index2Entries[fullHash];
-                return entry.RawOffset;
+                offset = entry.RawOffset;
             }
 
-            return 0;
+            // Do we have a synonym table entry?
+            if (Index2Synonyms.ContainsKey(fullHash))
+            {
+                var entry = Index2Synonyms[fullHash].FirstOrDefault(x => x.FilePath == filePath);
+                if(entry != null)
+                {
+                    offset = entry.Offset;
+                }
+            }
+
+            return offset;
         }
 
         /// <summary>
@@ -544,20 +597,6 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
             return ((long)GetRawDataOffsetIndex2(filePath)) * 8L;
         }
-        public virtual (uint DatNumber, long DataOffset) GetDataOffsetComplete(string filePath)
-        {
-            var raw = GetRawDataOffset(filePath);
-            var datNum = (uint)((raw & 0x0F) / 2);
-
-            // Multiply by 8 to get us in the right frame.
-            long longOffset = ((long)raw) * 8;
-                
-            // And lop off the last 7 bits.
-            var longWithout = (longOffset / 128) * 128;
-
-            return (datNum, longWithout);
-        }
-
 
         /// <summary>
         /// Update the data offset for a given file, adding the file if needed.
@@ -623,13 +662,18 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
         }
 
+
+        protected virtual uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        {
+            return INTERNAL_SetDataOffset(filePath, newRawOffsetWithDatNumEmbed, false);
+        }
         /// <summary>
         /// Update the data offset for a given file, adding the file if needed.
         /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
         /// 
         /// Setting a value of 0 for the offset will remove the file pointer.
         /// </summary>
-        public virtual uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        protected virtual uint INTERNAL_SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed, bool allowRepair = false)
         {
             var fileName = Path.GetFileName(filePath);
             var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
@@ -637,69 +681,206 @@ namespace xivModdingFramework.SqPack.DataContainers
             var folderHash = (uint)HashGenerator.GetHash(folderName);
             var fullHash = (uint)HashGenerator.GetHash(filePath);
 
+            ulong key = (ulong)fileHash;
+            key = key << 32;
+            key |= folderHash;
 
-            if (!Index1Entries.ContainsKey(folderHash))
+            uint originalOffsetIndex1 = GetRawDataOffsetIndex1(filePath);
+            uint originalOffsetIndex2 = GetRawDataOffsetIndex2(filePath);
+            bool existsInIndex1 = originalOffsetIndex1 > 0;
+            bool existsInIndex2 = originalOffsetIndex2 > 0;
+            bool index1Syn = Index1Synonyms.ContainsKey(key);
+            bool index2Syn = Index2Synonyms.ContainsKey(fullHash);
+
+
+            // Create folder hash if needed.
+            if (newRawOffsetWithDatNumEmbed > 0 && !Index1Entries.ContainsKey(folderHash))
             {
                 Index1Entries.Add(folderHash, new Dictionary<uint, FileIndexEntry>());
             }
-
-            uint originalOffset = 0;
-            if (!Index1Entries[folderHash].ContainsKey(fileHash)) {
-
-                if (newRawOffsetWithDatNumEmbed != 0)
-                {
-                    var entry = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
-                    Index1Entries[folderHash].Add(fileHash, entry);
-                }
-            } else
+            
+            if(originalOffsetIndex1 == originalOffsetIndex2 && (!index1Syn && !index2Syn))
             {
+                // This is the typical case for updating, adding, or removing a file.
+                // It exists in the same state in both indexes, with no colisions.
+
+                if(originalOffsetIndex1 == newRawOffsetWithDatNumEmbed)
+                {
+                    // Updating to the same value that already exists, just return.
+                    return originalOffsetIndex1;
+                }
+
+                // Deleting existing file.
                 if (newRawOffsetWithDatNumEmbed == 0)
                 {
                     Index1Entries[folderHash].Remove(fileHash);
+                    Index2Entries.Remove(fullHash);
+
+                    // Remove folder if empty now.
+                    if(Index1Entries[folderHash].Count == 0)
+                    {
+                        Index1Entries.Remove(folderHash);
+                    }
+                    return originalOffsetIndex1;
                 }
                 else
                 {
-                    originalOffset = Index1Entries[folderHash][fileHash].RawOffset;
-                    Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
-                }
-            }
+                    // Creating or Updating.
+                    if (originalOffsetIndex1 > 0)
+                    {
+                        // Update existing
+                        Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        return originalOffsetIndex1;
+                    }
+                    else
+                    {
+                        // Add new, non-colliding file.
+                        var entry1 = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
+                        var entry2 = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
 
-            if(!Index2Entries.ContainsKey(fullHash))
+                        Index1Entries[folderHash].Add(fileHash, entry1);
+                        Index2Entries.Add(fullHash, entry2);
+                        return originalOffsetIndex1;
+                    }
+                }
+            } else if (!index1Syn && !index2Syn)
             {
-                if (newRawOffsetWithDatNumEmbed != 0)
+                // Cases where the values between indexes did not match, while not being synonyms.
+                // These are essentially all error states.
+                if(originalOffsetIndex1 == 0)
                 {
-                    var entry = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
-                    Index2Entries.Add(fullHash, entry);
+                    if (allowRepair)
+                    {
+                        // Create/Update as needed.
+                        var entry1 = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
+                        Index1Entries[folderHash].Add(fileHash, entry1);
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                        // Values out of repair path are unused/invalid.
+                        return uint.MaxValue;
+                    }
+
+                    if (_BENCHMARK_HACK)
+                    {
+                        // Doesn't exist in Index 1.
+                        // Set value from Index 2 to Index 1 and re-call.
+                        var entry1 = new FileIndexEntry(originalOffsetIndex2, fileHash, folderHash);
+                        Index1Entries[folderHash].Add(fileHash, entry1);
+                        return SetDataOffset(filePath, newRawOffsetWithDatNumEmbed);
+                    }
+
+                    // Doesn't exist in Index 1.
+                    // This means we hit a -NEW- Synonym in Index 2.
+                    throw new InvalidDataException("Cannot write new Synonym to Index 2 File: " + filePath + " : " + fullHash);
+                } else if(originalOffsetIndex2 == 0)
+                {
+                    if (allowRepair)
+                    {
+                        // Create/Update as needed.
+                        Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        var entry2 = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
+                        Index2Entries.Add(fullHash, entry2);
+
+                        // Values out of repair path are unused/invalid.
+                        return uint.MaxValue;
+                    }
+
+                    // Doesn't exist in Index 2.
+                    // This means we hit a -NEW- Synonym in Index 1.
+                    throw new InvalidDataException("Cannot write new Synonym to Index 1 File: "  + filePath + " : " + fileHash + " : " + folderHash);
+                } else
+                {
+                    if (allowRepair)
+                    {
+                        // Update existing
+                        Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                        // Values out of repair path are unused/invalid.
+                        return uint.MaxValue;
+                    }
+
+                    // This is a case, where the hash exists in both indexes, but with mismatching values...
+                    // While /NOT/ being a synonym in either...
+                    // This means either the index is partially corrupt....
+                    throw new InvalidDataException("Cannot Update non-Synonym index with mismatched Index1/Index2 Values: " + filePath);
                 }
             } else
             {
-                if (newRawOffsetWithDatNumEmbed == 0)
+                // Exists as a Synonym in one or both tables.
+                
+                if (index1Syn)
                 {
-                    Index2Entries.Remove(fullHash);
-                } else {
-                    if (!Index2Synonyms.ContainsKey(fullHash))
+                    // Update the synonym entry.
+                    var synEntry = Index1Synonyms[key].FirstOrDefault(x => x.FilePath == filePath);
+                    if(synEntry == null)
                     {
-                        // No Synonym.  Easy.
-                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
-                    } else
-                    {
-                        // We have to find our appropriate synonym table entry and update it.
-                        var syns = Index2Synonyms[fullHash];
-                        var syn = syns.FirstOrDefault(x => x.FilePath == filePath);
-                        if(syn == null)
-                        {
-                            throw new Exception("Cannot write 3rd hash-collision Synonym for file/Hash: " + filePath + " : " + fullHash.ToString());
-                        }
-
-                        syn.Offset = newRawOffsetWithDatNumEmbed;
+                        throw new InvalidDataException("Cannot add third Synonym Definition for Index1 Entry: " + filePath);
                     }
-
+                    synEntry.Offset = newRawOffsetWithDatNumEmbed;
                 }
-            }
+                
+                if(index2Syn)
+                {
+                    // Update the synonym entry.
+                    var synEntry = Index2Synonyms[fullHash].FirstOrDefault(x => x.FilePath == filePath);
+                    if (synEntry == null)
+                    {
+                        throw new InvalidDataException("Cannot add third Synonym Definition for Index2 Entry: " + filePath);
+                    }
+                    synEntry.Offset = newRawOffsetWithDatNumEmbed;
+                }
 
-            return originalOffset;
+                return originalOffsetIndex1;
+            }
         }
 
+
+        /// <summary>
+        /// Attempts to repair a broken index value.
+        /// </summary>
+        /// <param name="filePath"></param>
+        public virtual void RepairIndexValue(string filePath)
+        {
+            var fileName = Path.GetFileName(filePath);
+            var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
+            var fileHash = (uint)HashGenerator.GetHash(fileName);
+            var folderHash = (uint)HashGenerator.GetHash(folderName);
+            var fullHash = (uint)HashGenerator.GetHash(filePath);
+
+            ulong key = (ulong)fileHash;
+            key = key << 32;
+            key |= folderHash;
+
+            uint originalOffsetIndex1 = GetRawDataOffsetIndex1(filePath);
+            uint originalOffsetIndex2 = GetRawDataOffsetIndex2(filePath);
+            bool existsInIndex1 = originalOffsetIndex1 > 0;
+            bool existsInIndex2 = originalOffsetIndex2 > 0;
+            bool index1Syn = Index1Synonyms.ContainsKey(key);
+            bool index2Syn = Index2Synonyms.ContainsKey(fullHash);
+
+            if(originalOffsetIndex1 == originalOffsetIndex2)
+            {
+                // Doesn't need repair.
+                return;
+            }
+
+            if (!existsInIndex1)
+            {
+                INTERNAL_SetDataOffset(filePath, originalOffsetIndex2, true);
+            } else if(!existsInIndex2)
+            {
+                INTERNAL_SetDataOffset(filePath, originalOffsetIndex1, true);
+            }
+            else
+            {
+                // Exists in both indices with mismatching values.
+                // Treat Index1 as the gold truth value.
+                INTERNAL_SetDataOffset(filePath, originalOffsetIndex1, true);
+            }
+
+        }
 
         /// <summary>
         /// Returns the raw index entries contained in a specific folder.
@@ -716,7 +897,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
 
         /// <summary>
-        /// Retrieves the entire universe of folder => file hashes in the index.
+        /// Retrieves the entire universe of folder => file hashes in the index1.
         /// </summary>
         /// <returns></returns>
         public virtual Dictionary<uint, HashSet<uint>> GetAllHashes()
@@ -785,17 +966,8 @@ namespace xivModdingFramework.SqPack.DataContainers
 
         public virtual bool FileExists(string fullPath)
         {
-            var fileName = Path.GetFileName(fullPath);
-            var folderName = fullPath.Substring(0, fullPath.LastIndexOf('/'));
-            var fileHash = (uint)HashGenerator.GetHash(fileName);
-            var folderHash = (uint)HashGenerator.GetHash(folderName);
-
-            if(Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].ContainsKey(fileHash))
-            {
-                var entry = Index1Entries[folderHash][fileHash];
-                return entry.RawOffset != 0;
-            }
-            return false;
+            var offset = GetRawDataOffset(fullPath);
+            return offset > 0;
         }
 
         public virtual bool FolderExists(uint folderHash)
