@@ -1,8 +1,12 @@
 ﻿using HelixToolkit.SharpDX.Core.Core2D;
+using HelixToolkit.SharpDX.Core.Helper;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -48,8 +52,6 @@ namespace xivModdingFramework.SqPack.DataContainers
         // Index type, either 0 or 2.
         protected List<uint> IndexType = new List<uint>();
 
-        protected List<byte[]> SynonymTable = new List<byte[]>();
-
         protected List<byte[]> EmptyBlock = new List<byte[]>();
 
         // We regenerate the directory list manually, so we don't save it.
@@ -62,6 +64,12 @@ namespace xivModdingFramework.SqPack.DataContainers
         // Index2 entries.  Keyed by [Full Hash] => Entry
         protected Dictionary<uint, FileIndex2Entry> Index2Entries = new Dictionary<uint, FileIndex2Entry>();
 
+        // Index 1 Synonyms.  Keyed by merged [File Hash-Folder Hash] => Entries.
+        internal Dictionary<ulong, List<SynonymTableEntry>> Index1Synonyms = new Dictionary<ulong, List<SynonymTableEntry>>();
+
+        // Index 2 Synonyms.  Keyed by [Full Hash] => Entries
+        internal Dictionary<uint, List<SynonymTableEntry>> Index2Synonyms = new Dictionary<uint, List<SynonymTableEntry>>();
+
         // The data file this Index file refers to.
         public readonly XivDataFile DataFile;
 
@@ -71,9 +79,15 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream, bool readOnly = true)
         {
-            DataFile = dataFile;
-            ReadIndexFile(index1Stream, 0);
-            ReadIndexFile(index2Stream, 1);
+            try
+            {
+                DataFile = dataFile;
+                ReadIndexFile(index1Stream, 0);
+                ReadIndexFile(index2Stream, 1);
+            } catch(Exception ex)
+            {
+                throw;
+            }
         }
 
         public virtual void Save() {
@@ -107,7 +121,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         protected virtual void ReadIndexFile(BinaryReader br, int indexId = 0)
         {
             // Store the SqPack header for writing back later, though it's mostly just empty data.
-            _SqPackHeader.Add(br.ReadBytes(32));
+            _SqPackHeader.Add(br.ReadBytes((int)_SqPackHeaderSize));
             br.BaseStream.Seek(_SqPackHeaderSize, SeekOrigin.Begin);
 
             var headerSize = br.ReadUInt32();
@@ -129,7 +143,8 @@ namespace xivModdingFramework.SqPack.DataContainers
             // Don't need to store this since we regenerate it.
             var dataFileCount = br.ReadUInt32();
 
-            SynonymTable.Add(ReadSegment(br));
+            ReadSynTable(br, indexId);
+
             EmptyBlock.Add(ReadSegment(br));
 
             // We don't actually care about the directory data, since we regenerate it automatically.
@@ -138,7 +153,6 @@ namespace xivModdingFramework.SqPack.DataContainers
             IndexType.Add(br.ReadUInt32());
 
             // Rest of the file is padding and self-hash.
-            Debug.Write("asdf");
         }
         /// <summary>
         /// Reads the index offset data in index1 format mode.
@@ -191,10 +205,19 @@ namespace xivModdingFramework.SqPack.DataContainers
 
                 var bytes = br.ReadBytes(8);
                 entry.SetBytes(bytes);
+                var offset = BitConverter.ToUInt32(bytes, 4);
 
                 if (!Index2Entries.ContainsKey(entry.FullPathHash))
                 {
                     Index2Entries.Add(entry.FullPathHash, entry);
+                }
+                else
+                {
+                    Debug.Write(entry.RawOffset);
+                }
+                if ((offset & 0x1) > 0)
+                {
+                    Debug.Write(offset);
                 }
             }
 
@@ -202,6 +225,38 @@ namespace xivModdingFramework.SqPack.DataContainers
             br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
         }
 
+
+        protected virtual void ReadSynTable(BinaryReader br, int indexId)
+        {
+            uint segmentOffset = br.ReadUInt32();
+            uint segmentSize = br.ReadUInt32();
+            var storedOffset = br.BaseStream.Position;
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+
+            for (int i = 0; i < segmentSize / SynonymTableEntry.Size; i++)
+            {
+                var entry = SynonymTableEntry.ReadEntry(br);
+                if(indexId == 0)
+                {
+                    ulong key = entry.FilePathHash;
+                    key = key << 32;
+                    key |= entry.FolderPathHash;
+                    if (!Index1Synonyms.ContainsKey(key))
+                    {
+                        Index1Synonyms.Add(key, new List<SynonymTableEntry>());
+                    }
+                    Index1Synonyms[key].Add(entry);
+                } else
+                {
+                    if (!Index2Synonyms.ContainsKey(entry.FilePathHash))
+                    {
+                        Index2Synonyms.Add(entry.FilePathHash, new List<SynonymTableEntry>());
+                    }
+                    Index2Synonyms[entry.FilePathHash].Add(entry);
+                }
+            }
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+        }
 
         protected virtual byte[] ReadSegment(BinaryReader br)
         {
@@ -281,23 +336,53 @@ namespace xivModdingFramework.SqPack.DataContainers
             var offset = 0;
             foreach (var file in fileListing)
             {
-                var bytes = file.GetBytes();
+                var bytes = file.GetBytes(this);
                 Array.Copy(bytes, 0, fileSegment, offset, bytes.Length);
                 offset += bytes.Length;
             }
 
-            // Folder listing.
+            // Synonym table
+            var synTableSize = 0;
+            var synonymTableSegment = new byte[0];
+            offset = 0;
+            if (indexId == 0)
+            {
+                synTableSize = Index1Synonyms.Sum(x => x.Value.Count) * SynonymTableEntry.Size;
+                synonymTableSegment = new byte[synTableSize];
+                foreach (var kv in Index1Synonyms)
+                {
+                    foreach (var entry in kv.Value)
+                    {
+                        Array.Copy(entry.GetBytes(), 0, synonymTableSegment, offset, SynonymTableEntry.Size);
+                        offset += SynonymTableEntry.Size;
+                    }
+                }
+            } else
+            {
+                synTableSize = Index2Synonyms.Sum(x => x.Value.Count) * SynonymTableEntry.Size;
+                synonymTableSegment = new byte[synTableSize];
+                foreach (var kv in Index2Synonyms)
+                {
+                    foreach (var entry in kv.Value)
+                    {
+                        Array.Copy(entry.GetBytes(), 0, synonymTableSegment, offset, SynonymTableEntry.Size);
+                        offset += SynonymTableEntry.Size;
+                    }
+                }
+            }
+
+
+            // Folder listing
             var folderSegmentSize = folderListing.Count * 16;
             var folderSegment = new byte[folderSegmentSize];
             offset = 0;
             foreach (var kv in folderListing)
             {
-                Array.Copy(kv.Value.GetBytes(), 0, folderSegment, offset, 16);
+                Array.Copy(kv.Value.GetBytes(this), 0, folderSegment, offset, 16);
                 offset += 16;
             }
 
 
-            var synTableSize = SynonymTable[indexId].Length;
             var emptyBlockSize = EmptyBlock[indexId].Length;
 
             // Total size is Headers + segment sizes.
@@ -306,7 +391,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             // Calculate offsets.
             var segmentOffsets = new List<int>();
 
-            var fileSegmentOffset = offset;
+            var fileSegmentOffset = (int)(_SqPackHeaderSize + _IndexHeaderSize);
             var synTableOffset = fileSegmentOffset + fileSegmentSize;
             var emptyBlockOffset = synTableOffset + synTableSize;
             var folderSegmentOffset = emptyBlockOffset + emptyBlockSize;
@@ -331,15 +416,15 @@ namespace xivModdingFramework.SqPack.DataContainers
                     // Synonym Table Data Segment
                     bw.Write(BitConverter.GetBytes(synTableOffset));
                     bw.Write(BitConverter.GetBytes(synTableSize));
-                    Write64ByteHash(bw, sh.ComputeHash(SynonymTable[indexId]));
+                    Write64ByteHash(bw, sh.ComputeHash(synonymTableSegment));
 
                     // Empty Block Data Segment
-                    bw.Write(BitConverter.GetBytes(emptyBlockOffset));
+                    bw.Write(BitConverter.GetBytes(emptyBlockSize == 0 ? 0 : emptyBlockOffset));
                     bw.Write(BitConverter.GetBytes(emptyBlockSize));
                     Write64ByteHash(bw, sh.ComputeHash(EmptyBlock[indexId]));
 
                     // Folder Data Segment
-                    bw.Write(BitConverter.GetBytes(folderSegmentOffset));
+                    bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 ? 0 : folderSegmentOffset));
                     bw.Write(BitConverter.GetBytes(folderSegmentSize));
                     Write64ByteHash(bw, sh.ComputeHash(folderSegment));
 
@@ -364,7 +449,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             stream.Write(expandedHeader);
             stream.Write(indexHeaderBlock);
             stream.Write(fileSegment);
-            stream.Write(SynonymTable[indexId]);
+            stream.Write(synonymTableSegment);
             stream.Write(EmptyBlock[indexId]);
             stream.Write(folderSegment);
         }
@@ -581,7 +666,6 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             if(!Index2Entries.ContainsKey(fullHash))
             {
-
                 if (newRawOffsetWithDatNumEmbed != 0)
                 {
                     var entry = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
@@ -592,24 +676,30 @@ namespace xivModdingFramework.SqPack.DataContainers
                 if (newRawOffsetWithDatNumEmbed == 0)
                 {
                     Index2Entries.Remove(fullHash);
-                } else { 
-                    Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                } else {
+                    if (!Index2Synonyms.ContainsKey(fullHash))
+                    {
+                        // No Synonym.  Easy.
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                    } else
+                    {
+                        // We have to find our appropriate synonym table entry and update it.
+                        var syns = Index2Synonyms[fullHash];
+                        var syn = syns.FirstOrDefault(x => x.FilePath == filePath);
+                        if(syn == null)
+                        {
+                            throw new Exception("Cannot write 3rd hash-collision Synonym for file/Hash: " + filePath + " : " + fullHash.ToString());
+                        }
+
+                        syn.Offset = newRawOffsetWithDatNumEmbed;
+                    }
+
                 }
             }
 
             return originalOffset;
         }
 
-
-        /// <summary>
-        /// Checks to see if a given file path shows up in the Synonyms table.
-        /// </summary>
-        /// <param name="filePath"></param>
-        /// <returns></returns>
-        public virtual bool IsSynonym(string filePath)
-        {
-            return false;
-        }
 
         /// <summary>
         /// Returns the raw index entries contained in a specific folder.
@@ -732,7 +822,7 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public abstract class IndexEntry : IComparable, ICloneable
     {
-        public abstract byte[] GetBytes();
+        public abstract byte[] GetBytes(IndexFile indexFile);
         public abstract void SetBytes(byte[] b);
         public abstract int CompareTo(object obj);
         public abstract object Clone();
@@ -808,11 +898,21 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
 
-        public override byte[] GetBytes()
+        public override byte[] GetBytes(IndexFile indexFile)
         {
-            byte[] b = new byte[8];
-            IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fullPathHash), 0);
-            IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fileOffset), 4);
+            var b = new byte[8];
+
+            if (indexFile.Index2Synonyms.ContainsKey(_fileOffset))
+            {
+                // Synonyms just write a [1] in place of offset since they use the Synonym table.
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fullPathHash), 0);
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes((uint)1), 4);
+            }
+            else
+            {
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fullPathHash), 0);
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fileOffset), 4);
+            }
 
             return b;
         }
@@ -921,7 +1021,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
 
-        public override byte[] GetBytes()
+        public override byte[] GetBytes(IndexFile indexFile)
         {
             byte[] b = new byte[16];
             IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fileNameHash), 0);
@@ -1015,7 +1115,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             _totalFolderSize = totalSize;
         }
 
-        public override byte[] GetBytes()
+        public override byte[] GetBytes(IndexFile indexFile)
         {
             byte[] b = new byte[16];
             IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_folderPathHash), 0);
@@ -1062,5 +1162,78 @@ namespace xivModdingFramework.SqPack.DataContainers
     }
 
 
+    public class SynonymTableEntry
+    {
+        public const int Size = 256;
+        public uint FilePathHash;
+        public uint FolderPathHash; // Always Seems to be 0.
+        public uint Offset;
+        public uint SynonymNumber; // 0 or 1
+        public string FilePath;
+
+        /// <summary>
+        /// The default table-ending synonym entry.
+        /// Seems to always be included?
+        /// </summary>
+        /// <returns></returns>
+        public static SynonymTableEntry GetSynTableEndingEntry()
+        {
+            var entry = new SynonymTableEntry();
+            entry.FilePathHash = uint.MaxValue;
+            entry.FolderPathHash = uint.MaxValue;
+            entry.Offset = 0;
+            entry.SynonymNumber = uint.MaxValue;
+            entry.FilePath = "";
+            return entry;
+        }
+
+        public static SynonymTableEntry ReadEntry(BinaryReader br)
+        {
+            var entry = new SynonymTableEntry();
+            var offset = br.BaseStream.Position;
+            var end = br.BaseStream.Position + Size;
+            entry.FilePathHash = br.ReadUInt32();
+            entry.FolderPathHash = br.ReadUInt32();
+
+            entry.Offset = br.ReadUInt32();
+            entry.SynonymNumber = br.ReadUInt32();
+            entry.FilePath = Dat.ReadNullTerminatedString(br);
+
+            // Remainder is padding bytes of value 254 or 0 depending on if it is a valid or ending entry.
+            br.BaseStream.Seek(end, SeekOrigin.Begin);
+
+            return entry;
+        }
+
+        public byte[] GetBytes()
+        {
+            try
+            {
+                var bytes = new byte[Size];
+                Array.Copy(BitConverter.GetBytes(FilePathHash), 0, bytes, 0, sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(FolderPathHash), 0, bytes, 4, sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(Offset), 0, bytes, 8, sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(SynonymNumber), 0, bytes, 12, sizeof(uint));
+
+                var strBytes = Encoding.UTF8.GetBytes(FilePath);
+                Array.Copy(strBytes, 0, bytes, 16, strBytes.Length);
+
+                if (FilePathHash != uint.MaxValue)
+                {
+                    var offset = strBytes.Length + 16 + 1;
+                    for (int i = offset; i < Size; i++)
+                    {
+                        bytes[i] = 254;
+                    }
+                }
+                return bytes;
+            }
+            catch(Exception ex)
+            {
+                throw;
+            }
+        }
+
+    }
 
 }
