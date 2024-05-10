@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
@@ -17,6 +18,9 @@ namespace xivModdingFramework.Mods
 {
     public class ModTransaction : IDisposable
     {
+
+        #region Properties and Accessors
+
         private Dictionary<XivDataFile, IndexFile> _IndexFiles = new Dictionary<XivDataFile, IndexFile>();
 
         // Modified times the first time we access the index files.
@@ -30,8 +34,9 @@ namespace xivModdingFramework.Mods
 
         private ModList _ModList;
         public ModPack ModPack { get; set; }
-        private bool _ReadOnly = false;
+        private readonly bool _ReadOnly = false;
         private bool _Finished = false;
+        private TransactionDataHandler _DataHandler;
 
         private SqPack.FileTypes.Index __Index;
         private Modding __Modding;
@@ -94,29 +99,6 @@ namespace xivModdingFramework.Mods
             return _IndexFiles[dataFile];
         } 
 
-        /// <summary>
-        /// Syntactic shortcut for retrieving the 8x Data offset from the index files.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        public async Task<long> Get8xDataOffset(string path)
-        {
-            var df = IOUtil.GetDataFileFromPath(path);
-            var idx = await GetIndexFile(df);
-            return idx.Get8xDataOffset(path);
-        }
-        /// <summary>
-        /// Syntactic shortcut for validating a file exists.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        public async Task<bool> FileExists(string path)
-        {
-            var df = IOUtil.GetDataFileFromPath(path);
-            var idx = await GetIndexFile(df);
-            return idx.FileExists(path);
-        }
-
         public async Task<ModList> GetModList()
         {
             if(_ModList == null)
@@ -127,108 +109,28 @@ namespace xivModdingFramework.Mods
             return _ModList;
         }
 
-        private void CheckWriteTimes()
-        {
-            if(_ModListModifiedTime != File.GetLastWriteTimeUtc(__Modding.ModListDirectory.FullName) && _ModListModifiedTime != new DateTime())
-            {
-                throw new Exception("Modlist file were modified since beginning transaction.  Cannot safely commit/cancel transaction");
-            }
+        #endregion
 
-            foreach (var kv in _IndexFiles)
-            {
-                var dataFile = kv.Key;
-                var index1Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.IndexExtension}");
-                var index2Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.Index2Extension}");
 
-                var index1Time = File.GetLastWriteTimeUtc(index1Path);
-                var index2Time = File.GetLastWriteTimeUtc(index2Path);
-
-                if (_Index1ModifiedTimes[dataFile] != index1Time
-                    || _Index2ModifiedTimes[dataFile] != index2Time)
-                {
-                    throw new Exception("Index files were modified since beginning transaction.  Cannot safely commit/cancel transaction.");
-                }
-            }
-        }
-
-        private void TruncateDats()
-        {
-            foreach (var kv in _IndexFiles)
-            {
-                var dataFile = kv.Key;
-                for (int i = 0; i < _MAX_DATS; i++)
-                {
-                    var datPath = Dat.GetDatPath(dataFile, i);
-                    if (File.Exists(datPath) && _DatFileSizes[dataFile].Count > i)
-                    {
-                        using (var fs = File.Open(datPath, FileMode.Open))
-                        {
-                            fs.SetLength(_DatFileSizes[dataFile][i]);
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Sets the internal ModPack object.
-        /// This is used as a default modpack to list as the owner of any file changes.
-        /// It can be changed mid-transaction as many times as necessary, or NULL'd if there should be no modpack associated,
-        /// or if the ModList will be managed directly at some point during the transaction instead.
-        /// </summary>
-        /// <param name="modpack"></param>
-        private void SetModPack(ModPack modpack)
-        {
-            ModPack = modpack;
-        }
-
+        #region Constructor/Disposable Pattern
         private ModTransaction(bool readOnly = false, ModPack modpack = null)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
             __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
             __Modding = new Modding(XivCache.GameInfo.GameDirectory);
-            _ReadOnly = readOnly;
-        }
 
-        private async Task CommitTransaction()
-        {
+            // NOTE: Readonly Transactions should not implement anything that requires disposal via IDisposable.
+            // Readonly Tx are intended to be lightweight and used in non-disposable/standard memory managed contexts.
+            _ReadOnly = readOnly;
             if (_ReadOnly)
             {
-                throw new Exception("Attempted to commit a Read Only Transaction.");
-            }
-
-            // Lumina import mode does not write to came indexes/modlist.
-            if (XivCache.GameInfo.UseLumina)
+                // Readonly Data Handlers do not technically need to be disposed as they never create a data store.
+                _DataHandler = new TransactionDataHandler(EFileStorageType.ReadOnly);
+            } else
             {
-                return;
+                _DataHandler = new TransactionDataHandler(EFileStorageType.UncompressedIndividual);
             }
-
-            CheckWriteTimes();
-
-            foreach (var index in _IndexFiles)
-            {
-                index.Value.Save();
-            }
-            if (_ModList != null)
-            {
-                await __Modding.SaveModListAsync(_ModList);
-            }
-        }
-        private void CancelTransaction()
-        {
-            if (!_ReadOnly && !_Finished)
-            {
-                // Validate that nothing has touched our Indexes.
-                CheckWriteTimes();
-
-                // Reset our DAT sizes back to what they were before we started the Transaction.
-                TruncateDats();
-            }
-
-            _IndexFiles = null;
-            _ModList = null;
-            ModPack = null;
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -236,6 +138,13 @@ namespace xivModdingFramework.Mods
             {
                 if (!_Finished)
                 {
+                    if (_DataHandler != null)
+                    {
+                        // Clear data handler temp files.
+                        _DataHandler.Dispose();
+                        _DataHandler = null;
+                    }
+
                     // If we haven't been cancelled or committed, do so.
                     ModTransaction.CancelTransaction(this);
                 }
@@ -248,7 +157,10 @@ namespace xivModdingFramework.Mods
             Dispose(true);
             GC.SuppressFinalize(this);
         }
+        #endregion
 
+
+        #region Open/Close Transaction Functions
         /// <summary>
         /// Opens a new mod transaction.
         /// Transactions will still write data to DATs in real time, but will cache index and modlist changes until they are committed.
@@ -302,6 +214,30 @@ namespace xivModdingFramework.Mods
                 XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
             }
         }
+        private async Task CommitTransaction()
+        {
+            if (_ReadOnly)
+            {
+                throw new Exception("Attempted to commit a Read Only Transaction.");
+            }
+
+            // Lumina import mode does not write to came indexes/modlist.
+            if (XivCache.GameInfo.UseLumina)
+            {
+                return;
+            }
+
+            CheckWriteTimes();
+
+            foreach (var index in _IndexFiles)
+            {
+                index.Value.Save();
+            }
+            if (_ModList != null)
+            {
+                await __Modding.SaveModListAsync(_ModList);
+            }
+        }
 
         /// <summary>
         /// Cancels the given transaction.
@@ -312,7 +248,7 @@ namespace xivModdingFramework.Mods
         {
 
             // Readonly transactions don't really have a true cancel, or need to be cancelled, but we can at least mark them done.
-            if(tx._ReadOnly)
+            if (tx._ReadOnly)
             {
                 tx.CancelTransaction();
                 tx._Finished = true;
@@ -335,5 +271,161 @@ namespace xivModdingFramework.Mods
                 XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
             }
         }
+        private void CancelTransaction()
+        {
+            if (!_ReadOnly && !_Finished)
+            {
+                // Validate that nothing has touched our Indexes.
+                CheckWriteTimes();
+
+                // Reset our DAT sizes back to what they were before we started the Transaction.
+                TruncateDats();
+            }
+
+            _IndexFiles = null;
+            _ModList = null;
+            ModPack = null;
+        }
+        private void CheckWriteTimes()
+        {
+            if (_ModListModifiedTime != File.GetLastWriteTimeUtc(__Modding.ModListDirectory.FullName) && _ModListModifiedTime != new DateTime())
+            {
+                throw new Exception("Modlist file were modified since beginning transaction.  Cannot safely commit/cancel transaction");
+            }
+
+            foreach (var kv in _IndexFiles)
+            {
+                var dataFile = kv.Key;
+                var index1Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.IndexExtension}");
+                var index2Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.Index2Extension}");
+
+                var index1Time = File.GetLastWriteTimeUtc(index1Path);
+                var index2Time = File.GetLastWriteTimeUtc(index2Path);
+
+                if (_Index1ModifiedTimes[dataFile] != index1Time
+                    || _Index2ModifiedTimes[dataFile] != index2Time)
+                {
+                    throw new Exception("Index files were modified since beginning transaction.  Cannot safely commit/cancel transaction.");
+                }
+            }
+        }
+        private void TruncateDats()
+        {
+            foreach (var kv in _IndexFiles)
+            {
+                var dataFile = kv.Key;
+                for (int i = 0; i < _MAX_DATS; i++)
+                {
+                    var datPath = Dat.GetDatPath(dataFile, i);
+                    if (File.Exists(datPath) && _DatFileSizes[dataFile].Count > i)
+                    {
+                        using (var fs = File.Open(datPath, FileMode.Open))
+                        {
+                            fs.SetLength(_DatFileSizes[dataFile][i]);
+                        }
+                    }
+                }
+            }
+        }
+        #endregion
+
+
+        #region Index File Shortcut Accessors
+        /// <summary>
+        /// Syntactic shortcut for retrieving the 8x Data offset from the index files.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<long> Get8xDataOffset(string path)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return idx.Get8xDataOffset(path);
+        }
+        /// <summary>
+        /// Syntactic shortcut for retrieving the uint32 Dat-Embedded, FFXIV-Style Data offset from the index files.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<uint> GetDataOffset(string path)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return idx.GetRawDataOffset(path);
+        }
+        /// <summary>
+        /// Syntactic shortcut for validating a file exists.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<bool> FileExists(string path)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return idx.FileExists(path);
+        }
+        /// <summary>
+        /// Syntactic shortcut for updating a given index's offset.
+        /// Takes and returns the 8x dat-embedded index offset.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="offset8x"></param>
+        /// <returns></returns>
+        public async Task<uint> UpdateDataOffset(string path, long offset8x)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return 8 * idx.SetDataOffset(path, offset8x);
+        }
+
+        /// <summary>
+        /// Syntactic shortcut for updating a given index's offset.
+        /// Takes and returns a dat-embedded uint32 FFXIV style offset.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="sqOffset"></param>
+        /// <returns></returns>
+        public async Task<uint> UpdateDataOffset(string path, uint sqOffset)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var idx = await GetIndexFile(df);
+            return idx.SetDataOffset(path, sqOffset);
+        }
+        #endregion
+
+
+        #region Raw Data I/O
+
+        /// <summary>
+        /// Retrieves the data for a given data file/offset key.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="offset8x"></param>
+        /// <returns></returns>
+        public async Task<byte[]> GetData(XivDataFile dataFile, long offset8x, bool compressed = false)
+        {
+            if (compressed)
+            {
+                return await _DataHandler.GetCompressedFile(dataFile, offset8x);
+            } else
+            {
+                return await _DataHandler.GetUncompressedFile(dataFile, offset8x);
+            }
+        }
+
+        /// <summary>
+        /// Writes the given data to the default transaction data store, keyed to the given data file/offset key.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="offset8x"></param>
+        /// <param name="compressed"></param>
+        /// <returns></returns>
+        public async Task WriteData(XivDataFile dataFile, long offset8x, byte[] data, bool compressed = false)
+        {
+            await _DataHandler.WriteFile(dataFile, offset8x, data, compressed);
+        }
+
+        #endregion
+
     }
 }

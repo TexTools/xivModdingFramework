@@ -603,7 +603,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 // Always write data to end of file during modpack imports in case we need
                                 // to roll back the import.
-                                uint offset = await dat.WriteToDat(data, df);
+                                uint offset = await dat.Unsafe_WriteToDat(data, df);
                                 DatOffsets.Add(modJson.FullPath, offset);
 
                                 var dataType = BitConverter.ToInt32(data, 4);

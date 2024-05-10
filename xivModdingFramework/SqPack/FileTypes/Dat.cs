@@ -2141,7 +2141,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="importData"></param>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        public async Task<uint> WriteToDat(byte[] importData, XivDataFile dataFile, long targetOffset = 0)
+        public async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, long targetOffset = 0)
         {
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
@@ -2349,7 +2349,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // *only* if we're going to immediately save the modlist though.
                 // Otherwise it's possible this index update may get rolled back, so it would be unsafe
                 // to overwrite any data.
-                rawOffset = await WriteToDat(fileData, df, mod.data.modOffset);
+                rawOffset = await Unsafe_WriteToDat(fileData, df, mod.data.modOffset);
 
             }
             else if (index == null && doDatSave)
@@ -2360,17 +2360,17 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 if (slot.Key >= 2048)
                 {
-                    rawOffset = await WriteToDat(fileData, df, slot.Key);
+                    rawOffset = await Unsafe_WriteToDat(fileData, df, slot.Key);
                 }
                 else
                 {
-                    rawOffset = await WriteToDat(fileData, df);
+                    rawOffset = await Unsafe_WriteToDat(fileData, df);
                 }
             }
             else
             {
                 // If we're part of a larger transaction, just write to the end of the file.
-                rawOffset = await WriteToDat(fileData, df);
+                rawOffset = await Unsafe_WriteToDat(fileData, df);
             }
 
             retOffset = ((long)rawOffset) * 8L;
@@ -2584,7 +2584,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Order by their offset, ascending.
                 var ordered = kv.OrderBy(x => x.data.modOffset);
-
 
                 // Scan through each mod, and any time there's a gap, add it to the listing.
                 long lastEndPoint = 2048;
