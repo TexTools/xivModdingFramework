@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -12,6 +13,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.SqPack.DataContainers
@@ -34,29 +36,25 @@ namespace xivModdingFramework.SqPack.DataContainers
             get; private set;
         }
 
-        // Header bytes (1024 in length usually)
-        protected byte[] Index1Header;
-
-        // Header bytes (1024 in length usually)
-        protected byte[] Index2Header;
-
         // Total size of the segment header block (usually 1024)
-        protected uint Index1TotalSegmentHeaderSize;
+        protected const uint _SqPackHeaderSize = 1024;
+        protected const uint _IndexHeaderSize = 1024;
 
-        // Total size of the segment header block (usually 1024)
-        protected uint Index2TotalSegmentHeaderSize;
+        protected List<byte[]> _SqPackHeader = new List<byte[]>((int)_SqPackHeaderSize);
 
-        // The segment blocks we should copy/paste as-is into the file, which have unknown purpose.
-        protected List<byte[]> Index1ExtraSegments = new List<byte[]>();
+        // Version, typically just 1.
+        protected List<uint> IndexVersion = new List<uint>();
 
-        // The segment blocks we should copy/paste as-is into the file, which have unknown purpose.
-        protected List<byte[]> Index2ExtraSegments = new List<byte[]>();
+        // Index type, either 0 or 2.
+        protected List<uint> IndexType = new List<uint>();
 
-        // The unknown ints in the segment headers.
-        protected List<int> Index1SegmentUnknowns = new List<int>();
+        protected List<byte[]> SynonymTable = new List<byte[]>();
 
-        // The unknown ints in the segment headers.
-        protected List<int> Index2SegmentUnknowns = new List<int>();
+        protected List<byte[]> EmptyBlock = new List<byte[]>();
+
+        // We regenerate the directory list manually, so we don't save it.
+        //protected List<byte[]> DirBlock = new List<byte[]>();
+
 
         // Index1 entries.  Keyed by [Folder Hash, File Hash] => Entry
         protected Dictionary<uint, Dictionary<uint, FileIndexEntry>> Index1Entries = new Dictionary<uint, Dictionary<uint, FileIndexEntry>>();
@@ -71,20 +69,11 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Standard constructor.
         /// </summary>
-        public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream)
+        public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream, bool readOnly = true)
         {
             DataFile = dataFile;
-
-            ReadIndex1File(index1Stream);
-
-            if (index2Stream != null)
-            {
-                ReadIndex2File(index2Stream);
-                ReadOnlyMode = false;
-            } else
-            {
-                ReadOnlyMode = true;
-            }
+            ReadIndexFile(index1Stream, 0);
+            ReadIndexFile(index2Stream, 1);
         }
 
         public virtual void Save() {
@@ -105,416 +94,297 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
             if (ReadOnlyMode) throw new InvalidDataException("Index Files loaded in Read Only Mode cannot be saved to file.");
 
-            WriteIndex1File(index1Stream);
-            WriteIndex2File(index2Stream);
+            try
+            {
+                WriteIndexFile(index1Stream, 0);
+                WriteIndexFile(index2Stream, 1);
+            } catch (Exception ex)
+            {
+                throw;
+            }
+        }
 
+        protected virtual void ReadIndexFile(BinaryReader br, int indexId = 0)
+        {
+            // Store the SqPack header for writing back later, though it's mostly just empty data.
+            _SqPackHeader.Add(br.ReadBytes(32));
+            br.BaseStream.Seek(_SqPackHeaderSize, SeekOrigin.Begin);
+
+            var headerSize = br.ReadUInt32();
+            if(headerSize != _IndexHeaderSize)
+            {
+                throw new Exception("Invalid index or index file format changed.");
+            }
+
+            IndexVersion.Add(br.ReadUInt32());
+
+            if (indexId == 0)
+            {
+                ReadIndex1Data(br);
+            } else
+            {
+                ReadIndex2Data(br);
+            }
+
+            // Don't need to store this since we regenerate it.
+            var dataFileCount = br.ReadUInt32();
+
+            SynonymTable.Add(ReadSegment(br));
+            EmptyBlock.Add(ReadSegment(br));
+
+            // We don't actually care about the directory data, since we regenerate it automatically.
+            var directoryData = ReadSegment(br);
+
+            IndexType.Add(br.ReadUInt32());
+
+            // Rest of the file is padding and self-hash.
+            Debug.Write("asdf");
+        }
+        /// <summary>
+        /// Reads the index offset data in index1 format mode.
+        /// </summary>
+        /// <param name="br"></param>
+        protected virtual void ReadIndex1Data(BinaryReader br)
+        {
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var storedOffset = br.BaseStream.Position;
+
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            for (int x = 0; x < segmentSize; x += 16)
+            {
+                FileIndexEntry entry;
+                entry = new FileIndexEntry();
+
+                var bytes = br.ReadBytes(16);
+                entry.SetBytes(bytes);
+
+                if (!Index1Entries.ContainsKey(entry.FolderPathHash))
+                {
+                    Index1Entries.Add(entry.FolderPathHash, new Dictionary<uint, FileIndexEntry>());
+                }
+                if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
+                {
+                    Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
+                }
+            }
+
+            // Skip past the hash.
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+        }
+
+        /// <summary>
+        /// Reads the index offset data in index2 format mode.
+        /// </summary>
+        /// <param name="br"></param>
+        protected virtual void ReadIndex2Data(BinaryReader br)
+        {
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var storedOffset = br.BaseStream.Position;
+
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            for (int x = 0; x < segmentSize; x += 8)
+            {
+                FileIndex2Entry entry;
+                entry = new FileIndex2Entry();
+
+                var bytes = br.ReadBytes(8);
+                entry.SetBytes(bytes);
+
+                if (!Index2Entries.ContainsKey(entry.FullPathHash))
+                {
+                    Index2Entries.Add(entry.FullPathHash, entry);
+                }
+            }
+
+            // Skip past the hash.
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+        }
+
+
+        protected virtual byte[] ReadSegment(BinaryReader br)
+        {
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var storedOffset = br.BaseStream.Position;
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            var data = br.ReadBytes(segmentSize);
+
+            // Skip past the hash.
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+            return data;
+        }
+
+        protected virtual void WriteIndexFile(BinaryWriter stream, int indexId)
+        {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var datCount = _dat.GetLargestDatNumber(DataFile) + 1;
 
-            // Update Dat Counts.
-            index1Stream.BaseStream.Seek(1104, SeekOrigin.Begin);
-            index1Stream.Write(datCount);
-            index2Stream.BaseStream.Seek(1104, SeekOrigin.Begin);
-            index2Stream.Write(datCount);
-        }
-
-        protected virtual void ReadIndex1File(BinaryReader stream)
-        {
-            stream.BaseStream.Seek(12, SeekOrigin.Begin);
-            int headerSize = stream.ReadInt32();
-
-            stream.BaseStream.Seek(headerSize, SeekOrigin.Begin);
-            Index1TotalSegmentHeaderSize = stream.ReadUInt32();
-
-            for (int segmentId = 0; segmentId < 4; segmentId++)
-            {
-                // For some reason segment 0 has 4 bytes more padding
-                var offset = (segmentId * 72) + (headerSize + 4);
-                if (segmentId > 0)
-                {
-                    offset += 4;
-                }
-
-                stream.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                // 12 Bytes of metadata
-                Index1SegmentUnknowns.Add(stream.ReadInt32());
-                int segmentOffset = stream.ReadInt32();
-                int segmentSize = stream.ReadInt32();
-
-                // Next 20 bytes is the SHA-1 of the segment header.
-                // (Don't need to read b/c we recalculate it on writing anyways)
-
-                // Time to read the actual segment data.
-                stream.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
-
-                if (segmentId == 0)
-                {
-                    for (int x = 0; x < segmentSize; x += 16)
-                    {
-                        FileIndexEntry entry;
-                        entry = new FileIndexEntry();
-
-                        var bytes = stream.ReadBytes(16);
-                        entry.SetBytes(bytes);
-
-                        if (!Index1Entries.ContainsKey(entry.FolderPathHash))
-                        {
-                            Index1Entries.Add(entry.FolderPathHash, new Dictionary<uint, FileIndexEntry>());
-                        }
-                        if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
-                        {
-                            Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
-                        }
-                    }
-                } else if(segmentId == 1 || segmentId == 2)
-                {
-                    // Segment 4 is regenerated when writing, so we don't need to store it.
-                    Index1ExtraSegments.Add(stream.ReadBytes(segmentSize));
-                }
-            }
-
-            // Copy the original header in so we have it for later.
-            stream.BaseStream.Seek(0, SeekOrigin.Begin);
-            var header = stream.ReadBytes(headerSize);
-
-            Index1Header = header;
-        }
-        protected virtual void ReadIndex2File(BinaryReader stream)
-        {
-            stream.BaseStream.Seek(12, SeekOrigin.Begin);
-            int headerSize = stream.ReadInt32();
-
-            stream.BaseStream.Seek(headerSize, SeekOrigin.Begin);
-            Index2TotalSegmentHeaderSize = stream.ReadUInt32();
-
-            for (int segmentId = 0; segmentId < 4; segmentId++)
-            {
-                // For some reason segment 0 has 4 bytes more padding
-                var offset = (segmentId * 72) + (headerSize + 4);
-                if (segmentId > 0)
-                {
-                    offset += 4;
-                }
-
-                stream.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                // 12 Bytes of metadata
-                Index2SegmentUnknowns.Add(stream.ReadInt32());
-                int segmentOffset = stream.ReadInt32();
-                int segmentSize = stream.ReadInt32();
-
-                // Next 20 bytes is the SHA-1 of the segment header.
-                // (Don't need to read b/c we recalculat it on writing anyways)
-
-                // Time to read the actual segment data.
-                stream.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
-
-                if (segmentId == 0)
-                {
-                    for (int x = 0; x < segmentSize; x += 8)
-                    {
-                        FileIndex2Entry entry;
-                        entry = new FileIndex2Entry();
-
-                        var bytes = stream.ReadBytes(8);
-                        entry.SetBytes(bytes);
-
-                        if (!Index2Entries.ContainsKey(entry.FullPathHash))
-                        {
-                            Index2Entries.Add(entry.FullPathHash, entry);
-                        }
-                    }
-                }
-                else if (segmentId == 1 || segmentId == 2 || segmentId == 3)
-                {
-                       Index2ExtraSegments.Add(stream.ReadBytes(segmentSize));
-                }
-            }
-
-            // Copy the original header in so we have it for later.
-            stream.BaseStream.Seek(0, SeekOrigin.Begin);
-            var header = stream.ReadBytes(headerSize);
-
-            Index2Header = header;
-        }
-
-        protected virtual void WriteIndex1File(BinaryWriter stream)
-        {
             var sh = SHA1.Create();
 
             // First, we need to create the actual sorted lists of the file entries and folder entries.
-            var fileListing = new List<FileIndexEntry>();
+            var fileListing = new List<IndexEntry>();
             var folderListing = new Dictionary<uint, FolderIndexEntry>();
 
-            var sortedFolders = Index1Entries.Keys.OrderBy(x => x);
-            var currentFileOffset = (uint)(Index1Header.Length + Index1TotalSegmentHeaderSize);
-            foreach (var folderKey in sortedFolders)
+            var currentFileOffset = (uint)(_SqPackHeaderSize + _IndexHeaderSize);
+
+            if (indexId == 0)
             {
-                folderListing.Add(folderKey, new FolderIndexEntry(folderKey, 0, 0));
-
-                var sortedFiles = Index1Entries[folderKey].Keys.OrderBy(x => x);
-                foreach (var fileKey in sortedFiles)
+                var sortedFolders = Index1Entries.Keys.OrderBy(x => x);
+                // Index 1 has to be sorted by folder.
+                foreach (var folderKey in sortedFolders)
                 {
-                    var entry = Index1Entries[folderKey][fileKey];
+                    folderListing.Add(folderKey, new FolderIndexEntry(folderKey, 0, 0));
 
-                    // Don't include null files.
-                    if (entry.DataOffset == 0) continue;
-
-                    // Set the olfer start offset if we haven't yet.
-                    if (folderListing[folderKey].IndexEntriesOffset == 0)
+                    var sortedFiles = Index1Entries[folderKey].Keys.OrderBy(x => x);
+                    foreach (var fileKey in sortedFiles)
                     {
-                        folderListing[folderKey].IndexEntriesOffset = currentFileOffset;
+                        var entry = Index1Entries[folderKey][fileKey];
+
+                        // Don't include null files.
+                        if (entry.DataOffset == 0) continue;
+
+                        // Set the folder start offset if we haven't yet.
+                        if (folderListing[folderKey].IndexEntriesOffset == 0)
+                        {
+                            folderListing[folderKey].IndexEntriesOffset = currentFileOffset;
+                        }
+
+                        folderListing[folderKey].FileCount++;
+                        if (entry.FileNameHash != fileKey || entry.FolderPathHash != folderKey)
+                        {
+                            throw new Exception("Attempted to save Index file with invalid structure.");
+                        }
+                        fileListing.Add(entry);
+
+                        currentFileOffset += 16;
                     }
 
-                    folderListing[folderKey].FileCount++;
-                    if (entry.FileNameHash != fileKey || entry.FolderPathHash != folderKey)
+                    // Don't include empty folders.
+                    if (folderListing[folderKey].FileCount == 0)
                     {
-                        throw new Exception("Attempted to save Index file with invalid structure.");
+                        folderListing.Remove(folderKey);
                     }
-                    fileListing.Add(entry);
 
-                    currentFileOffset += 16;
                 }
-
-                // Don't include empty folders.
-                if(folderListing[folderKey].FileCount == 0)
-                {
-                    folderListing.Remove(folderKey);
-                }
-
+            } else
+            {
+                // Index 2 is just sorted by hash
+                fileListing.AddRange(Index2Entries.Select(x => x.Value).OrderBy(x => x.FullPathHash));
             }
 
 
-            var totalSize = Index1Header.Length;
-            totalSize += (int)Index1TotalSegmentHeaderSize;
+            // File listing.
+            var fileSegmentSize = fileListing.Count * (indexId == 0 ? 16 : 8);
+            var fileSegment = new byte[fileSegmentSize];
+            var offset = 0;
+            foreach (var file in fileListing)
+            {
+                var bytes = file.GetBytes();
+                Array.Copy(bytes, 0, fileSegment, offset, bytes.Length);
+                offset += bytes.Length;
+            }
 
-            var fileSegmentSize = fileListing.Count * 16;
+            // Folder listing.
             var folderSegmentSize = folderListing.Count * 16;
-            var otherSegmentSize = Index1ExtraSegments[0].Length + Index1ExtraSegments[1].Length;
+            var folderSegment = new byte[folderSegmentSize];
+            offset = 0;
+            foreach (var kv in folderListing)
+            {
+                Array.Copy(kv.Value.GetBytes(), 0, folderSegment, offset, 16);
+                offset += 16;
+            }
+
+
+            var synTableSize = SynonymTable[indexId].Length;
+            var emptyBlockSize = EmptyBlock[indexId].Length;
 
             // Total size is Headers + segment sizes.
-            totalSize += fileSegmentSize + folderSegmentSize + otherSegmentSize;
-
-
-
-            // Calculate individual sizes.
-            var segmentSizes = new List<int>()
-            {
-                fileListing.Count * 16,
-                Index1ExtraSegments[0].Length,
-                Index1ExtraSegments[1].Length,
-                folderListing.Count * 16,
-            };
+            var totalSize = (int)(_SqPackHeaderSize + _IndexHeaderSize) + fileSegmentSize + folderSegmentSize + emptyBlockSize + synTableSize;
 
             // Calculate offsets.
             var segmentOffsets = new List<int>();
 
-            int offset = Index1Header.Length + (int)Index1TotalSegmentHeaderSize;
-            for (int i = 0; i < 4; i++)
+            var fileSegmentOffset = offset;
+            var synTableOffset = fileSegmentOffset + fileSegmentSize;
+            var emptyBlockOffset = synTableOffset + synTableSize;
+            var folderSegmentOffset = emptyBlockOffset + emptyBlockSize;
+
+
+            var indexHeaderBlock = new byte[_IndexHeaderSize];
+            using(var ms = new MemoryStream(indexHeaderBlock))
             {
-                if (segmentSizes[i] != 0)
+                using (var bw = new BinaryWriter(ms))
                 {
-                    segmentOffsets.Add(offset);
-                } else
-                {
-                    segmentOffsets.Add((int)0);
+                    bw.Write(BitConverter.GetBytes(_IndexHeaderSize));
+                    bw.Write(BitConverter.GetBytes(IndexVersion[indexId]));
+
+                    // Index Data Segment
+                    bw.Write(BitConverter.GetBytes(fileSegmentOffset));
+                    bw.Write(BitConverter.GetBytes(fileSegmentSize));
+                    Write64ByteHash(bw, sh.ComputeHash(fileSegment));
+
+                    // Dat Count - Why is it here in the middle of the other data? Who knows.
+                    bw.Write(BitConverter.GetBytes(datCount));
+
+                    // Synonym Table Data Segment
+                    bw.Write(BitConverter.GetBytes(synTableOffset));
+                    bw.Write(BitConverter.GetBytes(synTableSize));
+                    Write64ByteHash(bw, sh.ComputeHash(SynonymTable[indexId]));
+
+                    // Empty Block Data Segment
+                    bw.Write(BitConverter.GetBytes(emptyBlockOffset));
+                    bw.Write(BitConverter.GetBytes(emptyBlockSize));
+                    Write64ByteHash(bw, sh.ComputeHash(EmptyBlock[indexId]));
+
+                    // Folder Data Segment
+                    bw.Write(BitConverter.GetBytes(folderSegmentOffset));
+                    bw.Write(BitConverter.GetBytes(folderSegmentSize));
+                    Write64ByteHash(bw, sh.ComputeHash(folderSegment));
+
+                    // Index Type
+                    bw.Write(BitConverter.GetBytes(indexId == 0 ? 0 : 2));
+
+                    // Pad until end, minus the self-hash.
+                    var diff = _IndexHeaderSize - bw.BaseStream.Position - 64;
+                    bw.Write(new byte[diff]);
                 }
-                offset += segmentSizes[i];
             }
 
-
-            int[] SegmentShaOffsets = new int[4];
-            byte[] SegmentHeaderBlock = new byte[Index1TotalSegmentHeaderSize];
-
-            Array.Copy(BitConverter.GetBytes(Index1TotalSegmentHeaderSize), 0, SegmentHeaderBlock, 0, 4);
-
-            offset = 4;
-            for (int i = 0; i < 4; i++)
-            {
-                // Write headers
-                Array.Copy(BitConverter.GetBytes(Index1SegmentUnknowns[i]), 0, SegmentHeaderBlock, offset, 4);
-                Array.Copy(BitConverter.GetBytes(segmentOffsets[i]), 0, SegmentHeaderBlock, offset + 4, 4);
-                Array.Copy(BitConverter.GetBytes(segmentSizes[i]), 0, SegmentHeaderBlock, offset  + 8, 4);
-
-                SegmentShaOffsets[i] = offset + 12;
-
-                offset += (i == 0) ? 76 : 72;
-            }
-
-            List<byte[]> SegmentData = new List<byte[]>();
-
-
-            // Write the actual segment data.
-            for(int i = 0; i < 4; i++)
-            {
-                offset = 0;
-                var len = segmentSizes[i];
-                var data = new byte[len];
-                SegmentData.Add(data);
-
-                if(i == 0)
-                {
-                    // File listing.
-                    foreach(var file in fileListing)
-                    {
-                        Array.Copy(file.GetBytes(), 0, data, offset, 16);
-                        offset += 16;
-                    }
-
-                } else if( i == 1 || i == 2)
-                {
-                    var d = Index1ExtraSegments[i - 1];
-                    Array.Copy(d, 0, data, 0, len);
-                    
-                } else if(i == 3)
-                {
-                    // Folder listing.
-                    foreach (var kv in folderListing)
-                    {
-                        Array.Copy(kv.Value.GetBytes(), 0, data, offset, 16);
-                        offset += 16;
-                    }
-                }
-
-                // Calculate the hash of the resultant data and write it into the header.
-                var sha = sh.ComputeHash(data, 0, data.Length);
-                Array.Copy(sha, 0, SegmentHeaderBlock, SegmentShaOffsets[i], sha.Length);
-            }
-
-            // Calculate SHA for the segment headers.
-            var segmentHeaderSha = sh.ComputeHash(SegmentHeaderBlock, 0, SegmentHeaderBlock.Length - 64);
-            Array.Copy(segmentHeaderSha, 0, SegmentHeaderBlock, SegmentHeaderBlock.Length - 64, segmentHeaderSha.Length);
-
+            var headerHash = sh.ComputeHash(indexHeaderBlock, 0, indexHeaderBlock.Length - 64);
+            Array.Copy(headerHash, 0, indexHeaderBlock, indexHeaderBlock.Length - 64, headerHash.Length);
 
             // Write the final fully composed data blocks together.
             stream.Seek(0, SeekOrigin.Begin);
-            stream.Write(Index1Header);
-            stream.Write(SegmentHeaderBlock);
-            for(int i = 0; i < 4; i++)
-            {
-                stream.Write(SegmentData[i]);
-            }
+
+            var expandedHeader = new byte[_SqPackHeaderSize];
+            _SqPackHeader[indexId].CopyTo(expandedHeader, 0);
+
+            stream.Write(expandedHeader);
+            stream.Write(indexHeaderBlock);
+            stream.Write(fileSegment);
+            stream.Write(SynonymTable[indexId]);
+            stream.Write(EmptyBlock[indexId]);
+            stream.Write(folderSegment);
         }
-        protected virtual void WriteIndex2File(BinaryWriter stream)
+
+        /// <summary>
+        /// Writes a given hash into a 64 byte block, padding as needed.
+        /// </summary>
+        /// <param name="bw"></param>
+        /// <param name="hash"></param>
+        protected virtual void Write64ByteHash(BinaryWriter bw, byte[] hash)
         {
-            var sh = SHA1.Create();
-
-            // First, we need to create the actual sorted lists of the file entries and folder entries.
-            var fileListing = new List<FileIndex2Entry>();
-
-            var sortedFiles = Index2Entries.Select(x => x.Value).OrderBy(x => x.FullPathHash);
-            fileListing = sortedFiles.ToList();
-
-
-            var totalSize = Index2Header.Length;
-            totalSize += (int)Index2TotalSegmentHeaderSize;
-
-            var fileSegmentSize = fileListing.Count * 8;
-            var otherSegmentSize = Index2ExtraSegments[0].Length + Index2ExtraSegments[1].Length + Index2ExtraSegments[2].Length;
-
-            // Total size is Headers + segment sizes.
-            totalSize += fileSegmentSize + otherSegmentSize;
-
-
-
-            // Calculate individual sizes.
-            var segmentSizes = new List<int>()
+            var pos = bw.BaseStream.Position;
+            bw.Write(hash);
+            var goal = pos + 64;
+            var diff = goal - bw.BaseStream.Position;
+            if(diff > 0)
             {
-                fileListing.Count * 8,
-                Index2ExtraSegments[0].Length,
-                Index2ExtraSegments[1].Length,
-                Index2ExtraSegments[2].Length,
-            };
-
-            // Calculate offsets.
-            var segmentOffsets = new List<int>();
-
-            int offset = Index2Header.Length + (int)Index2TotalSegmentHeaderSize;
-            for (int i = 0; i < 4; i++)
-            {
-                if (segmentSizes[i] != 0)
-                {
-                    segmentOffsets.Add(offset);
-                }
-                else
-                {
-                    segmentOffsets.Add((int)0);
-                }
-                offset += segmentSizes[i];
-            }
-
-
-            int[] SegmentShaOffsets = new int[4];
-            byte[] SegmentHeaderBlock = new byte[Index2TotalSegmentHeaderSize];
-
-            Array.Copy(BitConverter.GetBytes(Index2TotalSegmentHeaderSize), 0, SegmentHeaderBlock, 0, 4);
-
-            offset = 4;
-            for (int i = 0; i < 4; i++)
-            {
-                // Write headers
-                Array.Copy(BitConverter.GetBytes(Index2SegmentUnknowns[i]), 0, SegmentHeaderBlock, offset, 4);
-                Array.Copy(BitConverter.GetBytes(segmentOffsets[i]), 0, SegmentHeaderBlock, offset + 4, 4);
-                Array.Copy(BitConverter.GetBytes(segmentSizes[i]), 0, SegmentHeaderBlock, offset + 8, 4);
-
-                SegmentShaOffsets[i] = offset + 12;
-
-                offset += (i == 0) ? 76 : 72;
-            }
-
-            // Index 2 files have a random 2 here in the middle of the padding.
-            // Omitting it doesn't seem to actually do anything, but might as well replicate.
-            SegmentHeaderBlock[300] = 2;
-
-            List<byte[]> SegmentData = new List<byte[]>();
-
-
-            // Write the actual segment data.
-            for (int i = 0; i < 4; i++)
-            {
-                offset = 0;
-                var len = segmentSizes[i];
-                var data = new byte[len];
-                SegmentData.Add(data);
-
-                if (i == 0)
-                {
-                    // File listing.
-                    foreach (var file in fileListing)
-                    {
-                        Array.Copy(file.GetBytes(), 0, data, offset, 8);
-                        offset += 8;
-                    }
-
-                }
-                else if (i == 1 || i == 2 || i == 3)
-                {
-                    var d = Index2ExtraSegments[i - 1];
-                    Array.Copy(d, 0, data, 0, len);
-
-                }
-
-                // Calculate the hash of the resultant data and write it into the header.
-                var sha = sh.ComputeHash(data, 0, data.Length);
-                Array.Copy(sha, 0, SegmentHeaderBlock, SegmentShaOffsets[i], sha.Length);
-            }
-
-            // Calculate SHA for the segment headers.
-            var segmentHeaderSha = sh.ComputeHash(SegmentHeaderBlock, 0, SegmentHeaderBlock.Length - 64);
-            Array.Copy(segmentHeaderSha, 0, SegmentHeaderBlock, SegmentHeaderBlock.Length - 64, segmentHeaderSha.Length);
-
-
-            // Write the final fully composed data blocks together.
-            stream.Seek(0, SeekOrigin.Begin);
-            stream.Write(Index2Header);
-            stream.Write(SegmentHeaderBlock);
-            for (int i = 0; i < 4; i++)
-            {
-                stream.Write(SegmentData[i]);
+                bw.Write(new byte[diff]);
             }
         }
-
 
         /// <summary>
         /// Gets the raw uint data offset from the index file, with DatNumber embeded.
@@ -730,6 +600,16 @@ namespace xivModdingFramework.SqPack.DataContainers
             return originalOffset;
         }
 
+
+        /// <summary>
+        /// Checks to see if a given file path shows up in the Synonyms table.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public virtual bool IsSynonym(string filePath)
+        {
+            return false;
+        }
 
         /// <summary>
         /// Returns the raw index entries contained in a specific folder.

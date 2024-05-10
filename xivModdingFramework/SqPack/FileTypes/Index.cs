@@ -608,7 +608,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
                         {
-                            index = new IndexFile(dataFile, index1Stream, index2Stream);
+                            index = new IndexFile(dataFile, index1Stream, index2Stream, true);
                         }
                     }
                     return index;
@@ -623,7 +623,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
                             {
-                                index = new IndexFile(dataFile, index1Stream, index2Stream);
+                                index = new IndexFile(dataFile, index1Stream, index2Stream, false);
                             }
                         }
 

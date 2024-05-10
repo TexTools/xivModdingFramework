@@ -45,6 +45,66 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return RealPath.StartsWith(XivCache.GameInfo.GameDirectory.FullName) && RealPath.EndsWith(Dat.DatExtension) && StorageType == EFileStorageType.CompressedBlob;
             }
         }
+
+
+        private int _CompressedFileSize;
+        private int _UncompressedFileSize;
+
+        /// <summary>
+        /// Retrieves the compressed file size of this file.
+        /// NOTE: If the file is stored uncompressed, and has never been compressed, this function will compress the file in order to determine the resultant size.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> GetCompressedFileSize()
+        {
+            if (StorageType == EFileStorageType.CompressedIndividual || StorageType == EFileStorageType.CompressedBlob)
+            {
+                _CompressedFileSize = FileSize;
+            } else if(_CompressedFileSize == 0)
+            {
+                // Nothing to be done here but just compress the file and see how large it is.
+                // We can cache it though at least.
+                using (var fs = File.OpenRead(RealPath))
+                {
+                    using (var br = new BinaryReader(fs))
+                    {
+
+                        br.BaseStream.Seek(RealOffset, SeekOrigin.Begin);
+                        var data = br.ReadBytes(FileSize);
+
+                        // This is a bit clunky.  We have to ship this to the smart compressor.
+                        data = await SmartImport.CreateCompressedFile(data, false);
+                        _CompressedFileSize = data.Length;
+                    }
+                }
+            }
+            return _CompressedFileSize;
+        }
+
+        /// <summary>
+        /// Retrieves the uncompressed file size of this file.
+        /// </summary>
+        /// <returns></returns>
+        public int GetUncompressedFileSize()
+        {
+            if (StorageType == EFileStorageType.UncompressedIndividual || StorageType == EFileStorageType.UncompressedBlob)
+            {
+                _UncompressedFileSize = FileSize;
+            }
+            else if (_UncompressedFileSize == 0)
+            {
+                // Compressed SqPack files have information on their uncompressed size, so we can just read that and cache it.
+                using (var fs = File.OpenRead(RealPath))
+                {
+                    using (var br = new BinaryReader(fs))
+                    {
+                        br.BaseStream.Seek(RealOffset + 12, SeekOrigin.Begin);
+                        _UncompressedFileSize = br.ReadInt32();
+                    }
+                }
+            }
+            return _UncompressedFileSize;
+        }
     }
 
     /// <summary>
@@ -58,12 +118,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         private readonly string DefaultBlobName;
 
         private Dictionary<XivDataFile, Dictionary<long, FileStorageInformation>> OffsetMapping = new Dictionary<XivDataFile, Dictionary<long, FileStorageInformation>>();
+
         private bool disposedValue;
 
         public TransactionDataHandler(EFileStorageType defaultType = EFileStorageType.ReadOnly, string defaultPath = null) {
             foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile))) {
                 OffsetMapping.Add(df, new Dictionary<long, FileStorageInformation>());
             }
+
 
             DefaultType = defaultType;
             DefaultPathRoot = defaultPath;
@@ -285,11 +347,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (OffsetMapping[dataFile].ContainsKey(offset8x))
             {
-                // Should this also delete the temporary file?
                 OffsetMapping[dataFile].Remove(offset8x);
             }
             OffsetMapping[dataFile].Add(offset8x, storageInfo);
         }
+
 
         protected virtual void Dispose(bool disposing)
         {

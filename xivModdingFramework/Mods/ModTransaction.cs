@@ -43,10 +43,17 @@ namespace xivModdingFramework.Mods
         private DirectoryInfo _GameDirectory;
 
         private static ModTransaction _OpenTransaction = null;
+        internal ModTransaction ActiveTransaction
+        {
+            get
+            {
+                return _OpenTransaction;
+            }
+        }
+
         private static bool _WorkerStatus = false;
         private bool _Disposed;
 
-        const int _MAX_DATS = 8;
         public List<XivDataFile> ActiveDataFiles
         {
             get
@@ -79,7 +86,7 @@ namespace xivModdingFramework.Mods
                     // This allows us to truncate transaction data from the end on Transaction Cancel,
                     // as transaction data is always written to the end of the DAT files.
                     _DatFileSizes.Add(dataFile, new List<long>());
-                    for (int i = 0; i < _MAX_DATS; i++)
+                    for (int i = 0; i < Dat._MAX_DATS; i++)
                     {
                         var datPath = Dat.GetDatPath(dataFile, i);
                         if (!File.Exists(datPath))
@@ -314,7 +321,7 @@ namespace xivModdingFramework.Mods
             foreach (var kv in _IndexFiles)
             {
                 var dataFile = kv.Key;
-                for (int i = 0; i < _MAX_DATS; i++)
+                for (int i = 0; i < Dat._MAX_DATS; i++)
                 {
                     var datPath = Dat.GetDatPath(dataFile, i);
                     if (File.Exists(datPath) && _DatFileSizes[dataFile].Count > i)

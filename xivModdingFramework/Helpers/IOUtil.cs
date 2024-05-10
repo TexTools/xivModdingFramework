@@ -303,6 +303,10 @@ namespace xivModdingFramework.Helpers
         /// <param name="dir"></param>
         public static void DeleteTempDirectory(string dir)
         {
+            if(String.IsNullOrWhiteSpace(dir))
+            {
+                return;
+            }
             if (dir.StartsWith(Path.GetTempPath()))
             {
                 RecursiveDelete(dir);
