@@ -219,11 +219,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             var unmoddedList = await GetUnmoddedDatList(dataFile, alreadyLocked);
             var datPath = Dat.GetDatPath(dataFile, datNum);
 
-            for (int i = 0; i < unmoddedList.Count; i++)
-            {
-                unmoddedList[i] = Path.GetFileName(unmoddedList[i]);
-            }
-
             var result = unmoddedList.Contains(datPath);
             OriginalDatStatus[dataFile][datNum] = result;
 
