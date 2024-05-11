@@ -1072,7 +1072,7 @@ namespace xivModdingFramework.Models.DataContainers
         public async Task<XivMdl> GetRawMdl(Mdl _mdl, ModTransaction tx = null)
         {
             if (!IsInternal) return null;
-            return await _mdl.GetRawMdlData(Source, false, tx);
+            return await _mdl.GetXivMdl(Source, false, tx);
         }
         #endregion
 

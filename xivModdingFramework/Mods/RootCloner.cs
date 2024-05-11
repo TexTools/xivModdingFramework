@@ -266,8 +266,7 @@ namespace xivModdingFramework.Mods
                 {
                     var src = kv.Key;
                     var dst = kv.Value;
-                    var offset = index.Get8xDataOffset(src);
-                    var xmdl = await _mdl.GetRawMdlData(offset, src, tx);
+                    var xmdl = await _mdl.GetXivMdl(src, false, tx);
                     var tmdl = TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)

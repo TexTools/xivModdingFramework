@@ -20,7 +20,10 @@ using System.Collections.Generic;
 namespace xivModdingFramework.Models.DataContainers
 {
     /// <summary>
-    /// This class contains the properties for the entire mdl file
+    /// This class is an internal representation of the entire sum of an uncompressed .mdl file.
+    /// It is not used in any high-level APIs, but is often used as a storage of the many bits of data that
+    /// either we don't know what they do, or that users have no interaction with, but are still parts of the
+    /// final .mdl file.
     /// </summary>
     public class XivMdl
     {

@@ -59,8 +59,17 @@ namespace xivModdingFramework.Models.FileTypes
 {
     public class Mdl
     {
+        #region Constants/Structures/Constructors
         private const string MdlExtension = ".mdl";
         private readonly DirectoryInfo _gameDirectory;
+
+        // Some constant pointers/sizes
+        private const int _MdlHeaderSize = 0x44; // 68 Decimal
+        private const int _vertexDataHeaderSize = 0x88; // 136 Decimal
+
+        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
+        private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+
 
         // Simple internal use hashable pair of Halfs.
         private struct HalfUV
@@ -150,353 +159,152 @@ namespace xivModdingFramework.Models.FileTypes
         {
             _gameDirectory = gameDirectory;
         }
+        #endregion
 
-        private static List<List<ShapeData.ShapeDataEntry>> _SavedData = new List<List<ShapeData.ShapeDataEntry>>();
-        private static List<List<Vector3>> _SavedVectorArrays = new List<List<Vector3>>();
-
-        /// <summary>
-        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
-        /// to match the target file extention.
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="race"></param>
-        /// <param name="submeshId"></param>
-        /// <returns></returns>
-        public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false)
-        {
-            var mdlPath = await GetMdlPath(item, race, submeshId);
-            var mtrlVariant = 1;
-            try
-            {
-                var _imc = new Imc(_gameDirectory);
-                mtrlVariant = (await _imc.GetImcInfo(item)).MaterialSet;
-            }
-            catch (Exception ex)
-            {
-                // No-op, defaulted to 1.
-            }
-
-            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, includeTextures, getOriginal);
-        }
-
+        #region High-Level Model Accessors
 
         /// <summary>
-        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
-        /// to match the target file extention.
+        /// Resolves the model path for a given item and race.
         /// </summary>
-        /// <param name="mdlPath"></param>
-        /// <param name="outputFilePath"></param>
-        /// <param name="getOriginal"></param>
-        /// <returns></returns>
-        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool getOriginal = false)
+        /// <param name="itemModel">The item model</param>
+        /// <param name="xivRace">The selected race for the given item</param>
+        /// <param name="submeshId">The submesh ID - Only used for furniture items which contain multiple meshes, like the Ahriman Clock.</param>
+        /// <returns>The path in string format.  Not a fucking tuple.</returns>
+        public async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null)
         {
-            // Importers and exporters currently use the same criteria.
-            // Any available exporter is assumed to be able to import and vice versa.
-            // This may change at a later date.
-            var exporters = GetAvailableExporters();
-            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
-            fileFormat = fileFormat.ToLower();
-            if (!exporters.Contains(fileFormat))
+            string mdlFolder = "", mdlFile = "";
+
+            var mdlInfo = itemModel.ModelInfo;
+            var id = mdlInfo.PrimaryID.ToString().PadLeft(4, '0');
+            var bodyVer = mdlInfo.SecondaryID.ToString().PadLeft(4, '0');
+            var itemCategory = itemModel.SecondaryCategory;
+
+            var race = xivRace.GetRaceCode();
+            var itemType = itemModel.GetPrimaryItemType();
+
+            switch (itemType)
             {
-                throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
-            }
-
-            var dir = Path.GetDirectoryName(outputFilePath);
-            if (!Directory.Exists(dir))
-            {
-                System.IO.Directory.CreateDirectory(dir);
-            }
-
-            var imc = new Imc(_gameDirectory);
-            var model = await GetModel(mdlPath);
-            await ExportModel(model, outputFilePath, mtrlVariant, includeTextures);
-        }
-
-
-        /// <summary>
-        /// Exports a TTModel file to the given output path.
-        /// </summary>
-        /// <param name="model"></param>
-        /// <param name="outputFilePath"></param>
-        /// <returns></returns>
-        public async Task ExportModel(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, ModTransaction tx = null)
-        {
-            var exporters = GetAvailableExporters();
-            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
-            fileFormat = fileFormat.ToLower();
-            if (!exporters.Contains(fileFormat))
-            {
-                throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
-            }
-
-
-
-            var dir = Path.GetDirectoryName(outputFilePath);
-            if (!Directory.Exists(dir))
-            {
-                System.IO.Directory.CreateDirectory(dir);
-            }
-
-            // Remove the existing file if it exists, so that the user doesn't get confused thinking an old file is the new one.
-            File.Delete(outputFilePath);
-
-            outputFilePath = outputFilePath.Replace("/", "\\");
-
-            // OBJ is a bit of a special, speedy case.  The format both has no textures, and no weights,
-            // So we don't need to do any heavy lifting for that stuff.
-            if (fileFormat == "obj")
-            {
-                var obj = new Obj(_gameDirectory);
-                obj.ExportObj(model, outputFilePath);
-                return;
-            }
-
-            if (!model.IsInternal)
-            {
-                // This isn't *really* true, but there's no case where we are re-exporting TTModel objects
-                // right now without them at least having an internal XIV path associated, so I don't see a need to fuss over this,
-                // since it would be complicated.
-                throw new NotSupportedException("Cannot export non-internal model - Skel data unidentifiable.");
-            }
-
-            // The export process could really be sped up by forking threads to do
-            // both the bone and material exports at the same time.
-
-            // Pop the textures out so the exporters can reference them.
-            if (includeTextures)
-            {
-                // Fix up our skin references in the model before exporting, to ensure
-                // we supply the right material names to the exporters down-chain.
-                if (model.IsInternal)
-                {
-                    ModelModifiers.FixUpSkinReferences(model, model.Source, null);
-                }
-                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant, XivRace.All_Races, tx);
-            }
-
-
-
-            // Save the DB file.
-
-            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var converterFolder = cwd + "\\converters\\" + fileFormat;
-            Directory.CreateDirectory(converterFolder);
-            var dbPath = converterFolder + "\\input.db";
-            model.SaveToFile(dbPath, outputFilePath);
-
-
-            if (fileFormat == "db")
-            {
-                // Just want the intermediate file? Just see if we need to move it.
-                if (!Path.Equals(outputFilePath, dbPath))
-                {
-                    File.Delete(outputFilePath);
-                    File.Move(dbPath, outputFilePath);
-                }
-            }
-            else
-            {
-                // We actually have an external importer to use.
-
-                // We don't really care that much about showing the user a log
-                // during exports, so we can just do this the simple way.
-
-                var outputFile = converterFolder + "\\result." + fileFormat;
-
-                // Get rid of any existing intermediate output file, in case it causes problems for any converters.
-                File.Delete(outputFile);
-
-                var proc = new Process
-                {
-                    StartInfo = new ProcessStartInfo
+                case XivItemType.equipment:
+                    mdlFolder = $"chara/{itemType}/e{id}/model";
+                    mdlFile = $"c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
+                    break;
+                case XivItemType.accessory:
+                    mdlFolder = $"chara/{itemType}/a{id}/model";
+                    var abrv = itemModel.GetItemSlotAbbreviation();
+                    // Just left ring things.
+                    if (submeshId == "ril")
                     {
-                        FileName = converterFolder + "\\converter.exe",
-                        Arguments = "\"" + dbPath + "\"",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        WorkingDirectory = "" + converterFolder + "",
-                        CreateNoWindow = true
+                        abrv = "ril";
                     }
-                };
+                    mdlFile = $"c{race}a{id}_{abrv}{MdlExtension}";
+                    break;
+                case XivItemType.weapon:
+                    mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
+                    mdlFile = $"w{id}b{bodyVer}{MdlExtension}";
+                    break;
+                case XivItemType.monster:
+                    mdlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/model";
+                    mdlFile = $"m{id}b{bodyVer}{MdlExtension}";
+                    break;
+                case XivItemType.demihuman:
+                    mdlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/model";
+                    mdlFile = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
+                    break;
+                case XivItemType.human:
+                    if (itemCategory.Equals(XivStrings.Body))
+                    {
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/model";
+                        mdlFile = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
+                    }
+                    else if (itemCategory.Equals(XivStrings.Hair))
+                    {
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/model";
+                        mdlFile = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                    }
+                    else if (itemCategory.Equals(XivStrings.Face))
+                    {
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/model";
+                        mdlFile = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                    }
+                    else if (itemCategory.Equals(XivStrings.Tail))
+                    {
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
+                        mdlFile = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
+                    }
+                    else if (itemCategory.Equals(XivStrings.Ear))
+                    {
+                        mdlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/model";
+                        mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
+                    }
+                    break;
+                case XivItemType.furniture:
+                    // Language doesn't matter for this call.
+                    var housing = new Housing(_gameDirectory, XivLanguage.None);
+                    var mdlPath = "";
+                    // Housing assets use a different function to scrub the .sgd files for
+                    // their direct absolute model references.
 
-                proc.Start();
-                proc.WaitForExit();
-                var code = proc.ExitCode;
+                    // HACKHACK: We don't actually allow editing .SGD files natively in TexTools, and I'm not sure anyone, anywhere, has even bothered trying.
+                    // So just rip a readonly TX here to pass down, because this function really shouldn't need a transaction argument to resolve.
 
-                if (code != 0)
-                {
-                    throw new Exception("Exporter threw error code: " + proc.ExitCode);
-                }
+                    var tx = ModTransaction.BeginTransaction(true);
+                    var assetDict = await housing.GetFurnitureModelParts(itemModel, tx);
 
-                // Just move the result file if we need to.
-                if (!Path.Equals(outputFilePath, outputFile))
-                {
-                    File.Delete(outputFilePath);
-                    File.Move(outputFile, outputFilePath);
-                }
+                    if (submeshId == null || submeshId == "base")
+                    {
+                        submeshId = "b0";
+                    }
+
+                    mdlPath = assetDict[submeshId];
+                    return mdlPath;
+                    break;
+                default:
+                    mdlFolder = "";
+                    mdlFile = "";
+                    break;
             }
+
+            return mdlFolder + "/" + mdlFile;
         }
 
         /// <summary>
-        /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
-        /// </summary>
-        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races, ModTransaction tx = null)
-        {
-            if(tx == null)
-            {
-                // Readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
-            }
-            var modelName = Path.GetFileNameWithoutExtension(model.Source);
-            var directory = Path.GetDirectoryName(outputFilePath);
-
-            // Language doesn't actually matter here.
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            var _tex = new Tex(gameDirectory);
-            var _index = new Index(gameDirectory);
-            var materialIdx = 0;
-
-
-            foreach (var materialName in model.Materials)
-            {
-                try
-                {
-                    var mdlPath = model.Source;
-
-                    // Set source race to match so that it doesn't get replaced
-                    if (targetRace != XivRace.All_Races)
-                    {
-                        var bodyRegex = new Regex("(b[0-9]{4})");
-                        var faceRegex = new Regex("(f[0-9]{4})");
-                        var tailRegex = new Regex("(t[0-9]{4})");
-
-                        if (bodyRegex.Match(materialName).Success)
-                        {
-                            var currentRace = model.Source.Substring(model.Source.LastIndexOf('c') + 1, 4);
-                            mdlPath = model.Source.Replace(currentRace, targetRace.GetRaceCode());
-                        }
-
-                        var faceMatch = faceRegex.Match(materialName);
-                        if (faceMatch.Success)
-                        {
-                            var mdlFace = faceRegex.Match(model.Source).Value;
-
-                            mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
-                        }
-
-                        var tailMatch = tailRegex.Match(materialName);
-                        if (tailMatch.Success)
-                        {
-                            var mdlTail = tailRegex.Match(model.Source).Value;
-
-                            mdlPath = model.Source.Replace(mdlTail, tailMatch.Value);
-                        }
-                    }
-
-                    // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
-                    var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
-                    var mtrl = await _mtrl.GetXivMtrl(mtrlPath, false, tx);
-                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl, null, -1, tx);
-
-                    // Outgoing file names.
-                    var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
-                    var mtrl_suffix = ".png";
-
-                    if (modelMaps.Diffuse != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Diffuse, modelMaps.Width, modelMaps.Height))
-                        {
-                            img.Save(mtrl_prefix + "d" + mtrl_suffix, new PngEncoder());
-                        }
-                    }
-
-                    if (modelMaps.Normal != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Normal, modelMaps.Width, modelMaps.Height))
-                        {
-                            img.Save(mtrl_prefix + "n" + mtrl_suffix, new PngEncoder());
-                        }
-                    }
-
-                    if (modelMaps.Specular != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Specular, modelMaps.Width, modelMaps.Height))
-                        {
-                            img.Save(mtrl_prefix + "s" + mtrl_suffix, new PngEncoder());
-                        }
-                    }
-
-                    if (modelMaps.Alpha != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Alpha, modelMaps.Width, modelMaps.Height))
-                        {
-                            img.Save(mtrl_prefix + "o" + mtrl_suffix, new PngEncoder());
-                        }
-                    }
-
-                    if (modelMaps.Emissive != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Emissive, modelMaps.Width, modelMaps.Height))
-                        {
-                            img.Save(mtrl_prefix + "e" + mtrl_suffix, new PngEncoder());
-                        }
-                    }
-
-                }
-                catch (Exception exc)
-                {
-                    // Failing to resolve a material is considered a non-critical error.
-                    // Continue attempting to resolve the rest of the materials in the model.
-                    //throw exc;
-                }
-                materialIdx++;
-            }
-        }
-
-        /// <summary>
-        /// Retreives the high level TTModel representation of an underlying MDL file.
+        /// Retrieves the high level model represenation for a given item.
         /// </summary>
         /// <param name="item"></param>
         /// <param name="race"></param>
         /// <param name="submeshId"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<TTModel> GetModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
+        public async Task<TTModel> GetTTModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
-            var mdl = await GetRawMdlData(item, race, submeshId, getOriginal, tx);
-            var ttModel = TTModel.FromRaw(mdl);
-            return ttModel;
-        }
-        public async Task<TTModel> GetModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
-        {
-            var mdl = await GetRawMdlData(mdlPath, getOriginal, tx);
-            var ttModel = TTModel.FromRaw(mdl);
-            return ttModel;
-        }
-
-        public async Task<XivMdl> GetRawMdlData(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
-        {
             var mdlPath = await GetMdlPath(item, race, submeshId);
-            return await GetRawMdlData(mdlPath, getOriginal, tx);
+            var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
+            var ttModel = TTModel.FromRaw(mdl);
+            return ttModel;
         }
 
-        // Some constant pointers/sizes
-        private const int _MdlHeaderSize = 0x44; // 68 Decimal
-        private const int _vertexDataHeaderSize = 0x88; // 136 Decimal
-
-
+        /// <summary>
+        /// Retrieves the high level model represenation for a given path.
+        /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="getOriginal"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public async Task<TTModel> GetTTModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
+        {
+            var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
+            var ttModel = TTModel.FromRaw(mdl);
+            return ttModel;
+        }
 
         /// <summary>
         /// Retrieves the raw XivMdl file at a given internal file path.
-        /// 
-        /// If it an explicit offset is provided, it will be used over path or mod offset resolution.
         /// </summary>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetRawMdlData(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
+        public async Task<XivMdl> GetXivMdl(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             long offset = 0;
             var df = IOUtil.GetDataFileFromPath(mdlPath);
@@ -507,42 +315,19 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginTransaction(true);
             }
 
-            var index = await tx.GetIndexFile(df);
-            offset = index.Get8xDataOffset(mdlPath);
-
-            if(getOriginal)
-            {
-                var modlist = await tx.GetModList();
-                modlist.ModDictionary.TryGetValue(mdlPath, out var mod);
-                if(mod != null)
-                {
-                    offset = mod.data.originalOffset;
-                }
-            }
-            return await GetRawMdlData(offset, mdlPath, tx);
-        }
-
-        /// <summary>
-        /// Retrieves the MDL data at a given offset.
-        /// String name is only used to identify data file and attach the internal name to the resulting data.
-        /// It can be set to empty-string if truly needed, though the resulting MDL will be treated as if it is an externally imported model.
-        /// </summary>
-        /// <param name="offset"></param>
-        /// <param name="internalPathName"></param>
-        /// <returns></returns>
-        public async Task<XivMdl> GetRawMdlData(long offset, string internalPathName, ModTransaction tx = null)
-        {
-            var getShapeData = true;
-            var dat = new Dat(_gameDirectory);
-
+            offset = await tx.Get8xDataOffset(mdlPath, getOriginal);
             if (offset == 0)
             {
                 return null;
             }
 
-            var mdlData = await dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(internalPathName), tx);
+            var getShapeData = true;
+            var dat = new Dat(_gameDirectory);
 
-            var xivMdl = new XivMdl { MdlPath = internalPathName };
+
+            var mdlData = await dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(mdlPath), tx);
+
+            var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
 
             var meshCount = BitConverter.ToUInt16(mdlData, 12);
@@ -2137,29 +1922,304 @@ namespace xivModdingFramework.Models.FileTypes
             return materials;
         }
 
+        #endregion
+
+        #region High-Level Model Export
+        /// <summary>
+        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
+        /// to match the target file extention.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <param name="race"></param>
+        /// <param name="submeshId"></param>
+        /// <returns></returns>
+        public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
+        {
+            var mdlPath = await GetMdlPath(item, race, submeshId);
+            var mtrlVariant = 1;
+            try
+            {
+                var _imc = new Imc(_gameDirectory);
+                mtrlVariant = (await _imc.GetImcInfo(item)).MaterialSet;
+            }
+            catch (Exception ex)
+            {
+                // No-op, defaulted to 1.
+            }
+
+            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, includeTextures, getOriginal, tx);
+        }
 
         /// <summary>
-        /// Retreieves the available list of file extensions the framework has importers available for.
+        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
+        /// to match the target file extention.
         /// </summary>
+        /// <param name="mdlPath"></param>
+        /// <param name="outputFilePath"></param>
+        /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public List<string> GetAvailableImporters()
+        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
         {
-            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            cwd = cwd.Replace("\\", "/");
-            string importerPath = cwd + "/converters/";
-            var ret = new List<string>();
-            ret.Add("db");  // Raw already-parsed DB files are fine.
-
-            var directories = Directory.GetDirectories(importerPath);
-            foreach (var d in directories)
+            // Importers and exporters currently use the same criteria.
+            // Any available exporter is assumed to be able to import and vice versa.
+            // This may change at a later date.
+            var exporters = GetAvailableExporters();
+            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
+            fileFormat = fileFormat.ToLower();
+            if (!exporters.Contains(fileFormat))
             {
-                var suffix = (d.Replace(importerPath, "")).ToLower();
-                if (ret.IndexOf(suffix) < 0)
+                throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
+            }
+
+            var dir = Path.GetDirectoryName(outputFilePath);
+            if (!Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+
+            var model = await GetTTModel(mdlPath, getOriginal, tx);
+            await ExportTTModelToFile(model, outputFilePath, mtrlVariant, includeTextures, tx);
+        }
+
+        /// <summary>
+        /// Exports a TTModel file to the given output path, including associated materials/textures.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <param name="outputFilePath"></param>
+        /// <returns></returns>
+        public async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, ModTransaction tx = null)
+        {
+            var exporters = GetAvailableExporters();
+            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
+            fileFormat = fileFormat.ToLower();
+            if (!exporters.Contains(fileFormat))
+            {
+                throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
+            }
+
+
+
+            var dir = Path.GetDirectoryName(outputFilePath);
+            if (!Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+
+            // Remove the existing file if it exists, so that the user doesn't get confused thinking an old file is the new one.
+            File.Delete(outputFilePath);
+
+            outputFilePath = outputFilePath.Replace("/", "\\");
+
+            // OBJ is a bit of a special, speedy case.  The format both has no textures, and no weights,
+            // So we don't need to do any heavy lifting for that stuff.
+            if (fileFormat == "obj")
+            {
+                var obj = new Obj(_gameDirectory);
+                obj.ExportObj(model, outputFilePath);
+                return;
+            }
+
+            if (!model.IsInternal)
+            {
+                // This isn't *really* true, but there's no case where we are re-exporting TTModel objects
+                // right now without them at least having an internal XIV path associated, so I don't see a need to fuss over this,
+                // since it would be complicated.
+                throw new NotSupportedException("Cannot export non-internal model - Skel data unidentifiable.");
+            }
+
+            // The export process could really be sped up by forking threads to do
+            // both the bone and material exports at the same time.
+
+            // Pop the textures out so the exporters can reference them.
+            if (includeTextures)
+            {
+                // Fix up our skin references in the model before exporting, to ensure
+                // we supply the right material names to the exporters down-chain.
+                if (model.IsInternal)
                 {
-                    ret.Add(suffix);
+                    ModelModifiers.FixUpSkinReferences(model, model.Source, null);
+                }
+                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant, XivRace.All_Races, tx);
+            }
+
+
+
+            // Save the DB file.
+
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var converterFolder = cwd + "\\converters\\" + fileFormat;
+            Directory.CreateDirectory(converterFolder);
+            var dbPath = converterFolder + "\\input.db";
+            model.SaveToFile(dbPath, outputFilePath);
+
+
+            if (fileFormat == "db")
+            {
+                // Just want the intermediate file? Just see if we need to move it.
+                if (!Path.Equals(outputFilePath, dbPath))
+                {
+                    File.Delete(outputFilePath);
+                    File.Move(dbPath, outputFilePath);
                 }
             }
-            return ret;
+            else
+            {
+                // We actually have an external importer to use.
+
+                // We don't really care that much about showing the user a log
+                // during exports, so we can just do this the simple way.
+
+                var outputFile = converterFolder + "\\result." + fileFormat;
+
+                // Get rid of any existing intermediate output file, in case it causes problems for any converters.
+                File.Delete(outputFile);
+
+                var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = converterFolder + "\\converter.exe",
+                        Arguments = "\"" + dbPath + "\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        WorkingDirectory = "" + converterFolder + "",
+                        CreateNoWindow = true
+                    }
+                };
+
+                proc.Start();
+                proc.WaitForExit();
+                var code = proc.ExitCode;
+
+                if (code != 0)
+                {
+                    throw new Exception("Exporter threw error code: " + proc.ExitCode);
+                }
+
+                // Just move the result file if we need to.
+                if (!Path.Equals(outputFilePath, outputFile))
+                {
+                    File.Delete(outputFilePath);
+                    File.Move(outputFile, outputFilePath);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
+        /// </summary>
+        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly tx if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            var modelName = Path.GetFileNameWithoutExtension(model.Source);
+            var directory = Path.GetDirectoryName(outputFilePath);
+
+            // Language doesn't actually matter here.
+            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+            var _tex = new Tex(gameDirectory);
+            var _index = new Index(gameDirectory);
+            var materialIdx = 0;
+
+
+            foreach (var materialName in model.Materials)
+            {
+                try
+                {
+                    var mdlPath = model.Source;
+
+                    // Set source race to match so that it doesn't get replaced
+                    if (targetRace != XivRace.All_Races)
+                    {
+                        var bodyRegex = new Regex("(b[0-9]{4})");
+                        var faceRegex = new Regex("(f[0-9]{4})");
+                        var tailRegex = new Regex("(t[0-9]{4})");
+
+                        if (bodyRegex.Match(materialName).Success)
+                        {
+                            var currentRace = model.Source.Substring(model.Source.LastIndexOf('c') + 1, 4);
+                            mdlPath = model.Source.Replace(currentRace, targetRace.GetRaceCode());
+                        }
+
+                        var faceMatch = faceRegex.Match(materialName);
+                        if (faceMatch.Success)
+                        {
+                            var mdlFace = faceRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlFace, faceMatch.Value);
+                        }
+
+                        var tailMatch = tailRegex.Match(materialName);
+                        if (tailMatch.Success)
+                        {
+                            var mdlTail = tailRegex.Match(model.Source).Value;
+
+                            mdlPath = model.Source.Replace(mdlTail, tailMatch.Value);
+                        }
+                    }
+
+                    // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
+                    var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
+                    var mtrl = await _mtrl.GetXivMtrl(mtrlPath, false, tx);
+                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl, null, -1, tx);
+
+                    // Outgoing file names.
+                    var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
+                    var mtrl_suffix = ".png";
+
+                    if (modelMaps.Diffuse != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Diffuse, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "d" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Normal != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Normal, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "n" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Specular != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Specular, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "s" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Alpha != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Alpha, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "o" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                    if (modelMaps.Emissive != null && modelMaps.Diffuse.Length > 0)
+                    {
+                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Emissive, modelMaps.Width, modelMaps.Height))
+                        {
+                            img.Save(mtrl_prefix + "e" + mtrl_suffix, new PngEncoder());
+                        }
+                    }
+
+                }
+                catch (Exception exc)
+                {
+                    // Failing to resolve a material is considered a non-critical error.
+                    // Continue attempting to resolve the rest of the materials in the model.
+                    //throw exc;
+                }
+                materialIdx++;
+            }
         }
 
         /// <summary>
@@ -2187,12 +2247,39 @@ namespace xivModdingFramework.Models.FileTypes
             return ret;
         }
 
+        #endregion
+
+        #region Model Import Pipeline
+
+        /// <summary>
+        /// Retreieves the available list of file extensions the framework has importers available for.
+        /// </summary>
+        /// <returns></returns>
+        public List<string> GetAvailableImporters()
+        {
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            cwd = cwd.Replace("\\", "/");
+            string importerPath = cwd + "/converters/";
+            var ret = new List<string>();
+            ret.Add("db");  // Raw already-parsed DB files are fine.
+
+            var directories = Directory.GetDirectories(importerPath);
+            foreach (var d in directories)
+            {
+                var suffix = (d.Replace(importerPath, "")).ToLower();
+                if (ret.IndexOf(suffix) < 0)
+                {
+                    ret.Add(suffix);
+                }
+            }
+            return ret;
+        }
+
         // Just a default no-op function if we don't care about warning messages.
         private void NoOp(bool isWarning, string message)
         {
             //No-Op.
         }
-
 
         private async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
         {
@@ -2374,7 +2461,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Load the base game model.
                 // This is used for some model modifier options and the like.
                 // Some paths may not actually use this(?)
-                originalMdl = await GetRawMdlData(internalPath, true, tx);
+                originalMdl = await GetXivMdl(internalPath, true, tx);
             }
             catch
             {
@@ -2386,7 +2473,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mod != null)
                 {
                     // If we have a modded base, we need to load that as well.
-                    currentMdl = await GetRawMdlData(internalPath, false, tx);
+                    currentMdl = await GetXivMdl(internalPath, false, tx);
                 } else
                 {
                     currentMdl = originalMdl;
@@ -2420,7 +2507,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (externalPath == null || externalPath == "")
                 {
                     // If we were given no path, load the current model.
-                    ttModel = await GetModel(internalPath);
+                    ttModel = await GetTTModel(internalPath);
                 }
                 else if (suffix == "db")
                 {
@@ -2480,7 +2567,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");
-                bytes = await MakeMdlFile(ttModel, currentMdl, loggingFunction);
+                bytes = MakeMdlFile(ttModel, currentMdl, loggingFunction);
 
                 loggingFunction(false, "Job done!");
             });
@@ -2488,11 +2575,320 @@ namespace xivModdingFramework.Models.FileTypes
             return bytes;
         }
 
+        /// <summary>
+        /// Converts the given TTModel into an SqPack type 3 file.
+        /// </summary>
+        /// <param name="ttModel"></param>
+        /// <param name="ogMdl"></param>
+        /// <param name="loggingFunction"></param>
+        /// <returns></returns>
         public async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
-            var mdl = await MakeMdlFile(ttModel, ogMdl, loggingFunction);
+            var mdl = MakeMdlFile(ttModel, ogMdl, loggingFunction);
             var compressed = await CompressMdlFile(mdl);
             return compressed;
+        }
+
+        /// <summary>
+        /// Compresses a MDL file into a valid Type3 datafile.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public async Task<byte[]> CompressMdlFile(byte[] data)
+        {
+
+            #region MDL Header Reading
+            // Read sizes and offsets.
+            const int _VertexInfoSizeOffset = 0x04;
+            const int _ModelDataSizeOffset = 0x08;
+            const ushort _MeshCountOffset = 12;
+            const ushort _MaterialCountOffset = 14;
+            const int _LodMax = 3;
+
+            var signature = BitConverter.ToUInt32(data, 0);
+
+            var vertexInfoUncompOffset = _MdlHeaderSize;
+            var vertexInfoUncompSize = BitConverter.ToInt32(data, _VertexInfoSizeOffset);
+
+            var modelUncompDataOffset = vertexInfoUncompOffset + vertexInfoUncompSize;
+            var modelUncompDataSize = BitConverter.ToInt32(data, _ModelDataSizeOffset);
+
+            var meshCount = BitConverter.ToUInt16(data, _MeshCountOffset);
+            var materialCount = BitConverter.ToUInt16(data, _MaterialCountOffset);
+
+            var offset = 16;
+
+            uint[] vertexDataOffsets = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+            uint[] indexDataOffsets = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+            uint[] vertexDataSizes = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+            uint[] indexDataSizes = Dat.Read3IntBuffer(data, offset);
+            offset += (sizeof(uint) * _LodMax);
+
+            var lodCount = data[offset];
+            var flags = data[offset + 1];
+            #endregion
+
+            #region Data Compression
+            // We can now compress the data blocks.
+            var compressedMDLData = new List<byte>();
+
+            // Vertex Info Compression
+            var vertexInfoBlock = data.Skip(vertexInfoUncompOffset).Take(vertexInfoUncompSize).ToList();
+            var compressedVertexInfoParts = await Dat.CompressData(vertexInfoBlock);
+            foreach (var block in compressedVertexInfoParts)
+            {
+                compressedMDLData.AddRange(block);
+            }
+
+            // Model Data Compression
+            var modelDataBlock = data.Skip(modelUncompDataOffset).Take(modelUncompDataSize).ToList();
+            List<byte[]> compressedModelDataParts = new List<byte[]>();
+            compressedModelDataParts = await Dat.CompressData(modelDataBlock);
+            foreach (var block in compressedModelDataParts)
+            {
+                compressedMDLData.AddRange(block);
+            }
+
+            // Vertex & Index Data Compression
+            var compressedVertexDataParts = new List<List<byte[]>>();
+            var compressedIndexDataParts = new List<List<byte[]>>();
+            for (int i = 0; i < _LodMax; i++)
+            {
+                // Written as [Vertex Block LoD0] [Index Block Lod0] [Vertex LoD1] ....
+                var uncompressedVertex = data.Skip((int)vertexDataOffsets[i]).Take((int)vertexDataSizes[i]).ToList();
+                var compressedVertex = await Dat.CompressData(uncompressedVertex);
+                var uncompressedIndex = data.Skip((int)indexDataOffsets[i]).Take((int)indexDataSizes[i]).ToList();
+                var compressedIndex = await Dat.CompressData(uncompressedIndex);
+
+                foreach (var block in compressedVertex)
+                {
+                    compressedMDLData.AddRange(block);
+                }
+                foreach (var block in compressedIndex)
+                {
+                    compressedMDLData.AddRange(block);
+                }
+
+                compressedVertexDataParts.Add(compressedVertex);
+                compressedIndexDataParts.Add(compressedIndex);
+            }
+
+            #endregion
+
+            #region Type 3 Header Writing
+
+            var datHeader = new List<byte>();
+
+            // This is the most common size of header for models
+            var headerLength = 256;
+
+            // Total # of blocks.
+            var blockCount = compressedVertexInfoParts.Count + compressedModelDataParts.Count + compressedVertexDataParts.Sum(x => x.Count) + compressedIndexDataParts.Sum(x => x.Count);
+
+            // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
+            if (blockCount > 24)
+            {
+                var remainingBlocks = blockCount - 24;
+                var bytesUsed = remainingBlocks * 2;
+                var extensionNeeeded = (bytesUsed / 128) + 1;
+                var newSize = 256 + (extensionNeeeded * 128);
+                headerLength = newSize;
+            }
+
+            // Header Length
+            datHeader.AddRange(BitConverter.GetBytes(headerLength));
+
+            // Data Type (models are type 3 data)
+            datHeader.AddRange(BitConverter.GetBytes(3));
+
+            // Model files are comprised of a fixed length header +  The Vertex Headers/Infos Structures + the larger general model metadata block + the geometry data blocks.
+            var uncompressedSize = _MdlHeaderSize + vertexInfoBlock.Count + modelDataBlock.Count + vertexDataSizes.Sum(x => x) + indexDataSizes.Sum(x => x);
+            datHeader.AddRange(BitConverter.GetBytes((uint)uncompressedSize));
+
+            // Max Buffer Size?
+            datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128 + 16));
+            // Buffer Size
+            datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128));
+
+            // Mdl Version / Signature
+            datHeader.AddRange(BitConverter.GetBytes(signature));
+
+
+            // Vertex Info Block Uncompressed Size
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad(vertexInfoBlock.Count, 128)));
+            // Model Data Block Uncompressed Size
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad(modelDataBlock.Count, 128)));
+            // Vertex Data Block Uncompressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)vertexDataSizes[0], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)vertexDataSizes[1], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)vertexDataSizes[2], 128)));
+            // Edge Geometry Uncompressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            // Index Data Uncompressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[0], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[1], 128)));
+            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[2], 128)));
+
+            // Vertex Info Total Compressed Size
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexInfoParts.Sum(x => x.Length)));
+            // Model Data Total Compressed Size
+            datHeader.AddRange(BitConverter.GetBytes(compressedModelDataParts.Sum(x => x.Length)));
+            // Vertex Data Total Compressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[0].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[1].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[2].Sum(x => x.Length)));
+            // Edge Geometry Total Compressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            // Index Data Total Compressed Sizes
+            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[0].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[1].Sum(x => x.Length)));
+            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[2].Sum(x => x.Length)));
+
+
+            // Compressed Offsets
+            var vertexInfoOffset = 0;
+            var modelDataOffset = vertexInfoOffset + compressedVertexInfoParts.Sum(x => x.Length);
+
+            var vertexDataBlock0Offset = modelDataOffset + compressedModelDataParts.Sum(x => x.Length);
+            var indexDataBlock0Offset = vertexDataBlock0Offset + compressedVertexDataParts[0].Sum(x => x.Length);
+
+            var vertexDataBlock1Offset = indexDataBlock0Offset + compressedIndexDataParts[0].Sum(x => x.Length);
+            var indexDataBlock1Offset = vertexDataBlock1Offset + compressedVertexDataParts[1].Sum(x => x.Length);
+
+            var vertexDataBlock2Offset = indexDataBlock1Offset + compressedIndexDataParts[1].Sum(x => x.Length);
+            var indexDataBlock2Offset = vertexDataBlock2Offset + compressedVertexDataParts[2].Sum(x => x.Length);
+
+            // Vertex Info Compressed Offset
+            datHeader.AddRange(BitConverter.GetBytes(vertexInfoOffset));
+            // Model Data Compressed Offset
+            datHeader.AddRange(BitConverter.GetBytes(modelDataOffset));
+            // Vertex Data Compressed Offsets
+            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock0Offset));
+            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock1Offset));
+            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock2Offset));
+            // Edge Geometry Compressed Offsets
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            datHeader.AddRange(BitConverter.GetBytes(0));
+            // Index Data Compressed Offsets
+            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock0Offset));
+            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock1Offset));
+            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock2Offset));
+
+            // Data Block Indexes
+            var vertexInfoDataBlockIndex = 0;
+            var modelDataBlockIndex = vertexInfoDataBlockIndex + compressedVertexInfoParts.Count;
+
+            var vertexDataBlock0 = modelDataBlockIndex + compressedModelDataParts.Count;
+            var indexDataBlock0 = vertexDataBlock0 + compressedVertexDataParts[0].Count;
+
+            var vertexDataBlock1 = indexDataBlock0 + compressedIndexDataParts[0].Count;
+            var indexDataBlock1 = vertexDataBlock1 + compressedVertexDataParts[1].Count;
+
+            var vertexDataBlock2 = indexDataBlock1 + compressedIndexDataParts[1].Count;
+            var indexDataBlock2 = vertexDataBlock2 + compressedVertexDataParts[2].Count;
+
+            // Vertex Info Block Index
+            datHeader.AddRange(BitConverter.GetBytes((short)vertexInfoDataBlockIndex));
+            // Model Data Block Index
+            datHeader.AddRange(BitConverter.GetBytes((short)modelDataBlockIndex));
+            // Vertex Data Block LoD[0] Indexes
+            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock0));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock1));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock2));
+            // Edge Geometry Data Block Indexes
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock0));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
+            // Index Data Block Indexes
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock0));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
+
+
+            // Data Block Counts
+            // Vertex Info Part Count
+            datHeader.AddRange(BitConverter.GetBytes((short)compressedVertexInfoParts.Count));
+            // Model Data Part Count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts.Count));
+            // Vertex Data Block LoD[0] part count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[0].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[1].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[2].Count));
+            // Edge Geometry Counts
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+
+            // Index Data Block Counts
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[0].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[1].Count));
+            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[2].Count));
+
+
+            // Mesh Count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)meshCount));
+            // Material Count
+            datHeader.AddRange(BitConverter.GetBytes((ushort)materialCount));
+            // LoD Count
+            datHeader.Add(lodCount);
+            // Flags, specifically flag 1 enables index streaming.
+            datHeader.Add(flags);
+            // Padding
+            datHeader.AddRange(BitConverter.GetBytes((short)0));
+
+
+            // ==== Compressed Block Sizes in order go here ==== //
+
+            // Vertex Info Compressed Block Sizes
+            for (var i = 0; i < compressedVertexInfoParts.Count; i++)
+            {
+                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexInfoParts[i].Length));
+            }
+
+            // Model Data Padded Size
+            for (var i = 0; i < compressedModelDataParts.Count; i++)
+            {
+                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts[i].Length));
+            }
+
+            // Vertex/Index Info Compressed Block Sizes
+            for (var l = 0; l < _LodMax; l++)
+            {
+                for (int i = 0; i < compressedVertexDataParts[l].Count; i++)
+                {
+                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[l][i].Length));
+                }
+
+                // If we had edge geometry blocks, they would go here.
+
+                for (int i = 0; i < compressedIndexDataParts[l].Count; i++)
+                {
+                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[l][i].Length));
+                }
+            }
+
+
+            // Pad out remaining header space.
+            if (datHeader.Count != headerLength)
+            {
+                var headerEnd = headerLength - datHeader.Count % headerLength;
+                datHeader.AddRange(new byte[headerEnd]);
+            }
+
+            // Prepend the header to the Compressed MDL data to create the final type3 File.
+            compressedMDLData.InsertRange(0, datHeader);
+            #endregion
+
+            return compressedMDLData.ToArray();
+
         }
 
         /// <summary>
@@ -2502,7 +2898,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        public async Task<byte[]> MakeMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public byte[] MakeMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
             ttModel.MdlVersion = mdlVersion;
@@ -3789,308 +4185,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
-        /// <summary>
-        /// Compresses a MDL file into a valid Type3 datafile.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        public async Task<byte[]> CompressMdlFile(byte[] data)
-        {
-
-            #region MDL Header Reading
-            // Read sizes and offsets.
-            const int _VertexInfoSizeOffset = 0x04;
-            const int _ModelDataSizeOffset = 0x08;
-            const ushort _MeshCountOffset = 12;
-            const ushort _MaterialCountOffset = 14;
-            const int _LodMax = 3;
-
-            var signature = BitConverter.ToUInt32(data, 0);
-
-            var vertexInfoUncompOffset = _MdlHeaderSize;
-            var vertexInfoUncompSize = BitConverter.ToInt32(data, _VertexInfoSizeOffset);
-
-            var modelUncompDataOffset = vertexInfoUncompOffset + vertexInfoUncompSize;
-            var modelUncompDataSize = BitConverter.ToInt32(data, _ModelDataSizeOffset);
-
-            var meshCount = BitConverter.ToUInt16(data, _MeshCountOffset);
-            var materialCount = BitConverter.ToUInt16(data, _MaterialCountOffset);
-
-            var offset = 16;
-
-            uint[] vertexDataOffsets = Dat.Read3IntBuffer(data, offset);
-            offset += (sizeof(uint) * _LodMax);
-            uint[] indexDataOffsets = Dat.Read3IntBuffer(data, offset);
-            offset += (sizeof(uint) * _LodMax);
-            uint[] vertexDataSizes = Dat.Read3IntBuffer(data, offset);
-            offset += (sizeof(uint) * _LodMax);
-            uint[] indexDataSizes = Dat.Read3IntBuffer(data, offset);
-            offset += (sizeof(uint) * _LodMax);
-
-            var lodCount = data[offset];
-            var flags = data[offset + 1];
-            #endregion
-
-            #region Data Compression
-            // We can now compress the data blocks.
-            var compressedMDLData = new List<byte>();
-
-            // Vertex Info Compression
-            var vertexInfoBlock = data.Skip(vertexInfoUncompOffset).Take(vertexInfoUncompSize).ToList();
-            var compressedVertexInfoParts = await Dat.CompressData(vertexInfoBlock);
-            foreach (var block in compressedVertexInfoParts)
-            {
-                compressedMDLData.AddRange(block);
-            }
-
-            // Model Data Compression
-            var modelDataBlock = data.Skip(modelUncompDataOffset).Take(modelUncompDataSize).ToList();
-            List<byte[]> compressedModelDataParts = new List<byte[]>();
-            compressedModelDataParts = await Dat.CompressData(modelDataBlock);
-            foreach (var block in compressedModelDataParts)
-            {
-                compressedMDLData.AddRange(block);
-            }
-
-            // Vertex & Index Data Compression
-            var compressedVertexDataParts = new List<List<byte[]>>();
-            var compressedIndexDataParts = new List<List<byte[]>>();
-            for (int i = 0; i < _LodMax; i++)
-            {
-                // Written as [Vertex Block LoD0] [Index Block Lod0] [Vertex LoD1] ....
-                var uncompressedVertex = data.Skip((int) vertexDataOffsets[i]).Take((int)vertexDataSizes[i]).ToList();
-                var compressedVertex = await Dat.CompressData(uncompressedVertex);
-                var uncompressedIndex = data.Skip((int)indexDataOffsets[i]).Take((int)indexDataSizes[i]).ToList();
-                var compressedIndex = await Dat.CompressData(uncompressedIndex);
-
-                foreach (var block in compressedVertex)
-                {
-                    compressedMDLData.AddRange(block);
-                }
-                foreach (var block in compressedIndex)
-                {
-                    compressedMDLData.AddRange(block);
-                }
-
-                compressedVertexDataParts.Add(compressedVertex);
-                compressedIndexDataParts.Add(compressedIndex);
-            }
-
-            #endregion
-
-            #region Type 3 Header Writing
-
-            var datHeader = new List<byte>();
-
-            // This is the most common size of header for models
-            var headerLength = 256;
-
-            // Total # of blocks.
-            var blockCount = compressedVertexInfoParts.Count + compressedModelDataParts.Count + compressedVertexDataParts.Sum(x => x.Count) + compressedIndexDataParts.Sum(x => x.Count);
-
-            // If the data is large enough, the header length goes to the next larger size (add 128 bytes)
-            if (blockCount > 24)
-            {
-                var remainingBlocks = blockCount - 24;
-                var bytesUsed = remainingBlocks * 2;
-                var extensionNeeeded = (bytesUsed / 128) + 1;
-                var newSize = 256 + (extensionNeeeded * 128);
-                headerLength = newSize;
-            }
-
-            // Header Length
-            datHeader.AddRange(BitConverter.GetBytes(headerLength));
-
-            // Data Type (models are type 3 data)
-            datHeader.AddRange(BitConverter.GetBytes(3));
-
-            // Model files are comprised of a fixed length header +  The Vertex Headers/Infos Structures + the larger general model metadata block + the geometry data blocks.
-            var uncompressedSize = _MdlHeaderSize + vertexInfoBlock.Count + modelDataBlock.Count + vertexDataSizes.Sum(x => x) + indexDataSizes.Sum(x => x);
-            datHeader.AddRange(BitConverter.GetBytes((uint) uncompressedSize));
-
-            // Max Buffer Size?
-            datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128 + 16));
-            // Buffer Size
-            datHeader.AddRange(BitConverter.GetBytes(compressedMDLData.Count / 128));
-
-            // Mdl Version / Signature
-            datHeader.AddRange(BitConverter.GetBytes(signature));
-
-
-            // Vertex Info Block Uncompressed Size
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad(vertexInfoBlock.Count, 128)));
-            // Model Data Block Uncompressed Size
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad(modelDataBlock.Count, 128)));
-            // Vertex Data Block Uncompressed Sizes
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int) vertexDataSizes[0], 128)));
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int) vertexDataSizes[1], 128)));
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int) vertexDataSizes[2], 128)));
-            // Edge Geometry Uncompressed Sizes
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            // Index Data Uncompressed Sizes
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[0], 128)));
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[1], 128)));
-            datHeader.AddRange(BitConverter.GetBytes(Dat.Pad((int)indexDataSizes[2], 128)));
-
-            // Vertex Info Total Compressed Size
-            datHeader.AddRange(BitConverter.GetBytes(compressedVertexInfoParts.Sum(x => x.Length)));
-            // Model Data Total Compressed Size
-            datHeader.AddRange(BitConverter.GetBytes(compressedModelDataParts.Sum(x => x.Length)));
-            // Vertex Data Total Compressed Sizes
-            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[0].Sum(x => x.Length)));
-            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[1].Sum(x => x.Length)));
-            datHeader.AddRange(BitConverter.GetBytes(compressedVertexDataParts[2].Sum(x => x.Length)));
-            // Edge Geometry Total Compressed Sizes
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            // Index Data Total Compressed Sizes
-            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[0].Sum(x => x.Length)));
-            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[1].Sum(x => x.Length)));
-            datHeader.AddRange(BitConverter.GetBytes(compressedIndexDataParts[2].Sum(x => x.Length)));
-
-
-            // Compressed Offsets
-            var vertexInfoOffset = 0;
-            var modelDataOffset = vertexInfoOffset + compressedVertexInfoParts.Sum(x => x.Length);
-
-            var vertexDataBlock0Offset = modelDataOffset + compressedModelDataParts.Sum(x => x.Length);
-            var indexDataBlock0Offset = vertexDataBlock0Offset + compressedVertexDataParts[0].Sum(x => x.Length);
-
-            var vertexDataBlock1Offset = indexDataBlock0Offset + compressedIndexDataParts[0].Sum(x => x.Length);
-            var indexDataBlock1Offset = vertexDataBlock1Offset + compressedVertexDataParts[1].Sum(x => x.Length);
-
-            var vertexDataBlock2Offset = indexDataBlock1Offset + compressedIndexDataParts[1].Sum(x => x.Length);
-            var indexDataBlock2Offset = vertexDataBlock2Offset + compressedVertexDataParts[2].Sum(x => x.Length);
-            
-            // Vertex Info Compressed Offset
-            datHeader.AddRange(BitConverter.GetBytes(vertexInfoOffset));
-            // Model Data Compressed Offset
-            datHeader.AddRange(BitConverter.GetBytes(modelDataOffset));
-            // Vertex Data Compressed Offsets
-            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock0Offset));
-            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock1Offset));
-            datHeader.AddRange(BitConverter.GetBytes(vertexDataBlock2Offset));
-            // Edge Geometry Compressed Offsets
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            datHeader.AddRange(BitConverter.GetBytes(0));
-            // Index Data Compressed Offsets
-            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock0Offset));
-            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock1Offset));
-            datHeader.AddRange(BitConverter.GetBytes(indexDataBlock2Offset));
-
-            // Data Block Indexes
-            var vertexInfoDataBlockIndex = 0;
-            var modelDataBlockIndex = vertexInfoDataBlockIndex + compressedVertexInfoParts.Count;
-
-            var vertexDataBlock0 = modelDataBlockIndex + compressedModelDataParts.Count;
-            var indexDataBlock0 = vertexDataBlock0 + compressedVertexDataParts[0].Count;
-
-            var vertexDataBlock1 = indexDataBlock0 + compressedIndexDataParts[0].Count;
-            var indexDataBlock1 = vertexDataBlock1 + compressedVertexDataParts[1].Count;
-
-            var vertexDataBlock2 = indexDataBlock1 + compressedIndexDataParts[1].Count;
-            var indexDataBlock2 = vertexDataBlock2 + compressedVertexDataParts[2].Count;
-
-            // Vertex Info Block Index
-            datHeader.AddRange(BitConverter.GetBytes((short)vertexInfoDataBlockIndex));
-            // Model Data Block Index
-            datHeader.AddRange(BitConverter.GetBytes((short)modelDataBlockIndex));
-            // Vertex Data Block LoD[0] Indexes
-            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock0));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock1));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)vertexDataBlock2));
-            // Edge Geometry Data Block Indexes
-            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock0));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
-            // Index Data Block Indexes
-            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock0));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock1));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)indexDataBlock2));
-
-
-            // Data Block Counts
-            // Vertex Info Part Count
-            datHeader.AddRange(BitConverter.GetBytes((short)compressedVertexInfoParts.Count));
-            // Model Data Part Count
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts.Count));
-            // Vertex Data Block LoD[0] part count
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[0].Count));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[1].Count));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[2].Count));
-            // Edge Geometry Counts
-            datHeader.AddRange(BitConverter.GetBytes((short)0));
-            datHeader.AddRange(BitConverter.GetBytes((short)0));
-            datHeader.AddRange(BitConverter.GetBytes((short)0));
-
-            // Index Data Block Counts
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[0].Count));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[1].Count));
-            datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[2].Count));
-
-
-            // Mesh Count
-            datHeader.AddRange(BitConverter.GetBytes((ushort)meshCount));
-            // Material Count
-            datHeader.AddRange(BitConverter.GetBytes((ushort)materialCount));
-            // LoD Count
-            datHeader.Add(lodCount);
-            // Flags, specifically flag 1 enables index streaming.
-            datHeader.Add(flags);
-            // Padding
-            datHeader.AddRange(BitConverter.GetBytes((short)0));
-
-
-            // ==== Compressed Block Sizes in order go here ==== //
-
-            // Vertex Info Compressed Block Sizes
-            for (var i = 0; i < compressedVertexInfoParts.Count; i++)
-            {
-                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexInfoParts[i].Length));
-            }
-
-            // Model Data Padded Size
-            for (var i = 0; i < compressedModelDataParts.Count; i++)
-            {
-                datHeader.AddRange(BitConverter.GetBytes((ushort)compressedModelDataParts[i].Length));
-            }
-
-            // Vertex/Index Info Compressed Block Sizes
-            for (var l = 0; l < _LodMax; l++)
-            {
-                for(int i = 0; i < compressedVertexDataParts[l].Count; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedVertexDataParts[l][i].Length));
-                }
-
-                // If we had edge geometry blocks, they would go here.
-
-                for (int i = 0; i < compressedIndexDataParts[l].Count; i++)
-                {
-                    datHeader.AddRange(BitConverter.GetBytes((ushort)compressedIndexDataParts[l][i].Length));
-                }
-            }
-
-
-            // Pad out remaining header space.
-            if (datHeader.Count != headerLength)
-            {
-                var headerEnd = headerLength - datHeader.Count % headerLength;
-                datHeader.AddRange(new byte[headerEnd]);
-            }
-
-            // Prepend the header to the Compressed MDL data to create the final type3 File.
-            compressedMDLData.InsertRange(0, datHeader);
-            #endregion
-
-            return compressedMDLData.ToArray();
-            
-        }
-
 
         /// <summary>
         /// Converts the TTTModel Geometry into the raw byte blocks FFXIV expects.
@@ -4196,7 +4290,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             return bytes;
         }
-
 
         private bool WriteVectorData(List<byte> buffer, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, VertexUsageType usage, TTVertex v)
         {
@@ -4381,7 +4474,9 @@ namespace xivModdingFramework.Models.FileTypes
             return size0 + size1;
         }
 
+        #endregion
 
+        #region Model Deformation Handling
         /// <summary>
         /// Classes used in reading bone deformation data.
         /// </summary>
@@ -4531,9 +4626,9 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
-        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
-        private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+        #endregion
 
+        #region Skin Auto-Assignment (Bibo/Gen3/Etc.)
         public static bool IsAutoAssignableModel(string mdlPath)
         {
             if (!mdlPath.StartsWith("chara/"))
@@ -4579,7 +4674,7 @@ namespace xivModdingFramework.Models.FileTypes
             var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(mdlPath));
             var modlist = await tx.GetModList();
 
-            var ogMdl = await GetRawMdlData(mdlPath, false, tx);
+            var ogMdl = await GetXivMdl(mdlPath, false, tx);
             var ttMdl = TTModel.FromRaw(ogMdl);
 
             bool anyChanges = false;
@@ -4869,7 +4964,6 @@ namespace xivModdingFramework.Models.FileTypes
             return anyChanges;
         }
 
-
         private bool SkinCheckAndrofirm(TTModel ttMdl)
         {
             // AF is a bit of a special case.
@@ -4989,6 +5083,9 @@ namespace xivModdingFramework.Models.FileTypes
             return false;
         }
 
+        #endregion
+
+        #region Model Copying
         /// <summary>
         /// Creates a new racial model for a given set/slot by copying from already existing racial models.
         /// </summary>
@@ -5116,8 +5213,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var index = await tx.GetIndexFile(df);
                 var modlist = await tx.GetModList();
 
-                var offset = index.Get8xDataOffset(originalPath);
-                var xMdl = await GetRawMdlData(offset, originalPath, tx);
+                var xMdl = await GetXivMdl(originalPath, false, tx);
                 var model = TTModel.FromRaw(xMdl);
 
 
@@ -5257,7 +5353,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Save the final modified mdl.
                 var data = await MakeCompressedMdlFile(model, xMdl);
-                offset = await _dat.WriteModFile(data, newPath, source, item, tx);
+                var offset = await _dat.WriteModFile(data, newPath, source, item, tx);
 
                 if (ownTx) {
                     await ModTransaction.CommitTransaction(tx);
@@ -5274,126 +5370,23 @@ namespace xivModdingFramework.Models.FileTypes
                 throw;
             }
         }
+        #endregion
 
-
+        #region Dawntrail Model Fix
         public async Task FixPreDawntrailMdl(string path, string source = "Unknown", ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             // HACKHACK: This is going to be extremely inefficient, but works for the moment.
-            var ttMdl = await GetModel(path, false, tx);
-            var xivMdl = await GetRawMdlData(path, false, tx);
+            var ttMdl = await GetTTModel(path, false, tx);
+            var xivMdl = await GetXivMdl(path, false, tx);
 
             var bytes = await MakeCompressedMdlFile(ttMdl, xivMdl);
             await _dat.WriteModFile(bytes, path, source, null, tx);
-
-
         }
+        #endregion
 
-        /// <summary>
-        /// Gets the MDL path
-        /// </summary>
-        /// <param name="itemModel">The item model</param>
-        /// <param name="xivRace">The selected race for the given item</param>
-        /// <param name="submeshId">The submesh ID - Only used for furniture items which contain multiple meshes, like the Ahriman Clock.</param>
-        /// <returns>The path in string format.  Not a fucking tuple.</returns>
-        public async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null)
-        {
-            string mdlFolder = "", mdlFile = "";
-
-            var mdlInfo = itemModel.ModelInfo;
-            var id = mdlInfo.PrimaryID.ToString().PadLeft(4, '0');
-            var bodyVer = mdlInfo.SecondaryID.ToString().PadLeft(4, '0');
-            var itemCategory = itemModel.SecondaryCategory;
-
-            var race = xivRace.GetRaceCode();
-            var itemType = itemModel.GetPrimaryItemType();
-
-            switch (itemType)
-            {
-                case XivItemType.equipment:
-                    mdlFolder = $"chara/{itemType}/e{id}/model";
-                    mdlFile = $"c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}{MdlExtension}";
-                    break;
-                case XivItemType.accessory:
-                    mdlFolder = $"chara/{itemType}/a{id}/model";
-                    var abrv = itemModel.GetItemSlotAbbreviation();
-                    // Just left ring things.
-                    if (submeshId == "ril")
-                    {
-                        abrv = "ril";
-                    }
-                    mdlFile = $"c{race}a{id}_{abrv}{MdlExtension}";
-                    break;
-                case XivItemType.weapon:
-                    mdlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/model";
-                    mdlFile = $"w{id}b{bodyVer}{MdlExtension}";
-                    break;
-                case XivItemType.monster:
-                    mdlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/model";
-                    mdlFile = $"m{id}b{bodyVer}{MdlExtension}";
-                    break;
-                case XivItemType.demihuman:
-                    mdlFolder = $"chara/{itemType}/d{id}/obj/equipment/e{bodyVer}/model";
-                    mdlFile = $"d{id}e{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
-                    break;
-                case XivItemType.human:
-                    if (itemCategory.Equals(XivStrings.Body))
-                    {
-                        mdlFolder = $"chara/{itemType}/c{race}/obj/body/b{bodyVer}/model";
-                        mdlFile = $"c{race}b{bodyVer}_{SlotAbbreviationDictionary[itemModel.TertiaryCategory]}{MdlExtension}";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Hair))
-                    {
-                        mdlFolder = $"chara/{itemType}/c{race}/obj/hair/h{bodyVer}/model";
-                        mdlFile = $"c{race}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Face))
-                    {
-                        mdlFolder = $"chara/{itemType}/c{race}/obj/face/f{bodyVer}/model";
-                        mdlFile = $"c{race}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Tail))
-                    {
-                        mdlFolder = $"chara/{itemType}/c{race}/obj/tail/t{bodyVer}/model";
-                        mdlFile = $"c{race}t{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}{MdlExtension}";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Ear))
-                    {
-                        mdlFolder = $"chara/{itemType}/c{race}/obj/zear/z{bodyVer}/model";
-                        mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
-                    }
-                    break;
-                case XivItemType.furniture:
-                    // Language doesn't matter for this call.
-                    var housing = new Housing(_gameDirectory, XivLanguage.None);
-                    var mdlPath = "";
-                    // Housing assets use a different function to scrub the .sgd files for
-                    // their direct absolute model references.
-
-                    // HACKHACK: We don't actually allow editing .SGD files natively in TexTools, and I'm not sure anyone, anywhere, has even bothered trying.
-                    // So just rip a readonly TX here to pass down, because this function really shouldn't need a transaction argument to resolve.
-
-                    var tx = ModTransaction.BeginTransaction(true);
-                    var assetDict = await housing.GetFurnitureModelParts(itemModel, tx);
-
-                    if (submeshId == null || submeshId == "base")
-                    {
-                        submeshId = "b0";
-                    }
-
-                    mdlPath = assetDict[submeshId];
-                    return mdlPath;
-                    break;
-                default:
-                    mdlFolder = "";
-                    mdlFile = "";
-                    break;
-            }
-
-            return mdlFolder + "/" + mdlFile;
-        }
-
+        #region Static Dictionaries and Internal Classes
         public static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
         {
             {XivStrings.Head, "met"},
@@ -5511,5 +5504,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             public List<byte> IndexDataBlock = new List<byte>();
         }
+        #endregion
     }
 }
