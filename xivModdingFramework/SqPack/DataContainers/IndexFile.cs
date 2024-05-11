@@ -82,6 +82,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
             try
             {
+                ReadOnlyMode = readOnly;
                 DataFile = dataFile;
                 ReadIndexFile(index1Stream, 0);
                 ReadIndexFile(index2Stream, 1);
@@ -211,14 +212,6 @@ namespace xivModdingFramework.SqPack.DataContainers
                 if (!Index2Entries.ContainsKey(entry.FullPathHash))
                 {
                     Index2Entries.Add(entry.FullPathHash, entry);
-                }
-                else
-                {
-                    Debug.Write(entry.RawOffset);
-                }
-                if ((offset & 0x1) > 0)
-                {
-                    Debug.Write(offset);
                 }
             }
 
@@ -675,6 +668,11 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         protected virtual uint INTERNAL_SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed, bool allowRepair = false)
         {
+            if (ReadOnlyMode)
+            {
+                throw new Exception("Cannot write index updates to ReadOnly Index File.");
+            }
+
             var fileName = Path.GetFileName(filePath);
             var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
             var fileHash = (uint)HashGenerator.GetHash(fileName);

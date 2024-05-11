@@ -248,7 +248,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        public async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool allowReadOnly = false)
+        public async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
         {
             var index1Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
             var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
@@ -261,14 +261,14 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             IndexFile index;
 
-                if (!allowReadOnly)
+                if (!readOnly)
                 {
                     // If we're getting a writeable index, we need to get a fresh copy to avoid polluting the cache.
                     using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
                     {
                         using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
                         {
-                            index = new IndexFile(dataFile, index1Stream, index2Stream, true);
+                            index = new TransactionIndexFile(dataFile, index1Stream, index2Stream, readOnly);
                         }
                     }
                     return index;
@@ -283,7 +283,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
                             {
-                                index = new IndexFile(dataFile, index1Stream, index2Stream, false);
+                                index = new IndexFile(dataFile, index1Stream, index2Stream, readOnly);
                             }
                         }
 
