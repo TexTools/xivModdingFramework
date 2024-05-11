@@ -118,6 +118,10 @@ namespace xivModdingFramework.Mods
 
 
         #region Constructor/Disposable Pattern
+        public ModTransaction()
+        {
+            throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
+        }
         private ModTransaction(bool readOnly = false, ModPack modpack = null)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
