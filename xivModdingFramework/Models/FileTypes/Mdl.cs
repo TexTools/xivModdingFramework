@@ -151,19 +151,6 @@ namespace xivModdingFramework.Models.FileTypes
             _gameDirectory = gameDirectory;
         }
 
-        private byte[] _rawData;
-
-        /// <summary>
-        /// Retrieves and clears the RawData value.
-        /// </summary>
-        /// <returns></returns>
-        public byte[] GetRawData()
-        {
-            var ret = _rawData;
-            _rawData = null;
-            return ret;
-        }
-
         private static List<List<ShapeData.ShapeDataEntry>> _SavedData = new List<List<ShapeData.ShapeDataEntry>>();
         private static List<List<Vector3>> _SavedVectorArrays = new List<List<Vector3>>();
 
@@ -2287,7 +2274,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
+        public async Task<byte[]> ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
         {
 
             #region Setup and Validation
@@ -2327,17 +2314,20 @@ namespace xivModdingFramework.Models.FileTypes
 
             var bytes = await FileToModelBytes(path, mdlPath, options, loggingFunction, intermediaryFunction, submeshId);
             var compressed = await CompressMdlFile(bytes);
-            _rawData = compressed;
 
             var modEntry = await modding.TryGetModEntry(mdlPath);
+            byte[] ret = null;
             if (!rawDataOnly)
             {
                 loggingFunction(false, "Writing MDL File to FFXIV File System...");
                 await dat.WriteModFile(compressed, mdlPath, source, item);
+            } else
+            {
+                ret = compressed;
             }
 
             loggingFunction(false, "Job done!");
-            return;
+            return ret;
         }
 
         /// <summary>
