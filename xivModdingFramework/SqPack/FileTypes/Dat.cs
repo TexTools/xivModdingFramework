@@ -46,6 +46,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         private readonly DirectoryInfo _gameDirectory;
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
 
+        private const int _MODDED_DAT_MARK_OFFSET = 0x200;
+        private const int _MODDED_DAT_MARK = 1337;
+
         public Dat(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
@@ -242,11 +245,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
-                                binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+                                binaryReader.BaseStream.Seek(_MODDED_DAT_MARK_OFFSET, SeekOrigin.Begin);
                                 var one = binaryReader.ReadInt32();
                                 var two = binaryReader.ReadInt32();
 
-                                if(one != 1337 || two != 1337)
+                                if(one != _MODDED_DAT_MARK  || two != _MODDED_DAT_MARK)
                                 {
                                     datList.Add(datFilePath);
                                 }
@@ -291,12 +294,12 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
                             {
-                                binaryReader.BaseStream.Seek(24, SeekOrigin.Begin);
+                                binaryReader.BaseStream.Seek(_MODDED_DAT_MARK_OFFSET, SeekOrigin.Begin);
                                 var one = binaryReader.ReadInt32();
                                 var two = binaryReader.ReadInt32();
 
                                 // Check the magic numbers
-                                if(one == 1337 && two == 1337)
+                                if(one == _MODDED_DAT_MARK && two == _MODDED_DAT_MARK)
                                 {
                                     datList.Add(datFilePath);
                                 }
@@ -327,16 +330,34 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 var sha1 = new SHA1Managed();
 
-                bw.Write(1632661843);
-                bw.Write(27491);
-                bw.Write(0);
-                bw.Write(1024);
-                bw.Write(1);
-                bw.Write(1);
-                bw.Write(1337);
-                bw.Write(1337);
-                bw.Seek(8, SeekOrigin.Current);
-                bw.Write(-1);
+                // Magic Bytes
+                bw.Write(1632661843);   // 0x00
+                bw.Write(27491);        // 0x04
+
+                // Platform ID
+                bw.Write(0);            // 0x08
+
+                // Size of SQPack Header
+                bw.Write(1024);         // 0x0C
+                
+                // Version
+                bw.Write(1);            // 0x10
+
+                // Type
+                bw.Write(1);            // 0x14
+
+                // Unknown blank data.  Possibly Padding bytes.
+                bw.Write(0);            // 0x18
+                bw.Write(0);            // 0x1C
+                
+                // End of header marker
+                bw.Write(-1);           // 0x20
+
+                // Framework-Modded Dat-Mark
+                bw.Seek(_MODDED_DAT_MARK_OFFSET, SeekOrigin.Begin);
+                bw.Write(1337);         // 0x200
+                bw.Write(1337);         // 0x204
+
                 bw.Seek(960, SeekOrigin.Begin);
                 bw.Write(sha1.ComputeHash(header, 0, 959));
             }
