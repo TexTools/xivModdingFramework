@@ -19,6 +19,7 @@ using xivModdingFramework.Models.Enums;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Models.ModelTextures;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
 
@@ -1065,13 +1066,13 @@ namespace xivModdingFramework.Models.DataContainers
 
 
         /// <summary>
-        /// Retreives the raw XivMdl entry that was used to populate this TTModel, if it exists.
+        /// Re-Loads the XivMDL at the source path for this model, if it exists.
         /// </summary>
         /// <returns></returns>
-        public async Task<XivMdl> GetRawMdl(Mdl _mdl)
+        public async Task<XivMdl> GetRawMdl(Mdl _mdl, ModTransaction tx = null)
         {
             if (!IsInternal) return null;
-            return await _mdl.GetRawMdlData(Source);
+            return await _mdl.GetRawMdlData(Source, false, tx);
         }
         #endregion
 

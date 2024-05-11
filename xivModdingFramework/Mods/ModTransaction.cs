@@ -265,6 +265,12 @@ namespace xivModdingFramework.Mods
                 return;
             }
 
+            if (tx._Finished)
+            {
+                // TX has already been completed/cancelled.
+                return;
+            }
+
             if (tx != _ActiveTransaction)
             {
                 throw new Exception("Attempted to cancel transaction other than the current open mod transation.");

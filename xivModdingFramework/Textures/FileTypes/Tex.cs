@@ -146,11 +146,11 @@ namespace xivModdingFramework.Textures.FileTypes
                 if (path.Contains(".atex"))
                 {
                     var atex = new ATex(_gameDirectory, df);
-                    xivTex = await atex.GetATexData(offset);
+                    xivTex = await atex.GetATexData(offset, tx);
                 }
                 else
                 {
-                    xivTex = await _dat.GetTexFromDat(offset, df);
+                    xivTex = await _dat.GetTexFromDat(offset, df, tx);
                 }
             }
             catch (Exception ex)
@@ -236,7 +236,7 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
 
-        public async Task<XivTex> GetTexDataByOffset(TexTypePath ttp, long offset)
+        public async Task<XivTex> GetTexDataByOffset(TexTypePath ttp, long offset, ModTransaction tx = null)
         {
             if (offset == 0)
             {
@@ -249,11 +249,11 @@ namespace xivModdingFramework.Textures.FileTypes
                 if (ttp.Path.Contains(".atex"))
                 {
                     var atex = new ATex(_gameDirectory, ttp.DataFile);
-                    xivTex = await atex.GetATexData(offset);
+                    xivTex = await atex.GetATexData(offset, tx);
                 }
                 else
                 {
-                    xivTex = await _dat.GetTexFromDat(offset, ttp.DataFile);
+                    xivTex = await _dat.GetTexFromDat(offset, ttp.DataFile, tx);
                 }
             }
             catch (Exception ex)

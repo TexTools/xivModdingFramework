@@ -93,41 +93,6 @@ namespace xivModdingFramework.Helpers
             });
         }
 
-        /// <summary>
-        /// Checks the index for the number of dats the game will attempt to read
-        /// </summary>
-        /// <returns>True if there is a problem, False otherwise</returns>
-        public Task<bool> CheckForLargeDats(XivDataFile dataFile)
-        {
-            return Task.Run(() =>
-            {
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
-
-                var fileSizeList = new List<long>();
-
-                for (var i = 0; i < largestDatNum; i++)
-                {
-                    var datPath = Dat.GetDatPath(dataFile, i);
-                    var fileInfo = new FileInfo(datPath);
-
-                    try
-                    {
-                        fileSizeList.Add(fileInfo.Length);
-                    }
-                    catch
-                    {
-                        return true;
-                    }
-                }
-
-                if (largestDatNum > 8 || fileSizeList.FindAll(x => x.Equals(2048)).Count > 1)
-                {
-                    return true;
-                }
-
-                return false;
-            });
-        }
 
         /// <summary>
         /// Repairs the dat count in the index files

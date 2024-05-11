@@ -383,11 +383,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
-            return await ReadSqPackType2(info.Offset, info.DataFile);
+            return await ReadSqPackType2(info.Offset, info.DataFile, tx);
         }
 
         /// <summary>
-        /// Gets the data for type 2 files.
+        /// Reads and decompresses the Type 2 Sqpack data from the transaction file store or game files.
         /// </summary>
         /// <remarks>
         /// Type 2 files vary in content.
@@ -395,7 +395,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">The offset where the data is located.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        internal async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile)
+        internal async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -405,28 +405,31 @@ namespace xivModdingFramework.SqPack.FileTypes
             byte[] type2Bytes = null;
 
             // This formula is used to obtain the dat number in which the offset is located
-            var originalOffset = (offset / 8);
-            var bot4 = (int)(originalOffset & 0x0F);
-            var datNum = bot4 / 2;
+            var parts = Offset8xToParts(offset);
 
-            var datPath = Dat.GetDatPath(dataFile, datNum);
-
-
-            offset = OffsetCorrection(offset);
-            await _lock.WaitAsync();
-            try
+            if (tx != null)
             {
-                await Task.Run(async () =>
-                {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        type2Bytes = await ReadSqPackType2(br, offset);
-                    }
-                });
+                type2Bytes = await tx.GetData(dataFile, offset);
             }
-            finally
+            else
             {
-                _lock.Release();
+                await _lock.WaitAsync();
+                try
+                {
+                    await Task.Run(async () =>
+                    {
+
+                        var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
+                        using (var br = new BinaryReader(File.OpenRead(datPath)))
+                        {
+                            type2Bytes = await ReadSqPackType2(br, parts.Offset);
+                        }
+                    });
+                }
+                finally
+                {
+                    _lock.Release();
+                }
             }
             if (type2Bytes == null)
             {
@@ -686,10 +689,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
-            return await ReadSqPackType3(info.Offset, info.DataFile);
+            return await ReadSqPackType3(info.Offset, info.DataFile, tx);
         }
         /// <summary>
-        /// Gets the data for Type 3 (Model) files
+        /// Reads the uncompressed Type3 data from the given transaction store or game files.
         /// </summary>
         /// <remarks>
         /// Type 3 files are used for models
@@ -697,7 +700,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the type 3 data</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<byte[]> ReadSqPackType3(long offset, XivDataFile dataFile)
+        public async Task<byte[]> ReadSqPackType3(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -708,17 +711,24 @@ namespace xivModdingFramework.SqPack.FileTypes
             var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
             return await Task.Run(async () =>
             {
-                await _lock.WaitAsync();
-                try
+                if (tx != null)
                 {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        return await ReadSqPackType3(br, parts.Offset);
-                    }
+                    return await tx.GetData(dataFile, offset);
                 }
-                finally
+                else
                 {
-                    _lock.Release();
+                    await _lock.WaitAsync();
+                    try
+                    {
+                        using (var br = new BinaryReader(File.OpenRead(datPath)))
+                        {
+                            return await ReadSqPackType3(br, parts.Offset);
+                        }
+                    }
+                    finally
+                    {
+                        _lock.Release();
+                    }
                 }
             });
         }
@@ -1203,7 +1213,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
-                    return await GetTexFromDat(modEntry.data.originalOffset, dataFile);
+                    return await GetTexFromDat(modEntry.data.originalOffset, dataFile, tx);
                 }
             }
 
@@ -1221,7 +1231,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception($"Could not find offset for {internalPath}");
             }
 
-            return await GetTexFromDat(offset, dataFile);
+            return await GetTexFromDat(offset, dataFile, tx);
         }
 
         /// <summary>
@@ -1233,24 +1243,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetTexFromDat(long offset, XivDataFile dataFile)
+        public async Task<XivTex> GetTexFromDat(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
                 throw new InvalidDataException("Cannot get file size data without valid offset.");
             }
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var parts = Dat.Offset8xToParts(offset);
-            var datFile = Dat.GetDatPath(dataFile, parts.DatNum);
-
             // Get the uncompressed .tex file.
-            byte[] data = null;
-            using (var br = new BinaryReader(File.OpenRead(datFile)))
-            {
-                data = await ReadSqPackType4(br, parts.Offset);
-            }
-
+            var data = await ReadSqPackType4(offset, dataFile, tx);
             return XivTex.FromUncompressedTex(data);
         }
 
@@ -1261,7 +1261,15 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        internal async Task<byte[]> ReadSqPackType4(long offset, XivDataFile dataFile)
+        /// <summary>
+        /// Retrieves the uncompressed type 4 bytes from a given transaction store or the game files.
+        /// </summary>
+        /// <param name="offset"></param>
+        /// <param name="dataFile"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidDataException"></exception>
+        internal async Task<byte[]> ReadSqPackType4(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -1272,17 +1280,24 @@ namespace xivModdingFramework.SqPack.FileTypes
             var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
             return await Task.Run(async () =>
             {
-                await _lock.WaitAsync();
-                try
+                if (tx != null)
                 {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        return await ReadSqPackType4(br, parts.Offset);
-                    }
+                    return await tx.GetData(dataFile, offset);
                 }
-                finally
+                else
                 {
-                    _lock.Release();
+                    await _lock.WaitAsync();
+                    try
+                    {
+                        using (var br = new BinaryReader(File.OpenRead(datPath)))
+                        {
+                            return await ReadSqPackType4(br, parts.Offset);
+                        }
+                    }
+                    finally
+                    {
+                        _lock.Release();
+                    }
                 }
             });
         }
@@ -2280,15 +2295,16 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
 
-            var doDatSave = tx == null;
             if (XivCache.GameInfo.UseLumina)
             {
-                return await DoLuminaWrite(fileData, internalFilePath, doDatSave);
+                return await DoLuminaWrite(fileData, internalFilePath, tx == null);
             }
 
             // Open a transaction if we don't have one.
+            var doDatSave = false;
             if (tx == null)
             {
+                doDatSave = true;
                 tx = ModTransaction.BeginTransaction();
             }
             try
@@ -2349,7 +2365,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 else if (index == null && doDatSave)
                 {
-                    // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot.
+                    // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot and perfrom a real write.
                     var slots = await Dat.ComputeOpenSlots(df);
                     var slot = slots.FirstOrDefault(x => x.Value >= size);
 
@@ -2365,7 +2381,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 else
                 {
                     // If we're part of a larger transaction, write to the transaction data store.
-                    //tx.WriteData()
+                    //retOffset = await tx.WriteData(df, fileData);
+                    //rawOffset = (uint) (retOffset / 8);
                     rawOffset = await Unsafe_WriteToDat(fileData, df);
                 }
 
@@ -2540,7 +2557,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static (long Offset, int DatNum) Offset8xToParts(long offset8xWithDatNumEmbed)
         {
-            var datNum = (int)((offset8xWithDatNumEmbed / 8) & 0x0F) / 2;
+            var datNum = (int)(((ulong) offset8xWithDatNumEmbed >> 4) & 0b111);
             var offset = OffsetCorrection(offset8xWithDatNumEmbed);
             return (offset, datNum);
         }

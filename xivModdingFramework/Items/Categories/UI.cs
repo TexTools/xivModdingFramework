@@ -27,6 +27,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.HUD.FileTypes;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Resources;
+using xivModdingFramework.Mods;
 
 namespace xivModdingFramework.Items.Categories
 {
@@ -60,13 +61,13 @@ namespace xivModdingFramework.Items.Categories
         /// They contain refrences to textures among other unknown things (likely placement data)
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetUldList()
+        public async Task<List<XivUi>> GetUldList(ModTransaction tx = null)
         {
             var uldLock = new object();
             var uldList = new List<XivUi>();
 
             var uld = new Uld(_gameDirectory);
-            var uldPaths = await uld.GetTexFromUld();
+            var uldPaths = await uld.GetTexFromUld(tx);
 
             await Task.Run(() => Parallel.ForEach(uldPaths, (uldPath) =>
             {

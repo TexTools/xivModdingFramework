@@ -211,7 +211,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 return null;
             }
 
-            var mtrlData = await GetMtrlData(mtrlOffset, mtrlPath);
+            var mtrlData = await GetMtrlData(mtrlOffset, mtrlPath, tx);
 
             return mtrlData;
         }
@@ -570,14 +570,14 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="mtrlOffset">The offset to the mtrl in the dat file</param>
         /// <param name="mtrlPath">The full internal game path for the mtrl</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetMtrlData(long mtrlOffset, string mtrlPath)
+        public async Task<XivMtrl> GetMtrlData(long mtrlOffset, string mtrlPath, ModTransaction tx = null)
         {
             var dat = new Dat(_gameDirectory);
             var index = new Index(_gameDirectory);
 
             // Get uncompressed mtrl data
             var df = IOUtil.GetDataFileFromPath(mtrlPath);
-            var mtrlData = await dat.ReadSqPackType2(mtrlOffset, df);
+            var mtrlData = await dat.ReadSqPackType2(mtrlOffset, df, tx);
 
             XivMtrl xivMtrl = null;
             await Task.Run((Func<Task>)(async () =>

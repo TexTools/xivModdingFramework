@@ -532,7 +532,7 @@ namespace xivModdingFramework.Models.FileTypes
                     offset = mod.data.originalOffset;
                 }
             }
-            return await GetRawMdlData(offset, mdlPath);
+            return await GetRawMdlData(offset, mdlPath, tx);
         }
 
         /// <summary>
@@ -543,7 +543,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="offset"></param>
         /// <param name="internalPathName"></param>
         /// <returns></returns>
-        public async Task<XivMdl> GetRawMdlData(long offset, string internalPathName)
+        public async Task<XivMdl> GetRawMdlData(long offset, string internalPathName, ModTransaction tx = null)
         {
             var getShapeData = true;
             var dat = new Dat(_gameDirectory);
@@ -553,7 +553,7 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
-            var mdlData = await dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(internalPathName));
+            var mdlData = await dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(internalPathName), tx);
 
             var xivMdl = new XivMdl { MdlPath = internalPathName };
             int totalNonNullMaterials = 0;
@@ -5127,7 +5127,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var modlist = await tx.GetModList();
 
                 var offset = index.Get8xDataOffset(originalPath);
-                var xMdl = await GetRawMdlData(offset, originalPath);
+                var xMdl = await GetRawMdlData(offset, originalPath, tx);
                 var model = TTModel.FromRaw(xMdl);
 
 
@@ -5184,7 +5184,7 @@ namespace xivModdingFramework.Models.FileTypes
                     try
                     {
                         offset = index.Get8xDataOffset(material);
-                        var mtrl = await _mtrl.GetMtrlData(offset, material);
+                        var mtrl = await _mtrl.GetMtrlData(offset, material, tx);
 
                         if (copyTextures)
                         {

@@ -101,7 +101,7 @@ namespace xivModdingFramework.Exd.FileTypes
                 throw new Exception($"Could not find offset for exd/{exFile}{ExhExtension}");
             }
 
-            var exhData = await _dat.ReadSqPackType2(offset, XivDataFile._0A_Exd);
+            var exhData = await _dat.ReadSqPackType2(offset, XivDataFile._0A_Exd, tx);
 
             await Task.Run(() =>
             {
@@ -209,7 +209,7 @@ namespace xivModdingFramework.Exd.FileTypes
                 {
                     try
                     {
-                        var exData = await _dat.ReadSqPackType2(exdData.Key, XivDataFile._0A_Exd);
+                        var exData = await _dat.ReadSqPackType2(exdData.Key, XivDataFile._0A_Exd, tx);
 
                         // Big Endian Byte Order 
                         using (var br = new BinaryReaderBE(new MemoryStream(exData)))

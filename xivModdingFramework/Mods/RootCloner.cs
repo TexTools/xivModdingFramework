@@ -267,7 +267,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
                     var offset = index.Get8xDataOffset(src);
-                    var xmdl = await _mdl.GetRawMdlData(offset, src);
+                    var xmdl = await _mdl.GetRawMdlData(offset, src, tx);
                     var tmdl = TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
@@ -319,7 +319,7 @@ namespace xivModdingFramework.Mods
                     {
                         var offset = index.Get8xDataOffset(src);
                         if (offset == 0) continue;
-                        var xivMtrl = await _mtrl.GetMtrlData(offset, src);
+                        var xivMtrl = await _mtrl.GetMtrlData(offset, src, tx);
                         xivMtrl.MTRLPath = dst;
 
                         for (int i = 0; i < xivMtrl.Textures.Count; i++)
@@ -576,7 +576,7 @@ namespace xivModdingFramework.Mods
             }
             else
             {
-                var data = await _dat.ReadSqPackType2(originalMetadataOffset, df);
+                var data = await _dat.ReadSqPackType2(originalMetadataOffset, df, tx);
                 originalMetadata = await ItemMetadata.Deserialize(data);
             }
             return originalMetadata;

@@ -23,6 +23,7 @@ using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.FileTypes;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
@@ -45,7 +46,7 @@ namespace xivModdingFramework.HUD.FileTypes
         /// Gets the texture paths from the uld file
         /// </summary>
         /// <returns>List of texture paths from the uld file</returns>
-        public async Task<List<string>> GetTexFromUld()
+        public async Task<List<string>> GetTexFromUld(ModTransaction tx = null)
         {
             var uldLock = new object();
             var hashedFolder = HashGenerator.GetHash("ui/uld");
@@ -60,7 +61,7 @@ namespace xivModdingFramework.HUD.FileTypes
                 byte[] uldData;
                 try
                 {
-                    uldData = dat.ReadSqPackType2(offset, XivDataFile._06_Ui).Result;
+                    uldData = dat.ReadSqPackType2(offset, XivDataFile._06_Ui, tx).Result;
                 }
                 catch (Exception ex)
                 {

@@ -400,7 +400,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new Exception($"Could not find offset for {skelBPath}");
             }
 
-            var sklbData = await dat.ReadSqPackType2(offset, dataFile);
+            var sklbData = await dat.ReadSqPackType2(offset, dataFile, tx);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))
             {

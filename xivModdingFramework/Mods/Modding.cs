@@ -602,7 +602,7 @@ namespace xivModdingFramework.Mods
                     foreach (var mod in metadataEntries)
                     {
                         var df = IOUtil.GetDataFileFromPath(mod.fullPath);
-                        var data = await _dat.ReadSqPackType2(mod.data.modOffset, df);
+                        var data = await _dat.ReadSqPackType2(mod.data.modOffset, df, tx);
                         var meta = await ItemMetadata.Deserialize(data);
 
                         meta.Validate(mod.fullPath);
