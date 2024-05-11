@@ -1060,7 +1060,7 @@ namespace xivModdingFramework.Mods
                             if (size % 256 != 0) throw new Exception("Dicks");
 
                             var data = _dat.GetCompressedData(mod.data.modOffset, df, size);
-                            var newOffset = await WriteToTempDat(_dat, data, df);
+                            var newOffset = await WriteToTempDat(data, df);
 
                             if (mod.IsCustomFile())
                             {
@@ -1131,21 +1131,25 @@ namespace xivModdingFramework.Mods
 
         }
 
-        private async Task<long> WriteToTempDat(Dat _dat, byte[] data, XivDataFile df)
+        private async Task<long> WriteToTempDat(byte[] data, XivDataFile df)
         {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var moddedDats = await _dat.GetModdedDatList(df);
             var tempDats = moddedDats.Select(x => x + ".temp");
             var maxSize = Dat.GetMaximumDatSize();
 
+            var rex = new Regex("([0-9])\\.temp$");
             string targetDatFile = null;
             foreach(var file in tempDats)
             {
-                if(!File.Exists(file))
+                var datId = Int32.Parse(rex.Match(targetDatFile).Groups[1].Value);
+
+                if (!File.Exists(file))
                 {
                     using (var stream = new BinaryWriter(File.Create(file)))
                     {
-                        stream.Write(Dat.MakeSqPackHeader());
-                        stream.Write(Dat.MakeDatHeader());
+                        stream.Write(Dat.MakeCustomDatSqPackHeader());
+                        stream.Write(Dat.MakeDatHeader(datId, 0));
                     }
                     targetDatFile = file;
                     break;
@@ -1160,7 +1164,6 @@ namespace xivModdingFramework.Mods
 
             if (targetDatFile == null) throw new Exception("Unable to find open temp dat to write to.");
 
-            var rex = new Regex("([0-9])\\.temp$");
             var match = rex.Match(targetDatFile);
             uint datNum = UInt32.Parse(match.Groups[1].Value);
 

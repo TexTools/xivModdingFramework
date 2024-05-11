@@ -135,8 +135,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 using (var bw = new BinaryWriter(fs))
                 {
-                    bw.Write(MakeSqPackHeader());
-                    bw.Write(MakeDatHeader());
+                    bw.Write(MakeCustomDatSqPackHeader());
+                    bw.Write(MakeDatHeader(nextDatNumber, 0));
                 }
             }
 
@@ -322,7 +322,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the SqPack portion of the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        internal static byte[] MakeSqPackHeader()
+        internal static byte[] MakeCustomDatSqPackHeader()
         {
             var header = new byte[1024];
 
@@ -369,24 +369,55 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        internal static byte[] MakeDatHeader()
+        internal static byte[] MakeDatHeader(int datNum, int fileSize, byte[] dataHash = null)
         {
             var header = new byte[1024];
+
+            // SqPack and Dat headers are 1024 each.
+            var dataSize = fileSize - 2048;
+
+            if(dataHash == null)
+            {
+                dataHash = new byte[64];
+            }
+
+            var maxSize = (uint) GetMaximumDatSize();
+
 
             using (var bw = new BinaryWriter(new MemoryStream(header)))
             {
                 var sha1 = new SHA1Managed();
 
-                bw.Write(header.Length);
-                bw.Write(0);
-                bw.Write(16);
-                bw.Write(2048);
-                bw.Write(2);
-                bw.Write(0);
-                bw.Write(2000000000);
-                bw.Write(0);
+                // Dat Header Length
+                bw.Write(header.Length);        // 0x00
+
+                // Blank
+                bw.Write(0);                    // 0x04
+
+                // Unknown
+                bw.Write(16);                   // 0x08
+
+                // Data Size divided by 128 (# of file slots?)
+                bw.Write(dataSize);             // 0x0C
+
+                // Dat Number + 1
+                bw.Write((datNum + 1));         // 0x10
+
+                // Blank
+                bw.Write(0);                    // 0x14
+
+                // Max File Size
+                bw.Write(maxSize);              // 0x18
+
+                // Blank
+                bw.Write(0);                    // 0x1C
+
+                // Hash of the File Data (0x800 - EOF)
+                bw.Write(dataHash);             // 0x20
+                
+                // 0x3c0 - Hash of the DAT header.
                 bw.Seek(960, SeekOrigin.Begin);
-                bw.Write(sha1.ComputeHash(header, 0, 959));
+                bw.Write(sha1.ComputeHash(header, 0, 960));
             }
 
             return header;
