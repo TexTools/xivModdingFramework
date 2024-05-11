@@ -409,7 +409,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
                     var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
-                    var mtrl = await _mtrl.GetMtrlData(mtrlPath, -1, tx);
+                    var mtrl = await _mtrl.GetXivMtrl(mtrlPath, false, tx);
                     var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl, null, -1, tx);
 
                     // Outgoing file names.
@@ -5183,8 +5183,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // Time to copy the materials!
                     try
                     {
-                        offset = index.Get8xDataOffset(material);
-                        var mtrl = await _mtrl.GetMtrlData(offset, material, tx);
+                        var mtrl = await _mtrl.GetXivMtrl(material, false, tx);
 
                         if (copyTextures)
                         {

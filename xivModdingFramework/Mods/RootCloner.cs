@@ -317,9 +317,9 @@ namespace xivModdingFramework.Mods
                     var dst = kv.Value;
                     try
                     {
-                        var offset = index.Get8xDataOffset(src);
-                        if (offset == 0) continue;
-                        var xivMtrl = await _mtrl.GetMtrlData(offset, src, tx);
+                        
+                        if (await tx.FileExists(src)) continue;
+                        var xivMtrl = await _mtrl.GetXivMtrl(src, false, tx);
                         xivMtrl.MTRLPath = dst;
 
                         for (int i = 0; i < xivMtrl.Textures.Count; i++)

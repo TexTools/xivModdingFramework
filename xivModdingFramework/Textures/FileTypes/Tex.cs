@@ -1170,7 +1170,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     throw new InvalidDataException("Colorset Images must be either 4x16 or 8x32");
                 }
 
-                var size = width * height;
+                var size = width * height * 4;
                 var colorSetData = new List<Half>(size);
 
 

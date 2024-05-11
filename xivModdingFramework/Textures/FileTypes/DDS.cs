@@ -42,7 +42,7 @@ namespace xivModdingFramework.Textures.FileTypes
             switch (xivTex.TextureTypeAndPath.Type)
             {
                 case XivTexType.ColorSet:
-                    DDS.AddRange(CreateColorDDSHeader());
+                    DDS.AddRange(CreateColorDDSHeader(xivTex));
                     DDS.AddRange(xivTex.TexData);
                     break;
                 case XivTexType.Vfx:
@@ -436,7 +436,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <see cref="https://msdn.microsoft.com/en-us/library/windows/desktop/bb943982(v=vs.85).aspx"/>
         /// </summary>
         /// <returns>Byte array containing DDS header</returns>
-        private static byte[] CreateColorDDSHeader()
+        private static byte[] CreateColorDDSHeader(XivTex tex)
         {
             var header = new List<byte>();
 
@@ -453,16 +453,13 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(dwFlags));
 
             // Surface height (in pixels).
-            const uint dwHeight = 16;
-            header.AddRange(BitConverter.GetBytes(dwHeight));
+            header.AddRange(BitConverter.GetBytes(tex.Height));
 
             // Surface width (in pixels).
-            const uint dwWidth = 4;
-            header.AddRange(BitConverter.GetBytes(dwWidth));
+            header.AddRange(BitConverter.GetBytes(tex.Width));
 
             // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
-            const uint dwPitchOrLinearSize = 512;
-            header.AddRange(BitConverter.GetBytes(dwPitchOrLinearSize));
+            header.AddRange(BitConverter.GetBytes(tex.Width * 32));
 
             // Depth of a volume texture (in pixels), otherwise unused.
             const uint dwDepth = 0;
