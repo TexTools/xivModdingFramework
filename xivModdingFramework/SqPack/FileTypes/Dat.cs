@@ -365,23 +365,24 @@ namespace xivModdingFramework.SqPack.FileTypes
             return header;
         }
 
+
         /// <summary>
         /// Makes the header for the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        internal static byte[] MakeDatHeader(int datNum, int fileSize, byte[] dataHash = null)
+        internal static byte[] MakeDatHeader(int datNum, long fileSize, byte[] dataHash = null)
         {
             var header = new byte[1024];
 
             // SqPack and Dat headers are 1024 each.
-            var dataSize = (fileSize - 2048) / 128;
+            var dataSize = (uint) ((fileSize - 2048) / 128);
 
             if(dataHash == null)
             {
                 dataHash = new byte[64];
             }
 
-            var maxSize = (uint) GetMaximumDatSize();
+            //var maxSize = GetMaximumDatSize();
 
 
             using (var bw = new BinaryWriter(new MemoryStream(header)))
@@ -424,6 +425,22 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             return header;
+        }
+
+        /// <summary>
+        /// Updates the active DAT's header, returning the stream pointer back to where it was after.
+        /// </summary>
+        /// <param name="bw"></param>
+        /// <param name="datNum"></param>
+        /// <param name="fileSize"></param>
+        /// <param name="dataHash"></param>
+        internal static void UpdateDatHeader(BinaryWriter bw, int datNum, long fileSize, byte[] dataHash = null)
+        {
+            var pos = bw.BaseStream.Position;
+            var header = MakeDatHeader(datNum, fileSize, dataHash);
+            bw.BaseStream.Seek(1024, SeekOrigin.Begin);
+            bw.Write(header);
+            bw.BaseStream.Seek(pos, SeekOrigin.Begin);
         }
 
         /// <summary>
@@ -2302,6 +2319,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         bw.Write((byte)0);
                     }
+
+                    var size = bw.BaseStream.Length;
+                    UpdateDatHeader(bw, datNum, size);
+
                 }
                 finally
                 {
