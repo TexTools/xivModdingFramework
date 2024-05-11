@@ -406,8 +406,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Blank
                 bw.Write(0);                    // 0x14
 
-                // Max File Size
-                bw.Write(maxSize);              // 0x18
+                // (Ostensibly) Max File Size....
+                // But SE just seems to keep this locked at 2m even after exceeding that value.
+                // When in Rome...
+                bw.Write(2000000000);           // 0x18
+                //bw.Write(maxSize);            // 0x18
 
                 // Blank
                 bw.Write(0);                    // 0x1C
