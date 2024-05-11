@@ -236,7 +236,7 @@ namespace xivModdingFramework.Mods
                 if (Destination != Source)
                 {
                     var dPath = Destination.Info.GetRootFolder();
-                    var allMods = modlist.Mods.ToList();
+                    var allMods = modlist.Mods;
                     foreach (var mod in allMods)
                     {
                         if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())

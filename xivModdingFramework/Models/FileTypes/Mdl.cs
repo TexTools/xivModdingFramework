@@ -518,7 +518,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if(getOriginal)
                 {
                     var modlist = await tx.GetModList();
-                    var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == mdlPath);
+                    modlist.ModDictionary.TryGetValue(mdlPath, out var mod);
                     if(mod != null)
                     {
                         offset = mod.data.originalOffset;
@@ -2380,7 +2380,7 @@ namespace xivModdingFramework.Models.FileTypes
             if(tx != null)
             {
                 var modlist = await tx.GetModList();
-                mod = modlist.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                modlist.ModDictionary.TryGetValue(internalPath, out mod);
             } else
             {
                 var modding = new Modding(_gameDirectory);
@@ -4621,7 +4621,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var bytes = await MakeCompressedMdlFile(ttMdl, ogMdl);
 
                 // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
-                var modEntry = modlist.Mods.First(x => x.fullPath == mdlPath);
+                modlist.ModDictionary.TryGetValue(mdlPath, out var modEntry);
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 
                 await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, tx);

@@ -782,12 +782,12 @@ namespace xivModdingFramework.Materials.FileTypes
             var modList = await tx.GetModList();
             foreach (var kv in indexToMtrlDictionary)
             {
-                var mtrlMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Value);
+                modList.ModDictionary.TryGetValue(kv.Value, out var mtrlMod);
 
                 if (mtrlMod == null)
                     continue;
 
-                var indexMod = modList.Mods.FirstOrDefault(x => x.fullPath == kv.Key);
+                modList.ModDictionary.TryGetValue(kv.Key, out var indexMod);
 
                 if (indexMod == null)
                     continue; // We -SHOULD- never hit this, but...

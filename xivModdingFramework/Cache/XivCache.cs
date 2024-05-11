@@ -873,21 +873,7 @@ namespace xivModdingFramework.Cache
             var _modding = new Modding(GameInfo.GameDirectory);
             var modList = await _modding.GetModList();
 
-            var paths = new List<string>(modList.Mods.Count);
-            foreach (var m in modList.Mods)
-            {
-                try
-                {
-                    if (m.fullPath != null && m.fullPath != "")
-                    {
-                        paths.Add(m.fullPath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw;
-                }
-            }
+            var paths = modList.ModDictionary.Keys.ToList();
             QueueDependencyUpdate(paths);
         }
 
@@ -1700,15 +1686,12 @@ namespace xivModdingFramework.Cache
             bool anyValidMods = false;
 
             var query = "select child, parent from dependencies_parents where child in(";
-            foreach(var mod in modList.Mods)
+            var files = modList.ModDictionary.Keys.ToList();
+            foreach(var file in files)
             {
-                if(mod.fullPath == null || mod.fullPath == "")
-                {
-                    continue;
-                }
 
                 anyValidMods = true;
-                query += "'" + mod.fullPath + "',";
+                query += "'" + file + "',";
             }
 
 

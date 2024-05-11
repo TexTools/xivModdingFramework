@@ -49,6 +49,10 @@ namespace xivModdingFramework.Mods.DataContainers
                     {
                         continue;
                     }
+                    if(String.IsNullOrWhiteSpace(m.fullPath))
+                    {
+                        continue;
+                    }
 
                     if (modPacks.ContainsKey(m.modPack.name))
                     {
@@ -63,11 +67,130 @@ namespace xivModdingFramework.Mods.DataContainers
             }
         }
 
+        [JsonIgnore]
+        private Dictionary<string, Mod> _ModDictionary;
+
+        [JsonIgnore]
+        public Dictionary<string, Mod> ModDictionary
+        {
+            get
+            {
+                if(_ModDictionary == null)
+                {
+                    _ModDictionary = new Dictionary<string, Mod>();
+                    foreach(var mod in Mods)
+                    {
+                        _ModDictionary.Add(mod.fullPath, mod);
+                    }
+                }
+                return _ModDictionary;
+            }
+
+        }
+
+        [JsonIgnore]
+        private List<Mod> _ModList;
+
         /// <summary>
         /// The list of Mods
+        /// Returns a SHALLOW CLONE of the current modlist.
+        /// Directly adding to or removing mods from this list will have no lasting effect.
         /// </summary>
-        public List<Mod> Mods { get; set; }
+        [JsonProperty]
+        public List<Mod> Mods
+        {
+            get
+            {
+                if(_ModList == null)
+                {
+                    return null;
+                }
+                return _ModList.ToList();
+            }
+            private set
+            {
+                _ModList = value;
+            }
+        }
 
+        /// <summary>
+        /// Removes a given mod based on its modified path, if it exists.
+        /// </summary>
+        /// <param name="path"></param>
+        public void RemoveMod(string path)
+        {
+            if (ModDictionary.ContainsKey(path))
+            {
+                RemoveMod(ModDictionary[path]);
+            }
+        }
+
+        /// <summary>
+        /// Adds or replaces a mod based on it's file path.
+        /// </summary>
+        /// <param name="m"></param>
+        public void AddOrUpdateMod(Mod m)
+        {
+            if (ModDictionary.ContainsKey(m.fullPath))
+            {
+                ModDictionary[m.fullPath] = m;
+            }
+            else
+            {
+                ModDictionary.Add(m.fullPath, m);
+            }
+
+            // If list structure already contains the mod, we don't need to re-add it.
+            if (!_ModList.Contains(m))
+            {
+                _ModList.Add(m);
+            }
+        }
+
+        /// <summary>
+        /// Removes a mod from the modlist.
+        /// </summary>
+        /// <param name="m"></param>
+        public void RemoveMod(Mod m)
+        {
+            if (ModDictionary.ContainsKey(m.fullPath))
+            {
+                ModDictionary.Remove(m.fullPath);
+            }
+            _ModList.Remove(m);
+        }
+
+        /// <summary>
+        /// Removes a subset of mods from the modlist.
+        /// </summary>
+        /// <param name="mods"></param>
+        public void RemoveMods(IEnumerable<Mod> mods)
+        {
+            foreach (var mod in mods)
+            {
+                RemoveMod(mod);
+            }
+        }
+
+        /// <summary>
+        /// Safely attempts to get a given mod based on path, returning NULL if the mod does not exist.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public Mod GetMod(string path)
+        {
+            ModDictionary.TryGetValue(path, out var mod);
+            return mod;
+        }
+
+        public ModList(bool newList = false)
+        {
+            // This weird pattern is necessary to not bash JSON Deserialization.
+            if (newList)
+            {
+                _ModList = new List<Mod>();
+            }
+        }
         public object Clone()
         {
             // Since reflection methods have proven slightly unstable for this purpose, the safest

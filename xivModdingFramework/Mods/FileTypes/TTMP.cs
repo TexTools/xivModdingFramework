@@ -706,7 +706,7 @@ namespace xivModdingFramework.Mods.FileTypes
                             if (json == null) continue;
 
 
-                            var mod = modList.Mods.FirstOrDefault(x => x.fullPath == file);
+                            modList.ModDictionary.TryGetValue(file, out var mod);
                             var longOffset = ((long)DatOffsets[file]) * 8L;
                             var originalOffset = OriginalOffsets[file];
                             var longOriginal = ((long)originalOffset) * 8L;
@@ -741,7 +741,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 mod.data.dataType = fileType;
                                 mod.enabled = true;
                                 mod.modPack = json.ModPackEntry;
-                                modList.Mods.Add(mod);
+                                modList.AddOrUpdateMod(mod);
 
                             }
                             else

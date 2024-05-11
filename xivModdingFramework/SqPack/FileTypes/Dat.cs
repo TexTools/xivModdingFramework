@@ -25,6 +25,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using HelixToolkit.SharpDX.Core.Helper;
+using Microsoft.Extensions.Logging.Abstractions;
 using SharpDX;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
@@ -661,7 +662,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (forceOriginal)
             {
                 var modList = await tx.GetModList();
-                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                modList.ModDictionary.TryGetValue(internalPath, out var modEntry);
 
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
@@ -1203,7 +1204,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Mod modEntry = null;
                 if(tx != null)
                 {
-                    modEntry = (await tx.GetModList()).Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                    (await tx.GetModList()).ModDictionary.TryGetValue(internalPath, out modEntry);
                 } else
                 {
                     var modding = new Modding(_gameDirectory);
@@ -1410,7 +1411,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                var modEntry = (await tx.GetModList()).Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                (await tx.GetModList()).ModDictionary.TryGetValue(internalPath, out var modEntry);
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
@@ -2316,7 +2317,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var modList = await tx.GetModList();
                 var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(internalFilePath));
 
-                var mod = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
+                modList.ModDictionary.TryGetValue(internalFilePath, out var mod);
 
                 // Resolve Item to attach to.
                 string itemName = "Unknown";
@@ -2419,7 +2420,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                     // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
                     mod.modPack = mod.IsInternal() ? null : tx.ModPack;
-                    modList.Mods.Add(mod);
+                    modList.AddOrUpdateMod(mod);
                 }
                 else
                 {

@@ -70,7 +70,7 @@ namespace xivModdingFramework.General
 
 
             var modlist = await _modding.GetModList();
-            var mod = modlist.Mods.FirstOrDefault(x => x.fullPath == path);
+            modlist.ModDictionary.TryGetValue(path, out var mod);
             if (mod != null && mod.enabled)
             {
                 await _modding.ToggleModStatus(path, false);

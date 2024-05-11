@@ -70,8 +70,8 @@ namespace xivModdingFramework.Mods
             CreateModlist();
         }
 
-        private ModList _CachedModList;
-        private DateTime _ModListLastModifiedTime;
+        private static ModList _CachedModList;
+        private static DateTime _ModListLastModifiedTime;
         public async Task<ModList> GetModList()
         {
             await _modlistSemaphore.WaitAsync();
@@ -162,10 +162,9 @@ namespace xivModdingFramework.Mods
                 return;
             }
 
-            var modList = new ModList
+            var modList = new ModList(true)
             {
                 version = _modlistVersion.ToString(),
-                Mods = new List<Mod>()
             };
 
             SaveModList(modList);
@@ -193,15 +192,8 @@ namespace xivModdingFramework.Mods
 
                     if (modList == null) return null;
 
-                    foreach (var modEntry in modList.Mods)
-                    {
-                        if (modEntry.fullPath.Equals(internalFilePath))
-                        {
-                            return modEntry;
-                        }
-                    }
-
-                    return null;
+                    modList.ModDictionary.TryGetValue(internalFilePath, out var mod);
+                    return mod;
                 });
             } catch(Exception ex)
             {
@@ -232,7 +224,7 @@ namespace xivModdingFramework.Mods
 
             if (indexCheck)
             {
-                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                modList.ModDictionary.TryGetValue(internalPath, out var modEntry);
                 if (modEntry == null)
                 {
                     return XivModStatus.Original;
@@ -256,7 +248,7 @@ namespace xivModdingFramework.Mods
             }
             else
             {
-                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalPath);
+                modList.ModDictionary.TryGetValue(internalPath, out var modEntry);
 
                 if (modEntry == null)
                 {
@@ -295,7 +287,7 @@ namespace xivModdingFramework.Mods
             try
             {
                 var modList = await tx.GetModList();
-                var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
+                modList.ModDictionary.TryGetValue(internalFilePath, out var modEntry);
                 var result = await ToggleModUnsafe(enable, modEntry, false, true, tx);
 
                 // If we were unable to toggle the mod, and we have a local transaction...
@@ -595,7 +587,7 @@ namespace xivModdingFramework.Mods
                     {
                         var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
                         await ToggleModUnsafe(enable, modEntry, true, false, tx);
-                        modList.Mods.Remove(modEntry);
+                        modList.RemoveMod(modEntry);
                     }
                 }
                 else if (enable)
@@ -701,7 +693,7 @@ namespace xivModdingFramework.Mods
 
             foreach(var block in toRemove)
             {
-                modList.Mods.Remove(block);
+                modList.RemoveMod(block);
                 removed++;
             }
 
@@ -757,7 +749,7 @@ namespace xivModdingFramework.Mods
                     await CMP.RestoreDefaultScaling(modToRemove.fullPath, tx);
                 }
 
-                modList.Mods.Remove(modToRemove);
+                modList.RemoveMod(modToRemove);
 
                 if (doSave)
                 {
@@ -799,10 +791,7 @@ namespace xivModdingFramework.Mods
                 await ToggleMods(false, modsToRemove.Select(x => x.fullPath), null, tx);
 
                 // Then remove them from the modlist.
-                foreach (var mod in modsToRemove)
-                {
-                    modList.Mods.Remove(mod);
-                }
+                modList.RemoveMods(modsToRemove);
 
                 await ModTransaction.CommitTransaction(tx);
             }
@@ -931,10 +920,7 @@ namespace xivModdingFramework.Mods
                 progressReporter?.Report((0, 0, "Removing empty mod slots..."));
 
                 // Remove all empty mod frames.
-                foreach (var mod in toRemove)
-                {
-                    modlist.Mods.Remove(mod);
-                }
+                modlist.RemoveMods(toRemove);
 
                 progressReporter?.Report((0, 0, "Saving Modlist file..."));
 
@@ -1042,7 +1028,8 @@ namespace xivModdingFramework.Mods
 
             var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
 
-            modlist.Mods.RemoveAll(x => String.IsNullOrWhiteSpace(x.fullPath));
+            var toRemove = modlist.Mods.Where(x => String.IsNullOrWhiteSpace(x.fullPath));
+            modlist.RemoveMods(toRemove);
 
             var modsByDf = modlist.Mods.GroupBy(x => XivDataFiles.GetXivDataFile(x.datFile));
             var indexFiles = new Dictionary<XivDataFile, IndexFile>();
