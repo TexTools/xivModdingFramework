@@ -466,7 +466,7 @@ namespace xivModdingFramework.Items.Categories
                 assetFile = $"gar_b0_m{id}.sgb";
             }
 
-            var assetOffset = await tx.GetDataOffset(assetFolder + "/" + assetFile);
+            var assetOffset = await tx.Get8xDataOffset(assetFolder + "/" + assetFile);
 
             var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon);
 
@@ -570,7 +570,7 @@ namespace xivModdingFramework.Items.Categories
                 var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
                 var assetFile = Path.GetFileName(additionalAsset);
 
-                var assetOffset = await tx.GetDataOffset(additionalAsset);
+                var assetOffset = await tx.Get8xDataOffset(additionalAsset);
                 var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon);
 
                 await Task.Run(() =>
@@ -643,56 +643,6 @@ namespace xivModdingFramework.Items.Categories
                     }
                 });
             }
-        }
-
-        /// <summary>
-        /// Searches for housing items given a model ID
-        /// </summary>
-        /// <param name="modelID">The Model ID of the housing item</param>
-        /// <param name="type">The type of housing item to search for</param>
-        /// <returns>A list of Search Results</returns>
-        public async Task<List<SearchResults>> SearchHousingByModelID(int modelID, XivItemType type)
-        {
-            var searchResultsList = new List<SearchResults>();
-            var index = new Index(_gameDirectory);
-            var id = modelID.ToString().PadLeft(4, '0');
-
-            var folder = "";
-
-            if (type == XivItemType.furniture)
-            {
-                folder = $"bgcommon/hou/indoor/general/{id}/material";
-            }
-
-            if (await index.FolderExists(folder, XivDataFile._01_Bgcommon))
-            {
-                var searchResults = new SearchResults
-                {
-                    Body = "-",
-                    Slot = XivStrings.Furniture_Indoor,
-                    Variant = int.Parse(id)
-                };
-
-                searchResultsList.Add(searchResults);
-            }
-
-            folder = $"bgcommon/hou/outdoor/general/{id}/material";
-
-            if (await index.FolderExists(folder, XivDataFile._01_Bgcommon))
-            {
-                var searchResults = new SearchResults
-                {
-                    Body = "-",
-                    Slot = XivStrings.Furniture_Outdoor,
-                    Variant = int.Parse(id)
-                };
-
-                searchResultsList.Add(searchResults);
-            }
-
-            searchResultsList.Sort();
-
-            return searchResultsList;
         }
     }
 

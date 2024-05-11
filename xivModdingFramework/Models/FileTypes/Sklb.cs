@@ -393,7 +393,7 @@ namespace xivModdingFramework.Models.FileTypes
             var dat = new Dat(XivCache.GameInfo.GameDirectory);
             var dataFile = IOUtil.GetDataFileFromPath(skelBPath);
 
-            var offset = await tx.GetDataOffset(skelBPath);
+            var offset = await tx.Get8xDataOffset(skelBPath);
 
             if (offset == 0)
             {

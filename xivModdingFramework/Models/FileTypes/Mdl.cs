@@ -5006,65 +5006,87 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="slot"></param>
         /// <param name="newRace"></param>
         /// <returns></returns>
-        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source)
+        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source, ModTransaction tx = null)
         {
-
-            var _index = new Index(_gameDirectory);
-            var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
-
-            if (!isAccessory)
+            var ownTx = false;
+            if (tx == null)
             {
-                var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
-                if (!slotOk)
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction();
+            }
+            try
+            {
+
+                var _index = new Index(_gameDirectory);
+                var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
+
+                if (!isAccessory)
                 {
-                    throw new InvalidDataException("Attempted to get racial models for invalid slot.");
-                }
-            }
-
-            // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
-            var format = "";
-            if (!isAccessory)
-            {
-                format = _EquipmentModelPathFormat;
-            }
-            else
-            {
-                format = _AccessoryModelPathFormat;
-            }
-
-            var path = String.Format(format, setId.ToString().PadLeft(4, '0'), newRace.GetRaceCode(), slot);
-
-            // File already exists, no adjustments needed.
-            if ((await _index.FileExists(path))) return;
-
-            var _eqp = new Eqp(_gameDirectory);
-            var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
-            var baseModelOrder = newRace.GetModelPriorityList();
-
-            // Ok, we need to find which racial model to use as our base now...
-            var baseRace = XivRace.All_Races;
-            var originalPath = "";
-            foreach (var targetRace in baseModelOrder)
-            {
-                if (availableModels.Contains(targetRace))
-                {
-                    originalPath = String.Format(format, setId.ToString().PadLeft(4, '0'), targetRace.GetRaceCode(), slot);
-                    var exists = await _index.FileExists(originalPath);
-                    if (exists)
+                    var slotOk = EquipmentDeformationParameterSet.SlotsAsList(false).Contains(slot);
+                    if (!slotOk)
                     {
-                        baseRace = targetRace;
-                        break;
-                    } else
-                    {
-                        continue;
+                        throw new InvalidDataException("Attempted to get racial models for invalid slot.");
                     }
                 }
+
+                // If we're adding a new race, we need to clone an existing model, if it doesn't exist already.
+                var format = "";
+                if (!isAccessory)
+                {
+                    format = _EquipmentModelPathFormat;
+                }
+                else
+                {
+                    format = _AccessoryModelPathFormat;
+                }
+
+                var path = String.Format(format, setId.ToString().PadLeft(4, '0'), newRace.GetRaceCode(), slot);
+
+                // File already exists, no adjustments needed.
+                if ((await tx.FileExists(path))) return;
+
+                var _eqp = new Eqp(_gameDirectory);
+                var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
+                var baseModelOrder = newRace.GetModelPriorityList();
+
+                // Ok, we need to find which racial model to use as our base now...
+                var baseRace = XivRace.All_Races;
+                var originalPath = "";
+                foreach (var targetRace in baseModelOrder)
+                {
+                    if (availableModels.Contains(targetRace))
+                    {
+                        originalPath = String.Format(format, setId.ToString().PadLeft(4, '0'), targetRace.GetRaceCode(), slot);
+                        var exists = await tx.FileExists(originalPath);
+                        if (exists)
+                        {
+                            baseRace = targetRace;
+                            break;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+                }
+
+                if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
+
+                // Create the new model.
+                await CopyModel(originalPath, path, source, false, tx);
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
             }
-
-            if (baseRace == XivRace.All_Races) throw new Exception("Unable to find base model to create new racial model from.");
-
-            // Create the new model.
-            await CopyModel(originalPath, path, source);
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
         }
 
         /// <summary>
@@ -5074,7 +5096,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="originalPath"></param>
         /// <param name="newPath"></param>
         /// <returns></returns>
-        public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false)
+        public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, ModTransaction tx = null)
         {
             var _dat = new Dat(_gameDirectory);
             var _index = new Index(_gameDirectory);
@@ -5091,7 +5113,14 @@ namespace xivModdingFramework.Models.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(originalPath);
 
-            using (var tx = ModTransaction.BeginTransaction())
+            var ownTx = false;
+            if(tx == null)
+            {
+                ownTx = true;
+                tx = tx = ModTransaction.BeginTransaction();
+            }
+
+            try
             {
 
                 var index = await tx.GetIndexFile(df);
@@ -5241,9 +5270,19 @@ namespace xivModdingFramework.Models.FileTypes
                 var data = await MakeCompressedMdlFile(model, xMdl);
                 offset = await _dat.WriteModFile(data, newPath, source, item, tx);
 
-                await ModTransaction.CommitTransaction(tx);
+                if (ownTx) {
+                    await ModTransaction.CommitTransaction(tx);
+                }
                 XivCache.QueueDependencyUpdate(allFiles.ToList());
                 return offset;
+            }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
             }
         }
 

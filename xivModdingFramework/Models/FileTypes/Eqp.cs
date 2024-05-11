@@ -1128,19 +1128,12 @@ namespace xivModdingFramework.Models.FileTypes
             bool exists = false;
             if (tx == null)
             {
-                var index = new Index(XivCache.GameInfo.GameDirectory);
-                var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
-                var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-                exists = await index.FileExists(fileName);
+                tx = ModTransaction.BeginTransaction(true);
             }
-            else
-            {
-                var index = await tx.GetIndexFile(XivDataFile._04_Chara);
-                var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
-                var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-                index.FileExists(fileName);
-
-            }
+            var index = await tx.GetIndexFile(XivDataFile._04_Chara);
+            var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
+            var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
+            exists = index.FileExists(fileName);
             // EQDP files are just keyed by race, and typically all exist, unless it's for some unusual NPC race.
             // As such, there's no real penalty to retaining this cache indefinitely, regardless of mod status.
             _eqdpFileExistsCache[accessory].Add(race, exists);
@@ -1161,7 +1154,7 @@ namespace xivModdingFramework.Models.FileTypes
             var races = includeNPCs ? PlayableRacesWithNPCs : PlayableRaces;
             foreach (var race in races)
             {
-                if (!await EqdpFileExists(race, accessory)) continue;
+                if (!await EqdpFileExists(race, accessory, tx)) continue;
                 var result = await GetEquipmentDeformationSet(equipmentId, race, accessory, forceDefault, tx);
                 sets.Add(race, result);
             }

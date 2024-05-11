@@ -354,7 +354,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<uint> GetDataOffset(string path)
+        public async Task<uint> GetRawOffset(string path)
         {
             var df = IOUtil.GetDataFileFromPath(path);
             var idx = await GetIndexFile(df);

@@ -173,8 +173,14 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="gearItem">The gear item</param>
         /// <returns>A list of TexTypePath containing Icon Info</returns>
-        public async Task<List<TexTypePath>> GetItemIcons(IItemModel iconItem)
+        public async Task<List<TexTypePath>> GetItemIcons(IItemModel iconItem, ModTransaction tx = null)
         {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+
             var type = iconItem.GetType();
             uint iconNumber = 0;
             if (type == typeof(XivGear))
@@ -202,7 +208,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
 
             var path = iconFolder + "/" + iconFile;
-            if (await _index.FileExists(path, XivDataFile._06_Ui))
+            if (await tx.FileExists(path))
             {
                 ttpList.Add(new TexTypePath
                 {
@@ -215,7 +221,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
 
             path = iconHQFolder + "/" + iconFile;
-            if (await _index.FileExists(path, XivDataFile._06_Ui))
+            if (await tx.FileExists(path))
             {
                 ttpList.Add(new TexTypePath
                 {

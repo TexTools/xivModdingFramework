@@ -168,6 +168,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Checks whether the index file contains any of the folders passed in
+        /// 
+        /// NOTE: Not Transaction safe... Though since this codepath is really only used for jank listing of available face/hair/etc. entries,
+        /// this isn't really a big concern at present.
         /// </summary>
         /// <remarks>
         /// Runs through the index file once checking if the hashed folder value exists in the dictionary
@@ -190,38 +193,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             return ret;
         }
 
-
-
-        public async Task<bool> FileExists(string fullPath)
-        {
-            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
-            return await FileExists(fullPath, dataFile);
-        }
-
-        /// <summary>
-        /// Determines whether the given file path exists
-        /// </summary>
-        /// <param name="fileHash">The hashed file</param>
-        /// <param name="folderHash">The hashed folder</param>
-        /// <param name="dataFile">The data file</param>
-        /// <returns>True if it exists, False otherwise</returns>
-        public async Task<bool> FileExists(string filePath, XivDataFile dataFile)
-        {
-            var index = await GetIndexFile(dataFile, false, true);
-            return index.FileExists(filePath);
-        }
-
-        /// <summary>
-        /// Determines whether the given folder path exists
-        /// </summary>
-        /// <param name="folderHash">The hashed folder</param>
-        /// <param name="dataFile">The data file</param>
-        /// <returns>True if it exists, False otherwise</returns>
-        public async Task<bool> FolderExists(string folder, XivDataFile dataFile)
-        {
-            var index = await GetIndexFile(dataFile, false, true);
-            return index.FolderExists(folder);
-        }
 
         /// <summary>
         /// Gets all the file offsets in a given folder path
