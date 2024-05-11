@@ -15,20 +15,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Resources;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
-using HelixToolkit.SharpDX.Core.Helper;
-using Microsoft.Extensions.Logging.Abstractions;
-using SharpDX;
 using xivModdingFramework.Cache;
-using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -37,8 +30,6 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
-using xivModdingFramework.Resources;
-using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
