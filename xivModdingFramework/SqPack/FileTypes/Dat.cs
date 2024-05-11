@@ -374,7 +374,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var header = new byte[1024];
 
             // SqPack and Dat headers are 1024 each.
-            var dataSize = fileSize - 2048;
+            var dataSize = (fileSize - 2048) / 128;
 
             if(dataHash == null)
             {
