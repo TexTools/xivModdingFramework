@@ -509,7 +509,7 @@ namespace xivModdingFramework.Cache
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _atex = new ATex(XivCache.GameInfo.GameDirectory, df);
+            var _atex = new ATex(XivCache.GameInfo.GameDirectory);
 
             var files = new HashSet<string>();
 

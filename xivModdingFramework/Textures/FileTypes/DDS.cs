@@ -574,6 +574,241 @@ namespace xivModdingFramework.Textures.FileTypes
             return ddsParts;
         }
 
+        #region Pixel Conversion Functions
+
+        /// <summary>
+        /// Converts the given DDS Compressed pixel data into 8.8.8.8 RGBA pixel data.
+        /// </summary>
+        /// <param name="DdsCompressedPixelData"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <param name="DDSFormat"></param>
+        /// <returns></returns>
+        public static async Task<byte[]> ConvertPixelData(byte[] DdsCompressedPixelData, int width, int height, XivTexFormat DDSFormat, int layers = 1, int targetLayer = -1)
+        {
+            return await Task.Run(async () =>
+            {
+                byte[] imageData = null;
+                if (layers == 0)
+                {
+                    layers = 1;
+                }
+
+                switch (DDSFormat)
+                {
+                    case XivTexFormat.DXT1:
+                        imageData = DxtUtil.DecompressDxt1(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.DXT3:
+                        imageData = DxtUtil.DecompressDxt3(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.DXT5:
+                        imageData = DxtUtil.DecompressDxt5(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.BC5:
+                        imageData = DxtUtil.DecompressBc5(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.BC7:
+                        imageData = DxtUtil.DecompressBc7(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A4R4G4B4:
+                        imageData = await Read4444Image(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A1R5G5B5:
+                        imageData = await Read5551Image(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A8R8G8B8:
+                        imageData = await SwapRBColors(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.L8:
+                    case XivTexFormat.A8:
+                        imageData = await Read8bitImage(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.X8R8G8B8:
+                    case XivTexFormat.R32F:
+                    case XivTexFormat.G16R16F:
+                    case XivTexFormat.G32R32F:
+                    case XivTexFormat.A16B16G16R16F:
+                    case XivTexFormat.A32B32G32R32F:
+                    case XivTexFormat.D16:
+                    default:
+                        imageData = DdsCompressedPixelData;
+                        break;
+                }
+
+                if (targetLayer >= 0)
+                {
+                    var bytesPerLayer = imageData.Length / layers;
+                    var offset = bytesPerLayer * targetLayer;
+
+                    byte[] nData = new byte[bytesPerLayer];
+                    Array.Copy(imageData, offset, nData, 0, bytesPerLayer);
+
+                    imageData = nData;
+                }
+
+                return imageData;
+            });
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed A1R5G5B5 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        internal static async Task<byte[]> Read5551Image(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var pixel = br.ReadUInt16() & 0xFFFF;
+
+                                var red = ((pixel & 0x7E00) >> 10) * 8;
+                                var green = ((pixel & 0x3E0) >> 5) * 8;
+                                var blue = ((pixel & 0x1F)) * 8;
+                                var alpha = ((pixel & 0x8000) >> 15) * 255;
+
+                                convertedBytes.Add((byte)red);
+                                convertedBytes.Add((byte)green);
+                                convertedBytes.Add((byte)blue);
+                                convertedBytes.Add((byte)alpha);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+
+        /// <summary>
+        /// Creates bitmap from decompressed A4R4G4B4 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        internal static async Task<byte[]> Read4444Image(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var pixel = br.ReadUInt16() & 0xFFFF;
+                                var red = ((pixel & 0xF)) * 16;
+                                var green = ((pixel & 0xF0) >> 4) * 16;
+                                var blue = ((pixel & 0xF00) >> 8) * 16;
+                                var alpha = ((pixel & 0xF000) >> 12) * 16;
+
+                                convertedBytes.Add((byte)blue);
+                                convertedBytes.Add((byte)green);
+                                convertedBytes.Add((byte)red);
+                                convertedBytes.Add((byte)alpha);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed A8/L8 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The created bitmap.</returns>
+        internal static async Task<byte[]> Read8bitImage(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var pixel = br.ReadByte() & 0xFF;
+
+                                convertedBytes.Add((byte)pixel);
+                                convertedBytes.Add((byte)pixel);
+                                convertedBytes.Add((byte)pixel);
+                                convertedBytes.Add(255);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed Linear texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        internal static async Task<byte[]> SwapRBColors(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var blue = br.ReadByte();
+                                var green = br.ReadByte();
+                                var red = br.ReadByte();
+                                var alpha = br.ReadByte();
+
+                                convertedBytes.Add(red);
+                                convertedBytes.Add(green);
+                                convertedBytes.Add(blue);
+                                convertedBytes.Add(alpha);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+        #endregion
+
         public enum DXGI_FORMAT : uint
         {
             DXGI_FORMAT_UNKNOWN,

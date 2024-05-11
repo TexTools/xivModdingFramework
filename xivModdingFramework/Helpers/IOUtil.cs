@@ -298,6 +298,22 @@ namespace xivModdingFramework.Helpers
         }
 
         /// <summary>
+        /// Safely checks if the given file lives in the user's temp directory, and deletes the file IF and only IF it does.
+        /// </summary>
+        /// <param name="dir"></param>
+        public static void DeleteTempFile(string file)
+        {
+            if (String.IsNullOrWhiteSpace(file))
+            {
+                return;
+            }
+            if (file.StartsWith(Path.GetTempPath()))
+            {
+                File.Delete(file);
+            }
+        }
+
+        /// <summary>
         /// Safely checks if the given directory is a temporary directory, and deletes it IF and only IF it is a temporary file directory.
         /// </summary>
         /// <param name="dir"></param>

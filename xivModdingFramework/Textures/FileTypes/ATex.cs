@@ -38,12 +38,10 @@ namespace xivModdingFramework.Textures.FileTypes
     public class ATex
     {
         private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
 
-        public ATex(DirectoryInfo gameDirectory, XivDataFile dataFile)
+        public ATex(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
         }
 
         /// <summary>
@@ -65,8 +63,9 @@ namespace xivModdingFramework.Textures.FileTypes
         }
         public async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
         {
+            var df = IOUtil.GetDataFileFromPath(vfxPath);
             var index = new Index(_gameDirectory);
-            var avfx = new Avfx(_gameDirectory, _dataFile);
+            var avfx = new Avfx(_gameDirectory, df);
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
@@ -86,7 +85,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 var ttp = new TexTypePath
                 {
-                    DataFile = _dataFile,
+                    DataFile = df,
                     Name = "VFX: " + Path.GetFileNameWithoutExtension(atexPath),
                     Path = atexPath
                 };
@@ -102,10 +101,10 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the ATex file</param>
         /// <returns>An XivTex with all the texture data</returns>
-        public async Task<XivTex> GetATexData(long offset, ModTransaction tx = null)
+        public async Task<XivTex> GetATexData(long offset, XivDataFile df, ModTransaction tx = null)
         {
             var dat = new Dat(_gameDirectory);
-            var atexData = await dat.ReadSqPackType2(offset, _dataFile, tx);
+            var atexData = await dat.ReadSqPackType2(offset, df, tx);
 
             var xivTex = new XivTex();
             xivTex.Layers = 1;

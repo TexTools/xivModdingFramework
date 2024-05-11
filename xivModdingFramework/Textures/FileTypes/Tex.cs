@@ -51,6 +51,7 @@ using System.Diagnostics;
 using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Helper;
 using xivModdingFramework.Exd.Enums;
+using SharpDX.Toolkit.Graphics;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -59,14 +60,79 @@ namespace xivModdingFramework.Textures.FileTypes
     /// </summary>
     public class Tex
     {
+        #region Consts, Structs, & Constructor
         private const string TexExtension = ".tex";
         private readonly DirectoryInfo _gameDirectory;
         private readonly Index _index;
         private readonly Dat _dat;
-        private readonly XivDataFile _dataFile;
+
+        public const uint _DDSHeaderSize = 128;
+        public const uint _TexHeaderSize = 80;
 
         // The 'magic number' for PNG file headers, indicating that the following data is a PNG file.
         private readonly byte[] _PNG_MAGIC = { 137, 80, 78, 71, 13, 10, 26, 10 };
+
+        public struct TexHeader
+        {
+            // Bitflags
+            public uint Attributes;
+
+            // Texture Format
+            public uint TextureFormat;
+
+            public ushort Width;
+            public ushort Height;
+
+            public ushort Depth;
+
+            public byte MipCount;
+            public bool MipFlag;
+
+            public byte ArraySize;
+
+            uint[] LoDMips;
+
+            uint[] MipMapOffsets;
+
+            /// <summary>
+            /// Reads a .tex file header (80 bytes) from the given stream.
+            /// </summary>
+            /// <param name="br"></param>
+            internal static TexHeader ReadTexHeader(BinaryReader br, long offset = -1)
+            {
+                var header = new TexHeader();
+                if (offset >= 0)
+                {
+                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                }
+
+                header.Attributes = br.ReadUInt32();
+                header.TextureFormat = br.ReadUInt32();
+
+                header.Width = br.ReadUInt16();
+                header.Height = br.ReadUInt16();
+
+                header.Depth = br.ReadUInt16();
+                header.MipCount = br.ReadByte();
+                header.MipFlag = (header.MipCount & 8) > 0;
+                header.MipCount = (byte)(header.MipCount & 0xF);
+                header.ArraySize = br.ReadByte();
+
+                header.LoDMips = new uint[3];
+                for (int i = 0; i < header.LoDMips.Length; i++)
+                {
+                    header.LoDMips[i] = br.ReadUInt32();
+                }
+
+                header.MipMapOffsets = new uint[13];
+                for (int i = 0; i < header.MipMapOffsets.Length; i++)
+                {
+                    header.MipMapOffsets[i] = br.ReadUInt32();
+                }
+                return header;
+            }
+        }
+
 
         /// <summary>
         /// Gets the path to the default blank texture for a given texture format.
@@ -91,25 +157,19 @@ namespace xivModdingFramework.Textures.FileTypes
             _index = new Index(_gameDirectory);
             _dat = new Dat(_gameDirectory);
         }
+        #endregion
 
-        public Tex(DirectoryInfo gameDirectory, XivDataFile dataFile)
-        {
-            _gameDirectory = gameDirectory;
-            _index = new Index(_gameDirectory);
-            _dat = new Dat(_gameDirectory);
-            _dataFile = dataFile;
-        }
+        #region High-Level XixTex Accessors
 
-        public async Task<XivTex> GetTexData(MtrlTexture tex, ModTransaction tx = null)
+        public async Task<XivTex> GetXivTex(MtrlTexture tex, bool forceOriginal = false, ModTransaction tx = null)
         {
-            return await GetTexData(tex.TexturePath, tex.Usage, tx);
+            return await GetXivTex(tex.TexturePath, tex.Usage, forceOriginal, tx);
         }
-
-        public async Task<XivTex> GetTexData(TexTypePath ttp, ModTransaction tx = null)
+        public async Task<XivTex> GetXivTex(TexTypePath ttp, bool forceOriginal = false, ModTransaction tx = null)
         {
-            return await GetTexData(ttp.Path, ttp.Type, tx);
+            return await GetXivTex(ttp.Path, ttp.Type, forceOriginal, tx);
         }
-        public async Task<XivTex> GetTexData(string path, XivTexType usage, ModTransaction tx = null)
+        public async Task<XivTex> GetXivTex(string path, XivTexType usage, bool forceOriginal = false, ModTransaction tx = null)
         {
             var dataFile = IOUtil.GetDataFileFromPath(path);
             var ttp = new TexTypePath()
@@ -118,21 +178,19 @@ namespace xivModdingFramework.Textures.FileTypes
                 Path = path,
                 Type = usage
             };
-            var xivTex = await GetTexData(ttp.Path, tx);
+            var xivTex = await GetXivTex(ttp.Path, forceOriginal, tx);
             xivTex.TextureTypeAndPath = ttp;
             return xivTex;
         }
-        public async Task<XivTex> GetTexData(string path, ModTransaction tx = null)
+        public async Task<XivTex> GetXivTex(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
-            var df = IOUtil.GetDataFileFromPath(path);
-
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction(true);
             }
 
-            var offset = (await tx.GetIndexFile(df)).Get8xDataOffset(path);
+            var offset = (await tx.Get8xDataOffset(path, forceOriginal));
 
             if (offset == 0)
             {
@@ -143,10 +201,12 @@ namespace xivModdingFramework.Textures.FileTypes
 
             try
             {
+                var df = IOUtil.GetDataFileFromPath(path);
+
                 if (path.Contains(".atex"))
                 {
-                    var atex = new ATex(_gameDirectory, df);
-                    xivTex = await atex.GetATexData(offset, tx);
+                    var atex = new ATex(_gameDirectory);
+                    xivTex = await atex.GetATexData(offset, df, tx);
                 }
                 else
                 {
@@ -159,7 +219,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             var ttp = new TexTypePath();
-            ttp.DataFile = df;
+            ttp.DataFile = IOUtil.GetDataFileFromPath(path);
             ttp.Name = Path.GetFileName(path);
             ttp.Type = XivTexType.Other;
             ttp.Path = path;
@@ -167,6 +227,11 @@ namespace xivModdingFramework.Textures.FileTypes
 
             return xivTex;
         }
+
+        #endregion
+
+        #region Weird One-Off Resolution Functions
+        // Weird brute-force texture path resolvers for UI stuff.
 
         /// <summary>
         /// Gets the Icon info for a specific gear item
@@ -236,162 +301,13 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
 
-        public async Task<XivTex> GetTexDataByOffset(TexTypePath ttp, long offset, ModTransaction tx = null)
-        {
-            if (offset == 0)
-            {
-                throw new Exception($"Could not find offset for {ttp.Path}");
-            }
-
-            XivTex xivTex;
-            try
-            {
-                if (ttp.Path.Contains(".atex"))
-                {
-                    var atex = new ATex(_gameDirectory, ttp.DataFile);
-                    xivTex = await atex.GetATexData(offset, tx);
-                }
-                else
-                {
-                    xivTex = await _dat.GetTexFromDat(offset, ttp.DataFile, tx);
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"There was an error reading texture data at offset {offset}");
-            }
-
-            xivTex.TextureTypeAndPath = ttp;
-
-            return xivTex;
-        }
-
         /// <summary>
-        /// Gets the list of available mtrl parts for a given item
+        /// Retrieves the avaiable textures for a given UI Map, via brute force check of estimated file names.
+        /// 
+        /// Not Transaction Safe
         /// </summary>
-        /// <param name="itemModel">An item that contains model data</param>
-        /// <param name="xivRace">The race for the requested data</param>
-        /// <returns>A list of part characters</returns>
-        public async Task<List<string>> GetTexturePartList(IItemModel itemModel, XivRace xivRace, XivDataFile dataFile)
-        {
-            var itemType = ItemType.GetPrimaryItemType(itemModel);
-
-            var version = "0001";
-
-            var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
-            var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
-            var itemCategory = itemModel.SecondaryCategory;
-
-            if (itemType != XivItemType.human && itemType != XivItemType.furniture)
-            {
-                // Get the mtrl version for the given item from the imc file
-                var imc = new Imc(_gameDirectory);
-                version = (await imc.GetImcInfo(itemModel)).MaterialSet.ToString().PadLeft(4, '0');
-            }
-
-            var parts = Helpers.Constants.Alphabet;
-            var race = xivRace.GetRaceCode();
-
-            string mtrlFolder = "", mtrlFile = "";
-
-            switch (itemType)
-            {
-                case XivItemType.equipment:
-                    mtrlFolder = $"chara/{itemType}/e{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}e{id}_{itemModel.GetItemSlotAbbreviation()}_";
-                    break;
-                case XivItemType.accessory:
-                    mtrlFolder = $"chara/{itemType}/a{id}/material/v{version}";
-                    mtrlFile = $"mt_c{race}a{id}_{SlotAbbreviationDictionary[itemCategory]}_";
-                    break;
-                case XivItemType.weapon:
-                    mtrlFolder = $"chara/{itemType}/w{id}/obj/body/b{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_w{id}b{bodyVer}_";
-                    break;
-                case XivItemType.monster:
-                    mtrlFolder = $"chara/{itemType}/m{id}/obj/body/b{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_m{id}b{bodyVer}_";
-                    break;
-                case XivItemType.demihuman:
-                    mtrlFolder = $"chara/{itemType}/d{id}/obj/body/e{bodyVer}/material/v{version}";
-                    mtrlFile = $"mt_d{id}e{bodyVer}_";
-                    break;
-                case XivItemType.human:
-                    if (itemCategory.Equals(XivStrings.Body))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/b{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}b{bodyVer}_";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Hair))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/h{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}h{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}_";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Face))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/f{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}f{bodyVer}_{SlotAbbreviationDictionary[itemCategory]}_";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Tail))
-                    {
-                        mtrlFolder = $"chara/{itemType}/c{id}/obj/body/t{bodyVer}/material/v{version}";
-                        mtrlFile = $"mt_c{id}t{bodyVer}_";
-                    }
-                    break;
-                case XivItemType.furniture:
-                    if (itemCategory.Equals(XivStrings.Furniture_Indoor))
-                    {
-                        mtrlFolder = $"bgcommon/hou/indoor/general/{id}/material";
-                        mtrlFile = $"fun_b0_m{id}_0";
-                    }
-                    else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
-                    {
-                        mtrlFolder = $"bgcommon/hou/outdoor/general/{id}/material";
-                        mtrlFile = $"gar_b0_m{id}_0";
-                    }
-
-                    break;
-                default:
-                    mtrlFolder = "";
-                    break;
-            }
-
-            // Get a list of hashed mtrl files that are in the given folder
-            var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
-
-            // append the part char to the mtrl file and see if its hashed value is within the files list
-            var partList =
-                (from part in parts
-                 let mtrlCheck = mtrlFile + part + ".mtrl"
-                 where files.Contains(HashGenerator.GetHash(mtrlCheck))
-                 select part.ToString()).ToList();
-
-            if (partList.Count < 1 && itemType == XivItemType.furniture)
-            {
-                if (itemCategory.Equals(XivStrings.Furniture_Indoor))
-                {
-                    mtrlFile = $"fun_b0_m{id}_1";
-                }
-                else if (itemCategory.Equals(XivStrings.Furniture_Outdoor))
-                {
-                    mtrlFile = $"gar_b0_m{id}_1";
-                }
-
-                // Get a list of hashed mtrl files that are in the given folder
-                files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), dataFile);
-
-                // append the part char to the mtrl file and see if its hashed value is within the files list
-                partList =
-                    (from part in parts
-                     let mtrlCheck = mtrlFile + part + ".mtrl"
-                     where files.Contains(HashGenerator.GetHash(mtrlCheck))
-                     select part.ToString()).ToList();
-            }
-
-            // returns the list of parts that exist within the mtrl folder
-            return partList;
-        }
-
+        /// <param name="path"></param>
+        /// <returns></returns>
         public async Task<Dictionary<string, string>> GetMapAvailableTex(string path)
         {
             var mapNamePathDictonary = new Dictionary<string, string>();
@@ -413,6 +329,23 @@ namespace xivModdingFramework.Textures.FileTypes
             return mapNamePathDictonary;
         }
 
+        #endregion
+
+        #region High-level File Exporting
+        /// <summary>
+        /// Saves a texture file located at the given internal path as a DDS at the given external path.
+        /// </summary>
+        /// <param name="internalPath"></param>
+        /// <param name="externalPath"></param>
+        /// <param name="forceoriginal"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public async Task SaveTexAsDDS(string internalPath, string externalPath, bool forceoriginal = false, ModTransaction tx = null)
+        {
+            var tex = await GetXivTex(internalPath, forceoriginal, tx);
+            SaveTexAsDDS(externalPath, tex);
+        }
+
         public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
         {
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
@@ -425,321 +358,30 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             DDS.MakeDDS(xivTex, path);
         }
+        #endregion
 
-
-        /// <summary>
-        /// Converts the DDS-Format pixel data in a given XivTex to 8.8.8.8 RGBA Pixel data and returns it.
-        /// </summary>
-        /// <param name="xivTex">The texture data</param>
-        /// <returns>A byte array with the image data</returns>
-        public async Task<byte[]> GetRawPixels(XivTex xivTex, int layer = -1)
-        {
-            return await Task.Run(async () =>
-            {
-                byte[] imageData = null;
-
-                var layers = xivTex.Layers;
-                if(layers == 0)
-                {
-                    layers = 1;
-                }
-
-                switch (xivTex.TextureFormat)
-                {
-                    case XivTexFormat.DXT1:
-                        imageData = DxtUtil.DecompressDxt1(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.DXT3:
-                        imageData = DxtUtil.DecompressDxt3(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.DXT5:
-                        imageData = DxtUtil.DecompressDxt5(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.BC5:
-                        imageData = DxtUtil.DecompressBc5(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.BC7:
-                        imageData = DxtUtil.DecompressBc7(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.A4R4G4B4:
-                        imageData = await Read4444Image(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.A1R5G5B5:
-                        imageData = await Read5551Image(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.A8R8G8B8:
-                        imageData = await SwapRBColors(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.L8:
-                    case XivTexFormat.A8:
-                        imageData = await Read8bitImage(xivTex.TexData, xivTex.Width, xivTex.Height * layers);
-                        break;
-                    case XivTexFormat.X8R8G8B8:
-                    case XivTexFormat.R32F:
-                    case XivTexFormat.G16R16F:
-                    case XivTexFormat.G32R32F:
-                    case XivTexFormat.A16B16G16R16F:
-                    case XivTexFormat.A32B32G32R32F:
-                    case XivTexFormat.D16:
-                    default:
-                        imageData = xivTex.TexData;
-                        break;
-                }
-
-                if(layer >= 0)
-                {
-                    var bytesPerLayer = imageData.Length / xivTex.Layers;
-                    var offset = bytesPerLayer * layer;
-
-                    byte[] nData = new byte[bytesPerLayer];
-                    Array.Copy(imageData, offset, nData, 0, bytesPerLayer);
-
-                    imageData = nData;
-                }
-
-                return imageData;
-            });
-        }
+        #region Image Import Pipeline
 
         /// <summary>
-        /// Creates bitmap from decompressed A1R5G5B5 texture data.
+        /// Covers the entire pipeline of importing an external image file into the game files.
+        /// This converts the file (if needed) to DDS (stored in a temp folder).
+        /// Then converts that DDS file to an uncompreesed .TEX file.
+        /// Then SQPacks compresses that .TEX file into a type 2 or 4 SQPack file depending on internal file path.
+        /// Then injects that SQPacked file into the given mod transaction or base game files.
         /// </summary>
-        /// <param name="textureData">The decompressed texture data.</param>
-        /// <param name="width">The textures width.</param>
-        /// <param name="height">The textures height.</param>
-        /// <returns>The raw byte data in 32bit</returns>
-        private static async Task<byte[]> Read5551Image(byte[] textureData, int width, int height)
-        {
-            var convertedBytes = new List<byte>();
-
-            await Task.Run(() =>
-            {
-                using (var ms = new MemoryStream(textureData))
-                {
-                    using (var br = new BinaryReader(ms))
-                    {
-                        for (var y = 0; y < height; y++)
-                        {
-                            for (var x = 0; x < width; x++)
-                            {
-                                var pixel = br.ReadUInt16() & 0xFFFF;
-
-                                var red = ((pixel & 0x7E00) >> 10) * 8;
-                                var green = ((pixel & 0x3E0) >> 5) * 8;
-                                var blue = ((pixel & 0x1F)) * 8;
-                                var alpha = ((pixel & 0x8000) >> 15) * 255;
-
-                                convertedBytes.Add((byte) red);
-                                convertedBytes.Add((byte) green);
-                                convertedBytes.Add((byte) blue);
-                                convertedBytes.Add((byte) alpha);
-                            }
-                        }
-                    }
-                }
-            });
-
-            return convertedBytes.ToArray();
-        }
-
-
-        /// <summary>
-        /// Creates bitmap from decompressed A4R4G4B4 texture data.
-        /// </summary>
-        /// <param name="textureData">The decompressed texture data.</param>
-        /// <param name="width">The textures width.</param>
-        /// <param name="height">The textures height.</param>
-        /// <returns>The raw byte data in 32bit</returns>
-        private static async Task<byte[]> Read4444Image(byte[] textureData, int width, int height)
-        {
-            var convertedBytes = new List<byte>();
-
-            await Task.Run(() =>
-            {
-                using (var ms = new MemoryStream(textureData))
-                {
-                    using (var br = new BinaryReader(ms))
-                    {
-                        for (var y = 0; y < height; y++)
-                        {
-                            for (var x = 0; x < width; x++)
-                            {
-                                var pixel = br.ReadUInt16() & 0xFFFF;
-                                var red = ((pixel & 0xF)) * 16;
-                                var green = ((pixel & 0xF0) >> 4) * 16;
-                                var blue = ((pixel & 0xF00) >> 8) * 16;
-                                var alpha = ((pixel & 0xF000) >> 12) * 16;
-
-                                convertedBytes.Add((byte) blue);
-                                convertedBytes.Add((byte) green);
-                                convertedBytes.Add((byte) red);
-                                convertedBytes.Add((byte) alpha);
-                            }
-                        }
-                    }
-                }
-            });
-
-            return convertedBytes.ToArray();
-        }
-
-        /// <summary>
-        /// Creates bitmap from decompressed A8/L8 texture data.
-        /// </summary>
-        /// <param name="textureData">The decompressed texture data.</param>
-        /// <param name="width">The textures width.</param>
-        /// <param name="height">The textures height.</param>
-        /// <returns>The created bitmap.</returns>
-        private static async Task<byte[]> Read8bitImage(byte[] textureData, int width, int height)
-        {
-            var convertedBytes = new List<byte>();
-
-            await Task.Run(() =>
-            {
-                using (var ms = new MemoryStream(textureData))
-                {
-                    using (var br = new BinaryReader(ms))
-                    {
-                        for (var y = 0; y < height; y++)
-                        {
-                            for (var x = 0; x < width; x++)
-                            {
-                                var pixel = br.ReadByte() & 0xFF;
-
-                                convertedBytes.Add((byte) pixel);
-                                convertedBytes.Add((byte) pixel);
-                                convertedBytes.Add((byte) pixel);
-                                convertedBytes.Add(255);
-                            }
-                        }
-                    }
-                }
-            });
-
-            return convertedBytes.ToArray();
-        }
-
-        /// <summary>
-        /// Creates bitmap from decompressed Linear texture data.
-        /// </summary>
-        /// <param name="textureData">The decompressed texture data.</param>
-        /// <param name="width">The textures width.</param>
-        /// <param name="height">The textures height.</param>
-        /// <returns>The raw byte data in 32bit</returns>
-        private static async Task<byte[]> SwapRBColors(byte[] textureData, int width, int height)
-        {
-            var convertedBytes = new List<byte>();
-
-            await Task.Run(() =>
-            {
-                using (var ms = new MemoryStream(textureData))
-                {
-                    using (var br = new BinaryReader(ms))
-                    {
-                        for (var y = 0; y < height; y++)
-                        {
-                            for (var x = 0; x < width; x++)
-                            {
-                                var blue = br.ReadByte();
-                                var green = br.ReadByte();
-                                var red = br.ReadByte();
-                                var alpha = br.ReadByte();
-
-                                convertedBytes.Add(red);
-                                convertedBytes.Add(green);
-                                convertedBytes.Add(blue);
-                                convertedBytes.Add(alpha);
-                            }
-                        }
-                    }
-                }
-            });
-
-            return convertedBytes.ToArray();
-        }
-
-
-        /// <summary>
-        /// Retrieves the texture format information from a DDS file stream.
-        /// </summary>
-        /// <param name="ddsStream"></param>
+        /// <param name="internalPath"></param>
+        /// <param name="externalPath"></param>
+        /// <param name="item"></param>
+        /// <param name="source"></param>
+        /// <param name="tx"></param>
         /// <returns></returns>
-        public XivTexFormat GetDDSTexFormat(BinaryReader ddsStream)
+        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, ModTransaction tx = null)
         {
-            // DX10 format magic number
-            const uint fourccDX10 = 0x30315844;
+            var path = internalPath;
 
-            ddsStream.BaseStream.Seek(12, SeekOrigin.Begin);
-
-            var newHeight = ddsStream.ReadInt32();
-            var newWidth = ddsStream.ReadInt32();
-            ddsStream.ReadBytes(8);
-            var newMipCount = ddsStream.ReadInt32();
-
-            if (newHeight % 2 != 0 || newWidth % 2 != 0)
-            {
-                throw new Exception("Resolution must be a multiple of 2");
-            }
-
-            ddsStream.BaseStream.Seek(80, SeekOrigin.Begin);
-
-            var textureFlags = ddsStream.ReadInt32();
-            var texType = ddsStream.ReadInt32();
-
-            XivTexFormat textureType;
-
-            if (texType == fourccDX10)
-            {
-                ddsStream.BaseStream.Seek(128, SeekOrigin.Begin);
-                var dxgiTexType = ddsStream.ReadInt32();
-
-                if (DXGIType.ContainsKey(dxgiTexType))
-                {
-                    textureType = DXGIType[dxgiTexType];
-                }
-                else
-                {
-                    throw new Exception($"DXGI format ({dxgiTexType}) not recognized.");
-                }
-            }
-            else if (DDSType.ContainsKey(texType))
-            {
-                textureType = DDSType[texType];
-            }
-            else
-            {
-                throw new Exception($"DDS Type ({texType}) not recognized.");
-            }
-
-            switch (textureFlags)
-            {
-                case 2 when textureType == XivTexFormat.A8R8G8B8:
-                    textureType = XivTexFormat.A8;
-                    break;
-                case 65 when textureType == XivTexFormat.A8R8G8B8:
-                    var bpp = ddsStream.ReadInt32();
-                    if (bpp == 32)
-                    {
-                        textureType = XivTexFormat.A8R8G8B8;
-                    }
-                    else
-                    {
-                        var red = ddsStream.ReadInt32();
-
-                        switch (red)
-                        {
-                            case 31744:
-                                textureType = XivTexFormat.A1R5G5B5;
-                                break;
-                            case 3840:
-                                textureType = XivTexFormat.A4R4G4B4;
-                                break;
-                        }
-                    }
-
-                    break;
-            }
-            return textureType;
+            var data = await MakeCompressedTex(path, externalPath, XivTexFormat.INVALID, tx);
+            var offset = await _dat.WriteModFile(data, path, source, item, tx);
+            return offset;
         }
 
         /// <summary>
@@ -751,7 +393,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="texFormat"></param>
         /// <returns></returns>
-        public async Task<byte[]> MakeTexData(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
+        public async Task<byte[]> MakeCompressedTex(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
             // Ensure file exists.
             if (!File.Exists(externalPath))
@@ -759,8 +401,20 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new IOException($"Could not find file: {externalPath}");
             }
             var ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat, tx);
-            var data = await DDSToDatReady(ddsFilePath, internalPath);
-            return data;
+            try
+            {
+                var data = DDSToUncompressedTex(ddsFilePath);
+                data = await CompressTexFile(data, internalPath);
+                return data;
+            }
+            finally
+            {
+                // Cleanup the dds file if it was a temp file we created.
+                if (ddsFilePath != externalPath)
+                {
+                    IOUtil.DeleteTempFile(ddsFilePath);
+                }
+            }
         }
 
         /// <summary>
@@ -935,10 +589,6 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public const uint _DDSHeaderSize = 128;
-        public const uint _TexHeaderSize = 80;
-
-
         /// <summary>
         /// Creates a valid DDS file from a 8.8.8.8 byte array...
         /// By manually creating a DDS header and stapling it onto the end.
@@ -1060,39 +710,12 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<byte[]> DDSToDatReady(string externalDdsPath, string internalPath)
-        {
-            var ddsSize = (uint) (new FileInfo(externalDdsPath).Length);
-            byte[] uncompTex; 
 
-            // Stream the file in to replace the header...
-            using (var fs = File.OpenRead(externalDdsPath))
-            {
-                using (var fileBr = new BinaryReader(fs))
-                {
-                    // Could use a file stream here instead..?
-                    // Less RAM, but slower..?
-                    using (var uncompTexMs = new MemoryStream())
-                    {
-                        using (var uncompTexWriter = new BinaryWriter(uncompTexMs))
-                        {
-                            DDSToUncompressedTex(fileBr, uncompTexWriter, ddsSize);
-                        }
-
-                        //uncompTexMs.Position = 0;
-                        uncompTex = uncompTexMs.ToArray();
-                    }
-                }
-            }
-
-            using (var ms = new MemoryStream(uncompTex))
-            {
-                using (var br = new BinaryReader(ms))
-                {
-                    return await CompressTexFile(br, (uint) uncompTex.Length, internalPath);
-                }
-            }
-        }
+        /// <summary>
+        /// Converts the given DDS format image file/data to an uncompressed .TEX file.
+        /// </summary>
+        /// <param name="externalDdsPath"></param>
+        /// <returns></returns>
         public byte[] DDSToUncompressedTex(string externalDdsPath)
         {
             var ddsSize = (uint)(new FileInfo(externalDdsPath).Length);
@@ -1120,28 +743,23 @@ namespace xivModdingFramework.Textures.FileTypes
             return uncompTex;
         }
 
-
-        public async Task<byte[]> DDSToUncompressedTex(byte[] data)
+        public byte[] DDSToUncompressedTex(byte[] data)
         {
-            // Set up streams to pass down to the lower level functions.
-            return await Task.Run(() =>
+            var uncompressedLength = data.Length;
+            using (var ms = new MemoryStream(data))
             {
-                var uncompressedLength = data.Length;
-                using (var ms = new MemoryStream(data))
+                using (var br = new BinaryReader(ms))
                 {
-                    using (var br = new BinaryReader(ms))
+                    using (var msOut = new MemoryStream())
                     {
-                        using (var msOut = new MemoryStream())
+                        using (var bw = new BinaryWriter(msOut))
                         {
-                            using (var bw = new BinaryWriter(msOut))
-                            {
-                                DDSToUncompressedTex(br, bw, (uint)uncompressedLength);
-                                return msOut.ToArray();
-                            }
+                            DDSToUncompressedTex(br, bw, (uint)uncompressedLength);
+                            return msOut.ToArray();
                         }
                     }
                 }
-            });
+            }
         }
 
         public void DDSToUncompressedTex(BinaryReader br, BinaryWriter bw, uint ddsSize)
@@ -1151,6 +769,186 @@ namespace xivModdingFramework.Textures.FileTypes
             uncompressedLength -= header.DDSHeaderSize;
             bw.Write(header.TexHeader);
             bw.Write(br.ReadBytes((int)uncompressedLength));
+        }
+
+        /// <summary>
+        /// Retrieves the texture format information from a DDS file stream/DDS header.
+        /// Expects the stream position or offset to point to the start of the DDS Header.
+        /// Advances the stream position somewhat arbitrarily.
+        /// </summary>
+        /// <param name="ddsStream"></param>
+        /// <returns></returns>
+        public static XivTexFormat GetDDSTexFormat(BinaryReader ddsStream, long offset = -1)
+        {
+
+            if(offset >= 0)
+            {
+                ddsStream.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = ddsStream.BaseStream.Position;
+            }
+
+            // DX10 format magic number
+            const uint fourccDX10 = 0x30315844;
+
+            ddsStream.BaseStream.Seek(12, SeekOrigin.Begin);
+
+            var newHeight = ddsStream.ReadInt32();
+            var newWidth = ddsStream.ReadInt32();
+            ddsStream.ReadBytes(8);
+            var newMipCount = ddsStream.ReadInt32();
+
+            if (newHeight % 2 != 0 || newWidth % 2 != 0)
+            {
+                throw new Exception("Resolution must be a multiple of 2");
+            }
+
+            ddsStream.BaseStream.Seek(80, SeekOrigin.Begin);
+
+            var textureFlags = ddsStream.ReadInt32();
+            var texType = ddsStream.ReadInt32();
+
+            XivTexFormat textureType;
+
+            if (texType == fourccDX10)
+            {
+                ddsStream.BaseStream.Seek(128, SeekOrigin.Begin);
+                var dxgiTexType = ddsStream.ReadInt32();
+
+                if (DXGIType.ContainsKey(dxgiTexType))
+                {
+                    textureType = DXGIType[dxgiTexType];
+                }
+                else
+                {
+                    throw new Exception($"DXGI format ({dxgiTexType}) not recognized.");
+                }
+            }
+            else if (DDSType.ContainsKey(texType))
+            {
+                textureType = DDSType[texType];
+            }
+            else
+            {
+                throw new Exception($"DDS Type ({texType}) not recognized.");
+            }
+
+            switch (textureFlags)
+            {
+                case 2 when textureType == XivTexFormat.A8R8G8B8:
+                    textureType = XivTexFormat.A8;
+                    break;
+                case 65 when textureType == XivTexFormat.A8R8G8B8:
+                    var bpp = ddsStream.ReadInt32();
+                    if (bpp == 32)
+                    {
+                        textureType = XivTexFormat.A8R8G8B8;
+                    }
+                    else
+                    {
+                        var red = ddsStream.ReadInt32();
+
+                        switch (red)
+                        {
+                            case 31744:
+                                textureType = XivTexFormat.A1R5G5B5;
+                                break;
+                            case 3840:
+                                textureType = XivTexFormat.A4R4G4B4;
+                                break;
+                        }
+                    }
+
+                    break;
+            }
+            return textureType;
+        }
+
+        /// <summary>
+        /// Creates an uncompressed .TEX file header from the given data.
+        /// TODO: This really should probably be a member function off TexHeader, and thus use the full
+        /// set of available header data, instead of nuking the Attributes and MipFlag.
+        /// </summary>
+        /// <param name="newWidth">The width of the DDS texture to be imported.</param>
+        /// <param name="newHeight">The height of the DDS texture to be imported.</param>
+        /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
+        /// <returns>The created header data.</returns>
+        internal static List<byte> CreateTexFileHeader(XivTexFormat format, int newWidth, int newHeight, int newMipCount)
+        {
+            if (newMipCount > 13)
+            {
+                throw new InvalidDataException("Image has too many MipMaps. (Max 13)");
+            }
+            var headerData = new List<byte>();
+
+            headerData.AddRange(BitConverter.GetBytes((short)0));
+            headerData.AddRange(BitConverter.GetBytes((short)128));
+            headerData.AddRange(BitConverter.GetBytes(short.Parse(format.GetTexFormatCode())));
+            headerData.AddRange(BitConverter.GetBytes((short)0));
+            headerData.AddRange(BitConverter.GetBytes((short)newWidth));
+            headerData.AddRange(BitConverter.GetBytes((short)newHeight));
+            headerData.AddRange(BitConverter.GetBytes((short)1));
+            headerData.AddRange(BitConverter.GetBytes((short)newMipCount));
+
+
+            headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
+            headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
+            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
+
+            int mipLength;
+
+            switch (format)
+            {
+                case XivTexFormat.DXT1:
+                    mipLength = (newWidth * newHeight) / 2;
+                    break;
+                case XivTexFormat.DXT5:
+                case XivTexFormat.A8:
+                    mipLength = newWidth * newHeight;
+                    break;
+                case XivTexFormat.A1R5G5B5:
+                case XivTexFormat.A4R4G4B4:
+                    mipLength = (newWidth * newHeight) * 2;
+                    break;
+                case XivTexFormat.L8:
+                case XivTexFormat.A8R8G8B8:
+                case XivTexFormat.X8R8G8B8:
+                case XivTexFormat.R32F:
+                case XivTexFormat.G16R16F:
+                case XivTexFormat.G32R32F:
+                case XivTexFormat.A16B16G16R16F:
+                case XivTexFormat.A32B32G32R32F:
+                case XivTexFormat.DXT3:
+                case XivTexFormat.D16:
+                default:
+                    mipLength = (newWidth * newHeight) * 4;
+                    break;
+            }
+
+            var mipMapUncompressedOffset = 80;
+
+            for (var i = 0; i < newMipCount; i++)
+            {
+                headerData.AddRange(BitConverter.GetBytes(mipMapUncompressedOffset));
+                mipMapUncompressedOffset = mipMapUncompressedOffset + mipLength;
+
+                if (mipLength > 16)
+                {
+                    mipLength = mipLength / 4;
+                }
+                else
+                {
+                    mipLength = 16;
+                }
+            }
+
+            var padding = 80 - headerData.Count;
+
+            headerData.AddRange(new byte[padding]);
+
+            return headerData;
         }
 
         /// <summary>
@@ -1198,7 +996,6 @@ namespace xivModdingFramework.Textures.FileTypes
             var texHeader = CreateTexFileHeader(texFormat, newWidth, newHeight, newMipCount).ToArray();
             return (texHeader, headerLength);
         }
-
 
         /// <summary>
         /// Compress a given uncompressed TEX file into a type 2 or type 4 file ready to be added to the DATs.
@@ -1274,75 +1071,10 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, ModTransaction tx = null)
-        {
-            var path = internalPath;
+        #endregion
 
-            var data = await MakeTexData(path, externalPath, XivTexFormat.INVALID, tx);
-
-            var offset = await _dat.WriteModFile(data, path, source, item, tx);
-            return offset;
-        }
-
-        public struct TexHeader
-        {
-            // Bitflags
-            public uint Attributes;
-
-            // Texture Format
-            public uint TextureFormat;
-
-            public ushort Width;
-            public ushort Height;
-
-            public ushort Depth;
-
-            // This is technically 2 fields smooshed together,
-            // Mip Count and ArraySize for image arrays.
-            // Can deal with that later though, TexTools already chokes on those files for multiple reasons.
-            public ushort MipCount;
-
-            uint[] LoDMips;
-
-            uint[] MipMapOffsets;
-
-            /// <summary>
-            /// Reads a .tex file header (80 bytes) from the given stream.
-            /// </summary>
-            /// <param name="br"></param>
-            internal static TexHeader ReadTexHeader(BinaryReader br, long offset = -1)
-            {
-                var header = new TexHeader();
-                if (offset >= 0)
-                {
-                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
-                }
-
-                header.Attributes = br.ReadUInt32();
-                header.TextureFormat = br.ReadUInt32();
-
-                header.Width = br.ReadUInt16();
-                header.Height = br.ReadUInt16();
-
-                header.Depth = br.ReadUInt16();
-                header.MipCount = br.ReadUInt16();
-
-                header.LoDMips = new uint[3];
-                for (int i = 0; i < header.LoDMips.Length; i++)
-                {
-                    header.LoDMips[i] = br.ReadUInt32();
-                }
-
-                header.MipMapOffsets = new uint[13];
-                for (int i = 0; i < header.MipMapOffsets.Length; i++)
-                {
-                    header.MipMapOffsets[i] = br.ReadUInt32();
-                }
-                return header;
-            }
-        }
-
-
+        #region Colorset Import Handling
+        // Special one-off functions for importing colorsets as image files.
 
         /// <summary>
         /// Imports a ColorSet file
@@ -1352,19 +1084,14 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item</param>
         /// <param name="source">The source importing the file</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory, IItem item, string source, XivLanguage lang, ModTransaction tx = null)
+        public async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, string ddsFilePath, IItem item, string source, ModTransaction tx = null)
         {
-            var colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
-            var colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
+            var colorSetData = DDSToColorset(ddsFilePath);
+            var colorSetExtraData = GetColorsetDyeInformationFromFile(ddsFilePath);
 
             // Replace the color set data with the imported data
             xivMtrl.ColorSetData = colorSetData;
             xivMtrl.ColorSetDyeData = colorSetExtraData;
-            if (xivMtrl.AdditionalData.Length > 0)
-            {
-                // This byte enables the dye set if it's not already enabled.
-                xivMtrl.AdditionalData[0] = 12;
-            }
 
             var doSave = false;
             if(tx == null)
@@ -1398,15 +1125,14 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
 
-
         /// <summary>
         /// Gets the raw Colorset data list from a dds file.
         /// </summary>
         /// <param name="ddsFileDirectory"></param>
         /// <returns></returns>
-        public static List<Half> GetColorsetDataFromDDS(DirectoryInfo ddsFileDirectory)
+        public static List<Half> DDSToColorset(string ddsPath)
         {
-            using (var br = new BinaryReader(File.OpenRead(ddsFileDirectory.FullName)))
+            using (var br = new BinaryReader(File.OpenRead(ddsPath)))
             {
                 // Check DDS type
                 br.BaseStream.Seek(84, SeekOrigin.Begin);
@@ -1433,23 +1159,23 @@ namespace xivModdingFramework.Textures.FileTypes
                 var height = br.ReadInt32();
                 var width = br.ReadInt32();
 
-                List<Half> colorSetData;
-                int size;
-                if (width == 4) {
-                    size = 256;
-                    colorSetData = new List<Half>(256);
+                if(width == 4 && height == 16)
+                {
+                    // Endwalker Colorset, this is fine.
+                } else if(width == 8 && height == 32)
+                {
+                    // Dawntrail Colorset, this is fine.
                 } else
                 {
-                    size = 1024;
-                    colorSetData = new List<Half>(1024);
+                    throw new InvalidDataException("Colorset Images must be either 4x16 or 8x32");
                 }
 
+                var size = width * height;
+                var colorSetData = new List<Half>(size);
 
-                // skip DDS header
+
                 br.BaseStream.Seek(128, SeekOrigin.Begin);
 
-                // color data is always 512 (4w x 16h = 64 x 8bpp = 512)
-                // this reads 256 ushort values which is 256 x 2 = 512
                 for (var i = 0; i < size; i++)
                 {
                     colorSetData.Add((new Half(br.ReadUInt16())));
@@ -1461,152 +1187,37 @@ namespace xivModdingFramework.Textures.FileTypes
 
         /// <summary>
         /// Retreives the associated .dat file for colorset dye data, if it exists.
-        /// This takes in the .DDS FILE path, not the .DAT file path.
+        /// Takes either a .dat file directly or the .dds file adjacent to it.
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public static byte[] GetColorsetExtraDataFromDDS(DirectoryInfo file)
+        public static byte[] GetColorsetDyeInformationFromFile(string file)
         {
-            var flagsPath = Path.Combine(Path.GetDirectoryName(file.FullName), (Path.GetFileNameWithoutExtension(file.FullName) + ".dat"));
+            var flagsPath = file;
+            if (file.EndsWith(".dds"))
+            {
+                flagsPath = Path.Combine(Path.GetDirectoryName(file), (Path.GetFileNameWithoutExtension(file) + ".dat"));
+            } else if (!file.EndsWith(".dat"))
+            {
+                throw new FileNotFoundException("File for Dye data extraction must be either .dat or .dds");
+            }
 
             byte[] colorSetExtraData;
             if (File.Exists(flagsPath))
             {
-                // The extra data after the colorset is always 32 bytes 
-                // This reads 16 ushort values which is 16 x 2 = 32
+                // Dye data length varies with EW/DT.
                 colorSetExtraData = File.ReadAllBytes(flagsPath);
-
-                // If for whatever reason there is a .dat file but it's missing data
-                if (colorSetExtraData.Length != 32)
-                {
-                    // Set all dye modifiers to 0 (undyeable)
-                    colorSetExtraData = new byte[32];
-                }
             }
             else
             {
-                // If .dat file is missing set all values to 0 (undyeable)
-                colorSetExtraData = new byte[32];
+                // If we have no dye data, return empty Array.
+                colorSetExtraData = new byte[0];
             }
             return colorSetExtraData;
         }
+        #endregion
 
-        /// <summary>
-        /// Converts a DDS file into a mtrl file and returns the raw data
-        /// </summary>
-        /// <param name="xivMtrl">The XivMtrl data of the original</param>
-        /// <param name="ddsFileDirectory">The dds directory of the new ColorSet</param>
-        /// <param name="item">The item</param>
-        /// <returns>The raw mtrl data</returns>
-        public byte[] DDStoMtrlData(XivMtrl xivMtrl, DirectoryInfo ddsFileDirectory)
-        {
-            var colorSetData = GetColorsetDataFromDDS(ddsFileDirectory);
-
-            var colorSetExtraData = new byte[32];
-            // If the colorset size is 544, it contains extra data that must be imported
-            try
-            {
-                colorSetExtraData = GetColorsetExtraDataFromDDS(ddsFileDirectory);
-            } catch
-            {
-                colorSetExtraData = new byte[32];
-            }
-
-            // Replace the color set data with the imported data
-            xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetDyeData = colorSetExtraData;
-
-            if (xivMtrl.AdditionalData.Length > 0)
-            {
-                // This byte enables the dye set if it's not already enabled.
-                xivMtrl.AdditionalData[0] = 12;
-            }
-
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            return _mtrl.CreateMtrlFile(xivMtrl);
-        }
-
-        /// <summary>
-        /// Creates the header for the texture info from the data to be imported.
-        /// </summary>
-        /// <param name="xivTex">Data for the currently displayed texture.</param>
-        /// <param name="newWidth">The width of the DDS texture to be imported.</param>
-        /// <param name="newHeight">The height of the DDS texture to be imported.</param>
-        /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
-        /// <returns>The created header data.</returns>
-        private static List<byte> CreateTexFileHeader(XivTexFormat format, int newWidth, int newHeight, int newMipCount)
-        {
-            var headerData = new List<byte>();
-            
-            headerData.AddRange(BitConverter.GetBytes((short)0));
-            headerData.AddRange(BitConverter.GetBytes((short)128));
-            headerData.AddRange(BitConverter.GetBytes(short.Parse(format.GetTexFormatCode())));
-            headerData.AddRange(BitConverter.GetBytes((short)0));
-            headerData.AddRange(BitConverter.GetBytes((short)newWidth));
-            headerData.AddRange(BitConverter.GetBytes((short)newHeight));
-            headerData.AddRange(BitConverter.GetBytes((short)1));
-            headerData.AddRange(BitConverter.GetBytes((short)newMipCount));
-
-
-            headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
-            headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
-            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
-
-            int mipLength;
-
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    mipLength = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.A8:
-                    mipLength = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    mipLength = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    mipLength = (newWidth * newHeight) * 4;
-                    break;
-            }
-
-            var mipMapUncompressedOffset = 80;
-
-            for (var i = 0; i < newMipCount; i++)
-            {
-                headerData.AddRange(BitConverter.GetBytes(mipMapUncompressedOffset));
-                mipMapUncompressedOffset = mipMapUncompressedOffset + mipLength;
-
-                if (mipLength > 16)
-                {
-                    mipLength = mipLength / 4;
-                }
-                else
-                {
-                    mipLength = 16;
-                }
-            }
-
-            var padding = 80 - headerData.Count;
-
-            headerData.AddRange(new byte[padding]);
-
-            return headerData;
-        }
-
-
+        #region Static Dictionaries
         /// <summary>
         /// A dictionary containing the int represntations of known file types for DDS
         /// </summary>
@@ -1648,36 +1259,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         /// <summary>
         /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
-        /// </summary>
-        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
-        {
-            {XivStrings.Head, "met"},
-            {XivStrings.Hands, "glv"},
-            {XivStrings.Legs, "dwn"},
-            {XivStrings.Feet, "sho"},
-            {XivStrings.Body, "top"},
-            {XivStrings.Earring, "ear"},
-            {XivStrings.Neck, "nek"},
-            {XivStrings.Rings, "rir"},
-            {XivStrings.LeftRing, "ril"},
-            {XivStrings.Wrists, "wrs"},
-            {XivStrings.Head_Body, "top"},
-            {XivStrings.Body_Hands, "top"},
-            {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "top"},
-            {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "top"},
-            {XivStrings.All, "top"},
-            {XivStrings.Face, "fac"},
-            {XivStrings.Iris, "iri"},
-            {XivStrings.Etc, "etc"},
-            {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
-
-        };
-
-        /// <summary>
-        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
+        /// (Used in UI Texture usage resolution)
         /// </summary>
         private static readonly Dictionary<string, string> MapTypeDictionary = new Dictionary<string, string>
         {
@@ -1688,7 +1270,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {"m_s", "LowRes Mask"}
 
         };
+        #endregion
 
-        
     }
 }

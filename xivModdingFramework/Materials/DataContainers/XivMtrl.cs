@@ -611,7 +611,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public async Task<XivTex> GetTexData()
         {
             var _tex = new Tex(XivCache.GameInfo.GameDirectory);
-            return await _tex.GetTexData(this);
+            return await _tex.GetXivTex(this);
         }
 
         public MtrlTexture()

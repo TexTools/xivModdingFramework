@@ -970,8 +970,8 @@ namespace xivModdingFramework.Materials.FileTypes
             var _dat = new Dat(_gameDirectory);
 
             // Read normal file.
-            var normalTex = await _tex.GetTexData(sourceNormalPath);
-            var texData = await _tex.GetRawPixels(normalTex);
+            var normalTex = await _tex.GetXivTex(sourceNormalPath);
+            var texData = await normalTex.GetRawPixels();
 
             // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
             var idPixels = new byte[texData.Length];
@@ -1021,7 +1021,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 // In theory, a streamlined function could be created to combine some of these steps.
                 var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, true);
-                ddsBytes = await _tex.DDSToUncompressedTex(ddsBytes);
+                ddsBytes = _tex.DDSToUncompressedTex(ddsBytes);
                 ddsBytes = await _tex.CompressTexFile(ddsBytes);
                 return (indexPath, ddsBytes);
             }

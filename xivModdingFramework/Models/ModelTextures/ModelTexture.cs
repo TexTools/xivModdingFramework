@@ -309,8 +309,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     continue;
                 }
 
-                var texData = await tex.GetTexData(ttp.Path, ttp.Type, tx);
-                var imageData = await tex.GetRawPixels(texData);
+                var texData = await tex.GetXivTex(ttp.Path, ttp.Type, false, tx);
+                var imageData = await texData.GetRawPixels();
 
                 switch (ttp.Type)
                 {

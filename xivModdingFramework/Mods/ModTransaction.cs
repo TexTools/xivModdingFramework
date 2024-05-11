@@ -352,22 +352,38 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<long> Get8xDataOffset(string path)
+        public async Task<long> Get8xDataOffset(string path, bool forceOriginal = false)
         {
-            var df = IOUtil.GetDataFileFromPath(path);
-            var idx = await GetIndexFile(df);
-            return idx.Get8xDataOffset(path);
+            if (!forceOriginal)
+            {
+                // Standard index retrieval.
+                var df = IOUtil.GetDataFileFromPath(path);
+                var idx = await GetIndexFile(df);
+                return idx.Get8xDataOffset(path);
+            } else
+            {
+                var mod = (await GetModList()).GetMod(path);
+                if(mod == null)
+                {
+                    // Re-call to default path.
+                    return await Get8xDataOffset(path, false);
+                }
+                else
+                {
+                    // Return original base game offset.
+                    return mod.data.originalOffset;
+                }
+            }
         }
+
         /// <summary>
         /// Syntactic shortcut for retrieving the uint32 Dat-Embedded, FFXIV-Style Data offset from the index files.
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<uint> GetRawDataOffset(string path)
+        public async Task<uint> GetRawDataOffset(string path, bool forceOriginal = false)
         {
-            var df = IOUtil.GetDataFileFromPath(path);
-            var idx = await GetIndexFile(df);
-            return idx.GetRawDataOffset(path);
+            return (uint) (await Get8xDataOffset(path, forceOriginal) / 8);
         }
         /// <summary>
         /// Syntactic shortcut for validating a file exists.
