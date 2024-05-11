@@ -167,33 +167,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// TRANSACTION-UNSAFE
-        /// Gets the current live index state of a path, returning the 8xDataOffset (with DAT # embed) value.
-        /// </summary>
-        /// <param name="fullPath"></param>
-        /// <returns></returns>
-        public async Task<long> GetDataOffset(string fullPath)
-        {
-            // Current List of things using this still in the Framework itself:
-            // - All of the Cache generation functions/EXD reading
-            // - Skeleton resolution
-            // - Exporting model maps
-            // - Furniture sub-mesh resolution 
-            // - ATex Path resolution
-            // + A bunch of places TexTools UI uses it.
-
-            var dataFile = IOUtil.GetDataFileFromPath(fullPath);
-            var indexFile = await GetIndexFile(dataFile, false, true);
-            var offset = indexFile.Get8xDataOffset(fullPath);
-            if (offset != 0)
-            {
-                return offset;
-            }
-            return 0;
-        }
-
-
-        /// <summary>
         /// Checks whether the index file contains any of the folders passed in
         /// </summary>
         /// <remarks>

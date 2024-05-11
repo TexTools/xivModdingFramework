@@ -2270,6 +2270,9 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Resolves the full bone heirarchy necessary to animate this TTModel.
         /// Used when saving the file to DB.  (Or potentially animating it)
+        /// 
+        /// NOTE: NOT Transaction safe... If the base skeletons were modified during transaction?
+        /// This is niche enough to leave for the moment and come back to if it proves an issue.
         /// </summary>
         /// <returns></returns>
         public static Dictionary<string, SkeletonData> ResolveBoneHeirarchyRaw(List<XivDependencyRootInfo> roots, XivRace race, List<string> bones = null, Action<bool, string> loggingFunction = null)

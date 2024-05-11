@@ -40,6 +40,7 @@ using System.Runtime.CompilerServices;
 using static xivModdingFramework.Models.DataContainers.ShapeData;
 using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
 using xivModdingFramework.Textures.DataContainers;
+using xivModdingFramework.Mods;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -132,10 +133,10 @@ namespace xivModdingFramework.Models.ModelTextures
         /// <param name="mtrl"></param>
         /// <param name="colors"></param>
         /// <returns></returns>
-        public static async Task<ModelTextureData> GetModelMaps(DirectoryInfo gameDirectory, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1)
+        public static async Task<ModelTextureData> GetModelMaps(DirectoryInfo gameDirectory, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
         {
             var tex = new Tex(gameDirectory);
-            return await GetModelMaps(tex, mtrl, colors, highlightedRow);
+            return await GetModelMaps(tex, mtrl, colors, highlightedRow, tx);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -158,12 +159,12 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public static async Task<ModelTextureData> GetModelMaps(Tex tex, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1)
+        public static async Task<ModelTextureData> GetModelMaps(Tex tex, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
         {
             if (colors == null)
                 colors = GetCustomColors();
 
-            var texMapData = await GetTexMapData(tex, mtrl);
+            var texMapData = await GetTexMapData(tex, mtrl, tx);
             var dimensions = await EqualizeTextureSizes(texMapData);
 
             var diffusePixels = texMapData.Diffuse?.Data;
@@ -291,7 +292,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Retreives the raw pixel data for each texture, collated into a class to hold them.
         /// </summary>
         /// <returns>The texure map data</returns>
-        private static async Task<TexMapData> GetTexMapData(Tex tex, XivMtrl mtrl)
+        private static async Task<TexMapData> GetTexMapData(Tex tex, XivMtrl mtrl, ModTransaction tx = null)
         {
             var texMapData = new TexMapData();
 
@@ -308,7 +309,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     continue;
                 }
 
-                var texData = await tex.GetTexData(ttp.Path, ttp.Type);
+                var texData = await tex.GetTexData(ttp.Path, ttp.Type, tx);
                 var imageData = await tex.GetRawPixels(texData);
 
                 switch (ttp.Type)

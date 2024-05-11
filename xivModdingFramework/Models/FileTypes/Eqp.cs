@@ -963,7 +963,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Get all the available models for a given piece of equipment.
         /// </summary>
-        public async Task<List<XivRace>> GetAvailableRacialModels(IItem item, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<List<XivRace>> GetAvailableRacialModels(IItem item, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             var root = item.GetRoot();
             if(root == null)
@@ -971,34 +971,34 @@ namespace xivModdingFramework.Models.FileTypes
                 return new List<XivRace>();
             }
 
-            return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs);
+            return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs, tx);
         }
 
         /// <summary>
         /// Get all the available models for a given piece of equipment.
         /// </summary>
-        public async Task<List<XivRace>> GetAvailableRacialModels(XivDependencyRoot root, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<List<XivRace>> GetAvailableRacialModels(XivDependencyRoot root, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
-            return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs);
+            return await GetAvailableRacialModels(root.Info, forceDefault, includeNPCs, tx);
         }
 
         /// <summary>
         /// Get all the available models for a given piece of equipment.
         /// </summary>
-        public async Task<List<XivRace>> GetAvailableRacialModels(XivDependencyRootInfo root, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<List<XivRace>> GetAvailableRacialModels(XivDependencyRootInfo root, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             if(root.PrimaryType != XivItemType.equipment && root.PrimaryType != XivItemType.accessory)
             {
                 return new List<XivRace>();
             }
 
-            return await GetAvailableRacialModels(root.PrimaryId, root.Slot, forceDefault, includeNPCs);
+            return await GetAvailableRacialModels(root.PrimaryId, root.Slot, forceDefault, includeNPCs, tx);
         }
 
         /// <summary>
         /// Get all the available models for a given piece of equipment.
         /// </summary>
-        public async Task<List<XivRace>> GetAvailableRacialModels(int equipmentId, string slot, bool forceDefault = false, bool includeNPCs = false)
+        public async Task<List<XivRace>> GetAvailableRacialModels(int equipmentId, string slot, bool forceDefault = false, bool includeNPCs = false, ModTransaction tx = null)
         {
             var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
 
@@ -1016,7 +1016,7 @@ namespace xivModdingFramework.Models.FileTypes
             root.Slot = slot;
             root.PrimaryType = isAccessory ? XivItemType.accessory : XivItemType.equipment;
 
-            var dict = await GetEquipmentDeformationParameters(root, forceDefault, includeNPCs);
+            var dict = await GetEquipmentDeformationParameters(root, forceDefault, includeNPCs, tx);
 
             List<XivRace> races = new List<XivRace>();
             foreach(var kv in dict)

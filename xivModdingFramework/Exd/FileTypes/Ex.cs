@@ -21,6 +21,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.FileTypes;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
@@ -87,10 +88,13 @@ namespace xivModdingFramework.Exd.FileTypes
             PageList = new List<int>();
             LanguageList = new List<int>();
 
+            // Readonly TX.  We don't allow live modification of exd/exh files.
+            var tx = ModTransaction.BeginTransaction(true);
+
             var exdFolderHash = HashGenerator.GetHash("exd");
             var exdFileHash = HashGenerator.GetHash(exFile + ExhExtension);
 
-            var offset = await _index.GetDataOffset("exd/" + exFile + ExhExtension);
+            var offset = await tx.GetDataOffset("exd/" + exFile + ExhExtension);
 
             if (offset == 0)
             {
@@ -170,6 +174,9 @@ namespace xivModdingFramework.Exd.FileTypes
                 language = "";
             }
 
+            // Readonly TX.  We don't allow live modification of exd/exh files.
+            var tx = ModTransaction.BeginTransaction(true);
+
             // Each page is a new exd file
             // A good example is item_[page]_[language].exd 
             // item_0_en.exd, item_500_en.exd, item_1000_en.exd, etc.
@@ -179,7 +186,7 @@ namespace xivModdingFramework.Exd.FileTypes
 
                 var exdFolderHash = HashGenerator.GetHash("exd");
                 var exdFileHash = HashGenerator.GetHash(exdFile);
-                var offset = await _index.GetDataOffset("exd/" + exdFile);
+                var offset = await tx.GetDataOffset("exd/" + exdFile);
 
                 // Benchmark omits parts of some exd files by giving them an offset and size of zero
                 if (offset == 0)

@@ -30,6 +30,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -364,17 +365,17 @@ namespace xivModdingFramework.Items.Categories
             return furnitureList;
         }
 
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel, ModTransaction tx = null)
         {
 
-            return await GetFurnitureModelParts(itemModel.ModelInfo.PrimaryID, itemModel.SecondaryCategory);
+            return await GetFurnitureModelParts(itemModel.ModelInfo.PrimaryID, itemModel.SecondaryCategory, tx);
         }
 
 
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, XivItemType type)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, XivItemType type, ModTransaction tx = null)
         {
             var cat = type == XivItemType.indoor ? XivStrings.Furniture_Indoor : XivStrings.Furniture_Outdoor;
-            return await GetFurnitureModelParts(modelID, cat);
+            return await GetFurnitureModelParts(modelID, cat, tx);
         }
 
         /// <summary>
@@ -382,11 +383,11 @@ namespace xivModdingFramework.Items.Categories
         /// </summary>
         /// <param name="itemModel">The item to get the parts for</param>
         /// <returns>A dictionary containing the part string and mdl path string</returns>
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, string category)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, string category, ModTransaction tx = null)
         {
             var furniturePartDict = new Dictionary<string, string>();
 
-            var assets = await GetFurnitureAssets(modelID, category);
+            var assets = await GetFurnitureAssets(modelID, category, tx);
 
             foreach (var mdl in assets.MdlList)
             {
@@ -440,10 +441,14 @@ namespace xivModdingFramework.Items.Categories
             /// </summary>
             /// <param name="modelID">The model id to get the assets for</param>
             /// <returns>A HousingAssets object containing the asset info</returns>
-        private async Task<HousingAssets> GetFurnitureAssets(int modelID, string category)
+        private async Task<HousingAssets> GetFurnitureAssets(int modelID, string category, ModTransaction tx = null)
         {
-            var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one;
+                tx = ModTransaction.BeginTransaction(true);
+            }
 
             var id = modelID.ToString().PadLeft(4, '0');
 
@@ -461,7 +466,7 @@ namespace xivModdingFramework.Items.Categories
                 assetFile = $"gar_b0_m{id}.sgb";
             }
 
-            var assetOffset = await index.GetDataOffset(assetFolder + "/" + assetFile);
+            var assetOffset = await tx.GetDataOffset(assetFolder + "/" + assetFile);
 
             var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon);
 
@@ -539,7 +544,7 @@ namespace xivModdingFramework.Items.Categories
 
             if (housingAssets.AdditionalAssetList.Count > 0)
             {
-                await GetAdditionalAssets(housingAssets);
+                await GetAdditionalAssets(housingAssets, tx);
             }
 
 
@@ -550,9 +555,14 @@ namespace xivModdingFramework.Items.Categories
         /// Gets additional assets when the original asset file contains asset file paths within it
         /// </summary>
         /// <param name="assets">The current asset object</param>
-        private async Task GetAdditionalAssets(HousingAssets assets)
+        private async Task GetAdditionalAssets(HousingAssets assets, ModTransaction tx = null)
         {
-            var index = new Index(_gameDirectory);
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+
             var dat = new Dat(_gameDirectory);
 
             foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
@@ -560,8 +570,7 @@ namespace xivModdingFramework.Items.Categories
                 var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
                 var assetFile = Path.GetFileName(additionalAsset);
 
-                var assetOffset = await index.GetDataOffset(additionalAsset);
-
+                var assetOffset = await tx.GetDataOffset(additionalAsset);
                 var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon);
 
                 await Task.Run(() =>

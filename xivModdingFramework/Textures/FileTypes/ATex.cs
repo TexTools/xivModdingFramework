@@ -25,6 +25,7 @@ using xivModdingFramework.Items;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
@@ -50,7 +51,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="itemModel">The item to get the atex paths for</param>
         /// <returns>A list of TexTypePath containing the atex info</returns>
-        public async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel)
+        public async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel, bool forceOriginal = false, ModTransaction tx = null)
         {
             // Gear is the only type we know how to retrieve atex information for.
             if (itemModel.GetType() != typeof(XivGear)) return new List<TexTypePath>();
@@ -60,33 +61,26 @@ namespace xivModdingFramework.Textures.FileTypes
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
             var vfxPath = await GetVfxPath(itemModel);
-            return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File);
+            return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File, forceOriginal, tx);
         }
-        public async Task<List<TexTypePath>> GetAtexPaths(string vfxPath)
+        public async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var index = new Index(_gameDirectory);
             var avfx = new Avfx(_gameDirectory, _dataFile);
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
 
-            var folder = vfxPath.Substring(0, vfxPath.LastIndexOf("/"));
-            var file = Path.GetFileName(vfxPath);
-            var vfxOffset = await index.GetDataOffset(vfxPath);
-            var atexTexTypePathList = new List<TexTypePath>();
 
-            if (vfxOffset <= 0)
+            if (!await tx.FileExists(vfxPath))
             {
                 return new List<TexTypePath>();
             }
 
-            var aTexPaths = new List<string>();
-
-            try
-            {
-                aTexPaths = await avfx.GetATexPaths(vfxOffset);
-            }
-            catch (Exception e)
-            {
-                throw new Exception(e.Message);
-            }            
+            var atexTexTypePathList = new List<TexTypePath>();
+            var aTexPaths = await avfx.GetATexPaths(vfxPath, forceOriginal, tx);          
 
             foreach (var atexPath in aTexPaths)
             {

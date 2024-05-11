@@ -1189,18 +1189,16 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
 
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                Mod modEntry = null;
-                if(tx != null)
-                {
-                    (await tx.GetModList()).ModDictionary.TryGetValue(internalPath, out modEntry);
-                } else
-                {
-                    var modding = new Modding(_gameDirectory);
-                    modEntry = await modding.TryGetModEntry(internalPath);
-                }
+                (await tx.GetModList()).ModDictionary.TryGetValue(internalPath, out var modEntry);
 
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
@@ -1216,17 +1214,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             folder = folder.Replace("\\", "/");
             var file = Path.GetFileName(internalPath);
 
-            long offset = 0;
-            if (tx != null)
-            {
-                offset = (await tx.GetIndexFile(dataFile)).Get8xDataOffset(internalPath);
-            }
-            else
-            {
-                var index = new Index(_gameDirectory);
-                offset = await index.GetDataOffset(internalPath);
-            }
 
+            var offset = (await tx.GetIndexFile(dataFile)).Get8xDataOffset(internalPath);
             if (offset == 0)
             {
                 throw new Exception($"Could not find offset for {internalPath}");

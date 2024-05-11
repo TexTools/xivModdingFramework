@@ -587,7 +587,7 @@ namespace xivModdingFramework.Cache
                 }
                 else
                 {
-                    races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true);
+                    races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true, tx);
                 }
 
                 var models = new List<string>();
@@ -599,7 +599,7 @@ namespace xivModdingFramework.Cache
             } else if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
             {
                 var _housing = new Housing(XivCache.GameInfo.GameDirectory, XivCache.GameInfo.GameLanguage);
-                var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.PrimaryType);
+                var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.PrimaryType, tx);
                 return housingAssets.Select(x => x.Value).ToList();
             } else {
 
@@ -613,17 +613,13 @@ namespace xivModdingFramework.Cache
                 if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair && Info.SecondaryId / 100 >= 1)
                 {
                     // For human types, if their model is missing, the version 00xx is used instead.
-                    IndexFile index;
                     if(tx == null)
                     {
-                        var _index = new Index(XivCache.GameInfo.GameDirectory);
-                        index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(modelPath), false, true);
-                    } else
-                    {
-                        index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(modelPath));
+                        // Readonly TX if we don't have one.
+                        tx = ModTransaction.BeginTransaction(true);
                     }
 
-                    if(!(index.FileExists(modelPath)))
+                    if(!(await tx.FileExists(modelPath)))
                     {
                         var replacementNumber = (Info.SecondaryId % 100);
                         var alteredRoot = new XivDependencyRoot(Info.PrimaryType, Info.PrimaryId, Info.SecondaryType, replacementNumber, Info.Slot);
@@ -865,6 +861,12 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public async Task<List<string>> GetImcEntryPaths(ModTransaction tx = null)
         {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+
             // We need to locate and open the IMC file, and then check how many
             // actual sets are in it, and calculate the pointers to our associated
             // Set + Slot entries.
@@ -882,16 +884,13 @@ namespace xivModdingFramework.Cache
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
             var dat = new Dat(_gameDirectory);
 
-            long imcOffset = 0;
             if (tx != null)
             {
-                var df = IOUtil.GetDataFileFromPath(imcPath);
-                imcOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(imcPath);
-            } else
-            {
-                var index = new Index(_gameDirectory);
-                imcOffset = await index.GetDataOffset(imcPath);
+                // Readonly Tx if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
             }
+            var df = IOUtil.GetDataFileFromPath(imcPath);
+            var imcOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(imcPath);
 
             if (imcOffset == 0)
             {

@@ -156,7 +156,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            return await GetMtrlData(mtrlFile, materialSet, dxVersion, tx);
+            return await GetMtrlData(mtrlFile, materialSet, tx);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="materialSet"></param>
         /// <param name="dxVersion"></param>
         /// <returns></returns>
-        public async Task<XivMtrl> GetMtrlData(string mtrlFile, int materialSet = -1, int dxVersion = 11, ModTransaction tx = null) { 
+        public async Task<XivMtrl> GetMtrlData(string mtrlFile, int materialSet = -1, ModTransaction tx = null) { 
             string mtrlPath = "";
             long mtrlOffset = 0;
             var index = new Index(_gameDirectory);
@@ -199,15 +199,12 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
             }
 
-            if (tx != null)
+            if (tx == null)
             {
-                var df = IOUtil.GetDataFileFromPath(mtrlPath);
-                mtrlOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(mtrlPath);
+                // Readonly tx if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
             }
-            else
-            {
-                mtrlOffset = await index.GetDataOffset(mtrlPath);
-            }
+            mtrlOffset = await tx.Get8xDataOffset(mtrlPath);
 
             if(mtrlOffset == 0)
             {
@@ -1290,9 +1287,9 @@ namespace xivModdingFramework.Materials.FileTypes
         /// Only needed because of the rare exception case of skin materials.
         /// </summary>
         /// <param name="mdlPath"></param>
-        /// <param name="mtrlVariant">Which material variant folder.  Defaulted to 1.</param>
+        /// <param name="materialSet">Which material variant folder.  Defaulted to 1.</param>
         /// <returns></returns>
-        public string GetMtrlPath(string mdlPath, string mtrlName, int mtrlVariant = 1)
+        public string GetMtrlPath(string mdlPath, string mtrlName, int materialSet = 1)
         {
             var mtrlFolder = "";
 
@@ -1390,7 +1387,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 mdlFolder = mdlFolder.Replace("\\", "/");
 
                 var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
-                mtrlFolder = baseFolder + "/material/v" + mtrlVariant.ToString().PadLeft(4, '0');
+                mtrlFolder = baseFolder + "/material/v" + materialSet.ToString().PadLeft(4, '0');
             }
 
             return mtrlFolder + mtrlName;

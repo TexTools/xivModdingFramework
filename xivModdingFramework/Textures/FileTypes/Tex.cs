@@ -124,17 +124,15 @@ namespace xivModdingFramework.Textures.FileTypes
         }
         public async Task<XivTex> GetTexData(string path, ModTransaction tx = null)
         {
-            long offset = 0;
             var df = IOUtil.GetDataFileFromPath(path);
 
-            if (tx != null)
+            if(tx == null)
             {
-                offset = (await tx.GetIndexFile(df)).Get8xDataOffset(path);
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
             }
-            else
-            {
-                offset = await _index.GetDataOffset(path);
-            }
+
+            var offset = (await tx.GetIndexFile(df)).Get8xDataOffset(path);
 
             if (offset == 0)
             {

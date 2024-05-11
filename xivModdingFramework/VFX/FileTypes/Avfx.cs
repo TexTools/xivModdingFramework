@@ -19,6 +19,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.VFX.FileTypes
@@ -39,13 +40,13 @@ namespace xivModdingFramework.VFX.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the avfx file</param>
         /// <returns>A list of atex paths</returns>
-        public async Task<List<string>> GetATexPaths(long offset)
+        public async Task<List<string>> GetATexPaths(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
             var atexList = new List<string>();
 
             var dat = new Dat(_gameDirectory);
 
-            var avfxData = await dat.ReadSqPackType2(offset, _dataFile);
+            var avfxData = await dat.ReadSqPackType2(path, forceOriginal, tx);
 
             await Task.Run(() =>
             {

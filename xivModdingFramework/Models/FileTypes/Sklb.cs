@@ -35,6 +35,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -57,6 +58,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves the base racial or body skeleton for a given model file, parsing it from the base
         /// game files to generate it, if necessary.
+        /// 
+        /// NOTE: Not Transaction safe... If the base skeleton files were altered during Transaction.
+        /// Which seems niche enough to not worry about for now.
         /// </summary>
         /// <param name="fullMdlPath"></param>
         /// <returns></returns>
@@ -72,7 +76,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             return await GetBaseSkeletonFile(root.Info, race);
         }
-        public static async Task<string> GetBaseSkeletonFile(XivDependencyRootInfo root, XivRace race) 
+        public static async Task<string> GetBaseSkeletonFile(XivDependencyRootInfo root, XivRace race, ModTransaction tx = null) 
         {
             var file = await GetBaseSkelbPath(root, race);
 
@@ -85,7 +89,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 return parsedFile;
             }
-            await ExtractAndParseSkel(file);
+            await ExtractAndParseSkel(file, tx);
             return parsedFile;
 
         }
@@ -93,6 +97,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves the Ex skeleton file for a given model file, parsing it from the base
         /// game files to generate it, if necessary.
+        /// 
+        /// NOTE: NOT Transaction safe... If the base EST skeletons were modified during transaction?
+        /// This is niche enough to leave for the moment and come back to if it proves an issue.
         /// </summary>
         /// <param name="fullMdlPath"></param>
         /// <returns></returns>
@@ -111,7 +118,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
-        public static async Task<string> GetExtraSkeletonFile(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
+        public static async Task<string> GetExtraSkeletonFile(XivDependencyRootInfo root, XivRace race = XivRace.All_Races, ModTransaction tx = null)
         {
             if(root.SecondaryType == XivItemType.ear)
             {
@@ -146,7 +153,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // In some cases, the extra skeleton doesn't actually exist, despite the 
                 // game files saying it should.  In these cases, SE actually intends to 
                 // default to the base skel.
-                await ExtractAndParseSkel(file);
+                await ExtractAndParseSkel(file, tx);
             }
             catch
             {
@@ -162,7 +169,7 @@ namespace xivModdingFramework.Models.FileTypes
             return input.Any(c => c > MaxAnsiCode);
         }
 
-        private static async Task ExtractAndParseSkel(string file)
+        private static async Task ExtractAndParseSkel(string file, ModTransaction tx = null)
         {
 
             var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
@@ -172,7 +179,7 @@ namespace xivModdingFramework.Models.FileTypes
             // Create skel folder if needed.
             Directory.CreateDirectory(Path.Combine(cwd, SkeletonsFolder));
 
-            var rawFile = await ExtractSkelb(file);
+            var rawFile = await ExtractSkelb(file, tx);
 
             var xmlFile = await ConvertSkelToXml(rawFile);
 
@@ -374,13 +381,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="fullMdlPath">Full path to the MDL.</param>
         /// <param name="internalSkelName">Internal skeleton name (for hair).  This can be resolved if missing, though it is slightly expensive to do so.</param>
-        private static async Task<string> ExtractSkelb(string skelBPath)
+        private static async Task<string> ExtractSkelb(string skelBPath, ModTransaction tx = null)
         {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+
             var index = new Index(XivCache.GameInfo.GameDirectory);
             var dat = new Dat(XivCache.GameInfo.GameDirectory);
             var dataFile = IOUtil.GetDataFileFromPath(skelBPath);
 
-            var offset = await index.GetDataOffset(skelBPath);
+            var offset = await tx.GetDataOffset(skelBPath);
 
             if (offset == 0)
             {

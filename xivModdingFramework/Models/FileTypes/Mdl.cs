@@ -232,7 +232,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
         /// <returns></returns>
-        public async Task ExportModel(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true)
+        public async Task ExportModel(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, ModTransaction tx = null)
         {
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
@@ -284,7 +284,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
-                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant);
+                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant, XivRace.All_Races, tx);
             }
 
 
@@ -354,8 +354,13 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
         /// </summary>
-        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races)
+        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races, ModTransaction tx = null)
         {
+            if(tx == null)
+            {
+                // Readonly tx if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
+            }
             var modelName = Path.GetFileNameWithoutExtension(model.Source);
             var directory = Path.GetDirectoryName(outputFilePath);
 
@@ -404,9 +409,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
                     var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
-                    var mtrlOffset = await _index.GetDataOffset(mtrlPath);
-                    var mtrl = await _mtrl.GetMtrlData(mtrlOffset, mtrlPath);
-                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl);
+                    var mtrl = await _mtrl.GetMtrlData(mtrlPath, -1, tx);
+                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl, null, -1, tx);
 
                     // Outgoing file names.
                     var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
@@ -510,35 +514,22 @@ namespace xivModdingFramework.Models.FileTypes
             long offset = 0;
             var df = IOUtil.GetDataFileFromPath(mdlPath);
 
-            if(tx != null)
+            if(tx == null)
             {
-                var index = await tx.GetIndexFile(df);
-                offset = index.Get8xDataOffset(mdlPath);
-
-                if(getOriginal)
-                {
-                    var modlist = await tx.GetModList();
-                    modlist.ModDictionary.TryGetValue(mdlPath, out var mod);
-                    if(mod != null)
-                    {
-                        offset = mod.data.originalOffset;
-                    }
-                }
+                // Readonly TX if we don't already have one.
+                tx = ModTransaction.BeginTransaction(true);
             }
-            else
-            {
-                var index = new Index(_gameDirectory);
-                offset = await index.GetDataOffset(mdlPath);
 
-                if (getOriginal)
+            var index = await tx.GetIndexFile(df);
+            offset = index.Get8xDataOffset(mdlPath);
+
+            if(getOriginal)
+            {
+                var modlist = await tx.GetModList();
+                modlist.ModDictionary.TryGetValue(mdlPath, out var mod);
+                if(mod != null)
                 {
-                    var modding = new Modding(_gameDirectory);
-                    var mod = await modding.TryGetModEntry(mdlPath);
-                    var modded = mod != null && mod.enabled;
-                    if (modded)
-                    {
-                        offset = mod.data.originalOffset;
-                    }
+                    offset = mod.data.originalOffset;
                 }
             }
             return await GetRawMdlData(offset, mdlPath);
@@ -2377,16 +2368,13 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             Mod mod = null;
-            if(tx != null)
+            if (tx == null)
             {
-                var modlist = await tx.GetModList();
-                modlist.ModDictionary.TryGetValue(internalPath, out mod);
-            } else
-            {
-                var modding = new Modding(_gameDirectory);
-                var dat = new Dat(_gameDirectory);
-                mod = await modding.TryGetModEntry(internalPath);
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
             }
+            var modlist = await tx.GetModList();
+            modlist.ModDictionary.TryGetValue(internalPath, out mod);
 
             // Resolve the current (and possibly modded) Mdl.
             XivMdl currentMdl = null;
@@ -4421,6 +4409,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Loads the deformation files for attempting racial deformation
         /// Currently in debugging phase.
+        /// 
+        /// NOTE: NOT Transaction safe... If the skeleton files were altered during transaction.
+        /// Which seems rare enough to not follow up on this at the moment.
         /// </summary>
         /// <param name="race"></param>
         /// <param name="deformations"></param>
@@ -5351,7 +5342,12 @@ namespace xivModdingFramework.Models.FileTypes
                     var mdlPath = "";
                     // Housing assets use a different function to scrub the .sgd files for
                     // their direct absolute model references.
-                    var assetDict = await housing.GetFurnitureModelParts(itemModel);
+
+                    // HACKHACK: We don't actually allow editing .SGD files natively in TexTools, and I'm not sure anyone, anywhere, has even bothered trying.
+                    // So just rip a readonly TX here to pass down, because this function really shouldn't need a transaction argument to resolve.
+
+                    var tx = ModTransaction.BeginTransaction(true);
+                    var assetDict = await housing.GetFurnitureModelParts(itemModel, tx);
 
                     if (submeshId == null || submeshId == "base")
                     {

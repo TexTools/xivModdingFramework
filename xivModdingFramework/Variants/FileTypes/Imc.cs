@@ -243,19 +243,14 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <returns></returns>
         internal async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var dat = new Dat(_gameDirectory);
-            var index = new Index(_gameDirectory);
-
-            bool exists = false;
-            if (tx != null)
+            if(tx == null)
             {
-                var indexFile = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(path));
-                exists = indexFile.FileExists(path);
-            } else
-            {
-                exists = await index.FileExists(path);
-
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction(true);
             }
+
+            var exists = await tx.FileExists(path);
+
             FullImcInfo info;
             if(exists)
             {
