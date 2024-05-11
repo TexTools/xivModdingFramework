@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
@@ -22,6 +20,11 @@ namespace xivModdingFramework.Mods
         #region Properties and Accessors
 
         private Dictionary<XivDataFile, IndexFile> _IndexFiles = new Dictionary<XivDataFile, IndexFile>();
+        private Dictionary<XivDataFile, uint> _NextDataOffset = new Dictionary<XivDataFile, uint>();
+
+        // Collection of files that have been modified in the indexes, with their new data offset8x.
+        // Used to remap temporary files on commit.
+        private Dictionary<string, long> _TemporaryOffsetMapping = new Dictionary<string, long>();
 
         // Modified times the first time we access the index files.
         private Dictionary<XivDataFile, DateTime> _Index1ModifiedTimes = new Dictionary<XivDataFile, DateTime>();
@@ -33,27 +36,29 @@ namespace xivModdingFramework.Mods
         private DateTime _ModListModifiedTime;
 
         private ModList _ModList;
-        public ModPack ModPack { get; set; }
         private readonly bool _ReadOnly = false;
         private bool _Finished = false;
+
         private TransactionDataHandler _DataHandler;
 
         private SqPack.FileTypes.Index __Index;
         private Modding __Modding;
         private DirectoryInfo _GameDirectory;
 
-        private static ModTransaction _OpenTransaction = null;
-        internal ModTransaction ActiveTransaction
+
+        private bool _Disposed;
+        public ModPack ModPack { get; set; }
+
+
+        private static bool _WorkerStatus = false;
+        private static ModTransaction _ActiveTransaction = null;
+        internal static ModTransaction ActiveTransaction
         {
             get
             {
-                return _OpenTransaction;
+                return _ActiveTransaction;
             }
         }
-
-        private static bool _WorkerStatus = false;
-        private bool _Disposed;
-
         public List<XivDataFile> ActiveDataFiles
         {
             get
@@ -62,13 +67,6 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        public static bool OpenTransaction
-        {
-            get
-            {
-                return _OpenTransaction != null;
-            }
-        }
 
         public async Task<IndexFile> GetIndexFile(XivDataFile dataFile)
         {
@@ -184,9 +182,9 @@ namespace xivModdingFramework.Mods
                 return readonlyTx;
             }
 
-            if (OpenTransaction)
+            if (_ActiveTransaction != null)
             {
-                throw new Exception("Cannot have two open mod transactions simultaneously.");
+                throw new Exception("Cannot have two write-enabled mod transactions open simultaneously.");
             }
 
             // Disable the cache worker during transactions.
@@ -194,7 +192,7 @@ namespace xivModdingFramework.Mods
             XivCache.CacheWorkerEnabled = false;
 
             var tx = new ModTransaction(readOnly, modpack);
-            _OpenTransaction = tx;
+            _ActiveTransaction = tx;
             return tx;
         }
 
@@ -205,7 +203,12 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task CommitTransaction(ModTransaction tx)
         {
-            if (tx != _OpenTransaction)
+            if (tx._ReadOnly)
+            {
+                throw new Exception("Attempted to commit a Read Only Transaction.");
+            }
+
+            if (tx != _ActiveTransaction)
             {
                 throw new Exception("Attempted to commit transaction other than the current open mod transation.");
             }
@@ -216,9 +219,9 @@ namespace xivModdingFramework.Mods
             }
             finally
             {
-                _OpenTransaction = null;
+                _ActiveTransaction = null;
                 tx._Finished = true;
-                XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
+                XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
         private async Task CommitTransaction()
@@ -262,7 +265,7 @@ namespace xivModdingFramework.Mods
                 return;
             }
 
-            if (tx != _OpenTransaction)
+            if (tx != _ActiveTransaction)
             {
                 throw new Exception("Attempted to cancel transaction other than the current open mod transation.");
             }
@@ -273,7 +276,7 @@ namespace xivModdingFramework.Mods
             }
             finally
             {
-                _OpenTransaction = null;
+                _ActiveTransaction = null;
                 tx._Finished = true;
                 XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
             }
@@ -354,7 +357,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<uint> GetRawOffset(string path)
+        public async Task<uint> GetRawDataOffset(string path)
         {
             var df = IOUtil.GetDataFileFromPath(path);
             var idx = await GetIndexFile(df);
@@ -404,6 +407,24 @@ namespace xivModdingFramework.Mods
         #region Raw Data I/O
 
         /// <summary>
+        /// Internal listener function for updates to our constintuent index files.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="originalOffset"></param>
+        /// <param name="updatedOffset"></param>
+        internal void INTERNAL_OnIndexUpdate(XivDataFile dataFile, string path, long originalOffset, long updatedOffset)
+        {
+            if (!_TemporaryOffsetMapping.ContainsKey(path))
+            {
+                _TemporaryOffsetMapping.Add(path, updatedOffset);
+            }
+            else
+            {
+                _TemporaryOffsetMapping[path] = updatedOffset;
+            }
+        }
+
+        /// <summary>
         /// Retrieves the data for a given data file/offset key.
         /// </summary>
         /// <param name="dataFile"></param>
@@ -420,6 +441,33 @@ namespace xivModdingFramework.Mods
             }
         }
 
+
+        /// <summary>
+        /// Writes the given data to the default transaction data store for the data file, returning the next available placeholder offset.
+        /// Returns the 8x Dat-embeded placeholder transactionary offset.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public async Task<long> WriteData(XivDataFile dataFile, byte[] data, bool compressed = false)
+        {
+            if (!_NextDataOffset.ContainsKey(dataFile))
+            {
+                // Start at Max value (without synonym flag) and go down.
+                _NextDataOffset.Add(dataFile, uint.MaxValue - 1);
+            }
+
+            var offset = _NextDataOffset[dataFile];
+
+            // Decrement by 16, which is really just 1 less in the actual offset field.
+            _NextDataOffset[dataFile] = _NextDataOffset[dataFile] - 16;
+
+            long longOffset = offset * 8L;
+
+            await WriteData(dataFile, longOffset, data, compressed);
+
+            return longOffset;
+        }
+
         /// <summary>
         /// Writes the given data to the default transaction data store, keyed to the given data file/offset key.
         /// </summary>
@@ -427,7 +475,7 @@ namespace xivModdingFramework.Mods
         /// <param name="offset8x"></param>
         /// <param name="compressed"></param>
         /// <returns></returns>
-        public async Task WriteData(XivDataFile dataFile, long offset8x, byte[] data, bool compressed = false)
+        internal async Task WriteData(XivDataFile dataFile, long offset8x, byte[] data, bool compressed = false)
         {
             await _DataHandler.WriteFile(dataFile, offset8x, data, compressed);
         }
