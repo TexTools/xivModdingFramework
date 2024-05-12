@@ -209,6 +209,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 return color;
             }
 
+#if DAWNTRAIL
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             (int, float) readColorIndex(int i)
             {
@@ -218,10 +219,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 float blendAmount = 1.0f - blendByte / 255.0f;
                 return (rowNumber, blendAmount);
             }
-
+#else
             // This was how color sets were selected pre-Dawntrail
             // As of the Dawntrail benchmark, this method of color mapping appears to no longer be used
-            /*
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             (int, float) readColorIndex(int i)
             {
@@ -230,16 +230,18 @@ namespace xivModdingFramework.Models.ModelTextures
                 float blendAmount = (colorsetByte % 17) / 17.0f;
                 return (rowNumber, blendAmount);
             }
-            */
+#endif
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
             var shaderFn = GetShaderMapper(GetCustomColors(), mtrl);
             var colorSetFn = GetColorSetMapper(texMapData.ColorSet, mtrl, highlightedRow);
             bool invertNormalGreen = colors.InvertNormalGreen;
 
+#if DAWNTRAIL
             // No id map, just disable color sets
             if (indexPixels == null)
                 colorSetFn = null;
+#endif
 
             await Task.Run(() =>
             {
