@@ -48,6 +48,12 @@ namespace xivModdingFramework.Helpers
         /// <returns>True if there is a problem, False otherwise</returns>
         public Task<bool> CheckIndexDatCounts(XivDataFile dataFile)
         {
+            if (ModTransaction.ActiveTransaction != null)
+            {
+                // Safety check here to prevent any misuse or weird bugs from assuming this would be based on post-transaction state.
+                throw new Exception("Cannot sanely perform DAT file checks with an open write-enabled transaction.");
+            }
+
             return Task.Run(() =>
             {
                 var indexDatCounts = _index.GetIndexDatCount(dataFile);
@@ -73,6 +79,13 @@ namespace xivModdingFramework.Helpers
         /// <returns>A list of dats which are empty if any</returns>
         public Task<List<int>> CheckForEmptyDatFiles(XivDataFile dataFile)
         {
+            if (ModTransaction.ActiveTransaction != null)
+            {
+                // Safety check here to prevent any misuse or weird bugs from assuming this would be based on post-transaction state.
+                throw new Exception("Cannot sanely perform DAT file checks with an open write-enabled transaction.");
+            }
+
+
             return Task.Run(() =>
             {
                 var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
@@ -107,13 +120,15 @@ namespace xivModdingFramework.Helpers
         }
 
         /// <summary>
-        /// This function returns TRUE if the backups should be used, and FALSE if they should not.
+        /// This function returns TRUE if the backups pass validation.
         /// </summary>
         /// <param name="dataFile"></param>
         /// <param name="backupsDirectory"></param>
         /// <returns></returns>
-        public Task<bool> CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
+        public Task<bool> ValidateIndexBackup(XivDataFile dataFile, DirectoryInfo backupsDirectory)
         {
+
+            // TODO: This is very outdated and should be investigated/redone.
             return Task.Run(() =>
             {
                 var backupDataFile =
@@ -156,6 +171,11 @@ namespace xivModdingFramework.Helpers
 
         public Task PerformStartOver(DirectoryInfo backupsDirectory, IProgress<string> progress = null, XivLanguage language = XivLanguage.None)
         {
+            if (!Dat.AllowDatAlteration)
+            {
+                throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+            }
+
             var workerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
             try
@@ -244,20 +264,35 @@ namespace xivModdingFramework.Helpers
                 var index = new Index(_gameDirectory);
                 var modding = new Modding(_gameDirectory);
 
-                if (index.IsIndexLocked(XivDataFile._0A_Exd))
-                {
-                    throw new Exception("Index files are in use by another process.");
-                }
+                // Readonly tx to get live game state.
+                var tx = ModTransaction.BeginTransaction();
 
-                try
+                var ml = await tx.GetModList();
+
+                var anyEnabled = ml.Mods.Any(x => x.enabled);
+                if (anyEnabled)
                 {
-                    // Toggle off all mods
-                    await modding.ToggleAllMods(false);
-                }
-                catch
-                {
-                    throw new Exception("Failed to disable mods.\n\n" +
-                        "Please check For problems by selecting Help -> Check For Problems");
+                    if (!Dat.AllowDatAlteration)
+                    {
+                        // Live game state isn't clean and we have a transaction open or other disable lock.
+                        throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+                    }
+
+                    if (index.IsIndexLocked(XivDataFile._0A_Exd))
+                    {
+                        throw new Exception("Index files are in use by another process.");
+                    }
+
+                    try
+                    {
+                        // Toggle off all mods
+                        await modding.ToggleAllMods(false);
+                    }
+                    catch
+                    {
+                        throw new Exception("Failed to disable mods.\n\n" +
+                            "Please check For problems by selecting Help -> Check For Problems");
+                    }
                 }
 
 
@@ -281,6 +316,11 @@ namespace xivModdingFramework.Helpers
 
         public Task<bool> RestoreBackups(DirectoryInfo backupsDirectory)
         {
+            if (!Dat.AllowDatAlteration)
+            {
+                throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+            }
+
             return Task.Run(async () =>
             {
                 var backupFiles = Directory.GetFiles(backupsDirectory.FullName);
@@ -295,7 +335,7 @@ namespace xivModdingFramework.Helpers
 
                     try
                     {
-                        var outdatedCheck = await CheckForOutdatedBackups(xivDataFile, backupsDirectory);
+                        var outdatedCheck = await ValidateIndexBackup(xivDataFile, backupsDirectory);
 
                         if (!outdatedCheck)
                         {

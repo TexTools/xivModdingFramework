@@ -468,7 +468,16 @@ namespace xivModdingFramework.Cache
             // Tex file fix migration
             // This technically has nothing to do with the cache version,
             // but I think this is one of the only places that this can go
+
+
+            // This can be safely removed once Dawntrail lands, if not before.
             if (lastCacheVersion < new Version(1, 0, 2, 2)) {
+
+                if(!Dat.AllowDatAlteration)
+                {
+                    throw new Exception("Cannot perform Cache Migration/Texture-Fix when DAT writing is disabled.");
+                }
+
 	            var m = new Modding(_gameInfo.GameDirectory);
 	            var modList = await m.GetModList();
 	            foreach (var mod in modList.Mods) {

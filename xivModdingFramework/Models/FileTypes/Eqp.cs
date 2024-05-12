@@ -721,6 +721,9 @@ namespace xivModdingFramework.Models.FileTypes
                         accessories[race].Add(e);
                     } else
                     {
+                        // Invalid race or race we don't know how to parse yet.  (Ex. Files from the future with additional races)
+                        if (race == XivRace.All_Races) continue;
+
                         if (!equipment.ContainsKey(race))
                         {
                             equipment.Add(race, new List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>());

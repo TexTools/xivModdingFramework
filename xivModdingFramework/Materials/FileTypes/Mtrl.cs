@@ -1653,10 +1653,17 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <summary>
         /// Retrieves simplified material info for ALL Materials in the entire game.
         /// Used to collect data to store into SQLite DB or JSON.
+        /// 
+        /// Not Transaction Safe
         /// </summary>
         /// <returns></returns>
         public async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
         {
+            if(ModTransaction.ActiveTransaction != null)
+            {
+                throw new Exception("Cannot perform material/shader scan with an open write-enabled transaction.");
+            }
+
             var materials = new List<SimplifiedMtrlInfo>();
             foreach (XivDataFile dat in Enum.GetValues(typeof(XivDataFile)))
             {
@@ -1668,8 +1675,19 @@ namespace xivModdingFramework.Materials.FileTypes
             return materials;
         }
 
+        /// <summary>
+        /// Scans the entire collection of DATs for a given data file for material files, pulling their info for the shader scan.
+        /// Not transaction safe - Should only be used in the Shader Scan pipeline.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="useIndex2"></param>
+        /// <returns></returns>
         public async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(XivDataFile dataFile, bool useIndex2 = false)
         {
+            if (ModTransaction.ActiveTransaction != null)
+            {
+                throw new Exception("Cannot perform material/shader scan with an open write-enabled transaction.");
+            }
             const int _ThreadCount = 32;
             const uint _DatCount = 8;
 
@@ -1782,8 +1800,23 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
+        /// <summary>
+        /// Scans the given index entry file list to see which ones are materials and return their data where applicable.
+        /// Not Transaction safe - Should only be used in the Shader Scan pipeline.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="files"></param>
+        /// <param name="datData"></param>
+        /// <param name="index1Dict"></param>
+        /// <param name="index2Dict"></param>
+        /// <returns></returns>
         private async Task<List<SimplifiedMtrlInfo>> GetMaterials(XivDataFile dataFile, List<IndexEntry> files, byte[] datData, Dictionary<uint, (uint FolderHash, uint FileHash)> index1Dict, Dictionary<uint, uint> index2Dict)
         {
+            if (ModTransaction.ActiveTransaction != null)
+            {
+                throw new Exception("Cannot perform material/shader scan with an open write-enabled transaction.");
+            }
+
             var materials = new List<SimplifiedMtrlInfo>();
             var _Dat = new Dat(XivCache.GameInfo.GameDirectory);
             var count = 0;
