@@ -678,6 +678,11 @@ namespace xivModdingFramework.Items.Categories
                     Name = (string)onlineStatus.GetColumnByName("Name"),
                 };
 
+                if (string.IsNullOrWhiteSpace(xivUi.Name))
+                {
+                    xivUi.Name = "Unknown Online Status #" + xivUi.IconNumber.ToString();
+                }
+
                 lock (onlineStatusLock)
                 {
                     onlineStatusList.Add(xivUi);
@@ -711,6 +716,12 @@ namespace xivModdingFramework.Items.Categories
                     IconNumber = (int)weather.GetColumnByName("Icon"),
                     Name = (string)weather.GetColumnByName("Name"),
                 };
+
+                if (string.IsNullOrWhiteSpace(xivUi.Name))
+                {
+                    xivUi.Name = "Unknown Weather #" + xivUi.IconNumber.ToString();
+                }
+
 
                 lock (weatherLock)
                 {

@@ -82,7 +82,7 @@ namespace xivModdingFramework.Materials.FileTypes
         {
 
             var imc = new Imc(_gameDirectory);
-            var materialSet = 1;
+            var materialSet = 0;
             try
             {
                 var imcEntry = await imc.GetImcInfo(item);
@@ -90,7 +90,11 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             catch
             {
-                var root = XivDependencyGraph.ExtractRootInfoFilenameOnly(mtrlFileOrPath);
+                var root = XivDependencyGraph.ExtractRootInfo(mtrlFileOrPath);
+                if (!root.IsValid())
+                {
+                    root = XivDependencyGraph.ExtractRootInfoFilenameOnly(mtrlFileOrPath);
+                }
                 if (root.SecondaryType == XivItemType.hair || root.SecondaryType == XivItemType.tail || root.SecondaryType == XivItemType.body)
                 {
                     // These don't have IMC files, but still have material sets somehow, but are defaulted to 1.
@@ -113,7 +117,11 @@ namespace xivModdingFramework.Materials.FileTypes
         public async Task<XivMtrl> GetXivMtrl(string mtrlFileOrPath, int materialSet, bool forceOriginal = false, ModTransaction tx = null)
         {
             // Get the root from the material file in specific.
-            var root = XivDependencyGraph.ExtractRootInfoFilenameOnly(mtrlFileOrPath);
+            var root = XivDependencyGraph.ExtractRootInfo(mtrlFileOrPath);
+            if (!root.IsValid())
+            {
+                root = XivDependencyGraph.ExtractRootInfoFilenameOnly(mtrlFileOrPath);
+            }
             var mtrlFile = Path.GetFileName(mtrlFileOrPath);
 
             // Reconstitute the full path with the new material set.

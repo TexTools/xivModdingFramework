@@ -299,6 +299,8 @@ namespace xivModdingFramework.Models.ModelTextures
             // Use the function that returns proper sane reuslts.
             var ttps = mtrl.GetTextureTypePathList();
 
+            ttps.RemoveAll(x => x.Path.StartsWith("bgcommon/texture/dummy_"));
+
             // Decode compressed textures
             foreach (var ttp in ttps)
             {

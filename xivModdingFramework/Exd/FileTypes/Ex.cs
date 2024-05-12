@@ -461,7 +461,7 @@ namespace xivModdingFramework.Exd.FileTypes
             /// <exception cref="InvalidDataException"></exception>
             public void CheckColumn(int column, ExcelColumnDataType expectedType, string name = "Unknown")
             {
-                if(Columns.Count >= column)
+                if(column >= Columns.Count)
                 {
                     throw new InvalidDataException(ExFile.ToString() + " Column " + column + " (" + name + ") is larger than the available column count.");
                 }
