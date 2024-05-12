@@ -170,7 +170,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivRace">The selected race for the given item</param>
         /// <param name="submeshId">The submesh ID - Only used for furniture items which contain multiple meshes, like the Ahriman Clock.</param>
         /// <returns>The path in string format.  Not a fucking tuple.</returns>
-        public async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null)
+        public async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null, ModTransaction tx = null)
         {
             string mdlFolder = "", mdlFile = "";
 
@@ -241,13 +241,6 @@ namespace xivModdingFramework.Models.FileTypes
                     // Language doesn't matter for this call.
                     var housing = new Housing(_gameDirectory, XivLanguage.None);
                     var mdlPath = "";
-                    // Housing assets use a different function to scrub the .sgd files for
-                    // their direct absolute model references.
-
-                    // HACKHACK: We don't actually allow editing .SGD files natively in TexTools, and I'm not sure anyone, anywhere, has even bothered trying.
-                    // So just rip a readonly TX here to pass down, because this function really shouldn't need a transaction argument to resolve.
-
-                    var tx = ModTransaction.BeginTransaction(true);
                     var assetDict = await housing.GetFurnitureModelParts(itemModel, tx);
 
                     if (submeshId == null || submeshId == "base")
@@ -280,7 +273,7 @@ namespace xivModdingFramework.Models.FileTypes
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var modding = new Modding(_gameDirectory);
-            var mdlPath = await GetMdlPath(item, race, submeshId);
+            var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
             return ttModel;
@@ -1935,7 +1928,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
         {
-            var mdlPath = await GetMdlPath(item, race, submeshId);
+            var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mtrlVariant = 1;
             try
             {
@@ -2361,7 +2354,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task<byte[]> ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false)
+        public async Task<byte[]> ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false, ModTransaction tx = null)
         {
 
             #region Setup and Validation
@@ -2397,17 +2390,16 @@ namespace xivModdingFramework.Models.FileTypes
 
             var modding = new Modding(_gameDirectory);
             var dat = new Dat(_gameDirectory);
-            var mdlPath = await GetMdlPath(item, race);
+            var mdlPath = await GetMdlPath(item, race, submeshId, tx);
 
-            var bytes = await FileToModelBytes(path, mdlPath, options, loggingFunction, intermediaryFunction, submeshId);
+            var bytes = await FileToModelBytes(path, mdlPath, options, loggingFunction, intermediaryFunction, tx);
             var compressed = await CompressMdlFile(bytes);
 
-            var modEntry = await modding.TryGetModEntry(mdlPath);
             byte[] ret = null;
             if (!rawDataOnly)
             {
                 loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                await dat.WriteModFile(compressed, mdlPath, source, item);
+                await dat.WriteModFile(compressed, mdlPath, source, item, tx);
             } else
             {
                 ret = compressed;
@@ -2431,7 +2423,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="InvalidDataException"></exception>
-        public async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string submeshId = null, ModTransaction tx = null)
+        public async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, ModTransaction tx = null)
         {
 
             if (options == null)

@@ -14,6 +14,23 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Mods
 {
+    public enum ETransactionTarget
+    {
+        Invalid,
+
+        // Write the modified files to the game .DATs on transaction commit.
+        GameDats,
+
+        // Write the modified files to the given folder on transaction commit, in Penumbra-style folder chains.
+        PenumbraFolder,
+
+        // Write the modified files to a TTMP at the given destination on transaction commit.
+        TTMP,
+
+        // Write the modified files to PMP file at the given destination on transaction commit.
+        PMP
+    }
+
     public class ModTransaction : IDisposable
     {
 
@@ -45,6 +62,20 @@ namespace xivModdingFramework.Mods
         private Modding __Modding;
         private DirectoryInfo _GameDirectory;
 
+        public ETransactionTarget Target { get; private set; }
+        public string TargetPath { get; private set; }
+
+        public bool AffectsGameFiles
+        {
+            get
+            {
+                if(Target == ETransactionTarget.GameDats && TargetPath == XivCache.GameInfo.GameDirectory.FullName)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
 
         private bool _Disposed;
         public ModPack ModPack { get; set; }
@@ -122,12 +153,13 @@ namespace xivModdingFramework.Mods
         {
             throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
         }
-        private ModTransaction(bool readOnly = false, ModPack modpack = null)
+        private ModTransaction(bool readOnly = false, ModPack modpack = null, ETransactionTarget target = ETransactionTarget.GameDats, string targetPath = null)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
             __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
             __Modding = new Modding(XivCache.GameInfo.GameDirectory);
+
 
             // NOTE: Readonly Transactions should not implement anything that requires disposal via IDisposable.
             // Readonly Tx are intended to be lightweight and used in non-disposable/standard memory managed contexts.
@@ -136,8 +168,29 @@ namespace xivModdingFramework.Mods
             {
                 // Readonly Data Handlers do not technically need to be disposed as they never create a data store.
                 _DataHandler = new TransactionDataHandler(EFileStorageType.ReadOnly);
+                Target = ETransactionTarget.Invalid;
+                TargetPath = null;
             } else
             {
+                Target = target;
+                TargetPath = targetPath;
+
+                if (target == ETransactionTarget.Invalid)
+                {
+                    throw new Exception("Invalid Transaction Target.");
+                }
+
+                if (target == ETransactionTarget.GameDats && targetPath == null)
+                {
+                    // If we weren't given an explicit game path to commit to, use the default game directory.
+                    TargetPath = XivCache.GameInfo.GameDirectory.FullName;
+                }
+
+                if (String.IsNullOrWhiteSpace(TargetPath))
+                {
+                    throw new Exception("A target path must be supplied for non-GameDat Transactions.");
+                }
+
                 _DataHandler = new TransactionDataHandler(EFileStorageType.UncompressedIndividual);
             }
         }
@@ -176,8 +229,9 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack modpack = null)
+        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack modpack = null, ETransactionTarget target = ETransactionTarget.GameDats, string targetPath = null)
         {
+
             if (readOnly)
             {
                 // Read-Only Transactions don't block anything else, and really just serve as
@@ -191,11 +245,19 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot have two write-enabled mod transactions open simultaneously.");
             }
 
+            if (!Dat.AllowDatAlteration)
+            {
+                // Right now this will never trigger since this is the same condition twice,
+                // But it's possible AllowDatAlteration may get expanded to be more comprehensive later,
+                // So check it here, too.
+                throw new Exception("Cannot open write transaction while DAT writing is disabled.");
+            }
+
             // Disable the cache worker during transactions.
             _WorkerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
-            var tx = new ModTransaction(readOnly, modpack);
+            var tx = new ModTransaction(readOnly, modpack, ETransactionTarget target = ETransactionTarget.GameDats, string targetPath = null);
             _ActiveTransaction = tx;
             return tx;
         }
@@ -350,7 +412,7 @@ namespace xivModdingFramework.Mods
         #endregion
 
 
-        #region Index File Shortcut Accessors
+        #region Shortcut Accessors
         /// <summary>
         /// Syntactic shortcut for retrieving the 8x Data offset from the index files.
         /// </summary>
@@ -389,6 +451,7 @@ namespace xivModdingFramework.Mods
         {
             return (uint) (await Get8xDataOffset(path, forceOriginal) / 8);
         }
+
         /// <summary>
         /// Syntactic shortcut for validating a file exists.
         /// </summary>
@@ -400,6 +463,7 @@ namespace xivModdingFramework.Mods
             var idx = await GetIndexFile(df);
             return idx.FileExists(path);
         }
+
         /// <summary>
         /// Syntactic shortcut for updating a given index's offset.
         /// Takes and returns the 8x dat-embedded index offset.
@@ -426,6 +490,18 @@ namespace xivModdingFramework.Mods
             var df = IOUtil.GetDataFileFromPath(path);
             var idx = await GetIndexFile(df);
             return idx.SetDataOffset(path, sqOffset);
+        }
+
+        /// <summary>
+        /// Syntactic shortcut for retrieving a mod (if it exists) at a given path.
+        /// Returns null if the mod does not exist.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<Mod> GetMod(string path)
+        {
+            var ml = await GetModList();
+            return ml.GetMod(path);
         }
         #endregion
 

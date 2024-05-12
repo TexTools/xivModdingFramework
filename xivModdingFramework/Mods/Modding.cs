@@ -172,10 +172,12 @@ namespace xivModdingFramework.Mods
 
         /// <summary>
         /// Tries to get the mod entry for the given internal file path, return null otherwise
+        /// NOT transaction safe.  Should be eventually removed.  Only currently used by the
+        /// TexTools UI Project in a handful of places.
         /// </summary>
         /// <param name="internalFilePath">The internal file path to find</param>
         /// <returns>The mod entry if found, null otherwise</returns>
-        public async Task<Mod> TryGetModEntry(string internalFilePath)
+        public async Task<Mod> LEGACY_TryGetModEntry(string internalFilePath)
         {
             try
             {
@@ -1020,6 +1022,10 @@ namespace xivModdingFramework.Mods
             if (XivCache.GameInfo.UseLumina)
             {
                 throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+            }
+            if (!Dat.AllowDatAlteration)
+            {
+                throw new Exception("Cannot defragment DATs while DAT writing is disabled.");
             }
 
             var modlist = await GetModList();

@@ -18,10 +18,89 @@ using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.Mods
 {
+
+    /// <summary>
+    /// Static class that handles importing arbitrary files, and dynamically calling the appropriate functions, 
+    /// to convert those files into the FFXIV format files, and/or SQPack them as needed, before ultimately
+    /// writing them to a transaction.
+    /// </summary>
     public static class SmartImport
     {
+
         /// <summary>
-        /// Handles importing an arbitrary external file into the game.
+        /// Imports an arbitrary subset of files to the given transaction target.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <param name="target"></param>
+        /// <param name="targetPath"></param>
+        /// <param name="modpackName"></param>
+        /// <param name="modpackAuthor"></param>
+        /// <returns></returns>
+        public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, ETransactionTarget target, string targetPath, string sourceApplication = "Unknown", string modpackName = "Uknown Batch Import", string modpackAuthor = "Unknown")
+        {
+            var modPack = new ModPack()
+            {
+                name = modpackName,
+                author = modpackAuthor,
+                version = "1.0"
+            };
+            var tx = ModTransaction.BeginTransaction(false, modPack, target, targetPath);
+            try
+            {
+                await ImportBatch(files, sourceApplication, tx);
+                await ModTransaction.CommitTransaction(tx);
+            }
+            catch
+            {
+                ModTransaction.CancelTransaction(tx);
+            }
+        }
+
+        /// <summary>
+        /// Imports an arbitrary subset of files to the given transaction, or to the base game files, if no transaction is provided.
+        /// </summary>
+        /// <param name=""></param>
+        /// <param name=""></param>
+        /// <param name="sourceApplication"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, string sourceApplication = "Unknown", ModTransaction tx = null)
+        {
+            var ownTx = false;
+            if(tx == null)
+            {
+                ownTx = true;
+                var modPack = new ModPack()
+                {
+                    name = "Unknown Batch Import",
+                    author = "Unknown",
+                    version = "1.0",
+                };
+                tx = ModTransaction.BeginTransaction(false, modPack);
+            }
+            try
+            {
+                foreach(var file in files)
+                {
+                    await Import(file.ExternalPath, file.InternalPath, sourceApplication, tx);
+                }
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+            }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Handles importing an arbitrary external file to the given transaction, or to the base game files, if no transaction is provided.
         /// NOTE: If a Cached index/modlist is provided, the resulting index/modlist changes will not be automatically saved,
         /// as it is assumed to be part of a batch write that will be handled later.
         /// </summary>

@@ -49,6 +49,22 @@ namespace xivModdingFramework.SqPack.FileTypes
         private const int _MODDED_DAT_MARK_OFFSET = 0x200;
         private const int _MODDED_DAT_MARK = 1337;
 
+        /// <summary>
+        /// Universal Boolean that should be checked before allowing any alteration to DAT files.
+        /// The only place this should be ignored is interanlly during the Transaction Commit phase.
+        /// </summary>
+        public static bool AllowDatAlteration
+        {
+            get
+            {
+                if(ModTransaction.ActiveTransaction != null)
+                {
+                    return false;
+                }
+                return true;
+            }
+        }
+
         public Dat(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
@@ -723,24 +739,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 tx = ModTransaction.BeginTransaction(true);
             }
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
-
-            long offset = 0;
-            if (forceOriginal)
-            {
-                var modList = await tx.GetModList();
-                modList.ModDictionary.TryGetValue(internalPath, out var modEntry);
-
-                // If the file exists in the modlist, get the data from the original data
-                if (modEntry != null)
-                {
-                    offset = modEntry.data.originalOffset;
-                }
-            }
-
-            if (offset == 0)
-            {
-                offset = await tx.Get8xDataOffset(internalPath);
-            }
+            var offset = await tx.Get8xDataOffset(internalPath, forceOriginal);
 
             if (offset == 0)
             {
@@ -1231,8 +1230,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// WARNING: DOES NOT USE/RESPECT TRANSACTIONS
-        /// This is a very specific fixer-function designed to handle a very specific error caused by old TexTools builds that would
-        /// generate invalid file sizes.
+        /// This is a very specific fixer-function designed to handle a very specific error caused by very old TexTools builds that would
+        /// generate invalid compressed file sizes for texture files.
+        /// It is only run via the Problem checker.
         /// </summary>
         /// <param name="df"></param>
         /// <param name="offsetWithDatNumber"></param>
@@ -1240,18 +1240,18 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public async Task UpdateType4UncompressedSize(XivDataFile df, long offsetWithDatNumber, uint correctedFileSize)
         {
+            if(!AllowDatAlteration)
+            {
+                throw new Exception("Not allowed to alter DAT files when DAT Alteration is disabled.");
+            }
+
             // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
-
-            var offset = OffsetCorrection(offsetWithDatNumber);
-
-            var datPath = Dat.GetDatPath(df, datNum);
-
+            var part = Dat.Offset8xToParts(offsetWithDatNumber);
             await Task.Run(async () =>
             {
-                using (var br = new BinaryWriter(File.OpenWrite(datPath)))
+                using (var br = new BinaryWriter(File.OpenWrite(GetDatPath(df, part.DatNum))))
                 {
-                    br.BaseStream.Seek(offset + 8, SeekOrigin.Begin);
+                    br.BaseStream.Seek(part.Offset + 8, SeekOrigin.Begin);
                     br.Write(correctedFileSize);
                 }
             });
@@ -2349,9 +2349,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Writes a given block of data to the DAT files, updates the index to point to it for the given file path,
         /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
         ///
-        /// NOTE -- If the Index File and ModList are provided, the steps SAVING those entires are SKIPPED for performance.
-        /// It is assumed if they are provided, that the calling function will handle saving them once it is done manipulating them.
-        ///
+        /// NOTE -- If a Transaction is provided, the DATs are currently written to, but the Index/Modlist changes are stored 
+        /// in the transaction.
+        /// 
         /// LUMINA - If Lumina writing is enabled, the indexes/modlist/dats will NEVER be modified by this function, making it
         /// functionally a NoOp() as far as the internal TexTools system state is concerned.  This means if another function
         /// relies upon the DATs/Indexes/Modlist to be altered coming out of this function, the calling function needs to
@@ -2360,7 +2360,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
         /// <param name="sourceApplication"></param>
-        /// <param name="retainModpack"></param>
         /// <returns></returns>
         public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
         {
@@ -2380,6 +2379,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             var doDatSave = false;
             if (tx == null)
             {
+                if (!AllowDatAlteration)
+                {
+                    throw new Exception("Cannot Write non-transaction modded file while DAT Writing is disabled.");
+                }
+
                 doDatSave = true;
                 tx = ModTransaction.BeginTransaction();
             }
