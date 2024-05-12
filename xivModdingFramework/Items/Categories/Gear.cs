@@ -517,8 +517,10 @@ namespace xivModdingFramework.Items.Categories
             {"1404", XivRace.AuRa_Female_NPC},
             {"1501", XivRace.Hrothgar_Male},
             {"1504", XivRace.Hrothgar_Male_NPC},
+#if DAWNTRAIL
             {"1601", XivRace.Hrothgar_Female},
             {"1604", XivRace.Hrothgar_Female_NPC},
+#endif
             {"1701", XivRace.Viera_Male},
             {"1704", XivRace.Viera_Male_NPC},
             {"1801", XivRace.Viera_Female},

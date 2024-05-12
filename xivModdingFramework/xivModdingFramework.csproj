@@ -6,6 +6,7 @@
     <Version>1.6.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>9.0</LangVersion>
+    <Configurations>Debug;Release;Endwalker Debug;Endwalker Release</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,6 +39,22 @@
  <PropertyGroup>
     <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
     <FileVersion>1.5.0.0</FileVersion>
+ </PropertyGroup>
+
+ <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+   <DefineConstants>$(DefineConstants);DAWNTRAIL</DefineConstants>
+ </PropertyGroup>
+
+ <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Endwalker Debug|AnyCPU'">
+   <DefineConstants>$(DefineConstants);ENDWALKER</DefineConstants>
+ </PropertyGroup>
+
+ <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+   <DefineConstants>$(DefineConstants);DAWNTRAIL</DefineConstants>
+ </PropertyGroup>
+
+ <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Endwalker Release|AnyCPU'">
+   <DefineConstants>$(DefineConstants);ENDWALKER</DefineConstants>
  </PropertyGroup>
 
   <ItemGroup>
