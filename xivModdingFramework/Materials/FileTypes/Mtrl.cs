@@ -885,6 +885,9 @@ namespace xivModdingFramework.Materials.FileTypes
         #region Endwalker => Dawntrail Material Conversion
         public async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress = null)
         {
+#if ENDWALKER
+            return;
+#endif
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             var total = paths.Count;
@@ -968,7 +971,10 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
         {
-            if(mtrl.ColorSetData.Count != 256)
+#if ENDWALKER
+            return (null, null);
+#endif
+            if (mtrl.ColorSetData.Count != 256)
             {
                 // Already updated or doesn't need updating.
                 return (null, null);

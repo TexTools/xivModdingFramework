@@ -2901,6 +2901,11 @@ namespace xivModdingFramework.Models.FileTypes
         public byte[] MakeMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
+
+#if ENDWALKER
+            mdlVersion = 5;
+#endif
+
             ttModel.MdlVersion = mdlVersion;
 
             byte _LoDCount = 1;

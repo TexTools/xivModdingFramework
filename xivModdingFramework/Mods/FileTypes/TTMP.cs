@@ -64,7 +64,11 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
+#if DAWNTRAIL
         internal const string _currentTTMPVersion = "2.0";
+#else
+        internal const string _currentTTMPVersion = "1.8";
+#endif
 
         internal const char _typeCodeSimple = 's';
         internal const char _typeCodeWizard = 'w';
@@ -926,6 +930,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public static async Task FixPreDawntrailImports(HashSet<string> filePaths, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
+#if ENDWALKER
+            return;
+#endif
+
             var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
             var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
 
