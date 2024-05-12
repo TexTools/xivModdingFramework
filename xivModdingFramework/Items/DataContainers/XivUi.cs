@@ -59,6 +59,9 @@ namespace xivModdingFramework.Items.DataContainers
         /// </remarks>
         public string TertiaryCategory { get; set; }
 
+
+        public string MapZoneCategory { get; set; }
+
         /// <summary>
         /// The data file the item belongs to
         /// </summary>
@@ -120,6 +123,10 @@ namespace xivModdingFramework.Items.DataContainers
 
         public override int GetHashCode()
         {
+            if(this.Name == null)
+            {
+                return 0;
+            }
             return this.Name.GetHashCode() ^ this.IconNumber.GetHashCode();
         }
 

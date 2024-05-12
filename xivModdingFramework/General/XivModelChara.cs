@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SixLabors.ImageSharp.Processing;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
+using static xivModdingFramework.Exd.FileTypes.Ex;
 
 namespace xivModdingFramework.General
 {
@@ -32,13 +34,13 @@ namespace xivModdingFramework.General
     public static class XivModelChara
     {
         /// <summary>
-        /// Gets the data dictionary for the modelchara ex
+        /// Shortcut accessor for reading the modelchara Ex Data
         /// </summary>
         /// <param name="gameDirectory"></param>
         /// <returns>Dictionary with modelchara data</returns>
-        public static async Task<Dictionary<int, Ex.ExdRow>> GetModelCharaData(DirectoryInfo gameDirectory)
+        public static async Task<Dictionary<int, Ex.ExdRow>> GetModelCharaData()
         {
-            var ex = new Ex(gameDirectory);
+            var ex = new Ex(XivCache.GameInfo.GameDirectory);
             var exData = await ex.ReadExData(XivEx.modelchara);
             return exData;
         }
@@ -49,84 +51,39 @@ namespace xivModdingFramework.General
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="index">The index of the data</param>
         /// <returns>The XivModelInfo data</returns>
-        public static async Task<XivModelInfo> GetModelInfo(DirectoryInfo gameDirectory, int index)
+        public static async Task<XivModelInfo> GetModelInfo(int index)
+        {
+            var ex = new Ex(XivCache.GameInfo.GameDirectory);
+            var modelCharaEx = await ex.ReadExData(XivEx.modelchara);
+            return GetModelInfo(modelCharaEx[index]);
+        }
+
+        /// <summary>
+        /// Gets the model info from the modelchara exd data
+        /// </summary>
+        /// <param name="row">The modelchara ex data</param>
+        /// <param name="index">The index of the data</param>
+        /// <returns>The XivModelInfo data</returns>
+        public static XivModelInfo GetModelInfo(ExdRow row)
         {
             var xivModelInfo = new XivMonsterModelInfo();
 
-            var ex = new Ex(gameDirectory);
-            var modelCharaEx = await ex.ReadExData(XivEx.modelchara);
+            var type = (byte)row.GetColumnByName("Type");
+            xivModelInfo.PrimaryID = (ushort) row.GetColumnByName("PrimaryId");
+            xivModelInfo.SecondaryID = (byte)row.GetColumnByName("SecondaryId");
+            xivModelInfo.ImcSubsetID = (byte)row.GetColumnByName("Variant");
 
-
-            var row = modelCharaEx[index];
-            xivModelInfo.PrimaryID = (ushort) row.GetColumn(1);
-
-            var modelType = (byte)row.GetColumn(0);
-            xivModelInfo.SecondaryID = (byte)row.GetColumn(2);
-            xivModelInfo.ImcSubsetID = (byte)row.GetColumn(3);
-            if (modelType == 2)
+            if (type == 2)
             {
                 xivModelInfo.ModelType = XivItemType.demihuman;
             }
-            else if (modelType == 3)
+            else if (type == 3)
             {
                 xivModelInfo.ModelType = XivItemType.monster;
             }
             else
             {
                 xivModelInfo.ModelType = XivItemType.unknown;
-            }
-
-            return xivModelInfo;
-        }
-
-        /// <summary>
-        /// Gets the model info from the modelchara exd data
-        /// </summary>
-        /// <param name="modelCharaEx">The modelchara ex data</param>
-        /// <param name="index">The index of the data</param>
-        /// <returns>The XivModelInfo data</returns>
-        public static XivModelInfo GetModelInfo(Dictionary<int, Ex.ExdRow> modelCharaEx, int index)
-        {
-            var xivModelInfo = new XivMonsterModelInfo();
-
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            int startOffset = 8;
-            int modelDataOffset = 12;
-            if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Chinese)
-            {
-                startOffset = 8;
-                modelDataOffset = 12;
-
-            } else if (XivCache.GameInfo.GameLanguage == Enums.XivLanguage.Korean)
-            { 
-                startOffset = 8;
-                modelDataOffset = 12;
-            }
-
-            // Big Endian Byte Order 
-            using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index].RawData)))
-            {
-                br.BaseStream.Seek(startOffset, SeekOrigin.Begin);
-                xivModelInfo.PrimaryID = br.ReadInt16();
-
-                br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
-                var modelType = br.ReadByte();
-                xivModelInfo.SecondaryID = br.ReadByte();
-                xivModelInfo.ImcSubsetID = br.ReadByte();
-
-                if (modelType == 2)
-                {
-                    xivModelInfo.ModelType = XivItemType.demihuman;
-                }
-                else if (modelType == 3)
-                {
-                    xivModelInfo.ModelType = XivItemType.monster;
-                }
-                else
-                {
-                    xivModelInfo.ModelType = XivItemType.unknown;
-                }
             }
 
             return xivModelInfo;

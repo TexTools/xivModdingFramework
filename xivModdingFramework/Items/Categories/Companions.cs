@@ -59,20 +59,6 @@ namespace xivModdingFramework.Items.Categories
             return await XivCache.GetCachedMinionsList(substring);
         }
 
-        private static Dictionary<string, int> MountDataLengthByPatch = new Dictionary<string, int>()
-        {
-            { "6.0", 76 },
-            { "6.1", 79 },
-        };
-
-        private static Dictionary<string, int> OrnamentDataLengthByPatch = new Dictionary<string, int>()
-        {
-            { "6.0", 28 },
-            { "6.1", 31 },
-        };
-
-
-
         /// <summary>
         /// Gets the list to be displayed in the Minion category
         /// </summary>
@@ -87,7 +73,7 @@ namespace xivModdingFramework.Items.Categories
             var minionList = new List<XivMinion>();
 
             var minionEx = await _ex.ReadExData(XivEx.companion);
-            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
+            var modelCharaEx = await XivModelChara.GetModelCharaData();
 
             // Loops through all available minions in the companion exd files
             // At present only one file exists (companion_0)
@@ -112,7 +98,7 @@ namespace xivModdingFramework.Items.Categories
                     SecondaryCategory = XivStrings.Minions,
                     IconId = icon,
                     Name = name,
-                    ModelInfo = XivModelChara.GetModelInfo(modelCharaEx, index)
+                    ModelInfo = XivModelChara.GetModelInfo(modelCharaEx[index])
                 };
 
                 lock (minionLock)
@@ -145,7 +131,7 @@ namespace xivModdingFramework.Items.Categories
             var mountList = new List<XivMount>();
 
             var mountEx = await _ex.ReadExData(XivEx.mount);
-            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
+            var modelCharaEx = await XivModelChara.GetModelCharaData();
 
             // Loops through all available mounts in the mount exd files
             // At present only one file exists (mount_0)
@@ -156,7 +142,7 @@ namespace xivModdingFramework.Items.Categories
 
                 if (index == 0) return;
 
-                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx, index);
+                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx[index]);
                 var icon = (ushort)row.GetColumnByName("Icon");
 
                 if (string.IsNullOrEmpty(name))
@@ -200,7 +186,7 @@ namespace xivModdingFramework.Items.Categories
             var ornamentList = new List<XivMount>();
 
             var ornamentEx = await _ex.ReadExData(XivEx.ornament);
-            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
+            var modelCharaEx = await XivModelChara.GetModelCharaData();
 
             // Loops through all available mounts in the mount exd files
             // At present only one file exists (mount_0)
@@ -212,7 +198,7 @@ namespace xivModdingFramework.Items.Categories
                 if (model == 0) return;
 
                 // This will get the model data using the index obtained for the current mount
-                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx, model);
+                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx[model]);
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
@@ -282,7 +268,7 @@ namespace xivModdingFramework.Items.Categories
                 {7105, XivStrings.Seraph}
             };
 
-            var modelCharaEx = await XivModelChara.GetModelCharaData(_gameDirectory);
+            var modelCharaEx = await XivModelChara.GetModelCharaData();
 
             // Loops through the list of indices containing Pet model data
             await Task.Run(() => Parallel.ForEach(petModelIndexList, (petIndex) =>
@@ -294,7 +280,7 @@ namespace xivModdingFramework.Items.Categories
                 };
 
                 // Gets the model info from modelchara for the given index
-                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx, petIndex);
+                var modelInfo = XivModelChara.GetModelInfo(modelCharaEx[petIndex]);
 
                 // Finds the name of the pet using the model ID and the above dictionary
                 if (petModelDictionary.ContainsKey(modelInfo.PrimaryID))

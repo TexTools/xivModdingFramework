@@ -36,6 +36,26 @@ namespace xivModdingFramework.Exd.FileTypes
                     return GetMountExpectations(language);
                 case XivEx.ornament:
                     return GetOrnamentExpectations(language);
+                case XivEx.modelchara:
+                    return GetModelCharaExpectations(language);
+                case XivEx.placename:
+                    return GetPlaceNameExpectations(language);
+                case XivEx.map:
+                    return GetMapExpectations(language);
+                case XivEx.action:
+                    return GetActionExpectations(language);
+                case XivEx.actioncategory:
+                    return GetActionCategoryExpectations(language);
+                case XivEx.status:
+                    return GetStatusExpectations(language);
+                case XivEx.mapsymbol:
+                    return GetMapSymbolExpectations(language);
+                case XivEx.onlinestatus:
+                    return GetOnlineStatusExpectations(language);
+                case XivEx.weather:
+                    return GetWeatherExpectations(language);
+                case XivEx.loadingimage:
+                    return GetLoadingImageExpectations(language);
                 default:
                     return columnExpectations;
             }
@@ -189,7 +209,208 @@ namespace xivModdingFramework.Exd.FileTypes
 
             return columnExpectations;
         }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetModelCharaExpectations(XivLanguage language = XivLanguage.English)
+        {
 
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Type", ( 0, ExcelColumnDataType.UInt8 ) },
+                { "PrimaryId", ( 1, ExcelColumnDataType.UInt16 ) },
+                { "SecondaryId", ( 2, ExcelColumnDataType.UInt8) },
+                { "Variant", ( 3, ExcelColumnDataType.UInt8) },
+            };
 
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetMapExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "MapId", ( 6, ExcelColumnDataType.String) },
+                { "RegionPlaceNameId", ( 10, ExcelColumnDataType.UInt16 ) },
+                { "PrimaryPlaceNameId", ( 11, ExcelColumnDataType.UInt16 ) },
+                { "SubPlaceNameId", ( 12, ExcelColumnDataType.UInt16 ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetPlaceNameExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Name", ( 0, ExcelColumnDataType.String ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetActionExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Name", ( 0, ExcelColumnDataType.String ) },
+                { "Icon", ( 2, ExcelColumnDataType.UInt16 ) },
+                { "ActionCategoryId", ( 3, ExcelColumnDataType.UInt8 ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetActionCategoryExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Name", ( 0, ExcelColumnDataType.String ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetStatusExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Name", ( 0, ExcelColumnDataType.String ) },
+                { "Icon", ( 2, ExcelColumnDataType.UInt32 ) },
+                { "Type", ( 6, ExcelColumnDataType.UInt8 ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetMapSymbolExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Icon", ( 0, ExcelColumnDataType.Int32 ) },
+                { "PlaceNameId", ( 1, ExcelColumnDataType.Int32 ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetOnlineStatusExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Icon", ( 4, ExcelColumnDataType.UInt32 ) },
+                { "Name", ( 6, ExcelColumnDataType.String ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetWeatherExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Icon", ( 0, ExcelColumnDataType.Int32 ) },
+                { "Name", ( 1, ExcelColumnDataType.String ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetLoadingImageExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "Name", ( 0, ExcelColumnDataType.String ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
     }
 }

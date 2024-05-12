@@ -35,6 +35,7 @@ CREATE TABLE "ui" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,
+	"mapzonecategory" TEXT,
 	"path" TEXT,
 	"icon_id" INTEGER NOT NULL,
 	"root"		TEXT,

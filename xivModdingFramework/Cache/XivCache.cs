@@ -32,7 +32,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.2.7");
+        public static readonly Version CacheVersion = new Version("1.0.2.8");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -528,8 +528,8 @@ namespace xivModdingFramework.Cache
                     foreach (var item in list)
                     {
                         var query = @"
-                            insert into ui ( name,  category,  subcategory,  path,  icon_id,  root) 
-                                    values ($name, $category, $subcategory, $path, $icon_id, $root)
+                            insert into ui ( name,  category,  subcategory,  path,  icon_id,  root,  mapzonecategory) 
+                                    values ($name, $category, $subcategory, $path, $icon_id, $root, $mapzonecategory)
                                 on conflict do nothing";
                         using (var cmd = new SQLiteCommand(query, db))
                         {
@@ -538,6 +538,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
                             cmd.Parameters.AddWithValue("path", item.UiPath);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("mapzonecategory", item.MapZoneCategory);
                             cmd.Parameters.AddWithValue("root", null);  // Unsupported for UI elements for now.
                             cmd.ExecuteScalar();
                         }
@@ -1239,6 +1240,7 @@ namespace xivModdingFramework.Cache
                 PrimaryCategory = XivStrings.UI,
                 SecondaryCategory = reader.GetString("category"),
                 TertiaryCategory = reader.GetString("subcategory"),
+                MapZoneCategory = reader.GetString("mapzonecategory"),
                 Name = reader.GetString("name"),
                 IconNumber = reader.GetInt32("icon_id"),
                 UiPath = reader.GetString("path"),

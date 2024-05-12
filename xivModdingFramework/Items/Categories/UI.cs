@@ -28,6 +28,7 @@ using xivModdingFramework.HUD.FileTypes;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Mods;
+using static xivModdingFramework.Exd.FileTypes.Ex;
 
 namespace xivModdingFramework.Items.Categories
 {
@@ -92,6 +93,19 @@ namespace xivModdingFramework.Items.Categories
             return uldList;
         }
 
+        private string GetPlaceName(Dictionary<int, ExdRow> placeData, object placeId)
+        {
+            return GetPlaceName(placeData, (ushort)placeId);
+        }
+        private string GetPlaceName(Dictionary<int, ExdRow> placeData, int placeId)
+        {
+            return (string) placeData[placeId].GetColumnByName("Name");
+        }
+        private string GetActionCategory(Dictionary<int, ExdRow> data, int index)
+        {
+            return (string) data[index].GetColumnByName("Name");
+        }
+
         /// <summary>
         /// Gets the list of available map data
         /// </summary>
@@ -103,75 +117,51 @@ namespace xivModdingFramework.Items.Categories
         public async Task<List<XivUi>> GetMapList()
         {
             var mapLock = new object();
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int regionMapDataOffset = 12;
-            const int dataLength = 36;
-
             var mapList = new List<XivUi>();
 
             var placeNameData = await _ex.ReadExData(XivEx.placename);
             var mapData = await _ex.ReadExData(XivEx.map);
 
-            var mapNameList = new List<string>();
 
             // Loops through all available maps in the map exd files
             // At present only one file exists (map_0)
             await Task.Run(() => Parallel.ForEach(mapData.Values, (map) =>
             {
-                int regionIndex;
-                int mapIndex;
+
+
+                var regionName = GetPlaceName(placeNameData, map.GetColumnByName("RegionPlaceNameId"));
+                var primaryName = GetPlaceName(placeNameData, map.GetColumnByName("PrimaryPlaceNameId"));
+                var subMapName = GetPlaceName(placeNameData, map.GetColumnByName("SubPlaceNameId"));
+                var mapId = (string) map.GetColumnByName("MapId");
+
+                if (string.IsNullOrWhiteSpace(mapId))
+                    return;
+
+                var name = string.IsNullOrEmpty(subMapName) ? primaryName : subMapName;
+
+                if (string.IsNullOrWhiteSpace(regionName))
+                {
+                    name = "Unknown Map - " + mapId;
+                }
+                else if (string.IsNullOrWhiteSpace(primaryName))
+                {
+                    name = "Unknown " + regionName + " Map " + mapId;
+                }
 
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Maps
+                    SecondaryCategory = XivStrings.Maps,
+                    UiPath = mapId,
+                    TertiaryCategory = regionName,
+                    MapZoneCategory = string.IsNullOrEmpty(subMapName) ? "" : primaryName,
+                    Name = name,
                 };
-
-                // TODO: Update This
-
-                /*
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(map)))
-                {
-                    br.BaseStream.Seek(regionMapDataOffset, SeekOrigin.Begin);
-
-                    regionIndex = br.ReadInt16();
-                    mapIndex = br.ReadInt16();
-
-                    if (mapIndex == 0) return;
-
-                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-
-                    // The size of the map path string 
-                    // Size of the entire data chunk - size of the data portion
-                    var mapPathLength = map.Length - dataLength;
-
-                    if (mapPathLength < 4) return;
-
-                    xivUi.UiPath = Encoding.UTF8.GetString(br.ReadBytes(mapPathLength)).Replace("\0", "");
-                }
-
-                // Gets the name from the placename exd file
-                var regionName = GetPlaceName(placeNameData[regionIndex]);
-                var mapName = GetPlaceName(placeNameData[mapIndex]);
-
-                if (mapName.Equals(string.Empty)) return;
-
-                xivUi.Name = mapName;
-                xivUi.TertiaryCategory = regionName;
-
-                if (mapNameList.Contains(mapName))
-                {
-                    xivUi.Name = mapName + " " + xivUi.UiPath.Substring(xivUi.UiPath.Length - 2);
-                }
 
                 lock (mapLock)
                 {
-                    mapNameList.Add(mapName);
                     mapList.Add(xivUi);
                 }
-                */
             }));
 
             mapList.Sort();
@@ -198,106 +188,366 @@ namespace xivModdingFramework.Items.Categories
             var actionList = new List<XivUi>();
             var actionNames = new List<string>();
 
-            // TODO: Update This
-            /*
             await Task.Run(() => Parallel.ForEach(actionExData.Values, (action) =>
             {
+
+                var name = (string) action.GetColumnByName("Name");
+                var iconId = (ushort)action.GetColumnByName("Icon");
+                var actionCatId = (byte)action.GetColumnByName("ActionCategoryId");
+                var actionCat = GetActionCategory(actionCategoryExData, actionCatId);
+
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions
+                    SecondaryCategory = XivStrings.Actions,
+                    Name = name,
+                    IconNumber = iconId,
+                    TertiaryCategory = string.IsNullOrWhiteSpace(actionCat) ? XivStrings.None : actionCat
                 };
 
-                int actionCategory;
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(8, SeekOrigin.Begin);
-                    var iconNumber = br.ReadUInt16();
-
-                    if (iconNumber == 0) return;
-
-                    var dataOffset = 28;
-                    var dataLength = 60;
-
-                    br.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
-                    actionCategory = br.ReadByte();
-
-                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-                    var nameLength = action.Length - dataLength;
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
                 // The Cure icon is used as a placeholder so filter out all actions that aren't Cure but are using its icon as a placeholder
-                if (xivUi.Name.Equals(string.Empty) || (!xivUi.Name.Equals("Cure") && xivUi.IconNumber == 405)) return;
+                if (string.IsNullOrWhiteSpace(xivUi.Name) || (!xivUi.Name.Equals("Cure") && xivUi.IconNumber == 405)) return;
                 if (actionNames.Contains(xivUi.Name)) return;
-
-                var actionCategoryData = actionCategoryExData[actionCategory];
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(actionCategoryData)))
-                {
-                    br.BaseStream.Seek(4, SeekOrigin.Begin);
-
-                    var nameLength = actionCategoryData.Length - 4;
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    if (name.Equals(string.Empty))
-                    {
-                        xivUi.TertiaryCategory = XivStrings.None;
-                    }
-                    else
-                    {
-                        xivUi.TertiaryCategory = name;
-                    }
-                }
 
                 lock (actionLock)
                 {
                     actionNames.Add(xivUi.Name);
                     actionList.Add(xivUi);
                 }
-            }));
+             }));
 
             // Data from generalaction_0
             var generalActionExData = await _ex.ReadExData(XivEx.generalaction);
 
             await Task.Run(() => Parallel.ForEach(generalActionExData.Values, (action) =>
             {
-                var xivUi = new XivUi()
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.General
+                    };
+                return;
+                /*
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(6, SeekOrigin.Begin);
+
+                        var nameLength = br.ReadInt16();
+
+                        br.BaseStream.Seek(10, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(20, SeekOrigin.Begin);
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from buddyaction_0
+                var buddyActionExData = await _ex.ReadExData(XivEx.buddyaction);
+
+                await Task.Run(() => Parallel.ForEach(buddyActionExData.Values, (action) =>
                 {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.General
-                };
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.Buddy
+                    };
 
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(6, SeekOrigin.Begin);
+
+                        var nameLength = br.ReadInt16();
+
+                        br.BaseStream.Seek(10, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(20, SeekOrigin.Begin);
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from companyaction_0
+                var companyActionExData = await _ex.ReadExData(XivEx.companyaction);
+
+                await Task.Run(() => Parallel.ForEach(companyActionExData.Values, (action) =>
                 {
-                    br.BaseStream.Seek(6, SeekOrigin.Begin);
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.Company
+                    };
 
-                    var nameLength = br.ReadInt16();
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(6, SeekOrigin.Begin);
 
-                    br.BaseStream.Seek(10, SeekOrigin.Begin);
+                        var nameLength = br.ReadInt16();
 
-                    var iconNumber = br.ReadUInt16();
+                        br.BaseStream.Seek(14, SeekOrigin.Begin);
 
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
+                        var iconNumber = br.ReadUInt16();
 
-                    br.BaseStream.Seek(20, SeekOrigin.Begin);
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
 
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+                        br.BaseStream.Seek(20, SeekOrigin.Begin);
 
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
 
-                if (xivUi.Name.Equals(string.Empty)) return;
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from craftaction_100000
+                var craftActionExData = await _ex.ReadExData(XivEx.craftaction);
+
+                await Task.Run(() => Parallel.ForEach(craftActionExData.Values, (action) =>
+                {
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.Craft
+                    };
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(6, SeekOrigin.Begin);
+
+                        var nameLength = br.ReadInt16();
+
+                        br.BaseStream.Seek(48, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(60, SeekOrigin.Begin);
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from eventaction_0
+                var eventActionExData = await _ex.ReadExData(XivEx.eventaction);
+
+                await Task.Run(() => Parallel.ForEach(eventActionExData.Values, (action) =>
+                {
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.Event
+                    };
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(4, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(16, SeekOrigin.Begin);
+
+                        var nameLength = action.Length - 16;
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from emote_0
+                var emoteExData = await _ex.ReadExData(XivEx.emote);
+
+                await Task.Run(() => Parallel.ForEach(emoteExData.Values, (action) =>
+                {
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.Emote
+                    };
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(28, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(40, SeekOrigin.Begin);
+
+                        var nameLength = action.Length - 40;
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from marker_0
+                var markerExData = await _ex.ReadExData(XivEx.marker);
+
+                await Task.Run(() => Parallel.ForEach(markerExData.Values, (action) =>
+                {
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.Marker
+                    };
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(6, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(10, SeekOrigin.Begin);
+
+                        var nameLength = action.Length - 10;
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+
+                    lock (actionLock)
+                    {
+                        actionNames.Add(xivUi.Name);
+                        actionList.Add(xivUi);
+                    }
+                }));
+
+                // Data from fieldmarker_0
+                var fieldMarkerExData = await _ex.ReadExData(XivEx.fieldmarker);
+
+                await Task.Run(() => Parallel.ForEach(fieldMarkerExData.Values, (action) =>
+                {
+                    var xivUi = new XivUi()
+                    {
+                        PrimaryCategory = "UI",
+                        SecondaryCategory = XivStrings.Actions,
+                        TertiaryCategory = XivStrings.FieldMarker
+                    };
+
+                    // Big Endian Byte Order 
+                    using (var br = new BinaryReaderBE(new MemoryStream(action)))
+                    {
+                        br.BaseStream.Seek(8, SeekOrigin.Begin);
+
+                        var iconNumber = br.ReadUInt16();
+
+                        // Filter out any actions using placeholder icons
+                        if (iconNumber == 0 || iconNumber == 405) return;
+
+                        br.BaseStream.Seek(12, SeekOrigin.Begin);
+
+                        var nameLength = action.Length - 12;
+
+                        var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                        xivUi.Name = name;
+                        xivUi.IconNumber = iconNumber;
+                    }
+
+                    if (xivUi.Name.Equals(string.Empty)) return;
+                */
 
                 lock (actionLock)
                 {
@@ -305,301 +555,6 @@ namespace xivModdingFramework.Items.Categories
                     actionList.Add(xivUi);
                 }
             }));
-
-            // Data from buddyaction_0
-            var buddyActionExData = await _ex.ReadExData(XivEx.buddyaction);
-
-            await Task.Run(() => Parallel.ForEach(buddyActionExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.Buddy
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(6, SeekOrigin.Begin);
-
-                    var nameLength = br.ReadInt16();
-
-                    br.BaseStream.Seek(10, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(20, SeekOrigin.Begin);
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-
-            // Data from companyaction_0
-            var companyActionExData = await _ex.ReadExData(XivEx.companyaction);
-
-            await Task.Run(() => Parallel.ForEach(companyActionExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.Company
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(6, SeekOrigin.Begin);
-
-                    var nameLength = br.ReadInt16();
-
-                    br.BaseStream.Seek(14, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(20, SeekOrigin.Begin);
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-
-            // Data from craftaction_100000
-            var craftActionExData = await _ex.ReadExData(XivEx.craftaction);
-
-            await Task.Run(() => Parallel.ForEach(craftActionExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.Craft
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(6, SeekOrigin.Begin);
-
-                    var nameLength = br.ReadInt16();
-
-                    br.BaseStream.Seek(48, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(60, SeekOrigin.Begin);
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-
-            // Data from eventaction_0
-            var eventActionExData = await _ex.ReadExData(XivEx.eventaction);
-
-            await Task.Run(() => Parallel.ForEach(eventActionExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.Event
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(4, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(16, SeekOrigin.Begin);
-
-                    var nameLength = action.Length - 16;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-
-            // Data from emote_0
-            var emoteExData = await _ex.ReadExData(XivEx.emote);
-
-            await Task.Run(() => Parallel.ForEach(emoteExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.Emote
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(28, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(40, SeekOrigin.Begin);
-
-                    var nameLength = action.Length - 40;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-
-            // Data from marker_0
-            var markerExData = await _ex.ReadExData(XivEx.marker);
-
-            await Task.Run(() => Parallel.ForEach(markerExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.Marker
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(6, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(10, SeekOrigin.Begin);
-
-                    var nameLength = action.Length - 10;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-
-            // Data from fieldmarker_0
-            var fieldMarkerExData = await _ex.ReadExData(XivEx.fieldmarker);
-
-            await Task.Run(() => Parallel.ForEach(fieldMarkerExData.Values, (action) =>
-            {
-                var xivUi = new XivUi()
-                {
-                    PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Actions,
-                    TertiaryCategory = XivStrings.FieldMarker
-                };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(action)))
-                {
-                    br.BaseStream.Seek(8, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    // Filter out any actions using placeholder icons
-                    if (iconNumber == 0 || iconNumber == 405) return;
-
-                    br.BaseStream.Seek(12, SeekOrigin.Begin);
-
-                    var nameLength = action.Length - 12;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.Name = name;
-                    xivUi.IconNumber = iconNumber;
-                }
-
-                if (xivUi.Name.Equals(string.Empty)) return;
-
-                lock (actionLock)
-                {
-                    actionNames.Add(xivUi.Name);
-                    actionList.Add(xivUi);
-                }
-            }));
-            */
 
             // Remove any duplicates and return the sorted the list
             actionList = actionList.Distinct().ToList();
@@ -616,19 +571,7 @@ namespace xivModdingFramework.Items.Categories
         {
             var statusLock = new object();
             var statusList = new List<XivUi>();
-
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int nameLengthDataOffset = 6;
-            var typeDataOffset = 19;
-            var dataLength = 31;
-
-            if (_xivLanguage == XivLanguage.Chinese || _xivLanguage == XivLanguage.Korean)
-            {
-                typeDataOffset = 16;
-                dataLength = 28;
-            }
-
+            
             var statusExData = await _ex.ReadExData(XivEx.status);
 
             await Task.Run(() => Parallel.ForEach(statusExData.Values, (status) =>
@@ -636,36 +579,14 @@ namespace xivModdingFramework.Items.Categories
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Status
+                    SecondaryCategory = XivStrings.Status,
+                    Name = (string) status.GetColumnByName("Name"),
+                    IconNumber = (int)((uint) status.GetColumnByName("Icon"))
                 };
-
-                // TODO: Update This
-                /*
-            // Big Endian Byte Order 
-            using (var br = new BinaryReaderBE(new MemoryStream(status)))
-            {
-                br.BaseStream.Seek(nameLengthDataOffset, SeekOrigin.Begin);
-
-                var nameLength = br.ReadInt16();
-
-                var iconNumber = br.ReadUInt16();
-
-                if (iconNumber == 0) return;
-
-                br.BaseStream.Seek(typeDataOffset, SeekOrigin.Begin);
-
-                var type = br.ReadByte();
-
-                br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-
-                var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                xivUi.IconNumber = iconNumber;
-                xivUi.Name = name;
-
-                if (name.Equals(string.Empty)) return;
+                if (string.IsNullOrWhiteSpace(xivUi.Name)) return;
 
                 //Status effects have a byte that determines whether the effect is detrimental or beneficial
+                var type = (byte)status.GetColumnByName("Type");
                 if (type == 1)
                 {
                     xivUi.TertiaryCategory = XivStrings.Beneficial;
@@ -679,13 +600,11 @@ namespace xivModdingFramework.Items.Categories
                     xivUi.TertiaryCategory = XivStrings.None;
                     xivUi.Name = xivUi.Name + " " + type;
                 }
-            }
 
             lock (statusLock)
             {
                 statusList.Add(xivUi);
             }
-                */
             }));
 
             // Remove any duplicates and return the sorted the list
@@ -716,33 +635,20 @@ namespace xivModdingFramework.Items.Categories
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.MapSymbol
+                    SecondaryCategory = XivStrings.MapSymbol,
+                    IconNumber = (int)mapSymbol.GetColumnByName("Icon"),
+                    Name = GetPlaceName(placeNameData, (int)mapSymbol.GetColumnByName("PlaceNameId")),
                 };
 
-                int placeNameIndex;
-                // TODO: Update This
-                // Big Endian Byte Order 
-                /*
-                using (var br = new BinaryReaderBE(new MemoryStream(mapSymbol)))
+                if (string.IsNullOrWhiteSpace(xivUi.Name))
                 {
-                    var iconNumber = br.ReadInt32();
-
-                    placeNameIndex = br.ReadInt32();
-
-                    if (iconNumber == 0) return;
-
-                    xivUi.IconNumber = iconNumber;
+                    xivUi.Name = "Unknown Map Symbol #" + xivUi.IconNumber.ToString();
                 }
-
-                // Gets the name of the map symbol from the placename exd
-                xivUi.Name = GetPlaceName(placeNameData[placeNameIndex]);
-
-                if (xivUi.Name.Equals(string.Empty)) return;
 
                 lock (mapSymbolLock)
                 {
                     mapSymbolList.Add(xivUi);
-                }*/
+                }
             }));
 
             mapSymbolList.Sort();
@@ -759,49 +665,23 @@ namespace xivModdingFramework.Items.Categories
             var onlineStatusLock = new object();
             var onlineStatusList = new List<XivUi>();
 
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int iconNumberOffset = 6;
-            const int dataSize = 14;
 
             var onlineStatusExData = await _ex.ReadExData(XivEx.onlinestatus);
 
             await Task.Run(() => Parallel.ForEach(onlineStatusExData.Values, (onlineStatus) =>
             {
-                // TODO: Update This
-                /*
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.OnlineStatus
+                    SecondaryCategory = XivStrings.OnlineStatus,
+                    IconNumber = (int)(uint)onlineStatus.GetColumnByName("Icon"),
+                    Name = (string)onlineStatus.GetColumnByName("Name"),
                 };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(onlineStatus)))
-                {
-                    br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    if (iconNumber == 0) return;
-
-                    br.BaseStream.Seek(dataSize, SeekOrigin.Begin);
-
-                    // The size of the online status name string 
-                    // Size of the entire data chunk - size of the data portion
-                    var nameLength = onlineStatus.Length - dataSize;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.IconNumber = iconNumber;
-                    xivUi.Name = name;
-                }
 
                 lock (onlineStatusLock)
                 {
                     onlineStatusList.Add(xivUi);
                 }
-                */
             }));
 
             onlineStatusList.Sort();
@@ -818,52 +698,24 @@ namespace xivModdingFramework.Items.Categories
             var weatherLock = new object();
             var weatherList = new List<XivUi>();
 
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int nameLengthOffset = 6;
-            const int iconNumberOffset = 26;
-
             var weatherExData = await _ex.ReadExData(XivEx.weather);
 
             var weatherNames = new List<string>();
 
             await Task.Run(() => Parallel.ForEach(weatherExData.Values, (weather) =>
             {
-                // TODO: Update This
-                /*
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
-                    SecondaryCategory = XivStrings.Weather
+                    SecondaryCategory = XivStrings.Weather,
+                    IconNumber = (int)weather.GetColumnByName("Icon"),
+                    Name = (string)weather.GetColumnByName("Name"),
                 };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(weather)))
-                {
-                    br.BaseStream.Seek(nameLengthOffset, SeekOrigin.Begin);
-
-                    var nameLength = br.ReadInt16();
-
-                    br.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-
-                    var iconNumber = br.ReadUInt16();
-
-                    if (iconNumber == 0) return;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.IconNumber = iconNumber;
-                    xivUi.Name = name;
-                }
-
-                if (weatherNames.Contains(xivUi.Name)) return;
 
                 lock (weatherLock)
                 {
-                    weatherNames.Add(xivUi.Name);
                     weatherList.Add(xivUi);
                 }
-                */
             }));
 
             weatherList.Sort();
@@ -880,44 +732,22 @@ namespace xivModdingFramework.Items.Categories
             var loadingImageLock = new object();
             var loadingImageList = new List<XivUi>();
 
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int dataLength = 4;
-
             var loadingImageExData = await _ex.ReadExData(XivEx.loadingimage);
 
             await Task.Run(() => Parallel.ForEach(loadingImageExData.Values, (loadingImage) =>
             {
-                // TODO: Update This
-                /*
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
                     SecondaryCategory = XivStrings.LoadingScreen,
-                    UiPath = "ui/loadingimage"
+                    UiPath = "ui/loadingimage",
+                    Name = (string)loadingImage.GetColumnByName("Name"),
                 };
-
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(loadingImage)))
-                {
-                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-
-                    // The length of the loading image name string
-                    // Size of the entire data chunk - size of the data portion
-                    var nameLength = loadingImage.Length - dataLength;
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    if (name.Equals("")) return;
-
-                    xivUi.Name = name;
-                }
 
                 lock (loadingImageLock)
                 {
                     loadingImageList.Add(xivUi);
                 }
-                */
             }));
 
             loadingImageList.Sort();
@@ -925,30 +755,5 @@ namespace xivModdingFramework.Items.Categories
             return loadingImageList;
         }
 
-        /// <summary>
-        /// Helper function to obtain the string value from placename_0
-        /// </summary>
-        /// <param name="data">The uncompressed placename byte data</param>
-        /// <returns>A string containing the place name</returns>
-        private static string GetPlaceName(byte[] data)
-        {
-
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int nameLengthOffset = 6;
-            const int dataLength = 24;
-
-            // Big Endian Byte Order 
-            using (var br = new BinaryReaderBE(new MemoryStream(data)))
-            {
-                br.BaseStream.Seek(nameLengthOffset, SeekOrigin.Begin);
-
-                var nameLength = br.ReadInt16();
-
-                br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-
-                return Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-            }
-        }
     }
 }
