@@ -721,7 +721,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f),
                         Normal = new Color4(normal.Red, normal.Green, diffuse.Blue, 1.0f),
                         Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f),
-                        Alpha = new Color4(normal.Blue)
+                        Alpha = new Color4(normal.Alpha)
                     };
                 };
             }

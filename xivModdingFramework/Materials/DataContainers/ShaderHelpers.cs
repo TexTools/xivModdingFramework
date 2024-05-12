@@ -383,7 +383,7 @@ namespace xivModdingFramework.Materials.DataContainers
             } else if(samplerId == ESamplerId.g_SamplerIndex)
             {
                 return XivTexType.Index;
-            } else if(samplerId == ESamplerId.g_SamplerDiffuse)
+            } else if(samplerId == ESamplerId.g_SamplerDiffuse || samplerId == ESamplerId.g_SamplerColorMap0 || samplerId == ESamplerId.g_SamplerColorMap0)
             {
                 return XivTexType.Diffuse;
             } else if(samplerId == ESamplerId.g_SamplerReflectionArray || samplerId == ESamplerId.g_SamplerSphereMap)
