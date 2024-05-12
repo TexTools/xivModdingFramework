@@ -257,7 +257,7 @@ namespace xivModdingFramework.Mods
             _WorkerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
-            var tx = new ModTransaction(readOnly, modpack, ETransactionTarget target = ETransactionTarget.GameDats, string targetPath = null);
+            var tx = new ModTransaction(readOnly, modpack, target, targetPath);
             _ActiveTransaction = tx;
             return tx;
         }

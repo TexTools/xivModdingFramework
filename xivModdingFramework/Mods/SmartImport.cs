@@ -29,6 +29,7 @@ namespace xivModdingFramework.Mods
 
         /// <summary>
         /// Imports an arbitrary subset of files to the given transaction target.
+        /// Syntactic wrapper for opening/closing a transaction around a batch import.
         /// </summary>
         /// <param name="files"></param>
         /// <param name="target"></param>
@@ -36,7 +37,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modpackName"></param>
         /// <param name="modpackAuthor"></param>
         /// <returns></returns>
-        public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, ETransactionTarget target, string targetPath, string sourceApplication = "Unknown", string modpackName = "Uknown Batch Import", string modpackAuthor = "Unknown")
+        public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, ETransactionTarget target, string targetPath, string sourceApplication = "Unknown", string modpackName = "Unknown Batch Import", string modpackAuthor = "Unknown")
         {
             var modPack = new ModPack()
             {
