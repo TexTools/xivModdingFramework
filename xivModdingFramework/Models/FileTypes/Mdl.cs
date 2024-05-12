@@ -3796,8 +3796,12 @@ namespace xivModdingFramework.Models.FileTypes
                             data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
                         } else
                         {
+#if DAWNTRAIL
                             // DAWNTRAIL BENCHMARK HACKHACK - Add +1 to the bone count here to work around MDL v5 -> v6 in engine off-by-one error.
                             data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count + 1));
+#else
+                            data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
+#endif
                         }
                         
                         boneSetsBlock.AddRange(data);
@@ -4479,7 +4483,7 @@ namespace xivModdingFramework.Models.FileTypes
             return size0 + size1;
         }
 
-        #endregion
+#endregion
 
         #region Model Deformation Handling
         /// <summary>
