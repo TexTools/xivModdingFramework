@@ -128,6 +128,9 @@ namespace xivModdingFramework.Items.Categories
                     SecondaryCategory = XivStrings.Maps
                 };
 
+                // TODO: Update This
+
+                /*
                 // Big Endian Byte Order 
                 using (var br = new BinaryReaderBE(new MemoryStream(map)))
                 {
@@ -168,6 +171,7 @@ namespace xivModdingFramework.Items.Categories
                     mapNameList.Add(mapName);
                     mapList.Add(xivUi);
                 }
+                */
             }));
 
             mapList.Sort();
@@ -194,6 +198,8 @@ namespace xivModdingFramework.Items.Categories
             var actionList = new List<XivUi>();
             var actionNames = new List<string>();
 
+            // TODO: Update This
+            /*
             await Task.Run(() => Parallel.ForEach(actionExData.Values, (action) =>
             {
                 var xivUi = new XivUi()
@@ -593,6 +599,7 @@ namespace xivModdingFramework.Items.Categories
                     actionList.Add(xivUi);
                 }
             }));
+            */
 
             // Remove any duplicates and return the sorted the list
             actionList = actionList.Distinct().ToList();
@@ -632,50 +639,53 @@ namespace xivModdingFramework.Items.Categories
                     SecondaryCategory = XivStrings.Status
                 };
 
-                // Big Endian Byte Order 
-                using (var br = new BinaryReaderBE(new MemoryStream(status)))
+                // TODO: Update This
+                /*
+            // Big Endian Byte Order 
+            using (var br = new BinaryReaderBE(new MemoryStream(status)))
+            {
+                br.BaseStream.Seek(nameLengthDataOffset, SeekOrigin.Begin);
+
+                var nameLength = br.ReadInt16();
+
+                var iconNumber = br.ReadUInt16();
+
+                if (iconNumber == 0) return;
+
+                br.BaseStream.Seek(typeDataOffset, SeekOrigin.Begin);
+
+                var type = br.ReadByte();
+
+                br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
+
+                var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
+
+                xivUi.IconNumber = iconNumber;
+                xivUi.Name = name;
+
+                if (name.Equals(string.Empty)) return;
+
+                //Status effects have a byte that determines whether the effect is detrimental or beneficial
+                if (type == 1)
                 {
-                    br.BaseStream.Seek(nameLengthDataOffset, SeekOrigin.Begin);
-
-                    var nameLength = br.ReadInt16();
-
-                    var iconNumber = br.ReadUInt16();
-
-                    if (iconNumber == 0) return;
-
-                    br.BaseStream.Seek(typeDataOffset, SeekOrigin.Begin);
-
-                    var type = br.ReadByte();
-
-                    br.BaseStream.Seek(dataLength, SeekOrigin.Begin);
-
-                    var name = Encoding.UTF8.GetString(br.ReadBytes(nameLength)).Replace("\0", "");
-
-                    xivUi.IconNumber = iconNumber;
-                    xivUi.Name = name;
-
-                    if (name.Equals(string.Empty)) return;
-
-                    //Status effects have a byte that determines whether the effect is detrimental or beneficial
-                    if (type == 1)
-                    {
-                        xivUi.TertiaryCategory = XivStrings.Beneficial;
-                    }
-                    else if (type == 2)
-                    {
-                        xivUi.TertiaryCategory = XivStrings.Detrimental;
-                    }
-                    else
-                    {
-                        xivUi.TertiaryCategory = XivStrings.None;
-                        xivUi.Name = xivUi.Name + " " + type;
-                    }
+                    xivUi.TertiaryCategory = XivStrings.Beneficial;
                 }
-
-                lock (statusLock)
+                else if (type == 2)
                 {
-                    statusList.Add(xivUi);
+                    xivUi.TertiaryCategory = XivStrings.Detrimental;
                 }
+                else
+                {
+                    xivUi.TertiaryCategory = XivStrings.None;
+                    xivUi.Name = xivUi.Name + " " + type;
+                }
+            }
+
+            lock (statusLock)
+            {
+                statusList.Add(xivUi);
+            }
+                */
             }));
 
             // Remove any duplicates and return the sorted the list
@@ -710,7 +720,9 @@ namespace xivModdingFramework.Items.Categories
                 };
 
                 int placeNameIndex;
+                // TODO: Update This
                 // Big Endian Byte Order 
+                /*
                 using (var br = new BinaryReaderBE(new MemoryStream(mapSymbol)))
                 {
                     var iconNumber = br.ReadInt32();
@@ -730,7 +742,7 @@ namespace xivModdingFramework.Items.Categories
                 lock (mapSymbolLock)
                 {
                     mapSymbolList.Add(xivUi);
-                }
+                }*/
             }));
 
             mapSymbolList.Sort();
@@ -756,6 +768,8 @@ namespace xivModdingFramework.Items.Categories
 
             await Task.Run(() => Parallel.ForEach(onlineStatusExData.Values, (onlineStatus) =>
             {
+                // TODO: Update This
+                /*
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
@@ -787,6 +801,7 @@ namespace xivModdingFramework.Items.Categories
                 {
                     onlineStatusList.Add(xivUi);
                 }
+                */
             }));
 
             onlineStatusList.Sort();
@@ -814,6 +829,8 @@ namespace xivModdingFramework.Items.Categories
 
             await Task.Run(() => Parallel.ForEach(weatherExData.Values, (weather) =>
             {
+                // TODO: Update This
+                /*
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
@@ -846,6 +863,7 @@ namespace xivModdingFramework.Items.Categories
                     weatherNames.Add(xivUi.Name);
                     weatherList.Add(xivUi);
                 }
+                */
             }));
 
             weatherList.Sort();
@@ -870,6 +888,8 @@ namespace xivModdingFramework.Items.Categories
 
             await Task.Run(() => Parallel.ForEach(loadingImageExData.Values, (loadingImage) =>
             {
+                // TODO: Update This
+                /*
                 var xivUi = new XivUi()
                 {
                     PrimaryCategory = "UI",
@@ -897,6 +917,7 @@ namespace xivModdingFramework.Items.Categories
                 {
                     loadingImageList.Add(xivUi);
                 }
+                */
             }));
 
             loadingImageList.Sort();

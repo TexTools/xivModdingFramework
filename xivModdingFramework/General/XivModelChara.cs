@@ -36,7 +36,7 @@ namespace xivModdingFramework.General
         /// </summary>
         /// <param name="gameDirectory"></param>
         /// <returns>Dictionary with modelchara data</returns>
-        public static async Task<Dictionary<int, byte[]>> GetModelCharaData(DirectoryInfo gameDirectory)
+        public static async Task<Dictionary<int, Ex.ExdRow>> GetModelCharaData(DirectoryInfo gameDirectory)
         {
             var ex = new Ex(gameDirectory);
             var exData = await ex.ReadExData(XivEx.modelchara);
@@ -53,37 +53,27 @@ namespace xivModdingFramework.General
         {
             var xivModelInfo = new XivMonsterModelInfo();
 
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            int startOffset = 8;
-            int modelDataOffset = 12;
-
             var ex = new Ex(gameDirectory);
             var modelCharaEx = await ex.ReadExData(XivEx.modelchara);
 
-            // Big Endian Byte Order 
-            using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
+
+            var row = modelCharaEx[index];
+            xivModelInfo.PrimaryID = (ushort) row.GetColumn(1);
+
+            var modelType = (byte)row.GetColumn(0);
+            xivModelInfo.SecondaryID = (byte)row.GetColumn(2);
+            xivModelInfo.ImcSubsetID = (byte)row.GetColumn(3);
+            if (modelType == 2)
             {
-                br.BaseStream.Seek(startOffset, SeekOrigin.Begin);
-                xivModelInfo.PrimaryID = br.ReadInt16();
-
-                br.BaseStream.Seek(modelDataOffset, SeekOrigin.Begin);
-                var modelType = br.ReadByte();
-                xivModelInfo.SecondaryID = br.ReadByte();
-                xivModelInfo.ImcSubsetID = br.ReadByte();
-
-                if (modelType == 2)
-                {
-                    xivModelInfo.ModelType = XivItemType.demihuman;
-                }
-                else if (modelType == 3)
-                {
-                    xivModelInfo.ModelType = XivItemType.monster;
-                }
-                else
-                {
-                    xivModelInfo.ModelType = XivItemType.unknown;
-                }
+                xivModelInfo.ModelType = XivItemType.demihuman;
+            }
+            else if (modelType == 3)
+            {
+                xivModelInfo.ModelType = XivItemType.monster;
+            }
+            else
+            {
+                xivModelInfo.ModelType = XivItemType.unknown;
             }
 
             return xivModelInfo;
@@ -95,7 +85,7 @@ namespace xivModdingFramework.General
         /// <param name="modelCharaEx">The modelchara ex data</param>
         /// <param name="index">The index of the data</param>
         /// <returns>The XivModelInfo data</returns>
-        public static XivModelInfo GetModelInfo(Dictionary<int, byte[]> modelCharaEx, int index)
+        public static XivModelInfo GetModelInfo(Dictionary<int, Ex.ExdRow> modelCharaEx, int index)
         {
             var xivModelInfo = new XivMonsterModelInfo();
 
@@ -115,7 +105,7 @@ namespace xivModdingFramework.General
             }
 
             // Big Endian Byte Order 
-            using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index])))
+            using (var br = new BinaryReaderBE(new MemoryStream(modelCharaEx[index].RawData)))
             {
                 br.BaseStream.Seek(startOffset, SeekOrigin.Begin);
                 xivModelInfo.PrimaryID = br.ReadInt16();

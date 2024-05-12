@@ -117,14 +117,11 @@ namespace xivModdingFramework.Materials.FileTypes
             var exData = await ex.ReadExData(XivEx.stain);
 
 
-            var dataLength = exData[0].Length - 2;
-
             foreach (var kv in exData)
             {
                 if (kv.Key == 0) continue;
 
-                var size = kv.Value.Length - dataLength;
-                var name = Encoding.UTF8.GetString(kv.Value, dataLength, size).Replace("\0", "");
+                var name = (string) kv.Value.GetColumn(3);
                 var dyeId = kv.Key - 1;
                 if (String.IsNullOrEmpty(name)) {
                     name = "Dye " + dyeId.ToString();
