@@ -1706,47 +1706,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             return parts;
         }
 
-        public async Task<int> GetCompressedFileSize(string path, ModTransaction tx)
-        {
-            var offset8x = await tx.Get8xDataOffset(path);
-            var df = IOUtil.GetDataFileFromPath(path);
-            return await GetCompressedFileSize(offset8x, df);
-        }
-
-        public async Task<int> GetCompressedFileSize(long offset, XivDataFile dataFile)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file size data without valid offset.");
-            }
-
-
-            var xivTex = new XivTex();
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var offsetParts = Offset8xToParts(offset);
-            offset = offsetParts.Offset;
-
-            await _lock.WaitAsync();
-
-            try
-            {
-                var datPath = Dat.GetDatPath(dataFile, offsetParts.DatNum);
-
-                return await Task.Run(async () =>
-                {
-                    using (var br = new BinaryReader(File.OpenRead(datPath)))
-                    {
-                        return GetCompressedFileSize(br, offset);
-                    }
-                });
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-        public int GetCompressedFileSize(BinaryReader br, long offset = -1)
+        /// <summary>
+        /// Partially parses (without decompressing) the SQPack file in order to determine its total length.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="offset"></param>
+        /// <returns></returns>
+        /// <exception cref="NotSupportedException"></exception>
+        public static int GetCompressedFileSize(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
             {
@@ -1867,18 +1834,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         }
 
-        public static string ReadNullTerminatedString(BinaryReader br)
-        {
-            var data = new List<byte>();
-            var b = br.ReadByte();
-            while(b != 0)
-            {
-                data.Add(b);
-                b = br.ReadByte();
-            }
-            return System.Text.Encoding.UTF8.GetString(data.ToArray());
-        }
-
         /// <summary>
         /// Gets the file type of an item
         /// </summary>
@@ -1931,13 +1886,13 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Gets the compressed data directly from the dats, with a known file size.
-        /// Not Transaction safe.  Only used in a few places.  Needs investigation on how this can be altered.
+        /// NOT TRANSACTION SAFE - Only used during DAT defragment procedure.
         /// </summary>
         /// <param name="offset8xWithDatEmbed"></param>
         /// <param name="dataFile"></param>
         /// <param name="dataSize"></param>
         /// <returns></returns>
-        public byte[] UNSAFE_GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
+        internal byte[] UNSAFE_GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
         {
             var offsetParts = Offset8xToParts(offset8xWithDatEmbed);
             var datPath = GetDatPath(dataFile, offsetParts.DatNum);
@@ -2573,6 +2528,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only).
+        /// NOT TRANSACTION SAFE - This reads from the baseline DATS for this determinant.
+        /// Currently Unused.
         /// </summary>
         /// <param name="df"></param>
         /// <returns></returns>
@@ -2609,7 +2566,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var size = mod.data.modSize;
                     if(size <= 0)
                     {
-                        size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+                        var parts = Dat.Offset8xToParts(mod.data.modOffset);
+                        using (var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
+                        {
+                            // Check size.
+                            br.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
+                            Dat.GetCompressedFileSize(br);
+                        }
                     }
 
                     if(size % 256 != 0)

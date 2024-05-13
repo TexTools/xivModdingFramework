@@ -210,7 +210,7 @@ namespace xivModdingFramework.Mods
             Func<Task<byte[]>> modDataTask = async () =>
             {
 
-                var rawData = await tx.ReadFile(modsJson.FullPath);
+                var rawData = await tx.ReadFile(modsJson.FullPath, false, true);
 
                 if (rawData == null)
                 {

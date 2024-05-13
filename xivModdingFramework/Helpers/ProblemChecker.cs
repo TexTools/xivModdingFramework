@@ -128,44 +128,11 @@ namespace xivModdingFramework.Helpers
         public Task<bool> ValidateIndexBackup(XivDataFile dataFile, DirectoryInfo backupsDirectory)
         {
 
-            // TODO: This is very outdated and should be investigated/redone.
             return Task.Run(() =>
             {
-                var backupDataFile =
-                    new DirectoryInfo(Path.Combine(backupsDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
-                var currentDataFile =
-                    new DirectoryInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
-
-                // Since the material addition directly adds to section 1 we can no longer check for outdated using that section header
-                // so instead compare the hashes of sections 2 and 3
-                byte[] currentHashSection2;
-                byte[] currentHashSection3;
-                byte[] backupHashSection2;
-                byte[] backupHashSection3;
-                try
-                {
-                    currentHashSection2 = _index.GetIndexSection2Hash(currentDataFile);
-                    currentHashSection3 = _index.GetIndexSection3Hash(currentDataFile);
-                }
-                catch
-                {
-                    // Base files are fucked, use *any* backups.
-                    return true;
-                }
-
-                try
-                {
-                    backupHashSection2 = _index.GetIndexSection2Hash(backupDataFile);
-                    backupHashSection3 = _index.GetIndexSection3Hash(backupDataFile);
-                }
-                catch
-                {
-                    // Backups are fucked, can't use those.
-                    return false;
-                }
-
-
-                return backupHashSection2.SequenceEqual(currentHashSection2) && backupHashSection3.SequenceEqual(currentHashSection3);
+                // Since we rewrite all of the hashes now, we can't use hash comparison on index backups anymore.
+                // This should just validate the hashes of the index backups are valid on their own.
+                return true;
             });
         }
 
@@ -206,7 +173,7 @@ namespace xivModdingFramework.Helpers
                             await modding.ToggleAllMods(false);
                             progress?.Report("Index restore failed, attempting to delete all mods instead...");
                         }
-                        catch
+                        catch(Exception ex2)
                         {
                             throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Disable all mods.");
                         }

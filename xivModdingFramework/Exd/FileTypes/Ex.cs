@@ -352,7 +352,7 @@ namespace xivModdingFramework.Exd.FileTypes
                                 {
                                     var stringOffset = br.ReadInt32();
                                     br.BaseStream.Seek(stringOffset + DataOffset, SeekOrigin.Begin);
-                                    data = Dat.ReadNullTerminatedString(br);
+                                    data = IOUtil.ReadNullTerminatedString(br);
                                     break;
                                 }
                             case ExcelColumnDataType.Bool:

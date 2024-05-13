@@ -204,6 +204,7 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 progress = IOUtil.NoOpImportProgress;
             }
+            var fullSize = modPackData.SimpleModDataList.Sum(x => x.ModSize);
 
             return await Task.Run(async () =>
             {

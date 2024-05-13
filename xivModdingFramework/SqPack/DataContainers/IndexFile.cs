@@ -1333,7 +1333,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             entry.Offset = br.ReadUInt32();
             entry.SynonymNumber = br.ReadUInt32();
-            entry.FilePath = Dat.ReadNullTerminatedString(br);
+            entry.FilePath = IOUtil.ReadNullTerminatedString(br);
 
             // Remainder is padding bytes of value 254 or 0 depending on if it is a valid or ending entry.
             br.BaseStream.Seek(end, SeekOrigin.Begin);

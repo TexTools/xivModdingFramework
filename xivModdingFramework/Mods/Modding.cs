@@ -1021,11 +1021,19 @@ namespace xivModdingFramework.Mods
 
                         try
                         {
-                            var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
+                            var parts = Dat.Offset8xToParts(mod.data.modOffset);
+                            byte[] data;
+                            using(var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
+                            {
+                                // Check size.
+                                br.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
+                                var size = Dat.GetCompressedFileSize(br);
 
-                            if (size % 256 != 0) throw new Exception("Dicks");
+                                // Pull entire file.
+                                br.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
+                                data = br.ReadBytes(size);
+                            }
 
-                            var data = _dat.UNSAFE_GetCompressedData(mod.data.modOffset, df, size);
                             var newOffset = await WriteToTempDat(data, df);
 
                             if (mod.IsCustomFile())

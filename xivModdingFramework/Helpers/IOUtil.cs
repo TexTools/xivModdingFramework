@@ -352,5 +352,17 @@ namespace xivModdingFramework.Helpers
         {
             //No-Op
         });
+        public static string ReadNullTerminatedString(BinaryReader br)
+        {
+            var data = new List<byte>();
+            var b = br.ReadByte();
+            while (b != 0)
+            {
+                data.Add(b);
+                b = br.ReadByte();
+            }
+            return System.Text.Encoding.UTF8.GetString(data.ToArray());
+        }
+
     }
 }

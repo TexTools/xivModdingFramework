@@ -14,6 +14,7 @@ using System.Globalization;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
+using System.ComponentModel.Design;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -123,6 +124,22 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         private bool disposedValue;
 
+        private FileStorageInformation MakeGameStorageInfo(XivDataFile df, long offset8x)
+        {
+            // Create standard Game DAT file request info.
+            var info = new FileStorageInformation();
+            var parts = Dat.Offset8xToParts(offset8x);
+            info.RealOffset = parts.Offset;
+            info.RealPath = Dat.GetDatPath(df, parts.DatNum);
+            info.StorageType = EFileStorageType.CompressedBlob;
+
+            // We could check the file size here, but since this is a temporary file handle, and we don't know if we actually need the pointer...
+            // Just set it to 0, then code down the line can identify that it needs to check the file size manually if needed.
+            info.FileSize = 0;
+
+            return info;
+        }
+
         public TransactionDataHandler(EFileStorageType defaultType = EFileStorageType.ReadOnly, string defaultPath = null) {
             foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile))) {
                 OffsetMapping.Add(df, new Dictionary<long, FileStorageInformation>());
@@ -170,11 +187,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             else
             {
                 // Create standard Game DAT file request info.
-                info = new FileStorageInformation();
-                var parts = Dat.Offset8xToParts(offset8x);
-                info.RealOffset = parts.Offset;
-                info.RealPath = Dat.GetDatPath(dataFile, parts.DatNum);
-                info.StorageType = EFileStorageType.CompressedBlob;
+                info = MakeGameStorageInfo(dataFile, offset8x);
             }
 
             return await GetUncompressedFile(info);
@@ -198,6 +211,53 @@ namespace xivModdingFramework.SqPack.FileTypes
                         return await _dat.GetUncompressedData(br, info.RealOffset);
                     }
                 }
+            }
+        }
+        public async Task<BinaryReader> GetUncompressedFileStream(XivDataFile dataFile, long offset8x, bool forceType2 = false)
+        {
+            if (!OffsetMapping.ContainsKey(dataFile))
+            {
+                throw new FileNotFoundException("Invalid Data File: " + dataFile.ToString());
+            }
+
+            FileStorageInformation info;
+            if (OffsetMapping[dataFile].ContainsKey(offset8x))
+            {
+                // Load info from mapping
+                info = OffsetMapping[dataFile][offset8x];
+            }
+            else
+            {
+                // Create standard Game DAT file request info.
+                info = MakeGameStorageInfo(dataFile, offset8x);
+            }
+
+            return await GetUncompressedFileStream(info, forceType2);
+        }
+        private async Task<BinaryReader> GetUncompressedFileStream(FileStorageInformation info, bool forceType2 = false)
+        {
+            if (info.StorageType == EFileStorageType.UncompressedBlob || info.StorageType == EFileStorageType.UncompressedIndividual)
+            {
+                // We can return the raw file reader and save memory here, yay!
+                var br = new BinaryReader(File.OpenRead(info.RealPath));
+                br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                return br;
+            }
+            else
+            {
+                // This is a bit clunky.  We have to decompress the file.
+                byte[] data;
+                using (var br = new BinaryReader(File.OpenRead(info.RealPath)))
+                {
+                    // Open file, navigate to the offset(or start of file), read and decompress SQPack file.
+                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+                    br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                    data = await _dat.GetUncompressedData(br, info.RealOffset);
+                }
+
+                // Return new stream.
+                data = await SmartImport.CreateCompressedFile(data, forceType2);
+                return new BinaryReader(new MemoryStream(data));
             }
         }
 
@@ -226,11 +286,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             else
             {
                 // Create standard Game DAT file request info.
-                info = new FileStorageInformation();
-                var parts = Dat.Offset8xToParts(offset8x);
-                info.RealOffset = parts.Offset;
-                info.RealPath = Dat.GetDatPath(dataFile, parts.DatNum);
-                info.StorageType = EFileStorageType.CompressedBlob;
+                info = MakeGameStorageInfo(dataFile, offset8x);
             }
 
             return await GetCompressedFile(info, forceType2);
@@ -245,10 +301,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                     br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
                     if((info.StorageType == EFileStorageType.CompressedBlob || info.StorageType == EFileStorageType.CompressedIndividual) && info.FileSize == 0)
                     {
-                        // If it's an SqPacked file that we don't have a size for, we need to get the size.
-                        var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-                        info.FileSize = _dat.GetCompressedFileSize(br, info.RealOffset);
+                        // If we don't have the compressed file size already, check it.
+                        // (This is mostly the case when reading game DATs, for perf reasons)
+                        if (info.FileSize == 0)
+                        {
+                            info.FileSize = Dat.GetCompressedFileSize(br, info.RealOffset);
+                        }
                         br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
                     }
 
@@ -260,6 +318,49 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                     return data;
                 }
+            }
+        }
+        public async Task<BinaryReader> GetCompressedFileStream(XivDataFile dataFile, long offset8x, bool forceType2 = false)
+        {
+            if (!OffsetMapping.ContainsKey(dataFile))
+            {
+                throw new FileNotFoundException("Invalid Data File: " + dataFile.ToString());
+            }
+
+            FileStorageInformation info;
+            if (OffsetMapping[dataFile].ContainsKey(offset8x))
+            {
+                // Load info from mapping
+                info = OffsetMapping[dataFile][offset8x];
+            }
+            else
+            {
+                // Create standard Game DAT file request info.
+                info = MakeGameStorageInfo(dataFile, offset8x);
+            }
+
+            return await GetCompressedFileStream(info, forceType2);
+        }
+        private async Task<BinaryReader> GetCompressedFileStream(FileStorageInformation info, bool forceType2 = false)
+        {
+            if (info.StorageType == EFileStorageType.CompressedBlob || info.StorageType == EFileStorageType.CompressedIndividual)
+            {
+                // We can return the raw file reader and save memory here, yay!
+                var br = new BinaryReader(File.OpenRead(info.RealPath));
+                br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                return br;
+            }
+            else
+            {
+                // This is a bit clunky.  We have to compress the file.
+                byte[] data;
+                using (var br = new BinaryReader(File.OpenRead(info.RealPath)))
+                {
+                    br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                    data = br.ReadBytes(info.FileSize);
+                }
+                data = await SmartImport.CreateCompressedFile(data, forceType2);
+                return new BinaryReader(new MemoryStream(data));
             }
         }
 
@@ -364,6 +465,26 @@ namespace xivModdingFramework.SqPack.FileTypes
             OffsetMapping[dataFile].Add(offset8x, storageInfo);
         }
 
+        public int GetUncompressedSize(XivDataFile dataFile, long offset8x)
+        {
+            if (!OffsetMapping.ContainsKey(dataFile))
+            {
+                throw new FileNotFoundException("Invalid Data File: " + dataFile.ToString());
+            }
+
+            FileStorageInformation info;
+            if (OffsetMapping[dataFile].ContainsKey(offset8x))
+            {
+                // Load info from mapping
+                info = OffsetMapping[dataFile][offset8x];
+            }
+            else
+            {
+                // Create standard Game DAT file request info.
+                info = MakeGameStorageInfo(dataFile, offset8x);
+            }
+            return info.GetUncompressedFileSize();
+        }
 
         /// <summary>
         /// Writes all the files in this data store to the given transaction target.

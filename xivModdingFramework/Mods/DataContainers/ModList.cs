@@ -295,8 +295,14 @@ namespace xivModdingFramework.Mods.DataContainers
         public object Clone()
         {
             var clone = (Mod)MemberwiseClone();
-            clone.data = (Data) data.Clone();
-            clone.modPack = (ModPack) modPack.Clone();
+            if (data != null)
+            {
+                clone.data = (Data)data.Clone();
+            }
+            if (modPack != null)
+            {
+                clone.modPack = (ModPack)modPack.Clone();
+            }
             return clone;
         }
     }

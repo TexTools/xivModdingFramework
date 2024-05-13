@@ -370,13 +370,13 @@ namespace xivModdingFramework.Mods
             XivCache.CacheWorkerEnabled = false;
 
             var tx = new ModTransaction(readOnly, modpack, settings, waitToStart);
-            _ActiveTransaction = tx;
-
             if (!Dat.AllowDatAlteration && tx.Settings.Target == ETransactionTarget.GameFiles)
             {
+                _ActiveTransaction = tx;
                 CancelTransaction(tx);
                 throw new Exception("Cannot open write transaction while DAT writing is disabled.");
             }
+            _ActiveTransaction = tx;
 
 
             return tx;
@@ -780,7 +780,7 @@ namespace xivModdingFramework.Mods
         #endregion
 
 
-        #region Raw Data I/O
+        #region Internals
 
         /// <summary>
         /// Internal listener function for updates to our constintuent index files.
@@ -790,9 +790,9 @@ namespace xivModdingFramework.Mods
         /// <param name="updatedOffset"></param>
         internal void INTERNAL_OnIndexUpdate(XivDataFile dataFile, string path, long originalOffset, long updatedOffset)
         {
-            if(State != ETransactionState.Open && State != ETransactionState.Preparing)
+            if(State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Closing)
             {
-                throw new Exception("Attempted to write to index files in a non Open or Preparing Transaction.");
+                throw new Exception("Attempted to write to index files during invalid Transaction State.");
             }
 
             if (State == ETransactionState.Preparing)
@@ -855,6 +855,35 @@ namespace xivModdingFramework.Mods
         }
 
         /// <summary>
+        /// Gets the next temporary offset to use for transaction storage file writing.
+        /// These start at UINT.MAX * 8 and decrement down by 16.  (By functionally 1 for the real uint based offset pointer each time)
+        /// These offsets are then replaced with real offsets when the transaction is committed.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        private long GetNextTempOffset(XivDataFile dataFile)
+        {
+            if (!_NextDataOffset.ContainsKey(dataFile))
+            {
+                // Start at Max value (without synonym flag) and go down.
+                _NextDataOffset.Add(dataFile, uint.MaxValue - 1);
+            }
+
+            var offset = _NextDataOffset[dataFile];
+
+            // Decrement by 16, which is really just 1 less in the actual offset field.
+            _NextDataOffset[dataFile] = _NextDataOffset[dataFile] - 16;
+
+            long longOffset = offset * 8L;
+
+            return longOffset;
+        }
+        #endregion
+
+
+        #region Raw File I/O
+
+        /// <summary>
         /// Retrieves the data for a given path/mod status.
         /// </summary>
         /// <param name="dataFile"></param>
@@ -901,37 +930,16 @@ namespace xivModdingFramework.Mods
 
 
         /// <summary>
-        /// Gets the next temporary offset to use for transaction storage file writing.
-        /// These start at UINT.MAX * 8 and decrement down by 16.  (By functionally 1 for the real uint based offset pointer each time)
-        /// These offsets are then replaced with real offsets when the transaction is committed.
-        /// </summary>
-        /// <param name="dataFile"></param>
-        /// <returns></returns>
-        private long GetNextTempOffset(XivDataFile dataFile)
-        {
-            if (!_NextDataOffset.ContainsKey(dataFile))
-            {
-                // Start at Max value (without synonym flag) and go down.
-                _NextDataOffset.Add(dataFile, uint.MaxValue - 1);
-            }
-
-            var offset = _NextDataOffset[dataFile];
-
-            // Decrement by 16, which is really just 1 less in the actual offset field.
-            _NextDataOffset[dataFile] = _NextDataOffset[dataFile] - 16;
-
-            long longOffset = offset * 8L;
-
-            return longOffset;
-        }
-
-        /// <summary>
         /// Writes the given data to the default transaction data store for the data file, returning the next available placeholder offset.
         /// Returns the 8x Dat-embeded placeholder transactionary offset.
+        /// Does /NOT/ update any index file offsets.
+        /// 
+        /// Should largely only be used by Dat.WriteModFile() unless you want to use the transaction data store as as scratch pad.
+        /// Files stored in the transaction data store without a valid game path in the indexes will not be written on transaction commit.
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task<long> WriteData(XivDataFile dataFile, byte[] data, bool compressed = false)
+        internal async Task<long> WriteData(XivDataFile dataFile, byte[] data, bool compressed = false)
         {
             var offset = GetNextTempOffset(dataFile);
             await WriteData(dataFile, offset, data, compressed);
@@ -941,38 +949,93 @@ namespace xivModdingFramework.Mods
 
         /// <summary>
         /// Writes the given data to the default transaction data store, keyed to the given data file/offset key.
+        /// Does /NOT/ update any index file offsets, and expects a transaction temporary offset.
         /// </summary>
         /// <param name="dataFile"></param>
         /// <param name="offset8x"></param>
         /// <param name="compressed"></param>
         /// <returns></returns>
-        internal async Task WriteData(XivDataFile dataFile, long offset8x, byte[] data, bool compressed = false)
+        private async Task WriteData(XivDataFile dataFile, long offset8x, byte[] data, bool compressed = false)
         {
             await _DataHandler.WriteFile(dataFile, offset8x, data, compressed);
         }
 
         /// <summary>
-        /// Retrieve an SQPack File read stream for a given data file and offset.
+        /// Retrieve a readable file stream to the base file.
+        /// Depending on the file store, this may be a direct stream to a file on disk, or may have to compress/decompress
+        /// the data first before attaching it to a memorystream.
         /// </summary>
-        /// <param name="dataFile"></param>
-        /// <param name="offset8x"></param>
+        /// <param name="path"></param>
+        /// <param name="forceOriginal"></param>
+        /// <param name="compressed"></param>
         /// <returns></returns>
-        internal async Task<BinaryReader> GetCompressedFileStream(XivDataFile dataFile, long offset8x)
+        public async Task<BinaryReader> GetFileStream(string path, bool forceOriginal = false, bool compressed = false)
         {
-            var data = await _DataHandler.GetCompressedFile(dataFile, offset8x);
-            return new BinaryReader(new MemoryStream(data));
+            var df = IOUtil.GetDataFileFromPath(path);
+            var offset = await Get8xDataOffset(path, forceOriginal);
+            return await GetFileStream(df, offset, compressed);
         }
 
         /// <summary>
-        /// Retrieve an uncompressed read stream for a given data file and offset.
+        /// Retrieve a readable file stream to the base file.
+        /// Depending on the file store, this may be a direct stream to a file on disk, or may have to compress/decompress
+        /// the data first before attaching it to a memorystream.
         /// </summary>
         /// <param name="dataFile"></param>
         /// <param name="offset8x"></param>
+        /// <param name="compressed"></param>
         /// <returns></returns>
-        internal async Task<BinaryReader> GetUncompressedFilesStream(XivDataFile dataFile, long offset8x)
+        public async Task<BinaryReader> GetFileStream(XivDataFile dataFile, long offset8x, bool compressed = false)
         {
-            var data = await _DataHandler.GetUncompressedFile(dataFile, offset8x);
-            return new BinaryReader(new MemoryStream(data));
+            if (compressed)
+            {
+                return await _DataHandler.GetCompressedFileStream(dataFile, offset8x);
+            }
+            else
+            {
+                return await _DataHandler.GetUncompressedFileStream(dataFile, offset8x);
+            }
+        }
+
+
+        /// <summary>
+        /// Gets the Compressed/SQPacked size of a file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="forceOriginal"></param>
+        /// <returns></returns>
+        public async Task<int> GetCompressedFileSize(string path, bool forceOriginal = false)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var offset = await Get8xDataOffset(path, forceOriginal);
+            var size =  await GetCompressedFileSize(df, offset);
+            return size;
+        }
+        public async Task<int> GetCompressedFileSize(XivDataFile dataFile, long offset8x)
+        {
+            using (var stream = await GetFileStream(dataFile, offset8x, true))
+            {
+                var size =  Dat.GetCompressedFileSize(stream);
+                return size;
+            }
+        }
+
+
+        /// <summary>
+        /// Gets the uncompressed/un-SQPacked size of a file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="forceOriginal"></param>
+        /// <returns></returns>
+        public async Task<int> GetUncompressedFileSize(string path, bool forceOriginal = false)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var offset = await Get8xDataOffset(path, forceOriginal);
+            return GetUncompressedFileSize(df, offset);
+        }
+        public int GetUncompressedFileSize(XivDataFile dataFile, long offset8x)
+        {
+            return _DataHandler.GetUncompressedSize(dataFile, offset8x);
         }
 
         #endregion

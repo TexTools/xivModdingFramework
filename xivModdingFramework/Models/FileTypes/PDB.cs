@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -135,7 +136,7 @@ namespace xivModdingFramework.Models.FileTypes
                         for (int i = 0; i < numBones; i++)
                         {
                             br.BaseStream.Seek(boneOffsets[i], SeekOrigin.Begin);
-                            bones.Add(Dat.ReadNullTerminatedString(br));
+                            bones.Add(IOUtil.ReadNullTerminatedString(br));
                         }
                         br.BaseStream.Seek(current, SeekOrigin.Begin);
 

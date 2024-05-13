@@ -239,26 +239,26 @@ namespace xivModdingFramework.Materials.FileTypes
                 for (var i = 0; i < texCount; i++)
                 {
                     br.BaseStream.Seek(stringBlockStart + texPathOffsets[i], SeekOrigin.Begin);
-                    var path = Dat.ReadNullTerminatedString(br);
+                    var path = IOUtil.ReadNullTerminatedString(br);
                     xivMtrl.Textures[i].TexturePath = path;
                 }
 
                 for (var i = 0; i < xivMtrl.MapStrings.Count; i++)
                 {
                     br.BaseStream.Seek(stringBlockStart + mapOffset[i], SeekOrigin.Begin);
-                    var st = Dat.ReadNullTerminatedString(br);
+                    var st = IOUtil.ReadNullTerminatedString(br);
                     xivMtrl.MapStrings[i].Value = st;
                 }
 
                 for (var i = 0; i < xivMtrl.ColorsetStrings.Count; i++)
                 {
                     br.BaseStream.Seek(stringBlockStart + colorsetOffsets[i], SeekOrigin.Begin);
-                    var st = Dat.ReadNullTerminatedString(br);
+                    var st = IOUtil.ReadNullTerminatedString(br);
                     xivMtrl.ColorsetStrings[i].Value = st;
                 }
 
                 br.BaseStream.Seek(stringBlockStart + shaderNameOffset, SeekOrigin.Begin);
-                xivMtrl.ShaderPackRaw = Dat.ReadNullTerminatedString(br);
+                xivMtrl.ShaderPackRaw = IOUtil.ReadNullTerminatedString(br);
 
                 br.BaseStream.Seek(stringBlockStart + stringBlockSize, SeekOrigin.Begin);
 
