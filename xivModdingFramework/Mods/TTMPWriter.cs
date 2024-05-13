@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
@@ -20,7 +21,7 @@ namespace xivModdingFramework.Mods
         {
             // Files can be added as an already available byte[], or as a read operation to be completed on demand
             // Tasks should not be executed until a point where user is being updated on progress
-            public Func<byte[]> DataTask;
+            public Func<Task<byte[]>> DataTask;
             public byte[] Data;
             public ModsJson Mod;
 
@@ -31,17 +32,17 @@ namespace xivModdingFramework.Mods
                 Mod = mod;
             }
 
-            public AddedFile(Func<byte[]> dataTask, ModsJson mod)
+            public AddedFile(Func<Task<byte[]>> dataTask, ModsJson mod)
             {
                 DataTask = dataTask;
                 Data = null;
                 Mod = mod;
             }
 
-            public byte[] GetData()
+            public async Task<byte[]> GetData()
             {
                 if (Data == null)
-                    Data = DataTask();
+                    Data = await DataTask();
                 return Data;
             }
         }
@@ -185,7 +186,7 @@ namespace xivModdingFramework.Mods
 
         // Add a mod file to a simple/backup modpack
         // Since the data is not immediately available, a datafile reference is required to read data from
-        public ModsJson AddFile(SimpleModData modData, Dat dat)
+        public ModsJson AddFile(SimpleModData modData, ModTransaction tx)
         {
             if (_modPackJson.SimpleModsList == null)
                 throw new Exception("Wrong modpack type");
@@ -206,11 +207,10 @@ namespace xivModdingFramework.Mods
 
             _modPackJson.SimpleModsList.Add(modsJson);
 
-            Func<byte[]> modDataTask = () =>
+            Func<Task<byte[]>> modDataTask = async () =>
             {
-                var rawData = dat.UNSAFE_GetCompressedData(modData.ModOffset,
-                    XivDataFiles.GetXivDataFile(modData.DatFile),
-                    modData.ModSize);
+
+                var rawData = await tx.ReadFile(modsJson.FullPath);
 
                 if (rawData == null)
                 {
@@ -245,7 +245,7 @@ namespace xivModdingFramework.Mods
         }
 
         // Write MPD file while updating ModSize and ModOffset values in the modpack json data
-        private void _writeMPD(string tempMPD, IProgress<(int current, int total, string message)> progress)
+        private async Task _writeMPD(string tempMPD, IProgress<(int current, int total, string message)> progress)
         {
             // Keeps track of previously written files for deduplication
             var seenFiles = new Dictionary<SHA1HashKey, long>();
@@ -260,7 +260,7 @@ namespace xivModdingFramework.Mods
                 progress?.Report((modCount++, _addedFiles.Count, string.Empty));
 
                 // This may execute a file-read operation
-                var data = addedFile.GetData();
+                var data = await addedFile.GetData();
 
                 var dedupeHash = new SHA1HashKey(sha1.ComputeHash(data));
                 long offset = -1;
@@ -284,6 +284,13 @@ namespace xivModdingFramework.Mods
             var modPackName = _modPackJson.Name;
             var modPackPath = Path.Combine(modPackDirectory.FullName, $"{modPackName}.ttmp2");
 
+            if (modPackDirectory.FullName.EndsWith(".ttmp2"))
+            {
+                // Explicit path already provided.
+                modPackPath = modPackDirectory.FullName;
+                modPackName = Path.GetFileNameWithoutExtension(modPackPath);
+            }
+
             if (File.Exists(modPackPath) && !overwriteModpack)
             {
                 var fileNum = 1;
@@ -302,13 +309,13 @@ namespace xivModdingFramework.Mods
             return modPackPath;
         }
 
-        public void Write(IProgress<(int current, int total, string message)> progress, DirectoryInfo modPackDirectory, bool overwriteModpack)
+        public async Task Write(IProgress<(int current, int total, string message)> progress, DirectoryInfo modPackDirectory, bool overwriteModpack)
         {
             string tempMPD = Path.Combine(_tmpDir, "TTMPD.mpd");
             string tempMPL = Path.Combine(_tmpDir, "TTMPL.mpl");
 
             // Write MPD
-            _writeMPD(tempMPD, progress);
+            await _writeMPD(tempMPD, progress);
 
             // Write MPL
             File.WriteAllText(tempMPL, JsonConvert.SerializeObject(_modPackJson));

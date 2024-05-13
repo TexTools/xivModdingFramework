@@ -79,7 +79,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
         private readonly DirectoryInfo _modPackDirectory;
 
-        public TTMP(DirectoryInfo modPackDirectory, string source)
+        public TTMP(DirectoryInfo modPackDirectory)
         {
             _modPackDirectory = modPackDirectory;
         }
@@ -164,7 +164,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns>The number of pages created for the mod pack</returns>
         public async Task<int> CreateWizardModPack(ModPackData modPackData, IProgress<double> progress, bool overwriteModpack)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 using var ttmpWriter = new TTMPWriter(modPackData, _typeCodeWizard);
 
@@ -185,7 +185,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 // Actually executes the work of deduplicating mods and writing the TTMP file
-                ttmpWriter.Write(new WizardProgressWrapper(progress), _modPackDirectory, overwriteModpack);
+                await ttmpWriter.Write(new WizardProgressWrapper(progress), _modPackDirectory, overwriteModpack);
                 return ttmpWriter.PageCount;
             });
         }
@@ -197,11 +197,22 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <returns>The number of mods processed for the mod pack</returns>
-        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress, bool overwriteModpack)
+        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, IProgress<(int current, int total, string message)> progress = null, bool overwriteModpack = false, ModTransaction tx = null)
         {
-            return await Task.Run(() =>
+
+            if(progress == null)
             {
-                var dat = new Dat(gameDirectory);
+                progress = IOUtil.NoOpImportProgress;
+            }
+
+            return await Task.Run(async () =>
+            {
+                if (tx == null)
+                {
+                    // Readonly TX if we don't have one already.
+                    tx = ModTransaction.BeginTransaction(true);
+                }
+
                 using var writer = new TTMPWriter(modPackData, _typeCodeSimple);
 
                 var mp = new ModPack
@@ -214,13 +225,13 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 foreach (var mod in modPackData.SimpleModDataList)
                 {
-                    var modJson = writer.AddFile(mod, dat);
+                    var modJson = writer.AddFile(mod, tx);
                     // This field is intended for backup modpacks, but TexTools started writing it in to simple modpacks as well at some point
                     if (modJson != null)
                         modJson.ModPackEntry = mp;
                 }
 
-                writer.Write(progress, _modPackDirectory, overwriteModpack);
+                await writer.Write(progress, _modPackDirectory, overwriteModpack);
                 return writer.ModCount;
             });
         }
@@ -233,21 +244,25 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <param name="overwriteModpack">Whether or not to overwrite an existing modpack with the same name</param>
         /// <returns>The number of mods processed for the mod pack</returns>
-        public async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, DirectoryInfo gameDirectory, IProgress<(int current, int total, string message)> progress, bool overwriteModpack)
+        public async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, IProgress<(int current, int total, string message)> progress, bool overwriteModpack, ModTransaction tx = null)
         {
-            return await Task.Run(() =>
+            if (tx == null)
             {
-                var dat = new Dat(gameDirectory);
+                // Readonly TX if we don't have one already.
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            return await Task.Run(async () =>
+            {
                 using var writer = new TTMPWriter(backupModpackData, _typeCodeBackup);
 
                 foreach (var mod in backupModpackData.ModsToBackup)
                 {
-                    var modJson = writer.AddFile(mod.SimpleModData, dat);
+                    var modJson = writer.AddFile(mod.SimpleModData, tx);
                     if (modJson != null)
                         modJson.ModPackEntry = mod.ModPack;
                 }
 
-                writer.Write(progress, _modPackDirectory, overwriteModpack);
+                await writer.Write(progress, _modPackDirectory, overwriteModpack);
                 return writer.ModCount;
             });
         }
@@ -462,11 +477,6 @@ namespace xivModdingFramework.Mods.FileTypes
             bool AutoAssignBodyMaterials = false, bool fixPreDawntrailMods = true)
         {
             if (modsJson == null || modsJson.Count == 0) return (null, null, 0);
-
-            if(XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("Cannot import modpacks via TexTools in Lumina mode.");
-            }
 
             if(progress == null)
             {

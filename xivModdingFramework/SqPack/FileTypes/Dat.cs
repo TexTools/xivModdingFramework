@@ -61,6 +61,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     return false;
                 }
+                if (XivCache.GameInfo.UseLumina)
+                {
+                    return false;
+                }
                 return true;
             }
         }
@@ -497,7 +501,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if (tx != null)
             {
-                type2Bytes = await tx.GetData(dataFile, offset);
+                type2Bytes = await tx.ReadFile(dataFile, offset);
             }
             else
             {
@@ -784,7 +788,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (tx != null)
                 {
-                    return await tx.GetData(dataFile, offset);
+                    return await tx.ReadFile(dataFile, offset);
                 }
                 else
                 {
@@ -1354,7 +1358,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (tx != null)
                 {
-                    return await tx.GetData(dataFile, offset);
+                    return await tx.ReadFile(dataFile, offset);
                 }
                 else
                 {
@@ -1922,7 +1926,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var offset = await tx.Get8xDataOffset(path, forceOriginal);
             var df = IOUtil.GetDataFileFromPath(path);
-            return await tx.GetData(df, offset, true);
+            return await tx.ReadFile(df, offset, true);
         }
 
         /// <summary>
@@ -2345,11 +2349,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         ///
         /// NOTE -- If a Transaction is provided, the DATs are currently written to, but the Index/Modlist changes are stored 
         /// in the transaction.
-        /// 
-        /// LUMINA - If Lumina writing is enabled, the indexes/modlist/dats will NEVER be modified by this function, making it
-        /// functionally a NoOp() as far as the internal TexTools system state is concerned.  This means if another function
-        /// relies upon the DATs/Indexes/Modlist to be altered coming out of this function, the calling function needs to
-        /// assert() that Lumina writing is disabled.
         /// </summary>
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
@@ -2361,13 +2360,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
-
-
-
-            if (XivCache.GameInfo.UseLumina)
-            {
-                return await DoLuminaWrite(fileData, internalFilePath, tx == null);
-            }
 
             // Open a transaction if we don't have one.
             var doDatSave = false;
@@ -2520,42 +2512,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
         }
-
-        private async Task<long> DoLuminaWrite(byte[] fileData, string internalFilePath, bool expandMetadata)
-        {
-            var doLumina = XivCache.GameInfo.UseLumina;
-            var luminaOutDir = XivCache.GameInfo.LuminaDirectory;
-            if (doLumina && luminaOutDir == null)
-            {
-                throw new InvalidDataException("Cannot perform Lumina imports without valid Lumina directory.");
-            }
-
-            if (doLumina && (luminaOutDir == null || !luminaOutDir.Exists))
-                throw new ArgumentException("No valid lumina output path was specified.", nameof(luminaOutDir));
-
-            await DecompressAndWrite(fileData, luminaOutDir, internalFilePath);
-            if (expandMetadata)
-            {
-                await ExpandMetadata(fileData, internalFilePath);
-            }
-
-            return -1;
-        }
-
-        /// <summary>
-        /// Write the uncompressed SQPack file to the given file directory.
-        /// </summary>
-        /// <param name="data">The modded data.</param>
-        /// <param name="outDirectory">The output folder to write to.</param>
-        /// <param name="internalPath"></param>
-        private async Task DecompressAndWrite(byte[] data, DirectoryInfo outDirectory, string internalPath)
-        {
-            var extractedFile = new FileInfo(Path.Combine(outDirectory.FullName, internalPath));
-            extractedFile.Directory?.Create();
-            var uncompressedData = await GetUncompressedData(data);
-            File.WriteAllBytes(extractedFile.FullName, uncompressedData);
-        }
-
 
         /// <summary>
         /// Dictionary that holds [Texture Code, Texture Format] data

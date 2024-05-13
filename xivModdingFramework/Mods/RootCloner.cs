@@ -54,16 +54,6 @@ namespace xivModdingFramework.Mods
                 throw new InvalidDataException("Cannot clone unsupported root.");
             }
 
-            if(XivCache.GameInfo.UseLumina)
-            {
-                // Using the root cloner with Lumina import mode enabled is unstable/not safe.
-                // ( The state of the game files in the TT system may not match the state of the 
-                // Lumina mod setup, and the modlist/etc. can get bashed as this function directly
-                // modifies the modlist during the cloning process. )
-                throw new Exception("Item Conversion cannot be used with Lumina import mode.");
-            }
-
-
             if (ProgressReporter != null)
             {
                 ProgressReporter.Report("Stopping Cache Worker...");
@@ -506,7 +496,7 @@ namespace xivModdingFramework.Mods
                     var desc = "Item Converter Modpack - " + srcItem.Name + " -> " + iName + "\nCreated at: " + DateTime.Now.ToString();
                     // Time to save the modlist to file.
                     var dir = new DirectoryInfo(saveDirectory);
-                    var _ttmp = new TTMP(dir, ApplicationSource);
+                    var _ttmp = new TTMP(dir);
                     var smpd = new SimpleModPackData()
                     {
                         Author = modPack.author,
@@ -519,7 +509,6 @@ namespace xivModdingFramework.Mods
 
                     foreach(var mod in mods)
                     {
-                        var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
                         var smd = new SimpleModData()
                         {
                             Name = iName,
@@ -527,13 +516,12 @@ namespace xivModdingFramework.Mods
                             DatFile = df.GetDataFileName(),
                             Category = iCat,
                             IsDefault = false,
-                            ModSize = size,
                             ModOffset = mod.data.modOffset
                         };
                         smpd.SimpleModDataList.Add(smd);
                     }
 
-                    await _ttmp.CreateSimpleModPack(smpd, XivCache.GameInfo.GameDirectory, null, true);
+                    await _ttmp.CreateSimpleModPack(smpd, null, true, tx);
                 }
 
 
@@ -782,13 +770,12 @@ namespace xivModdingFramework.Mods
                     }
                     else
                     {
-                        // If we got here, we have some random orphaned files that got copied over.
-                        // These likely belonged to whatever base mod was installed on the root previously.
-                        // It's adding extra unused files to the new destination folder, so it's not idea, but it's fine for now.
-
-                        // We don't need to reset it in the old root either, since it's not part of this modpack.
+                        // If we got here, we have mods that weren't in the original modpack import, that got included in the root clone.
+                        // This should never happen if the modpack includes the entire subset of files necessary to properly fill out its item root.
                         
-                        throw new Exception("Root Cloner wanted to modify more files than were provided by the modpack import.");
+                        // If it /does/ happen, it means we just copied some unknown (possibly orphaned) files into the destination item directory.
+                        // Which isn't necessarily dangerous, but isn't correct, either.
+                        throw new Exception("Root CloneAndReset wanted to copy more files than were provided by the modpack import.");
                     }
                 }
                 clearedFiles.UnionWith(filesToReset);

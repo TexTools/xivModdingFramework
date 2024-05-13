@@ -12,6 +12,8 @@ using xivModdingFramework.Mods;
 using static xivModdingFramework.SqPack.FileTypes.TransactionDataHandler;
 using System.Globalization;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -370,47 +372,173 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="target"></param>
         /// <param name="targetPath"></param>
         /// <returns></returns>
-        internal async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteAllToTarget(ETransactionTarget target, string targetPath, ModTransaction tx)
+        internal async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteAllToTarget(ModTransactionSettings settings, ModTransaction tx)
         {
             var offsets = new Dictionary<string, (long RealOffset, long TempOffset)>();
-            if(target == ETransactionTarget.GameFiles)
+            if(settings.Target == ETransactionTarget.GameFiles)
             {
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+                return await WriteToGameFiles(tx, settings);
+            } 
+            else if(settings.Target == ETransactionTarget.LuminaFolders)
+            {
+                return await WriteToLuminaFolders(tx, settings);
+            }
+            else if (settings.Target == ETransactionTarget.TTMP)
+            {
+                return await WriteToTTMP(tx, settings);
+            }
+            if (settings.Target == ETransactionTarget.PMP)
+            {
+                return await WriteToTTMP(tx, settings);
+            }
+            throw new InvalidDataException("Invalid Transaction Target");
+        }
 
-                // TODO - Could paralellize this by datafile, but pretty rare that would get any gains.
-                foreach(var dkv in OffsetMapping)
+        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToGameFiles(ModTransaction tx, ModTransactionSettings settings)
+        {
+            if(settings.TargetPath != XivCache.GameInfo.GameDirectory.FullName)
+            {
+                throw new NotImplementedException("Writing to other game installs has not been implemented. :(");
+            }
+
+            var offsets = new Dictionary<string, (long RealOffset, long TempOffset)>();
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+            // TODO - Could paralellize this by datafile, but pretty rare that would get any gains.
+            foreach (var dkv in OffsetMapping)
+            {
+                var df = dkv.Key;
+                var files = dkv.Value;
+                if (files.Count == 0) continue;
+                var index = await tx.GetIndexFile(df);
+
+                foreach (var fkv in files)
+                {
+                    var tempOffset = fkv.Key;
+                    var file = fkv.Value;
+
+                    // Get the live paths this file is being used in...
+                    var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
+                    foreach (var path in paths)
+                    {
+                        // Depending on store this may already be compressed.
+                        // Or it may not.
+                        var forceType2 = path.EndsWith(".atex");
+                        var data = await GetCompressedFile(file, forceType2);
+
+                        // We now have everything we need for DAT writing.
+                        var realOffset = (await _dat.Unsafe_WriteToDat(data, df)) * 8L;
+
+                        offsets.Add(path, (realOffset, tempOffset));
+                    }
+                }
+            }
+
+            return offsets;
+
+        }
+
+        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToLuminaFolders(ModTransaction tx, ModTransactionSettings settings)
+        {
+            foreach (var dkv in OffsetMapping)
+            {
+                var df = dkv.Key;
+                var files = dkv.Value;
+                if (files.Count == 0) continue;
+                var index = await tx.GetIndexFile(df);
+
+                foreach (var fkv in files)
+                {
+                    var tempOffset = fkv.Key;
+                    var file = fkv.Value;
+
+                    // Get the live paths this file is being used in...
+                    var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
+                    foreach (var path in paths)
+                    {
+                        var destinationPath = Path.Combine(settings.TargetPath, path);
+                        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+
+                        // Write the file to disk.
+                        File.WriteAllBytes(destinationPath, await GetUncompressedFile(df, tempOffset));
+                    }
+                }
+            }
+
+            // Don't have real offsets to update to, since we don't write to game files.
+            return null;
+        }
+
+        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToTTMP(ModTransaction tx, ModTransactionSettings settings)
+        {
+            if (!settings.TargetPath.EndsWith(".ttmp2"))
+            {
+                // Directory instead of file path.
+                var fileName = "transaction.ttmp2";
+                settings.TargetPath = Path.Combine(settings.TargetPath, fileName);
+            }
+
+            var dir = Path.GetDirectoryName(settings.TargetPath);
+            Directory.CreateDirectory(dir);
+
+            var simplePack = new SimpleModPackData();
+
+            // Use the Transaction's current modpack settings if it has any set.
+            Version.TryParse(tx.ModPack == null ? "1.0" : tx.ModPack.version, out var ver);
+
+            simplePack.Name = tx.ModPack == null ? "Transaction Modpack" : tx.ModPack.name;
+            simplePack.Author = tx.ModPack == null ? "Unknown" : tx.ModPack.author;
+            simplePack.Version = ver == null ? new Version("1.0") : ver;
+            simplePack.SimpleModDataList = new List<SimpleModData>();
+
+            var mList = await tx.GetModList();
+
+            var tempFile = Path.GetTempFileName();
+
+            using (var bw = new BinaryWriter(File.Open(tempFile, FileMode.Create)))
+            {
+                foreach (var dkv in OffsetMapping)
                 {
                     var df = dkv.Key;
                     var files = dkv.Value;
                     if (files.Count == 0) continue;
                     var index = await tx.GetIndexFile(df);
 
-                    foreach(var fkv in files)
+                    foreach (var fkv in files)
                     {
                         var tempOffset = fkv.Key;
                         var file = fkv.Value;
-                        
+
                         // Get the live paths this file is being used in...
                         var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
                         foreach (var path in paths)
-                         {
-                            // Depending on store this may already be compressed.
-                            // Or it may not.
-                            var forceType2 = path.EndsWith(".atex");
-                            var data = await GetCompressedFile(file, forceType2);
-
-                            // We now have everything we need for DAT writing.
-                            var realOffset = (await _dat.Unsafe_WriteToDat(data, df)) * 8L;
-
-                            offsets.Add(path, (realOffset, tempOffset));
+                        {
+                            // Bind the offsets for paths/mod objects for the TTMP writer.
+                            var mod = mList.GetMod(path);
+                            var md = new SimpleModData();
+                            md.FullPath = path;
+                            md.DatFile = df.ToString();
+                            md.Category = mod != null ? mod.category : "Unknown";
+                            md.Name = mod != null ? mod.name : "Unknown";
+                            simplePack.SimpleModDataList.Add(md);
                         }
                     }
                 }
-
-                return offsets;
             }
-            throw new NotImplementedException();
+
+            // Create the actual TTMP.
+            var _ttmp = new TTMP(new DirectoryInfo(settings.TargetPath));
+            await _ttmp.CreateSimpleModPack(simplePack, null, false, tx);
+
+            // Don't have real offsets to update to, since we don't write to game files.
+            return null;
         }
+
+        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToPMP(ModTransaction tx, ModTransactionSettings settings)
+        {
+            throw new NotImplementedException("PMP Export not yet implemented. :(");
+        }
+
 
         protected virtual void Dispose(bool disposing)
         {

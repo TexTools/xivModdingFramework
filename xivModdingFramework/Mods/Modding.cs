@@ -268,11 +268,6 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status of the mod</param>
         public async Task<bool> ToggleModStatus(string internalFilePath, bool enable, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
             var index = new Index(_gameDirectory);
 
             if (string.IsNullOrEmpty(internalFilePath))
@@ -328,11 +323,6 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status of the mod</param>
         public async Task ToggleModPackStatus(string modPackName, bool enable, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
             var ownTransaction = false;
             if(tx == null)
             {
@@ -392,11 +382,6 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
             if (mod == null) return false;
             if (string.IsNullOrEmpty(mod.name)) return false;
             if (string.IsNullOrEmpty(mod.fullPath)) return false;
@@ -507,11 +492,6 @@ namespace xivModdingFramework.Mods
         /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
         public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-            if(XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
-            }
-
             var ownTransaction = false;
             if (tx == null)
             {
@@ -538,11 +518,6 @@ namespace xivModdingFramework.Mods
 
         public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
-            }
-
             var _index = new Index(_gameDirectory);
 
             var modList = await GetModList();
@@ -708,11 +683,6 @@ namespace xivModdingFramework.Mods
         /// <param name="modItemPath">The mod item path of the mod to delete</param>
         public async Task DeleteMod(string modItemPath, bool allowInternal = false, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
             var doSave = false;
             var _index = new Index(_gameDirectory);
             if (tx == null)
@@ -774,12 +744,6 @@ namespace xivModdingFramework.Mods
         /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
         public async Task DeleteModPack(string modPackName)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
-
             using (var tx = ModTransaction.BeginTransaction())
             {
                 var modList = await tx.GetModList();
@@ -1019,10 +983,6 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
             if (!Dat.AllowDatAlteration)
             {
                 throw new Exception("Cannot defragment DATs while DAT writing is disabled.");

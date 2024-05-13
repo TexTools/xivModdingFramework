@@ -16,6 +16,7 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Mods
 {
+    #region Enums and Structs
     public enum ETransactionTarget
     {
         Invalid,
@@ -23,8 +24,8 @@ namespace xivModdingFramework.Mods
         // Write the modified files to the game .DATs on transaction commit.
         GameFiles,
 
-        // Write the modified files to the given folder on transaction commit, in Penumbra-style folder chains.
-        PenumbraFolder,
+        // Write the modified files to the given folder on transaction commit, in Lumina-style folder chains.
+        LuminaFolders,
 
         // Write the modified files to a TTMP at the given destination on transaction commit.
         TTMP,
@@ -33,8 +34,55 @@ namespace xivModdingFramework.Mods
         PMP
     }
 
+    public enum ETransactionState
+    {
+        Invalid,
+
+        // Just hanging out reading stuff.
+        ReadOnly,
+
+        // TX has been created, and is in setup phase.
+        // During this period, files that are imported into the TX will not be tracked for final output writing,
+        // But will still be imported into the Transaction state.
+        // Tl;Dr: Import Dependencies here.
+        Preparing,
+
+        // TX is actively open and recording file/index changes.
+        Open,
+
+        // TX in the process of either cancelling or committing.
+        Closing,
+
+        // TX has been cancelled or commited and is now closed.
+        Closed
+    }
+
+    public struct ModTransactionSettings
+    {
+        public EFileStorageType StorageType { get; set; }
+        public ETransactionTarget Target { get; set; }
+        public string TargetPath { get; set; }
+    }
+    #endregion
+
     public class ModTransaction : IDisposable
     {
+        #region Events
+        public delegate void TransactionEventHandler(ModTransaction sender);
+        public delegate void TransactionCancelledEventHandler(ModTransaction sender, bool graceful);
+        public delegate void TransactionStateChangedEventHandler(ModTransaction sender, ETransactionState oldState, ETransactionState newState);
+
+        public event TransactionEventHandler TransactionCommitted;
+        public event TransactionCancelledEventHandler TransactionCancelled;
+        public event TransactionEventHandler TransactionClosed;
+        public event TransactionStateChangedEventHandler TransactionStateChanged;
+
+        public static event TransactionEventHandler ActiveTransactionCommitted;
+        public static event TransactionCancelledEventHandler ActiveTransactionCancelled;
+        public static event TransactionEventHandler ActiveTransactionClosed;
+        public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
+        #endregion
+
 
         #region Properties and Accessors
 
@@ -62,7 +110,6 @@ namespace xivModdingFramework.Mods
 
         private ModList _ModList;
         private readonly bool _ReadOnly = false;
-        private bool _Finished = false;
 
         private TransactionDataHandler _DataHandler;
 
@@ -70,14 +117,12 @@ namespace xivModdingFramework.Mods
         private Modding __Modding;
         private DirectoryInfo _GameDirectory;
 
-        public ETransactionTarget Target { get; private set; }
-        public string TargetPath { get; private set; }
-
+        public ModTransactionSettings Settings { get; private set; }
         public bool AffectsGameFiles
         {
             get
             {
-                if(Target == ETransactionTarget.GameFiles && TargetPath == XivCache.GameInfo.GameDirectory.FullName)
+                if(Settings.Target == ETransactionTarget.GameFiles && Settings.TargetPath == XivCache.GameInfo.GameDirectory.FullName)
                 {
                     return true;
                 }
@@ -103,6 +148,35 @@ namespace xivModdingFramework.Mods
             get
             {
                 return _IndexFiles.Select(x => x.Key).ToList();
+            }
+        }
+
+        private ETransactionState _State;
+        public ETransactionState State { 
+            get {
+                return _State;
+            } 
+            private set
+            {
+                var isActiveTx = this == ActiveTransaction;
+
+                var oldState = _State;
+                _State = value;
+
+                TransactionStateChanged?.Invoke(this, oldState, _State);
+                if (isActiveTx)
+                {
+                    ActiveTransactionStateChanged?.Invoke(this, oldState, _State);
+                }
+
+                if(_State == ETransactionState.Closed)
+                {
+                    TransactionClosed?.Invoke(this);
+                    if (isActiveTx)
+                    {
+                        ActiveTransactionClosed?.Invoke(this);
+                    }
+                }
             }
         }
 
@@ -161,52 +235,71 @@ namespace xivModdingFramework.Mods
         {
             throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
         }
-        private ModTransaction(bool readOnly = false, ModPack modpack = null, ETransactionTarget target = ETransactionTarget.GameFiles, string targetPath = null)
+        private ModTransaction(bool readOnly = false, ModPack modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
             __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
             __Modding = new Modding(XivCache.GameInfo.GameDirectory);
 
+            _ReadOnly = readOnly;
+            State = ETransactionState.Preparing;
+
+
+
 
             // NOTE: Readonly Transactions should not implement anything that requires disposal via IDisposable.
             // Readonly Tx are intended to be lightweight and used in non-disposable/standard memory managed contexts.
-            _ReadOnly = readOnly;
             if (_ReadOnly)
             {
                 // Readonly Data Handlers do not technically need to be disposed as they never create a data store.
                 _DataHandler = new TransactionDataHandler(EFileStorageType.ReadOnly);
-                Target = ETransactionTarget.Invalid;
-                TargetPath = null;
+                Settings = new ModTransactionSettings()
+                {
+                    StorageType = EFileStorageType.ReadOnly,
+                    Target = ETransactionTarget.Invalid,
+                    TargetPath = null,
+                };
+                State = ETransactionState.ReadOnly;
             } else
             {
-                Target = target;
-                TargetPath = targetPath;
+                if (settings == null)
+                {
+                    settings = GetDefaultSettings();
+                }
+                Settings = settings.Value;
 
-                if (target == ETransactionTarget.Invalid)
+                if (Settings.Target == ETransactionTarget.Invalid)
                 {
                     throw new Exception("Invalid Transaction Target.");
                 }
 
-                if (target == ETransactionTarget.GameFiles && targetPath == null)
+                if (Settings.Target == ETransactionTarget.GameFiles && Settings.TargetPath == null)
                 {
                     // If we weren't given an explicit game path to commit to, use the default game directory.
-                    TargetPath = XivCache.GameInfo.GameDirectory.FullName;
+                    var s = Settings;
+                    s.TargetPath = XivCache.GameInfo.GameDirectory.FullName;
+                    Settings = s;
                 }
 
-                if (String.IsNullOrWhiteSpace(TargetPath))
+                if (String.IsNullOrWhiteSpace(Settings.TargetPath))
                 {
                     throw new Exception("A target path must be supplied for non-GameDat Transactions.");
                 }
 
                 _DataHandler = new TransactionDataHandler(EFileStorageType.UncompressedIndividual);
             }
+
+            if (!waitToStart)
+            {
+                State = ETransactionState.Open;
+            }
         }
         protected virtual void Dispose(bool disposing)
         {
             if (!_Disposed)
             {
-                if (!_Finished)
+                if (State != ETransactionState.Closed)
                 {
                     if (_DataHandler != null)
                     {
@@ -231,13 +324,26 @@ namespace xivModdingFramework.Mods
 
 
         #region Open/Close Transaction Functions
+
+        /// <summary>
+        /// Advances the Transaction state from Preparing to Open
+        /// </summary>
+        public void Start()
+        {
+            if(State != ETransactionState.Preparing)
+            {
+                throw new Exception("Cannot start transaction that is not in the Preparing State.");
+            }
+            State = ETransactionState.Open;
+        }
+
         /// <summary>
         /// Opens a new mod transaction.
         /// Transactions will still write data to DATs in real time, but will cache index and modlist changes until they are committed.
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack modpack = null, ETransactionTarget target = ETransactionTarget.GameFiles, string targetPath = null)
+        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
         {
 
             if (readOnly)
@@ -253,20 +359,20 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot have two write-enabled mod transactions open simultaneously.");
             }
 
-            if (!Dat.AllowDatAlteration)
-            {
-                // Right now this will never trigger since this is the same condition twice,
-                // But it's possible AllowDatAlteration may get expanded to be more comprehensive later,
-                // So check it here, too.
-                throw new Exception("Cannot open write transaction while DAT writing is disabled.");
-            }
-
             // Disable the cache worker during transactions.
             _WorkerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
-            var tx = new ModTransaction(readOnly, modpack, target, targetPath);
+            var tx = new ModTransaction(readOnly, modpack, settings, waitToStart);
             _ActiveTransaction = tx;
+
+            if (!Dat.AllowDatAlteration && tx.Settings.Target == ETransactionTarget.GameFiles)
+            {
+                CancelTransaction(tx);
+                throw new Exception("Cannot open write transaction while DAT writing is disabled.");
+            }
+
+
             return tx;
         }
 
@@ -287,6 +393,11 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to commit transaction other than the current open mod transation.");
             }
 
+            if(tx.State != ETransactionState.Open)
+            {
+                throw new Exception("Cannot Commit transaction that is not in the Open State.");
+            }
+
             try
             {
                 await tx.CommitTransaction();
@@ -299,7 +410,7 @@ namespace xivModdingFramework.Mods
             finally
             {
                 _ActiveTransaction = null;
-                tx._Finished = true;
+                tx.State = ETransactionState.Closed;
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
@@ -310,11 +421,13 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to commit a Read Only Transaction.");
             }
 
-            // Lumina import mode does not write to came indexes/modlist.
-            if (XivCache.GameInfo.UseLumina)
+            if (XivCache.GameInfo.UseLumina && Settings.Target == ETransactionTarget.GameFiles)
             {
-                return;
+                throw new Exception("Attempted to write to game files while Lumina mode was enabled.");
             }
+
+
+            State = ETransactionState.Closing;
 
             CheckWriteTimes();
 
@@ -327,55 +440,64 @@ namespace xivModdingFramework.Mods
             // Once Index save is done, so are we.
 
             // Write data from the transaction store to the real data target.
-            var pathMap = await _DataHandler.WriteAllToTarget(Target, TargetPath, this);
+            var pathMap = await _DataHandler.WriteAllToTarget(Settings, this);
 
-            Mod m;
-
-            // Update all the indexes with the real, post-write offsets.
-            foreach (var kv in pathMap)
+            // If the data handler returned a null, that means we aren't doing
+            // anything else to the base game files/modlist here.
+            if (pathMap != null)
             {
-                var lastOffset = await Set8xDataOffset(kv.Key, kv.Value.RealOffset);
-                if(lastOffset != kv.Value.TempOffset)
+                // Update all the indexes with the real, post-write offsets.
+                foreach (var kv in pathMap)
                 {
-                    throw new Exception("Temp-Real Offset mismatch.");
-                }
-                var df = IOUtil.GetDataFileFromPath(kv.Key);
-
-                if (!_TempToRealOffsetMapping.ContainsKey(df))
-                {
-                    _TempToRealOffsetMapping.Add(df, new Dictionary<long, long>());
-                }
-
-                _TempToRealOffsetMapping[df].Add(kv.Value.TempOffset, kv.Value.RealOffset);
-            }
-
-            // We only write to the modlist for actual game data saves.
-            if (_ModList != null && AffectsGameFiles)
-            {
-                // Update the modlist with the real, post-write offsets.
-                foreach(var kv in pathMap)
-                {
-                    var mod = _ModList.GetMod(kv.Key);
-                    if (mod != null)
+                    var lastOffset = await Set8xDataOffset(kv.Key, kv.Value.RealOffset);
+                    if (lastOffset != kv.Value.TempOffset)
                     {
-                        mod.data.modOffset = kv.Value.RealOffset;
-                        if(mod.data.originalOffset == kv.Value.TempOffset)
+                        throw new Exception("Temp-Real Offset mismatch.");
+                    }
+                    var df = IOUtil.GetDataFileFromPath(kv.Key);
+
+                    if (!_TempToRealOffsetMapping.ContainsKey(df))
+                    {
+                        _TempToRealOffsetMapping.Add(df, new Dictionary<long, long>());
+                    }
+
+                    _TempToRealOffsetMapping[df].Add(kv.Value.TempOffset, kv.Value.RealOffset);
+                }
+
+                // We only write to the modlist for actual game data saves.
+                if (_ModList != null && AffectsGameFiles)
+                {
+                    // Update the modlist with the real, post-write offsets.
+                    foreach(var kv in pathMap)
+                    {
+                        var mod = _ModList.GetMod(kv.Key);
+                        if (mod != null)
                         {
-                            mod.data.originalOffset = kv.Value.RealOffset;
+                            mod.data.modOffset = kv.Value.RealOffset;
+                            if(mod.data.originalOffset == kv.Value.TempOffset)
+                            {
+                                mod.data.originalOffset = kv.Value.RealOffset;
+                            }
                         }
                     }
+
+                    await __Modding.SaveModListAsync(_ModList);
                 }
 
-                await __Modding.SaveModListAsync(_ModList);
+                // We only write index files if we're writing to a game file store.
+                if (Settings.Target == ETransactionTarget.GameFiles)
+                {
+                    foreach (var index in _IndexFiles)
+                    {
+                        index.Value.Save();
+                    }
+                }
             }
 
-            // We only write index files if we're writing to a game file store.
-            if (Target == ETransactionTarget.GameFiles)
+            TransactionCommitted?.Invoke(this);
+            if(ActiveTransaction == this)
             {
-                foreach (var index in _IndexFiles)
-                {
-                    index.Value.Save();
-                }
+                ActiveTransactionCommitted?.Invoke(this);
             }
         }
 
@@ -384,18 +506,18 @@ namespace xivModdingFramework.Mods
         /// This discards the internal cached index and modlist pointers and truncates the .DAT files back to their pre-transaction states.
         /// </summary>
         /// <param name="tx"></param>
-        public static void CancelTransaction(ModTransaction tx)
+        public static void CancelTransaction(ModTransaction tx, bool graceful = false)
         {
 
             // Readonly transactions don't really have a true cancel, or need to be cancelled, but we can at least mark them done.
             if (tx._ReadOnly)
             {
                 tx.CancelTransaction();
-                tx._Finished = true;
+                tx.State = ETransactionState.Closed;
                 return;
             }
 
-            if (tx._Finished)
+            if (tx.State == ETransactionState.Closed)
             {
                 // TX has already been completed/cancelled.
                 return;
@@ -408,26 +530,39 @@ namespace xivModdingFramework.Mods
 
             try
             {
-                tx.CancelTransaction();
+                tx.CancelTransaction(graceful);
             }
             finally
             {
                 _ActiveTransaction = null;
-                tx._Finished = true;
+                tx.State = ETransactionState.Closed;
                 XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
             }
         }
-        private void CancelTransaction()
+        private void CancelTransaction(bool graceful = false)
         {
-            if (!_ReadOnly && !_Finished)
+            if (!_ReadOnly && State != ETransactionState.Closed)
             {
-                // Validate that nothing has touched our Indexes.
-                CheckWriteTimes();
+                State = ETransactionState.Closing;
 
-                // Reset our DAT sizes back to what they were before we started the Transaction.
-                TruncateDats();
+                // Call this before cleanup.
+                // That way event handlers can potentially
+                // swoop in to save the TX data store/Index data if desired.
+                TransactionCancelled?.Invoke(this, graceful);
+                if (ActiveTransaction == this ) {
+                    ActiveTransactionCancelled?.Invoke(this, graceful);
+                }
+
+                if (Settings.Target == ETransactionTarget.GameFiles)
+                {
+                    // Validate that nothing has touched our Indexes.
+                    CheckWriteTimes();
+
+                    // Reset our DAT sizes back to what they were before we started the Transaction.
+                    TruncateDats();
+                }
+                _DataHandler.Dispose();
             }
-
             _IndexFiles = null;
             _ModList = null;
             ModPack = null;
@@ -677,6 +812,19 @@ namespace xivModdingFramework.Mods
             return _TemporaryOffsetMapping[df][offset];
         }
 
+        /// <summary>
+        /// Retrieves the data for a given path/mod status.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="offset8x"></param>
+        /// <returns></returns>
+        public async Task<byte[]> ReadFile(string path, bool forceOriginal = false, bool compressed = false)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var offset = await Get8xDataOffset(path, forceOriginal);
+
+            return await ReadFile(df, offset, compressed);
+        }
 
         /// <summary>
         /// Retrieves the data for a given data file/offset key.
@@ -684,7 +832,7 @@ namespace xivModdingFramework.Mods
         /// <param name="dataFile"></param>
         /// <param name="offset8x"></param>
         /// <returns></returns>
-        public async Task<byte[]> GetData(XivDataFile dataFile, long offset8x, bool compressed = false)
+        public async Task<byte[]> ReadFile(XivDataFile dataFile, long offset8x, bool compressed = false)
         {
             if (compressed)
             {
@@ -693,6 +841,20 @@ namespace xivModdingFramework.Mods
             {
                 return await _DataHandler.GetUncompressedFile(dataFile, offset8x);
             }
+        }
+
+        /// <summary>
+        /// Syntactic shortcut to Dat.WriteModFile()
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="data"></param>
+        /// <param name="sourceApplication"></param>
+        /// <returns></returns>
+        public async Task<long> WriteFile(string path, byte[] data, string sourceApplication = "Unknown")
+        {
+            var dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+            return await dat.WriteModFile(data, path, sourceApplication, null, this);
         }
 
 
@@ -773,5 +935,24 @@ namespace xivModdingFramework.Mods
 
         #endregion
 
+
+        #region Static Default Settings
+
+        private static ModTransactionSettings _DefaultSettings = new ModTransactionSettings()
+        {
+            StorageType = EFileStorageType.CompressedIndividual,
+            Target = ETransactionTarget.GameFiles,
+            TargetPath = null
+        };
+        public static ModTransactionSettings? GetDefaultSettings()
+        {
+            return _DefaultSettings;
+        }
+        public static void SetDefaultTransactionSettings(ModTransactionSettings settings)
+        {
+            _DefaultSettings = settings;
+        }
+
+        #endregion
     }
 }

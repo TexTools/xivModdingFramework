@@ -157,6 +157,11 @@ namespace xivModdingFramework.Cache
         }
         public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
         {
+            if(ModTransaction.ActiveTransaction != null)
+            {
+                throw new Exception("Cannot change GameInfo settings while there is an open write-enabled transaction.");
+            }
+
             // We need to either have a valid game directory reference in the static already or need one in the constructor.
             if (_gameInfo == null && (gameInfo == null || gameInfo.GameDirectory == null)) {
                 throw new Exception("First call to cache must include a valid game directoy.");
@@ -167,6 +172,7 @@ namespace xivModdingFramework.Cache
                 throw new Exception("Provided Game Directory does not exist.");
             }
 
+
             // Sleep and lock this thread until rebuild is done.
             while (_REBUILDING)
             {
@@ -176,6 +182,26 @@ namespace xivModdingFramework.Cache
             if (gameInfo != null)
             {
                 _gameInfo = gameInfo;
+            }
+
+            if (GameInfo.UseLumina && GameInfo.LuminaDirectory != null)
+            {
+                var luminaTxSettings = new ModTransactionSettings()
+                {
+                    Target = ETransactionTarget.LuminaFolders,
+                    StorageType = EFileStorageType.UncompressedIndividual,
+                    TargetPath = GameInfo.LuminaDirectory.ToString()
+                };
+                ModTransaction.SetDefaultTransactionSettings(luminaTxSettings);
+            } else if(GameInfo != null)
+            {
+                var gameWritingTxSettings = new ModTransactionSettings()
+                {
+                    Target = ETransactionTarget.GameFiles,
+                    StorageType = EFileStorageType.CompressedIndividual,
+                    TargetPath = XivCache.GameInfo.GameDirectory.FullName
+                };
+                ModTransaction.SetDefaultTransactionSettings(gameWritingTxSettings);
             }
 
 

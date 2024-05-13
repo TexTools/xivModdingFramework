@@ -37,7 +37,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modpackName"></param>
         /// <param name="modpackAuthor"></param>
         /// <returns></returns>
-        public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, ETransactionTarget target, string targetPath, string sourceApplication = "Unknown", string modpackName = "Unknown Batch Import", string modpackAuthor = "Unknown")
+        public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, ModTransactionSettings settings, string sourceApplication = "Unknown", string modpackName = "Unknown Batch Import", string modpackAuthor = "Unknown")
         {
             var modPack = new ModPack()
             {
@@ -45,7 +45,8 @@ namespace xivModdingFramework.Mods
                 author = modpackAuthor,
                 version = "1.0"
             };
-            var tx = ModTransaction.BeginTransaction(false, modPack, target, targetPath);
+
+            var tx = ModTransaction.BeginTransaction(false, modPack, settings);
             try
             {
                 await ImportBatch(files, sourceApplication, tx);
