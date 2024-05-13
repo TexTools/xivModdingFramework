@@ -95,6 +95,7 @@ namespace xivModdingFramework.Mods
         private Dictionary<string, long> _TemporaryPathMapping = new Dictionary<string, long>();
         private Dictionary<string, long> _OriginalOffsets = new Dictionary<string, long>();
         private Dictionary<XivDataFile, Dictionary<long, List<string>>> _TemporaryOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, List<string>>>();
+        private HashSet<string> _PrepFiles = new HashSet<string>();
 
         // Dictionary of Temporary offsets to Real offsets, only populated after committing a transaction.
         private Dictionary<XivDataFile, Dictionary<long, long>> _TempToRealOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, long>>();
@@ -290,6 +291,11 @@ namespace xivModdingFramework.Mods
                 _DataHandler = new TransactionDataHandler(EFileStorageType.UncompressedIndividual);
             }
 
+            if (waitToStart && Settings.Target == ETransactionTarget.GameFiles)
+            {
+                throw new NotImplementedException("Prep-File support for game file writing is not yet implemented (Need to wrap ModList to prevent mod bashing).");
+            }
+
             if (!waitToStart)
             {
                 State = ETransactionState.Open;
@@ -449,6 +455,14 @@ namespace xivModdingFramework.Mods
                 // Update all the indexes with the real, post-write offsets.
                 foreach (var kv in pathMap)
                 {
+                    if (IsPrepFile(kv.Key))
+                    {
+                        // Prep files have their index restored instead.
+                        var offset = await GetPreTransactionOffset(kv.Key);
+                        await Set8xDataOffset(kv.Key, offset);
+                        continue;
+                    }
+
                     var lastOffset = await Set8xDataOffset(kv.Key, kv.Value.RealOffset);
                     if (lastOffset != kv.Value.TempOffset)
                     {
@@ -470,6 +484,14 @@ namespace xivModdingFramework.Mods
                     // Update the modlist with the real, post-write offsets.
                     foreach(var kv in pathMap)
                     {
+                        if (IsPrepFile(kv.Key))
+                        {
+                            // TODO: Need to restore the Mod entry here.
+                            // But that involves Wrapping the Modlist class...
+                            // That's going to be a pain.
+                            continue;
+                        }
+
                         var mod = _ModList.GetMod(kv.Key);
                         if (mod != null)
                         {
@@ -768,6 +790,21 @@ namespace xivModdingFramework.Mods
         /// <param name="updatedOffset"></param>
         internal void INTERNAL_OnIndexUpdate(XivDataFile dataFile, string path, long originalOffset, long updatedOffset)
         {
+            if(State != ETransactionState.Open && State != ETransactionState.Preparing)
+            {
+                throw new Exception("Attempted to write to index files in a non Open or Preparing Transaction.");
+            }
+
+            if (State == ETransactionState.Preparing)
+            {
+                // If we're in prep state, note that the file was added in prep.
+                _PrepFiles.Add(path);
+            } else
+            {
+                // Otherwise, make sure it's not included in prep anymore, if we wrote over it.
+                _PrepFiles.Remove(path);
+            }
+
             // Update the Path's pointer.
             if (!_TemporaryPathMapping.ContainsKey(path))
             {
@@ -810,6 +847,11 @@ namespace xivModdingFramework.Mods
             if (!_TemporaryOffsetMapping[df].ContainsKey(offset))
                 return new List<string>();
             return _TemporaryOffsetMapping[df][offset];
+        }
+
+        internal bool IsPrepFile(string path)
+        {
+            return _PrepFiles.Contains(path);
         }
 
         /// <summary>

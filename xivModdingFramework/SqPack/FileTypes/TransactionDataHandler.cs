@@ -421,6 +421,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
                     foreach (var path in paths)
                     {
+                        if (tx.IsPrepFile(path))
+                        {
+                            // Prep files don't get written to final product.
+                            continue;
+                        }
+
                         // Depending on store this may already be compressed.
                         // Or it may not.
                         var forceType2 = path.EndsWith(".atex");
@@ -456,6 +462,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
                     foreach (var path in paths)
                     {
+                        if (tx.IsPrepFile(path))
+                        {
+                            // Prep files don't get written to final product.
+                            continue;
+                        }
+
                         var destinationPath = Path.Combine(settings.TargetPath, path);
                         Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
 
@@ -513,6 +525,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
                         foreach (var path in paths)
                         {
+                            if (tx.IsPrepFile(path))
+                            {
+                                // Prep files don't get written to final product.
+                                continue;
+                            }
+
                             // Bind the offsets for paths/mod objects for the TTMP writer.
                             var mod = mList.GetMod(path);
                             var md = new SimpleModData();
