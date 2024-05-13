@@ -364,5 +364,40 @@ namespace xivModdingFramework.Helpers
             return System.Text.Encoding.UTF8.GetString(data.ToArray());
         }
 
+
+
+        /// <summary>
+        /// Wipes the bottom 7 bits the given offset, matching it to SE style expected file increments.
+        /// </summary>
+        /// <param name="offset"></param>
+        /// <returns></returns>
+        public static long RemoveDatNumberEmbed(long offset)
+        {
+            offset = offset & ~(0b1111111);
+            return offset;
+        }
+
+        /// <summary>
+        /// Takes an 8x Dat Embeded offset, returning the constituent parts.
+        /// </summary>
+        /// <param name="offset8xWithDatNumEmbed"></param>
+        /// <returns></returns>
+        public static (long Offset, int DatNum) Offset8xToParts(long offset8xWithDatNumEmbed)
+        {
+            var datNum = (int)(((ulong)offset8xWithDatNumEmbed >> 4) & 0b111);
+            var offset = RemoveDatNumberEmbed(offset8xWithDatNumEmbed);
+            return (offset, datNum);
+        }
+
+        /// <summary>
+        /// Takes a uint 32 Embeded offset, returning the constituent parts.
+        /// </summary>
+        /// <param name="offset8xWithDatNumEmbed"></param>
+        /// <returns></returns>
+        public static (long Offset, int DatNum) RawOffsetToParts(uint sqpackOffset)
+        {
+            return Offset8xToParts(sqpackOffset * 8L);
+        }
+
     }
 }

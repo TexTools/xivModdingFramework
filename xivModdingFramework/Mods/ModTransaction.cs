@@ -67,6 +67,7 @@ namespace xivModdingFramework.Mods
 
     public class ModTransaction : IDisposable
     {
+
         #region Events
         public delegate void TransactionEventHandler(ModTransaction sender);
         public delegate void TransactionCancelledEventHandler(ModTransaction sender, bool graceful);
@@ -83,6 +84,54 @@ namespace xivModdingFramework.Mods
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
         #endregion
 
+        private class TxPathData
+        {
+            public TxPathData(string path)
+            {
+                Path = path;
+            }
+
+            // Internal File Path
+            public string Path { get; set; }
+
+            public bool OriginalOffset_Set { get; private set; } = false;
+            public bool OriginalMod_Set { get; private set; } = false;
+
+            // Index Data
+            public XivDataFile DataFile { get
+                {
+                    return IOUtil.GetDataFileFromPath(Path);
+                }
+            }
+            public long TemporaryOffset { get; set; }
+
+            private long _OriginalOffset = 0;
+            public long OriginalOffset
+            {
+                get
+                {
+                    return _OriginalOffset;
+                }
+                set
+                {
+                    _OriginalOffset = value;
+                    OriginalOffset_Set = true;
+                }
+            }
+
+            // ModList Data
+            private Mod _OriginalMod = null;
+            public Mod OriginalMod { get
+                {
+                    return _OriginalMod;
+                }
+                set
+                {
+                    _OriginalMod = value;
+                    OriginalMod_Set = true;
+                }
+            }
+        }
 
         #region Properties and Accessors
 
@@ -91,11 +140,15 @@ namespace xivModdingFramework.Mods
 
 
         // Collections used in data tracking of modified files.
-        // Used to remap temporary files on commit.
-        private Dictionary<string, long> _TemporaryPathMapping = new Dictionary<string, long>();
-        private Dictionary<string, long> _OriginalOffsets = new Dictionary<string, long>();
+        
+        // Primary collection of data, used in tracking what has been changed.
+        private Dictionary<string, TxPathData> _ModifiedFiles = new Dictionary<string, TxPathData>();
+
+        // Collection of files imported during Prep mode.
+        private Dictionary<string, TxPathData> _PrepFiles = new Dictionary<string, TxPathData>();
+
+        // Offset mapping of Temporary Offset => File paths referencing that offset.
         private Dictionary<XivDataFile, Dictionary<long, List<string>>> _TemporaryOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, List<string>>>();
-        private HashSet<string> _PrepFiles = new HashSet<string>();
 
         // Dictionary of Temporary offsets to Real offsets, only populated after committing a transaction.
         private Dictionary<XivDataFile, Dictionary<long, long>> _TempToRealOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, long>>();
@@ -111,6 +164,13 @@ namespace xivModdingFramework.Mods
 
         private ModList _ModList;
         private readonly bool _ReadOnly = false;
+        public bool ReadOnly
+        {
+            get
+            {
+                return _ReadOnly;
+            }
+        }
 
         private TransactionDataHandler _DataHandler;
 
@@ -452,17 +512,19 @@ namespace xivModdingFramework.Mods
             // anything else to the base game files/modlist here.
             if (pathMap != null)
             {
+                foreach(var kv in _PrepFiles)
+                {
+                    // Validation
+                    if (IsPrepFile(kv.Key))
+                    {
+                        // Reset file to pre-TX state.
+                        await ResetFile(kv.Key, true);
+                    }
+                }
+
                 // Update all the indexes with the real, post-write offsets.
                 foreach (var kv in pathMap)
                 {
-                    if (IsPrepFile(kv.Key))
-                    {
-                        // Prep files have their index restored instead.
-                        var offset = await GetPreTransactionOffset(kv.Key);
-                        await Set8xDataOffset(kv.Key, offset);
-                        continue;
-                    }
-
                     var lastOffset = await Set8xDataOffset(kv.Key, kv.Value.RealOffset);
                     if (lastOffset != kv.Value.TempOffset)
                     {
@@ -633,7 +695,7 @@ namespace xivModdingFramework.Mods
         #endregion
 
 
-        #region Shortcut Accessors
+        #region Shortcut Index/Modlist Accessors
         /// <summary>
         /// Syntactic shortcut for retrieving the 8x Data offset from the index files.
         /// </summary>
@@ -725,10 +787,119 @@ namespace xivModdingFramework.Mods
             return ml.GetMod(path);
         }
 
+        /// <summary>
+        /// Syntactic shortcut for adding or updating a mod.
+        /// </summary>
+        /// <param name="mod"></param>
+        public async void AddOrUpdateMod(Mod mod)
+        {
+            var ml = await GetModList();
+            ml.AddOrUpdateMod(mod);
+        }
+
+        /// <summary>
+        /// Syntactic shortcut for removing a mod.
+        /// </summary>
+        /// <param name="mod"></param>
+        public async void RemoveMod(Mod mod)
+        {
+            var ml = await GetModList();
+            ml.RemoveMod(mod);
+        }
+
+        /// <summary>
+        /// Syntactic shortcut for removing a subset of mods.
+        /// </summary>
+        /// <param name="mods"></param>
+        public async void RemoveMod(IEnumerable<Mod> mods)
+        {
+            var ml = await GetModList();
+            ml.RemoveMods(mods);
+        }
+
+        #endregion
+
+
+        #region Internals
+
+        private void CheckPathData(string path)
+        {
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new Exception("Internal File Path was invalid (NULL or Empty).");
+            }
+
+            if (ReadOnly)
+            {
+                // Don't need to do anything here.
+                return;
+            }
+
+            if (State == ETransactionState.Preparing && _PrepFiles.ContainsKey(path))
+            {
+                return;
+            }
+
+            if (_ModifiedFiles.ContainsKey(path))
+            {
+                return;
+            }
+
+            var data = new TxPathData(path);
+
+            if (State == ETransactionState.Preparing)
+            {
+                // If we're in prep state, note that the file was added in prep.
+                _PrepFiles.Add(path, data);
+            }
+            else
+            {
+                _ModifiedFiles.Add(path, data);
+            }
+        }
+        private TxPathData GetOrCreatePathData(string path)
+        {
+            CheckPathData(path);
+            if (State == ETransactionState.Preparing)
+            {
+                return _PrepFiles[path];
+            }
+            else
+            {
+                return _ModifiedFiles[path];
+            }
+        }
+
+        /// <summary>
+        /// Resets a given file's Index pointer and ModList status back to its pre-Transaction state.
+        /// Does not delete the internal data store's file data, but that data will not be written in the final
+        /// TX commit if it is no longer referenced at a valid file path.  Data is still accessible with
+        /// the explicit data file and offset until the TX is closed.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public async Task ResetFile(string file, bool prePrep = false)
+        {
+            var offset = await GetPreTransactionOffset(file, prePrep);
+            await Set8xDataOffset(file, offset);
+
+            var mod = await GetPreTransactionMod(file, prePrep);
+            var current = await GetMod(file);
+            if(mod == null && current != null)
+            {
+                RemoveMod(current);
+            } else
+            {
+                AddOrUpdateMod(current);
+            }
+
+        }
 
         /// <summary>
         /// Retrieves the real offset written over the given temporary offset when the transaction was committed.
-        /// Returns 0 if the file was not written to the final transaction state.
+        /// Returns 0 if the file was not written to the final transaction state, or if the final transaction was to 
+        /// a data store other than the game files.
         /// </summary>
         /// <param name="df"></param>
         /// <param name="temporary8xOffset"></param>
@@ -746,20 +917,31 @@ namespace xivModdingFramework.Mods
             return _TempToRealOffsetMapping[df][temporary8xOffset];
         }
 
-
         /// <summary>
-        /// Resets a given file's Index pointer back to it's pre-Transaction state.
-        /// Does not interact with the ModList at all.
+        /// Gets the pre-transaction offset for this file.
+        /// May or may not be a modded file.
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public async Task ResetFile(string file)
+        public async Task<long> GetPreTransactionOffset(string file, bool prePrep = false)
         {
-            if (!_OriginalOffsets.ContainsKey(file))
+            long offset = -1;
+            if (_ModifiedFiles.ContainsKey(file) && _ModifiedFiles[file].OriginalOffset_Set)
             {
-                return;
+                offset = _ModifiedFiles[file].OriginalOffset;
             }
-            await Set8xDataOffset(file, _OriginalOffsets[file]);
+
+            if(prePrep && _PrepFiles.ContainsKey(file) && _PrepFiles[file].OriginalOffset_Set)
+            {
+                offset = _PrepFiles[file].OriginalOffset;
+            }
+
+            if(offset >= 0)
+            {
+                return offset;
+            }
+
+            return await Get8xDataOffset(file);
         }
 
         /// <summary>
@@ -768,19 +950,56 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public async Task<long> GetPreTransactionOffset(string file)
+        public async Task<Mod> GetPreTransactionMod(string file, bool prePrep = false)
         {
-            if (_OriginalOffsets.ContainsKey(file))
+            Mod mod = null;
+            bool found = false;
+            if (_ModifiedFiles.ContainsKey(file) && _ModifiedFiles[file].OriginalMod_Set)
             {
-                return _OriginalOffsets[file];
+                found = true;
+                mod = (Mod) _ModifiedFiles[file].OriginalMod.Clone();
             }
 
-            return await Get8xDataOffset(file);
+            if (prePrep && _PrepFiles.ContainsKey(file) && _PrepFiles[file].OriginalMod_Set)
+            {
+                found = true;
+                mod = (Mod) _PrepFiles[file].OriginalMod.Clone();
+            }
+
+            if (found)
+            {
+                return mod;
+            }
+
+            return await GetMod(file);
         }
-        #endregion
 
+        /// <summary>
+        /// Internal listener function for updates to our constituend modlist file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="originalMod"></param>
+        /// <param name="newMod"></param>
+        /// <exception cref="Exception"></exception>
+        internal void INTERNAL_OnModUpdate(string path, Mod originalMod, Mod newMod)
+        {
+            if (ReadOnly)
+            {
+                // This should never actually called since Readonly TX don't use our wrapped index files currently.
+                throw new Exception("Attempted to write to ModList inside a ReadOnly Transaction.");
+            }
 
-        #region Internals
+            if (State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Closing)
+            {
+                throw new Exception("Attempted to write to ModList during invalid Transaction State.");
+            }
+
+            var data = GetOrCreatePathData(path);
+            if (!data.OriginalMod_Set)
+            {
+                data.OriginalMod = (Mod)originalMod.Clone();
+            }
+        }
 
         /// <summary>
         /// Internal listener function for updates to our constintuent index files.
@@ -790,56 +1009,68 @@ namespace xivModdingFramework.Mods
         /// <param name="updatedOffset"></param>
         internal void INTERNAL_OnIndexUpdate(XivDataFile dataFile, string path, long originalOffset, long updatedOffset)
         {
+            if (ReadOnly)
+            {
+                // This should never actually called since Readonly TX don't use our wrapped index files currently.
+                throw new Exception("Attempted to write to index files inside a ReadOnly Transaction.");
+            }
+
             if(State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Closing)
             {
                 throw new Exception("Attempted to write to index files during invalid Transaction State.");
             }
 
-            if (State == ETransactionState.Preparing)
+            var data = GetOrCreatePathData(path);
+
+            if (!data.OriginalOffset_Set)
             {
-                // If we're in prep state, note that the file was added in prep.
-                _PrepFiles.Add(path);
-            } else
-            {
-                // Otherwise, make sure it's not included in prep anymore, if we wrote over it.
-                _PrepFiles.Remove(path);
+                data.OriginalOffset = originalOffset;
             }
 
-            // Update the Path's pointer.
-            if (!_TemporaryPathMapping.ContainsKey(path))
-            {
-                _TemporaryPathMapping.Add(path, updatedOffset);
-            }
-            else
-            {
-                _TemporaryPathMapping[path] = updatedOffset;
-            }
+            data.TemporaryOffset = updatedOffset;
 
-            // Update the Offset's pathlist.
             if (!_TemporaryOffsetMapping.ContainsKey(dataFile))
             {
                 _TemporaryOffsetMapping.Add(dataFile, new Dictionary<long, List<string>>());
             }
 
+
+            // If we have an old file pointer.
+            if (_TemporaryOffsetMapping[dataFile].ContainsKey(originalOffset) && _TemporaryOffsetMapping[dataFile][originalOffset].Contains(path))
+            {
+                // And the file has a live modification.
+                if (_ModifiedFiles.ContainsKey(path))
+                {
+                    // And we're currently /back/ in prep mode...
+                    if(State == ETransactionState.Preparing)
+                    {
+                        // Uhh... Fuck.  This is a really complicated state that we don't know how to handle just yet.
+                        throw new Exception("Cannot update Prep mode Index Offset over Modified Transaction Index Offset.");
+                    }
+                }
+            }
+
+            // Update the Offset's pathlist.
             if (!_TemporaryOffsetMapping[dataFile].ContainsKey(updatedOffset))
             {
                 _TemporaryOffsetMapping[dataFile][updatedOffset] = new List<string>();
             }
             _TemporaryOffsetMapping[dataFile][updatedOffset].Add(path);
 
+
             // Remove from old Offset's pathlist.
             if (_TemporaryOffsetMapping[dataFile].ContainsKey(originalOffset))
             {
                 _TemporaryOffsetMapping[dataFile][originalOffset].Remove(path);
             }
-
-            // Store the original offset if this is the first time the path has been modified.
-            if (!_OriginalOffsets.ContainsKey(path))
-            {
-                _OriginalOffsets.Add(path, originalOffset);
-            }
         }
 
+        /// <summary>
+        /// Retrieves the file paths currently pointing to a given temporary offset.
+        /// </summary>
+        /// <param name="df"></param>
+        /// <param name="offset"></param>
+        /// <returns></returns>
         internal List<string> GetFilePathsFromTempOffset(XivDataFile df, long offset)
         {
             if (!_TemporaryOffsetMapping.ContainsKey(df))
@@ -851,7 +1082,10 @@ namespace xivModdingFramework.Mods
 
         internal bool IsPrepFile(string path)
         {
-            return _PrepFiles.Contains(path);
+            var inPrep = _PrepFiles.ContainsKey(path);
+            var inLive = _ModifiedFiles.ContainsKey(path);
+
+            return inPrep && !inLive;
         }
 
         /// <summary>
@@ -878,6 +1112,7 @@ namespace xivModdingFramework.Mods
 
             return longOffset;
         }
+
         #endregion
 
 

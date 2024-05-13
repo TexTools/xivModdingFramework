@@ -128,7 +128,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             // Create standard Game DAT file request info.
             var info = new FileStorageInformation();
-            var parts = Dat.Offset8xToParts(offset8x);
+            var parts = IOUtil.Offset8xToParts(offset8x);
             info.RealOffset = parts.Offset;
             info.RealPath = Dat.GetDatPath(df, parts.DatNum);
             info.StorageType = EFileStorageType.CompressedBlob;

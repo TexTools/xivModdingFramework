@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
@@ -515,7 +516,7 @@ namespace xivModdingFramework.Cache
                     var datPath = Dat.GetDatPath(dat, datNum);
 
                     int uncompressedSize = -1;
-                    long seekTo = Dat.OffsetCorrection(mod.data.modOffset) + 8;
+                    long seekTo = IOUtil.RemoveDatNumberEmbed(mod.data.modOffset) + 8;
 
                     // Seek to and read the uncompressed texture size catching any exceptions
                     // because we handle further processing with the initial value of -1

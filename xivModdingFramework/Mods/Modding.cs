@@ -1021,7 +1021,7 @@ namespace xivModdingFramework.Mods
 
                         try
                         {
-                            var parts = Dat.Offset8xToParts(mod.data.modOffset);
+                            var parts = IOUtil.Offset8xToParts(mod.data.modOffset);
                             byte[] data;
                             using(var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
                             {

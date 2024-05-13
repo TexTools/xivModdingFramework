@@ -497,7 +497,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             byte[] type2Bytes = null;
 
             // This formula is used to obtain the dat number in which the offset is located
-            var parts = Offset8xToParts(offset);
+            var parts = IOUtil.Offset8xToParts(offset);
 
             if (tx != null)
             {
@@ -782,7 +782,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new InvalidDataException("Cannot get file data without valid offset.");
             }
 
-            var parts = Offset8xToParts(offset);
+            var parts = IOUtil.Offset8xToParts(offset);
             var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
             return await Task.Run(async () =>
             {
@@ -1216,7 +1216,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
 
-            var offset = OffsetCorrection(offsetWithDatNumber);
+            var offset = IOUtil.RemoveDatNumberEmbed(offsetWithDatNumber);
 
             var datPath = Dat.GetDatPath(df, datNum);
 
@@ -1250,7 +1250,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // This formula is used to obtain the dat number in which the offset is located
-            var part = Dat.Offset8xToParts(offsetWithDatNumber);
+            var part = IOUtil.Offset8xToParts(offsetWithDatNumber);
             await Task.Run(async () =>
             {
                 using (var br = new BinaryWriter(File.OpenWrite(GetDatPath(df, part.DatNum))))
@@ -1352,7 +1352,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new InvalidDataException("Cannot get file data without valid offset.");
             }
 
-            var parts = Offset8xToParts(offset);
+            var parts = IOUtil.Offset8xToParts(offset);
             var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
             return await Task.Run(async () =>
             {
@@ -1492,7 +1492,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(internalPath);
 
-            var parts = Dat.Offset8xToParts(offset8x);
+            var parts = IOUtil.Offset8xToParts(offset8x);
             var datPath = GetDatPath(df, parts.DatNum);
 
             int type = -1;
@@ -1845,7 +1845,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var datNum = (int)((offset / 8) & 0x0F) / 2;
 
-            offset = OffsetCorrection(offset);
+            offset = IOUtil.RemoveDatNumberEmbed(offset);
 
             var datPath = Dat.GetDatPath(dataFile, datNum);
 
@@ -1894,7 +1894,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         internal byte[] UNSAFE_GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
         {
-            var offsetParts = Offset8xToParts(offset8xWithDatEmbed);
+            var offsetParts = IOUtil.Offset8xToParts(offset8xWithDatEmbed);
             var datPath = GetDatPath(dataFile, offsetParts.DatNum);
 
             using (var br = new BinaryReader(File.OpenRead(datPath)))
@@ -2494,39 +2494,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Takes an 8x Dat Embeded offset, returning the constituent parts.
-        /// </summary>
-        /// <param name="offset8xWithDatNumEmbed"></param>
-        /// <returns></returns>
-        public static (long Offset, int DatNum) Offset8xToParts(long offset8xWithDatNumEmbed)
-        {
-            var datNum = (int)(((ulong) offset8xWithDatNumEmbed >> 4) & 0b111);
-            var offset = OffsetCorrection(offset8xWithDatNumEmbed);
-            return (offset, datNum);
-        }
-
-        /// <summary>
-        /// Takes a uint 32 Embeded offset, returning the constituent parts.
-        /// </summary>
-        /// <param name="offset8xWithDatNumEmbed"></param>
-        /// <returns></returns>
-        public static (long Offset, int DatNum) OffsetToParts(uint sqpackOffset)
-        {
-            return Offset8xToParts(sqpackOffset * 8L);
-        }
-
-        /// <summary>
-        /// Wipes the bottom 7 bits the given offset, matching it to SE style expected file increments.
-        /// </summary>
-        /// <param name="offset"></param>
-        /// <returns></returns>
-        public static long OffsetCorrection(long offset)
-        {
-            offset = offset & ~(0b1111111);
-            return offset;
-        }
-
-        /// <summary>
         /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only).
         /// NOT TRANSACTION SAFE - This reads from the baseline DATS for this determinant.
         /// Currently Unused.
@@ -2566,7 +2533,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var size = mod.data.modSize;
                     if(size <= 0)
                     {
-                        var parts = Dat.Offset8xToParts(mod.data.modOffset);
+                        var parts = IOUtil.Offset8xToParts(mod.data.modOffset);
                         using (var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
                         {
                             // Check size.
