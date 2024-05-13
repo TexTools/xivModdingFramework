@@ -67,7 +67,7 @@ namespace xivModdingFramework.General.Enums
         /// <summary>
         /// Contains UI Script data(CURRENTLY NOT PRESENT)
         /// </summary>
-        [XivDataFileDescription("090000", "ui_script")] _09_UiScript,
+        //[XivDataFileDescription("090000", "ui_script")] _09_UiScript,
         /// <summary>
         /// Contains EXD data such as information files, cut scene text, quest text, etc.
         /// </summary>

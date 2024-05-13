@@ -765,7 +765,8 @@ namespace xivModdingFramework.Cache
                 }
             }
 
-
+            /*
+            // This includes orphaned modded materials, but I don't think there's any reason to do so anymore.
             var rootFolder = Info.GetRootFolder();
             var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
             foreach (var mod in modlist.Mods)
@@ -789,7 +790,7 @@ namespace xivModdingFramework.Cache
                         }
                     }
                 }
-            }
+            }*/
 
             return materials.ToList();
         }

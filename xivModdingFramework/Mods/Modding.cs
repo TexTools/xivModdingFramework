@@ -432,7 +432,7 @@ namespace xivModdingFramework.Mods
                 // Added file.
                 if (enable)
                 {
-                    index.SetDataOffset(mod.fullPath, mod.data.modOffset);
+                    index.Set8xDataOffset(mod.fullPath, mod.data.modOffset);
                     mod.enabled = true;
 
                     if (commit)
@@ -454,11 +454,11 @@ namespace xivModdingFramework.Mods
                     // Removing a file.
                     if (mod.IsCustomFile())
                     {
-                        index.SetDataOffset(mod.fullPath, 0);
+                        index.SetRawDataOffset(mod.fullPath, 0);
                     }
                     else
                     {
-                        index.SetDataOffset(mod.fullPath, mod.data.originalOffset);
+                        index.Set8xDataOffset(mod.fullPath, mod.data.originalOffset);
                     }
 
                     if(commit)
@@ -1065,7 +1065,7 @@ namespace xivModdingFramework.Mods
 
                             if (size % 256 != 0) throw new Exception("Dicks");
 
-                            var data = _dat.GetCompressedData(mod.data.modOffset, df, size);
+                            var data = _dat.UNSAFE_GetCompressedData(mod.data.modOffset, df, size);
                             var newOffset = await WriteToTempDat(data, df);
 
                             if (mod.IsCustomFile())
@@ -1073,7 +1073,7 @@ namespace xivModdingFramework.Mods
                                 mod.data.originalOffset = newOffset;
                             }
                             mod.data.modOffset = newOffset;
-                            indexFiles[df].SetDataOffset(mod.fullPath, newOffset);
+                            indexFiles[df].Set8xDataOffset(mod.fullPath, newOffset);
                         }
                         catch (Exception except)
                         {

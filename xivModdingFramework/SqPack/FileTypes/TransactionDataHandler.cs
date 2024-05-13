@@ -241,6 +241,15 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
 
                     br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                    if((info.StorageType == EFileStorageType.CompressedBlob || info.StorageType == EFileStorageType.CompressedIndividual) && info.FileSize == 0)
+                    {
+                        // If it's an SqPacked file that we don't have a size for, we need to get the size.
+                        var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+                        info.FileSize = _dat.GetCompressedFileSize(br, info.RealOffset);
+                        br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                    }
+
                     var data = br.ReadBytes(info.FileSize);
                     if (info.StorageType == EFileStorageType.UncompressedBlob || info.StorageType == EFileStorageType.UncompressedIndividual)
                     {
@@ -314,7 +323,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new FileNotFoundException("Invalid Data File.");
             }
 
-            storageInfo.FileSize = data.Length;
             if ((storageInfo.StorageType == EFileStorageType.CompressedIndividual || storageInfo.StorageType == EFileStorageType.CompressedBlob) && preCompressed == false)
             {
                 data = await SmartImport.CreateCompressedFile(data);
@@ -336,6 +344,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 storageInfo.RealOffset = fSize;
             }
 
+            storageInfo.FileSize = data.Length;
+
             using (var fs = File.Open(storageInfo.RealPath, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 using (var bw = new BinaryWriter(fs))
@@ -352,6 +362,55 @@ namespace xivModdingFramework.SqPack.FileTypes
             OffsetMapping[dataFile].Add(offset8x, storageInfo);
         }
 
+
+        /// <summary>
+        /// Writes all the files in this data store to the given transaction target.
+        /// If the target is the main game files, store the new offsets we write the data to.
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="targetPath"></param>
+        /// <returns></returns>
+        internal async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteAllToTarget(ETransactionTarget target, string targetPath, ModTransaction tx)
+        {
+            var offsets = new Dictionary<string, (long RealOffset, long TempOffset)>();
+            if(target == ETransactionTarget.GameFiles)
+            {
+                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+
+                // TODO - Could paralellize this by datafile, but pretty rare that would get any gains.
+                foreach(var dkv in OffsetMapping)
+                {
+                    var df = dkv.Key;
+                    var files = dkv.Value;
+                    if (files.Count == 0) continue;
+                    var index = await tx.GetIndexFile(df);
+
+                    foreach(var fkv in files)
+                    {
+                        var tempOffset = fkv.Key;
+                        var file = fkv.Value;
+                        
+                        // Get the live paths this file is being used in...
+                        var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
+                        foreach (var path in paths)
+                         {
+                            // Depending on store this may already be compressed.
+                            // Or it may not.
+                            var forceType2 = path.EndsWith(".atex");
+                            var data = await GetCompressedFile(file, forceType2);
+
+                            // We now have everything we need for DAT writing.
+                            var realOffset = (await _dat.Unsafe_WriteToDat(data, df)) * 8L;
+
+                            offsets.Add(path, (realOffset, tempOffset));
+                        }
+                    }
+                }
+
+                return offsets;
+            }
+            throw new NotImplementedException();
+        }
 
         protected virtual void Dispose(bool disposing)
         {

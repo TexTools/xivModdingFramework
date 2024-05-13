@@ -208,7 +208,7 @@ namespace xivModdingFramework.Mods
 
             Func<byte[]> modDataTask = () =>
             {
-                var rawData = dat.GetCompressedData(modData.ModOffset,
+                var rawData = dat.UNSAFE_GetCompressedData(modData.ModOffset,
                     XivDataFiles.GetXivDataFile(modData.DatFile),
                     modData.ModSize);
 

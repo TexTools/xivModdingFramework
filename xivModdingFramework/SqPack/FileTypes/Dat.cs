@@ -1912,34 +1912,28 @@ namespace xivModdingFramework.SqPack.FileTypes
             return datPath;
         }
 
-        public async Task<byte[]> GetCompressedData(string path, ModTransaction tx = null)
+        public async Task<byte[]> GetCompressedData(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
             if(tx == null)
             {
+                // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction(true);
             }
-            var dataSize = await GetCompressedFileSize(path, tx);
 
-            var offset8x = await tx.Get8xDataOffset(path);
+            var offset = await tx.Get8xDataOffset(path, forceOriginal);
             var df = IOUtil.GetDataFileFromPath(path);
-            var offsetParts = Offset8xToParts(offset8x);
-            var datPath = GetDatPath(df, offsetParts.DatNum);
-
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
-            {
-                try
-                {
-                    br.BaseStream.Seek(offsetParts.Offset, SeekOrigin.Begin);
-                    return br.ReadBytes(dataSize);
-                }
-                catch
-                {
-                    return null;
-                }
-            }
+            return await tx.GetData(df, offset, true);
         }
 
-        public byte[] GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
+        /// <summary>
+        /// Gets the compressed data directly from the dats, with a known file size.
+        /// Not Transaction safe.  Only used in a few places.  Needs investigation on how this can be altered.
+        /// </summary>
+        /// <param name="offset8xWithDatEmbed"></param>
+        /// <param name="dataFile"></param>
+        /// <param name="dataSize"></param>
+        /// <returns></returns>
+        public byte[] UNSAFE_GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
         {
             var offsetParts = Offset8xToParts(offset8xWithDatEmbed);
             var datPath = GetDatPath(dataFile, offsetParts.DatNum);
@@ -2158,7 +2152,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return await tx.Get8xDataOffset(targetPath);
                 }
 
-                var data = await GetCompressedData(sourcePath, tx);
+                var data = await GetCompressedData(sourcePath, false, tx);
 
 
                 XivDependencyRoot root = null;
@@ -2424,55 +2418,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     category = referenceItem.GetModlistItemCategory();
                 }
 
-                var size = fileData.Length;
-                if (size % 256 != 0)
-                {
-                    size += 256 - (size % 256);
-                }
+                // TODO: Should we manually pad the file to 256 increments or 128 increments here?
 
-                // Update the DAT files.
-                uint rawOffset = 0;
-                long retOffset = -1;
+                // Write to the Data store and update the index with the temporary offset.
+                var offset8x = await tx.WriteData(df, fileData, true);
+                var originalOffset = await tx.Set8xDataOffset(internalFilePath, offset8x);
+                
 
-                if (mod != null && mod.data.modSize >= size && doDatSave)
-                {
-                    // If our existing mod slot is large enough to hold us, keep using it.
-                    // *only* if we're going to immediately save the modlist though.
-                    // Otherwise it's possible this index update may get rolled back, so it would be unsafe
-                    // to overwrite any data.
-                    rawOffset = await Unsafe_WriteToDat(fileData, df, mod.data.modOffset);
-
-                }
-                else if (index == null && doDatSave)
-                {
-                    // If we're doing a singleton/non-batch update, go ahead and take the time to calculate a free spot and perfrom a real write.
-                    var slots = await Dat.ComputeOpenSlots(df);
-                    var slot = slots.FirstOrDefault(x => x.Value >= size);
-
-                    if (slot.Key >= 2048)
-                    {
-                        rawOffset = await Unsafe_WriteToDat(fileData, df, slot.Key);
-                    }
-                    else
-                    {
-                        rawOffset = await Unsafe_WriteToDat(fileData, df);
-                    }
-                }
-                else
-                {
-                    // If we're part of a larger transaction, write to the transaction data store.
-                    //retOffset = await tx.WriteData(df, fileData);
-                    //rawOffset = (uint) (retOffset / 8);
-                    rawOffset = await Unsafe_WriteToDat(fileData, df);
-                }
-
-                retOffset = ((long)rawOffset) * 8L;
-                uint originalOffset = 0;
-
-                // Update the Index files.
-                originalOffset = index.SetDataOffset(internalFilePath, retOffset);
-
-                var longOriginal = ((long)originalOffset) * 8L;
                 var fileType = BitConverter.ToInt32(fileData, 4);
 
                 if (mod == null)
@@ -2489,9 +2441,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                         fullPath = internalFilePath,
                         data = new Data()
                     };
-                    mod.data.modOffset = retOffset;
-                    mod.data.originalOffset = (fileAdditionMod ? retOffset : longOriginal);
-                    mod.data.modSize = size;
+                    mod.data.modOffset = offset8x;
+                    mod.data.originalOffset = (fileAdditionMod ? offset8x : originalOffset);
+                    mod.data.modSize = fileData.Length;
                     mod.data.dataType = fileType;
                     mod.enabled = true;
 
@@ -2505,12 +2457,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                     if (fileAdditionMod)
                     {
-                        mod.data.originalOffset = retOffset;
+                        mod.data.originalOffset = offset8x;
                     }
-                    mod.data.modOffset = retOffset;
+                    mod.data.modOffset = offset8x;
                     mod.enabled = true;
                     mod.modPack = mod.IsInternal() ? null : mPack;
-                    mod.data.modSize = size;
+                    mod.data.modSize = fileData.Length;
                     mod.data.dataType = fileType;
                     mod.name = itemName;
                     mod.category = category;
@@ -2526,7 +2478,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 XivCache.QueueDependencyUpdate(internalFilePath);
 
                 // Job done.
-                return retOffset;
+                return offset8x;
             }
             catch
             {

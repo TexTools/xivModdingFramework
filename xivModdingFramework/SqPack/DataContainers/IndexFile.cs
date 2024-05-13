@@ -593,70 +593,25 @@ namespace xivModdingFramework.SqPack.DataContainers
 
         /// <summary>
         /// Update the data offset for a given file, adding the file if needed.
-        /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
+        /// Returns the previous 8x Data Offset (with dat Number Embedded), or 0 if the file did not exist.
         /// 
         /// Setting a value of 0 or negative for the offset will remove the file pointer.
         /// </summary>
-        public virtual uint SetDataOffset(string filePath, long new8xOffset, uint datNumber)
-        {
-
-            if (new8xOffset <= 0)
-            {
-                return SetDataOffset(filePath, 0);
-            }
-            else
-            {
-                uint val = (uint)(new8xOffset / 8);
-                return SetDataOffset(filePath, val, datNumber);
-            }
-        }
-
-        /// <summary>
-        /// Update the data offset for a given file, adding the file if needed.
-        /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
-        /// 
-        /// Setting a value of 0 for the offset will remove the file pointer.
-        /// </summary>
-        public virtual uint SetDataOffset(string filePath, uint newRawOffset, uint datNumber)
-        {
-            if(newRawOffset % 8 != 0)
-            {
-                throw new InvalidDataException("Provided offset is not a valid dat-less offset.");
-            }
-
-            if (newRawOffset == 0)
-            {
-                return SetDataOffset(filePath, 0);
-            }
-            else
-            {
-                byte bits = (byte)(datNumber * 2);
-                var modulatedOffset = newRawOffset | bits;
-                return SetDataOffset(filePath, modulatedOffset);
-            }
-        }
-
-        /// <summary>
-        /// Update the data offset for a given file, adding the file if needed.
-        /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
-        /// 
-        /// Setting a value of 0 or negative for the offset will remove the file pointer.
-        /// </summary>
-        public virtual uint SetDataOffset(string filePath, long new8xOffsetWithDatNumEmbed)
+        public virtual long Set8xDataOffset(string filePath, long new8xOffsetWithDatNumEmbed)
         {
             if (new8xOffsetWithDatNumEmbed <= 0)
             {
-                return SetDataOffset(filePath, 0);
+                return SetRawDataOffset(filePath, 0);
             }
             else
             {
                 uint val = (uint)(new8xOffsetWithDatNumEmbed / 8);
-                return SetDataOffset(filePath, val);
+                return SetRawDataOffset(filePath, val) * 8L;
             }
         }
 
 
-        public virtual uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        public virtual uint SetRawDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
         {
             return INTERNAL_SetDataOffset(filePath, newRawOffsetWithDatNumEmbed, false);
         }
@@ -696,7 +651,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                 Index1Entries.Add(folderHash, new Dictionary<uint, FileIndexEntry>());
             }
 
-            if (!existsInIndex1 && Index1Entries[folderHash].ContainsKey(fileHash))
+            if (!existsInIndex1 && Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].ContainsKey(fileHash))
             {
                 // 0 Offset value in the index table.  Remove it.
                 Index1Entries[folderHash].Remove(fileHash);
@@ -776,7 +731,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                         // Set value from Index 2 to Index 1 and re-call.
                         var entry1 = new FileIndexEntry(originalOffsetIndex2, fileHash, folderHash);
                         Index1Entries[folderHash].Add(fileHash, entry1);
-                        return SetDataOffset(filePath, newRawOffsetWithDatNumEmbed);
+                        return SetRawDataOffset(filePath, newRawOffsetWithDatNumEmbed);
                     }
 
                     // Doesn't exist in Index 1.

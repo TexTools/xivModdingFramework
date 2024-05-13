@@ -309,6 +309,7 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Copying materials...");
                 }
                 HashSet<string> CopiedMaterials = new HashSet<string>();
+
                 // Load every Material file and edit the texture references to the new texture paths.
                 foreach (var kv in newMaterialPaths)
                 {
@@ -316,8 +317,8 @@ namespace xivModdingFramework.Mods
                     var dst = kv.Value;
                     try
                     {
-                        
-                        if (await tx.FileExists(src)) continue;
+                        var exists = await tx.FileExists(src);
+                        if (!exists) continue;
                         var xivMtrl = await _mtrl.GetXivMtrl(src, false, tx);
                         xivMtrl.MTRLPath = dst;
 
@@ -548,7 +549,7 @@ namespace xivModdingFramework.Mods
                 dict.Add(Source.Info.GetRootFile(), Destination.Info.GetRootFile());
                 return dict;
 
-            } catch
+            } catch (Exception ex)
             {
                 if (doSave)
                 {
@@ -703,7 +704,7 @@ namespace xivModdingFramework.Mods
         /// <param name="readTx"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, uint> originalOffsets, string sourceApplication)
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, (Mod mod, long originalOffset)> originalMods, string sourceApplication)
         {
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
@@ -746,8 +747,11 @@ namespace xivModdingFramework.Mods
                         var root = XivDependencyGraph.ExtractRootInfo(file);
                         if (root == source.Info)
                         {
-                            importedFiles.Remove(file);
-                            filesToReset.Add(file);
+                            if (!filesToReset.Contains(file))
+                            {
+                                importedFiles.Remove(file);
+                                filesToReset.Add(file);
+                            }
                         }
                     }
 
@@ -758,10 +762,34 @@ namespace xivModdingFramework.Mods
                 // as some of the modded roots may be co-dependent.
                 foreach (var file in filesToReset)
                 {
-                    var oldOffset = originalOffsets[file];
-                    var index = await tx.GetIndexFile(df);
-                    index.SetDataOffset(file, oldOffset);
-                    importedFiles.Remove(file);
+                    if (originalMods.ContainsKey(file))
+                    {
+                        // Restore the state of the files at the root.
+
+                        var mod = originalMods[file].mod;
+                        var originalOffset = originalMods[file].originalOffset;
+                        if(mod != null)
+                        {
+                            newModList.AddOrUpdateMod(mod);
+                        } else
+                        {
+                            newModList.RemoveMod(file);
+                        }
+                        // If this was a modded file, restore it to the pre-modpack install state.
+                        var index = await tx.GetIndexFile(df);
+                        index.Set8xDataOffset(file, originalOffset);
+                        importedFiles.Remove(file);
+                    }
+                    else
+                    {
+                        // If we got here, we have some random orphaned files that got copied over.
+                        // These likely belonged to whatever base mod was installed on the root previously.
+                        // It's adding extra unused files to the new destination folder, so it's not idea, but it's fine for now.
+
+                        // We don't need to reset it in the old root either, since it's not part of this modpack.
+                        
+                        throw new Exception("Root Cloner wanted to modify more files than were provided by the modpack import.");
+                    }
                 }
                 clearedFiles.UnionWith(filesToReset);
             }

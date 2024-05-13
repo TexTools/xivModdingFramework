@@ -32,6 +32,7 @@ using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
@@ -535,7 +536,6 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     Dictionary<string, uint> DatOffsets = new Dictionary<string, uint>();
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
-                    Dictionary<string, int> FileTypes = new Dictionary<string, int>();
 
 
                     var _modding = new Modding(XivCache.GameInfo.GameDirectory);
@@ -568,19 +568,12 @@ namespace xivModdingFramework.Mods.FileTypes
                     using (var tx = ModTransaction.BeginTransaction())
                     {
                         var modList = await tx.GetModList();
-                        Dictionary<string, Mod> modsByFile = new Dictionary<string, Mod>();
 
-                        foreach (var mod in modList.Mods)
-                        {
-                            if (!modsByFile.ContainsKey(mod.fullPath))
-                            {
-                                modsByFile.Add(mod.fullPath, mod);
-                            }
-                        }
+                        Dictionary<string, (Mod mod, long offset)> OriginalData = new Dictionary<string, (Mod mod, long offset)>();
 
                         // 1 - Copy all the mod data to the DAT files.
                         count = 0;
-                        progress.Report((0, 0, "Writing new mod data to DAT files..."));
+                        progress.Report((0, 0, "Writing Mod Data..."));
                         using (var binaryReader = new BinaryReader(new FileStream(_tempMPD, FileMode.Open)))
                         {
                             foreach (var modJson in filteredModsJson)
@@ -588,30 +581,32 @@ namespace xivModdingFramework.Mods.FileTypes
                                 binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
                                 var data = binaryReader.ReadBytes(modJson.ModSize);
 
+                                // TODO : Could also handle endwalker => Dawntrail upgrades here.
                                 if (modJson.FullPath.EndsWith(".tex") && needsTexFix)
 	                                FixupTextoolsTex(data);
 
                                 var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
 
-                                var size = data.Length;
-                                if (size % 256 != 0)
+                                // Store original data for use later with the root cloner.
+                                var originalOffset = await tx.Get8xDataOffset(modJson.FullPath);
+                                var originalMod = modList.GetMod(modJson.FullPath);
+                                if(originalMod != null)
                                 {
-                                    size += (256 - (size % 256));
+                                    originalMod = (Mod)originalMod.Clone();
                                 }
+                                OriginalData.Add(modJson.FullPath, (originalMod, originalOffset));
 
-                                Mod mod = null;
-                                if (modsByFile.ContainsKey(modJson.FullPath))
-                                {
-                                    mod = modsByFile[modJson.FullPath];
-                                }
+                                // Bind the mod pack entry/info and write the mod.
+                                tx.ModPack = modJson.ModPackEntry;
+                                var item = new SimpleIItem(modJson.Name, modJson.Category);
 
-                                // Always write data to end of file during modpack imports in case we need
-                                // to roll back the import.
-                                uint offset = await dat.Unsafe_WriteToDat(data, df);
-                                DatOffsets.Add(modJson.FullPath, offset);
+                                var offset = await dat.WriteModFile(data, modJson.FullPath, sourceApplication, item, tx);
+                                tx.ModPack = null;
+
+                                var uOffset = (uint)(offset / 8);
+                                DatOffsets.Add(modJson.FullPath, uOffset);
 
                                 var dataType = BitConverter.ToInt32(data, 4);
-                                FileTypes.Add(modJson.FullPath, dataType);
 
                                 if (!FilesPerDf.ContainsKey(df))
                                 {
@@ -620,7 +615,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                                 FilesPerDf[df].Add(modJson.FullPath);
                                 count++;
-                                progress.Report((count, totalFiles, "Writing new mod data to DAT files..."));
+                                progress.Report((count, totalFiles, "Writing Mod Data..."));
                             }
                         }
 
@@ -628,31 +623,9 @@ namespace xivModdingFramework.Mods.FileTypes
                         File.Delete(_tempMPL);
                         File.Delete(_tempMPD);
 
-                        count = 0;
-                        progress.Report((count, totalFiles, "Updating Index file references..."));
 
                         // We've now copied the data into the game files, we now need to update the indices.
                         var _index = new Index(XivCache.GameInfo.GameDirectory);
-
-                        // Store originals...
-                        Dictionary<string, uint> OriginalOffsets = new Dictionary<string, uint>();
-
-                        foreach (var kv in FilesPerDf)
-                        {
-                            // Load each index file and update all the files within it as needed.
-                            var df = kv.Key;
-                            var txIndex = await tx.GetIndexFile(df);
-
-                            foreach (var file in kv.Value)
-                            {
-                                var original = txIndex.SetDataOffset(file, DatOffsets[file]);
-                                OriginalOffsets.Add(file, original);
-                            }
-
-
-                            count++;
-                            progress.Report((count, totalFiles, "Updating Index file references..."));
-                        }
 
 
                         // Root Alterations/Item Conversion
@@ -689,87 +662,14 @@ namespace xivModdingFramework.Mods.FileTypes
                                 progress.Report((0, 0, "Updating Destination Items..."));
 
                                 tx.ModPack = modPack;
-                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, OriginalOffsets, sourceApplication);
+                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, OriginalData, sourceApplication);
                                 tx.ModPack = null;
                             }
                         }
 
 
 
-                        // Dat files and indices are updated, time to update the modlist.
-                        count = 0;
-                        progress.Report((count, totalFiles, "Updating Mod List file..."));
-
-
-                        // Update the Mod List file.
-                        foreach (var file in filePaths)
-                        {
-                            var json = filteredModsJson.FirstOrDefault(x => x.FullPath == file);
-
-                            // Files moved by the root converter will miss here, which is fine, since the root converter updates the mod info for them.
-                            if (json == null) continue;
-
-
-                            modList.ModDictionary.TryGetValue(file, out var mod);
-                            var longOffset = ((long)DatOffsets[file]) * 8L;
-                            var originalOffset = OriginalOffsets[file];
-                            var longOriginal = ((long)originalOffset) * 8L;
-                            var fileType = FileTypes[file];
-                            var df = IOUtil.GetDataFileFromPath(file);
-
-
-                            var size = json.ModSize;
-                            if (size % 256 != 0)
-                            {
-                                size += 256 - (size % 256);
-                            }
-
-                            if (mod == null)
-                            {
-                                // Determine if this is an original game file or not.
-                                var fileAdditionMod = originalOffset == 0;
-
-                                mod = new Mod()
-                                {
-                                    name = json.Name,
-                                    category = json.Category,
-                                    datFile = df.GetDataFileName(),
-                                    source = sourceApplication,
-                                    fullPath = file,
-                                    data = new Data()
-                                };
-
-                                mod.data.modSize = size;
-                                mod.data.modOffset = longOffset;
-                                mod.data.originalOffset = (fileAdditionMod ? longOffset : longOriginal);
-                                mod.data.dataType = fileType;
-                                mod.enabled = true;
-                                mod.modPack = json.ModPackEntry;
-                                modList.AddOrUpdateMod(mod);
-
-                            }
-                            else
-                            {
-                                var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
-                                if (fileAdditionMod)
-                                {
-                                    mod.data.originalOffset = longOffset;
-                                }
-
-                                mod.data.modSize = size;
-                                mod.data.modOffset = longOffset;
-                                mod.enabled = true;
-                                mod.modPack = json.ModPackEntry;
-                                mod.data.dataType = fileType;
-                                mod.name = json.Name;
-                                mod.category = json.Category;
-                                mod.source = sourceApplication;
-                            }
-
-                            count++;
-                            progress.Report((count, totalFiles, "Updating Mod List file..."));
-                        }
-
+                        progress.Report((0, 0, "Committing Transaction..."));
                         await ModTransaction.CommitTransaction(tx);
                     }
                     // end CORE TRANSACTION

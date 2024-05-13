@@ -131,8 +131,10 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="m"></param>
         public void AddOrUpdateMod(Mod m)
         {
+            Mod oldMod = null;
             if (ModDictionary.ContainsKey(m.fullPath))
             {
+                oldMod = ModDictionary[m.fullPath];
                 ModDictionary[m.fullPath] = m;
             }
             else
@@ -140,11 +142,15 @@ namespace xivModdingFramework.Mods.DataContainers
                 ModDictionary.Add(m.fullPath, m);
             }
 
-            // If list structure already contains the mod, we don't need to re-add it.
-            if (!_ModList.Contains(m))
+            if (oldMod != null && oldMod != m)
+            {
+                _ModList.Remove(oldMod);
+            }
+            if(oldMod != m)
             {
                 _ModList.Add(m);
             }
+
         }
 
         /// <summary>
@@ -202,7 +208,7 @@ namespace xivModdingFramework.Mods.DataContainers
         }
     }
 
-    public class Mod
+    public class Mod : ICloneable
     {
         /// <summary>
         /// The source of the mod
@@ -285,9 +291,17 @@ namespace xivModdingFramework.Mods.DataContainers
                 data = new Data()
             };
         }
+
+        public object Clone()
+        {
+            var clone = (Mod)MemberwiseClone();
+            clone.data = (Data) data.Clone();
+            clone.modPack = (ModPack) modPack.Clone();
+            return clone;
+        }
     }
 
-    public class Data
+    public class Data : ICloneable
     {
         /// <summary>
         /// The datatype associated with this mod
@@ -318,9 +332,13 @@ namespace xivModdingFramework.Mods.DataContainers
         /// </remarks>
         public int modSize { get; set; }
 
+        public object Clone()
+        {
+            return MemberwiseClone();
+        }
     }
 
-    public class ModPack
+    public class ModPack : ICloneable
     {
 
         /// <summary>
@@ -339,6 +357,11 @@ namespace xivModdingFramework.Mods.DataContainers
                 var hash = sha.ComputeHash(keyBytes);
                 return hash;
             }
+        }
+
+        public object Clone()
+        {
+            return MemberwiseClone();
         }
 
         /// <summary>

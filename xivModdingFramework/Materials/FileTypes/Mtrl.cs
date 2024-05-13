@@ -974,6 +974,11 @@ namespace xivModdingFramework.Materials.FileTypes
 #if ENDWALKER
             return (null, null);
 #endif
+            if(mtrl == null)
+            {
+                return (null, null);
+            }
+
             if (mtrl.ColorSetData.Count != 256)
             {
                 // Already updated or doesn't need updating.
