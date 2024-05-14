@@ -547,7 +547,7 @@ namespace xivModdingFramework.Exd.FileTypes
                 { "Timeline4", ( 5, ExcelColumnDataType.UInt16 ) },
                 { "Timeline5", ( 6, ExcelColumnDataType.UInt16 ) },
                 { "Timeline6", ( 7, ExcelColumnDataType.UInt16 ) },
-                { "Icon", ( 19, ExcelColumnDataType.Int32 ) },
+                { "Icon", ( 20, ExcelColumnDataType.UInt16 ) },
             };
 
             if (language == XivLanguage.Korean)

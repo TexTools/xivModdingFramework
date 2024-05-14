@@ -360,7 +360,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(emoteData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (int)action.GetColumnByName("Icon");
+                var iconId = (ushort)action.GetColumnByName("Icon");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
