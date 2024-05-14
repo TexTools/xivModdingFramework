@@ -154,33 +154,8 @@ namespace xivModdingFramework.Mods.FileTypes
                 return null;
             }
 
-
-            if(tx != null)
-            {
-                // If we're within a transaction, load based the .meta file, if it exists.
-                // This is mostly because it's possible we may have loaded .meta files in, but not expanded them yet.
-                // (Ex. During root conversion during TTMP import)
-
-                var filePath = root.Info.GetRootFile();
-                var df = IOUtil.GetDataFileFromPath(filePath);
-                var index = await tx.GetIndexFile(df);
-                if (index.FileExists(filePath))
-                {
-                    var dat = new Dat(XivCache.GameInfo.GameDirectory);
-                    var data = await dat.ReadSqPackType2(filePath, false, tx);
-                    return await ItemMetadata.Deserialize(data);
-                } else
-                {
-                    // Unmodified root, create from file state.
-                    return await CreateFromRaw(root, forceDefault, tx);
-                }
-            }
-            else
-            {
-                // If we're not in a transaction, retrieve state based on live files.
-                return await CreateFromRaw(root, forceDefault, tx);
-            }
-
+            // Always retrieve live tx file state.
+            return await CreateFromRaw(root, forceDefault, tx);
         }
 
 
@@ -316,12 +291,11 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
-        internal static async Task ApplyMetadata(string internalPath, bool forceOriginal, ModTransaction tx)
+        internal static async Task ApplyMetadata(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var data = await dat.ReadSqPackType2(internalPath, forceOriginal, tx);
-            var meta = await ItemMetadata.Deserialize(data);
 
+            ItemMetadata meta = await GetMetadata(internalPath, forceOriginal, tx);
             meta.Validate(internalPath);
 
             await ApplyMetadata(meta, tx);
@@ -408,7 +382,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         public static async Task RestoreDefaultMetadata(XivDependencyRoot root, ModTransaction tx = null)
         {
-            var original = await ItemMetadata.CreateFromRaw(root, true);
+            var original = await GetMetadata(root, true, tx);
             await ApplyMetadata(original, tx);
         }
 

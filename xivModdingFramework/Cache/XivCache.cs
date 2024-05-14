@@ -26,6 +26,15 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 namespace xivModdingFramework.Cache
 {
 
+    public class CacheException : Exception
+    {
+        new public Exception InnerException;
+        public CacheException(Exception ex) {
+            InnerException = ex;
+        }
+
+    }
+
     /// <summary>
     /// Item Dependency Cache for keeping track of item dependency information.
     /// </summary>
@@ -2019,109 +2028,115 @@ namespace xivModdingFramework.Cache
             // 4. Add our affected children to the parent queue.
             // 5. Add this root to the items sets file if it didn't already exist.
 
-            using (var db = new SQLiteConnection(CacheConnectionString))
+            try
             {
-                db.Open();
-                using (var transaction = db.BeginTransaction())
+                using (var db = new SQLiteConnection(CacheConnectionString))
                 {
-                    foreach (var file in files)
+                    db.Open();
+                    using (var transaction = db.BeginTransaction())
                     {
-
-                        var oldCacheChildren = new List<string>();
-
-                        // Clear out our old children.
-                        var query = "delete from dependencies_children where parent = $parent";
-                        using (var cmd = new SQLiteCommand(query, db))
+                        foreach (var file in files)
                         {
-                            cmd.Parameters.AddWithValue("parent", file);
-                            cmd.ExecuteScalar();
-                        }
 
-                        // Find all the files that currently point to us as a parent in the cache.
-                        query = "select child from dependencies_parents where parent = $parent";
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            cmd.Parameters.AddWithValue("parent", file);
-                            using (var reader = new CacheReader(cmd.ExecuteReader()))
+                            var oldCacheChildren = new List<string>();
+
+                            // Clear out our old children.
+                            var query = "delete from dependencies_children where parent = $parent";
+                            using (var cmd = new SQLiteCommand(query, db))
                             {
-                                while (reader.NextRow())
+                                cmd.Parameters.AddWithValue("parent", file);
+                                cmd.ExecuteScalar();
+                            }
+
+                            // Find all the files that currently point to us as a parent in the cache.
+                            query = "select child from dependencies_parents where parent = $parent";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("parent", file);
+                                using (var reader = new CacheReader(cmd.ExecuteReader()))
                                 {
-                                    oldCacheChildren.Add(reader.GetString("child"));
+                                    while (reader.NextRow())
+                                    {
+                                        oldCacheChildren.Add(reader.GetString("child"));
+                                    }
                                 }
                             }
-                        }
 
-                        // And purge all of those cached file's parents.
-                        query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            cmd.Parameters.AddWithValue("parent", file);
-                            cmd.ExecuteScalar();
-                        }
+                            // And purge all of those cached file's parents.
+                            query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("parent", file);
+                                cmd.ExecuteScalar();
+                            }
 
-                        // Now add us to both queues.
-                        query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
-                        using (var insertCmd = new SQLiteCommand(query, db))
-                        {
-                            insertCmd.Parameters.AddWithValue("file", file);
-                            insertCmd.ExecuteScalar();
-                        }
-
-                        query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
-                        using (var insertCmd = new SQLiteCommand(query, db))
-                        {
-                            insertCmd.Parameters.AddWithValue("file", file);
-                            insertCmd.ExecuteScalar();
-                        }
-
-                        // Queue up all the files that we parent-purged into the parent queue.
-                        foreach (var c in oldCacheChildren)
-                        {
-                            if (c == null) continue;
+                            // Now add us to both queues.
+                            query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
+                            using (var insertCmd = new SQLiteCommand(query, db))
+                            {
+                                insertCmd.Parameters.AddWithValue("file", file);
+                                insertCmd.ExecuteScalar();
+                            }
 
                             query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
                             using (var insertCmd = new SQLiteCommand(query, db))
                             {
-                                insertCmd.Parameters.AddWithValue("file", c);
+                                insertCmd.Parameters.AddWithValue("file", file);
                                 insertCmd.ExecuteScalar();
                             }
-                        }
 
-                    }
-                    transaction.Commit();
-                }
-            }
-
-            // Now connect to the root cache and inject our roots.
-            using (var db = new SQLiteConnection(RootsCacheConnectionString))
-            {
-                db.Open();
-                using (var transaction = db.BeginTransaction())
-                {
-                    HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
-                    var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
-                    using (var cmd = new SQLiteCommand(query, db))
-                    {
-                        foreach (var file in files)
-                        {
-                            var root = XivDependencyGraph.ExtractRootInfo(file);
-                            if (root == null || root.PrimaryId < 0)
+                            // Queue up all the files that we parent-purged into the parent queue.
+                            foreach (var c in oldCacheChildren)
                             {
-                                continue;
+                                if (c == null) continue;
+
+                                query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
+                                using (var insertCmd = new SQLiteCommand(query, db))
+                                {
+                                    insertCmd.Parameters.AddWithValue("file", c);
+                                    insertCmd.ExecuteScalar();
+                                }
                             }
-                            if (roots.Contains(root))
-                                continue;
 
-                            var fullRoot = XivDependencyGraph.CreateDependencyRoot(root);
-                            if (fullRoot == null)
-                                continue;
-
-                            roots.Add(root);
-                            XivCache.CacheRoot(root, db, cmd);
                         }
+                        transaction.Commit();
                     }
-                    transaction.Commit();
                 }
+
+                // Now connect to the root cache and inject our roots.
+                using (var db = new SQLiteConnection(RootsCacheConnectionString))
+                {
+                    db.Open();
+                    using (var transaction = db.BeginTransaction())
+                    {
+                        HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
+                        var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var file in files)
+                            {
+                                var root = XivDependencyGraph.ExtractRootInfo(file);
+                                if (root == null || root.PrimaryId < 0)
+                                {
+                                    continue;
+                                }
+                                if (roots.Contains(root))
+                                    continue;
+
+                                var fullRoot = XivDependencyGraph.CreateDependencyRoot(root);
+                                if (fullRoot == null)
+                                    continue;
+
+                                roots.Add(root);
+                                XivCache.CacheRoot(root, db, cmd);
+                            }
+                        }
+                        transaction.Commit();
+                    }
+                }
+            } catch(Exception ex)
+            {
+                throw new CacheException(ex);
             }
         }
 

@@ -7,9 +7,11 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
@@ -626,7 +628,7 @@ namespace xivModdingFramework.Mods
             {
                 _ActiveTransaction = null;
                 tx.State = ETransactionState.Closed;
-                XivCache.CacheWorkerEnabled = XivCache.CacheWorkerEnabled;
+                XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
         private void CancelTransaction(bool graceful = false)
@@ -1409,6 +1411,14 @@ namespace xivModdingFramework.Mods
             if (state.OriginalMod_Set)
             {
                 await UpdateMod(state.OriginalMod, state.Path);
+            }
+
+            if (state.Path.EndsWith(".meta"))
+            {
+                await ItemMetadata.ApplyMetadata(state.Path, false, this);
+            } else if(state.Path.EndsWith(".rgsp"))
+            {
+                await CMP.ApplyRgspFile(state.Path, false, this);
             }
         }
 

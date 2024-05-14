@@ -35,10 +35,10 @@ namespace xivModdingFramework.General
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        internal static async Task ApplyRgspFile(string filePath, ModTransaction tx = null)
+        internal static async Task ApplyRgspFile(string filePath, bool forceDefault = false, ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var rgspData = await _dat.ReadSqPackType2(filePath, false, tx);
+            var rgspData = await _dat.ReadSqPackType2(filePath, forceDefault, tx);
 
             await ApplyRgspFile(rgspData, tx);
         }
@@ -107,7 +107,7 @@ namespace xivModdingFramework.General
 
         }
 
-        internal static async Task RestoreDefaultScaling(string rgspPath, ModTransaction tx = null)
+        internal static async Task RestoreDefaultScaling(string rgspPath ModTransaction tx = null)
         {
             var match = RgspPathExtractFormat.Match(rgspPath);
             if (!match.Success) throw new InvalidDataException("Invalid .RGSP file path.");

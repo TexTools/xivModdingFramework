@@ -381,7 +381,7 @@ namespace xivModdingFramework.Mods
                         }
                         else if (ext == ".rgsp")
                         {
-                            await CMP.ApplyRgspFile(mod.FilePath, tx);
+                            await CMP.ApplyRgspFile(mod.FilePath, false, tx);
                         }
                     }
                 }

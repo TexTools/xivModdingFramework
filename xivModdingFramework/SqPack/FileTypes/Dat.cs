@@ -2175,6 +2175,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Writes a given block of data to the DAT files or Transaction data store, updates the index to point to it for the given file path,
         /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
+        /// 
+        /// This is the main workhorse function for mod writing.
         /// </summary>
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
@@ -2293,10 +2295,12 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 modList.AddOrUpdateMod(mod);
 
+                // Always expand metadata.
+                await ExpandMetadata(fileData, internalFilePath, tx);
+
                 if (doDatSave)
                 {
                     // Commit the transaction if we're doing a single file save.
-                    await ExpandMetadata(fileData, internalFilePath, tx);
                     await ModTransaction.CommitTransaction(tx);
                 }
                 XivCache.QueueDependencyUpdate(internalFilePath);
