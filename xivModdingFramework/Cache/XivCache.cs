@@ -185,6 +185,8 @@ namespace xivModdingFramework.Cache
                 _gameInfo = gameInfo;
             }
 
+            Modding.CreateModlist();
+
             if (GameInfo.UseLumina && GameInfo.LuminaDirectory != null)
             {
                 var luminaTxSettings = new ModTransactionSettings()

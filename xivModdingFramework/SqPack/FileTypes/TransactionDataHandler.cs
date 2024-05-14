@@ -116,9 +116,9 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// </summary>
     internal class TransactionDataHandler : IDisposable
     {
-        private readonly EFileStorageType DefaultType;
-        private readonly string DefaultPathRoot;
-        private readonly string DefaultBlobName;
+        internal readonly EFileStorageType DefaultType;
+        internal readonly string DefaultPathRoot;
+        internal readonly string DefaultBlobName;
 
         private Dictionary<XivDataFile, Dictionary<long, FileStorageInformation>> OffsetMapping = new Dictionary<XivDataFile, Dictionary<long, FileStorageInformation>>();
 
@@ -220,6 +220,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new FileNotFoundException("Invalid Data File: " + dataFile.ToString());
             }
 
+            if (offset8x < 0)
+            {
+                throw new InvalidDataException("Cannot retrieve uncompressed file at Invalid Offset");
+            }
+
             FileStorageInformation info;
             if (OffsetMapping[dataFile].ContainsKey(offset8x))
             {
@@ -277,6 +282,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new FileNotFoundException("Invalid Data File: " + dataFile.ToString());
             }
 
+            if(offset8x < 0)
+            {
+                throw new InvalidDataException("Cannot retrieve compressed file at Invalid Offset");
+            }
+
             FileStorageInformation info;
             if (OffsetMapping[dataFile].ContainsKey(offset8x))
             {
@@ -299,7 +309,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
 
                     br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                    if((info.StorageType == EFileStorageType.CompressedBlob || info.StorageType == EFileStorageType.CompressedIndividual) && info.FileSize == 0)
+                    if((info.StorageType == EFileStorageType.CompressedBlob) && info.FileSize == 0)
                     {
                         // If we don't have the compressed file size already, check it.
                         // (This is mostly the case when reading game DATs, for perf reasons)
@@ -307,8 +317,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                         {
                             info.FileSize = Dat.GetCompressedFileSize(br, info.RealOffset);
                         }
+
                         br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                    } else if(info.StorageType == EFileStorageType.CompressedIndividual)
+                    {
+                        // We can be a cheatyface here regardless of if we have the size and just dump the entire file back.
+                        return br.ReadAllBytes();
                     }
+
 
                     var data = br.ReadBytes(info.FileSize);
                     if (info.StorageType == EFileStorageType.UncompressedBlob || info.StorageType == EFileStorageType.UncompressedIndividual)
@@ -484,6 +500,18 @@ namespace xivModdingFramework.SqPack.FileTypes
                 info = MakeGameStorageInfo(dataFile, offset8x);
             }
             return info.GetUncompressedFileSize();
+        }
+
+
+        /// <summary>
+        /// Adds a file storage reference without writing the associated data.
+        /// </summary>
+        /// <param name="storageInfo"></param>
+        /// <param name="dataFile"></param>
+        /// <param name="offset8x"></param>
+        internal void UNSAFE_AddFileInfo(FileStorageInformation storageInfo, XivDataFile dataFile, long offset8x)
+        {
+            OffsetMapping[dataFile].Add(offset8x , storageInfo);
         }
 
         /// <summary>

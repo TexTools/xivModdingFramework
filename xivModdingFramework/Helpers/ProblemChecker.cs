@@ -222,9 +222,9 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        public Task BackupIndexFiles(DirectoryInfo backupsDirectory)
+        public async Task BackupIndexFiles(DirectoryInfo backupsDirectory)
         {
-            return Task.Run(async () => {
+            await Task.Run(async () => {
                 var indexFiles = new XivDataFile[] { XivDataFile._0A_Exd, XivDataFile._04_Chara, XivDataFile._06_Ui, XivDataFile._01_Bgcommon };
                 var index = new Index(_gameDirectory);
 
@@ -233,7 +233,18 @@ namespace xivModdingFramework.Helpers
 
                 var ml = await tx.GetModList();
 
-                var anyEnabled = ml.Mods.Any(x => x.Value.Enabled);
+                bool anyEnabled = false;
+                var allMods = ml.GetMods();
+                foreach(var m in allMods)
+                {
+                    var state = await m.GetState(tx);
+                    if(state == Mods.Enums.EModState.Enabled)
+                    {
+                        anyEnabled = true;
+                        break;
+                    }
+                }
+
                 if (anyEnabled)
                 {
                     if (!Dat.AllowDatAlteration)

@@ -39,7 +39,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, ModTransactionSettings settings, string sourceApplication = "Unknown", string modpackName = "Unknown Batch Import", string modpackAuthor = "Unknown")
         {
-            var modPack = new ModPack()
+            var modPack = new ModPack(null)
             {
                 Name = modpackName,
                 Author = modpackAuthor,
@@ -72,7 +72,7 @@ namespace xivModdingFramework.Mods
             if(tx == null)
             {
                 ownTx = true;
-                var modPack = new ModPack()
+                var modPack = new ModPack(null)
                 {
                     Name = "Unknown Batch Import",
                     Author = "Unknown",

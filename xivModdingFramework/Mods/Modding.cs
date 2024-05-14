@@ -139,6 +139,28 @@ namespace xivModdingFramework.Mods
         {
             if (File.Exists(ModListDirectory))
             {
+                // Try to parse it.
+                try
+                {
+                    var modlistText = File.ReadAllText(ModListDirectory);
+                    var res = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    if(res == null)
+                    {
+                        throw new Exception("Null Modlist");
+                    }
+                }
+                catch(Exception ex) 
+                {
+                    // Broken.  Regenerate modlist.
+                    var newModList = new ModList(true)
+                    {
+                        Version = _modlistVersion.ToString(),
+                    };
+
+                    SaveModList(newModList);
+                }
+                
+
                 return;
             }
 
@@ -157,7 +179,7 @@ namespace xivModdingFramework.Mods
         /// <param name="dataFile">The data file to check in</param>
         /// <param name="indexCheck">Flag to determine whether to check the index file or just the modlist</param>
         /// <returns></returns>
-        public static async Task<XivModStatus> IsModEnabled(string internalPath, bool indexCheck = true, ModTransaction tx = null)
+        public static async Task<EModState> GetModState(string internalPath, ModTransaction tx = null)
         {
             if(tx == null)
             {
@@ -166,42 +188,28 @@ namespace xivModdingFramework.Mods
             }
             var modList = await tx.GetModList();
 
-            if (indexCheck)
+            var nmod = modList.GetMod(internalPath);
+            if (nmod == null)
             {
-                var nmod = modList.GetMod(internalPath);
-                if (nmod == null)
-                {
-                    return XivModStatus.Original;
-                }
-                var mod = nmod.Value;
-
-                var originalOffset = mod.OriginalOffset8x;
-                var moddedOffset = mod.ModOffset8x;
-                var offset = await tx.Get8xDataOffset(internalPath);
-
-                if (offset.Equals(originalOffset))
-                {
-                    return XivModStatus.Disabled;
-                }
-
-                if (offset.Equals(moddedOffset))
-                {
-                    return XivModStatus.Enabled;
-                }
-
-                return XivModStatus.Invalid;
+                return EModState.UnModded;
             }
-            else
+            var mod = nmod.Value;
+
+            var originalOffset = mod.OriginalOffset8x;
+            var moddedOffset = mod.ModOffset8x;
+            var offset = await tx.Get8xDataOffset(internalPath);
+
+            if (offset.Equals(originalOffset))
             {
-                var nmod = modList.GetMod(internalPath);
-                if (nmod == null)
-                {
-                    return XivModStatus.Original;
-                }
-                var mod = nmod.Value;
-
-                return mod.Enabled ? XivModStatus.Enabled : XivModStatus.Disabled;
+                return EModState.Disabled;
             }
+
+            if (offset.Equals(moddedOffset))
+            {
+                return EModState.Enabled;
+            }
+
+            return EModState.Invalid;
         }
 
         /// <summary>
@@ -327,12 +335,12 @@ namespace xivModdingFramework.Mods
             if (string.IsNullOrEmpty(mod.ItemName)) return false;
             if (string.IsNullOrEmpty(mod.FilePath)) return false;
 
-            if (mod.OriginalOffset8x <= 0 && !enable)
+            if (mod.OriginalOffset8x < 0 && !enable)
             {
                 throw new Exception("Cannot disable mod with invalid original offset.");
             }
 
-            if (enable && mod.ModOffset8x <= 0)
+            if (enable && mod.ModOffset8x < 0)
             {
                 throw new Exception("Cannot enable mod with invalid mod offset.");
             }
@@ -358,11 +366,10 @@ namespace xivModdingFramework.Mods
 
                 tx.ModPack = mod.GetModPack(modList);
 
-                // Added file.
                 if (enable)
                 {
+                    // Enabling Mod
                     index.Set8xDataOffset(mod.FilePath, mod.ModOffset8x);
-                    mod.Enabled = true;
 
                     if (commit)
                     {
@@ -380,17 +387,10 @@ namespace xivModdingFramework.Mods
                 }
                 else if (!enable)
                 {
-                    // Removing a file.
-                    if (mod.IsCustomFile())
-                    {
-                        index.SetRawDataOffset(mod.FilePath, 0);
-                    }
-                    else
-                    {
-                        index.Set8xDataOffset(mod.FilePath, mod.OriginalOffset8x);
-                    }
+                    // Disabling mod.
+                    index.Set8xDataOffset(mod.FilePath, mod.OriginalOffset8x);
 
-                    if(commit)
+                    if (commit)
                     {
                         // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
                         if (mod.FilePath.EndsWith(".meta"))
@@ -404,8 +404,6 @@ namespace xivModdingFramework.Mods
                             await CMP.RestoreDefaultScaling(mod.FilePath, tx);
                         }
                     }
-
-                    mod.Enabled = false;
                 }
 
                 if (commit)

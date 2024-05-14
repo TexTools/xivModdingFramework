@@ -2373,6 +2373,12 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 var fileType = BitConverter.ToInt32(fileData, 4);
 
+                ModPack? modPack;
+                if(tx.ModPack != null)
+                {
+                    modList.AddOrUpdateModpack(tx.ModPack.Value);
+                }
+
                 Mod mod;
                 if (nullMod == null)
                 {
@@ -2387,14 +2393,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                         FilePath = internalFilePath,
                     };
                     mod.ModOffset8x = offset8x;
-                    mod.OriginalOffset8x = (fileAdditionMod ? offset8x : originalOffset);
+                    mod.OriginalOffset8x = originalOffset;
                     mod.FileSize = fileData.Length;
-                    mod.Enabled = true;
+                    mod.FilePath = internalFilePath;
 
                     // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
                     var mp = tx.ModPack == null ? "" : tx.ModPack.Value.Name;
                     mod.ModPack = mod.IsInternal() ? null : mp;
-                    modList.AddOrUpdateMod(mod);
                 }
                 else
                 {
@@ -2404,10 +2409,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                     if (fileAdditionMod)
                     {
-                        mod.OriginalOffset8x = offset8x;
+                        mod.OriginalOffset8x = 0;
                     }
                     mod.ModOffset8x = offset8x;
-                    mod.Enabled = true;
+                    mod.FilePath = internalFilePath;
                     mod.ModPack = mod.IsInternal() ? null : mp;
                     mod.FileSize = fileData.Length;
                     mod.ItemName = itemName;

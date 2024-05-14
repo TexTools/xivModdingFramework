@@ -47,6 +47,6 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// Mod pack that the mod is a part of
         /// </summary>
-        public  ModPack ModPack { get; set; }
+        public  ModPack? ModPack { get; set; }
     }
 }

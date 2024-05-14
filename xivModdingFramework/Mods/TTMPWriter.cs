@@ -210,7 +210,8 @@ namespace xivModdingFramework.Mods
             Func<Task<byte[]>> modDataTask = async () =>
             {
 
-                var rawData = await tx.ReadFile(modsJson.FullPath, false, true);
+                // Get the data at the mod offset, regardless of it it's enabled or not.
+                var rawData = await tx.ReadFile(IOUtil.GetDataFileFromPath(modsJson.FullPath), modData.ModOffset, true);
 
                 if (rawData == null)
                 {

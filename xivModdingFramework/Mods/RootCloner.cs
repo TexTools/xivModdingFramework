@@ -64,7 +64,7 @@ namespace xivModdingFramework.Mods
             var iCat = destItem.SecondaryCategory;
             var iName = destItem.Name;
 
-            var modPack = new ModPack() { Author = "System", Name = "Item Copy - " + srcItem.Name + " to " + iName, Url = "", Version = "1.0" };
+            var modPack = new ModPack(null) { Author = "System", Name = "Item Copy - " + srcItem.Name + " to " + iName, Url = "", Version = "1.0" };
 
             var doSave = false;
             if (tx == null)

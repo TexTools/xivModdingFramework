@@ -491,7 +491,7 @@ namespace xivModdingFramework.Mods.FileTypes
             long endTime = 0;
             long part1Duration = 0;
             long part2Duration = 0;
-            string _tempMPD, _tempMPL;
+            string _tempMPD;
 
             var dat = new Dat(XivCache.GameInfo.GameDirectory);
 
@@ -549,88 +549,84 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                     var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
-
-                    // 0 - Extract the MPD file.
-                    using (var zf = ZipFile.Read(modpackPath))
-                    {
-                        progress.Report((0, 0, "Unzipping TTMP File..."));
-                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
-                        var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
-
-                        _tempMPD = Path.GetTempFileName();
-                        _tempMPL = Path.GetTempFileName();
-
-                        using (var fs = new FileStream(_tempMPL, FileMode.Open))
-                        {
-                            mpl.Extract(fs);
-                        }
-
-                        using (var fs = new FileStream(_tempMPD, FileMode.Open))
-                        {
-                            mpd.Extract(fs);
-                        }
-                    }
-
                     var count = 0;
 
                     // Begin CORE TRANSACTION
                     using (var tx = ModTransaction.BeginTransaction())
                     {
                         var modList = await tx.GetModList();
+                        var originalData = new Dictionary<string, (Mod? mod, long originalOffset)>();
 
-                        Dictionary<string, (Mod? mod, long offset)> OriginalData = new Dictionary<string, (Mod? mod, long offset)>();
+                        // 0 - Extract the MPD file.
+                        // It is time to do wild and crazy things...
 
-                        // 1 - Copy all the mod data to the DAT files.
-                        count = 0;
-                        progress.Report((0, 0, "Writing Mod Data..."));
-                        using (var binaryReader = new BinaryReader(new FileStream(_tempMPD, FileMode.Open)))
+                        // First, unzip the TTMP into our transaction data store folder.
+                        var txSTorePath = tx.UNSAFE_GetTransactionStore();
+                        using (var zf = ZipFile.Read(modpackPath))
                         {
-                            foreach (var modJson in filteredModsJson)
+                            progress.Report((0, 0, "Unzipping TTMP File to Transaction Data Store..."));
+                            var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
+
+                            _tempMPD = Path.Combine(txSTorePath, Guid.NewGuid().ToString());
+
+                            using (var fs = new FileStream(_tempMPD, FileMode.Create))
                             {
-                                binaryReader.BaseStream.Seek(modJson.ModOffset, SeekOrigin.Begin);
-                                var data = binaryReader.ReadBytes(modJson.ModSize);
-
-                                // TODO : Could also handle endwalker => Dawntrail upgrades here.
-                                if (modJson.FullPath.EndsWith(".tex") && needsTexFix)
-	                                FixupTextoolsTex(data);
-
-                                var df = IOUtil.GetDataFileFromPath(modJson.FullPath);
-
-                                // Store original data for use later with the root cloner.
-                                var originalOffset = await tx.Get8xDataOffset(modJson.FullPath);
-                                var originalMod = modList.GetMod(modJson.FullPath);
-                                OriginalData.Add(modJson.FullPath, (originalMod, originalOffset));
-
-                                // Bind the mod pack entry/info and write the mod.
-                                tx.ModPack = modJson.ModPackEntry;
-                                var item = new SimpleIItem(modJson.Name, modJson.Category);
-
-                                var offset = await dat.WriteModFile(data, modJson.FullPath, sourceApplication, item, tx);
-                                tx.ModPack = null;
-
-                                var uOffset = (uint)(offset / 8);
-                                DatOffsets.Add(modJson.FullPath, uOffset);
-
-                                var dataType = BitConverter.ToInt32(data, 4);
-
-                                if (!FilesPerDf.ContainsKey(df))
-                                {
-                                    FilesPerDf.Add(df, new List<string>());
-                                }
-
-                                FilesPerDf[df].Add(modJson.FullPath);
-                                count++;
-                                progress.Report((count, totalFiles, "Writing Mod Data..."));
+                                mpd.Extract(fs);
                             }
                         }
 
 
-                        File.Delete(_tempMPL);
-                        File.Delete(_tempMPD);
+                        // Now, we need to rip the offsets, and generate Transaction data store file handles for them.
+                        var tempOffsets = new Dictionary<string, long>();
+                        count = 0;
+                        foreach (var modJson in filteredModsJson)
+                        {
+                            progress.Report((count, filteredModsJson.Count, "Writing Mod Files..."));
+                            var storeInfo = new FileStorageInformation()
+                            {
+                                StorageType = EFileStorageType.CompressedBlob,
+                                RealPath = _tempMPD,
+                                RealOffset = modJson.ModOffset,
+                                FileSize = modJson.ModSize
+                            };
 
+                            // And get an in-system data offset for them...
+                            var offset = tx.UNSAFE_AddFileInfo(storeInfo, IOUtil.GetDataFileFromPath(modJson.FullPath));
 
-                        // We've now copied the data into the game files, we now need to update the indices.
-                        var _index = new Index(XivCache.GameInfo.GameDirectory);
+                            tempOffsets.Add(modJson.FullPath, offset);
+
+                            // And Update the Index to point to the new file.
+                            var oldOffset = await tx.Set8xDataOffset(modJson.FullPath, offset);
+
+                            // And Update the Modlist entry.
+                            var prevMod = modList.GetMod(modJson.FullPath);
+
+                            // Save this stuff for the root cloner.
+                            originalData.Add(modJson.FullPath, (prevMod, oldOffset));
+
+                            Mod mod = new Mod();
+
+                            if(prevMod != null)
+                            {
+                                oldOffset = prevMod.Value.OriginalOffset8x;
+                            }
+
+                            mod.ItemName = modJson.Name;
+                            mod.ItemCategory = modJson.Category;
+                            mod.FilePath = modJson.FullPath;
+                            mod.FileSize = modJson.ModSize;
+                            mod.ModOffset8x = offset;
+                            mod.OriginalOffset8x = oldOffset;
+                            mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
+
+                            modList.AddOrUpdateMod(mod);
+                            count++;
+                        }
+
+                        // Aaaand, we're done.
+                        // The Unzipped MPD file will remain in the transaction store until the transaction is closed or cancelled.
+                        // At which point it will be removed.
+                        // The transaction commit logic will handle finalizing the write to the DATs if it's needed.
 
 
                         // Root Alterations/Item Conversion
@@ -667,7 +663,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 progress.Report((0, 0, "Updating Destination Items..."));
 
                                 tx.ModPack = modPack;
-                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, OriginalData, sourceApplication);
+                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalData, sourceApplication);
                                 tx.ModPack = null;
                             }
                         }

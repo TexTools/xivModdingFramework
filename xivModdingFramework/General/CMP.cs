@@ -63,20 +63,46 @@ namespace xivModdingFramework.General
         /// <param name="race"></param>
         /// <param name="gender"></param>
         /// <returns></returns>
-        public static async Task DisableRgspMod(XivSubRace race, XivGender gender)
+        public static async Task DisableRgspMod(XivSubRace race, XivGender gender, ModTransaction tx = null)
         {
-            var path = GetRgspPath(race, gender);
+            var ownTx = false;
+            if(tx == null)
+            {
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction();
+            }
+            try
+            {
+                var path = GetRgspPath(race, gender);
 
 
-            var modlist = await Modding.GetModList();
-            var mod = modlist.GetMod(path);
-            if (mod != null && mod.Value.Enabled)
+                var modlist = await Modding.GetModList();
+                var mod = modlist.GetMod(path);
+                if (mod != null)
+                {
+                    var state = await mod.Value.GetState(tx);
+                    if (state == Mods.Enums.EModState.Enabled)
+                    {
+                        await Modding.ToggleModStatus(path, false);
+                    }
+                }
+                else
+                {
+                    var def = await GetScalingParameter(race, gender, true);
+                    await SetScalingParameter(def);
+                }
+
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+            } catch(Exception ex)
             {
-                await Modding.ToggleModStatus(path, false);
-            } else
-            {
-                var def = await GetScalingParameter(race, gender, true);
-                await SetScalingParameter(def);
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
             }
 
         }

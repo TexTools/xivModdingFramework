@@ -24,8 +24,10 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.Enums;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
@@ -77,13 +79,18 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="mod"></param>
         public void AddOrUpdateMod(Mod mod)
         {
+            if(string.IsNullOrWhiteSpace(mod.FilePath))
+            {
+                throw new Exception("Cannot add NULL path mod.");
+            }
+
             if (_Mods.ContainsKey(mod.FilePath))
             {
                 var oldMod = _Mods[mod.FilePath];
                 _Mods[mod.FilePath] = mod;
 
 
-                if (!string.IsNullOrWhiteSpace(oldMod.ModPack) && _ModPacks.ContainsKey(oldMod.ModPack))
+                if (!string.IsNullOrWhiteSpace(oldMod.ModPack) && _ModPacks.ContainsKey(oldMod.ModPack) && mod.ModPack != oldMod.ModPack)
                 {
                     // Remove our old mod from its associated modpack, and remove the modpack if it was the last one.
                     var shouldRemove = _ModPacks[oldMod.ModPack].INTERNAL_RemoveMod(oldMod.FilePath);
@@ -101,9 +108,9 @@ namespace xivModdingFramework.Mods.DataContainers
             // Add to modpack's list if it has a valid modpack.
             if (!string.IsNullOrWhiteSpace(mod.ModPack))
             {
-                if (_ModPacks.ContainsKey(mod.ModPack))
+                if (!_ModPacks.ContainsKey(mod.ModPack))
                 {
-                    var newMp = new ModPack()
+                    var newMp = new ModPack(null)
                     {
                         Name = mod.ModPack,
                     };
@@ -174,19 +181,78 @@ namespace xivModdingFramework.Mods.DataContainers
         }
 
         /// <summary>
+        /// Add or update a modpack.
+        /// </summary>
+        /// <param name="modpack"></param>
+        public void AddOrUpdateModpack(ModPack modpack)
+        {
+            var oldMp = GetModPack(modpack.Name);
+
+            var data = new HashSet<string>();
+            if (oldMp != null)
+            {
+                data = oldMp.Value.Mods;
+            }
+
+            // Always re-initialize the modpack to ensure we have a
+            // valid data pointer for the mods HashSet.
+            var mp = new ModPack(data)
+            {
+                Name = modpack.Name,
+                Author = modpack.Author,
+                Version = modpack.Version,
+                Url = modpack.Url
+            };
+
+            if(_ModPacks.ContainsKey(modpack.Name))
+            {
+                _ModPacks[modpack.Name] = mp;
+            }
+            else
+            {
+                _ModPacks.Add(mp.Name, mp);
+            }
+        }
+
+        /// <summary>
+        /// Removes a modpack from the listing, and optionally all of its referenced mods.
+        /// </summary>
+        /// <param name="modpack"></param>
+        /// <param name="removeMods"></param>
+        public void RemoveModpack(ModPack modpack, bool removeMods = false)
+        {
+            _ModPacks.Remove(modpack.Name);
+
+            // Always get the list manually, as we can't trust incoming data.
+            var mods = GetMods(x => x.ModPack == modpack.Name);
+            foreach(var mod in mods)
+            {
+                var newMod = mod;
+                newMod.ModPack = "";
+                if (removeMods)
+                {
+                    RemoveMod(mod);
+                } else
+                {
+                    AddOrUpdateMod(newMod);
+                }
+            }
+        }
+
+        /// <summary>
         /// Safely attempts to get a given mod based on path, returning NULL if the mod does not exist.
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
         public Mod? GetMod(string path)
         {
-            _Mods.TryGetValue(path, out var mod);
-            return mod;
+            Mod? ret = _Mods.ContainsKey(path) ? _Mods[path] : null;
+            return ret;
         }
 
         public ModPack? GetModPack(string modpackName)
         {
-            _ModPacks.TryGetValue(modpackName, out var modpack);
+            ModPack? modpack = _ModPacks.ContainsKey(modpackName) ? _ModPacks[modpackName] : null;
             return modpack;
         }
 
@@ -208,6 +274,12 @@ namespace xivModdingFramework.Mods.DataContainers
             };
 
             return _Mods.Where(newPred).Select(x => x.Value);
+        }
+
+
+        public IEnumerable<ModPack> GetModPacks()
+        {
+            return GetModPacks(x => true);
         }
 
         /// <summary>
@@ -246,13 +318,12 @@ namespace xivModdingFramework.Mods.DataContainers
 
                 if (!_ModPacks.ContainsKey(mkv.Value.ModPack))
                 {
-                    var newMp = new ModPack()
+                    var newMp = new ModPack(null)
                     {
                         Name = mkv.Value.ModPack,
                     };
                     _ModPacks.Add(mkv.Value.ModPack, newMp);
                 }
-
                 _ModPacks[mkv.Value.ModPack].INTERNAL_AddMod(mkv.Value.FilePath);
             }
         }
@@ -297,18 +368,82 @@ namespace xivModdingFramework.Mods.DataContainers
         /// </summary>
         public string ItemCategory { get; set; }
 
+        [JsonProperty("FilePath")]
+        private string _FilePath;
+
         /// <summary>
         /// The internal path of the modified item
         /// </summary>
-        public string FilePath { get; set; }
+        [JsonIgnore]
+        public string FilePath { get
+            {
+                return _FilePath == null ? "" : _FilePath;
+            }
+            set
+            {
+                if(value == null)
+                {
+                    _FilePath = "";
+                    return;
+                }
+                _FilePath = value;
+            }
+        }
+
+        [JsonIgnore]
+        public bool Valid
+        {
+            get {
+                return !String.IsNullOrWhiteSpace(FilePath);
+            }
+        }
+
+        [JsonIgnore]
+        public XivDataFile DataFile {
+            get
+            {
+                return IOUtil.GetDataFileFromPath(FilePath);
+            } 
+        }
+
+        public async Task<EModState> GetState(ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+            var activeOffset = await tx.Get8xDataOffset(FilePath);
+
+            if(activeOffset == ModOffset8x)
+            {
+                return EModState.Enabled;
+            } else if(activeOffset == OriginalOffset8x)
+            {
+                return EModState.Disabled;
+            }
+            return EModState.Invalid;
+        }
 
         /// <summary>
-        /// The mod status
+        /// Synchronously check the mod state.
+        /// The Transaction must already have the relevant index file and modlist loaded.
         /// </summary>
-        /// <remarks>
-        /// true if enabled, false if disabled
-        /// </remarks>
-        public bool Enabled { get; set; }
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public EModState GetStateSync(ModTransaction tx)
+        {
+            var activeOffset = tx.Get8xDataOffsetSync(FilePath);
+
+            if (activeOffset == ModOffset8x)
+            {
+                return EModState.Enabled;
+            }
+            else if (activeOffset == OriginalOffset8x)
+            {
+                return EModState.Disabled;
+            }
+            return EModState.Invalid;
+        }
 
 
         [JsonProperty("ModPack")]
@@ -364,7 +499,7 @@ namespace xivModdingFramework.Mods.DataContainers
 
         public bool IsCustomFile()
         {
-            return ModOffset8x == OriginalOffset8x;
+            return ModOffset8x != 0 && OriginalOffset8x == 0;
         }
 
         /// <summary>
@@ -392,8 +527,7 @@ namespace xivModdingFramework.Mods.DataContainers
                 ItemName = modsJson.Name,
                 ItemCategory = modsJson.Category,
                 FilePath = modsJson.FullPath,
-                Enabled = true,
-                ModPack = modsJson.ModPackEntry.Name,
+                ModPack = modsJson.ModPackEntry?.Name,
                 ModOffset8x = modsJson.ModOffset,
             };
         }
@@ -437,14 +571,6 @@ namespace xivModdingFramework.Mods.DataContainers
 
     public struct ModPack
     {
-        public bool Valid
-        {
-            get
-            {
-                return String.IsNullOrWhiteSpace(Name);
-            }
-        }
-
         /// <summary>
         /// The name of the modpack
         /// </summary>
@@ -476,12 +602,33 @@ namespace xivModdingFramework.Mods.DataContainers
         public HashSet<string> Mods {
             get
             {
-                if (_Mods == null)
-                {
-                    _Mods = new HashSet<string>();
-                }
                 return new HashSet<string>(_Mods);
             }
+        }
+        
+        public ModPack(HashSet<string> mods = null)
+        {
+            if(mods == null)
+            {
+                mods = new HashSet<string>();
+            }
+            _Mods = new HashSet<string>(mods);
+            Name = "";
+            Author = "";
+            Version = "";
+            Url = "";
+        }
+
+        /// <summary>
+        /// Get the full mod objects referencing this modpack.
+        /// Syntactic Shorcut for ModList.GetMods(x => Mods.Contains(x.FilePath))
+        /// </summary>
+        /// <param name="modList"></param>
+        /// <returns></returns>
+        public IEnumerable<Mod> GetMods(ModList modList)
+        {
+            var mods = Mods;
+            return modList.GetMods(x => mods.Contains(x.FilePath));
         }
 
         /// <summary>
@@ -499,10 +646,6 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="filePath"></param>
         internal void INTERNAL_AddMod(string filePath)
         {
-            if(_Mods == null)
-            {
-                _Mods = new HashSet<string>();
-            }
             if (!_Mods.Contains(filePath))
             {
                 _Mods.Add(filePath);
@@ -515,11 +658,6 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="filePath"></param>
         internal bool INTERNAL_RemoveMod(string filePath)
         {
-            if (_Mods == null)
-            {
-                _Mods = new HashSet<string>();
-            }
-
             _Mods.Remove(filePath);
             if(_Mods.Count == 0)
             {

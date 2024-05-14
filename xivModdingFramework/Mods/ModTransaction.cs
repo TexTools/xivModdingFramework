@@ -148,7 +148,7 @@ namespace xivModdingFramework.Mods
         private Dictionary<string, TxPathData> _PrepFiles = new Dictionary<string, TxPathData>();
 
         // Offset mapping of Temporary Offset => File paths referencing that offset.
-        private Dictionary<XivDataFile, Dictionary<long, List<string>>> _TemporaryOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, List<string>>>();
+        private Dictionary<XivDataFile, Dictionary<long, HashSet<string>>> _TemporaryOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, HashSet<string>>>();
 
         // Dictionary of Temporary offsets to Real offsets, only populated after committing a transaction.
         private Dictionary<XivDataFile, Dictionary<long, long>> _TempToRealOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, long>>();
@@ -645,7 +645,10 @@ namespace xivModdingFramework.Mods
                     // Reset our DAT sizes back to what they were before we started the Transaction.
                     TruncateDats();
                 }
-                _DataHandler.Dispose();
+                if (_DataHandler != null)
+                {
+                    _DataHandler.Dispose();
+                }
             }
             _IndexFiles = null;
             _ModList = null;
@@ -714,8 +717,10 @@ namespace xivModdingFramework.Mods
                 var mod = (await GetModList()).GetMod(path);
                 if(mod == null)
                 {
-                    // Re-call to default path.
-                    return await Get8xDataOffset(path, false);
+                    // Standard index retrieval
+                    var df = IOUtil.GetDataFileFromPath(path);
+                    var idx = await GetIndexFile(df);
+                    return idx.Get8xDataOffset(path);
                 }
                 else
                 {
@@ -723,6 +728,50 @@ namespace xivModdingFramework.Mods
                     return mod.Value.OriginalOffset8x;
                 }
             }
+        }
+
+        /// <summary>
+        /// Retrieves a data offset Synchronously.
+        /// The Index File and ModList in question must already be cached or this will error.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="forceOriginal"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public long Get8xDataOffsetSync(string path, bool forceOriginal = false)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            if (!_IndexFiles.ContainsKey(df))
+            {
+                throw new Exception("Cannot use Synchronous Data Offset Retrieval when Index File has not been loaded.");
+            }
+            if(_ModList == null)
+            {
+                throw new Exception("Cannot use Synchronous Data Offset Retrieval when ModList has not been loaded.");
+            }
+
+            var idx = _IndexFiles[df];
+            var modList = _ModList;
+
+            if (!forceOriginal)
+            {
+                // Standard index retrieval.
+                return idx.Get8xDataOffset(path);
+            }
+            else
+            {
+                var mod = modList.GetMod(path);
+                if (mod == null)
+                {
+                    return idx.Get8xDataOffset(path);
+                }
+                else
+                {
+                    // Return original base game offset.
+                    return mod.Value.OriginalOffset8x;
+                }
+            }
+
         }
 
         /// <summary>
@@ -1020,6 +1069,11 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to write to index files during invalid Transaction State.");
             }
 
+            if(originalOffset == updatedOffset)
+            {
+                return;
+            }
+
             var data = GetOrCreatePathData(path);
 
             if (!data.OriginalOffset_Set)
@@ -1031,7 +1085,7 @@ namespace xivModdingFramework.Mods
 
             if (!_TemporaryOffsetMapping.ContainsKey(dataFile))
             {
-                _TemporaryOffsetMapping.Add(dataFile, new Dictionary<long, List<string>>());
+                _TemporaryOffsetMapping.Add(dataFile, new Dictionary<long, HashSet<string>>());
             }
 
 
@@ -1053,7 +1107,7 @@ namespace xivModdingFramework.Mods
             // Update the Offset's pathlist.
             if (!_TemporaryOffsetMapping[dataFile].ContainsKey(updatedOffset))
             {
-                _TemporaryOffsetMapping[dataFile][updatedOffset] = new List<string>();
+                _TemporaryOffsetMapping[dataFile][updatedOffset] = new HashSet<string>();
             }
             _TemporaryOffsetMapping[dataFile][updatedOffset].Add(path);
 
@@ -1071,12 +1125,12 @@ namespace xivModdingFramework.Mods
         /// <param name="df"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        internal List<string> GetFilePathsFromTempOffset(XivDataFile df, long offset)
+        internal HashSet<string> GetFilePathsFromTempOffset(XivDataFile df, long offset)
         {
             if (!_TemporaryOffsetMapping.ContainsKey(df))
-                return new List<string>();
+                return new HashSet<string>();
             if (!_TemporaryOffsetMapping[df].ContainsKey(offset))
-                return new List<string>();
+                return new HashSet<string>();
             return _TemporaryOffsetMapping[df][offset];
         }
 
@@ -1179,6 +1233,48 @@ namespace xivModdingFramework.Mods
             var offset = GetNextTempOffset(dataFile);
             await WriteData(dataFile, offset, data, compressed);
 
+            return offset;
+        }
+
+
+        /// <summary>
+        /// Data-Writing function that allows for setting explicit transaction store information.
+        /// Mostly useful when we know we're performing a task that would have significant performance
+        /// penalties when stored in the wrong [Compressed/Uncompressed] state.
+        /// </summary>
+        /// <param name="storageSettings"></param>
+        /// <param name="dataFile"></param>
+        /// <param name="data"></param>
+        /// <param name="compressed"></param>
+        /// <returns></returns>
+        internal async Task<long> ExplicitWriteData(FileStorageInformation storageSettings, XivDataFile dataFile, byte[] data, bool compressed = false)
+        {
+            var offset = GetNextTempOffset(dataFile);
+            await WriteData(dataFile, offset, data, compressed);
+            await _DataHandler.WriteFile(storageSettings, dataFile, offset, data, compressed);
+            return offset;
+        }
+
+        /// <summary>
+        /// Gets the temp folder used by the internal transaction store.
+        /// </summary>
+        /// <returns></returns>
+        internal string UNSAFE_GetTransactionStore()
+        {
+            return _DataHandler.DefaultPathRoot;
+        }
+
+        /// <summary>
+        /// Adds a file storage handle into the internal data store.
+        /// Does not add any raw data in the process.  The file is expected to exist and be managed by the caller,
+        /// or be manually added to the data manager's temp path.
+        /// </summary>
+        /// <param name="storageSettings"></param>
+        /// <param name="dataFile"></param>
+        internal long UNSAFE_AddFileInfo(FileStorageInformation storageSettings, XivDataFile dataFile)
+        {
+            var offset = GetNextTempOffset(dataFile);
+            _DataHandler.UNSAFE_AddFileInfo(storageSettings, dataFile, offset);
             return offset;
         }
 

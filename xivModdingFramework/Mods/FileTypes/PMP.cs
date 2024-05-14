@@ -169,7 +169,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             _RgspRaceGenders = new HashSet<uint>();
             _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
-            var modPack = new ModPack();
+            var modPack = new ModPack(null);
 
             modPack.Name = pmp.Meta.Name;
             modPack.Author = pmp.Meta.Author;
