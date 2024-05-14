@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
@@ -30,6 +31,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
@@ -141,7 +143,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="dataFile">The data file to create a new dat for.</param>
         /// <returns>The new dat number.</returns>
-        internal int CreateNewDat(XivDataFile dataFile, bool alreadyLocked = false)
+        private int CreateNewDat(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var nextDatNumber = GetLargestDatNumber(dataFile, alreadyLocked) + 1;
 
@@ -169,7 +171,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check.</param>
         /// <returns>The largest dat number for the given data file.</returns>
-        internal int GetLargestDatNumber(XivDataFile dataFile, bool alreadyLocked = false)
+        internal static int GetLargestDatNumber(XivDataFile dataFile, bool alreadyLocked = false)
         {
 
             string[] allFiles = null;
@@ -179,7 +181,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             try
             {
-                allFiles = Directory.GetFiles(_gameDirectory.FullName);
+                allFiles = Directory.GetFiles(XivCache.GameInfo.GameDirectory.FullName);
             }
             finally
             {
@@ -246,7 +248,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        internal async Task<List<string>> GetUnmoddedDatList(XivDataFile dataFile, bool alreadyLocked = false)
+        private async Task<List<string>> GetUnmoddedDatList(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var datList = new List<string>();
 
@@ -343,7 +345,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the SqPack portion of the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        internal static byte[] MakeCustomDatSqPackHeader()
+        private static byte[] MakeCustomDatSqPackHeader()
         {
             var header = new byte[1024];
 
@@ -391,7 +393,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Makes the header for the dat file.
         /// </summary>
         /// <returns>byte array containing the header.</returns>
-        internal static byte[] MakeDatHeader(int datNum, long fileSize, byte[] dataHash = null)
+        private static byte[] MakeDatHeader(int datNum, long fileSize, byte[] dataHash = null)
         {
             var header = new byte[1024];
 
@@ -455,7 +457,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="datNum"></param>
         /// <param name="fileSize"></param>
         /// <param name="dataHash"></param>
-        internal static void UpdateDatHeader(BinaryWriter bw, int datNum, long fileSize, byte[] dataHash = null)
+        private static void UpdateDatHeader(BinaryWriter bw, int datNum, long fileSize, byte[] dataHash = null)
         {
             var pos = bw.BaseStream.Position;
             var header = MakeDatHeader(datNum, fileSize, dataHash);
@@ -1176,57 +1178,80 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             return ret.ToArray();
         }
-        public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offsetWithDatNumber)
+
+        public async Task<uint> GetReportedType4UncompressedSize(string path, bool forceOrginal = false, ModTransaction tx = null)
         {
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offsetWithDatNumber / 8) & 0x0F) / 2;
-
-            var offset = IOUtil.RemoveDatNumberEmbed(offsetWithDatNumber);
-
-            var datPath = Dat.GetDatPath(df, datNum);
-
-            return await Task.Run(async () =>
+            if (tx == null)
             {
-                using (var br = new BinaryReader(File.OpenRead(datPath)))
-                {
-                    br.BaseStream.Seek(offset+8, SeekOrigin.Begin);
+                tx = ModTransaction.BeginTransaction();
+            }
+            var offset = await tx.Get8xDataOffset(path, forceOrginal);
+            var df = IOUtil.GetDataFileFromPath(path);
+            return await GetReportedType4UncompressedSize(df, offset, tx);
 
-                    var size = br.ReadUInt32();
-                    return size;
-                }
-            });
+        }
+        public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offset8x, ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+            using (var br = await tx.GetFileStream(df, offset8x, true))
+            {
+                br.BaseStream.Seek(8, SeekOrigin.Current);
+                var size = br.ReadUInt32();
+                return size;
+            }
         }
 
         /// <summary>
-        /// WARNING: DOES NOT USE/RESPECT TRANSACTIONS
         /// This is a very specific fixer-function designed to handle a very specific error caused by very old TexTools builds that would
         /// generate invalid compressed file sizes for texture files.
-        /// It is only run via the Problem checker.
         /// 
-        /// TODO: This should be updated and probably stapled onto the TTMP import Dawntrail functions.
-        /// That way we can ensure that any mods in-system are sane.
+        /// Returns true if the file was modified.
         /// </summary>
-        /// <param name="df"></param>
-        /// <param name="offsetWithDatNumber"></param>
-        /// <param name="correctedFileSize"></param>
         /// <returns></returns>
-        public async Task UpdateType4UncompressedSize(XivDataFile df, long offsetWithDatNumber, uint correctedFileSize)
+        public async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
         {
-            if(!AllowDatAlteration)
+            var ownTx = false;
+            if(tx == null)
             {
-                throw new Exception("Not allowed to alter DAT files when DAT Alteration is disabled.");
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction(true);
             }
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var part = IOUtil.Offset8xToParts(offsetWithDatNumber);
-            await Task.Run(async () =>
+            try
             {
-                using (var br = new BinaryWriter(File.OpenWrite(GetDatPath(df, part.DatNum))))
+                var reportedSize = await tx.GetCompressedFileSize(dataFile, offset);
+                var data = await tx.ReadFile(dataFile, offset);
+                var realSize = data.Length;
+
+                if(reportedSize == realSize)
                 {
-                    br.BaseStream.Seek(part.Offset + 8, SeekOrigin.Begin);
-                    br.Write(correctedFileSize);
+                    if (ownTx)
+                    {
+                        ModTransaction.CancelTransaction(tx, true);
+                    }
+                    return false;
                 }
-            });
+
+                // Write the corrected size and save file.
+                Array.Copy(BitConverter.GetBytes(realSize), 0, data, 8, sizeof(uint));
+                await tx.WriteFile(path, data, sourceApplication);
+
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+                return true;
+            }
+            catch(Exception ex)
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
         }
 
         /// <summary>
@@ -1411,45 +1436,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             return finalbytes;
         }
 
-
-        /// <summary>
-        /// Retrieves the raw uncompressed/De-SQPacked bytes for a given file.
-        /// </summary>
-        /// <param name="internalPath"></param>
-        /// <param name="forceOriginal"></param>
-        /// <param name="tx"></param>
-        /// <returns></returns>
-        public async Task<byte[]> GetUncompressedData(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
-        {
-            if (tx == null)
-            {
-                // Use simple readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction();
-            }
-
-            var offset8x = await tx.Get8xDataOffset(internalPath);
-            if (forceOriginal)
-            {
-                // Checks if the item being imported already exists in the modlist
-                (await tx.GetModList()).Mods.TryGetValue(internalPath, out var modEntry);
-                // If the file exists in the modlist, get the data from the original data
-                if (modEntry != null)
-                {
-                    offset8x = modEntry.OriginalOffset8x;
-                }
-            }
-
-            var df = IOUtil.GetDataFileFromPath(internalPath);
-
-            var parts = IOUtil.Offset8xToParts(offset8x);
-            var datPath = GetDatPath(df, parts.DatNum);
-
-            int type = -1;
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
-            {
-                return await GetUncompressedData(br, parts.Offset);
-            }
-        }
 
         /// <summary>
         /// Decompresses (De-SqPacks) a given block of data.
@@ -1798,87 +1784,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         }
 
-        /// <summary>
-        /// Gets the file type of an item
-        /// </summary>
-        /// <param name="offset">Offset to the texture data.</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>The file type</returns>
-        public int GetFileType(long offset, XivDataFile dataFile)
-        {
-            // This formula is used to obtain the dat number in which the offset is located
-            var datNum = (int)((offset / 8) & 0x0F) / 2;
-
-            offset = IOUtil.RemoveDatNumberEmbed(offset);
-
-            var datPath = Dat.GetDatPath(dataFile, datNum);
-
-            if (File.Exists(datPath))
-            {
-                using (var br = new BinaryReader(File.OpenRead(datPath)))
-                {
-                    br.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                    br.ReadInt32(); // Header Length
-                    return br.ReadInt32(); // File Type
-                }
-            }
-            else
-            {
-                throw new Exception($"Unable to find {datPath}");
-            }
-        }
-
-        public static string GetDatPath(XivDataFile dataFile, int datNumber)
+        internal static string GetDatPath(XivDataFile dataFile, int datNumber)
         {
             var datPath = $"{XivCache.GameInfo.GameDirectory}/{dataFile.GetDataFileName()}{Dat.DatExtension}{datNumber}";
             return datPath;
         }
-
-        public async Task<byte[]> GetCompressedData(string path, bool forceOriginal = false, ModTransaction tx = null)
-        {
-            if(tx == null)
-            {
-                // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
-            }
-
-            var offset = await tx.Get8xDataOffset(path, forceOriginal);
-            var df = IOUtil.GetDataFileFromPath(path);
-            return await tx.ReadFile(df, offset, true);
-        }
-
-        /// <summary>
-        /// Gets the compressed data directly from the dats, with a known file size.
-        /// NOT TRANSACTION SAFE - Only used during DAT defragment procedure.
-        /// </summary>
-        /// <param name="offset8xWithDatEmbed"></param>
-        /// <param name="dataFile"></param>
-        /// <param name="dataSize"></param>
-        /// <returns></returns>
-        internal byte[] UNSAFE_GetCompressedData(long offset8xWithDatEmbed, XivDataFile dataFile, int dataSize)
-        {
-            var offsetParts = IOUtil.Offset8xToParts(offset8xWithDatEmbed);
-            var datPath = GetDatPath(dataFile, offsetParts.DatNum);
-
-            using (var br = new BinaryReader(File.OpenRead(datPath)))
-            {
-                try
-                {
-                    br.BaseStream.Seek(offsetParts.Offset, SeekOrigin.Begin);
-
-                    return br.ReadBytes(dataSize);
-                }
-                catch
-                {
-                    return null;
-                }
-
-            }
-        }
-
-
-
 
 
         /// <summary>
@@ -2075,7 +1985,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return await tx.Get8xDataOffset(targetPath);
                 }
 
-                var data = await GetCompressedData(sourcePath, false, tx);
+                var data = await tx.ReadFile(sourcePath, false, true);
 
 
                 XivDependencyRoot root = null;
@@ -2137,7 +2047,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="importData"></param>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        public async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, long targetOffset = 0)
+        internal async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, long targetOffset = 0)
         {
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
@@ -2468,7 +2378,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="df"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<long, long>> ComputeOpenSlots(XivDataFile df)
+        private static async Task<Dictionary<long, long>> ComputeOpenSlots(XivDataFile df)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
@@ -2527,6 +2437,252 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
             return slots;
+        }
+
+
+
+
+        /// <summary>
+        /// This function will rewrite all the mod files to new DAT entries, replacing the existing modded DAT files with new, defragmented ones.
+        /// Returns the total amount of bytes recovered.
+        /// 
+        /// NOT TRANSACTION SAFE.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        {
+            if (!Dat.AllowDatAlteration)
+            {
+                throw new Exception("Cannot defragment DATs while DAT writing is disabled.");
+            }
+
+            var modlist = await Modding.GetModList();
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
+
+            var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
+
+            var modsByDf = modlist.GetMods().GroupBy(x => IOUtil.GetDataFileFromPath(x.FilePath));
+            var indexFiles = new Dictionary<XivDataFile, IndexFile>();
+
+            var count = 0;
+            var total = modlist.Mods.Count();
+
+            var originalSize = await GetTotalModDataSize();
+
+            var workerStatus = XivCache.CacheWorkerEnabled;
+            XivCache.CacheWorkerEnabled = false;
+            try
+            {
+                var newMods = new List<Mod>();
+                // Copy files over into contiguous data blocks in the new dat files.
+                foreach (var dKv in modsByDf)
+                {
+                    var df = dKv.Key;
+                    indexFiles.Add(df, await _index.GetIndexFile(df));
+
+                    foreach (var oMod in dKv)
+                    {
+                        var mod = oMod;
+                        progressReporter?.Report((count, total, "Writing mod data to temporary DAT files..."));
+
+                        try
+                        {
+                            var parts = IOUtil.Offset8xToParts(mod.ModOffset8x);
+                            byte[] data;
+                            using (var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
+                            {
+                                // Check size.
+                                br.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
+                                var size = Dat.GetCompressedFileSize(br);
+
+                                // Pull entire file.
+                                br.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
+                                data = br.ReadBytes(size);
+                            }
+
+                            var newOffset = await WriteToTempDat(data, df);
+
+                            if (mod.IsCustomFile())
+                            {
+                                mod.OriginalOffset8x = newOffset;
+                            }
+                            mod.ModOffset8x = newOffset;
+                            indexFiles[df].Set8xDataOffset(mod.FilePath, newOffset);
+                            newMods.Add(mod);
+                        }
+                        catch (Exception except)
+                        {
+                            throw;
+                        }
+
+                        count++;
+                    }
+                }
+
+                modlist.AddOrUpdateMods(newMods);
+
+                progressReporter?.Report((0, 0, "Removing old modded DAT files..."));
+                foreach (var dKv in modsByDf)
+                {
+                    // Now we need to delete the current modded dat files.
+                    var moddedDats = await _dat.GetModdedDatList(dKv.Key);
+                    foreach (var file in moddedDats)
+                    {
+                        File.Delete(file);
+                    }
+                }
+
+                // Now we need to rename our temp files.
+                progressReporter?.Report((0, 0, "Renaming temporary DAT files..."));
+                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
+                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
+                foreach (var temp in temps)
+                {
+                    var oldName = temp.FullName;
+                    var newName = temp.FullName.Substring(0, oldName.Length - 4);
+                    System.IO.File.Move(oldName, newName);
+                }
+
+                progressReporter?.Report((0, 0, "Saving updated Index Files..."));
+
+                foreach (var dKv in modsByDf)
+                {
+                    indexFiles[dKv.Key].Save();
+                }
+
+                progressReporter?.Report((0, 0, "Saving updated Modlist..."));
+
+                // Save modList
+                await Modding.SaveModListAsync(modlist);
+
+
+                var finalSize = await GetTotalModDataSize();
+                var saved = originalSize - finalSize;
+                saved = saved > 0 ? saved : 0;
+                return saved;
+            }
+            finally
+            {
+                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
+                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
+                foreach (var temp in temps)
+                {
+                    temp.Delete();
+                }
+
+                XivCache.CacheWorkerEnabled = workerStatus;
+            }
+
+        }
+
+        private static async Task<long> WriteToTempDat(byte[] data, XivDataFile df)
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var moddedDats = await _dat.GetModdedDatList(df);
+            var tempDats = moddedDats.Select(x => x + ".temp");
+            var maxSize = Dat.GetMaximumDatSize();
+
+            var rex = new Regex("([0-9])\\.temp$");
+            string targetDatFile = null;
+            foreach (var file in tempDats)
+            {
+                var datId = Int32.Parse(rex.Match(targetDatFile).Groups[1].Value);
+
+                if (!File.Exists(file))
+                {
+                    using (var stream = new BinaryWriter(File.Create(file)))
+                    {
+                        stream.Write(Dat.MakeCustomDatSqPackHeader());
+                        stream.Write(Dat.MakeDatHeader(datId, 0));
+                    }
+                    targetDatFile = file;
+                    break;
+                }
+
+                var finfo = new FileInfo(file);
+                if (finfo.Length + data.Length < maxSize)
+                {
+                    targetDatFile = file;
+                }
+            }
+
+            if (targetDatFile == null) throw new Exception("Unable to find open temp dat to write to.");
+
+            var match = rex.Match(targetDatFile);
+            uint datNum = UInt32.Parse(match.Groups[1].Value);
+
+
+            long baseOffset = 0;
+            using (var stream = new BinaryWriter(File.Open(targetDatFile, FileMode.Append)))
+            {
+                baseOffset = stream.BaseStream.Position;
+                stream.Write(data);
+            }
+
+            long offset = ((baseOffset / 8) | (datNum * 2)) * 8;
+
+            return offset;
+        }
+
+        /// <summary>
+        /// Gets the sum total size in bytes of all modded dats.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<long> GetTotalModDataSize()
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
+
+            long size = 0;
+            foreach (var df in dataFiles)
+            {
+                var moddedDats = await _dat.GetModdedDatList(df);
+                foreach (var dat in moddedDats)
+                {
+                    var finfo = new FileInfo(dat);
+                    size += finfo.Length;
+                }
+            }
+
+            return size;
+        }
+
+
+        /// <summary>
+        /// Removes any empty DAT files from the game files.
+        /// Not Transaction safe, but also not TX relevant typically and will not allow running during TX.
+        /// </summary>
+        public static async Task RemoveEmptyDats(XivDataFile dataFile)
+        {
+            if (ModTransaction.ActiveTransaction != null)
+            {
+                // Safety check here to prevent any misuse or weird bugs from assuming this would be based on post-transaction state.
+                throw new Exception("Cannot sanely perform DAT file checks with an open write-enabled transaction.");
+            }
+
+
+            await Task.Run(() =>
+            {
+                var largestDatNum = GetLargestDatNumber(dataFile) + 1;
+                var emptyList = new List<string>();
+
+                for (var i = 0; i < largestDatNum; i++)
+                {
+                    var datPath = Dat.GetDatPath(dataFile, i);
+                    var fileInfo = new FileInfo(datPath);
+
+                    if (fileInfo.Length == 0)
+                    {
+                        emptyList.Add(datPath);
+                    }
+                }
+                foreach (var f in emptyList)
+                {
+                    File.Delete(f);
+                }
+                return emptyList;
+            });
         }
     }
 }

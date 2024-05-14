@@ -42,38 +42,6 @@ namespace xivModdingFramework.Helpers
             _dat = new Dat(_gameDirectory);
         }
 
-        /// <summary>
-        /// Checks the index for any empty dat files
-        /// </summary>
-        /// <returns>A list of dats which are empty if any</returns>
-        public Task<List<int>> CheckForEmptyDatFiles(XivDataFile dataFile)
-        {
-            if (ModTransaction.ActiveTransaction != null)
-            {
-                // Safety check here to prevent any misuse or weird bugs from assuming this would be based on post-transaction state.
-                throw new Exception("Cannot sanely perform DAT file checks with an open write-enabled transaction.");
-            }
-
-
-            return Task.Run(() =>
-            {
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
-                var emptyList = new List<int>();
-
-                for (var i = 0; i < largestDatNum; i++)
-                {
-                    var datPath = Dat.GetDatPath(dataFile, i);
-                    var fileInfo = new FileInfo(datPath);
-
-                    if (fileInfo.Length == 0)
-                    {
-                        emptyList.Add(i);
-                    }
-                }
-
-                return emptyList;
-            });
-        }
 
 
         /// <summary>

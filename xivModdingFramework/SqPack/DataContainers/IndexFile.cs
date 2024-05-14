@@ -267,8 +267,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
         protected virtual void WriteIndexFile(BinaryWriter stream, int indexId)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var datCount = _dat.GetLargestDatNumber(DataFile) + 1;
+            var datCount = Dat.GetLargestDatNumber(DataFile) + 1;
 
             var sh = SHA1.Create();
 
