@@ -500,30 +500,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             // This formula is used to obtain the dat number in which the offset is located
             var parts = IOUtil.Offset8xToParts(offset);
 
-            if (tx != null)
+            if(tx == null)
             {
-                type2Bytes = await tx.ReadFile(dataFile, offset);
+                tx = ModTransaction.BeginTransaction();
             }
-            else
-            {
-                await _lock.WaitAsync();
-                try
-                {
-                    await Task.Run(async () =>
-                    {
-
-                        var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
-                        using (var br = new BinaryReader(File.OpenRead(datPath)))
-                        {
-                            type2Bytes = await ReadSqPackType2(br, parts.Offset);
-                        }
-                    });
-                }
-                finally
-                {
-                    _lock.Release();
-                }
-            }
+            type2Bytes = await tx.ReadFile(dataFile, offset);
             if (type2Bytes == null)
             {
                 return new byte[0];
@@ -785,29 +766,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var parts = IOUtil.Offset8xToParts(offset);
-            var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
-            return await Task.Run(async () =>
+            if(tx == null)
             {
-                if (tx != null)
-                {
-                    return await tx.ReadFile(dataFile, offset);
-                }
-                else
-                {
-                    await _lock.WaitAsync();
-                    try
-                    {
-                        using (var br = new BinaryReader(File.OpenRead(datPath)))
-                        {
-                            return await ReadSqPackType3(br, parts.Offset);
-                        }
-                    }
-                    finally
-                    {
-                        _lock.Release();
-                    }
-                }
-            });
+                tx = new ModTransaction();
+            }
+            return await tx.ReadFile(dataFile, offset);
         }
 
         public async Task<byte[]> ReadSqPackType3(byte[] data)
@@ -1356,31 +1319,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 throw new InvalidDataException("Cannot get file data without valid offset.");
             }
-
             var parts = IOUtil.Offset8xToParts(offset);
-            var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
-            return await Task.Run(async () =>
+            if (tx == null)
             {
-                if (tx != null)
-                {
-                    return await tx.ReadFile(dataFile, offset);
-                }
-                else
-                {
-                    await _lock.WaitAsync();
-                    try
-                    {
-                        using (var br = new BinaryReader(File.OpenRead(datPath)))
-                        {
-                            return await ReadSqPackType4(br, parts.Offset);
-                        }
-                    }
-                    finally
-                    {
-                        _lock.Release();
-                    }
-                }
-            });
+                tx = new ModTransaction();
+            }
+            return await tx.ReadFile(dataFile, offset);
         }
 
         internal async Task<byte[]> ReadSqPackType4(byte[] data)
@@ -1522,6 +1466,21 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return await GetUncompressedData(br);
                 }
             }
+        }
+
+        public static uint GetSqPackType(BinaryReader br, long offset = -1)
+        {
+            if (offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = br.BaseStream.Position;
+            }
+
+            br.BaseStream.Seek(offset + 4, SeekOrigin.Begin);
+            return br.ReadUInt32();
         }
 
         /// <summary>

@@ -54,19 +54,18 @@ namespace xivModdingFramework.HUD.FileTypes
             var dat = new Dat(_gameDirectory);
 
             var uldStringList = new HashSet<string>();
-            var uldOffsetList = await index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui);
+            var uldOffsetList = await index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui, tx);
 
-            await Task.Run(() => Parallel.ForEach(uldOffsetList, (offset) =>
+            await Task.Run(() => Parallel.ForEach(uldOffsetList, async (offset) =>
             {
                 byte[] uldData;
-                try
+                var type = await tx.GetSqPackType(XivDataFile._06_Ui, offset, false);
+                if (type == 2)
                 {
                     uldData = dat.ReadSqPackType2(offset, XivDataFile._06_Ui, tx).Result;
                 }
-                catch (Exception ex)
+                else
                 {
-                    Debug.WriteLine($"Error at offset: {offset}");
-                    Debug.WriteLine($"Message: {ex.Message}");
                     return;
                 }
 

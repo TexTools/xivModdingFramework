@@ -1193,6 +1193,36 @@ namespace xivModdingFramework.Mods
 
 
         /// <summary>
+        /// Gets the SqPack type of a file.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="forceOriginal"></param>
+        /// <returns></returns>
+        public async Task<uint> GetSqPackType(string path, bool forceOriginal = false)
+        {
+            var forceType2 = path.EndsWith(".atex");
+            var offset = await Get8xDataOffset(path, forceOriginal);
+            return await GetSqPackType(IOUtil.GetDataFileFromPath(path), offset, forceType2);
+        }
+
+        /// <summary>
+        /// Gets the SqPack type of a file.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="offset"></param>
+        /// <param name="forceType2"></param>
+        /// <returns></returns>
+        public async Task<uint> GetSqPackType(XivDataFile dataFile, long offset, bool forceType2 = false)
+        {
+            var parts = IOUtil.Offset8xToParts(offset);
+            using (var br = await _DataHandler.GetCompressedFileStream(dataFile, parts.Offset))
+            {
+                return Dat.GetSqPackType(br, offset);
+            }
+        }
+
+
+        /// <summary>
         /// Writes the given data to the default transaction data store for the data file, returning the next available placeholder offset.
         /// Returns the 8x Dat-embeded placeholder transactionary offset.
         /// Does /NOT/ update any index file offsets.
