@@ -34,6 +34,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 {
     /// <summary>
     /// Class for manipulating Index files.
+    /// Primarily this holds a number of weird one-off Index parsing functions for use in data scraping.
     /// </summary>
     internal class Index
     {

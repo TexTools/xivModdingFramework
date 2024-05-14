@@ -37,7 +37,8 @@ using xivModdingFramework.Textures.FileTypes;
 namespace xivModdingFramework.SqPack.FileTypes
 {
     /// <summary>
-    /// This class contains the methods that deal with the .dat file type
+    /// The core workhorse class for working with SQPacked data, whether in an actual .DAT file or elsewhere.
+    /// Contains many functions for compressing, uncompressing, and manipulating binary files.
     /// </summary>
     public class Dat
     {
@@ -140,7 +141,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="dataFile">The data file to create a new dat for.</param>
         /// <returns>The new dat number.</returns>
-        public int CreateNewDat(XivDataFile dataFile, bool alreadyLocked = false)
+        internal int CreateNewDat(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var nextDatNumber = GetLargestDatNumber(dataFile, alreadyLocked) + 1;
 
@@ -168,7 +169,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check.</param>
         /// <returns>The largest dat number for the given data file.</returns>
-        public int GetLargestDatNumber(XivDataFile dataFile, bool alreadyLocked = false)
+        internal int GetLargestDatNumber(XivDataFile dataFile, bool alreadyLocked = false)
         {
 
             string[] allFiles = null;
@@ -245,7 +246,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        public async Task<List<string>> GetUnmoddedDatList(XivDataFile dataFile, bool alreadyLocked = false)
+        internal async Task<List<string>> GetUnmoddedDatList(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var datList = new List<string>();
 
@@ -293,7 +294,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        public async Task<List<string>> GetModdedDatList(XivDataFile dataFile, bool alreadyLocked = false)
+        internal async Task<List<string>> GetModdedDatList(XivDataFile dataFile, bool alreadyLocked = false)
         {
             var datList = new List<string>();
 
@@ -766,6 +767,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
             return await ReadSqPackType3(info.Offset, info.DataFile, tx);
         }
+
         /// <summary>
         /// Reads the uncompressed Type3 data from the given transaction store or game files.
         /// </summary>
@@ -1237,6 +1239,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// This is a very specific fixer-function designed to handle a very specific error caused by very old TexTools builds that would
         /// generate invalid compressed file sizes for texture files.
         /// It is only run via the Problem checker.
+        /// 
+        /// TODO: This should be updated and probably stapled onto the TTMP import Dawntrail functions.
+        /// That way we can ensure that any mods in-system are sane.
         /// </summary>
         /// <param name="df"></param>
         /// <param name="offsetWithDatNumber"></param>
@@ -2299,11 +2304,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Writes a given block of data to the DAT files, updates the index to point to it for the given file path,
+        /// Writes a given block of data to the DAT files or Transaction data store, updates the index to point to it for the given file path,
         /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
-        ///
-        /// NOTE -- If a Transaction is provided, the DATs are currently written to, but the Index/Modlist changes are stored 
-        /// in the transaction.
         /// </summary>
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
@@ -2502,7 +2504,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only).
         /// NOT TRANSACTION SAFE - This reads from the baseline DATS for this determinant.
-        /// Currently Unused.
+        /// 
+        /// Currently Unused.  Could use this during TX Commit phase to help avoid empty blocks?
         /// </summary>
         /// <param name="df"></param>
         /// <returns></returns>
