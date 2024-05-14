@@ -83,6 +83,24 @@ namespace xivModdingFramework.Exd.FileTypes
 
         }
 
+        /*  ===== COLUMN DEFINITIONS =====
+         * 
+         *  These represent the expected column # and data type, for columns we actually care about.
+         *  These columns are automatically validated on EXD load, and will error with clear error messages if they are wrong.
+         *  
+         *  Thus, typically only include columns we actually care about in these, so we don't have to constantly update these 
+         *  on every minor table alteration.
+         *  
+         *  That said, if there's a column you need to access, please add it here so the system can track it for changes.
+         *  
+         *  Each function also has an If block for CN/KR, to allow for compatibility with their client versions, which
+         *  sometimes have altered EXD tables.
+         *  
+         *  You can use tools like Godbert or XivExplorer to view the raw EXD tables if necessary when checking the column IDs
+         *  and data types, or hook a debugger onto the EXD load and inspect the column results manually.
+         *  
+        */ 
+
         private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetItemExpectations(XivLanguage language = XivLanguage.English)
         {
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
