@@ -367,7 +367,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to buddyaction_0_{0}.exd.
+        ///   Looks up a localized string similar to Buddy Action.
         /// </summary>
         internal static string BuddyAction {
             get {
@@ -421,7 +421,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to companyaction_0_{0}.exd.
+        ///   Looks up a localized string similar to Company Action.
         /// </summary>
         internal static string CompanyAction {
             get {
@@ -439,7 +439,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to craftaction_100000_{0}.exd.
+        ///   Looks up a localized string similar to Crafting Action.
         /// </summary>
         internal static string CraftAction {
             get {
@@ -898,7 +898,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to eventaction_0_{0}.exd.
+        ///   Looks up a localized string similar to Event Action.
         /// </summary>
         internal static string EventAction {
             get {
@@ -1645,6 +1645,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Map.
+        /// </summary>
+        internal static string Map {
+            get {
+                return ResourceManager.GetString("Map", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to map_0.exd.
         /// </summary>
         internal static string MapExd {
@@ -1731,6 +1740,15 @@ namespace xivModdingFramework.Resources {
         internal static string Mask {
             get {
                 return ResourceManager.GetString("Mask", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Minimap.
+        /// </summary>
+        internal static string Minimap {
+            get {
+                return ResourceManager.GetString("Minimap", resourceCulture);
             }
         }
         

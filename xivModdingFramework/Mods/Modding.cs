@@ -607,7 +607,6 @@ namespace xivModdingFramework.Mods
         public static async Task DeleteMod(string modItemPath, bool allowInternal = false, ModTransaction tx = null)
         {
             var doSave = false;
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
             if (tx == null)
             {
                 doSave = true;

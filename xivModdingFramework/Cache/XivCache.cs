@@ -246,7 +246,7 @@ namespace xivModdingFramework.Cache
 
                     // FFXIV Updated?  This one always gets highest priority for reason.
                     var val = GetMetaValue("ffxiv_version");
-                    var version = new Version(val);
+                    Version version = val == null ? null : new Version(val);
                     if (version != _gameInfo.GameVersion)
                     {
                         return CacheRebuildReason.FFXIVUpdate;

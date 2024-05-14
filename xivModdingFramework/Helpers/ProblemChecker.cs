@@ -198,7 +198,7 @@ namespace xivModdingFramework.Helpers
                 var index = new Index(_gameDirectory);
 
                 // Readonly tx to get live game state.
-                var tx = ModTransaction.BeginTransaction();
+                var tx = ModTransaction.BeginTransaction(true);
 
                 var ml = await tx.GetModList();
 
