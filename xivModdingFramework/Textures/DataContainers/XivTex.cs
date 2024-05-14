@@ -112,7 +112,7 @@ namespace xivModdingFramework.Textures.DataContainers
 
             var tex = new XivTex();
 
-            tex.TextureFormat = Dat.TextureTypeDictionary[(int)header.TextureFormat];
+            tex.TextureFormat = Tex.TextureTypeDictionary[(int)header.TextureFormat];
             tex.Width = header.Width;
             tex.Height = header.Height;
 

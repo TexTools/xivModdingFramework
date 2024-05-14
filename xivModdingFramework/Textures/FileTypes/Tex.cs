@@ -1270,6 +1270,30 @@ namespace xivModdingFramework.Textures.FileTypes
             {"m_s", "LowRes Mask"}
 
         };
+        /// <summary>
+        /// Dictionary that holds [Texture Code, Texture Format] data
+        /// </summary>
+        public static readonly Dictionary<int, XivTexFormat> TextureTypeDictionary = new Dictionary<int, XivTexFormat>
+        {
+            {4400, XivTexFormat.L8 },
+            {4401, XivTexFormat.A8 },
+            {5184, XivTexFormat.A4R4G4B4 },
+            {5185, XivTexFormat.A1R5G5B5 },
+            {5200, XivTexFormat.A8R8G8B8 },
+            {5201, XivTexFormat.X8R8G8B8 },
+            {8528, XivTexFormat.R32F},
+            {8784, XivTexFormat.G16R16F },
+            {8800, XivTexFormat.G32R32F },
+            {9312, XivTexFormat.A16B16G16R16F },
+            {9328, XivTexFormat.A32B32G32R32F },
+            {13344, XivTexFormat.DXT1 },
+            {13360, XivTexFormat.DXT3 },
+            {13361, XivTexFormat.DXT5 },
+            {16704, XivTexFormat.D16 },
+            {25136, XivTexFormat.BC5 },
+            {25650, XivTexFormat.BC7 }
+        };
+
         #endregion
 
     }

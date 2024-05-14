@@ -112,7 +112,7 @@ namespace xivModdingFramework.Textures.FileTypes
             using (var br = new BinaryReader(new MemoryStream(atexData)))
             {
                 var signature = br.ReadInt32();
-                xivTex.TextureFormat = Dat.TextureTypeDictionary[br.ReadInt32()];
+                xivTex.TextureFormat = Tex.TextureTypeDictionary[br.ReadInt32()];
                 xivTex.Width = br.ReadInt16();
                 xivTex.Height = br.ReadInt16();
 
