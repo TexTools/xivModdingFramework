@@ -565,7 +565,7 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                         }
 
-                        Dictionary<string, ModTransaction.TxPathData> originalStates = new Dictionary<string, ModTransaction.TxPathData>();
+                        Dictionary<string, ModTransaction.TxFileState> originalStates = new Dictionary<string, ModTransaction.TxFileState>();
 
                         // Now, we need to rip the offsets, and generate Transaction data store file handles for them.
                         var tempOffsets = new Dictionary<string, long>();

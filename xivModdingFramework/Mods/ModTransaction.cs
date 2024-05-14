@@ -84,27 +84,33 @@ namespace xivModdingFramework.Mods
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
         #endregion
 
-        public class TxPathData
+        /// <summary>
+        /// A class representing the holistic state of a file in the system.
+        /// In particular, this store the index and mod information about the file.
+        /// Used in saving and restoring states.
+        /// </summary>
+        public class TxFileState
         {
-            public TxPathData(string path)
+            public TxFileState(string path)
             {
                 Path = path;
             }
 
             // Internal File Path
             public string Path { get; set; }
-
-            public bool OriginalOffset_Set { get; private set; } = false;
-            public bool OriginalMod_Set { get; private set; } = false;
-
-            // Index Data
-            public XivDataFile DataFile { get
+            public XivDataFile DataFile
+            {
+                get
                 {
                     return IOUtil.GetDataFileFromPath(Path);
                 }
             }
-            public long TemporaryOffset { get; set; }
+            
+            // Tracking Flags
+            public bool OriginalOffset_Set { get; private set; } = false;
+            public bool OriginalMod_Set { get; private set; } = false;
 
+            // Index Data
             private long _OriginalOffset = 0;
             public long OriginalOffset
             {
@@ -142,10 +148,10 @@ namespace xivModdingFramework.Mods
         // Collections used in data tracking of modified files.
         
         // Primary collection of data, used in tracking what has been changed.
-        private Dictionary<string, TxPathData> _ModifiedFiles = new Dictionary<string, TxPathData>();
+        private Dictionary<string, TxFileState> _OriginalStates = new Dictionary<string, TxFileState>();
 
         // Collection of files imported during Prep mode.
-        private Dictionary<string, TxPathData> _PrepFiles = new Dictionary<string, TxPathData>();
+        private Dictionary<string, TxFileState> _PrePrepStates = new Dictionary<string, TxFileState>();
 
         // Offset mapping of Temporary Offset => File paths referencing that offset.
         private Dictionary<XivDataFile, Dictionary<long, HashSet<string>>> _TemporaryOffsetMapping = new Dictionary<XivDataFile, Dictionary<long, HashSet<string>>>();
@@ -510,7 +516,7 @@ namespace xivModdingFramework.Mods
             // anything else to the base game files/modlist here.
             if (pathMap != null)
             {
-                foreach(var kv in _PrepFiles)
+                foreach(var kv in _PrePrepStates)
                 {
                     // Validation
                     if (IsPrepFile(kv.Key))
@@ -894,7 +900,7 @@ namespace xivModdingFramework.Mods
 
         #region Internals
 
-        private void CheckPathData(string path)
+        private void CheckStateData(string path)
         {
 
             if (string.IsNullOrWhiteSpace(path))
@@ -908,64 +914,67 @@ namespace xivModdingFramework.Mods
                 return;
             }
 
-            if (State == ETransactionState.Preparing && _PrepFiles.ContainsKey(path))
+            if (State == ETransactionState.Preparing && _PrePrepStates.ContainsKey(path))
             {
                 return;
             }
 
-            if (_ModifiedFiles.ContainsKey(path))
+            if (_OriginalStates.ContainsKey(path))
             {
                 return;
             }
 
-            var data = new TxPathData(path);
-
+            var data = new TxFileState(path);
             if (State == ETransactionState.Preparing)
             {
                 // If we're in prep state, note that the file was added in prep.
-                _PrepFiles.Add(path, data);
+                _PrePrepStates.Add(path, data);
             }
             else
             {
-                _ModifiedFiles.Add(path, data);
+                _OriginalStates.Add(path, data);
             }
         }
-        private TxPathData GetOrCreatePathData(string path)
+        private TxFileState GetOrCreateStateBackup(string path)
         {
-            CheckPathData(path);
+            CheckStateData(path);
             if (State == ETransactionState.Preparing)
             {
-                return _PrepFiles[path];
+                return _PrePrepStates[path];
             }
             else
             {
-                return _ModifiedFiles[path];
+                return _OriginalStates[path];
             }
         }
 
         /// <summary>
-        /// Resets a given file's Index pointer and ModList status back to its pre-Transaction state.
-        /// Does not delete the internal data store's file data, but that data will not be written in the final
-        /// TX commit if it is no longer referenced at a valid file path.  Data is still accessible with
-        /// the explicit data file and offset until the TX is closed.
+        /// Resets the state of a given file to the pre-transaction state, or optionally to the pre-prep state of the file.
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
         public async Task ResetFile(string file, bool prePrep = false)
         {
-            var offset = await GetPreTransactionOffset(file, prePrep);
-            await Set8xDataOffset(file, offset);
-
-            var mod = await GetPreTransactionMod(file, prePrep);
-            var current = await GetMod(file);
-            if(mod == null && current != null)
+            await RestoreFileState(await GetPreTransactionState(file, prePrep));
+        }
+        public async Task<TxFileState> GetPreTransactionState(string file, bool prePrep = false)
+        {
+            TxFileState data = null;
+            if (_OriginalStates.ContainsKey(file))
             {
-                RemoveMod(current.Value);
-            } else
-            {
-                AddOrUpdateMod(current.Value);
+                data = _OriginalStates[file];
             }
 
+            if (_PrePrepStates.ContainsKey(file) && prePrep)
+            {
+                data = _PrePrepStates[file];
+            }
+
+            if (data == null)
+            {
+                data = await SaveFileState(file);
+            }
+            return data;
         }
 
         /// <summary>
@@ -989,62 +998,7 @@ namespace xivModdingFramework.Mods
             return _TempToRealOffsetMapping[df][temporary8xOffset];
         }
 
-        /// <summary>
-        /// Gets the pre-transaction offset for this file.
-        /// May or may not be a modded file.
-        /// </summary>
-        /// <param name="file"></param>
-        /// <returns></returns>
-        public async Task<long> GetPreTransactionOffset(string file, bool prePrep = false)
-        {
-            long offset = -1;
-            if (_ModifiedFiles.ContainsKey(file) && _ModifiedFiles[file].OriginalOffset_Set)
-            {
-                offset = _ModifiedFiles[file].OriginalOffset;
-            }
 
-            if(prePrep && _PrepFiles.ContainsKey(file) && _PrepFiles[file].OriginalOffset_Set)
-            {
-                offset = _PrepFiles[file].OriginalOffset;
-            }
-
-            if(offset >= 0)
-            {
-                return offset;
-            }
-
-            return await Get8xDataOffset(file);
-        }
-
-        /// <summary>
-        /// Gets the pre-transaction offset for this file.
-        /// May or may not be a modded file.
-        /// </summary>
-        /// <param name="file"></param>
-        /// <returns></returns>
-        public async Task<Mod?> GetPreTransactionMod(string file, bool prePrep = false)
-        {
-            Mod? mod = null;
-            bool found = false;
-            if (_ModifiedFiles.ContainsKey(file) && _ModifiedFiles[file].OriginalMod_Set)
-            {
-                found = true;
-                mod = (Mod) _ModifiedFiles[file].OriginalMod;
-            }
-
-            if (prePrep && _PrepFiles.ContainsKey(file) && _PrepFiles[file].OriginalMod_Set)
-            {
-                found = true;
-                mod = (Mod) _PrepFiles[file].OriginalMod;
-            }
-
-            if (found)
-            {
-                return mod;
-            }
-
-            return await GetMod(file);
-        }
 
         /// <summary>
         /// Internal listener function for updates to our constituend modlist file.
@@ -1057,7 +1011,6 @@ namespace xivModdingFramework.Mods
         {
             if (ReadOnly)
             {
-                // This should never actually called since Readonly TX don't use our wrapped index files currently.
                 throw new Exception("Attempted to write to ModList inside a ReadOnly Transaction.");
             }
 
@@ -1066,7 +1019,7 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to write to ModList during invalid Transaction State.");
             }
 
-            var data = GetOrCreatePathData(path);
+            var data = GetOrCreateStateBackup(path);
             if (!data.OriginalMod_Set)
             {
                 data.OriginalMod = originalMod;
@@ -1097,14 +1050,12 @@ namespace xivModdingFramework.Mods
                 return;
             }
 
-            var data = GetOrCreatePathData(path);
+            var data = GetOrCreateStateBackup(path);
 
             if (!data.OriginalOffset_Set)
             {
                 data.OriginalOffset = originalOffset;
             }
-
-            data.TemporaryOffset = updatedOffset;
 
             if (!_TemporaryOffsetMapping.ContainsKey(dataFile))
             {
@@ -1116,7 +1067,7 @@ namespace xivModdingFramework.Mods
             if (_TemporaryOffsetMapping[dataFile].ContainsKey(originalOffset) && _TemporaryOffsetMapping[dataFile][originalOffset].Contains(path))
             {
                 // And the file has a live modification.
-                if (_ModifiedFiles.ContainsKey(path))
+                if (_OriginalStates.ContainsKey(path))
                 {
                     // And we're currently /back/ in prep mode...
                     if(State == ETransactionState.Preparing)
@@ -1159,8 +1110,8 @@ namespace xivModdingFramework.Mods
 
         internal bool IsPrepFile(string path)
         {
-            var inPrep = _PrepFiles.ContainsKey(path);
-            var inLive = _ModifiedFiles.ContainsKey(path);
+            var inPrep = _PrePrepStates.ContainsKey(path);
+            var inLive = _OriginalStates.ContainsKey(path);
 
             return inPrep && !inLive;
         }
@@ -1402,9 +1353,9 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<TxPathData> SaveFileState(string path) {
+        public async Task<TxFileState> SaveFileState(string path) {
 
-            var data = new TxPathData(path);
+            var data = new TxFileState(path);
 
             var offset = await Get8xDataOffset(path);
             var mod = await GetMod(path);
@@ -1418,10 +1369,17 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="state"></param>
         /// <returns></returns>
-        public async Task RestoreFileState(TxPathData state)
+        public async Task RestoreFileState(TxFileState state)
         {
-            await Set8xDataOffset(state.Path, state.OriginalOffset);
-            await UpdateMod(state.OriginalMod, state.Path);
+            if (state.OriginalOffset_Set)
+            {
+                await Set8xDataOffset(state.Path, state.OriginalOffset);
+            }
+
+            if (state.OriginalMod_Set)
+            {
+                await UpdateMod(state.OriginalMod, state.Path);
+            }
         }
 
         #endregion

@@ -699,7 +699,7 @@ namespace xivModdingFramework.Mods
         /// <param name="readTx"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, ModTransaction.TxPathData> originalStates, string sourceApplication)
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, ModTransaction.TxFileState> originalStates, string sourceApplication)
         {
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));

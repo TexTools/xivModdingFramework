@@ -24,6 +24,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -54,7 +55,7 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the List to be displayed under the Character category
         /// </summary>
         /// <returns>A list containing XivCharacter data</returns>
-        public Task<List<XivCharacter>> GetUnCachedCharacterList()
+        public Task<List<XivCharacter>> GetUnCachedCharacterList(ModTransaction tx = null)
         {
             return Task.Run(async () =>
             {
@@ -73,13 +74,13 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo.SecondaryID = 0;
 
                     // Only add to this listing if there is any data.
-                    var matNumbers = await GetNumbersForCharacterItem(c);
+                    var matNumbers = await GetNumbersForCharacterItem(c, true, tx);
                     if (matNumbers.Length > 0)
                     {
                         characterList.Add(c);
                     }
                     else { 
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
                         if(mdlNumbers.Length > 0)
                         {
                             characterList.Add(c);
@@ -90,14 +91,14 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
+                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
                     if (matNumbers.Length > 0)
                     {
                         characterList.Add(c);
                     }
                     else
                     {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
                         if (mdlNumbers.Length > 0)
                         {
                             characterList.Add(c);
@@ -108,14 +109,14 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
+                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
                     if (matNumbers.Length > 0)
                     {
                         characterList.Add(c);
                     }
                     else
                     {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
                         if (mdlNumbers.Length > 0)
                         {
                             characterList.Add(c);
@@ -126,14 +127,14 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
+                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
                     if (matNumbers.Length > 0)
                     {
                         characterList.Add(c);
                     }
                     else
                     {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
                         if (mdlNumbers.Length > 0)
                         {
                             characterList.Add(c);
@@ -144,14 +145,14 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
+                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
                     if (matNumbers.Length > 0)
                     {
                         characterList.Add(c);
                     }
                     else
                     {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
+                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
                         if (mdlNumbers.Length > 0)
                         {
                             characterList.Add(c);
@@ -238,7 +239,7 @@ namespace xivModdingFramework.Items.Categories
 
             return availableRacesAndNumbers;
         }
-        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem, bool materials = true)
+        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem, bool materials = true, ModTransaction tx = null)
         {
 
             var race = charaItem.ModelInfo.PrimaryID.ToString().PadLeft(4,'0');
@@ -276,7 +277,7 @@ namespace xivModdingFramework.Items.Categories
                 testDictionary.Add(HashGenerator.GetHash(mtrl), i);
             }
 
-            var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+            var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara, tx);
             numList.Sort();
             return numList.ToArray();
         }

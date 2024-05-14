@@ -33,6 +33,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
@@ -67,13 +68,13 @@ namespace xivModdingFramework.Items.Categories
         /// The data within companion_0 exd contains a reference to the index for lookup in modelchara
         /// </remarks>
         /// <returns>A list containing XivMinion data</returns>
-        public async Task<List<XivMinion>> GetUncachedMinionList()
+        public async Task<List<XivMinion>> GetUncachedMinionList(ModTransaction tx = null)
         {
             var minionLock = new object();
             var minionList = new List<XivMinion>();
 
-            var minionEx = await _ex.ReadExData(XivEx.companion);
-            var modelCharaEx = await XivModelChara.GetModelCharaData();
+            var minionEx = await _ex.ReadExData(XivEx.companion, tx);
+            var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 
             // Loops through all available minions in the companion exd files
             // At present only one file exists (companion_0)
@@ -125,13 +126,13 @@ namespace xivModdingFramework.Items.Categories
         /// The data within mount_0 exd contains a reference to the index for lookup in modelchara
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public async Task<List<XivMount>> GetUncachedMountList()
+        public async Task<List<XivMount>> GetUncachedMountList(ModTransaction tx = null)
         {
             var mountLock = new object();
             var mountList = new List<XivMount>();
 
-            var mountEx = await _ex.ReadExData(XivEx.mount);
-            var modelCharaEx = await XivModelChara.GetModelCharaData();
+            var mountEx = await _ex.ReadExData(XivEx.mount, tx);
+            var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 
             // Loops through all available mounts in the mount exd files
             // At present only one file exists (mount_0)
@@ -180,13 +181,13 @@ namespace xivModdingFramework.Items.Categories
         /// The data format used by Ornaments is identical to mounts so XivMount can be used to store the data
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public async Task<List<XivMount>> GetUncachedOrnamentList()
+        public async Task<List<XivMount>> GetUncachedOrnamentList(ModTransaction tx = null)
         {
             var mountLock = new object();
             var ornamentList = new List<XivMount>();
 
-            var ornamentEx = await _ex.ReadExData(XivEx.ornament);
-            var modelCharaEx = await XivModelChara.GetModelCharaData();
+            var ornamentEx = await _ex.ReadExData(XivEx.ornament, tx);
+            var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 
             // Loops through all available mounts in the mount exd files
             // At present only one file exists (mount_0)
@@ -239,7 +240,7 @@ namespace xivModdingFramework.Items.Categories
         /// Because of this, the Pet data is hardcoded until a better way of obtaining it is found.
         /// </remarks>
         /// <returns>A list containing XivMount data</returns>
-        public async Task<List<XivPet>> GetUncachedPetList()
+        public async Task<List<XivPet>> GetUncachedPetList(ModTransaction tx = null)
         {
             var petLock = new object();
             var petList = new List<XivPet>();
@@ -268,7 +269,7 @@ namespace xivModdingFramework.Items.Categories
                 {7105, XivStrings.Seraph}
             };
 
-            var modelCharaEx = await XivModelChara.GetModelCharaData();
+            var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 
             // Loops through the list of indices containing Pet model data
             await Task.Run(() => Parallel.ForEach(petModelIndexList, (petIndex) =>

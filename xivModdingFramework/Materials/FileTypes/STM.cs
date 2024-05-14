@@ -102,7 +102,7 @@ namespace xivModdingFramework.Materials.FileTypes
             throw new NotImplementedException();
 
         }
-        public static async Task<Dictionary<int, string>> GetDyeNames()
+        public static async Task<Dictionary<int, string>> GetDyeNames(ModTransaction tx = null)
         {
 
             var lang = XivCache.GameInfo.GameLanguage;
@@ -114,7 +114,7 @@ namespace xivModdingFramework.Materials.FileTypes
             Dictionary<int, string> Dyes = new Dictionary<int, string>();
 
             var ex = new Ex(XivCache.GameInfo.GameDirectory, lang);
-            var exData = await ex.ReadExData(XivEx.stain);
+            var exData = await ex.ReadExData(XivEx.stain, tx);
 
 
             foreach (var kv in exData)

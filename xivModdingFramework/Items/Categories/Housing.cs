@@ -62,13 +62,13 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of all Housing Items
         /// </summary>
         /// <returns>A list of XivFurniture objects containing housing items</returns>
-        public async Task<List<XivFurniture>> GetUncachedFurnitureList()
+        public async Task<List<XivFurniture>> GetUncachedFurnitureList(ModTransaction tx = null)
         {
             var furnitureList = new List<XivFurniture>();
 
-            furnitureList.AddRange(await GetIndoorFurniture());
-            furnitureList.AddRange(await GetPaintings());
-            furnitureList.AddRange(await GetOutdoorFurniture());
+            furnitureList.AddRange(await GetIndoorFurniture(tx));
+            furnitureList.AddRange(await GetPaintings(tx));
+            furnitureList.AddRange(await GetOutdoorFurniture(tx));
 
             return furnitureList;
         }
@@ -84,12 +84,12 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option one
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetIndoorFurniture()
+        private async Task<List<XivFurniture>> GetIndoorFurniture(ModTransaction tx = null)
         {
             var indoorLock = new object();
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var housingDictionary = await ex.ReadExData(XivEx.housingfurniture);
-            var itemDictionary = await ex.ReadExData(XivEx.item);
+            var housingDictionary = await ex.ReadExData(XivEx.housingfurniture, tx);
+            var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
             var furnitureList = new List<XivFurniture>();
 
@@ -147,13 +147,13 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option two as the item index was removed from the picture exd file in patch 5.2
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetPaintings()
+        private async Task<List<XivFurniture>> GetPaintings(ModTransaction tx = null)
         {
             var paintingsLock = new object();
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var pictureDictionary = await ex.ReadExData(XivEx.picture);
-            var itemDictionary = await ex.ReadExData(XivEx.item);
+            var pictureDictionary = await ex.ReadExData(XivEx.picture, tx);
+            var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
             var furnitureList = new List<XivFurniture>();
 
@@ -205,7 +205,7 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of outdoor furniture
         /// </summary>
         /// <returns>A list of XivFurniture objects containing outdoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetOutdoorFurniture()
+        private async Task<List<XivFurniture>> GetOutdoorFurniture(ModTransaction tx = null)
         {
             var outdoorLock = new object();
             // These are the offsets to relevant data
@@ -213,8 +213,8 @@ namespace xivModdingFramework.Items.Categories
 
 
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var housingEx = await ex.ReadExData(XivEx.housingyardobject);
-            var itemsEx = await ex.ReadExData(XivEx.item);
+            var housingEx = await ex.ReadExData(XivEx.housingyardobject, tx);
+            var itemsEx = await ex.ReadExData(XivEx.item, tx);
 
             var furnitureList = new List<XivFurniture>();
 

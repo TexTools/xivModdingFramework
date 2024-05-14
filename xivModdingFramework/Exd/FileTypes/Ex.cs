@@ -196,7 +196,7 @@ namespace xivModdingFramework.Exd.FileTypes
         /// </remarks>
         /// <param name="exFile"></param>
         /// <returns>A dictionary containing the Index and Raw Data of the ex file</returns>
-        public async Task<Dictionary<int, ExdRow>> ReadExData(XivEx exFile)
+        public async Task<Dictionary<int, ExdRow>> ReadExData(XivEx exFile, ModTransaction tx = null)
         {
             var expectations = ExColumnExpectations.GetColumnExpectations(exFile, _language);
             var exdNameOffsetDictionary = new Dictionary<long, string>();
@@ -214,8 +214,10 @@ namespace xivModdingFramework.Exd.FileTypes
                 language = "";
             }
 
-            // Readonly TX.  We don't allow live modification of exd/exh files.
-            var tx = ModTransaction.BeginTransaction();
+            if (tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
 
             await Task.Run(async () =>
             {

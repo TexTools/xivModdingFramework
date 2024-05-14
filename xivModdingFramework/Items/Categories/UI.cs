@@ -114,13 +114,13 @@ namespace xivModdingFramework.Items.Categories
         /// There may be unlisted maps which this does not check for
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetMapList()
+        public async Task<List<XivUi>> GetMapList(ModTransaction tx = null)
         {
             var mapLock = new object();
             var mapList = new List<XivUi>();
 
-            var placeNameData = await _ex.ReadExData(XivEx.placename);
-            var mapData = await _ex.ReadExData(XivEx.map);
+            var placeNameData = await _ex.ReadExData(XivEx.placename, tx);
+            var mapData = await _ex.ReadExData(XivEx.map, tx);
 
 
             // Loops through all available maps in the map exd files
@@ -177,13 +177,13 @@ namespace xivModdingFramework.Items.Categories
         /// There may be some actions that are missing
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetActionList()
+        public async Task<List<XivUi>> GetActionList(ModTransaction tx)
         {
             var actionLock = new object();
 
             // Data from the action_0 exd
-            var actionExData = await _ex.ReadExData(XivEx.action);
-            var actionCategoryExData = await _ex.ReadExData(XivEx.actioncategory);
+            var actionExData = await _ex.ReadExData(XivEx.action, tx);
+            var actionCategoryExData = await _ex.ReadExData(XivEx.actioncategory, tx);
 
             var actionList = new List<XivUi>();
             var actionNames = new HashSet<string>();
@@ -224,7 +224,7 @@ namespace xivModdingFramework.Items.Categories
              }));
 
             // Data from generalaction_0
-            var generalActionExData = await _ex.ReadExData(XivEx.generalaction);
+            var generalActionExData = await _ex.ReadExData(XivEx.generalaction, tx);
 
             await Task.Run(() => Parallel.ForEach(generalActionExData.Values, (action) =>
             {
@@ -250,7 +250,7 @@ namespace xivModdingFramework.Items.Categories
 
 
             // Data from buddyaction_0
-            var buddyActionExData = await _ex.ReadExData(XivEx.buddyaction);
+            var buddyActionExData = await _ex.ReadExData(XivEx.buddyaction, tx);
 
             await Task.Run(() => Parallel.ForEach(buddyActionExData.Values, (action) =>
             {
@@ -286,7 +286,7 @@ namespace xivModdingFramework.Items.Categories
                 }
             }));
 
-            var companyActionExData = await _ex.ReadExData(XivEx.companyaction);
+            var companyActionExData = await _ex.ReadExData(XivEx.companyaction, tx);
             await Task.Run(() => Parallel.ForEach(companyActionExData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
@@ -309,7 +309,7 @@ namespace xivModdingFramework.Items.Categories
                 }
             }));
 
-            var craftActionData = await _ex.ReadExData(XivEx.craftaction);
+            var craftActionData = await _ex.ReadExData(XivEx.craftaction, tx);
             await Task.Run(() => Parallel.ForEach(craftActionData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
@@ -332,7 +332,7 @@ namespace xivModdingFramework.Items.Categories
                 }
             }));
 
-            var eventActionData = await _ex.ReadExData(XivEx.eventaction);
+            var eventActionData = await _ex.ReadExData(XivEx.eventaction, tx);
             await Task.Run(() => Parallel.ForEach(eventActionData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
@@ -356,7 +356,7 @@ namespace xivModdingFramework.Items.Categories
             }));
 
 
-            var emoteData = await _ex.ReadExData(XivEx.emote);
+            var emoteData = await _ex.ReadExData(XivEx.emote, tx);
             await Task.Run(() => Parallel.ForEach(emoteData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
@@ -380,7 +380,7 @@ namespace xivModdingFramework.Items.Categories
             }));
 
 
-            var markerData = await _ex.ReadExData(XivEx.marker);
+            var markerData = await _ex.ReadExData(XivEx.marker, tx);
             await Task.Run(() => Parallel.ForEach(markerData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
@@ -403,8 +403,8 @@ namespace xivModdingFramework.Items.Categories
                 }
             }));
 
-            var fieldMarkerData = await _ex.ReadExData(XivEx.fieldmarker);
-            var vfxData = await _ex.ReadExData(XivEx.vfx);
+            var fieldMarkerData = await _ex.ReadExData(XivEx.fieldmarker, tx);
+            var vfxData = await _ex.ReadExData(XivEx.vfx, tx);
             await Task.Run(() => Parallel.ForEach(fieldMarkerData.Values, (action) =>
             {
                 var vfxId = (int)action.GetColumnByName("VfxId");
@@ -452,12 +452,12 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of status effect UI elements
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetStatusList()
+        public async Task<List<XivUi>> GetStatusList(ModTransaction tx = null)
         {
             var statusLock = new object();
             var statusList = new List<XivUi>();
             
-            var statusExData = await _ex.ReadExData(XivEx.status);
+            var statusExData = await _ex.ReadExData(XivEx.status, tx);
 
             await Task.Run(() => Parallel.ForEach(statusExData.Values, (status) =>
             {
@@ -507,13 +507,13 @@ namespace xivModdingFramework.Items.Categories
         /// The names of the symbols are contained withing the placenamedata exd
         /// </remarks>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetMapSymbolList()
+        public async Task<List<XivUi>> GetMapSymbolList(ModTransaction tx = null)
         {
             var mapSymbolLock = new object();
             var mapSymbolList = new List<XivUi>();
 
-            var mapSymbolExData = await _ex.ReadExData(XivEx.mapsymbol);
-            var placeNameData = await _ex.ReadExData(XivEx.placename);
+            var mapSymbolExData = await _ex.ReadExData(XivEx.mapsymbol, tx);
+            var placeNameData = await _ex.ReadExData(XivEx.placename, tx);
 
             await Task.Run(() => Parallel.ForEach(mapSymbolExData.Values, (mapSymbol) =>
             {
@@ -545,13 +545,13 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of online status UI elements
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetOnlineStatusList()
+        public async Task<List<XivUi>> GetOnlineStatusList(ModTransaction tx = null)
         {
             var onlineStatusLock = new object();
             var onlineStatusList = new List<XivUi>();
 
 
-            var onlineStatusExData = await _ex.ReadExData(XivEx.onlinestatus);
+            var onlineStatusExData = await _ex.ReadExData(XivEx.onlinestatus, tx);
 
             await Task.Run(() => Parallel.ForEach(onlineStatusExData.Values, (onlineStatus) =>
             {
@@ -583,12 +583,12 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of Weather UI elements
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetWeatherList()
+        public async Task<List<XivUi>> GetWeatherList(ModTransaction tx = null)
         {
             var weatherLock = new object();
             var weatherList = new List<XivUi>();
 
-            var weatherExData = await _ex.ReadExData(XivEx.weather);
+            var weatherExData = await _ex.ReadExData(XivEx.weather, tx);
 
             var weatherNames = new List<string>();
 
@@ -623,12 +623,12 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of available loading screen images
         /// </summary>
         /// <returns>A list containing XivUi data</returns>
-        public async Task<List<XivUi>> GetLoadingImageList()
+        public async Task<List<XivUi>> GetLoadingImageList(ModTransaction tx = null)
         {
             var loadingImageLock = new object();
             var loadingImageList = new List<XivUi>();
 
-            var loadingImageExData = await _ex.ReadExData(XivEx.loadingimage);
+            var loadingImageExData = await _ex.ReadExData(XivEx.loadingimage, tx);
 
             await Task.Run(() => Parallel.ForEach(loadingImageExData.Values, (loadingImage) =>
             {

@@ -304,13 +304,14 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
+        public static void RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest, ModTransaction tx = null)
         {
             var workerStatus = CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
             _REBUILDING = true;
             try
             {
+
 
                 if (CacheRebuilding != null)
                 {
@@ -320,9 +321,15 @@ namespace xivModdingFramework.Cache
 
                 Task.Run(async () =>
                 {
+
                     if (_gameInfo.GameLanguage == XivLanguage.None)
                     {
                         throw new NotSupportedException("A valid language must be specified when rebuilding the Cache.");
+                    }
+
+                    if (tx == null)
+                    {
+                        tx = ModTransaction.BeginTransaction();
                     }
 
                     try
@@ -332,12 +339,12 @@ namespace xivModdingFramework.Cache
                         var tasks = new List<Task>();
 
                         var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-                        tasks.Add(RebuildItemsCache());
-                        tasks.Add(RebuildCharactersCache());
-                        tasks.Add(RebuildMonstersCache());
-                        tasks.Add(RebuildUiCache());
-                        tasks.Add(RebuildFurnitureCache());
-                        tasks.Add(BuildModdedItemDependencies());
+                        tasks.Add(RebuildItemsCache(tx));
+                        tasks.Add(RebuildCharactersCache(tx));
+                        tasks.Add(RebuildMonstersCache(tx));
+                        tasks.Add(RebuildUiCache(tx));
+                        tasks.Add(RebuildFurnitureCache(tx));
+                        tasks.Add(BuildModdedItemDependencies(tx));
 
                         // This was originally running only if the reason was cache update,
                         // but if the cache gets messed up in one way or another, and has to
@@ -502,19 +509,19 @@ namespace xivModdingFramework.Cache
         /// Populate the ui table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildUiCache()
+        private static async Task RebuildUiCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 var _ui = new UI(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _ui.GetActionList();
-                list.AddRange(await _ui.GetLoadingImageList());
-                list.AddRange(await _ui.GetMapList());
-                list.AddRange(await _ui.GetMapSymbolList());
-                list.AddRange(await _ui.GetOnlineStatusList());
-                list.AddRange(await _ui.GetStatusList());
-                list.AddRange(await _ui.GetWeatherList());
-                list.AddRange(await _ui.GetUldList());
+                var list = await _ui.GetActionList(tx);
+                list.AddRange(await _ui.GetLoadingImageList(tx));
+                list.AddRange(await _ui.GetMapList(tx));
+                list.AddRange(await _ui.GetMapSymbolList(tx));
+                list.AddRange(await _ui.GetOnlineStatusList(tx));
+                list.AddRange(await _ui.GetStatusList(tx));
+                list.AddRange(await _ui.GetWeatherList(tx));
+                list.AddRange(await _ui.GetUldList(tx));
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -547,25 +554,25 @@ namespace xivModdingFramework.Cache
         /// Populate the monsters table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildMonstersCache()
+        private static async Task RebuildMonstersCache(ModTransaction tx)
         {
             // Mounts, Minions, etc. are really just monsters.
-            await RebuildMinionsCache();
-            await RebuildMountsCache();
-            await RebuildPetsCache();
+            await RebuildMinionsCache(tx);
+            await RebuildMountsCache(tx);
+            await RebuildPetsCache(tx);
         }
 
         /// <summary>
         /// Populate the housing table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildFurnitureCache()
+        private static async Task RebuildFurnitureCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _housing = new Housing(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _housing.GetUncachedFurnitureList();
+                var list = await _housing.GetUncachedFurnitureList(tx);
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -604,18 +611,18 @@ namespace xivModdingFramework.Cache
         /// Populate the mounts table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildMountsCache()
+        private static async Task RebuildMountsCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _companions.GetUncachedMountList();
+                var list = await _companions.GetUncachedMountList(tx);
 
                 // Don't get the ornament list for the Chinese or Korean clients as they don't have them yet
                 if (_gameInfo.GameLanguage != XivLanguage.Chinese && _gameInfo.GameLanguage != XivLanguage.Korean)
                 {
-                    list.AddRange(await _companions.GetUncachedOrnamentList());
+                    list.AddRange(await _companions.GetUncachedOrnamentList(tx));
                 }
 
                 db.Open();
@@ -663,13 +670,13 @@ namespace xivModdingFramework.Cache
         /// Populate the pets.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildPetsCache()
+        private static async Task RebuildPetsCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _companions.GetUncachedPetList();
+                var list = await _companions.GetUncachedPetList(tx);
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -717,13 +724,13 @@ namespace xivModdingFramework.Cache
         /// Populate the minions table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildMinionsCache()
+        private static async Task RebuildMinionsCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
                 var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _companions.GetUncachedMinionList();
+                var list = await _companions.GetUncachedMinionList(tx);
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -765,10 +772,10 @@ namespace xivModdingFramework.Cache
             }
         }
 
-        private static async Task RebuildCharactersCache()
+        private static async Task RebuildCharactersCache(ModTransaction tx)
         {
             var _character = new Character(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-            var items = await _character.GetUnCachedCharacterList();
+            var items = await _character.GetUnCachedCharacterList(tx);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
@@ -806,22 +813,22 @@ namespace xivModdingFramework.Cache
                 }
             }
         }
-        private static async Task RebuildItemsCache()
+        private static async Task RebuildItemsCache(ModTransaction tx)
         {
-            await RebuildGearCache();
+            await RebuildGearCache(tx);
         }
 
         /// <summary>
         /// Populate the items table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildGearCache()
+        private static async Task RebuildGearCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 Gear gear = null;
                 gear = new Gear(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var items = await gear.GetUnCachedGearList();
+                var items = await gear.GetUnCachedGearList(tx);
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -863,11 +870,15 @@ namespace xivModdingFramework.Cache
         /// all the file children of the modded files in the modlist.
         /// </summary>
         /// <returns></returns>
-        private static async Task BuildModdedItemDependencies()
+        private static async Task BuildModdedItemDependencies(ModTransaction tx = null)
         {
-            var modList = await Modding.GetModList();
-
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+            var modList = await tx.GetModList();
             var paths = modList.Mods.Keys.ToList();
+
             QueueDependencyUpdate(paths);
         }
 
@@ -1668,9 +1679,14 @@ namespace xivModdingFramework.Cache
         /// <param name="files"></param>
         /// <param name="cachedOnly"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<string, List<string>>> GetModListParents()
+        public static async Task<Dictionary<string, List<string>>> GetModListParents(ModTransaction tx = null)
         {
-            var modList = await Modding.GetModList();
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            var modList = await tx.GetModList();
             var dict = new Dictionary<string, List<string>>(modList.Mods.Count);
             if(modList.Mods.Count == 0)
             {

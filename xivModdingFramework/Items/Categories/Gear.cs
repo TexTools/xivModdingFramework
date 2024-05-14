@@ -30,6 +30,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -68,10 +69,10 @@ namespace xivModdingFramework.Items.Categories
         /// A getter for available gear in the Item exd files
         /// </summary>
         /// <returns>A list containing XivGear data</returns>
-        public async Task<List<XivGear>> GetUnCachedGearList()
+        public async Task<List<XivGear>> GetUnCachedGearList(ModTransaction tx = null)
         {
             var ex = new Ex(_gameDirectory, _xivLanguage);
-            var itemDictionary = await ex.ReadExData(XivEx.item);
+            var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
 
 

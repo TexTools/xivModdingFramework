@@ -24,6 +24,7 @@ using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
+using xivModdingFramework.Mods;
 using static xivModdingFramework.Exd.FileTypes.Ex;
 
 namespace xivModdingFramework.General
@@ -38,10 +39,10 @@ namespace xivModdingFramework.General
         /// </summary>
         /// <param name="gameDirectory"></param>
         /// <returns>Dictionary with modelchara data</returns>
-        public static async Task<Dictionary<int, Ex.ExdRow>> GetModelCharaData()
+        public static async Task<Dictionary<int, Ex.ExdRow>> GetModelCharaData(ModTransaction tx = null)
         {
             var ex = new Ex(XivCache.GameInfo.GameDirectory);
-            var exData = await ex.ReadExData(XivEx.modelchara);
+            var exData = await ex.ReadExData(XivEx.modelchara, tx);
             return exData;
         }
 
@@ -51,10 +52,10 @@ namespace xivModdingFramework.General
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="index">The index of the data</param>
         /// <returns>The XivModelInfo data</returns>
-        public static async Task<XivModelInfo> GetModelInfo(int index)
+        public static async Task<XivModelInfo> GetModelInfo(int index, ModTransaction tx = null)
         {
             var ex = new Ex(XivCache.GameInfo.GameDirectory);
-            var modelCharaEx = await ex.ReadExData(XivEx.modelchara);
+            var modelCharaEx = await ex.ReadExData(XivEx.modelchara, tx);
             return GetModelInfo(modelCharaEx[index]);
         }
 
