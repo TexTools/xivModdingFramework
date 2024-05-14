@@ -43,37 +43,6 @@ namespace xivModdingFramework.Helpers
         }
 
         /// <summary>
-        /// Checks the index for the number of dats the game will attempt to read
-        /// </summary>
-        /// <returns>True if there is a problem, False otherwise</returns>
-        public Task<bool> CheckIndexDatCounts(XivDataFile dataFile)
-        {
-            if (ModTransaction.ActiveTransaction != null)
-            {
-                // Safety check here to prevent any misuse or weird bugs from assuming this would be based on post-transaction state.
-                throw new Exception("Cannot sanely perform DAT file checks with an open write-enabled transaction.");
-            }
-
-            return Task.Run(() =>
-            {
-                var indexDatCounts = _index.GetIndexDatCount(dataFile);
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
-
-                if (indexDatCounts.Index1 != largestDatNum)
-                {
-                    return true;
-                }
-
-                if (indexDatCounts.Index2 != largestDatNum)
-                {
-                    return true;
-                }
-
-                return false;
-            });
-        }
-
-        /// <summary>
         /// Checks the index for any empty dat files
         /// </summary>
         /// <returns>A list of dats which are empty if any</returns>

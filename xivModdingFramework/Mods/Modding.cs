@@ -70,7 +70,7 @@ namespace xivModdingFramework.Mods
 
         private static ModList _CachedModList;
         private static DateTime _ModListLastModifiedTime;
-        public static async Task<ModList> GetModList()
+        internal static async Task<ModList> GetModList()
         {
             await _modlistSemaphore.WaitAsync();
             try
@@ -81,13 +81,13 @@ namespace xivModdingFramework.Mods
                 {
                     // First access
                     var modlistText = File.ReadAllText(ModListDirectory);
-                    _CachedModList = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    _CachedModList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
                     _ModListLastModifiedTime = lastUpdatedTime;
                 } else if (lastUpdatedTime > _ModListLastModifiedTime)
                 {
                     // Cache is stale.
                     var modlistText = File.ReadAllText(ModListDirectory);
-                    _CachedModList = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    _CachedModList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
                     _ModListLastModifiedTime = lastUpdatedTime;
                 }
                 _CachedModList.RebuildModPackList();
@@ -105,7 +105,7 @@ namespace xivModdingFramework.Mods
             return _CachedModList;
         }
 
-        public static void SaveModList(ModList ml)
+        internal static void SaveModList(ModList ml)
         {
             _modlistSemaphore.Wait();
 
@@ -118,7 +118,7 @@ namespace xivModdingFramework.Mods
                 _modlistSemaphore.Release();
             }
         }
-        public static async Task SaveModListAsync(ModList ml)
+        internal static async Task SaveModListAsync(ModList ml)
         {
             await _modlistSemaphore.WaitAsync();
 
@@ -135,7 +135,7 @@ namespace xivModdingFramework.Mods
         /// <summary>
         /// Creates a blank ModList file if one does not already exist.
         /// </summary>
-        public static void CreateModlist()
+        internal static void CreateModlist()
         {
             if (File.Exists(ModListDirectory))
             {

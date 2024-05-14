@@ -79,7 +79,12 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="mod"></param>
         public void AddOrUpdateMod(Mod mod)
         {
-            if(string.IsNullOrWhiteSpace(mod.FilePath))
+            INTERNAL_AddOrUpdateMod(mod);
+        }
+
+        protected virtual void INTERNAL_AddOrUpdateMod(Mod mod)
+        {
+            if (string.IsNullOrWhiteSpace(mod.FilePath))
             {
                 throw new Exception("Cannot add NULL path mod.");
             }
@@ -147,13 +152,18 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="m"></param>
         public void RemoveMod(string path)
         {
+            INTERNAL_RemoveMod(path);
+        }
+
+        protected virtual void INTERNAL_RemoveMod(string path)
+        {
             if (!_Mods.ContainsKey(path))
             {
                 return;
             }
             var oldMod = _Mods[path];
             _Mods.Remove(path);
-            
+
         }
 
         /// <summary>
@@ -213,6 +223,7 @@ namespace xivModdingFramework.Mods.DataContainers
                 _ModPacks.Add(mp.Name, mp);
             }
         }
+
 
         /// <summary>
         /// Removes a modpack from the listing, and optionally all of its referenced mods.

@@ -1053,7 +1053,7 @@ namespace xivModdingFramework.Mods
         /// <param name="originalMod"></param>
         /// <param name="newMod"></param>
         /// <exception cref="Exception"></exception>
-        internal void INTERNAL_OnModUpdate(string path, Mod? originalMod, Mod newMod)
+        internal void INTERNAL_OnModUpdate(string path, Mod? originalMod, Mod? newMod)
         {
             if (ReadOnly)
             {

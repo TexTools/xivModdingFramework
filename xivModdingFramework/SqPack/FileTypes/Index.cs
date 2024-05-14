@@ -33,137 +33,18 @@ using xivModdingFramework.SqPack.DataContainers;
 namespace xivModdingFramework.SqPack.FileTypes
 {
     /// <summary>
-    /// This class contains the methods that deal with the .index file type 
+    /// Class for manipulating Index files.
     /// </summary>
-    public class Index
+    internal class Index
     {
-        public const string IndexExtension = ".win32.index";
-        public const string Index2Extension = ".win32.index2";
+        internal const string IndexExtension = ".win32.index";
+        internal const string Index2Extension = ".win32.index2";
         private readonly DirectoryInfo _gameDirectory;
         internal static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
-        public Index(DirectoryInfo gameDirectory)
+        internal Index(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-        }
-
-        /// <summary>
-        /// Gets the dat count within the index files.
-        /// </summary>
-        /// <param name="dataFile">The data file to update the index for.</param>
-        public (int Index1, int Index2) GetIndexDatCount(XivDataFile dataFile)
-        {
-            int index1 = 0, index2 = 0;
-
-            var indexPaths = new[]
-            {
-                Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}"),
-                Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}")
-            };
-
-            _semaphoreSlim.Wait();
-            try
-            {
-                for (var i = 0; i < indexPaths.Length; i++)
-                {
-                    using (var br = new BinaryReader(File.OpenRead(indexPaths[i])))
-                    {
-                        br.BaseStream.Seek(1104, SeekOrigin.Begin);
-                        if (i == 0)
-                        {
-                            index1 = br.ReadByte();
-                        }
-                        else
-                        {
-                            index2 = br.ReadByte();
-                        }
-                    }
-                }
-            } finally
-            {
-                _semaphoreSlim.Release();
-            }
-
-            return (index1, index2);
-        }
-
-        /// <summary>
-        /// Gets the SHA1 hash for the file section
-        /// </summary>
-        /// <param name="dataFile">The data file to get the hash for</param>
-        /// <returns>The byte array containing the hash value</returns>
-        public byte[] GetIndexSection1Hash(DirectoryInfo indexPath)
-        {
-            byte[] sha1Bytes;
-
-            _semaphoreSlim.Wait();
-            try
-            {
-                using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
-                {
-                    br.BaseStream.Seek(1040, SeekOrigin.Begin);
-                    sha1Bytes = br.ReadBytes(20);
-                }
-            }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
-
-            return sha1Bytes;
-        }
-
-        /// <summary>
-        /// Gets the SHA1 hash for the file section
-        /// </summary>
-        /// <param name="dataFile">The data file to get the hash for</param>
-        /// <returns>The byte array containing the hash value</returns>
-        public byte[] GetIndexSection2Hash(DirectoryInfo indexPath)
-        {
-            byte[] sha1Bytes;
-
-            _semaphoreSlim.Wait();
-            try
-            {
-                using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
-                {
-                    br.BaseStream.Seek(1116, SeekOrigin.Begin);
-                    sha1Bytes = br.ReadBytes(20);
-                }
-            }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
-
-            return sha1Bytes;
-        }
-
-        /// <summary>
-        /// Gets the SHA1 hash for the file section
-        /// </summary>
-        /// <param name="dataFile">The data file to get the hash for</param>
-        /// <returns>The byte array containing the hash value</returns>
-        public byte[] GetIndexSection3Hash(DirectoryInfo indexPath)
-        {
-            byte[] sha1Bytes;
-
-            _semaphoreSlim.Wait();
-            try
-            {
-                using (var br = new BinaryReader(File.OpenRead(indexPath.FullName)))
-                {
-                    br.BaseStream.Seek(1188, SeekOrigin.Begin);
-                    sha1Bytes = br.ReadBytes(20);
-                }
-            }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
-            
-
-            return sha1Bytes;
         }
 
         /// <summary>
@@ -179,7 +60,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashNumDictionary">A Dictionary containing the folder hash and item number</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns></returns>
-        public async Task<List<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile)
+        internal async Task<List<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile)
         {
             var ret = new List<int>();
             var index = await GetIndexFile(dataFile, false, true);
@@ -200,7 +81,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFolder">The hashed value of the folder path</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>A list of all of the offsets in the given folder</returns>
-        public async Task<List<long>> GetAllFileOffsetsInFolder(int hashedFolder, XivDataFile dataFile)
+        internal async Task<List<long>> GetAllFileOffsetsInFolder(int hashedFolder, XivDataFile dataFile)
         {
             var index = await GetIndexFile(dataFile, false, true);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
@@ -215,7 +96,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFolder">The hashed value of the folder path</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>A list containing the hashed values of the files in the given folder</returns>
-        public async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile)
+        internal async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile)
         {
             var index = await GetIndexFile(dataFile, false, true);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
@@ -227,7 +108,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Gets the entire universe of hash pairs (folder, file) for a datafile.
         /// </summary>
-        public async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile)
+        internal async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile)
         {
             var index = await GetIndexFile(dataFile, false, true);
             return index.GetAllHashes();
@@ -237,7 +118,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static Dictionary<XivDataFile, long> _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
         private static Dictionary<XivDataFile, IndexFile> _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
 
-        public void ClearIndexCache()
+        internal void ClearIndexCache()
         {
             _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
             _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
@@ -248,7 +129,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        public async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
+        internal async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
         {
             var index1Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
             var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
