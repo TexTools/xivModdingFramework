@@ -225,7 +225,7 @@ namespace xivModdingFramework.Mods
                 if (Destination != Source)
                 {
                     var dPath = Destination.Info.GetRootFolder();
-                    var allMods = modlist.GetMods();
+                    var allMods = modlist.GetMods().ToList();
                     foreach (var mod in allMods)
                     {
                         if (mod.FilePath.StartsWith(dPath) && !mod.IsInternal())
@@ -699,7 +699,7 @@ namespace xivModdingFramework.Mods
         /// <param name="readTx"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, (Mod? mod, long originalOffset)> originalMods, string sourceApplication)
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, ModTransaction.TxPathData> originalStates, string sourceApplication)
         {
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
@@ -718,17 +718,18 @@ namespace xivModdingFramework.Mods
                     var destination = conversion.Value.Root;
                     var variant = conversion.Value.Variant;
 
-
                     var convertedFiles = await RootCloner.CloneRoot(source, destination, sourceApplication, variant, null, null, tx);
 
                     // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
                     foreach (var fileKv in convertedFiles)
                     {
-                        // Remove the file from our json list, the conversion already handled everything we needed to do with it.
 
                         if (fileKv.Key != fileKv.Value)
                         {
+                            // Note the new file that was added.
                             importedFiles.Add(fileKv.Value);
+                            
+                            // Reset the original file.
                             filesToReset.Add(fileKv.Key);
                         }
 
@@ -744,7 +745,6 @@ namespace xivModdingFramework.Mods
                         {
                             if (!filesToReset.Contains(file))
                             {
-                                importedFiles.Remove(file);
                                 filesToReset.Add(file);
                             }
                         }
@@ -752,27 +752,13 @@ namespace xivModdingFramework.Mods
 
                 }
 
-                // Reset the index pointers back to previous.
-                // This can only be done once we've finished moving all of the roots,
-                // as some of the modded roots may be co-dependent.
+                // Reset the states of all the requested files, and remove them form the import list.
                 foreach (var file in filesToReset)
                 {
-                    if (originalMods.ContainsKey(file))
+                    if (originalStates.ContainsKey(file))
                     {
-                        // Restore the state of the files at the root.
-
-                        var mod = originalMods[file].mod;
-                        var originalOffset = originalMods[file].originalOffset;
-                        if(mod != null)
-                        {
-                            newModList.AddOrUpdateMod(mod.Value);
-                        } else
-                        {
-                            newModList.RemoveMod(file);
-                        }
-                        // If this was a modded file, restore it to the pre-modpack install state.
-                        var index = await tx.GetIndexFile(df);
-                        index.Set8xDataOffset(file, originalOffset);
+                        // Restore the state of the files.
+                        await tx.RestoreFileState(originalStates[file]);
                         importedFiles.Remove(file);
                     }
                     else

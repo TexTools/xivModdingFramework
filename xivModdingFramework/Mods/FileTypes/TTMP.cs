@@ -555,7 +555,6 @@ namespace xivModdingFramework.Mods.FileTypes
                     using (var tx = ModTransaction.BeginTransaction())
                     {
                         var modList = await tx.GetModList();
-                        var originalData = new Dictionary<string, (Mod? mod, long originalOffset)>();
 
                         // 0 - Extract the MPD file.
                         // It is time to do wild and crazy things...
@@ -575,6 +574,7 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                         }
 
+                        Dictionary<string, ModTransaction.TxPathData> originalStates = new Dictionary<string, ModTransaction.TxPathData>();
 
                         // Now, we need to rip the offsets, and generate Transaction data store file handles for them.
                         var tempOffsets = new Dictionary<string, long>();
@@ -582,6 +582,10 @@ namespace xivModdingFramework.Mods.FileTypes
                         foreach (var modJson in filteredModsJson)
                         {
                             progress.Report((count, filteredModsJson.Count, "Writing Mod Files..."));
+
+                            // Save the original state for the root cloner.
+                            originalStates.Add(modJson.FullPath, await tx.SaveFileState(modJson.FullPath));
+
                             var storeInfo = new FileStorageInformation()
                             {
                                 StorageType = EFileStorageType.CompressedBlob,
@@ -600,9 +604,6 @@ namespace xivModdingFramework.Mods.FileTypes
 
                             // And Update the Modlist entry.
                             var prevMod = modList.GetMod(modJson.FullPath);
-
-                            // Save this stuff for the root cloner.
-                            originalData.Add(modJson.FullPath, (prevMod, oldOffset));
 
                             Mod mod = new Mod();
 
@@ -663,27 +664,18 @@ namespace xivModdingFramework.Mods.FileTypes
                                 progress.Report((0, 0, "Updating Destination Items..."));
 
                                 tx.ModPack = modPack;
-                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalData, sourceApplication);
+                                var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, sourceApplication);
                                 tx.ModPack = null;
                             }
                         }
 
 
-
-                        progress.Report((0, 0, "Committing Transaction..."));
-                        await ModTransaction.CommitTransaction(tx);
-                    }
-                    // end CORE TRANSACTION
+                        var totalMetadataEntries = filePaths.Count(x => x.EndsWith(".meta"));
+                        count = 0;
+                        progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
 
 
-                    var totalMetadataEntries = filePaths.Count(x => x.EndsWith(".meta"));
-                    count = 0;
-                    progress.Report((count, totalMetadataEntries, "Expanding Metadata Files..."));
-
-                    // For Metadata expansion we can use a standard mod transaction
-                    using (var tx = ModTransaction.BeginTransaction())
-                    {
-                        // ModList is updated now.  Time to expand the Metadata files.
+                        // Everything is all in the right places.  Time to expand the Metadata.
                         List<ItemMetadata> metadataEntries = new List<ItemMetadata>();
                         foreach (var file in filePaths)
                         {
@@ -710,7 +702,8 @@ namespace xivModdingFramework.Mods.FileTypes
                         try
                         {
                             await ItemMetadata.ApplyMetadataBatched(metadataEntries, tx);
-                        } catch (Exception Ex)
+                        }
+                        catch (Exception Ex)
                         {
                             throw new Exception("An error occured when attempting to expand the metadata entries.\n\nError:" + Ex.Message);
                         }
@@ -751,9 +744,15 @@ namespace xivModdingFramework.Mods.FileTypes
                             }
                         }
 
-                        // Commit the metadata transaction
+
+
+                        progress.Report((0, 0, "Committing Transaction..."));
                         await ModTransaction.CommitTransaction(tx);
                     }
+                    // end CORE TRANSACTION
+
+
+
 
 
 

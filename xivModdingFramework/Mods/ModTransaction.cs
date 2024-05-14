@@ -84,7 +84,7 @@ namespace xivModdingFramework.Mods
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
         #endregion
 
-        private class TxPathData
+        public class TxPathData
         {
             public TxPathData(string path)
             {
@@ -837,10 +837,33 @@ namespace xivModdingFramework.Mods
         }
 
         /// <summary>
+        /// Adds, Removes, or Updates mod as dictated by the given Mod state and path.
+        /// </summary>
+        /// <param name="mod"></param>
+        /// <param name="path"></param>
+        public async Task UpdateMod(Mod? mod, string path)
+        {
+            var ml = await GetModList();
+            if (mod == null)
+            {
+                ml.RemoveMod(path);
+            }
+            else
+            {
+                if(path != mod.Value.FilePath)
+                {
+                    throw new InvalidDataException("Mod path did not match given path.");
+                }
+
+                ml.AddOrUpdateMod(mod.Value);
+            }
+        }
+
+        /// <summary>
         /// Syntactic shortcut for adding or updating a mod.
         /// </summary>
         /// <param name="mod"></param>
-        public async void AddOrUpdateMod(Mod mod)
+        public async Task AddOrUpdateMod(Mod mod)
         {
             var ml = await GetModList();
             ml.AddOrUpdateMod(mod);
@@ -850,7 +873,7 @@ namespace xivModdingFramework.Mods
         /// Syntactic shortcut for removing a mod.
         /// </summary>
         /// <param name="mod"></param>
-        public async void RemoveMod(Mod mod)
+        public async Task RemoveMod(Mod mod)
         {
             var ml = await GetModList();
             ml.RemoveMod(mod);
@@ -860,7 +883,7 @@ namespace xivModdingFramework.Mods
         /// Syntactic shortcut for removing a subset of mods.
         /// </summary>
         /// <param name="mods"></param>
-        public async void RemoveMod(IEnumerable<Mod> mods)
+        public async Task RemoveMod(IEnumerable<Mod> mods)
         {
             var ml = await GetModList();
             ml.RemoveMods(mods);
@@ -1371,6 +1394,37 @@ namespace xivModdingFramework.Mods
 
         #endregion
 
+
+        #region Save/Restore Functions
+
+        /// <summary>
+        /// Saves the full state of a given file, returning a TxPathData object that can be used to restore that state later.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public async Task<TxPathData> SaveFileState(string path) {
+
+            var data = new TxPathData(path);
+
+            var offset = await Get8xDataOffset(path);
+            var mod = await GetMod(path);
+            data.OriginalMod = mod;
+            data.OriginalOffset = offset;
+            return data;
+        }
+
+        /// <summary>
+        /// Restores the full state of a given file to the given state.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <returns></returns>
+        public async Task RestoreFileState(TxPathData state)
+        {
+            await Set8xDataOffset(state.Path, state.OriginalOffset);
+            await UpdateMod(state.OriginalMod, state.Path);
+        }
+
+        #endregion
 
         #region Static Default Settings
 

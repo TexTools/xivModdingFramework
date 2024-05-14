@@ -570,12 +570,11 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 //HACK: This is a workaround for certain furniture items, mainly with picture frames and easel
-                var isEmpty = false;
-                try
-                {
-                    isEmpty = br.PeekChar() == 0;
-                }
-                catch { }
+                var pos = br.BaseStream.Position;
+                var nextShort = br.ReadUInt16();
+                br.BaseStream.Seek(pos, SeekOrigin.Begin);
+                var isEmpty = nextShort > 0;
+
 
                 if (isEmpty && totalLoDMeshes < mdlModelData.MeshCount)
                 {
@@ -4695,10 +4694,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var bytes = await MakeCompressedMdlFile(ttMdl, ogMdl);
 
                 // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
-                modlist.Mods.TryGetValue(mdlPath, out var modEntry);
+                var mod = (await tx.GetMod(mdlPath)).Value;
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 
-                await _dat.WriteModFile(bytes, mdlPath, modEntry.SourceApplication, null, tx);
+                await _dat.WriteModFile(bytes, mdlPath, mod.SourceApplication, null, tx);
 
             }
 
