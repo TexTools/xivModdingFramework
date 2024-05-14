@@ -251,8 +251,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         // Load the individual pixels into memory.
                         Color4 baseDiffuseColor = readInputPixel(diffusePixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
-                        Color4 baseNormalColor = readInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 0.5f, 1.0f));
-                        Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
+                        Color4 baseNormalColor = readInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 1.0f, 1.0f));
+                        Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(0.0f, 0.0f, 0.0f, 1.0f));
 
                         if (invertNormalGreen)
                             baseNormalColor.Green = 1.0f - baseNormalColor.Green;
@@ -347,6 +347,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 int stride = (mtrl.ColorSetData.Count < 1024) ? 16 : 32;
 
                 // All 32 color entries are allocated even if the original material only had 16
+                // Color set mapping code masks the index range to 0..31
                 var colorSetInfo = new ColorSetInfo()
                 {
                     Diffuse = new Color4[32],
@@ -510,6 +511,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
         private delegate ShaderMapperResult ShaderMapperDelegate(Color4 diffuse, Color4 normal, Color4 mask);
 
+#if DAWNTRAIL
         private static bool thrownException1 = false;
 
         private static ShaderMapperDelegate GetShaderMapper(CustomModelColors colors, XivMtrl mtrl)
@@ -605,7 +607,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         {
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
                             Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = Color4.Black, // no shiny
+                            Specular = Color4.Black,
                             Alpha = new Color4(normal.Blue)
                         };
                     };
@@ -685,7 +687,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                        Specular = new Color4(0.0f), // ?
+                        Specular = Color4.Black,
                         Alpha = new Color4(normal.Alpha)
                     };
                 };
@@ -698,7 +700,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         Diffuse = Color4.White,
                         Normal = new Color4(0.5f, 0.5f, 1.0f, 1.0f),
-                        Specular = new Color4(0.0f),
+                        Specular = Color4.Black,
                         Alpha = new Color4(0.0f)
                     };
                 };
@@ -721,7 +723,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (mtrl.ShaderPack == EShaderPack.Furniture || mtrl.ShaderPack == EShaderPack.Prop)
+            else if (shaderPack == EShaderPack.Furniture || shaderPack == EShaderPack.Prop)
             {
                 return (Color4 diffuse, Color4 normal, Color4 multi) => {
                     return new ShaderMapperResult()
@@ -733,7 +735,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (mtrl.ShaderPack == EShaderPack.DyeableFurniture)
+            else if (shaderPack == EShaderPack.DyeableFurniture)
             {
                 Color4 furnitureColor = colors.FurnitureColor;
                 return (Color4 diffuse, Color4 normal, Color4 multi) => {
@@ -754,12 +756,207 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         Diffuse = diffuse,
                         Normal = normal,
-                        Specular = new Color4(0.0f),
+                        Specular = Color4.Black,
                         Alpha = new Color4(1.0f)
                     };
                 };
             }
         }
+#endif
+
+#if ENDWALKER
+        private static ShaderMapperDelegate GetShaderMapper(CustomModelColors colors, XivMtrl mtrl)
+        {
+            // Based on https://docs.google.com/spreadsheets/d/1kIKvVsW3fOnVeTi9iZlBDqJo6GWVn6K6BCUIRldEjhw
+            // Although there is some overlap between this function and the DAWNTRAIL version,
+            // there are not legacy equivalents of all of these shaders.
+
+            // This var is technically defined in the Shaders parameters.
+            // But we can use a constant copy of it for now, since it's largely non-changeable.
+            const float PlayerColorMultiplier = 1.4f;
+            const float BrightPlayerColorMultiplier = 3.0f;
+
+            var shaderPack = mtrl.ShaderPack;
+
+            bool hasDiffuse = mtrl.GetTexture(XivTexType.Diffuse) != null;
+            bool hasSpecular = mtrl.GetTexture(XivTexType.Specular) != null;
+            bool hasMulti = mtrl.GetTexture(XivTexType.Mask) != null;
+
+            if (shaderPack == EShaderPack.Character || shaderPack == EShaderPack.CharacterGlass)
+            {
+                if (hasMulti)
+                {
+                    return (Color4 diffuse, Color4 normal, Color4 multi) => {
+                        return new ShaderMapperResult()
+                        {
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f),
+                            Alpha = new Color4(normal.Blue)
+                        };
+                    };
+                }
+                else if (hasSpecular)
+                {
+                    return (Color4 diffuse, Color4 normal, Color4 multi) => {
+                        return new ShaderMapperResult()
+                        {
+                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = new Color4(multi.Red, multi.Green, multi.Blue, 1.0f),
+                            Alpha = new Color4(normal.Blue)
+                        };
+                    };
+                }
+                else
+                {
+                    return (Color4 diffuse, Color4 normal, Color4 multi) => {
+                        return new ShaderMapperResult()
+                        {
+                            Diffuse = new Color4(diffuse.Red, diffuse.Red, diffuse.Red, normal.Blue),
+                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                            Specular = Color4.Black,
+                            Alpha = new Color4(normal.Blue)
+                        };
+                    };
+                }
+            }
+            else if (shaderPack == EShaderPack.Furniture || mtrl.ShaderPack == EShaderPack.Prop)
+            {
+                return (Color4 diffuse, Color4 normal, Color4 multi) => {
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = diffuse,
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
+                        Alpha = new Color4(diffuse.Alpha)
+                    };
+                };
+            }
+            else if (shaderPack == EShaderPack.DyeableFurniture)
+            {
+                Color4 furnitureColor = colors.FurnitureColor;
+                return (Color4 diffuse, Color4 normal, Color4 multi) => {
+                    float colorInfluence = diffuse.Alpha;
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = Color4.Lerp(new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f), furnitureColor, colorInfluence),
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
+                        Alpha = new Color4(1.0f)
+                    };
+                };
+            }
+            else if (shaderPack == EShaderPack.Skin)
+            {
+                var skinColor = colors.SkinColor;
+                var lipColor = colors.LipColor;
+
+                ShaderMapperDelegate skinShader = (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
+                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
+                    // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                    // tones down the specularity here, but without it the skin is hyper reflective.
+                    newSpecular = Color4.Scale(newSpecular, 0.25f);
+                    // New diffuse starts from regular diffuse file.
+                    // Then factors in the player's skin color multiplied by the shader value.
+                    float skinInfluence = specular.Red;
+                    var coloredSkin = diffuse * skinColor;
+                    Color4 newDiffuse = Color4.Lerp(diffuse, coloredSkin, skinInfluence);
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = newDiffuse,
+                        Normal = newNormal,
+                        Specular = newSpecular,
+                        Alpha = new Color4(1.0f)
+                    };
+                };
+
+                ShaderMapperDelegate faceShader = (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    ShaderMapperResult result = skinShader(diffuse, normal, specular);
+                    // Face shaders also allow for lip color.
+                    var coloredLip = diffuse * lipColor;
+                    float lipInfluence = specular.Blue;
+                    result.Diffuse = Color4.Lerp(result.Diffuse, coloredLip, lipInfluence);
+                    // For lipstick, increase the specular value slightly.
+                    float specAmp = 1.0f + (lipInfluence * 0.25f);
+                    result.Specular = result.Specular * specAmp;
+                    // Face shader supports alpha, unlike normal skin textures.
+                    result.Alpha = new Color4(normal.Blue);
+                    return result;
+                };
+
+                if (mtrl.ShaderKeys.Any(x => x.KeyId == 0xF52CCF05 && x.Value == 0xA7D2FF60)) // Face
+                    return faceShader;
+                else
+                    return skinShader;
+            }
+            else if (shaderPack == EShaderPack.Hair)
+            {
+                var hairHighlightColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
+                var hairTargetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
+
+                // Starting from the original hair color...
+                var baseColor = colors.HairColor;
+
+                // Hair highlight color if available.
+                // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
+                Color4 targetColor;
+
+                if (mtrl.ShaderKeys.Any(x => x.KeyId == 0x24826489 && x.Value == 0x6E5B8F10)) // Face
+                    targetColor = colors.TattooColor;
+                else if (mtrl.ShaderConstants.Any(x => x.ConstantId == 0x2C2A34DD && x.Values[0] == 3.0f)) // Limbal ring brightness
+                    // Multiplier here is 3.0 instead of 1.4
+                    targetColor = Color4.Scale(colors.TattooColor, BrightPlayerColorMultiplier / PlayerColorMultiplier);
+                else
+                    targetColor = hairHighlightColor;
+
+                return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
+                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
+                    // This is an arbitrary number.  There's likely some value in the shader params for skin that
+                    // tones down the specularity here, but without it the skin is hyper reflective.
+                    newSpecular = Color4.Scale(newSpecular, 0.25f);
+                    // The influence here determines which base color we use.
+                    float influenceStrength = specular.Alpha;
+                    Color4 newDiffuse = Color4.Lerp(baseColor, targetColor, influenceStrength);
+                    newDiffuse = Color4.Scale(newDiffuse, specular.Red);
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = newDiffuse,
+                        Normal = newNormal,
+                        Specular = newSpecular,
+                        Alpha = new Color4(normal.Alpha)
+                    };
+                };
+            }
+            else if (shaderPack == EShaderPack.Iris)
+            {
+                return (Color4 diffuse, Color4 normal, Color4 specular) =>
+                {
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = Color4.Scale(colors.EyeColor, specular.Red),
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
+                        Alpha = new Color4(normal.Alpha)
+                    };
+                };
+            }
+            else
+            {
+                return (Color4 diffuse, Color4 normal, Color4 specular) => {
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = diffuse,
+                        Normal = normal,
+                        Specular = Color4.Black,
+                        Alpha = new Color4(1.0f)
+                    };
+                };
+            }
+        }
+#endif
 
         private struct ColorSetMapperResult
         {
