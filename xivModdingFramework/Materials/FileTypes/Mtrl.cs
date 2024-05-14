@@ -142,7 +142,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (tx == null)
             {
                 // Readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var mtrlOffset = await tx.Get8xDataOffset(mtrlPath, forceOriginal);
 

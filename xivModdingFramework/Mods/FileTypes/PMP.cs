@@ -178,7 +178,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             try
             {
-                using (var tx = ModTransaction.BeginTransaction(false, modPack))
+                using (var tx = ModTransaction.BeginTransaction(true, modPack))
                 {
                     if (pmp.Groups == null || pmp.Groups.Count == 0)
                     {
@@ -248,7 +248,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (pmp.Meta.FileVersion <= 3)
                 {
                     // Transaction for fixing up our files.
-                    using (var tx = ModTransaction.BeginTransaction(false, modPack))
+                    using (var tx = ModTransaction.BeginTransaction(true, modPack))
                     {
 
                         progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));

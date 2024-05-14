@@ -184,7 +184,7 @@ namespace xivModdingFramework.Mods
             if(tx == null)
             {
                 // Read only TX so we can be lazy about manually disposing it.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var modList = await tx.GetModList();
 
@@ -229,7 +229,7 @@ namespace xivModdingFramework.Mods
             var doSave = false;
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
                 doSave = true;
             }
             try
@@ -283,7 +283,7 @@ namespace xivModdingFramework.Mods
             if(tx == null)
             {
                 ownTransaction = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -357,7 +357,7 @@ namespace xivModdingFramework.Mods
             bool commit = tx == null;
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction(false);
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -438,7 +438,7 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 ownTransaction = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -488,7 +488,7 @@ namespace xivModdingFramework.Mods
             if(tx == null)
             {
                 ownTransaction = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try { 
                 foreach (var modEntry in mods)
@@ -610,7 +610,7 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 doSave = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -665,7 +665,7 @@ namespace xivModdingFramework.Mods
         /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
         public static async Task DeleteModPack(string modPackName)
         {
-            using (var tx = ModTransaction.BeginTransaction())
+            using (var tx = ModTransaction.BeginTransaction(true))
             {
                 var modList = await tx.GetModList();
                 var mp = modList.GetModPack(modPackName);
@@ -711,7 +711,7 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 ownTransaction = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -846,7 +846,7 @@ namespace xivModdingFramework.Mods
                     if (tx == null)
                     {
                         // Read only TX if none supplied.
-                        tx = ModTransaction.BeginTransaction(true);
+                        tx = ModTransaction.BeginTransaction();
                     }
 
                     imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths(), false, tx);

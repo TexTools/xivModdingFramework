@@ -346,7 +346,7 @@ namespace xivModdingFramework.Mods.FileTypes
             if (tx == null)
             {
                 doSave = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {

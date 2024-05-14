@@ -333,7 +333,7 @@ namespace xivModdingFramework.Items.Categories
             if(tx == null)
             {
                 // Readonly TX if we don't have one;
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var id = modelID.ToString().PadLeft(4, '0');
@@ -446,7 +446,7 @@ namespace xivModdingFramework.Items.Categories
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var dat = new Dat(_gameDirectory);

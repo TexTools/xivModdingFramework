@@ -615,7 +615,7 @@ namespace xivModdingFramework.Cache
                     if(tx == null)
                     {
                         // Readonly TX if we don't have one.
-                        tx = ModTransaction.BeginTransaction(true);
+                        tx = ModTransaction.BeginTransaction();
                     }
 
                     if(!(await tx.FileExists(modelPath)))
@@ -650,7 +650,7 @@ namespace xivModdingFramework.Cache
             {
                 // Use a read only transaction if we don't have an open one.
                 // If we're not transacting that also means we can just use whatever's in the main state cache.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
                 useCache = true;
             }
 
@@ -868,7 +868,7 @@ namespace xivModdingFramework.Cache
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             // We need to locate and open the IMC file, and then check how many
@@ -891,7 +891,7 @@ namespace xivModdingFramework.Cache
             if (tx != null)
             {
                 // Readonly Tx if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var df = IOUtil.GetDataFileFromPath(imcPath);
             var imcOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(imcPath);

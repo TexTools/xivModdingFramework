@@ -127,7 +127,7 @@ namespace xivModdingFramework.Exd.FileTypes
             LanguageList = new List<int>();
 
             // Readonly TX.  We don't allow live modification of exd/exh files.
-            var tx = ModTransaction.BeginTransaction(true);
+            var tx = ModTransaction.BeginTransaction();
 
             var exdFolderHash = HashGenerator.GetHash("exd");
             var exdFileHash = HashGenerator.GetHash(exFile + ExhExtension);
@@ -215,7 +215,7 @@ namespace xivModdingFramework.Exd.FileTypes
             }
 
             // Readonly TX.  We don't allow live modification of exd/exh files.
-            var tx = ModTransaction.BeginTransaction(true);
+            var tx = ModTransaction.BeginTransaction();
 
             await Task.Run(async () =>
             {

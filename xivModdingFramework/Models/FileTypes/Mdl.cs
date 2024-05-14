@@ -304,7 +304,7 @@ namespace xivModdingFramework.Models.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't already have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             offset = await tx.Get8xDataOffset(mdlPath, getOriginal);
@@ -1742,7 +1742,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // If TX is null, this is probably coming from the internal mod cache resolver.
                 // Just use a readonly transaction.
                 useCached = true;
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var materials = new List<string>();
@@ -1874,7 +1874,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // No Tx, use a simple readonly one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var mdlData = await dat.ReadSqPackType3(mdlPath, getOriginal, tx);
@@ -2105,7 +2105,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var modelName = Path.GetFileNameWithoutExtension(model.Source);
             var directory = Path.GetDirectoryName(outputFilePath);
@@ -2436,7 +2436,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var modlist = await tx.GetModList();
             var mod = modlist.GetMod(internalPath);
@@ -4711,7 +4711,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<int> CheckAllModsSkinAssignments()
         {
-            using (var tx = ModTransaction.BeginTransaction())
+            using (var tx = ModTransaction.BeginTransaction(true))
             { 
                 var modList = await tx.GetModList();
                 var mods = modList.GetMods();
@@ -5097,7 +5097,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 ownTx = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -5201,7 +5201,7 @@ namespace xivModdingFramework.Models.FileTypes
             if(tx == null)
             {
                 ownTx = true;
-                tx = tx = ModTransaction.BeginTransaction();
+                tx = tx = ModTransaction.BeginTransaction(true);
             }
 
             try

@@ -421,7 +421,7 @@ namespace xivModdingFramework.Mods.DataContainers
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             var activeOffset = await tx.Get8xDataOffset(FilePath);
 

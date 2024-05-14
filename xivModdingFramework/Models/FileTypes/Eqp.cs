@@ -1138,7 +1138,7 @@ namespace xivModdingFramework.Models.FileTypes
             bool exists = false;
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var index = await tx.GetIndexFile(XivDataFile._04_Chara);
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;

@@ -69,7 +69,7 @@ namespace xivModdingFramework.General
             if(tx == null)
             {
                 ownTx = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {

@@ -46,7 +46,7 @@ namespace xivModdingFramework.Mods
                 Version = "1.0"
             };
 
-            var tx = ModTransaction.BeginTransaction(false, modPack, settings);
+            var tx = ModTransaction.BeginTransaction(true, modPack, settings);
             try
             {
                 await ImportBatch(files, sourceApplication, tx);
@@ -78,7 +78,7 @@ namespace xivModdingFramework.Mods
                     Author = "Unknown",
                     Version = "1.0",
                 };
-                tx = ModTransaction.BeginTransaction(false, modPack);
+                tx = ModTransaction.BeginTransaction(true, modPack);
             }
             try
             {

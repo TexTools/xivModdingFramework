@@ -56,7 +56,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             try
             {

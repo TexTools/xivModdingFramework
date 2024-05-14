@@ -741,7 +741,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
             var offset = await tx.Get8xDataOffset(internalPath, forceOriginal);
@@ -1283,7 +1283,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             if (forceOriginal)
@@ -1480,7 +1480,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (tx == null)
             {
                 // Use simple readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var offset8x = await tx.Get8xDataOffset(internalPath);
@@ -1881,7 +1881,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var offset = await tx.Get8xDataOffset(path, forceOriginal);
@@ -2106,7 +2106,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if(tx == null)
             {
                 ownTx = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
@@ -2327,7 +2327,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
 
                 doDatSave = true;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {

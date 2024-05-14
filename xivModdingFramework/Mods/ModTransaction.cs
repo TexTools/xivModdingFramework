@@ -295,13 +295,13 @@ namespace xivModdingFramework.Mods
         {
             throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
         }
-        private ModTransaction(bool readOnly = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
+        private ModTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
             __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
 
-            _ReadOnly = readOnly;
+            _ReadOnly = !writeEnabled;
             State = ETransactionState.Preparing;
 
 
@@ -407,14 +407,14 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
+        public static ModTransaction BeginTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
         {
 
-            if (readOnly)
+            if (!writeEnabled)
             {
                 // Read-Only Transactions don't block anything else, and really just serve as
                 // caches for index/modlist data.
-                var readonlyTx = new ModTransaction(readOnly, modpack);
+                var readonlyTx = new ModTransaction(writeEnabled, modpack);
                 return readonlyTx;
             }
 
@@ -427,7 +427,7 @@ namespace xivModdingFramework.Mods
             _WorkerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
-            var tx = new ModTransaction(readOnly, modpack, settings, waitToStart);
+            var tx = new ModTransaction(writeEnabled, modpack, settings, waitToStart);
             if (!Dat.AllowDatAlteration && tx.Settings.Target == ETransactionTarget.GameFiles)
             {
                 _ActiveTransaction = tx;

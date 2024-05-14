@@ -246,7 +246,7 @@ namespace xivModdingFramework.Variants.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var exists = await tx.FileExists(path);

@@ -198,7 +198,7 @@ namespace xivModdingFramework.Helpers
                 var index = new Index(_gameDirectory);
 
                 // Readonly tx to get live game state.
-                var tx = ModTransaction.BeginTransaction(true);
+                var tx = ModTransaction.BeginTransaction();
 
                 var ml = await tx.GetModList();
 
@@ -307,7 +307,7 @@ namespace xivModdingFramework.Helpers
 
                     // Update all the index counts to be safe, in case the user's index backups were generated when some mod dats existed.
                     // This can be done just by opening and committing a blank transaction.
-                    using (var tx = ModTransaction.BeginTransaction())
+                    using (var tx = ModTransaction.BeginTransaction(true))
                     {
                         await ModTransaction.CommitTransaction(tx);
                     }

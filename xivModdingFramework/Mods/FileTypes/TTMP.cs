@@ -211,7 +211,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 if (tx == null)
                 {
                     // Readonly TX if we don't have one already.
-                    tx = ModTransaction.BeginTransaction(true);
+                    tx = ModTransaction.BeginTransaction();
                 }
 
                 using var writer = new TTMPWriter(modPackData, _typeCodeSimple);
@@ -250,7 +250,7 @@ namespace xivModdingFramework.Mods.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one already.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
             return await Task.Run(async () =>
             {
@@ -543,7 +543,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     var count = 0;
 
                     // Begin CORE TRANSACTION
-                    using (var tx = ModTransaction.BeginTransaction())
+                    using (var tx = ModTransaction.BeginTransaction(true))
                     {
                         var modList = await tx.GetModList();
 

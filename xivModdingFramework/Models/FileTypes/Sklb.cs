@@ -386,7 +386,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var index = new Index(XivCache.GameInfo.GameDirectory);

@@ -187,7 +187,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var offset = (await tx.Get8xDataOffset(path, forceOriginal));
@@ -243,7 +243,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction(true);
+                tx = ModTransaction.BeginTransaction();
             }
 
             var type = iconItem.GetType();
@@ -1098,7 +1098,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 doSave = true;
                 // Open a transaction if needed since we're performing multiple operations.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
