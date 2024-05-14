@@ -476,7 +476,7 @@ namespace xivModdingFramework.Mods
                             nMod.ModPack = modPack.Name;
                         }
 
-                        mods.Add(mod);
+                        mods.Add(nMod);
                     }
                 }
 

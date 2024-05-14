@@ -534,16 +534,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 await Task.Run(async () =>
                 {
 
-                    // Okay, we need to do a few things here.
-                    // 0 - Extract the MPD file (tests so far with streaming the ZIP data have all failed)
-                    // 1 - Copy all the mod data to the DAT files.
-                    // 2 - Update all the indices.
-                    // 3 - Update the Modlist
-                    // 4 - Expand Metadata
-                    // 5 - Queue Cache Updates.
-
                     // We only need the actual Zip file during the initial copy stage.
-
                     Dictionary<string, uint> DatOffsets = new Dictionary<string, uint>();
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
 
@@ -556,7 +547,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         var modList = await tx.GetModList();
 
-                        // 0 - Extract the MPD file.
+                        // Extract the MPD file...
                         // It is time to do wild and crazy things...
 
                         // First, unzip the TTMP into our transaction data store folder.
@@ -579,6 +570,8 @@ namespace xivModdingFramework.Mods.FileTypes
                         // Now, we need to rip the offsets, and generate Transaction data store file handles for them.
                         var tempOffsets = new Dictionary<string, long>();
                         count = 0;
+
+                        var seenModPacks = new HashSet<string>();
                         foreach (var modJson in filteredModsJson)
                         {
                             progress.Report((count, filteredModsJson.Count, "Writing Mod Files..."));
@@ -593,6 +586,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 RealOffset = modJson.ModOffset,
                                 FileSize = modJson.ModSize
                             };
+
 
                             // And get an in-system data offset for them...
                             var offset = tx.UNSAFE_AddFileInfo(storeInfo, IOUtil.GetDataFileFromPath(modJson.FullPath));
@@ -621,6 +615,13 @@ namespace xivModdingFramework.Mods.FileTypes
                             mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
 
                             modList.AddOrUpdateMod(mod);
+
+                            // Add the modpack if we haven't already.
+                            if (modJson.ModPackEntry!= null && !seenModPacks.Contains(modJson.ModPackEntry.Value.Name))
+                            {
+                                seenModPacks.Add(modJson.ModPackEntry.Value.Name);
+                                modList.AddOrUpdateModpack(modJson.ModPackEntry.Value);
+                            }
                             count++;
                         }
 

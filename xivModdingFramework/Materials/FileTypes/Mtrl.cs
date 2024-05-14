@@ -932,7 +932,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     tasks.Add(Task.Run(async () =>
                     {
-                        var val = await CreateIndexFromNormal(tup.indexTextureToCreate, tup.normalToCreateFrom);
+                        var val = await CreateIndexFromNormal(tup.indexTextureToCreate, tup.normalToCreateFrom, tx);
                         count++;
                         progress?.Report((count, total, "Creating Index Textures..."));
                         return val;
@@ -1150,13 +1150,13 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
-        private async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath)
+        private async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
         {
             var _tex = new Tex(_gameDirectory);
             var _dat = new Dat(_gameDirectory);
 
             // Read normal file.
-            var normalTex = await _tex.GetXivTex(sourceNormalPath);
+            var normalTex = await _tex.GetXivTex(sourceNormalPath, false, tx);
             var texData = await normalTex.GetRawPixels();
 
             // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
