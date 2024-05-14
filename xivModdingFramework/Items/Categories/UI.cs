@@ -186,7 +186,7 @@ namespace xivModdingFramework.Items.Categories
             var actionCategoryExData = await _ex.ReadExData(XivEx.actioncategory);
 
             var actionList = new List<XivUi>();
-            var actionNames = new List<string>();
+            var actionNames = new HashSet<string>();
 
             await Task.Run(() => Parallel.ForEach(actionExData.Values, (action) =>
             {
@@ -207,7 +207,14 @@ namespace xivModdingFramework.Items.Categories
 
                 // The Cure icon is used as a placeholder so filter out all actions that aren't Cure but are using its icon as a placeholder
                 if (string.IsNullOrWhiteSpace(xivUi.Name) || (!xivUi.Name.Equals("Cure") && xivUi.IconNumber == 405)) return;
-                if (actionNames.Contains(xivUi.Name)) return;
+
+                var originalName = xivUi.Name;
+                var count = 2;
+                while(actionNames.Contains(xivUi.Name))
+                {
+                    xivUi.Name = originalName + " #" + count;
+                    count++;
+                }
 
                 lock (actionLock)
                 {

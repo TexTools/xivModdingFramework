@@ -363,20 +363,19 @@ namespace xivModdingFramework.Items
             var primaryId = "";
             var secondaryId = "";
             XivModelInfo modelInfo = null;
-            try {
-                // Hitting this catch 60,000 time for all the UI elements is really slow.
-                if (item != null && primaryType != XivItemType.ui)
+
+            if (item != null && primaryType != XivItemType.ui)
+            {
+                var im = item as IItemModel;
+                if (im != null && im.ModelInfo != null)
                 {
-                    modelInfo = ((IItemModel)item).ModelInfo;
+                    modelInfo = im.ModelInfo;
                     if (modelInfo != null)
                     {
                         primaryId = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
                         secondaryId = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
                     }
                 }
-            } catch(Exception ex)
-            {
-                // No-op.  If it failed it's one of the types we're not going to use it modelInfo on anyways.
             }
 
 
