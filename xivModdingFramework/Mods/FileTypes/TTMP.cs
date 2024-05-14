@@ -218,10 +218,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 var mp = new ModPack
                 {
-                    name = modPackData.Name,
-                    author = modPackData.Author,
-                    version = modPackData.Version.ToString(),
-                    url = modPackData.Url
+                    Name = modPackData.Name,
+                    Author = modPackData.Author,
+                    Version = modPackData.Version.ToString(),
+                    Url = modPackData.Url
                 };
 
                 foreach (var mod in modPackData.SimpleModDataList)
@@ -494,7 +494,6 @@ namespace xivModdingFramework.Mods.FileTypes
             string _tempMPD, _tempMPL;
 
             var dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var modding = new Modding(XivCache.GameInfo.GameDirectory);
 
             // Disable the cache woker while we're installing multiple items at once, so that we don't process queue items mid-import.
             // (Could result in improper parent file calculations, as the parent files may not be actually imported yet)
@@ -549,7 +548,6 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
 
 
-                    var _modding = new Modding(XivCache.GameInfo.GameDirectory);
                     var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
 
                     // 0 - Extract the MPD file.
@@ -580,7 +578,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         var modList = await tx.GetModList();
 
-                        Dictionary<string, (Mod mod, long offset)> OriginalData = new Dictionary<string, (Mod mod, long offset)>();
+                        Dictionary<string, (Mod? mod, long offset)> OriginalData = new Dictionary<string, (Mod? mod, long offset)>();
 
                         // 1 - Copy all the mod data to the DAT files.
                         count = 0;
@@ -601,10 +599,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                 // Store original data for use later with the root cloner.
                                 var originalOffset = await tx.Get8xDataOffset(modJson.FullPath);
                                 var originalMod = modList.GetMod(modJson.FullPath);
-                                if(originalMod != null)
-                                {
-                                    originalMod = (Mod)originalMod.Clone();
-                                }
                                 OriginalData.Add(modJson.FullPath, (originalMod, originalOffset));
 
                                 // Bind the mod pack entry/info and write the mod.

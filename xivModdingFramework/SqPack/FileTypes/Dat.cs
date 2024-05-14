@@ -1284,12 +1284,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                (await tx.GetModList()).ModDictionary.TryGetValue(internalPath, out var modEntry);
+                (await tx.GetModList()).Mods.TryGetValue(internalPath, out var modEntry);
 
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
-                    return await GetTexFromDat(modEntry.data.originalOffset, dataFile, tx);
+                    return await GetTexFromDat(modEntry.OriginalOffset8x, dataFile, tx);
                 }
             }
 
@@ -1482,11 +1482,11 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (forceOriginal)
             {
                 // Checks if the item being imported already exists in the modlist
-                (await tx.GetModList()).ModDictionary.TryGetValue(internalPath, out var modEntry);
+                (await tx.GetModList()).Mods.TryGetValue(internalPath, out var modEntry);
                 // If the file exists in the modlist, get the data from the original data
                 if (modEntry != null)
                 {
-                    offset8x = modEntry.data.originalOffset;
+                    offset8x = modEntry.OriginalOffset8x;
                 }
             }
 
@@ -2312,7 +2312,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
         {
 
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
 
@@ -2334,7 +2333,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var modList = await tx.GetModList();
                 var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(internalFilePath));
 
-                modList.ModDictionary.TryGetValue(internalFilePath, out var mod);
+                var nullMod = modList.GetMod(internalFilePath);
 
                 // Resolve Item to attach to.
                 string itemName = "Unknown";
@@ -2374,47 +2373,49 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 var fileType = BitConverter.ToInt32(fileData, 4);
 
-                if (mod == null)
+                Mod mod;
+                if (nullMod == null)
                 {
                     // Determine if this is an original game file or not.
                     var fileAdditionMod = originalOffset == 0;
 
                     mod = new Mod()
                     {
-                        name = itemName,
-                        category = category,
-                        datFile = df.GetDataFileName(),
-                        source = sourceApplication,
-                        fullPath = internalFilePath,
-                        data = new Data()
+                        ItemName = itemName,
+                        ItemCategory = category,
+                        SourceApplication = sourceApplication,
+                        FilePath = internalFilePath,
                     };
-                    mod.data.modOffset = offset8x;
-                    mod.data.originalOffset = (fileAdditionMod ? offset8x : originalOffset);
-                    mod.data.modSize = fileData.Length;
-                    mod.data.dataType = fileType;
-                    mod.enabled = true;
+                    mod.ModOffset8x = offset8x;
+                    mod.OriginalOffset8x = (fileAdditionMod ? offset8x : originalOffset);
+                    mod.FileSize = fileData.Length;
+                    mod.Enabled = true;
 
                     // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
-                    mod.modPack = mod.IsInternal() ? null : tx.ModPack;
+                    var mp = tx.ModPack == null ? "" : tx.ModPack.Value.Name;
+                    mod.ModPack = mod.IsInternal() ? null : mp;
                     modList.AddOrUpdateMod(mod);
                 }
                 else
                 {
-                    var mPack = tx.ModPack == null ? mod.modPack : tx.ModPack;
+                    mod = nullMod.Value;
+
+                    var mp = tx.ModPack == null ? mod.ModPack : tx.ModPack.Value.Name;
                     var fileAdditionMod = originalOffset == 0 || mod.IsCustomFile();
                     if (fileAdditionMod)
                     {
-                        mod.data.originalOffset = offset8x;
+                        mod.OriginalOffset8x = offset8x;
                     }
-                    mod.data.modOffset = offset8x;
-                    mod.enabled = true;
-                    mod.modPack = mod.IsInternal() ? null : mPack;
-                    mod.data.modSize = fileData.Length;
-                    mod.data.dataType = fileType;
-                    mod.name = itemName;
-                    mod.category = category;
-                    mod.source = sourceApplication;
+                    mod.ModOffset8x = offset8x;
+                    mod.Enabled = true;
+                    mod.ModPack = mod.IsInternal() ? null : mp;
+                    mod.FileSize = fileData.Length;
+                    mod.ItemName = itemName;
+                    mod.ItemCategory = category;
+                    mod.SourceApplication = sourceApplication;
                 }
+
+                modList.AddOrUpdateMod(mod);
 
                 if (doDatSave)
                 {
@@ -2503,15 +2504,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         public static async Task<Dictionary<long, long>> ComputeOpenSlots(XivDataFile df)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
             var moddedDats = await _dat.GetModdedDatList(df);
 
             var slots = new Dictionary<long, long>();
-            var modlist = await _modding.GetModList();
+            var modlist = await Modding.GetModList();
 
-            var modsByFile = modlist.Mods.Where(x => !String.IsNullOrWhiteSpace(x.fullPath) && x.datFile == df.GetDataFileName()).GroupBy(x => {
-                long offset = x.data.modOffset;
+            var modsByFile = modlist.GetMods().GroupBy(x => {
+                long offset = x.ModOffset8x;
                 var rawOffset = offset / 8;
                 var datNum = (rawOffset & 0xF) >> 1;
                 return (int)datNum;
@@ -2523,17 +2523,17 @@ namespace xivModdingFramework.SqPack.FileTypes
                 long fileOffsetKey = file << 4;
 
                 // Order by their offset, ascending.
-                var ordered = kv.OrderBy(x => x.data.modOffset);
+                var ordered = kv.OrderBy(x => x.ModOffset8x);
 
                 // Scan through each mod, and any time there's a gap, add it to the listing.
                 long lastEndPoint = 2048;
                 foreach (var mod in ordered) {
-                    var fileOffset = (mod.data.modOffset >> 7) << 7;
+                    var fileOffset = (mod.ModOffset8x >> 7) << 7;
 
-                    var size = mod.data.modSize;
+                    var size = mod.FileSize;
                     if(size <= 0)
                     {
-                        var parts = IOUtil.Offset8xToParts(mod.data.modOffset);
+                        var parts = IOUtil.Offset8xToParts(mod.ModOffset8x);
                         using (var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
                         {
                             // Check size.

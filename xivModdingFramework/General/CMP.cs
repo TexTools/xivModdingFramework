@@ -66,14 +66,13 @@ namespace xivModdingFramework.General
         public static async Task DisableRgspMod(XivSubRace race, XivGender gender)
         {
             var path = GetRgspPath(race, gender);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
 
-            var modlist = await _modding.GetModList();
-            modlist.ModDictionary.TryGetValue(path, out var mod);
-            if (mod != null && mod.enabled)
+            var modlist = await Modding.GetModList();
+            var mod = modlist.GetMod(path);
+            if (mod != null && mod.Value.Enabled)
             {
-                await _modding.ToggleModStatus(path, false);
+                await Modding.ToggleModStatus(path, false);
             } else
             {
                 var def = await GetScalingParameter(race, gender, true);

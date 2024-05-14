@@ -272,7 +272,6 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var index = new Index(_gameDirectory);
             var dat = new Dat(_gameDirectory);
-            var modding = new Modding(_gameDirectory);
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
@@ -2388,7 +2387,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
             #endregion
 
-            var modding = new Modding(_gameDirectory);
             var dat = new Dat(_gameDirectory);
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
 
@@ -2436,14 +2434,13 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction = NoOp;
             }
 
-            Mod mod = null;
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction(true);
             }
             var modlist = await tx.GetModList();
-            modlist.ModDictionary.TryGetValue(internalPath, out mod);
+            var mod = modlist.GetMod(internalPath);
 
             // Resolve the current (and possibly modded) Mdl.
             XivMdl currentMdl = null;
@@ -4698,10 +4695,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var bytes = await MakeCompressedMdlFile(ttMdl, ogMdl);
 
                 // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
-                modlist.ModDictionary.TryGetValue(mdlPath, out var modEntry);
+                modlist.Mods.TryGetValue(mdlPath, out var modEntry);
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 
-                await _dat.WriteModFile(bytes, mdlPath, modEntry.source, null, tx);
+                await _dat.WriteModFile(bytes, mdlPath, modEntry.SourceApplication, null, tx);
 
             }
 
@@ -4718,11 +4715,12 @@ namespace xivModdingFramework.Models.FileTypes
             using (var tx = ModTransaction.BeginTransaction())
             { 
                 var modList = await tx.GetModList();
+                var mods = modList.GetMods();
 
                 int count = 0;
-                foreach (var mod in modList.Mods)
+                foreach (var mod in mods)
                 {
-                    var changed = await CheckSkinAssignment(mod.fullPath, tx);
+                    var changed = await CheckSkinAssignment(mod.FilePath, tx);
                     if (changed)
                     {
                         count++;
@@ -5188,7 +5186,6 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var _dat = new Dat(_gameDirectory);
             var _index = new Index(_gameDirectory);
-            var _modding = new Modding(_gameDirectory);
 
             var fromRoot = await XivCache.GetFirstRoot(originalPath);
             var toRoot = await XivCache.GetFirstRoot(newPath);

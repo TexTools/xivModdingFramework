@@ -954,17 +954,20 @@ namespace xivModdingFramework.Materials.FileTypes
             var modList = await tx.GetModList();
             foreach (var kv in indexToMtrlDictionary)
             {
-                modList.ModDictionary.TryGetValue(kv.Value, out var mtrlMod);
+                var mtrlMod = modList.GetMod(kv.Value);
 
                 if (mtrlMod == null)
                     continue;
 
-                modList.ModDictionary.TryGetValue(kv.Key, out var indexMod);
+                var indexMod = modList.GetMod(kv.Key);
 
                 if (indexMod == null)
                     continue; // We -SHOULD- never hit this, but...
 
-                indexMod.modPack = mtrlMod.modPack;
+
+                var mod = indexMod.Value;
+                mod.ModPack = mtrlMod.Value.ModPack;
+                modList.AddOrUpdateMod(mod);
             }
         }
 

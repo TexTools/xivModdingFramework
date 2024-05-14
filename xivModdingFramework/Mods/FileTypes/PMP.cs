@@ -171,10 +171,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             var modPack = new ModPack();
 
-            modPack.name = pmp.Meta.Name;
-            modPack.author = pmp.Meta.Author;
-            modPack.version = pmp.Meta.Version;
-            modPack.url = pmp.Meta.Website;
+            modPack.Name = pmp.Meta.Name;
+            modPack.Author = pmp.Meta.Author;
+            modPack.Version = pmp.Meta.Version;
+            modPack.Url = pmp.Meta.Website;
 
             try
             {

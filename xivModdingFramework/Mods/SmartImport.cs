@@ -41,9 +41,9 @@ namespace xivModdingFramework.Mods
         {
             var modPack = new ModPack()
             {
-                name = modpackName,
-                author = modpackAuthor,
-                version = "1.0"
+                Name = modpackName,
+                Author = modpackAuthor,
+                Version = "1.0"
             };
 
             var tx = ModTransaction.BeginTransaction(false, modPack, settings);
@@ -74,9 +74,9 @@ namespace xivModdingFramework.Mods
                 ownTx = true;
                 var modPack = new ModPack()
                 {
-                    name = "Unknown Batch Import",
-                    author = "Unknown",
-                    version = "1.0",
+                    Name = "Unknown Batch Import",
+                    Author = "Unknown",
+                    Version = "1.0",
                 };
                 tx = ModTransaction.BeginTransaction(false, modPack);
             }

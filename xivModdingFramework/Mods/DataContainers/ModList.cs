@@ -15,9 +15,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -31,139 +34,131 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The ModList Version
         /// </summary>
-        public string version { get; set; }
+        public string Version { get; set; }
+
+
+        [JsonProperty("ModPacks")]
+        private Dictionary<string, ModPack> _ModPacks;
 
         /// <summary>
-        /// The list of ModPacks currently installed
+        /// The list of ModPacks currently installed.
+        /// Returns a clone of the internal list.  Altering this list will have no effect on the ModList.
         /// </summary>
-        public IEnumerable<ModPack> ModPacks { get
+        [JsonIgnore]
+        public Dictionary<string, ModPack> ModPacks { 
+            get
             {
-                if (Mods == null) { 
-                    return new List<ModPack>();
-                }
-
-                var modPacks = new Dictionary<string, ModPack>();
-                foreach (var m in Mods)
-                {
-                    if(m.modPack == null)
-                    {
-                        continue;
-                    }
-                    if(String.IsNullOrWhiteSpace(m.fullPath))
-                    {
-                        continue;
-                    }
-
-                    if (modPacks.ContainsKey(m.modPack.name))
-                    {
-                        m.modPack = modPacks[m.modPack.name];
-                    }
-                    else
-                    {
-                        modPacks.Add(m.modPack.name, m.modPack);
-                    }
-                }
-                return modPacks.Select(x => x.Value);
+                return new Dictionary<string, ModPack>(_ModPacks);
             }
         }
 
-        [JsonIgnore]
-        private Dictionary<string, Mod> _ModDictionary;
 
+        [JsonProperty("Mods")]
+        private Dictionary<string, Mod> _Mods;
+
+        /// <summary>
+        /// The dictionary of mod files currently installed.
+        /// Returns a clone of the dictionary.  Altering this list will have no effect on the ModList.
+        /// </summary>
         [JsonIgnore]
-        public Dictionary<string, Mod> ModDictionary
+        public Dictionary<string, Mod> Mods
         {
             get
             {
-                if(_ModDictionary == null)
+                return new Dictionary<string, Mod>(_Mods);
+            }
+
+        }
+
+
+        /// <summary>
+        /// Adds or updates a mod based on its file path.
+        /// </summary>
+        /// <param name="mod"></param>
+        public void AddOrUpdateMod(Mod mod)
+        {
+            if (_Mods.ContainsKey(mod.FilePath))
+            {
+                var oldMod = _Mods[mod.FilePath];
+                _Mods[mod.FilePath] = mod;
+
+
+                if (!string.IsNullOrWhiteSpace(oldMod.ModPack) && _ModPacks.ContainsKey(oldMod.ModPack))
                 {
-                    _ModDictionary = new Dictionary<string, Mod>();
-                    foreach(var mod in Mods)
+                    // Remove our old mod from its associated modpack, and remove the modpack if it was the last one.
+                    var shouldRemove = _ModPacks[oldMod.ModPack].INTERNAL_RemoveMod(oldMod.FilePath);
+                    if (shouldRemove)
                     {
-                        _ModDictionary.Add(mod.fullPath, mod);
+                        _ModPacks.Remove(oldMod.ModPack);
                     }
                 }
-                return _ModDictionary;
-            }
-
-        }
-
-        [JsonIgnore]
-        private List<Mod> _ModList;
-
-        /// <summary>
-        /// The list of Mods
-        /// Returns a SHALLOW CLONE of the current modlist.
-        /// Directly adding to or removing mods from this list will have no lasting effect.
-        /// </summary>
-        [JsonProperty]
-        public List<Mod> Mods
-        {
-            get
-            {
-                if(_ModList == null)
-                {
-                    return null;
-                }
-                return _ModList.ToList();
-            }
-            private set
-            {
-                _ModList = value;
-            }
-        }
-
-        /// <summary>
-        /// Removes a given mod based on its modified path, if it exists.
-        /// </summary>
-        /// <param name="path"></param>
-        public void RemoveMod(string path)
-        {
-            if (ModDictionary.ContainsKey(path))
-            {
-                RemoveMod(ModDictionary[path]);
-            }
-        }
-
-        /// <summary>
-        /// Adds or replaces a mod based on it's file path.
-        /// </summary>
-        /// <param name="m"></param>
-        public void AddOrUpdateMod(Mod m)
-        {
-            Mod oldMod = null;
-            if (ModDictionary.ContainsKey(m.fullPath))
-            {
-                oldMod = ModDictionary[m.fullPath];
-                ModDictionary[m.fullPath] = m;
             }
             else
             {
-                ModDictionary.Add(m.fullPath, m);
+                _Mods.Add(mod.FilePath, mod);
             }
 
-            if (oldMod != null && oldMod != m)
+            // Add to modpack's list if it has a valid modpack.
+            if (!string.IsNullOrWhiteSpace(mod.ModPack))
             {
-                _ModList.Remove(oldMod);
+                if (_ModPacks.ContainsKey(mod.ModPack))
+                {
+                    var newMp = new ModPack()
+                    {
+                        Name = mod.ModPack,
+                    };
+                    _ModPacks.Add(mod.ModPack, newMp);
+                }
+                _ModPacks[mod.ModPack].INTERNAL_AddMod(mod.FilePath);
             }
-            if(oldMod != m)
-            {
-                _ModList.Add(m);
-            }
+        }
 
+        /// <summary>
+        /// Add or update a subset of mods based on their file paths.
+        /// </summary>
+        /// <param name="mods"></param>
+        public void AddOrUpdateMods(IEnumerable<Mod> mods)
+        {
+            foreach(var mod in mods)
+            {
+                AddOrUpdateMod(mod);
+            }
+        }
+
+        /// <summary>
+        /// Removes a mod from the modlist.
+        /// </summary>
+        /// <param name="mod"></param>
+        public void RemoveMod(Mod mod)
+        {
+            RemoveMod(mod.FilePath);
         }
 
         /// <summary>
         /// Removes a mod from the modlist.
         /// </summary>
         /// <param name="m"></param>
-        public void RemoveMod(Mod m)
+        public void RemoveMod(string path)
         {
-            if (ModDictionary.ContainsKey(m.fullPath))
+            if (!_Mods.ContainsKey(path))
             {
-                ModDictionary.Remove(m.fullPath);
+                return;
             }
-            _ModList.Remove(m);
+            var oldMod = _Mods[path];
+            _Mods.Remove(path);
+            
+        }
+
+        /// <summary>
+        /// Removes a subset of mods from the modlist.
+        /// </summary>
+        /// <param name="mods"></param>
+        public void RemoveMods(IEnumerable<string> mods)
+        {
+            foreach (var mod in mods)
+            {
+                RemoveMod(mod);
+            }
         }
 
         /// <summary>
@@ -183,10 +178,83 @@ namespace xivModdingFramework.Mods.DataContainers
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public Mod GetMod(string path)
+        public Mod? GetMod(string path)
         {
-            ModDictionary.TryGetValue(path, out var mod);
+            _Mods.TryGetValue(path, out var mod);
             return mod;
+        }
+
+        public ModPack? GetModPack(string modpackName)
+        {
+            _ModPacks.TryGetValue(modpackName, out var modpack);
+            return modpack;
+        }
+
+        public IEnumerable<Mod> GetMods()
+        {
+            return GetMods(x => true);
+        }
+
+        /// <summary>
+        /// Retrieves a subset of mods based on a given predicate.
+        /// </summary>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
+        public IEnumerable<Mod> GetMods(Func<Mod, bool> predicate)
+        {
+            Func<KeyValuePair<string, Mod>, bool> newPred = (KeyValuePair<string, Mod> kv) =>
+            {
+                return predicate(kv.Value);
+            };
+
+            return _Mods.Where(newPred).Select(x => x.Value);
+        }
+
+        /// <summary>
+        /// Retrieves a subset of mods based on a given predicate.
+        /// </summary>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
+        public IEnumerable<ModPack> GetModPacks(Func<ModPack, bool> predicate)
+        {
+            Func<KeyValuePair<string, ModPack>, bool> newPred = (KeyValuePair<string, ModPack> kv) =>
+            {
+                return predicate(kv.Value);
+            };
+
+            return _ModPacks.Where(newPred).Select(x => x.Value);
+        }
+
+
+        /// <summary>
+        /// Regenerate the internal list of mods-per-modpack.
+        /// Used after deserializing the json modpack file.
+        /// </summary>
+        internal void RebuildModPackList()
+        {
+            foreach(var mpkv in _ModPacks)
+            {
+                mpkv.Value.INTERNAL_ClearMods();
+            }
+
+            foreach(var mkv in _Mods)
+            {
+                if (string.IsNullOrWhiteSpace(mkv.Value.ModPack))
+                {
+                    continue;
+                }
+
+                if (!_ModPacks.ContainsKey(mkv.Value.ModPack))
+                {
+                    var newMp = new ModPack()
+                    {
+                        Name = mkv.Value.ModPack,
+                    };
+                    _ModPacks.Add(mkv.Value.ModPack, newMp);
+                }
+
+                _ModPacks[mkv.Value.ModPack].INTERNAL_AddMod(mkv.Value.FilePath);
+            }
         }
 
         public ModList(bool newList = false)
@@ -194,7 +262,8 @@ namespace xivModdingFramework.Mods.DataContainers
             // This weird pattern is necessary to not bash JSON Deserialization.
             if (newList)
             {
-                _ModList = new List<Mod>();
+                _Mods = new Dictionary<string, Mod>();
+                _ModPacks = new Dictionary<string, ModPack>();
             }
         }
         public object Clone()
@@ -208,7 +277,7 @@ namespace xivModdingFramework.Mods.DataContainers
         }
     }
 
-    public class Mod : ICloneable
+    public struct Mod
     {
         /// <summary>
         /// The source of the mod
@@ -216,27 +285,22 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <remarks>
         /// This is normally the name of the application used to import the mod
         /// </remarks>
-        public string source { get; set; }
+        public string SourceApplication { get; set; }
 
         /// <summary>
         /// The modified items name
         /// </summary>
-        public string name { get; set; }
+        public string ItemName { get; set; }
 
         /// <summary>
         /// The modified items category
         /// </summary>
-        public string category { get; set; }
+        public string ItemCategory { get; set; }
 
         /// <summary>
         /// The internal path of the modified item
         /// </summary>
-        public string fullPath { get; set; }
-
-        /// <summary>
-        /// The dat file where the modified item is located
-        /// </summary>
-        public string datFile { get; set; }
+        public string FilePath { get; set; }
 
         /// <summary>
         /// The mod status
@@ -244,31 +308,74 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <remarks>
         /// true if enabled, false if disabled
         /// </remarks>
-        public bool enabled { get; set; }
+        public bool Enabled { get; set; }
+
+
+        [JsonProperty("ModPack")]
+        private string _ModPack { get; set; }
 
         /// <summary>
-        /// The minimum framework version necessary to operate on this mod safely.
+        /// The name of the containing modpack
+        /// Automatically Coerced to empty string if it is ever null.
         /// </summary>
-        public string minimumFrameworkVersion = "1.0.0.0";
+        [JsonIgnore]
+        public string ModPack {
+            get {
+
+                if (string.IsNullOrWhiteSpace(_ModPack))
+                {
+                    return "";
+                }
+                else
+                {
+                    return _ModPack;
+                }
+            } 
+            set {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    _ModPack = "";
+                } else
+                {
+                    _ModPack = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// The modPack associated with this mod
+        /// The 8x, Dat-Embedded offset of the mod file in the FFXIV internal file system.
         /// </summary>
-        public ModPack modPack { get; set; }
+        public long ModOffset8x { get; set; }
 
         /// <summary>
-        /// The mod data including offsets
+        /// The 8x, Dat-Embedded offset of the mod file in the FFXIV internal file system.
         /// </summary>
-        public Data data { get; set; }
+        public long OriginalOffset8x { get; set; }
+
+        /// <summary>
+        /// The size in bytes of the SqPack compressed mod file.
+        /// </summary>
+        public int FileSize { get; set; }
 
         public bool IsInternal()
         {
-            return source == Constants.InternalModSourceName;
+            return SourceApplication == Constants.InternalModSourceName;
         }
 
         public bool IsCustomFile()
         {
-            return data.modOffset == data.originalOffset;
+            return ModOffset8x == OriginalOffset8x;
+        }
+
+        /// <summary>
+        /// Retrieves the full data for the associated modpack.
+        /// Syntactic shortcut for ModList.GetModPack(Mod.Modpack)
+        /// </summary>
+        /// <param name="modList"></param>
+        /// <returns></returns>
+        public ModPack? GetModPack(ModList modList)
+        {
+            return modList.GetModPack(ModPack);
         }
 
         /// <summary>
@@ -281,113 +388,181 @@ namespace xivModdingFramework.Mods.DataContainers
         {
             return new Mod
             {
-                source = sourceApplication,
-                name = modsJson.Name,
-                category = modsJson.Category,
-                fullPath = modsJson.FullPath,
-                datFile = IOUtil.GetDataFileFromPath(modsJson.FullPath).GetDataFileName(),
-                enabled = true,
-                modPack = modsJson.ModPackEntry,
-                data = new Data()
+                SourceApplication = sourceApplication,
+                ItemName = modsJson.Name,
+                ItemCategory = modsJson.Category,
+                FilePath = modsJson.FullPath,
+                Enabled = true,
+                ModPack = modsJson.ModPackEntry.Name,
+                ModOffset8x = modsJson.ModOffset,
             };
         }
-
-        public object Clone()
+        public static bool operator ==(Mod m1, Mod m2)
         {
-            var clone = (Mod)MemberwiseClone();
-            if (data != null)
+            return m1.Equals(m2);
+        }
+
+        public static bool operator !=(Mod m1, Mod m2)
+        {
+            return !m1.Equals(m1);
+        }
+
+        public bool Equals(Mod other)
+        {
+            return Equals(other, this);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null || GetType() != obj.GetType())
             {
-                clone.data = (Data)data.Clone();
+                return false;
             }
-            if (modPack != null)
+
+            var m2 = (Mod)obj;
+
+            if(m2.FilePath == this.FilePath)
             {
-                clone.modPack = (ModPack)modPack.Clone();
+                // Mods are considered equal if they affect the same file.
+                return true;
             }
-            return clone;
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return FilePath.GetHashCode();
         }
     }
 
-    public class Data : ICloneable
+    public struct ModPack
     {
-        /// <summary>
-        /// The datatype associated with this mod
-        /// </summary>
-        /// <remarks>
-        /// 2: Binary Data, 3: Models, 4: Textures
-        /// </remarks>
-        public int dataType { get; set; }
-
-        /// <summary>
-        /// The oringial offset of the modified item
-        /// </summary>
-        /// <remarks>
-        /// Used to revert to the items original texture
-        /// </remarks>
-        public long originalOffset { get; set; }
-
-        /// <summary>
-        /// The modified offset of the modified item
-        /// </summary>
-        public long modOffset { get; set; }
-
-        /// <summary>
-        /// The size of the modified items data
-        /// </summary>
-        /// <remarks>
-        /// When importing a previously modified texture, this value is used to determine whether the modified data will be overwritten
-        /// </remarks>
-        public int modSize { get; set; }
-
-        public object Clone()
+        public bool Valid
         {
-            return MemberwiseClone();
-        }
-    }
-
-    public class ModPack : ICloneable
-    {
-
-        /// <summary>
-        /// Generates a hash identifier from this mod's name and author information,
-        /// in lowercase.  For identifying new versions of same mods, potentially.
-        /// </summary>
-        /// <returns></returns>
-        public byte[] GetHash()
-        {
-            using (SHA256 sha = SHA256.Create())
+            get
             {
-                var n = name.ToLower();
-                var a = author.ToLower();
-                var key = n + a;
-                var keyBytes= Encoding.Unicode.GetBytes(key);
-                var hash = sha.ComputeHash(keyBytes);
-                return hash;
+                return String.IsNullOrWhiteSpace(Name);
             }
-        }
-
-        public object Clone()
-        {
-            return MemberwiseClone();
         }
 
         /// <summary>
         /// The name of the modpack
         /// </summary>
-        public string name { get; set; }
+        public string Name { get; set; }
 
         /// <summary>
         /// The modpack author
         /// </summary>
-        public string author { get; set; }
+        public string Author { get; set; }
 
         /// <summary>
         /// The modpack version
         /// </summary>
-        public string version { get; set; }
+        public string Version { get; set; }
 
         /// <summary>
         /// The URL the author associated with this modpack.
         /// </summary>
-        public string url { get; set; }
+        public string Url { get; set; }
+
+        [JsonIgnore]
+        private HashSet<string> _Mods;
+
+        /// <summary>
+        /// The Mods contained in this modpack.
+        /// This is a Clone of the internal list.  Modifying the return value will not change the underlying modpack.
+        /// </summary>
+        [JsonIgnore]
+        public HashSet<string> Mods {
+            get
+            {
+                if (_Mods == null)
+                {
+                    _Mods = new HashSet<string>();
+                }
+                return new HashSet<string>(_Mods);
+            }
+        }
+
+        /// <summary>
+        /// Internal use only Clear Mods function.  Should only be called by the owning modlist.
+        /// </summary>
+        /// <param name="filePath"></param>
+        internal void INTERNAL_ClearMods()
+        {
+            _Mods.Clear();
+        }
+
+        /// <summary>
+        /// Internal use only Add Mod function.  Should only be called by the owning modlist.
+        /// </summary>
+        /// <param name="filePath"></param>
+        internal void INTERNAL_AddMod(string filePath)
+        {
+            if(_Mods == null)
+            {
+                _Mods = new HashSet<string>();
+            }
+            if (!_Mods.Contains(filePath))
+            {
+                _Mods.Add(filePath);
+            }
+        }
+
+        /// <summary>
+        /// Internal use only Remove Mod function.  Should only be called by the owning modlist.
+        /// </summary>
+        /// <param name="filePath"></param>
+        internal bool INTERNAL_RemoveMod(string filePath)
+        {
+            if (_Mods == null)
+            {
+                _Mods = new HashSet<string>();
+            }
+
+            _Mods.Remove(filePath);
+            if(_Mods.Count == 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static bool operator ==(ModPack m1, ModPack m2)
+        {
+            return m1.Equals(m2);
+        }
+
+        public static bool operator !=(ModPack m1, ModPack m2)
+        {
+            return !m1.Equals(m1);
+        }
+
+        public bool Equals(ModPack other)
+        {
+            return Equals(other, this);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null || GetType() != obj.GetType())
+            {
+                return false;
+            }
+
+            var m2 = (ModPack)obj;
+
+            if (m2.Name == this.Name)
+            {
+                // Modpacks are considered equal if they affect the same name.
+                return true;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return Name.GetHashCode();
+        }
     }
 }

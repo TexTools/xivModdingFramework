@@ -120,8 +120,8 @@ namespace xivModdingFramework.Mods
             }
 
             // ModList Data
-            private Mod _OriginalMod = null;
-            public Mod OriginalMod { get
+            private Mod? _OriginalMod;
+            public Mod? OriginalMod { get
                 {
                     return _OriginalMod;
                 }
@@ -175,7 +175,6 @@ namespace xivModdingFramework.Mods
         private TransactionDataHandler _DataHandler;
 
         private SqPack.FileTypes.Index __Index;
-        private Modding __Modding;
         private DirectoryInfo _GameDirectory;
 
         public ModTransactionSettings Settings { get; private set; }
@@ -192,7 +191,7 @@ namespace xivModdingFramework.Mods
         }
 
         private bool _Disposed;
-        public ModPack ModPack { get; set; }
+        public ModPack? ModPack { get; set; }
 
 
         private static bool _WorkerStatus = false;
@@ -282,8 +281,8 @@ namespace xivModdingFramework.Mods
         {
             if(_ModList == null)
             {
-                _ModListModifiedTime = File.GetLastWriteTimeUtc(__Modding.ModListDirectory.FullName);
-                _ModList = await __Modding.GetModList();
+                _ModListModifiedTime = File.GetLastWriteTimeUtc(Modding.ModListDirectory);
+                _ModList = await Modding.GetModList();
             }
             return _ModList;
         }
@@ -296,12 +295,11 @@ namespace xivModdingFramework.Mods
         {
             throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
         }
-        private ModTransaction(bool readOnly = false, ModPack modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
+        private ModTransaction(bool readOnly = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
             __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
-            __Modding = new Modding(XivCache.GameInfo.GameDirectory);
 
             _ReadOnly = readOnly;
             State = ETransactionState.Preparing;
@@ -409,7 +407,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
+        public static ModTransaction BeginTransaction(bool readOnly = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
         {
 
             if (readOnly)
@@ -557,15 +555,17 @@ namespace xivModdingFramework.Mods
                         var mod = _ModList.GetMod(kv.Key);
                         if (mod != null)
                         {
-                            mod.data.modOffset = kv.Value.RealOffset;
-                            if(mod.data.originalOffset == kv.Value.TempOffset)
+                            var m = mod.Value;
+                            m.ModOffset8x = kv.Value.RealOffset;
+                            if(m.OriginalOffset8x == kv.Value.TempOffset)
                             {
-                                mod.data.originalOffset = kv.Value.RealOffset;
+                                m.OriginalOffset8x = kv.Value.RealOffset;
                             }
+                            _ModList.AddOrUpdateMod(m);
                         }
                     }
 
-                    await __Modding.SaveModListAsync(_ModList);
+                    await Modding.SaveModListAsync(_ModList);
                 }
 
                 // We only write index files if we're writing to a game file store.
@@ -653,7 +653,7 @@ namespace xivModdingFramework.Mods
         }
         private void CheckWriteTimes()
         {
-            if (_ModListModifiedTime != File.GetLastWriteTimeUtc(__Modding.ModListDirectory.FullName) && _ModListModifiedTime != new DateTime())
+            if (_ModListModifiedTime != File.GetLastWriteTimeUtc(Modding.ModListDirectory) && _ModListModifiedTime != new DateTime())
             {
                 throw new Exception("Modlist file were modified since beginning transaction.  Cannot safely commit/cancel transaction");
             }
@@ -720,7 +720,7 @@ namespace xivModdingFramework.Mods
                 else
                 {
                     // Return original base game offset.
-                    return mod.data.originalOffset;
+                    return mod.Value.OriginalOffset8x;
                 }
             }
         }
@@ -781,7 +781,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<Mod> GetMod(string path)
+        public async Task<Mod?> GetMod(string path)
         {
             var ml = await GetModList();
             return ml.GetMod(path);
@@ -888,10 +888,10 @@ namespace xivModdingFramework.Mods
             var current = await GetMod(file);
             if(mod == null && current != null)
             {
-                RemoveMod(current);
+                RemoveMod(current.Value);
             } else
             {
-                AddOrUpdateMod(current);
+                AddOrUpdateMod(current.Value);
             }
 
         }
@@ -950,20 +950,20 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public async Task<Mod> GetPreTransactionMod(string file, bool prePrep = false)
+        public async Task<Mod?> GetPreTransactionMod(string file, bool prePrep = false)
         {
-            Mod mod = null;
+            Mod? mod = null;
             bool found = false;
             if (_ModifiedFiles.ContainsKey(file) && _ModifiedFiles[file].OriginalMod_Set)
             {
                 found = true;
-                mod = (Mod) _ModifiedFiles[file].OriginalMod.Clone();
+                mod = (Mod) _ModifiedFiles[file].OriginalMod;
             }
 
             if (prePrep && _PrepFiles.ContainsKey(file) && _PrepFiles[file].OriginalMod_Set)
             {
                 found = true;
-                mod = (Mod) _PrepFiles[file].OriginalMod.Clone();
+                mod = (Mod) _PrepFiles[file].OriginalMod;
             }
 
             if (found)
@@ -981,7 +981,7 @@ namespace xivModdingFramework.Mods
         /// <param name="originalMod"></param>
         /// <param name="newMod"></param>
         /// <exception cref="Exception"></exception>
-        internal void INTERNAL_OnModUpdate(string path, Mod originalMod, Mod newMod)
+        internal void INTERNAL_OnModUpdate(string path, Mod? originalMod, Mod newMod)
         {
             if (ReadOnly)
             {
@@ -997,7 +997,7 @@ namespace xivModdingFramework.Mods
             var data = GetOrCreatePathData(path);
             if (!data.OriginalMod_Set)
             {
-                data.OriginalMod = (Mod)originalMod.Clone();
+                data.OriginalMod = originalMod;
             }
         }
 

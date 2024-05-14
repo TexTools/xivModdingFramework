@@ -492,53 +492,8 @@ namespace xivModdingFramework.Cache
 
         private static async Task MigrateCache(Version lastCacheVersion) {
 
-            // Tex file fix migration
-            // This technically has nothing to do with the cache version,
-            // but I think this is one of the only places that this can go
+            // No migration tasks currently.
 
-
-            // This can be safely removed once Dawntrail lands, if not before.
-            if (lastCacheVersion < new Version(1, 0, 2, 2)) {
-
-                if(!Dat.AllowDatAlteration)
-                {
-                    throw new Exception("Cannot perform Cache Migration/Texture-Fix when DAT writing is disabled.");
-                }
-
-	            var m = new Modding(_gameInfo.GameDirectory);
-	            var modList = await m.GetModList();
-	            foreach (var mod in modList.Mods) {
-		            if (mod.data.dataType != 4) continue;
-
-		            var datNum = (int)((mod.data.modOffset / 8) & 0x0F) / 2;
-		            var dat = XivDataFiles.GetXivDataFile(mod.datFile);
-
-                    var datPath = Dat.GetDatPath(dat, datNum);
-
-                    int uncompressedSize = -1;
-                    long seekTo = IOUtil.RemoveDatNumberEmbed(mod.data.modOffset) + 8;
-
-                    // Seek to and read the uncompressed texture size catching any exceptions
-                    // because we handle further processing with the initial value of -1
-                    try
-                    {
-	                    using var reader = new BinaryReader(File.OpenRead(datPath));
-	                    reader.BaseStream.Position = seekTo;
-
-	                    uncompressedSize = reader.ReadInt32();
-                    } catch (Exception) {}
-                    
-                    // If we read an uncompressed size, seek to the same position and write the fixed uncompressed texture size
-                    if (uncompressedSize != -1)
-                    {
-	                    using var writer = new BinaryWriter(File.OpenWrite(datPath));
-	                    writer.BaseStream.Position = seekTo;
-
-	                    var tmp = BitConverter.GetBytes(uncompressedSize + 80);
-                        writer.Write(tmp);
-                    }
-	            }
-            }
         }
 
         /// <summary>
@@ -908,10 +863,9 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private static async Task BuildModdedItemDependencies()
         {
-            var _modding = new Modding(GameInfo.GameDirectory);
-            var modList = await _modding.GetModList();
+            var modList = await Modding.GetModList();
 
-            var paths = modList.ModDictionary.Keys.ToList();
+            var paths = modList.Mods.Keys.ToList();
             QueueDependencyUpdate(paths);
         }
 
@@ -1714,8 +1668,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static async Task<Dictionary<string, List<string>>> GetModListParents()
         {
-            var modding = new Modding(GameInfo.GameDirectory);
-            var modList = await modding.GetModList();
+            var modList = await Modding.GetModList();
             var dict = new Dictionary<string, List<string>>(modList.Mods.Count);
             if(modList.Mods.Count == 0)
             {
@@ -1725,7 +1678,7 @@ namespace xivModdingFramework.Cache
             bool anyValidMods = false;
 
             var query = "select child, parent from dependencies_parents where child in(";
-            var files = modList.ModDictionary.Keys.ToList();
+            var files = modList.Mods.Keys.ToList();
             foreach(var file in files)
             {
 

@@ -18,6 +18,7 @@ namespace xivModdingFramework.Mods.Enums
 {
     public enum XivModStatus
     {
+        Invalid,
         Original,
         Enabled,
         Disabled

@@ -225,7 +225,6 @@ namespace xivModdingFramework.Mods.FileTypes
         public static async Task SaveMetadata(ItemMetadata meta, string source, ModTransaction tx = null)
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();

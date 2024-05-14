@@ -149,7 +149,6 @@ namespace xivModdingFramework.Helpers
             {
                 return Task.Run(async () =>
                 {
-                    var modding = new Modding(_gameDirectory);
                     var backupsRestored = false;
 
 
@@ -169,8 +168,7 @@ namespace xivModdingFramework.Helpers
                         try
                         {
                             // If the index restore failed, try just disabling.
-                            await modding.DeleteAllFilesAddedByTexTools();
-                            await modding.ToggleAllMods(false);
+                            await Modding.ToggleAllMods(false);
                             progress?.Report("Index restore failed, attempting to delete all mods instead...");
                         }
                         catch(Exception ex2)
@@ -207,7 +205,7 @@ namespace xivModdingFramework.Helpers
                         // Delete mod list
                         File.Delete(modListDirectory.FullName);
 
-                        modding.CreateModlist();
+                        Modding.CreateModlist();
 
                         progress?.Report("Rebuilding Cache...");
 
@@ -229,14 +227,13 @@ namespace xivModdingFramework.Helpers
             return Task.Run(async () => {
                 var indexFiles = new XivDataFile[] { XivDataFile._0A_Exd, XivDataFile._04_Chara, XivDataFile._06_Ui, XivDataFile._01_Bgcommon };
                 var index = new Index(_gameDirectory);
-                var modding = new Modding(_gameDirectory);
 
                 // Readonly tx to get live game state.
                 var tx = ModTransaction.BeginTransaction();
 
                 var ml = await tx.GetModList();
 
-                var anyEnabled = ml.Mods.Any(x => x.enabled);
+                var anyEnabled = ml.Mods.Any(x => x.Value.Enabled);
                 if (anyEnabled)
                 {
                     if (!Dat.AllowDatAlteration)
@@ -253,7 +250,7 @@ namespace xivModdingFramework.Helpers
                     try
                     {
                         // Toggle off all mods
-                        await modding.ToggleAllMods(false);
+                        await Modding.ToggleAllMods(false);
                     }
                     catch
                     {

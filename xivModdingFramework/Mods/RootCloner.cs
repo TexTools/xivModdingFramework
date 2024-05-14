@@ -64,7 +64,7 @@ namespace xivModdingFramework.Mods
             var iCat = destItem.SecondaryCategory;
             var iName = destItem.Name;
 
-            var modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
+            var modPack = new ModPack() { Author = "System", Name = "Item Copy - " + srcItem.Name + " to " + iName, Url = "", Version = "1.0" };
 
             var doSave = false;
             if (tx == null)
@@ -85,7 +85,6 @@ namespace xivModdingFramework.Mods
                 var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 var _index = new Index(XivCache.GameInfo.GameDirectory);
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
 
                 bool locked = _index.IsIndexLocked(df);
@@ -226,21 +225,21 @@ namespace xivModdingFramework.Mods
                 if (Destination != Source)
                 {
                     var dPath = Destination.Info.GetRootFolder();
-                    var allMods = modlist.Mods;
+                    var allMods = modlist.GetMods();
                     foreach (var mod in allMods)
                     {
-                        if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
+                        if (mod.FilePath.StartsWith(dPath) && !mod.IsInternal())
                         {
                             if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
                             {
                                 // If this is a slotless root, purge everything.
-                                await _modding.DeleteMod(mod.fullPath, false, tx);
+                                await Modding.DeleteMod(mod.FilePath, false, tx);
                             }
-                            else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.GetBaseFileName(true)))
+                            else if (allFiles.Contains(mod.FilePath) || mod.FilePath.Contains(Destination.Info.GetBaseFileName(true)))
                             {
                                 // Otherwise, only purge the files we're replacing, and anything else that
                                 // contains our slot name.
-                                await _modding.DeleteMod(mod.fullPath, false, tx);
+                                await Modding.DeleteMod(mod.FilePath, false, tx);
                             }
                         }
                     }
@@ -458,25 +457,33 @@ namespace xivModdingFramework.Mods
 
 
                 List<Mod> mods = new List<Mod>();
-                foreach (var mod in modlist.Mods)
+                var mListMods = modlist.GetMods();
+                foreach (var mod in mListMods)
                 {
-                    if (allFiles.Contains(mod.fullPath))
+                    if (allFiles.Contains(mod.FilePath))
                     {
                         // Ensure all of our modified files are attributed correctly.
-                        mod.name = iName;
-                        mod.category = iCat;
-                        mod.source = ApplicationSource;
+                        var nMod = mod;
+                        nMod.ItemName = iName;
+                        nMod.ItemCategory = iCat;
+                        nMod.SourceApplication = ApplicationSource;
 
                         if (tx.ModPack != null)
                         {
-                            mod.modPack = tx.ModPack;
+                            nMod.ModPack = tx.ModPack.Value.Name;
                         } else
                         {
-                            mod.modPack = modPack;
+                            nMod.ModPack = modPack.Name;
                         }
 
                         mods.Add(mod);
                     }
+                }
+
+                // Save the changes.
+                foreach(var mod in mods)
+                {
+                    modlist.AddOrUpdateMod(mod);
                 }
 
                 // Commit our transaction.
@@ -499,11 +506,11 @@ namespace xivModdingFramework.Mods
                     var _ttmp = new TTMP(dir);
                     var smpd = new SimpleModPackData()
                     {
-                        Author = modPack.author,
+                        Author = modPack.Author,
                         Description = desc,
-                        Url = modPack.url,
+                        Url = modPack.Url,
                         Version = new Version(1, 0, 0),
-                        Name = modPack.name,
+                        Name = modPack.Name,
                         SimpleModDataList = new List<SimpleModData>()
                     };
 
@@ -512,11 +519,11 @@ namespace xivModdingFramework.Mods
                         var smd = new SimpleModData()
                         {
                             Name = iName,
-                            FullPath = mod.fullPath,
+                            FullPath = mod.FilePath,
                             DatFile = df.GetDataFileName(),
                             Category = iCat,
                             IsDefault = false,
-                            ModOffset = mod.data.modOffset
+                            ModOffset = mod.ModOffset8x
                         };
                         smpd.SimpleModDataList.Add(smd);
                     }
@@ -692,7 +699,7 @@ namespace xivModdingFramework.Mods
         /// <param name="readTx"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, (Mod mod, long originalOffset)> originalMods, string sourceApplication)
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, (Mod? mod, long originalOffset)> originalMods, string sourceApplication)
         {
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
@@ -758,7 +765,7 @@ namespace xivModdingFramework.Mods
                         var originalOffset = originalMods[file].originalOffset;
                         if(mod != null)
                         {
-                            newModList.AddOrUpdateMod(mod);
+                            newModList.AddOrUpdateMod(mod.Value);
                         } else
                         {
                             newModList.RemoveMod(file);

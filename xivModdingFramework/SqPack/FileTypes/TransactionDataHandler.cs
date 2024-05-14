@@ -617,10 +617,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             var simplePack = new SimpleModPackData();
 
             // Use the Transaction's current modpack settings if it has any set.
-            Version.TryParse(tx.ModPack == null ? "1.0" : tx.ModPack.version, out var ver);
+            Version.TryParse(tx.ModPack == null ? "1.0" : tx.ModPack.Value.Version, out var ver);
 
-            simplePack.Name = tx.ModPack == null ? "Transaction Modpack" : tx.ModPack.name;
-            simplePack.Author = tx.ModPack == null ? "Unknown" : tx.ModPack.author;
+            simplePack.Name = tx.ModPack == null ? "Transaction Modpack" : tx.ModPack.Value.Name;
+            simplePack.Author = tx.ModPack == null ? "Unknown" : tx.ModPack.Value.Author;
             simplePack.Version = ver == null ? new Version("1.0") : ver;
             simplePack.SimpleModDataList = new List<SimpleModData>();
 
@@ -657,8 +657,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                             var md = new SimpleModData();
                             md.FullPath = path;
                             md.DatFile = df.ToString();
-                            md.Category = mod != null ? mod.category : "Unknown";
-                            md.Name = mod != null ? mod.name : "Unknown";
+                            md.Category = mod != null ? mod.Value.ItemCategory : "Unknown";
+                            md.Name = mod != null ? mod.Value.ItemName : "Unknown";
                             simplePack.SimpleModDataList.Add(md);
                         }
                     }
