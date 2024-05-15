@@ -301,7 +301,13 @@ namespace xivModdingFramework.Models.ModelTextures
             // Use the function that returns proper sane reuslts.
             var ttps = mtrl.GetTextureTypePathList();
 
-            ttps.RemoveAll(x => x.Path.StartsWith("bgcommon/texture/dummy_"));
+            var keepNormDummy = ttps.Count(x => x.Type == XivTexType.Normal) == 1;
+            ttps.RemoveAll(x => {
+                var isDummy = x.Path.StartsWith("bgcommon/texture/dummy_");
+                if (!isDummy) return false;
+                if (keepNormDummy && x.Path.EndsWith("_n.tex")) return false;
+                return true;
+            });
 
             // Decode compressed textures
             foreach (var ttp in ttps)
@@ -721,7 +727,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     return new ShaderMapperResult()
                     {
                         Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f),
-                        Normal = new Color4(normal.Red, normal.Green, diffuse.Blue, 1.0f),
+                        Normal = new Color4(normal.Red, normal.Green, 0.0f, 1.0f),
                         Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f),
                         Alpha = new Color4(normal.Alpha)
                     };
@@ -735,9 +741,9 @@ namespace xivModdingFramework.Models.ModelTextures
                     return new ShaderMapperResult()
                     {
                         Diffuse = Color4.Lerp(new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f), furnitureColor, colorInfluence),
-                        Normal = new Color4(normal.Red, normal.Green, diffuse.Blue, 1.0f),
+                        Normal = new Color4(normal.Red, normal.Green, 0.0f, 1.0f),
                         Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f),
-                        Alpha = new Color4(normal.Blue)
+                        Alpha = new Color4(normal.Alpha)
                     };
                 };
             }

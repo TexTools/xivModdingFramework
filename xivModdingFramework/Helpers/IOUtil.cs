@@ -352,7 +352,7 @@ namespace xivModdingFramework.Helpers
         {
             //No-Op
         });
-        public static string ReadNullTerminatedString(BinaryReader br)
+        public static string ReadNullTerminatedString(BinaryReader br, bool utf8 = true)
         {
             var data = new List<byte>();
             var b = br.ReadByte();
@@ -361,7 +361,13 @@ namespace xivModdingFramework.Helpers
                 data.Add(b);
                 b = br.ReadByte();
             }
-            return System.Text.Encoding.UTF8.GetString(data.ToArray());
+            if (utf8)
+            {
+                return System.Text.Encoding.UTF8.GetString(data.ToArray());
+            }else
+            {
+                return System.Text.Encoding.ASCII.GetString(data.ToArray());
+            }
         }
 
 

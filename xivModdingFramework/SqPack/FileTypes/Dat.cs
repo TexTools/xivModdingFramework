@@ -899,7 +899,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var vertexBufferUncompressedOffsets = new uint[_VertexSegments];
             var indexBufferUncompressedOffsets = new uint[_VertexSegments];
             var vertexBufferRealSizes = new uint[_VertexSegments];
-            var indexOffsetRealSizes = new uint[_VertexSegments];
+            var indexBufferRealSizes = new uint[_VertexSegments];
 
             // Vertex and Model Headers
             var vInfoRealSize = await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
@@ -918,8 +918,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 decompOffset += await CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
 
                 indexBufferUncompressedOffsets[i] = (uint)decompOffset;
-                indexOffsetRealSizes[i] = (uint)await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
-                decompOffset += (int)indexOffsetRealSizes[i];
+                indexBufferRealSizes[i] = (uint)await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
+                decompOffset += (int)indexBufferRealSizes[i];
             }
 
             var header = new List<byte>(baseHeaderLength);
@@ -934,7 +934,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             Write3IntBuffer(header, vertexBufferUncompressedOffsets);
             Write3IntBuffer(header, indexBufferUncompressedOffsets);
             Write3IntBuffer(header, vertexBufferRealSizes);
-            Write3IntBuffer(header, indexOffsetRealSizes);
+            Write3IntBuffer(header, indexBufferRealSizes);
 
             header.Add(lodCount);
             header.Add(flags);

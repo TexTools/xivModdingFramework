@@ -115,6 +115,14 @@ namespace xivModdingFramework.Models.DataContainers
          */
         public byte Flags2 { get; set; }
 
+        public bool ExtraLoDEnabled
+        {
+            get
+            {
+                return (Flags2 & 0x10) > 0;
+            }
+        }
+
         /// <summary>
         /// Unknown Usage
         /// </summary>
@@ -138,7 +146,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public byte Unknown10a { get; set; }
+        public byte ExtraLoDCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
