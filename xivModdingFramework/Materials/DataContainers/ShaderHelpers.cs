@@ -475,6 +475,8 @@ namespace xivModdingFramework.Materials.DataContainers
             Prop,
             [Description("bgcolorchange.shpk")]
             DyeableFurniture,
+            [Description("bguvscroll.shpk")]
+            FurnitureScroll,
             [Description("charactertattoo.shpk")]
             CharacterTattoo,
             [Description("characterocclusion.shpk")]
