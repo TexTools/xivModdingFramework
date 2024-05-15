@@ -13,6 +13,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.Enums;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -83,7 +84,7 @@ namespace xivModdingFramework.General
                     var state = await mod.Value.GetState(tx);
                     if (state == Mods.Enums.EModState.Enabled)
                     {
-                        await Modding.ToggleModStatus(path, false);
+                        await Modding.SetModState(EModState.Disabled, path, tx);
                     }
                 }
                 else
@@ -107,7 +108,7 @@ namespace xivModdingFramework.General
 
         }
 
-        internal static async Task RestoreDefaultScaling(string rgspPath ModTransaction tx = null)
+        internal static async Task RestoreDefaultScaling(string rgspPath, ModTransaction tx = null)
         {
             var match = RgspPathExtractFormat.Match(rgspPath);
             if (!match.Success) throw new InvalidDataException("Invalid .RGSP file path.");

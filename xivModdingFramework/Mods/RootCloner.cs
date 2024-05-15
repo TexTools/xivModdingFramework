@@ -233,13 +233,13 @@ namespace xivModdingFramework.Mods
                             if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
                             {
                                 // If this is a slotless root, purge everything.
-                                await Modding.DeleteMod(mod.FilePath, false, tx);
+                                await Modding.DeleteMod(mod.FilePath, tx);
                             }
                             else if (allFiles.Contains(mod.FilePath) || mod.FilePath.Contains(Destination.Info.GetBaseFileName(true)))
                             {
                                 // Otherwise, only purge the files we're replacing, and anything else that
                                 // contains our slot name.
-                                await Modding.DeleteMod(mod.FilePath, false, tx);
+                                await Modding.DeleteMod(mod.FilePath, tx);
                             }
                         }
                     }
@@ -699,7 +699,7 @@ namespace xivModdingFramework.Mods
         /// <param name="readTx"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, ModTransaction.TxFileState> originalStates, string sourceApplication)
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, TxFileState> originalStates, string sourceApplication)
         {
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));

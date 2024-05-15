@@ -293,11 +293,15 @@ namespace xivModdingFramework.Mods.FileTypes
 
         internal static async Task ApplyMetadata(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
-            var dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-            ItemMetadata meta = await GetMetadata(internalPath, forceOriginal, tx);
+            var exists = await tx.FileExists(internalPath, forceOriginal);
+            if(!exists)
+            {
+                // If the metadata file does not exist, we're always restoring to default state.
+                forceOriginal = true;
+            }
+            
+            var meta = await GetMetadata(internalPath, forceOriginal, tx);
             meta.Validate(internalPath);
-
             await ApplyMetadata(meta, tx);
         }
 

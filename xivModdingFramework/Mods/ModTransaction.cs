@@ -67,6 +67,63 @@ namespace xivModdingFramework.Mods
     }
     #endregion
 
+    /// <summary>
+    /// A class representing the holistic state of a file in the system.
+    /// In particular, this store the index and mod information about the file.
+    /// Used in saving and restoring states.
+    /// </summary>
+    public class TxFileState
+    {
+        public TxFileState(string path)
+        {
+            Path = path;
+        }
+
+        // Internal File Path
+        public string Path { get; set; }
+        public XivDataFile DataFile
+        {
+            get
+            {
+                return IOUtil.GetDataFileFromPath(Path);
+            }
+        }
+
+        // Tracking Flags
+        public bool OriginalOffset_Set { get; private set; } = false;
+        public bool OriginalMod_Set { get; private set; } = false;
+
+        // Index Data
+        private long _OriginalOffset = 0;
+        public long OriginalOffset
+        {
+            get
+            {
+                return _OriginalOffset;
+            }
+            set
+            {
+                _OriginalOffset = value;
+                OriginalOffset_Set = true;
+            }
+        }
+
+        // ModList Data
+        private Mod? _OriginalMod;
+        public Mod? OriginalMod
+        {
+            get
+            {
+                return _OriginalMod;
+            }
+            set
+            {
+                _OriginalMod = value;
+                OriginalMod_Set = true;
+            }
+        }
+    }
+
     public class ModTransaction : IDisposable
     {
 
@@ -86,60 +143,6 @@ namespace xivModdingFramework.Mods
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
         #endregion
 
-        /// <summary>
-        /// A class representing the holistic state of a file in the system.
-        /// In particular, this store the index and mod information about the file.
-        /// Used in saving and restoring states.
-        /// </summary>
-        public class TxFileState
-        {
-            public TxFileState(string path)
-            {
-                Path = path;
-            }
-
-            // Internal File Path
-            public string Path { get; set; }
-            public XivDataFile DataFile
-            {
-                get
-                {
-                    return IOUtil.GetDataFileFromPath(Path);
-                }
-            }
-            
-            // Tracking Flags
-            public bool OriginalOffset_Set { get; private set; } = false;
-            public bool OriginalMod_Set { get; private set; } = false;
-
-            // Index Data
-            private long _OriginalOffset = 0;
-            public long OriginalOffset
-            {
-                get
-                {
-                    return _OriginalOffset;
-                }
-                set
-                {
-                    _OriginalOffset = value;
-                    OriginalOffset_Set = true;
-                }
-            }
-
-            // ModList Data
-            private Mod? _OriginalMod;
-            public Mod? OriginalMod { get
-                {
-                    return _OriginalMod;
-                }
-                set
-                {
-                    _OriginalMod = value;
-                    OriginalMod_Set = true;
-                }
-            }
-        }
 
         #region Properties and Accessors
 
@@ -797,11 +800,10 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<bool> FileExists(string path)
+        public async Task<bool> FileExists(string path, bool forceOriginal = false)
         {
-            var df = IOUtil.GetDataFileFromPath(path);
-            var idx = await GetIndexFile(df);
-            return idx.FileExists(path);
+            var offset = await Get8xDataOffset(path, forceOriginal);
+            return offset != 0;
         }
 
         /// <summary>

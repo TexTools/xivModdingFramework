@@ -26,6 +26,7 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.Cache;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using xivModdingFramework.Mods.Enums;
 
 namespace xivModdingFramework.Helpers
 {
@@ -73,6 +74,15 @@ namespace xivModdingFramework.Helpers
             });
         }
 
+        /// <summary>
+        /// Attempts to restore index backups, or failing that, delete all modded files.
+        /// NOT TRANSACTION SAFE.
+        /// </summary>
+        /// <param name="backupsDirectory"></param>
+        /// <param name="progress"></param>
+        /// <param name="language"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public Task PerformStartOver(DirectoryInfo backupsDirectory, IProgress<string> progress = null, XivLanguage language = XivLanguage.None)
         {
             if (!Dat.AllowDatAlteration)
@@ -104,8 +114,9 @@ namespace xivModdingFramework.Helpers
                     {
                         try
                         {
-                            // If the index restore failed, try just disabling.
-                            await Modding.ToggleAllMods(false);
+                            // Index backup failed for some reason.
+                            // Try at least deleting all existing mods.
+                            await Modding.SetAllModStates(EModState.UnModded, null);
                             progress?.Report("Index restore failed, attempting to delete all mods instead...");
                         }
                         catch(Exception ex2)
@@ -198,7 +209,7 @@ namespace xivModdingFramework.Helpers
                     try
                     {
                         // Toggle off all mods
-                        await Modding.ToggleAllMods(false);
+                        await Modding.SetAllModStates(false);
                     }
                     catch
                     {

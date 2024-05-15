@@ -51,10 +51,12 @@ namespace xivModdingFramework.Mods
     /// </summary>
     public static class Modding
     {
-        private static readonly Version _modlistVersion = new Version(1, 0);
+        #region Constants and Private Vars
+
+        private static readonly Version _modlistVersion = new Version(2, 0);
         private static SemaphoreSlim _modlistSemaphore = new SemaphoreSlim(1);
 
-        public static string ModListDirectory
+        internal static string ModListDirectory
         {
             get
             {
@@ -62,14 +64,59 @@ namespace xivModdingFramework.Mods
             }
         }
 
+        private static ModList _CachedModList;
+        private static DateTime _ModListLastModifiedTime;
+
+        #endregion
+
+        #region Modlist Accessors
+
         static Modding()
         {
             // Create modlist if we don't already have one.
             CreateModlist();
         }
 
-        private static ModList _CachedModList;
-        private static DateTime _ModListLastModifiedTime;
+        /// <summary>
+        /// Creates a blank ModList file if one does not already exist.
+        /// </summary>
+        internal static void CreateModlist()
+        {
+            if (File.Exists(ModListDirectory))
+            {
+                // Try to parse it.
+                try
+                {
+                    var modlistText = File.ReadAllText(ModListDirectory);
+                    var res = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    if (res == null)
+                    {
+                        throw new Exception("Null Modlist");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Broken.  Regenerate modlist.
+                    var newModList = new ModList(true)
+                    {
+                        Version = _modlistVersion.ToString(),
+                    };
+
+                    SaveModList(newModList);
+                }
+
+
+                return;
+            }
+
+            var modList = new ModList(true)
+            {
+                Version = _modlistVersion.ToString(),
+            };
+
+            SaveModList(modList);
+        }
+
         internal static async Task<ModList> GetModList()
         {
             await _modlistSemaphore.WaitAsync();
@@ -118,6 +165,7 @@ namespace xivModdingFramework.Mods
                 _modlistSemaphore.Release();
             }
         }
+
         internal static async Task SaveModListAsync(ModList ml)
         {
             await _modlistSemaphore.WaitAsync();
@@ -132,52 +180,16 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        /// <summary>
-        /// Creates a blank ModList file if one does not already exist.
-        /// </summary>
-        internal static void CreateModlist()
-        {
-            if (File.Exists(ModListDirectory))
-            {
-                // Try to parse it.
-                try
-                {
-                    var modlistText = File.ReadAllText(ModListDirectory);
-                    var res = JsonConvert.DeserializeObject<ModList>(modlistText);
-                    if(res == null)
-                    {
-                        throw new Exception("Null Modlist");
-                    }
-                }
-                catch(Exception ex) 
-                {
-                    // Broken.  Regenerate modlist.
-                    var newModList = new ModList(true)
-                    {
-                        Version = _modlistVersion.ToString(),
-                    };
 
-                    SaveModList(newModList);
-                }
-                
+        #endregion
 
-                return;
-            }
-
-            var modList = new ModList(true)
-            {
-                Version = _modlistVersion.ToString(),
-            };
-
-            SaveModList(modList);
-        }
+        #region Mod State Getters 
 
         /// <summary>
-        /// Checks to see whether the mod is currently enabled
+        /// Retrieves the current mod state of a file.
+        /// Mostly a useful wrapper for when you don't know if the mod exists or not.
         /// </summary>
         /// <param name="internalPath">The internal path of the file</param>
-        /// <param name="dataFile">The data file to check in</param>
-        /// <param name="indexCheck">Flag to determine whether to check the index file or just the modlist</param>
         /// <returns></returns>
         public static async Task<EModState> GetModState(string internalPath, ModTransaction tx = null)
         {
@@ -212,161 +224,100 @@ namespace xivModdingFramework.Mods
             return EModState.Invalid;
         }
 
-        /// <summary>
-        /// Toggles the mod on or off
-        /// </summary>
-        /// <param name="internalFilePath">The internal file path of the mod</param>
-        /// <param name="enable">The status of the mod</param>
-        public static async Task<bool> ToggleModStatus(string internalFilePath, bool enable, ModTransaction tx = null)
-        {
-            var index = new Index(XivCache.GameInfo.GameDirectory);
+        #endregion
 
-            if (string.IsNullOrEmpty(internalFilePath))
-            {
-                throw new Exception("File Path missing, unable to toggle mod.");
-            }
-
-            var doSave = false;
-            if (tx == null)
-            {
-                tx = ModTransaction.BeginTransaction(true);
-                doSave = true;
-            }
-            try
-            {
-                var modList = await tx.GetModList();
-                var mod = await tx.GetMod(internalFilePath);
-                if(mod == null)
-                {
-                    return false;
-                }
-
-                var result = await ToggleModUnsafe(enable, mod.Value, false, true, tx);
-
-                // If we were unable to toggle the mod, and we have a local transaction...
-                if(!result)
-                {
-                    if (doSave)
-                    {
-                        // Cancel and return;
-                        ModTransaction.CancelTransaction(tx);
-                    }
-
-                    return false;
-                }
-
-                // Successfully toggled mod.
-                if (doSave)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
-                return true;
-            }
-            catch
-            {
-                if (doSave)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
-                throw;
-            }
-        }
+        #region Mod State Setters
 
         /// <summary>
-        /// Toggles the mod on or off
-        /// </summary>
-        /// <param name="internalFilePath">The internal file path of the mod</param>
-        /// <param name="enable">The status of the mod</param>
-        public static async Task ToggleModPackStatus(string modPackName, bool enable, ModTransaction tx = null)
-        {
-            var ownTransaction = false;
-            if(tx == null)
-            {
-                ownTransaction = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
-            try
-            {
-
-                var modList = await tx.GetModList();
-                var modPack = modList.GetModPack(modPackName);
-                if(modPack == null)
-                {
-                    return;
-                }
-
-                var mods = modPack.Value.Mods;
-
-                if (mods.Count == 0)
-                {
-                    // Should never hit this, but you never know.
-                    return;
-                }
-
-                await ToggleMods(enable, mods, null, tx);
-
-                if (ownTransaction)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
-            }
-            catch
-            {
-                if(ownTransaction)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Performs the most low-level mod enable/disable functions, without saving the modlist,
-        /// ergo this should only be called by functions which will handle saving the modlist after
-        /// they're done performing all modlist operations.
-        /// 
-        /// NOTE: If a transaction is supplied, metadata files will not be expanded/reset, as it is assumed the higher level function will handle it.
+        /// Performs a standard state change for the mod at a given path.
+        /// Returns true if the value was actually changed.
         /// </summary>
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public static async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, ModTransaction tx = null)
+        public static async Task<bool> SetModState(EModState state, Mod mod, ModTransaction tx = null)
         {
-            if (mod == null) return false;
-            if (string.IsNullOrEmpty(mod.ItemName)) return false;
-            if (string.IsNullOrEmpty(mod.FilePath)) return false;
+            return await SetModState(state, mod.FilePath, tx);
+        }
 
-            if (mod.OriginalOffset8x < 0 && !enable)
+        /// <summary>
+        /// Performs a standard state change for the mod at a given path.
+        /// Returns true if the value was actually changed.
+        /// </summary>
+        /// <param name="enable"></param>
+        /// <param name="mod"></param>
+        /// <returns></returns>
+        public static async Task<bool> SetModState(EModState state, string path, ModTransaction tx = null)
+        {
+            return await INTERNAL_SetModState(state, path, false, tx);
+        }
+
+        /// <summary>
+        /// Performs a standard state change for the mod at a given path.
+        /// Returns true if the value was actually changed.
+        /// </summary>
+        /// <param name="enable"></param>
+        /// <param name="mod"></param>
+        /// <returns></returns>
+        private static async Task<bool> INTERNAL_SetModState(EModState state, string path, bool allowInternal = false, ModTransaction tx = null)
+        {
+            if(state == EModState.Invalid)
             {
-                throw new Exception("Cannot disable mod with invalid original offset.");
+                throw new Exception("Cannot intentionally set Mod State to Invalid.");
             }
-
-            if (enable && mod.ModOffset8x < 0)
-            {
-                throw new Exception("Cannot enable mod with invalid mod offset.");
-            }
-            
-            if(mod.IsInternal() && !includeInternal)
-            {
-                // Don't allow toggling internal mods unless we were specifically told to.
-                return false;
-            }
-
-            var df = IOUtil.GetDataFileFromPath(mod.FilePath);
-
 
             bool commit = tx == null;
-            if(tx == null)
+            if (tx == null)
             {
                 tx = ModTransaction.BeginTransaction(true);
             }
             try
             {
+                var nMod = await tx.GetMod(path);
+                if (nMod == null)
+                {
+                    if(state != EModState.UnModded)
+                    {
+                        throw new Exception("Cannot change state for non-existent mod.");
+                    }
+
+                    // No change.
+                    return false;
+                }
+                var mod = nMod.Value;
+                var curState = await mod.GetState(tx);
+
+                if (state == curState)
+                {
+                    // No change.
+                    return false;
+                }
+
+                if (mod.OriginalOffset8x < 0 && state == EModState.Disabled)
+                {
+                    throw new Exception("Cannot disable mod with invalid original offset.");
+                }
+
+                if (state == EModState.Enabled && mod.ModOffset8x < 0)
+                {
+                    throw new Exception("Cannot enable mod with invalid mod offset.");
+                }
+            
+                if(mod.IsInternal() && !allowInternal)
+                {
+                    // Don't allow toggling internal mods unless we were specifically told to.
+                    return false;
+                }
+
+                var df = IOUtil.GetDataFileFromPath(mod.FilePath);
+
+
                 var modList = await tx.GetModList();
                 var index = await tx.GetIndexFile(df);
 
                 tx.ModPack = mod.GetModPack(modList);
 
-                if (enable)
+                if (state == EModState.Enabled)
                 {
                     // Enabling Mod
                     index.Set8xDataOffset(mod.FilePath, mod.ModOffset8x);
@@ -385,7 +336,7 @@ namespace xivModdingFramework.Mods
                         }
                     }
                 }
-                else if (!enable)
+                else if (state == EModState.Disabled)
                 {
                     // Disabling mod.
                     index.Set8xDataOffset(mod.FilePath, mod.OriginalOffset8x);
@@ -404,6 +355,9 @@ namespace xivModdingFramework.Mods
                             await CMP.RestoreDefaultScaling(mod.FilePath, tx);
                         }
                     }
+                } else if(state == EModState.UnModded)
+                {
+                    await INTERNAL_DeleteMod(path, allowInternal, tx);
                 }
 
                 if (commit)
@@ -420,192 +374,37 @@ namespace xivModdingFramework.Mods
                 throw;
             }
 
-            if (updateCache)
-            {
-                XivCache.QueueDependencyUpdate(mod.FilePath);
-            }
+            XivCache.QueueDependencyUpdate(path);
 
             return true;
         }
 
         /// <summary>
-        /// Toggles all mods on or off
+        /// Deletes a mod from the modlist, if it exists.
         /// </summary>
-        /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
-        public static async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        public static async Task DeleteMod(Mod mod, ModTransaction tx = null)
         {
-            var ownTransaction = false;
-            if (tx == null)
-            {
-                ownTransaction = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
-            try
-            {
-                var modList = await tx.GetModList();
-                await ToggleMods(enable, modList.Mods.Select(x => x.Value.FilePath), progress, tx);
-
-                if(ownTransaction)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
-            } catch
-            {
-                if(ownTransaction)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
-            }
-        }
-
-        public static async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
-        {
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-
-            var modList = await GetModList();
-
-            if (modList == null || modList.Mods.Count == 0) return;
-
-            // Convert to hash set for speed when matching so we're not doing an O(n^2) check.
-            var files = new HashSet<string>();
-            foreach(var f in filePaths)
-            {
-                files.Add(f);
-            }
-
-            Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
-
-            var modNum = 0;
-            var mods = modList.GetMods(x => filePaths.Contains(x.FilePath)).ToList();
-
-            if (mods.Count == 0) return;
-
-            // If we're disabling all of our standard files, then this is a full toggle.
-
-            var fullToggle = mods.Count >= modList.Mods.Count;
-
-            var ownTransaction = false;
-            if(tx == null)
-            {
-                ownTransaction = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
-            try { 
-                foreach (var modEntry in mods)
-                {
-                    // Save disabling these for last.
-                    if (modEntry.IsInternal()) continue;
-                    await ToggleModUnsafe(enable, modEntry, false, false, tx);
-                    progress?.Report((++modNum, mods.Count, string.Empty));
-                }
-
-                if (fullToggle && !enable)
-                {
-                    // If we're doing a full mod toggle, we should purge our internal files as well.
-                    var internalEntries = modList.GetMods(x => x.IsInternal()).ToList();
-                    foreach (var modEntry in internalEntries)
-                    {
-                        var df = IOUtil.GetDataFileFromPath(modEntry.FilePath);
-                        await ToggleModUnsafe(enable, modEntry, true, false, tx);
-                        modList.RemoveMod(modEntry);
-                    }
-                }
-                else if (enable)
-                {
-                    progress?.Report((0, 0, "Expanding Metadata Entries..."));
-
-                    // Batch and group apply the metadata entries.
-                    var metadataEntries = modList.GetMods(x => x.FilePath.EndsWith(".meta")).ToList();
-                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-                    Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
-                    foreach (var mod in metadataEntries)
-                    {
-                        var df = IOUtil.GetDataFileFromPath(mod.FilePath);
-                        var data = await _dat.ReadSqPackType2(mod.ModOffset8x, df, tx);
-                        var meta = await ItemMetadata.Deserialize(data);
-
-                        meta.Validate(mod.FilePath);
-
-                        if (!metadata.ContainsKey(df))
-                        {
-                            metadata.Add(df, new List<ItemMetadata>());
-                        }
-                        metadata[df].Add(meta);
-                    }
-
-                    foreach (var dkv in metadata)
-                    {
-                        var df = dkv.Key;
-                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, tx);
-                    }
-
-                    var rgspEntries = modList.GetMods(x => x.FilePath.EndsWith(".rgsp")).ToList();
-                    foreach (var mod in rgspEntries)
-                    {
-                        await CMP.ApplyRgspFile(mod.FilePath, tx);
-                    }
-                }
-                else
-                {
-                    progress?.Report((0, 0, "Restoring Metadata Entries..."));
-                    var metadataEntries = modList.GetMods(x => x.FilePath.EndsWith(".meta")).ToList();
-                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-                    Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
-                    foreach (var mod in metadataEntries)
-                    {
-                        var root = await XivCache.GetFirstRoot(mod.FilePath);
-                        var df = IOUtil.GetDataFileFromPath(mod.FilePath);
-                        var meta = await ItemMetadata.GetMetadata(root, true);
-                        if (!metadata.ContainsKey(df))
-                        {
-                            metadata.Add(df, new List<ItemMetadata>());
-                        }
-                        metadata[df].Add(meta);
-                    }
-
-                    foreach (var dkv in metadata)
-                    {
-                        var df = dkv.Key;
-                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, tx);
-                    }
-
-                    var rgspEntries = modList.GetMods(x => x.FilePath.EndsWith(".rgsp")).ToList();
-                    foreach (var mod in rgspEntries)
-                    {
-                        await CMP.RestoreDefaultScaling(mod.FilePath, tx);
-                    }
-
-                }
-
-                if (ownTransaction)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
-
-                // Do these as a batch query at the end.
-                progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
-                var allPaths = mods.Select(x => x.FilePath).ToList();
-                XivCache.QueueDependencyUpdate(allPaths);
-            }
-            catch
-            {
-                if (ownTransaction)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
-            }
-
-
+            await INTERNAL_DeleteMod(mod.FilePath, false, tx);
         }
 
         /// <summary>
-        /// Deletes a mod from the modlist
+        /// Deletes a mod from the modlist, if it exists.
         /// </summary>
-        /// <param name="modItemPath">The mod item path of the mod to delete</param>
-        public static async Task DeleteMod(string modItemPath, bool allowInternal = false, ModTransaction tx = null)
+        public static async Task DeleteMod(string path, ModTransaction tx = null)
         {
+            await INTERNAL_DeleteMod(path, false, tx);
+        }
+
+        /// <summary>
+        /// Deletes a mod from the modlist, if it exists.
+        /// </summary>
+        private static async Task INTERNAL_DeleteMod(string path, bool allowInternal = false, ModTransaction tx = null)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Deleted Mod Path cannot be blank.");
+            }
+
             var doSave = false;
             if (tx == null)
             {
@@ -616,7 +415,7 @@ namespace xivModdingFramework.Mods
             {
                 var modList = await tx.GetModList();
 
-                var nmod = modList.GetMod(modItemPath);
+                var nmod = modList.GetMod(path);
                 // Mod doesn't exist in the modlist.
                 if (nmod == null) return;
 
@@ -627,21 +426,7 @@ namespace xivModdingFramework.Mods
                     throw new Exception("Cannot delete internal data without explicit toggle.");
                 }
 
-                await ToggleModUnsafe(false, modToRemove, allowInternal, true, tx);
-
-
-                // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
-                if (modToRemove.FilePath.EndsWith(".meta"))
-                {
-                    var root = await XivCache.GetFirstRoot(modToRemove.FilePath);
-                    await ItemMetadata.RestoreDefaultMetadata(root, tx);
-                }
-
-                if (modToRemove.FilePath.EndsWith(".rgsp"))
-                {
-                    await CMP.RestoreDefaultScaling(modToRemove.FilePath, tx);
-                }
-
+                await INTERNAL_SetModState(EModState.Disabled, path, allowInternal, tx);
                 modList.RemoveMod(modToRemove);
 
                 if (doSave)
@@ -660,45 +445,198 @@ namespace xivModdingFramework.Mods
         }
 
         /// <summary>
-        /// Deletes a Mod Pack and all its mods from the modlist
+        /// Sets a given Modpack's state.
         /// </summary>
-        /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
-        public static async Task DeleteModPack(string modPackName)
+        /// <param name="state"></param>
+        /// <param name="modPack"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task SetModpackState(EModState state, ModPack modPack, ModTransaction tx = null)
         {
-            using (var tx = ModTransaction.BeginTransaction(true))
+            await SetModpackState(state, modPack.Name, tx);
+        }
+
+        /// <summary>
+        /// Sets a given Modpack's state, if it exists.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="modPack"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task SetModpackState(EModState state, string modPackName, ModTransaction tx = null)
+        {
+            var ownTx = false;
+            if(tx == null)
             {
-                var modList = await tx.GetModList();
-                var mp = modList.GetModPack(modPackName);
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            try
+            {
+                var ml = await tx.GetModList();
+                var mp = ml.GetModPack(modPackName);
                 if(mp == null)
                 {
                     return;
                 }
 
-                var modPack = mp.Value;
-                var modsToRemove = modPack.Mods;
+                var pack = mp.Value;
+                var mods = pack.Mods;
 
-                var modRemoveCount = modsToRemove.Count;
+                foreach(var mod in mods)
+                {
+                    await SetModState(state, mod, tx);
+                }
 
-                // Disable all the mods.
-                await ToggleMods(false, modsToRemove, null, tx);
+                if(state == EModState.UnModded)
+                {
+                    ml.RemoveModpack(pack);
+                }
 
-                // Then remove them from the modlist.
-                modList.RemoveMods(modsToRemove);
-
-                await ModTransaction.CommitTransaction(tx);
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
             }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
+
+        }
+
+        /// <summary>
+        /// Deletes a Mod Pack and all its mods from the modlist
+        /// </summary>
+        /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
+        public static async Task DeleteModPack(ModPack modPack, ModTransaction tx = null)
+        {
+            await DeleteModPack(modPack.Name, tx);
+        }
+
+        /// <summary>
+        /// Deletes a Mod Pack and all its mods from the modlist
+        /// </summary>
+        /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
+        public static async Task DeleteModPack(string modPackName, ModTransaction tx = null)
+        {
+            await SetModpackState(EModState.UnModded, modPackName, tx);
         }
 
 
         /// <summary>
-        /// Cleans up the Modlist file, performing the following operations.
-        /// 
-        /// 1.  Fix up the Item Names and Categories of all mods to be consistent.
-        /// 2.  Remove all empty mod slots.
-        /// 
+        /// Set the state of all mods.
+        /// </summary>
+        /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
+        public static async Task SetAllModStates(EModState state, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        {
+            if(state == EModState.Invalid)
+            {
+                // This would error down chain anyways, but we can catch it early for some perf.
+                throw new Exception("Cannot intentionally set Invalid Mod State.");
+            }
+
+            var ownTransaction = false;
+            if (tx == null)
+            {
+                ownTransaction = true;
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            try
+            {
+                var modList = await tx.GetModList();
+                await SetModStates(state, modList.Mods.Select(x => x.Value.FilePath), progress, tx);
+
+                if (ownTransaction)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+            }
+            catch
+            {
+                if (ownTransaction)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Set the states of a given subset of mods.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="filePaths"></param>
+        /// <param name="progress"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task SetModStates(EModState state, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        {
+            var ownTx = false;
+            if(tx == null)
+            {
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            try
+            {
+                var total = 0;
+                if (progress != null)
+                {
+                    // Only enumerate here if it actually matters.
+                    total = filePaths.Count();
+                }
+
+                var verb = "Enabling";
+                switch (state)
+                {
+                    case EModState.Enabled:
+                        verb = "Enabling ";
+                        break;
+                    case EModState.Disabled:
+                        verb = "Disabling ";
+                        break;
+                    case EModState.UnModded:
+                        verb = "Deleting ";
+                        break;
+                }
+
+                var count = 0;
+                foreach (var file in filePaths)
+                {
+                    await SetModState(state, file, tx);
+
+                    progress?.Report((count, total, verb + " Mods..."));
+                    count++;
+                }
+
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+            }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+            }
+
+        }
+
+        #endregion
+
+        #region One-Off Functions 
+
+        /// <summary>
+        /// Fixes the Item Names and Item Categories of all mods to be consistent.
         /// </summary>
         /// <returns></returns>
-        public static async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
+        public static async Task CleanUpModlistItems(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
         {
             if (XivCache.GameInfo.UseLumina)
             {
@@ -818,7 +756,10 @@ namespace xivModdingFramework.Mods
 
                 progressReporter?.Report((0, 0, "Saving Modlist file..."));
 
-                await ModTransaction.CommitTransaction(tx);
+                if (ownTransaction)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
             }
             catch
             {
@@ -878,6 +819,12 @@ namespace xivModdingFramework.Mods
             }
         }
 
+        internal static async Task SetAllModStates(object emodState)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
 
     }
 

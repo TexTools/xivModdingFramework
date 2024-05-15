@@ -21,6 +21,7 @@ using SixLabors.ImageSharp;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Permissions;
@@ -495,10 +496,10 @@ namespace xivModdingFramework.Mods.FileTypes
                 // Get the MPL
                 var modpackMpl = await GetModpackList(modpackPath);
 
-                var startTime = DateTime.Now.Ticks;
+                var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                 long endTime = 0;
                 long part1Duration = 0;
-                long part2Duration = 0;
+                long p2Start = 0;
                 string _tempMPD;
 
                 var dat = new Dat(XivCache.GameInfo.GameDirectory);
@@ -530,6 +531,9 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 var totalFiles = filePaths.Count;
+                bool cancelled = false;
+                long rootDuration = 0;
+                Dictionary<string, TxFileState> originalStates = new Dictionary<string, TxFileState>();
 
                 await Task.Run(async () =>
                 {
@@ -560,8 +564,6 @@ namespace xivModdingFramework.Mods.FileTypes
                             mpd.Extract(fs);
                         }
                     }
-
-                    Dictionary<string, ModTransaction.TxFileState> originalStates = new Dictionary<string, ModTransaction.TxFileState>();
 
                     // Now, we need to rip the offsets, and generate Transaction data store file handles for them.
                     var tempOffsets = new Dictionary<string, long>();
@@ -640,45 +642,24 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // Everything from this point is basically user-opt-in tweaks to incoming data.
 
+                    part1Duration = DateTimeOffset.Now.ToUnixTimeMilliseconds() - startTime;
 
                     // Root Alterations/Item Conversion
                     if (GetRootConversionsFunction != null && filteredModsJson.Count > 0)
                     {
-                        Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
-                        try
+                        // Modpack to list conversions under.
+                        var modPack = filteredModsJson[0].ModPackEntry;
+                        rootDuration = await HandleRootConversion(filePaths, originalStates, tx, modPack, sourceApplication, GetRootConversionsFunction, progress);
+
+                        // User cancelled the import.
+                        if(rootDuration < 0)
                         {
-                            progress.Report((count, totalFiles, "Waiting on Destination Item Selection..."));
-
-                            endTime = DateTime.Now.Ticks;
-
-                            // Duration in ms
-                            part1Duration = (endTime - startTime) / 10000;
-
-
-                            rootConversions = await GetRootConversionsFunction(filePaths, tx);
-                        }
-                        catch (OperationCanceledException ex)
-                        {
-                            // User cancelled the function or otherwise a critical error happened in the conversion function.
-                            totalFiles = 0;
-                            throw new OperationCanceledException();
-                        }
-
-                        startTime = DateTime.Now.Ticks;
-
-                        if (rootConversions != null && rootConversions.Count > 0)
-                        {
-                            // Modpack to list conversions under.
-                            var modPack = filteredModsJson[0].ModPackEntry;
-
-                            // If we have any roots to move, move them over now.
-                            progress.Report((0, 0, "Updating Destination Items..."));
-
-                            tx.ModPack = modPack;
-                            var resetFiles = await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, sourceApplication);
-                            tx.ModPack = null;
+                            cancelled = true;
+                            return;
                         }
                     }
+
+                    p2Start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
                     // Auto assign body materials
                     if (AutoAssignBodyMaterials)
@@ -725,6 +706,23 @@ namespace xivModdingFramework.Mods.FileTypes
                     XivCache.QueueDependencyUpdate(files);
                 });
 
+                if(cancelled)
+                {
+                    if (ownTx)
+                    {
+                        ModTransaction.CancelTransaction(tx, true);
+                    } else
+                    {
+                        // Larger TX with an import cancel.
+                        foreach (var file in originalStates)
+                        {
+                            // Restore all the changed files before returning.
+                            await tx.RestoreFileState(file.Value);
+                        }
+                    }
+                    return (null, null, -1);
+                }
+
                 if (ownTx)
                 {
                     progress.Report((0, 0, "Committing Transaction..."));
@@ -733,12 +731,12 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 progress.Report((totalFiles, totalFiles, "Job Done."));
 
-                endTime = DateTime.Now.Ticks;
+                endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
                 // Duration in ms
-                part2Duration = (endTime - startTime) / 10000;
+                var part2Duration = (endTime - p2Start);
 
-                float seconds = (part1Duration + part2Duration) / 1000f;
+                float seconds = (part1Duration + rootDuration + part2Duration) / 1000f;
 
                 return (filePaths.ToList(), new List<string>(), seconds);
             } catch(Exception ex)
@@ -791,7 +789,7 @@ namespace xivModdingFramework.Mods.FileTypes
 	        tex[11] = buffer[3];
         }
 
-        public static async Task FixPreDawntrailImports(HashSet<string> filePaths, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task FixPreDawntrailImports(IEnumerable<string> filePaths, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
 #if ENDWALKER
             return;
@@ -815,6 +813,67 @@ namespace xivModdingFramework.Mods.FileTypes
                 progress?.Report((idx, total, "Fixing Pre-Dawntrail Models..."));
                 await _mdl.FixPreDawntrailMdl(path, source, tx);
             }
+        }
+
+        /// <summary>
+        /// Handles passing control to the application supplied root conversion function, then altering any inbound mod roots as needed.
+        /// Returns -1 if the user cancelled the process.
+        /// </summary>
+        /// <param name="filePaths"></param>
+        /// <param name="originalStates"></param>
+        /// <param name="tx"></param>
+        /// <param name="modPack"></param>
+        /// <param name="sourceApplication"></param>
+        /// <param name="GetRootConversionsFunction"></param>
+        /// <param name="progress"></param>
+        /// <returns></returns>
+        internal static async Task<long> HandleRootConversion(
+            HashSet<string> filePaths,
+            Dictionary<string, TxFileState> originalStates,
+            ModTransaction tx,
+            ModPack? modPack = null,
+            string sourceApplication = "Unknown",
+            // This cursed arg is a function that takes the file list and our TX
+            // And returns a dictionary of root conversion information.
+            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> GetRootConversionsFunction = null,
+            IProgress < (int current, int total, string message)> progress = null)
+        {
+
+            if (GetRootConversionsFunction == null)
+            {
+                return 0;
+            }
+
+            if(progress == null)
+            {
+                progress = IOUtil.NoOpImportProgress;
+            }
+
+            Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> rootConversions = null;
+            try
+            {
+
+                progress.Report((0, 0, "Waiting on Destination Item Selection..."));
+
+                rootConversions = await GetRootConversionsFunction(filePaths, tx);
+            }
+            catch (OperationCanceledException ex)
+            {
+                return -1;
+            }
+
+            var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            if (rootConversions != null && rootConversions.Count > 0)
+            {
+                // If we have any roots to move, move them over now.
+                progress.Report((0, 0, "Updating Destination Items..."));
+
+                tx.ModPack = modPack;
+                await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, sourceApplication);
+                tx.ModPack = null;
+            }
+            var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            return endTime - startTime;
         }
     }
 }

@@ -116,13 +116,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// </summary>
         /// <param name="path">System path to .PMP, .JSON, or Folder</param>
         /// <returns></returns>
-        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(string path, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress1 = null)
+        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(string path, ModTransaction tx = null, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress1 = null,
+
+            // This cursed arg is a function that takes the file list and our TX
+            // And returns a dictionary of root conversion information.
+            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> GetRootConversionsFunction = null)
         {
             path = await ResolvePMPBasePath(path);
             var pmpData = await LoadPMP(path);
             try
             {
-                return await ImportPMP(pmpData.pmp, pmpData.path, sourceApplication);
+                return await ImportPMP(pmpData.pmp, pmpData.path, tx, sourceApplication);
             }
             finally
             {
@@ -137,129 +141,177 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// Will automatically clean up unzippedPath after if it is in the user's TEMP directory.
         /// </summary>
         /// <returns></returns>
-        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(PMPJson pmp, string unzippedPath, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress = null)
+        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(PMPJson pmp, string unzippedPath, ModTransaction tx = null, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress = null,
+
+            // This cursed arg is a function that takes the file list and our TX
+            // And returns a dictionary of root conversion information.
+            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> GetRootConversionsFunction = null)
         {
             if (_ImportActive)
             {
                 throw new Exception("Cannot import multiple Modpacks simultaneously.");
             }
 
-            progress?.Report((0, 0, "Loading Modpack..."));
-
             var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-
-            if (unzippedPath.EndsWith(".json"))
-            {
-                unzippedPath = Path.GetDirectoryName(unzippedPath);
-            }
-
             var needsCleanup = false;
-            if(unzippedPath.EndsWith(".pmp"))
+            var ownTx = false;
+            if(tx == null)
             {
-                // File was not fully unzipped, and needs to be unzipped still.
-                needsCleanup = true;
-                var info = await LoadPMP(unzippedPath);
-                unzippedPath = info.path;
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction(true);
             }
-
-            var imported = new HashSet<string>();
-            var notImported = new HashSet<string>();
-            _ImportActive = true;
-            _MetaFiles = new HashSet<string>();
-            _RgspRaceGenders = new HashSet<uint>();
-            _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
-
-            var modPack = new ModPack(null);
-
-            modPack.Name = pmp.Meta.Name;
-            modPack.Author = pmp.Meta.Author;
-            modPack.Version = pmp.Meta.Version;
-            modPack.Url = pmp.Meta.Website;
-
             try
             {
-                using (var tx = ModTransaction.BeginTransaction(true, modPack))
+
+                progress?.Report((0, 0, "Loading Modpack..."));
+
+
+                if (unzippedPath.EndsWith(".json"))
                 {
-                    if (pmp.Groups == null || pmp.Groups.Count == 0)
+                    unzippedPath = Path.GetDirectoryName(unzippedPath);
+                }
+
+                if (unzippedPath.EndsWith(".pmp"))
+                {
+                    // File was not fully unzipped, and needs to be unzipped still.
+                    needsCleanup = true;
+                    var info = await LoadPMP(unzippedPath);
+                    unzippedPath = info.path;
+                }
+
+                var imported = new Dictionary<string, TxFileState>();
+                var notImported = new HashSet<string>();
+                _ImportActive = true;
+                _MetaFiles = new HashSet<string>();
+                _RgspRaceGenders = new HashSet<uint>();
+                _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
+
+                var modPack = new ModPack(null);
+
+                modPack.Name = pmp.Meta.Name;
+                modPack.Author = pmp.Meta.Author;
+                modPack.Version = pmp.Meta.Version;
+                modPack.Url = pmp.Meta.Website;
+
+                if (pmp.Groups == null || pmp.Groups.Count == 0)
+                {
+                    // No options, just default.
+                    var groupRes = await ImportOption(pmp.DefaultMod, unzippedPath, tx, progress);
+                    UnionDict(imported, groupRes.Imported);
+                    notImported.UnionWith(groupRes.NotImported);
+                }
+                else
+                {
+                    // Order groups by Priority, Lowest => Highest, tiebreaker default order
+                    var orderedGroups = pmp.Groups.OrderBy(x => x.Priority);
+                    var optionIdx = 0;
+                    foreach (var group in orderedGroups)
                     {
-                        // No options, just default.
-                        var groupRes = await ImportOption(pmp.DefaultMod, unzippedPath, tx, progress);
-                        imported.UnionWith(groupRes.Imported);
-                        notImported.UnionWith(groupRes.NotImported);
-                    }
-                    else
-                    {
-                        // Order groups by Priority, Lowest => Highest, tiebreaker default order
-                        var orderedGroups = pmp.Groups.OrderBy(x => x.Priority);
-                        var optionIdx = 0;
-                        foreach (var group in orderedGroups)
+                        if (group.Options == null || group.Options.Count == 0)
                         {
-                            if (group.Options == null || group.Options.Count == 0)
-                            {
-                                // No valid options.
-                                continue;
-                            }
+                            // No valid options.
+                            continue;
+                        }
 
-                            // Get Default selection.
-                            var selected = group.DefaultSettings;
-                            if (selected < 0 || selected >= group.Options.Count)
-                            {
-                                selected = 0;
-                            }
+                        // Get Default selection.
+                        var selected = group.DefaultSettings;
+                        if (selected < 0 || selected >= group.Options.Count)
+                        {
+                            selected = 0;
+                        }
 
-                            // If the user selected custom settings, use those.
-                            if (group.SelectedSettings >= 0)
-                            {
-                                selected = group.SelectedSettings;
-                            }
+                        // If the user selected custom settings, use those.
+                        if (group.SelectedSettings >= 0)
+                        {
+                            selected = group.SelectedSettings;
+                        }
 
-                            if (group.Type == "Single")
+                        if (group.Type == "Single")
+                        {
+                            var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, optionIdx);
+                            UnionDict(imported, groupRes.Imported);
+                            notImported.UnionWith(groupRes.NotImported);
+                        }
+                        else
+                        {
+                            // Bitmask options.
+                            for (int i = 0; i < group.Options.Count; i++)
                             {
-                                var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, optionIdx);
-                                imported.UnionWith(groupRes.Imported);
-                                notImported.UnionWith(groupRes.NotImported);
-                            }
-                            else
-                            {
-                                // Bitmask options.
-                                for(int i = 0; i < group.Options.Count; i++)
+                                var value = 1 << i;
+                                if ((selected & value) > 0)
                                 {
-                                    var value = 1 << i;
-                                    if((selected & value) > 0)
-                                    {
-                                        var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, optionIdx);
-                                        imported.UnionWith(groupRes.Imported);
-                                        notImported.UnionWith(groupRes.NotImported);
-                                        optionIdx++;
-                                    }
+                                    var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, optionIdx);
+                                    UnionDict(imported, groupRes.Imported);
+                                    notImported.UnionWith(groupRes.NotImported);
+                                    optionIdx++;
                                 }
-
                             }
 
                         }
+
                     }
+                }
 
+                var preRootTime= DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                long rootDuration = 0;
+                if (GetRootConversionsFunction != null)
+                {
+                    var files = new HashSet<string>(imported.Keys);
+                    rootDuration = await TTMP.HandleRootConversion(files, imported, tx, modPack, sourceApplication, GetRootConversionsFunction, progress);
+                    if (rootDuration < 0)
+                    {
+                        // User cancelled the process.
+                        if (ownTx)
+                        {
+                            ModTransaction.CancelTransaction(tx, true);
+                        } else
+                        {
+                            // Larger TX with an import cancel.
+                            foreach (var file in imported)
+                            {
+                                // Restore all the changed files before returning.
+                                await tx.RestoreFileState(file.Value);
+                            }
+                        }
+                        return (null, null, -1);
+                    }
+                }
 
-                    progress?.Report((0,0, "Saving Changes..."));
+                var afterRoot = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                // Pre-Dawntrail Files
+                if (pmp.Meta.FileVersion <= 3)
+                {
+                    progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
+                    await TTMP.FixPreDawntrailImports(imported.Keys, sourceApplication, progress, tx);
+                }
+
+                if (ownTx)
+                {
+                    progress?.Report((0, 0, "Committing Transaction..."));
                     await ModTransaction.CommitTransaction(tx);
                 }
 
-                    // Pre-Dawntrail Modpack.
-                if (pmp.Meta.FileVersion <= 3)
-                {
-                    // Transaction for fixing up our files.
-                    using (var tx = ModTransaction.BeginTransaction(true, modPack))
-                    {
+                progress?.Report((0, 0, "Job Done!"));
 
-                        progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
-                        await TTMP.FixPreDawntrailImports(imported, sourceApplication, progress, tx);
-                        await ModTransaction.CommitTransaction(tx);
-                    }
+                // Successful Import.
+                var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                var duration = (preRootTime - startTime) + rootDuration + (endTime - afterRoot);
+                var floatDuration = duration / 1000.0f;
+
+                var res = (imported.Keys.ToList(), notImported.ToList(), floatDuration);
+                return res;
+            }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
                 }
+                throw;
             }
             finally
             {
-                if(needsCleanup)
+                if (needsCleanup)
                 {
                     IOUtil.DeleteTempDirectory(unzippedPath);
                 }
@@ -268,20 +320,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 _Source = null;
                 _ImportActive = false;
             }
-
-            progress?.Report((0, 0, "Job Done!"));
-
-            // Successful Import.
-            var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-            var duration = (endTime - startTime) / 1000.0f;
-
-            var res = (imported.ToList(), notImported.ToList(), duration);
-            return res;
         }
 
-        private static async Task<(HashSet<string> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int optionIdx = 0)
+        private static async Task<(Dictionary<string, TxFileState> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int optionIdx = 0)
         {
-            var imported = new HashSet<string>();
+            var imported = new Dictionary<string, TxFileState>();
             var notImported = new HashSet<string>();
 
             // Import files.
@@ -308,9 +351,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 try
                 {
+                    // Save original state
+                    if (!imported.ContainsKey(internalPath))
+                    {
+                        imported.Add(internalPath, await tx.SaveFileState(internalPath));
+                    }
+
                     // Import the file...
                     await SmartImport.Import(externalPath, internalPath, _Source, tx);
-                    imported.Add(internalPath);
                     i++;
                 }
                 catch (Exception ex)
@@ -342,13 +390,20 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, false, tx);
                     }
-                    foreach(var effect in group)
+
+                    // Save initial state.
+                    var path = CMP.GetRgspPath(cmp.Race, cmp.Gender);
+                    if (!imported.ContainsKey(path))
+                    {
+                        imported.Add(path, await tx.SaveFileState(path));
+                    }
+
+                    foreach (var effect in group)
                     {
                         effect.ApplyScaling(cmp);
                     }
+
                     await CMP.SaveScalingParameter(cmp, _Source, tx);
-                    var path = CMP.GetRgspPath(cmp.Race, cmp.Gender);
-                    imported.Add(path);
                 }
 
                 // Metadata.
@@ -361,6 +416,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     var root = group.Key;
                     var metaPath = root.Info.GetRootFile();
+
+                    // Save initial state.
+                    if (!imported.ContainsKey(metaPath))
+                    {
+                        imported.Add(metaPath, await tx.SaveFileState(metaPath));
+                    }
+
                     ItemMetadata metaData;
                     if (!_MetaFiles.Contains(metaPath))
                     {
@@ -380,8 +442,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                     await ItemMetadata.SaveMetadata(metaData, _Source, tx);
                     await ItemMetadata.ApplyMetadata(metaData, tx);
-
-                    imported.Add(root.Info.GetRootFile());
                 }
             }
 
@@ -421,6 +481,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             throw new NotImplementedException();
         }
 
+
+        private static void UnionDict<TKey, TValue>(Dictionary<TKey, TValue> original, Dictionary<TKey, TValue> additional)
+        {
+            foreach (var entry in additional)
+            {
+                if (original.ContainsKey(entry.Key))
+                    continue;
+                original.Add(entry.Key, entry.Value);
+            }
+        }
 
     }
 
