@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using xivModdingFramework.Materials.DataContainers;
 
 namespace xivModdingFramework.Models.DataContainers
@@ -29,46 +30,45 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshCount
-                    + WaterMeshCount
-                    + ExtraMeshCount
-                    + ShadowMeshCount
-                    + TerrainShadowMeshCount
-                    + FogMeshCount;
+                return MeshTypes.Sum(x => x.Value.Count);
+            }
+        }
+
+        public bool HasExtraMeshes
+        {
+            get {
+                var extraStart = (int)EMeshType.LightShaft;
+                var extraMeshCount = 10;
+
+                for(int i = extraStart; i < extraStart + extraMeshCount; i++)
+                {
+                    var e = (EMeshType)i;
+                    if (MeshTypes.ContainsKey(e))
+                    {
+                        if (MeshTypes[e].Count > 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
             }
         }
 
         public EMeshType GetMeshType(int offset)
         {
-            if (offset < MeshIndex) {
-                throw new Exception("Invalid Mesh Offset");
-            } else if (offset < WaterMeshIndex) {
-                return EMeshType.Normal;
-            } else if (offset < ExtraMeshIndex) {
-                return EMeshType.Water;
-            } else if (offset < ShadowMeshIndex) {
-                return EMeshType.Extra;
-            } else if (offset < TerrainShadowMeshIndex || (TerrainShadowMeshIndex == 0 && offset < FogMeshIndex)) {
-                return EMeshType.Shadow;
-            } else if(offset < FogMeshIndex && TerrainShadowMeshCount > 0) {
-                return EMeshType.TerrainShadow;
-            } else {
-                return EMeshType.Fog;
+            foreach (var kv in MeshTypes)
+            {
+                if (offset >= kv.Value.Offset && offset < kv.Value.Offset + kv.Value.Count)
+                {
+                    return kv.Key;
+                }
             }
+            throw new Exception("Unknown Mesh Type.");
+
         }
 
-        /// <summary>
-        /// The offset to the mesh data block
-        /// </summary>
-        public ushort MeshIndex { get; set; }
-
-        /// <summary>
-        /// The number of meshes to use
-        /// </summary>
-        public short MeshCount { get; set; }
-
-        public ushort ExtraMeshIndex { get; set; }
-        public ushort ExtraMeshCount { get; set; }
+        public Dictionary<EMeshType, (ushort Offset, ushort Count)> MeshTypes = new Dictionary<EMeshType, (ushort Offset, ushort Count)>();
 
         /// <summary>
         /// Unknown Usage
@@ -79,48 +79,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// Unknown Usage
         /// </summary>
         public float TextureLoDRange { get; set; }
-
-        /// <summary>
-        /// Mesh End
-        /// </summary>
-        public short WaterMeshIndex { get; set; }
-
-        /// <summary>
-        /// Extra Mesh Count
-        /// </summary>
-        public short WaterMeshCount { get; set; }
-
-        /// <summary>
-        /// Mesh Sum
-        /// </summary>
-        public short ShadowMeshIndex{ get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short ShadowMeshCount { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short TerrainShadowMeshIndex { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short TerrainShadowMeshCount { get; set; }
-
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short FogMeshIndex { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short FogMeshCount { get; set; }
-
 
         /// <summary>
         /// Unknown Usage

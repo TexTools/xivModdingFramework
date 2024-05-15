@@ -399,7 +399,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     ExtraBoundingBoxCount = br.ReadUInt16(),
                     TerrainShadowSubmeshCount = br.ReadInt16(),
-                    ExtraLoDCount = br.ReadByte(),
+                    Unknown9 = br.ReadByte(),
 
                     BgChangeMaterialIndex = br.ReadByte(),
                     BgCrestChangeMaterialIndex = br.ReadByte(),
@@ -503,65 +503,58 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.LoDList = new List<LevelOfDetail>();
                 for (var i = 0; i < 3; i++)
                 {
-                    var lod = new LevelOfDetail
+                    var lod = new LevelOfDetail()
                     {
-                        MeshIndex = br.ReadUInt16(),
-                        MeshCount = br.ReadInt16(),
-                        ModelLoDRange = br.ReadSingle(),
-                        TextureLoDRange = br.ReadSingle(),
-                        WaterMeshIndex = br.ReadInt16(),
-                        WaterMeshCount = br.ReadInt16(),
-                        ShadowMeshIndex = br.ReadInt16(),
-                        ShadowMeshCount = br.ReadInt16(),
-                        TerrainShadowMeshIndex = br.ReadInt16(),
-                        TerrainShadowMeshCount = br.ReadInt16(),
-                        FogMeshIndex = br.ReadInt16(),
-                        FogMeshCount = br.ReadInt16(),
-                        EdgeGeometrySize = br.ReadInt32(),
-                        EdgeGeometryOffset = br.ReadInt32(),
-                        Unknown6 = br.ReadInt32(),
-                        Unknown7 = br.ReadInt32(),
-                        VertexDataSize = br.ReadInt32(),
-                        IndexDataSize = br.ReadInt32(),
-                        VertexDataOffset = br.ReadInt32(),
-                        IndexDataOffset = br.ReadInt32(),
                         MeshDataList = new List<MeshData>()
                     };
 
-                    // Placeholder value.
-                    lod.ExtraMeshIndex = (ushort) (lod.WaterMeshIndex + lod.WaterMeshCount);
+                    var StandardMeshIndex = br.ReadUInt16();
+                    var StandardMeshCount = br.ReadUInt16();
+                    lod.MeshTypes.Add(EMeshType.Standard, (StandardMeshIndex, StandardMeshCount));
+
+                    lod.ModelLoDRange = br.ReadSingle();
+                    lod.TextureLoDRange = br.ReadSingle();
+
+                    var WaterMeshIndex = br.ReadUInt16();
+                    var WaterMeshCount = br.ReadUInt16();
+                    lod.MeshTypes.Add(EMeshType.Water, (WaterMeshIndex, WaterMeshCount));
+
+                    var ShadowMeshIndex = br.ReadUInt16();
+                    var ShadowMeshCount = br.ReadUInt16();
+                    lod.MeshTypes.Add(EMeshType.Shadow, (ShadowMeshIndex, ShadowMeshCount));
+
+                    var TerrainShadowMeshIndex = br.ReadUInt16();
+                    var TerrainShadowMeshCount = br.ReadUInt16();
+                    lod.MeshTypes.Add(EMeshType.TerrainShadow, (TerrainShadowMeshIndex, TerrainShadowMeshCount));
+
+                    var FogMeshIndex = br.ReadUInt16();
+                    var FogMeshCount = br.ReadUInt16();
+                    lod.MeshTypes.Add(EMeshType.Fog, (FogMeshIndex, FogMeshCount));
+
+                    lod.EdgeGeometrySize = br.ReadInt32();
+                    lod.EdgeGeometryOffset = br.ReadInt32();
+                    lod.Unknown6 = br.ReadInt32();
+                    lod.Unknown7 = br.ReadInt32();
+                    lod.VertexDataSize = br.ReadInt32();
+                    lod.IndexDataSize = br.ReadInt32();
+                    lod.VertexDataOffset = br.ReadInt32();
+                    lod.IndexDataOffset = br.ReadInt32();
 
                     //Adding to xivMdl
                     xivMdl.LoDList.Add(lod);
                 }
 
-                if (mdlModelData.ExtraLoDEnabled)
+                if (mdlModelData.ExtraMeshesEnabled)
                 {
-                    for (var i = 0; i < mdlModelData.LoDCount; i++)
+                    for (var i = 0; i < 3; i++)
                     {
-                        // This is /absolutely/ not the correct way to read this struct.
-                        // But it /does/ work... Somehow...
-                        var list = new Dictionary<int, MeshIndexAndCount>(15);
-                        var start = br.BaseStream.Position;
-                        for (int mi = 0; mi < 15; mi++)
+                        var extraStart = (int)EMeshType.LightShaft;
+                        var extraEnd = (int)EMeshType.Shadow;
+                        for (int t = extraStart; t < extraEnd; t++)
                         {
                             var entry = MeshIndexAndCount.Read(br);
-                            list.Add(mi, entry);
-                            if(entry.MeshIndex > 0 || entry.MeshCount > 0)
-                            {
-                                var pos = br.BaseStream.Position - start - 4;
-                                var z = 254;
-                            }
-                        }
-
-                        var withValues = list.Where(x => x.Value.MeshIndex > 0 || x.Value.MeshCount > 0).ToList();
-
-                        if(withValues.Count > 0)
-                        {
-                            var extraMeshOffset = withValues.First(x => x.Value.MeshCount > 0).Value.MeshCount;
-                            var extraMeshCount = withValues.Sum(x => x.Value.MeshCount);
-                            xivMdl.LoDList[i].ExtraMeshIndex = (ushort) extraMeshOffset;
-                            xivMdl.LoDList[i].ExtraMeshCount = (ushort) extraMeshCount;
+                            var type = (EMeshType)t;
+                            xivMdl.LoDList[i].MeshTypes.Add(type, (entry.MeshIndex, entry.MeshCount));
                         }
                     }
                 }
@@ -621,7 +614,7 @@ namespace xivModdingFramework.Models.FileTypes
                         }
                     }
 
-                    loDStructPos += 136 * xivMdl.LoDList[i].MeshCount;
+                    loDStructPos += 136 * xivMdl.LoDList[i].TotalMeshCount;
                 }
                 
 
@@ -965,7 +958,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var meshDataList = lod.MeshDataList;
 
-                    if (lod.MeshIndex != totalMeshNum)
+                    if (lod.MeshTypes[EMeshType.Standard].Offset != totalMeshNum)
                     {
                         throw new Exception("Failed to parse some meshes in previous LoD level.");
                     }
@@ -1558,9 +1551,10 @@ namespace xivModdingFramework.Models.FileTypes
                         var indexMeshNum = new Dictionary<int, int>();
 
                         var shapeData = xivMdl.MeshShapeData.ShapeDataList;
+                        var mCount = lod.MeshTypes[EMeshType.Standard].Count;
 
                         // Get the index data offsets in each mesh
-                        for (var i = 0; i < lod.MeshCount; i++)
+                        for (var i = 0; i < mCount; i++)
                         {
                             var indexDataOffset = lod.MeshDataList[i].MeshInfo.IndexDataOffset;
 
@@ -1571,7 +1565,7 @@ namespace xivModdingFramework.Models.FileTypes
                         }
 
                         // For every mesh in this LoD
-                        for (var i = 0; i < lod.MeshCount; i++)
+                        for (var i = 0; i < mCount; i++)
                         {
                             var referencePositionsDictionary = new Dictionary<int, Vector3>();
                             var meshShapePositionsDictionary = new SortedDictionary<int, Vector3>();
@@ -3294,7 +3288,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var ogModelData = ogMdl.ModelData;
 
-                short meshCount = (short)(ttModel.MeshGroups.Count + ogMdl.LoDList[0].WaterMeshCount);
+                short meshCount = (short)(ttModel.MeshGroups.Count);
                 short higherLodMeshCount = 0;
                 meshCount += higherLodMeshCount;
                 ogModelData.MeshCount = meshCount;
@@ -3332,7 +3326,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Largely unknown stuff.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ExtraBoundingBoxCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.TerrainShadowSubmeshCount));
-                basicModelBlock.Add(ogModelData.ExtraLoDCount);
+                basicModelBlock.Add(ogModelData.Unknown9);
                 
                 // Handles which materials get some variable data (Ex. FC crests?)
                 basicModelBlock.Add(ogModelData.BgChangeMaterialIndex);
@@ -3366,36 +3360,29 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
 
 
-                // Extra LoD Data
-                #region Extra Level Of Detail Block
-                var extraLodDataBlock = new List<byte>();
+                // Extra Mesh Info
+                #region Extra Meshes Block
+                var extraMeshesBlock = new List<byte>();
 
                 // This seems to mostly be used in furniture, but some other things
                 // use it too.  Perchberd has great info on this stuff.
-                if (ogMdl.ExtraLoDList != null && ogMdl.ExtraLoDList.Count > 0)
+                if (ogMdl.ModelData.ExtraMeshesEnabled)
                 {
-                    foreach (var ld in ogMdl.ExtraLoDList)
+                    foreach (var ld in ogMdl.LoDList)
                     {
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.MeshIndex));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.MeshCount));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.ModelLoDRange));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.TextureLoDRange));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.WaterMeshIndex));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.WaterMeshCount));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.ShadowMeshIndex));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.ShadowMeshCount));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.TerrainShadowMeshIndex));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.TerrainShadowMeshCount));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.FogMeshIndex));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.FogMeshCount));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.EdgeGeometrySize));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.EdgeGeometryOffset));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.Unknown6));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.Unknown7));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.VertexDataSize));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.IndexDataSize));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.VertexDataOffset));
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.IndexDataOffset));
+                        var extraStart = (int)EMeshType.LightShaft;
+                        var extraEnd = (int)EMeshType.Shadow;
+
+                        for(int i = extraStart; i < extraEnd; i++)
+                        {
+                            var type = (EMeshType)i;
+                            var data = ld.MeshTypes.ContainsKey(type) ? ld.MeshTypes[type] : ((ushort)0, (ushort)0);
+
+                            // Offset and Count for each extra mesh type.
+                            extraMeshesBlock.AddRange(BitConverter.GetBytes(data.Item1));
+                            extraMeshesBlock.AddRange(BitConverter.GetBytes(data.Item2));
+                        }
+
                     }
 
 
@@ -3423,7 +3410,7 @@ namespace xivModdingFramework.Models.FileTypes
                         // We only care about Lod [0].
                         var lod = ogMdl.LoDList[0];
 
-                        bool addedMesh = mi >= lod.MeshCount;
+                        bool addedMesh = mi >= lod.TotalMeshCount;
                         var meshInfo = addedMesh ? null : lod.MeshDataList[mi].MeshInfo;
 
                         var vertexCount = addedMesh ? 0 : meshInfo.VertexCount;
@@ -3988,7 +3975,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Combined Data Block Sizes
                 // This is the offset to the beginning of the vertex data
-                var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraLodDataBlock.Count + meshDataBlock.Count +
+                var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraMeshesBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
                     boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
 
@@ -4074,7 +4061,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(basicModelBlock);
                 modelDataBlock.AddRange(unknownDataBlock0);
                 modelDataBlock.AddRange(lodDataBlock);
-                modelDataBlock.AddRange(extraLodDataBlock);
+                modelDataBlock.AddRange(extraMeshesBlock);
                 modelDataBlock.AddRange(meshDataBlock);
                 modelDataBlock.AddRange(attributePathDataBlock);
                 if (unknownDataBlock1 != null)

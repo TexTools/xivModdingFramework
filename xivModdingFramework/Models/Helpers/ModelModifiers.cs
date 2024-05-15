@@ -17,6 +17,7 @@ using HelixToolkit.SharpDX.Core;
 using System.Runtime.CompilerServices;
 using HelixToolkit.SharpDX.Core.ShaderManager;
 using System.Globalization;
+using SharpDX.Direct2D1;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -79,6 +80,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot copy settings from null MDL.");
                 }
+                ModelModifiers.MergeMeshTypes(ttModel, currentMdl, loggingFunction);
                 ModelModifiers.MergeAttributeData(ttModel, currentMdl, loggingFunction);
             }
 
@@ -309,6 +311,30 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
+        public static void MergeMeshTypes(TTModel ttModel, XivMdl rawMdl, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            loggingFunction(false, "Merging Mesh Types from original model...");
+
+            var meshIdx = 0;
+            foreach (var baseMesh in rawMdl.LoDList[0].MeshDataList)
+            {
+                if(meshIdx >= ttModel.MeshGroups.Count)
+                {
+                    continue;
+                }
+
+                var mg = ttModel.MeshGroups[meshIdx];
+                var type = rawMdl.LoDList[0].GetMeshType(meshIdx);
+                mg.MeshType = type;
+                meshIdx++;
+            }
+        }
+
         // Merges the full geometry data from a raw xivMdl
         // This will destroy any existing mesh groups in the TTModel.
         public static void MergeGeometryData(TTModel ttModel, XivMdl rawMdl, Action<bool, string> loggingFunction = null)
@@ -327,6 +353,9 @@ namespace xivModdingFramework.Models.Helpers
                 var ttMesh = new TTMeshGroup();
                 ttModel.MeshGroups.Add(ttMesh);
                 ttMesh.Name = "Group " + meshIdx;
+
+                var type = rawMdl.LoDList[0].GetMeshType(meshIdx);
+                ttMesh.MeshType = type;
 
                 // Build the bone set for our mesh.
                 if (rawMdl.MeshBoneSets != null && rawMdl.MeshBoneSets.Count > 0)

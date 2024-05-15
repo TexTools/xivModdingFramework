@@ -32,17 +32,25 @@ namespace xivModdingFramework.Models.DataContainers
     public enum EMeshType
     {
         // Standard Mesh
-        Normal,
+        Standard,
 
         Water,
-        Fog,
+        
+        // Extra Meshes
+        LightShaft,
+        Glass,
+        MaterialChange,
+        CrestChange,
+        ExtraUnknown4,
+        ExtraUnknown5,
+        ExtraUnknown6,
+        ExtraUnknown7,
+        ExtraUnknown8,
+        ExtraUnknown9,
+
         Shadow,
         TerrainShadow,
-
-        // Strange un-labeled mesh type.
-        // Seems to be only included when the ExtraLoD setting is turned on.
-        // But doesn't actually have data in the LoD header for it?
-        Extra
+        Fog,
     }
 
     /// <summary>
@@ -226,7 +234,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The type of this mesh when stored in MDL format.
         /// </summary>
-        public EMeshType MeshType = EMeshType.Normal;
+        public EMeshType MeshType = EMeshType.Standard;
 
 
         /// <summary>
@@ -1157,7 +1165,7 @@ namespace xivModdingFramework.Models.DataContainers
 
                             if (string.IsNullOrWhiteSpace(t))
                             {
-                                model.MeshGroups[meshNum].MeshType = EMeshType.Normal;
+                                model.MeshGroups[meshNum].MeshType = EMeshType.Standard;
                             }
                             else
                             {
