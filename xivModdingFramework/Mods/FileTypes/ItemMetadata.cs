@@ -147,15 +147,34 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="root"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
+        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceOriginal = false, ModTransaction tx = null)
         {
             if(root == null)
             {
                 return null;
             }
 
-            // Always retrieve live tx file state.
-            return await CreateFromRaw(root, forceDefault, tx);
+            if (tx == null) {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            var path = root.Info.GetRootFile();
+
+            if(await tx.FileExists(path, forceOriginal))
+            {
+                // If we have a valid meta file, read that.
+                var data = await tx.ReadFile(path, forceOriginal);
+                var meta = await Deserialize(data);
+                meta.Validate(path);
+                return meta;
+            }
+            else
+            {
+                // Meta file doesn't exist, create from live state.
+                return await CreateFromRaw(root, forceOriginal, tx);
+            }
+
         }
 
 
