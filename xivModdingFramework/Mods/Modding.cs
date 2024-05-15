@@ -321,19 +321,14 @@ namespace xivModdingFramework.Mods
                 {
                     // Enabling Mod
                     index.Set8xDataOffset(mod.FilePath, mod.ModOffset8x);
-
-                    if (commit)
+                    var ext = Path.GetExtension(mod.FilePath);
+                    if (ext == ".meta")
                     {
-                        // Check if we're re-enabling a metadata mod.
-                        var ext = Path.GetExtension(mod.FilePath);
-                        if (ext == ".meta")
-                        {
-                            await ItemMetadata.ApplyMetadata(mod.FilePath, false, tx);
-                        }
-                        else if (ext == ".rgsp")
-                        {
-                            await CMP.ApplyRgspFile(mod.FilePath, false, tx);
-                        }
+                        await ItemMetadata.ApplyMetadata(mod.FilePath, false, tx);
+                    }
+                    else if (ext == ".rgsp")
+                    {
+                        await CMP.ApplyRgspFile(mod.FilePath, false, tx);
                     }
                 }
                 else if (state == EModState.Disabled)
@@ -341,19 +336,16 @@ namespace xivModdingFramework.Mods
                     // Disabling mod.
                     index.Set8xDataOffset(mod.FilePath, mod.OriginalOffset8x);
 
-                    if (commit)
+                    // Restore original metadata.
+                    if (mod.FilePath.EndsWith(".meta"))
                     {
-                        // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
-                        if (mod.FilePath.EndsWith(".meta"))
-                        {
-                            var root = await XivCache.GetFirstRoot(mod.FilePath);
-                            await ItemMetadata.RestoreDefaultMetadata(root, tx);
-                        }
+                        var root = await XivCache.GetFirstRoot(mod.FilePath);
+                        await ItemMetadata.RestoreDefaultMetadata(root, tx);
+                    }
 
-                        if (mod.FilePath.EndsWith(".rgsp"))
-                        {
-                            await CMP.RestoreDefaultScaling(mod.FilePath, tx);
-                        }
+                    if (mod.FilePath.EndsWith(".rgsp"))
+                    {
+                        await CMP.RestoreDefaultScaling(mod.FilePath, tx);
                     }
                 } else if(state == EModState.UnModded)
                 {
