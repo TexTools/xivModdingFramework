@@ -414,8 +414,6 @@ namespace xivModdingFramework.Models.FileTypes
                     Unknown17 = br.ReadInt16()
                 };
 
-                var bytes = BitConverter.GetBytes(mdlModelData.ModelClipOutDistance);
-
                 // Finished reading all MdlModelData
                 // Adding to xivMdl
                 xivMdl.ModelData = mdlModelData;
@@ -649,9 +647,6 @@ namespace xivModdingFramework.Models.FileTypes
                             VertexDataEntrySize2 = br.ReadByte(),
                             VertexStreamCountUnknown = br.ReadByte()
                         };
-                        var mType = lod.GetMeshType(meshNum);
-
-                        //if(meshDataInfo.ver)
 
                          lod.MeshDataList[i].MeshInfo = meshDataInfo;
 
@@ -2527,7 +2522,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Time to create the raw MDL.
                 loggingFunction(false, "Creating MDL file from processed data...");
-                bytes = MakeMdlFile(ttModel, currentMdl, loggingFunction);
+                bytes = MakeUncompressedMdlFile(ttModel, currentMdl, loggingFunction);
 
                 loggingFunction(false, "Job done!");
             });
@@ -2544,7 +2539,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
-            var mdl = MakeMdlFile(ttModel, ogMdl, loggingFunction);
+            var mdl = MakeUncompressedMdlFile(ttModel, ogMdl, loggingFunction);
             var compressed = await CompressMdlFile(mdl);
             return compressed;
         }
@@ -2858,7 +2853,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        public byte[] MakeMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
 
@@ -2887,8 +2882,11 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             try
-            { 
+            {
+                ttModel.OrderMeshGroupsForImport();
                 var rawShapeData = ttModel.GetRawShapeParts();
+
+                #region Radius and Bounding Box Calculation
 
                 // Calculate Radius here for convenience.
                 // These values also used in writing bounding boxes later.
@@ -2921,6 +2919,8 @@ namespace xivModdingFramework.Models.FileTypes
                 // Radius seems like it's from (0,0,0), so just take the maximum absolute distances from 0 on each axis, and call it good enough.
                 var absVect = new Vector3(absX, absY, absZ);
                 var modelRadius = absVect.Length();
+
+                #endregion
 
                 // Vertex Info
                 #region Vertex Info Block
@@ -3300,13 +3300,15 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 // Geometry-related stuff that we have actual values for.
+                var boneListCount = ttModel.HasWeights ? (short)ttModel.MeshGroups.Count : 0;
+
                 basicModelBlock.AddRange(BitConverter.GetBytes(modelRadius));
                 basicModelBlock.AddRange(BitConverter.GetBytes(meshCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Attributes.Count));
                 basicModelBlock.AddRange(BitConverter.GetBytes(meshPartCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Materials.Count));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Bones.Count));
-                basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.MeshGroups.Count)); // Bone List Count is 1x # of groups for us.
+                basicModelBlock.AddRange(BitConverter.GetBytes((short)boneListCount)); // Bone List Count is 1x # of groups for us.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapeNames.Count : (short)0));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (short)ttModel.ShapePartCount : (short)0));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasShapeData ? (ushort)ttModel.ShapeDataCount : (ushort)0));
@@ -3317,10 +3319,21 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.Add(ogModelData.Flags1);
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ElementIdCount));
                 basicModelBlock.Add(ogModelData.TerrainShadowMeshCount);
-                basicModelBlock.Add(ogModelData.Flags2);
+
+                // Set extra mesh flag as needed.
+                var flags2 = ogModelData.Flags2;
+                if (ttModel.HasExtraMeshes)
+                {
+                    flags2 = (byte)(flags2 | 0x10);
+                }
+                else
+                {
+                    flags2 = (byte)(flags2 & ~0x10);
+                }
+                basicModelBlock.Add(flags2);
                 
                 // Model and Shadow Clip-Out distances.  Can set these to 0 to disable.
-                basicModelBlock.AddRange(BitConverter.GetBytes(0));
+                basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasWeights ? 0 : 9216f));    // Magic number, wooo~
                 basicModelBlock.AddRange(BitConverter.GetBytes(0));
 
                 // Largely unknown stuff.
@@ -3358,37 +3371,6 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 #endregion
-
-
-                // Extra Mesh Info
-                #region Extra Meshes Block
-                var extraMeshesBlock = new List<byte>();
-
-                // This seems to mostly be used in furniture, but some other things
-                // use it too.  Perchberd has great info on this stuff.
-                if (ogMdl.ModelData.ExtraMeshesEnabled)
-                {
-                    foreach (var ld in ogMdl.LoDList)
-                    {
-                        var extraStart = (int)EMeshType.LightShaft;
-                        var extraEnd = (int)EMeshType.Shadow;
-
-                        for(int i = extraStart; i < extraEnd; i++)
-                        {
-                            var type = (EMeshType)i;
-                            var data = ld.MeshTypes.ContainsKey(type) ? ld.MeshTypes[type] : ((ushort)0, (ushort)0);
-
-                            // Offset and Count for each extra mesh type.
-                            extraMeshesBlock.AddRange(BitConverter.GetBytes(data.Item1));
-                            extraMeshesBlock.AddRange(BitConverter.GetBytes(data.Item2));
-                        }
-
-                    }
-
-
-                }
-                #endregion
-
 
                 // Mesh Data
                 #region Mesh Groups Block
@@ -3433,7 +3415,7 @@ namespace xivModdingFramework.Models.FileTypes
                         vertexCount = (int)ttMeshGroup.VertexCount;
                         indexCount = (int)ttMeshGroup.IndexCount;
                         partCount = (short)ttMeshGroup.Parts.Count;
-                        boneSetIndex = (short)mi;
+                        boneSetIndex = (short) (ttModel.HasWeights ? mi : 0);
                         materialIndex = ttModel.GetMaterialIndex(mi);
 
 
@@ -3484,6 +3466,11 @@ namespace xivModdingFramework.Models.FileTypes
                         if (ogMdl.Partless)
                         {
                             partCount = 0;
+                        }
+
+                        if (!ttModel.HasWeights)
+                        {
+                            boneSetIndex = 255;
                         }
 
                         // Lots of offsets and counts.
@@ -3686,86 +3673,91 @@ namespace xivModdingFramework.Models.FileTypes
                 #region Mesh Bone Sets
 
                 var boneSetsBlock = new List<byte>();
-
                 var boneSetSize = 0;
-                if (mdlVersion >= 6)
+
+                // Gotta have bones to get bone sets.
+                if (ttModel.HasWeights)
                 {
-                    List<List<byte>> meshBoneSets = new List<List<byte>>();
-                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
+                    if (mdlVersion >= 6)
                     {
-                        meshBoneSets.Add(ttModel.Getv6BoneSet(mi));
-                    }
-
-                    var offset = ttModel.MeshGroups.Count;
-                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
-                    {
-                        var dataSize = meshBoneSets[mi].Count;
-                        short count = (short) (dataSize / 2);
-
-                        boneSetsBlock.AddRange(BitConverter.GetBytes((short) 0));
-                        boneSetsBlock.AddRange(BitConverter.GetBytes((short) (count)));
-
-                    }
-
-                    var boneSetStart = boneSetsBlock.Count;
-                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
-                    {
-                        var headerLocation = mi * 4;
-                        var distance = (short)((boneSetsBlock.Count - headerLocation) / 4);
-
-                        boneSetsBlock.AddRange(meshBoneSets[mi]);
-                        if (meshBoneSets[mi].Count % 4 != 0)
+                        List<List<byte>> meshBoneSets = new List<List<byte>>();
+                        for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                         {
-                            boneSetsBlock.AddRange(new byte[2]);
+                            meshBoneSets.Add(ttModel.Getv6BoneSet(mi));
                         }
 
-                        // Copy in the offset information.
-                        var offsetBytes = BitConverter.GetBytes(distance);
-                        boneSetsBlock[headerLocation] = offsetBytes[0];
-                        boneSetsBlock[headerLocation + 1] = offsetBytes[1];
-                    }
-                    var boneSetEnd = boneSetsBlock.Count;
-                    boneSetSize = (boneSetEnd - boneSetStart) / 2;
-                }
-                else
-                {
-                    for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
-                    {
-                        var originalBoneSet = ttModel.GetBoneSet(mi);
-                        var data = originalBoneSet;
-                        // Cut or pad to exactly 64 bones + blanks.  (v5 has a static array size of 128 bytes/64 shorts)
-                        if (data.Count > 128)
+                        var offset = ttModel.MeshGroups.Count;
+                        for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                         {
-                            data = data.GetRange(0, 128);
-                        }
-                        else if (data.Count < 128)
-                        {
-                            data.AddRange(new byte[128 - data.Count]);
+                            var dataSize = meshBoneSets[mi].Count;
+                            short count = (short)(dataSize / 2);
+
+                            boneSetsBlock.AddRange(BitConverter.GetBytes((short)0));
+                            boneSetsBlock.AddRange(BitConverter.GetBytes((short)(count)));
+
                         }
 
-                        // This is the array size... Which seems to need to be +1'd in Dawntrail for some reason.
-                        if (mi == 0 || ttModel.MeshGroups[mi].Bones.Count >= 64)
+                        var boneSetStart = boneSetsBlock.Count;
+                        for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                         {
-                            data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
-                        } else
+                            var headerLocation = mi * 4;
+                            var distance = (short)((boneSetsBlock.Count - headerLocation) / 4);
+
+                            boneSetsBlock.AddRange(meshBoneSets[mi]);
+                            if (meshBoneSets[mi].Count % 4 != 0)
+                            {
+                                boneSetsBlock.AddRange(new byte[2]);
+                            }
+
+                            // Copy in the offset information.
+                            var offsetBytes = BitConverter.GetBytes(distance);
+                            boneSetsBlock[headerLocation] = offsetBytes[0];
+                            boneSetsBlock[headerLocation + 1] = offsetBytes[1];
+                        }
+                        var boneSetEnd = boneSetsBlock.Count;
+                        boneSetSize = (boneSetEnd - boneSetStart) / 2;
+                    }
+                    else
+                    {
+                        for (var mi = 0; mi < ttModel.MeshGroups.Count; mi++)
                         {
+                            var originalBoneSet = ttModel.GetBoneSet(mi);
+                            var data = originalBoneSet;
+                            // Cut or pad to exactly 64 bones + blanks.  (v5 has a static array size of 128 bytes/64 shorts)
+                            if (data.Count > 128)
+                            {
+                                data = data.GetRange(0, 128);
+                            }
+                            else if (data.Count < 128)
+                            {
+                                data.AddRange(new byte[128 - data.Count]);
+                            }
+
+                            // This is the array size... Which seems to need to be +1'd in Dawntrail for some reason.
+                            if (mi == 0 || ttModel.MeshGroups[mi].Bones.Count >= 64)
+                            {
+                                data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
+                            }
+                            else
+                            {
 #if DAWNTRAIL
                             // DAWNTRAIL BENCHMARK HACKHACK - Add +1 to the bone count here to work around MDL v5 -> v6 in engine off-by-one error.
                             data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count + 1));
 #else
-                            data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
+                                data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
 #endif
-                        }
-                        
-                        boneSetsBlock.AddRange(data);
-                    }
-                    var boneIndexListSize = boneSetsBlock.Count;
-                }
+                            }
 
-                // Update the size listing.
-                var sizeBytes = BitConverter.GetBytes((short)(boneSetSize));
-                basicModelBlock[boneSetSizePointer] = sizeBytes[0];
-                basicModelBlock[boneSetSizePointer + 1] = sizeBytes[1];
+                            boneSetsBlock.AddRange(data);
+                        }
+                        var boneIndexListSize = boneSetsBlock.Count;
+                    }
+
+                    // Update the size listing.
+                    var sizeBytes = BitConverter.GetBytes((short)(boneSetSize));
+                    basicModelBlock[boneSetSizePointer] = sizeBytes[0];
+                    basicModelBlock[boneSetSizePointer + 1] = sizeBytes[1];
+                }
 
                 // Higher LoD Bone sets are omitted.
 
@@ -3970,6 +3962,34 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
 
 
+                // Extra Mesh Info
+                #region Extra Meshes Block
+                var extraMeshesBlock = new List<byte>();
+
+                // Write proper extra mesh info.
+                if (ttModel.HasExtraMeshes)
+                {
+                    // LoD 0 Data...
+                    var extraStart = (int)EMeshType.LightShaft;
+                    var extraEnd = (int)EMeshType.Shadow;
+
+                    for (int i = extraStart; i < extraEnd; i++)
+                    {
+                        var type = (EMeshType)i;
+                        var offset = ttModel.GetMeshTypeOffset(type);
+                        var count = ttModel.GetMeshTypeCount(type);
+
+                        // Offset and Count for each extra mesh type.
+                        extraMeshesBlock.AddRange(BitConverter.GetBytes(offset));
+                        extraMeshesBlock.AddRange(BitConverter.GetBytes(count));
+                    }
+
+                    // Data for LoD 1/2
+                    extraMeshesBlock.AddRange(new byte[80]);
+
+                }
+                #endregion
+
                 #region LoD Block
                 // LoD block is the most complex block, and so we write it last, even though it's actually pretty early on in the file.
 
@@ -3992,7 +4012,6 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // LoD 0 values.
                     short meshOffset = 0;
-                    short totalMeshes = (short)geometryData.Count;
                     vertexDataOffset = combinedDataBlockSize;
                     vertexDataSize = vertexDataBlock.Count;
                     indexDataOffset = vertexDataOffset + vertexDataSize;
@@ -4001,37 +4020,59 @@ namespace xivModdingFramework.Models.FileTypes
                     // LoD 1+ is always empty in our imports, so the real values for their offsets are just the end of LoD 0's data with 0s for counts
                     if (l > 0)
                     {
-                        meshOffset = totalMeshes;
-                        totalMeshes = 0;
+                        meshOffset = (short)ttModel.MeshGroups.Count;
                         vertexDataOffset = indexDataOffset + indexDataSize;
                         indexDataOffset = indexDataOffset + indexDataSize;
                         indexDataSize = 0;
                         vertexDataSize = 0;
                     }
 
-                    // We add any additional meshes to the offset if we added any through advanced importing, otherwise additionalMeshCount stays at 0
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)meshOffset));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
+                    if (l == 0)
+                    {
+                        // We add any additional meshes to the offset if we added any through advanced importing, otherwise additionalMeshCount stays at 0
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshTypeOffset(EMeshType.Standard)));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshGroupCount(EMeshType.Standard)));
 
-                    // Distances to kick in LoD effects
-                    lodDataBlock.AddRange(BitConverter.GetBytes(_ModelLoDDistance)); // Model LoD
-                    lodDataBlock.AddRange(BitConverter.GetBytes(_TextureLoDDistance * (l + 1))); // Texture LoD - We're actually okay with this one since we have MipMaps.
+                        // Distances to kick in LoD effects
+                        lodDataBlock.AddRange(BitConverter.GetBytes(_ModelLoDDistance)); // Model LoD
+                        lodDataBlock.AddRange(BitConverter.GetBytes(_TextureLoDDistance * (l + 1))); // Texture LoD - We're actually okay with this one since we have MipMaps.
 
-                    // Water Mesh Index and Count.
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(totalMeshes)));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        // Water Mesh Index and Count.
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshTypeOffset(EMeshType.Water)));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshGroupCount(EMeshType.Water)));
 
-                    // Shadow Mesh Index and Count
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)(totalMeshes)));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        // Shadow Mesh Index and Count
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshTypeOffset(EMeshType.Shadow)));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshGroupCount(EMeshType.Shadow)));
 
-                    // Terrain Shadow Mesh Index and Count
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        // Terrain Shadow Mesh Index and Count
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshTypeOffset(EMeshType.TerrainShadow)));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshGroupCount(EMeshType.TerrainShadow)));
 
-                    // Fog Mesh Index and Count
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)totalMeshes));
-                    lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        // Fog Mesh Index and Count
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshTypeOffset(EMeshType.Fog)));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)ttModel.GetMeshGroupCount(EMeshType.Fog)));
+                    } else
+                    {
+                        // Empty data for LoD 1+
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+
+                        lodDataBlock.AddRange(BitConverter.GetBytes(100.0f)); // Model LoD
+                        lodDataBlock.AddRange(BitConverter.GetBytes(_TextureLoDDistance * (l + 1))); // Texture LoD
+
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                        lodDataBlock.AddRange(BitConverter.GetBytes((short)0));
+                    }
 
                     // Edge Geometry Size and Offset
                     lodDataBlock.AddRange(BitConverter.GetBytes((int)0));

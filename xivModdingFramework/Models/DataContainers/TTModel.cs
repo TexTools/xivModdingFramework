@@ -33,9 +33,9 @@ namespace xivModdingFramework.Models.DataContainers
     {
         // Standard Mesh
         Standard,
-
         Water,
-        
+        Fog,
+
         // Extra Meshes
         LightShaft,
         Glass,
@@ -50,8 +50,28 @@ namespace xivModdingFramework.Models.DataContainers
 
         Shadow,
         TerrainShadow,
-        Fog,
     }
+    public static class EMeshTypeExtensions {
+        public static bool IsExtraMesh(this EMeshType mesh)
+        {
+            if((int) mesh >= (int) EMeshType.LightShaft && (int) mesh < (int)EMeshType.Shadow)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static bool UseZeroDefaultOffset(this EMeshType mesh)
+        {
+            if(mesh.IsExtraMesh() || mesh == EMeshType.TerrainShadow)
+            {
+                return true;
+            }
+            return false;
+        }
+    }
+
+
 
     /// <summary>
     /// Class representing a fully qualified, Square-Enix style Vertex.
@@ -581,7 +601,34 @@ namespace xivModdingFramework.Models.DataContainers
         public HashSet<string> ActiveShapes = new HashSet<string>();
 
 
+        /// <summary>
+        /// Re-orders the mesh group list for import.
+        /// In specific, mesh groups are ordered by their mesh types, but otherwise kept in-order.
+        /// </summary>
+        public void OrderMeshGroupsForImport()
+        {
+            MeshGroups = MeshGroups.OrderBy(x => (int)x.MeshType).ToList();
+
+            if (MeshGroups.Any(x => x.MeshType != EMeshType.Standard &&
+            x.Parts.Any(x => x.ShapeParts.Count(x => x.Key.StartsWith("shp_")) > 0)))
+            {
+                throw new InvalidDataException("Non-Standard Meshes cannot have shape data.");
+            }
+            
+        }
+
+
         #region Calculated Properties
+        /// <summary>
+        /// Does this TTModel have any of the mesh types which require the LoD header extension?
+        /// </summary>
+        public bool HasExtraMeshes
+        {
+            get
+            {
+                return MeshGroups.Any(x => x.MeshType.IsExtraMesh());
+            }
+        }
 
         /// <summary>
         /// Is this TTModel populated from an internal file, or external?
@@ -654,6 +701,53 @@ namespace xivModdingFramework.Models.DataContainers
                 }
                 return ret.ToList();
             }
+        }
+
+
+        public ushort GetMeshTypeCount(EMeshType type)
+        {
+            var ct = MeshGroups.Count(x => x.MeshType == type);
+            return (ushort) ct;
+        }
+
+        public ushort GetMeshTypeOffset(EMeshType type)
+        {
+            var anyExist = GetMeshTypeCount(type) > 0;
+
+            // There are meshes, just check where offset starts.
+            if (anyExist)
+            {
+                for (int i = 0; i < MeshGroups.Count; i++)
+                {
+                    if (MeshGroups[i].MeshType == type)
+                    {
+                        return (ushort)i;
+                    }
+                }
+            } else if (type.UseZeroDefaultOffset())
+            {
+                return 0;
+            }
+
+            // None exist.  We need to find the last type that did exist.
+            var t = type;
+            while (!anyExist && t != EMeshType.Standard)
+            {
+                t = (EMeshType)((int)t - 1);
+                anyExist = GetMeshTypeCount(t) > 0;
+            }
+
+            if(t == EMeshType.Standard && !anyExist)
+            {
+                // No meshes before us, so we get 0 offset.
+                return 0;
+            }
+
+            // Return end of last real mesh.
+            var lastRealType = GetMeshTypeOffset(t);
+            var offset = lastRealType + MeshGroups.Count(x => x.MeshType == t);
+
+            return (ushort) offset;
         }
 
 
