@@ -125,7 +125,7 @@ namespace xivModdingFramework.Items.DataContainers
 
             if (root.Info.PrimaryType == Enums.XivItemType.weapon)
             {
-                ((XivGearModelInfo)item.ModelInfo).IsWeapon = true;
+                //((XivGearModelInfo)item.ModelInfo).IsWeapon = true;
                 item.SecondaryCategory = XivStrings.Main_Hand;
             }
             else
@@ -155,6 +155,10 @@ namespace xivModdingFramework.Items.DataContainers
 
     public class XivGearModelInfo : XivModelInfo
     {
-        public bool IsWeapon = false;
+        public bool IsWeapon {
+            get {
+                return this.SecondaryID > 0;
+            }
+        }
     }
 }

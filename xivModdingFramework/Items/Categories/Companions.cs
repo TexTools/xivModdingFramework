@@ -327,7 +327,7 @@ namespace xivModdingFramework.Items.Categories
             return petList;
         }
 
-        public async Task<Dictionary<string, char[]>> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel)
+        public async Task<Dictionary<string, char[]>> GetDemiHumanMountTextureEquipPartList(IItemModel itemModel, ModTransaction tx = null)
         {
             var parts = Constants.Alphabet;
 
@@ -335,14 +335,14 @@ namespace xivModdingFramework.Items.Categories
 
             var index = new Index(_gameDirectory);
             var imc = new Imc(_gameDirectory);
-            var version = (await imc.GetImcInfo(itemModel)).MaterialSet.ToString().PadLeft(4, '0');
+            var version = (await imc.GetImcInfo(itemModel, false, tx)).MaterialSet.ToString().PadLeft(4, '0');
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
 
             var mtrlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/material/v{version}";
 
-            var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara);
+            var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mtrlFolder), XivDataFile._04_Chara, tx);
 
             foreach (var slotAbr in SlotAbbreviationDictionary)
             {
@@ -361,7 +361,7 @@ namespace xivModdingFramework.Items.Categories
             return equipPartDictionary;
         }
 
-        public async Task<List<string>> GetDemiHumanMountModelEquipPartList(IItemModel itemModel)
+        public async Task<List<string>> GetDemiHumanMountModelEquipPartList(IItemModel itemModel, ModTransaction tx = null)
         {
             var equipPartList = new List<string>();
 
@@ -374,7 +374,7 @@ namespace xivModdingFramework.Items.Categories
 
             var mdlFolder = $"chara/demihuman/d{id}/obj/equipment/e{bodyVer}/model";
 
-            var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara);
+            var files = await index.GetAllHashedFilesInFolder(HashGenerator.GetHash(mdlFolder), XivDataFile._04_Chara, tx);
 
             if (root == null || root.Info.Slot == null)
             {

@@ -20,6 +20,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.FileTypes;
 
@@ -140,7 +141,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <param name="addLowRes"></param>
         /// <param name="addHiRes"></param>
         /// <returns></returns>
-        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes = true, bool addHiRes = false)
+        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes = true, bool addHiRes = false, ModTransaction tx = null)
         {
             var resPaths = new Dictionary<string, string>();
 
@@ -148,7 +149,7 @@ namespace xivModdingFramework.Items.DataContainers
             {
                 var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
-                var mapNamePaths = await _tex.GetMapAvailableTex(UiPath);
+                var mapNamePaths = await _tex.GetMapAvailableTex(UiPath, tx);
                 return mapNamePaths;
             } else if(SecondaryCategory == XivStrings.HUD)
             {

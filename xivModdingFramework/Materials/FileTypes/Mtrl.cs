@@ -85,8 +85,11 @@ namespace xivModdingFramework.Materials.FileTypes
             var materialSet = 0;
             try
             {
-                var imcEntry = await imc.GetImcInfo(item);
-                materialSet = imcEntry.MaterialSet;
+                if (Imc.UsesImc(item))
+                {
+                    var imcEntry = await imc.GetImcInfo(item, false, tx);
+                    materialSet = imcEntry.MaterialSet;
+                }
             }
             catch
             {
@@ -1424,7 +1427,7 @@ namespace xivModdingFramework.Materials.FileTypes
             return GetMtrlFolder(root, materialSet);
         }
 
-        public static async Task<int> GetMaterialSetId(IItem item)
+        public static async Task<int> GetMaterialSetId(IItem item, bool forceOriginal = false, ModTransaction tx = null)
         {
             if (item == null) return -1;
 
@@ -1440,9 +1443,21 @@ namespace xivModdingFramework.Materials.FileTypes
 
             try
             {
-                var imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var entry = await imc.GetImcInfo((IItemModel)item);
-                return entry.MaterialSet;
+                var im = item as IItemModel;
+                if (im != null && im.ModelInfo != null && Imc.UsesImc(im))
+                {
+                    var imc = new Imc(XivCache.GameInfo.GameDirectory);
+                    var entry = await imc.GetImcInfo((IItemModel)item, false, tx);
+                    if(entry== null)
+                    {
+                        return 0;
+                    }
+
+                    return entry.MaterialSet;
+                } else
+                {
+                    return 0;
+                }
             } catch
             {
                 return 0;

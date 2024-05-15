@@ -4,24 +4,17 @@ using System.ComponentModel;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
-using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
-using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
-using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
-
-
-using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Cache
 {
@@ -127,6 +120,8 @@ namespace xivModdingFramework.Cache
                         {
                             // Something went wrong with the shutdown of the cache worker thread.
                             // Hopefully whatever went wrong fully crashed the thread.
+                            // Or Dispose will hard kill it.
+                            _cacheWorker.Dispose();
                             _cacheWorker = null;
                             break;
                         }
@@ -159,10 +154,10 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, int dxMode = 11, bool validateCache = true, bool enableCacheWorker = true,
+        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool enableCacheWorker = true,
             DirectoryInfo luminaDirectory = null, bool useLumina = false)
         {
-            var gi = new GameInfo(gameDirectory, language, dxMode, luminaDirectory, useLumina);
+            var gi = new GameInfo(gameDirectory, language, luminaDirectory, useLumina);
             SetGameInfo(gi, enableCacheWorker);
         }
         public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
@@ -1233,7 +1228,7 @@ namespace xivModdingFramework.Cache
 
             item.Name = reader.GetString("name");
             item.IconNumber = (uint)reader.GetInt32("icon_id");
-            primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
+            //primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
             primaryMi.PrimaryID = reader.GetInt32("primary_id");
             primaryMi.SecondaryID = reader.GetInt32("secondary_id");
             primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");
@@ -1387,7 +1382,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetChildFiles(string internalFilePath, bool cachedOnly = false)
+        public static async Task<List<string>> GetChildFiles(string internalFilePath, ModTransaction tx = null)
         {
             var wc = new WhereClause() { Column = "parent", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
             var list = await BuildListFromTable("dependencies_children", wc, async (reader) =>
@@ -1401,18 +1396,12 @@ namespace xivModdingFramework.Cache
                 return new List<string>();
             }
 
-            if (cachedOnly)
-            {
-                return list;
-            }
-
-
             
             if (list.Count == 0)
             {
                 // No cache data, have to update.
-                list = await XivDependencyGraph.GetChildFiles(internalFilePath);
-                await UpdateChildFiles(internalFilePath, list);
+                list = await XivDependencyGraph.GetChildFiles(internalFilePath, tx);
+                await UpdateChildFiles(internalFilePath, list, tx);
             }
             return list;
         }
@@ -1422,7 +1411,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetParentFiles(string internalFilePath, bool cachedOnly = false)
+        public static async Task<List<string>> GetParentFiles(string internalFilePath, ModTransaction tx = null)
         {
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
             var list = await BuildListFromTable("dependencies_parents", wc, async (reader) =>
@@ -1436,16 +1425,11 @@ namespace xivModdingFramework.Cache
                 return new List<string>();
             }
 
-            if (cachedOnly)
-            {
-                return list;
-            }
-
             if (list.Count == 0)
             {
                 // 0 Length list means there was no cached data.
-                list = await XivDependencyGraph.GetParentFiles(internalFilePath);
-                await UpdateParentFiles(internalFilePath, list);
+                list = await XivDependencyGraph.GetParentFiles(internalFilePath, tx);
+                await UpdateParentFiles(internalFilePath, list, tx);
             }
             return list;
         }
@@ -1757,9 +1741,9 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
+        public static async Task<List<string>> GetSiblingFiles(string internalFilePath, ModTransaction tx = null)
         {
-            return await XivDependencyGraph.GetSiblingFiles(internalFilePath);
+            return await XivDependencyGraph.GetSiblingFiles(internalFilePath, tx);
         }
 
         /// <summary>
@@ -1794,12 +1778,12 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public static async Task<HashSet<string>> GetChildrenRecursive(string file)
+        public static async Task<HashSet<string>> GetChildrenRecursive(string file, ModTransaction tx = null)
         {
             var files = new HashSet<string>();
             files.Add(file);
 
-            var baseChildren = await XivCache.GetChildFiles(file);
+            var baseChildren = await XivCache.GetChildFiles(file, tx);
             if (baseChildren == null || baseChildren.Count == 0)
             {
                 // No children, just us.
@@ -1811,7 +1795,7 @@ namespace xivModdingFramework.Cache
                 foreach (var child in baseChildren)
                 {
                     // Recursively get their children.
-                    var children = await GetChildrenRecursive(child);
+                    var children = await GetChildrenRecursive(child, tx);
                     foreach (var subchild in children)
                     {
                         // Add the results to the list.
@@ -1829,7 +1813,7 @@ namespace xivModdingFramework.Cache
         /// Returns the children that were written to the DB.
         /// </summary>
         /// <param name="internalFilePath"></param>
-        public static async Task<List<string>> UpdateChildFiles(string internalFilePath, List<string> children = null)
+        public static async Task<List<string>> UpdateChildFiles(string internalFilePath, List<string> children = null, ModTransaction tx = null)
         {
             var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Texture)
@@ -1840,7 +1824,7 @@ namespace xivModdingFramework.Cache
             // Just updating a single file.
             if (children == null)
             {
-                children = await XivDependencyGraph.GetChildFiles(internalFilePath);
+                children = await XivDependencyGraph.GetChildFiles(internalFilePath, tx);
             }
 
             var oldCacheChildren = new List<string>();
@@ -1948,7 +1932,7 @@ namespace xivModdingFramework.Cache
         /// Updates the file parents in the dependencies cache.
         /// </summary>
         /// <param name="internalFilePath"></param>
-        private static async Task UpdateParentFiles(string internalFilePath, List<string> parents = null)
+        private static async Task UpdateParentFiles(string internalFilePath, List<string> parents = null, ModTransaction tx = null)
         {
             var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root)
@@ -1959,7 +1943,7 @@ namespace xivModdingFramework.Cache
             // Just updating a single file.
             if (parents == null)
             {
-                parents = await XivDependencyGraph.GetParentFiles(internalFilePath);
+                parents = await XivDependencyGraph.GetParentFiles(internalFilePath, tx);
             }
 
             using (var db = new SQLiteConnection(CacheConnectionString))
@@ -2019,7 +2003,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="files"></param>
         /// <returns></returns>
-        public static void QueueDependencyUpdate(List<string> files) {
+        public static void QueueDependencyUpdate(IEnumerable<string> files) {
 
             // We need to...
             // 1. Purge and requeue the parent calculation for all files we had listed as children previously.
@@ -2235,6 +2219,8 @@ namespace xivModdingFramework.Cache
         /// </summary>
         private static void ProcessDependencyQueue(object sender, DoWorkEventArgs e)
         {
+            // Note: The Cache worker only runs when Transactions are not active.
+
             // This will be executed on another thread.
             BackgroundWorker worker = (BackgroundWorker)sender;
             while (!worker.CancellationPending)
@@ -2257,7 +2243,10 @@ namespace xivModdingFramework.Cache
                         try
                         {
                             // The get call will automatically cache the data, if it needs updating.
-                            var task = GetChildFiles(file, false);
+
+                            // Use a temporary readonly TX for perf.
+                            var tx = ModTransaction.BeginTransaction();
+                            var task = GetChildFiles(file, tx);
 
                             // Set a safety timeout here.
                             task.Wait(3000);
@@ -2292,8 +2281,11 @@ namespace xivModdingFramework.Cache
 
                             try
                             {
+                                // Use a temporary readonly TX for perf.
+                                var tx = ModTransaction.BeginTransaction();
+
                                 // The get call will automatically cache the data, if it needs updating.
-                                var task = GetParentFiles(file, false);
+                                var task = GetParentFiles(file, tx);
 
                                 // Set a safety timeout here.
                                 task.Wait(3000);

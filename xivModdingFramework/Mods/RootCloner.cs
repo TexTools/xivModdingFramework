@@ -87,13 +87,6 @@ namespace xivModdingFramework.Mods
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
 
-                bool locked = _index.IsIndexLocked(df);
-                if(locked)
-                {
-                    throw new Exception("Game files currently in use.");
-                }
-
-
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Analyzing items and variants...");
@@ -699,13 +692,15 @@ namespace xivModdingFramework.Mods
         /// <param name="readTx"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, TxFileState> originalStates, string sourceApplication)
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, TxFileState> originalStates, string sourceApplication, IProgress<(int current, int total, string message)> progress = null)
         {
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
             var newModList = await tx.GetModList();
 
             HashSet<string> clearedFiles = new HashSet<string>();
+            var total = roots.Count;
+            var count = 0;
             foreach (var dfe in conversionsByDf)
             {
                 HashSet<string> filesToReset = new HashSet<string>();
@@ -718,6 +713,8 @@ namespace xivModdingFramework.Mods
                     var destination = conversion.Value.Root;
                     var variant = conversion.Value.Variant;
 
+
+                    progress.Report((count, total, "Updating Destination Items..."));
                     var convertedFiles = await RootCloner.CloneRoot(source, destination, sourceApplication, variant, null, null, tx);
 
                     // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
@@ -750,6 +747,7 @@ namespace xivModdingFramework.Mods
                         }
                     }
 
+                    count++;
                 }
 
                 // Reset the states of all the requested files, and remove them form the import list.

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General;
@@ -141,6 +142,11 @@ namespace xivModdingFramework.Mods
         public static event TransactionCancelledEventHandler ActiveTransactionCancelled;
         public static event TransactionEventHandler ActiveTransactionClosed;
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
+
+        public static event TransactionEventHandler ActiveTransactionBlocked;
+
+        private static bool _CANCEL_BLOCKED_TX = false;
+        private static bool _ACTIVE_TX_BLOCKED = false;
         #endregion
 
 
@@ -251,6 +257,39 @@ namespace xivModdingFramework.Mods
             }
         }
 
+        /// <summary>
+        /// Cancels the current write-blocked transaction.
+        /// </summary>
+        public static void CancelBlockedTransaction()
+        {
+            if (_ACTIVE_TX_BLOCKED)
+            {
+                _CANCEL_BLOCKED_TX = true;
+            }
+        }
+
+        private bool AreGameFilesWritable()
+        {
+            foreach (var ik in _IndexFiles)
+            {
+                var df = ik.Key;
+                var index1Path = Path.Combine(_GameDirectory.FullName, $"{df.GetDataFileName()}{Index.IndexExtension}");
+                var index2Path = Path.Combine(_GameDirectory.FullName, $"{df.GetDataFileName()}{Index.Index2Extension}");
+
+                try
+                {
+                    var f1 = File.Open(index1Path, FileMode.Open, FileAccess.ReadWrite);
+                    var f2 = File.Open(index2Path, FileMode.Open, FileAccess.ReadWrite);
+                    f1.Dispose();
+                    f2.Dispose();
+                }
+                catch(Exception ex)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         public async Task<IndexFile> GetIndexFile(XivDataFile dataFile)
         {
@@ -486,6 +525,7 @@ namespace xivModdingFramework.Mods
             {
                 _ActiveTransaction = null;
                 tx.State = ETransactionState.Closed;
+                _CANCEL_BLOCKED_TX = false;
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
@@ -505,6 +545,36 @@ namespace xivModdingFramework.Mods
             State = ETransactionState.Closing;
 
             CheckWriteTimes();
+
+            if(Settings.Target == ETransactionTarget.GameFiles)
+            {
+                var cancelled = await Task.Run(() =>
+                {
+                    _ACTIVE_TX_BLOCKED = false;
+                    _CANCEL_BLOCKED_TX = false;
+                    while (!AreGameFilesWritable())
+                    {
+                        if (_ACTIVE_TX_BLOCKED == false)
+                        {
+                            _ACTIVE_TX_BLOCKED = true;
+                            ActiveTransactionBlocked.Invoke(null);
+                        }
+
+                        if(_CANCEL_BLOCKED_TX)
+                        {
+                            _ACTIVE_TX_BLOCKED = false;
+                            _CANCEL_BLOCKED_TX = false;
+                            State = ETransactionState.Open;
+                            ModTransaction.CancelTransaction(this, true);
+                            return true;
+                        }
+                        Thread.Sleep(1000);
+                    }
+                    return false;
+                });
+                if (cancelled) return;
+            }
+
 
             // Perform, in order...
             // DATA WRITE => MODLIST WRITE => INDEX WRITE
@@ -587,6 +657,13 @@ namespace xivModdingFramework.Mods
                         index.Value.Save();
                     }
                 }
+
+
+                // We have to queue all of the touched files up as possibly changed in the Mod Cache to be safe.
+                HashSet<string> files = new HashSet<string>();
+                files.Union(_PrePrepStates.Keys);
+                files.Union(_OriginalStates.Keys);
+                XivCache.QueueDependencyUpdate(files);
             }
 
             TransactionCommitted?.Invoke(this);
@@ -609,6 +686,7 @@ namespace xivModdingFramework.Mods
             {
                 tx.CancelTransaction();
                 tx.State = ETransactionState.Closed;
+                _CANCEL_BLOCKED_TX = false;
                 return;
             }
 
@@ -647,6 +725,14 @@ namespace xivModdingFramework.Mods
                 if (ActiveTransaction == this ) {
                     ActiveTransactionCancelled?.Invoke(this, graceful);
                 }
+
+                // We have to queue all of the touched files up as possibly changed in the Mod Cache.
+                HashSet<string> files = new HashSet<string>();
+
+                files.Union(_PrePrepStates.Keys);
+                files.Union(_OriginalStates.Keys);
+                XivCache.QueueDependencyUpdate(files);
+
 
                 if (Settings.Target == ETransactionTarget.GameFiles)
                 {
@@ -1425,6 +1511,7 @@ namespace xivModdingFramework.Mods
         }
 
         #endregion
+
 
         #region Static Default Settings
 

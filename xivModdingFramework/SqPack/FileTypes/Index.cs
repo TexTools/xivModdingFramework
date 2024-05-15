@@ -103,9 +103,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFolder">The hashed value of the folder path</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>A list containing the hashed values of the files in the given folder</returns>
-        internal async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile)
+        internal async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile, ModTransaction tx)
         {
-            var index = await GetIndexFile(dataFile, false, true);
+            var index = await tx.GetIndexFile(dataFile);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
 
             var hashes = entries.Select(x => (int)x.FileNameHash);

@@ -713,7 +713,7 @@ namespace xivModdingFramework.Mods
                         else if (Imc.UsesImc(root) && ext == ".tex")
                         {
                             // For textures, get the first material using them, and list them under that material's item.
-                            var parents = await XivCache.GetParentFiles(mod.FilePath);
+                            var parents = await XivCache.GetParentFiles(mod.FilePath, tx);
                             if (parents.Count == 0)
                             {
                                 item = root.GetFirstItem();

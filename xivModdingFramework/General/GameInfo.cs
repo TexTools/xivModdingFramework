@@ -49,8 +49,6 @@ namespace xivModdingFramework
         /// </summary>
         public Version GameVersion { get; }
 
-        public int DxMode { get; }
-
 
         /// <summary>
         /// The language used when parsing the game data.
@@ -63,7 +61,7 @@ namespace xivModdingFramework
         /// </summary>
         /// <param name="gameDirectory">The directory in which the game is installed.</param>
         /// <param name="xivLanguage">The language to use when parsing the game data.</param>
-        public GameInfo(DirectoryInfo gameDirectory, XivLanguage xivLanguage, int dxMode = 11, DirectoryInfo luminaDirectory = null, bool useLumina = false)
+        public GameInfo(DirectoryInfo gameDirectory, XivLanguage xivLanguage, DirectoryInfo luminaDirectory = null, bool useLumina = false)
         {
             GameDirectory = gameDirectory;
             GameLanguage  = xivLanguage;
@@ -77,7 +75,6 @@ namespace xivModdingFramework
             }
             LuminaDirectory = luminaDirectory;
             UseLumina = useLumina;
-            DxMode = dxMode;
 
             if (!gameDirectory.FullName.Contains(Path.Combine("game", "sqpack", "ffxiv")))
             {

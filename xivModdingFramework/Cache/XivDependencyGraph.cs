@@ -69,7 +69,7 @@ namespace xivModdingFramework.Cache
             }
 
         }
-        public static async Task<List<IItemModel>> GetSharedMaterialItems(this IItemModel item)
+        public static async Task<List<IItemModel>> GetSharedMaterialItems(this IItemModel item, ModTransaction tx = null)
         {
             var sameModelItems = new List<IItemModel>();
             sameModelItems = await item.GetSharedModelItems();
@@ -79,10 +79,10 @@ namespace xivModdingFramework.Cache
                 var sameMaterialItems = new List<IItemModel>();
 
                 var imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var originalInfo = await imc.GetImcInfo(item);
+                var originalInfo = await imc.GetImcInfo(item, false, tx);
                 foreach (var i in sameModelItems)
                 {
-                    var info = await imc.GetImcInfo(i);
+                    var info = await imc.GetImcInfo(i, false, tx);
                     if (info.MaterialSet == originalInfo.MaterialSet)
                     {
                         sameMaterialItems.Add(i);
@@ -98,7 +98,7 @@ namespace xivModdingFramework.Cache
                 return sameModelItems;
             }
         }
-        public static async Task<List<IItemModel>> GetSharedModelItems(this IItemModel item)
+        public static async Task<List<IItemModel>> GetSharedModelItems(this IItemModel item, ModTransaction tx = null)
         {
             var root = item.GetRoot();
             var items = new List<IItemModel>();
@@ -714,7 +714,7 @@ namespace xivModdingFramework.Cache
                         List<string> mdlMats = null;
                         if (useCache)
                         {
-                            mdlMats = await XivCache.GetChildFiles(model);
+                            mdlMats = await XivCache.GetChildFiles(model, tx);
                         } else
                         {
                             if (index.FileExists(model))
@@ -810,7 +810,7 @@ namespace xivModdingFramework.Cache
                     List<string> mtrlTexs = new List<string>();
                     if (tx == null)
                     {
-                        mtrlTexs = await XivCache.GetChildFiles(mat);
+                        mtrlTexs = await XivCache.GetChildFiles(mat, tx);
                     } else
                     {
                         var dataFile = IOUtil.GetDataFileFromPath(mat);
@@ -1040,7 +1040,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="imcSubset"></param>
         /// <returns></returns>
-        public async Task<List<IItemModel>> GetAllItems(int imcSubset = -1)
+        public async Task<List<IItemModel>> GetAllItems(int imcSubset = -1, ModTransaction tx = null)
         {
 
             var items = new List<IItemModel>();
@@ -1107,7 +1107,7 @@ namespace xivModdingFramework.Cache
             {
                 var imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var imcPaths = await GetImcEntryPaths();
-                var imcEntries = await imc.GetEntries(imcPaths);
+                var imcEntries = await imc.GetEntries(imcPaths, false, tx);
 
                 // Need to verify all of our IMC sets are properly represented in the item list.
                 for (int i = 0; i <  imcEntries.Count; i++)
@@ -1231,7 +1231,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetParentFiles(string internalFilePath)
+        public static async Task<List<string>> GetParentFiles(string internalFilePath, ModTransaction tx = null)
         {
             // This function should be written in terms of going up
             // the tree to the root, then climbing down through
@@ -1274,11 +1274,11 @@ namespace xivModdingFramework.Cache
                 foreach (var root in roots)
                 {
                     // Get all models in this depedency tree.
-                    var models = await root.GetModelFiles();
+                    var models = await root.GetModelFiles(tx);
                     foreach (var model in models)
                     {
                         // And make sure their child files are fully cached.
-                        var materials = await XivCache.GetChildFiles(model);
+                        var materials = await XivCache.GetChildFiles(model, tx);
                     }
                 }
 
@@ -1299,11 +1299,11 @@ namespace xivModdingFramework.Cache
                 foreach (var root in roots)
                 {
                     // Get all the materials in this dependency tree.
-                    var materials = await root.GetMaterialFiles();
+                    var materials = await root.GetMaterialFiles(-1, tx);
                     foreach(var mat in materials)
                     {
                         // And make sure their child files are fully cached.
-                        var textures = await XivCache.GetChildFiles(mat);
+                        var textures = await XivCache.GetChildFiles(mat, tx);
                     }
                 }
 
@@ -1328,14 +1328,14 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
+        public static async Task<List<string>> GetSiblingFiles(string internalFilePath, ModTransaction tx = null)
         {
             var parents = await GetParentFiles(internalFilePath);
             if (parents == null) return null;
             var siblings = new HashSet<string>();
             foreach(var p in parents)
             {
-                var children = await XivCache.GetChildFiles(p);
+                var children = await XivCache.GetChildFiles(p, tx);
                 foreach(var c in children)
                 {
                     siblings.Add(c);
@@ -1360,7 +1360,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetChildFiles(string internalFilePath)
+        public static async Task<List<string>> GetChildFiles(string internalFilePath, ModTransaction tx = null)
         {
 
             var level = GetDependencyLevel(internalFilePath);
@@ -1376,7 +1376,7 @@ namespace xivModdingFramework.Cache
                 var root = await XivCache.GetFirstRoot(internalFilePath);
                 if (root == null) return null;
 
-                return await root.GetModelFiles();
+                return await root.GetModelFiles(tx);
             }
 
             if (level == XivDependencyLevel.Model)
@@ -1385,7 +1385,7 @@ namespace xivModdingFramework.Cache
                 try
                 {
                     var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
-                    var mdlChildren = await _mdl.GetReferencedMaterialPaths(internalFilePath, -1, false, false);
+                    var mdlChildren = await _mdl.GetReferencedMaterialPaths(internalFilePath, -1, false, false, tx);
                     return mdlChildren;
                 } catch
                 {
@@ -1399,7 +1399,7 @@ namespace xivModdingFramework.Cache
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
                     var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-                    var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false, false);
+                    var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false, false, tx);
                     return mtrlChildren;
                 } catch
                 {

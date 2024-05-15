@@ -155,11 +155,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             var needsCleanup = false;
             var ownTx = false;
+            ModPack? prevPack = null;
             if(tx == null)
             {
                 ownTx = true;
                 tx = ModTransaction.BeginTransaction(true);
+            }else
+            {
+                prevPack = tx.ModPack;
             }
+
             try
             {
 
@@ -187,11 +192,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
                 var modPack = new ModPack(null);
-
                 modPack.Name = pmp.Meta.Name;
                 modPack.Author = pmp.Meta.Author;
                 modPack.Version = pmp.Meta.Version;
                 modPack.Url = pmp.Meta.Website;
+
+                tx.ModPack = modPack;
 
                 if (pmp.Groups == null || pmp.Groups.Count == 0)
                 {
@@ -252,7 +258,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
                 }
 
-                var preRootTime= DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                var preRootTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                 long rootDuration = 0;
                 if (GetRootConversionsFunction != null)
                 {
@@ -299,6 +305,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var floatDuration = duration / 1000.0f;
 
                 var res = (imported.Keys.ToList(), notImported.ToList(), floatDuration);
+
                 return res;
             }
             catch
@@ -311,6 +318,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
             finally
             {
+                if(tx != null)
+                {
+                    tx.ModPack = prevPack;
+                }
+
                 if (needsCleanup)
                 {
                     IOUtil.DeleteTempDirectory(unzippedPath);
@@ -327,13 +339,46 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var imported = new Dictionary<string, TxFileState>();
             var notImported = new HashSet<string>();
 
-            // Import files.
+            // File swaps first.
             var i = 0;
+            foreach(var kv in option.FileSwaps)
+            {
+
+                progress?.Report((i, option.FileSwaps.Count, "Importing File Swaps from Option " + (optionIdx + 1) + "..."));
+
+                var src = kv.Key;
+
+                // For some reason the destination value is backslashed instead of forward-slashed.
+                var dest = kv.Value.Replace("\\", "/");
+
+                if (!CanImport(src) || !CanImport(dest))
+                {
+                    notImported.Add(dest);
+                    i++;
+                    continue;
+                }
+
+                // Save original state
+                if (!imported.ContainsKey(dest))
+                {
+                    imported.Add(dest, await tx.SaveFileState(dest));
+                }
+
+                // Get original SqPacked file.
+                var data = await tx.ReadFile(src, true, true);
+
+                // Write it back to TX.
+                var newOffset = await tx.WriteFile(dest, data, _Source);
+                i++;
+            }
+
+            // Import files.
+            i = 0;
             foreach (var file in option.Files)
             {
                 var internalPath = file.Key;
                 var externalPath = Path.Combine(basePath, file.Value);
-                progress?.Report((i, option.Files.Count, "Importing Files for Option " + (optionIdx+1) + "..."));
+                progress?.Report((i, option.Files.Count, "Importing New Files from Option " + (optionIdx+1) + "..."));
 
                 // Safety checks.
                 if (!CanImport(file.Key))
@@ -377,8 +422,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var rspOptions = option.Manipulations.Select(x => x.Manipulation as PMPRspManipulationJson).Where(x => x != null);
                 var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
 
+                i = 0;
+                var total = byRg.Count();
                 foreach (var group in byRg)
                 {
+                    progress?.Report((i, total, "Importing Race Scaling Changes from Option " + (optionIdx + 1) + "..."));
                     var rg = group.First().GetRaceGender();
                     RacialGenderScalingParameter cmp;
                     if (_RgspRaceGenders.Contains(group.Key))
@@ -404,6 +452,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
 
                     await CMP.SaveScalingParameter(cmp, _Source, tx);
+                    i++;
                 }
 
                 // Metadata.
@@ -411,9 +460,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 var byRoot = metaOptions.GroupBy(x => x.GetRoot());
 
+                total = byRoot.Count();
                 // Apply Metadata in order by Root.
-                foreach(var group in byRoot)
+                foreach (var group in byRoot)
                 {
+                    progress?.Report((i, total, "Importing Metadata Changes from Option " + (optionIdx + 1) + "..."));
                     var root = group.Key;
                     var metaPath = root.Info.GetRootFile();
 
@@ -442,6 +493,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                     await ItemMetadata.SaveMetadata(metaData, _Source, tx);
                     await ItemMetadata.ApplyMetadata(metaData, tx);
+                    i++;
                 }
             }
 
@@ -819,7 +871,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Description;
 
         public Dictionary<string, string> Files;
-        public Dictionary<string, object> FileSwaps;
+        public Dictionary<string, string> FileSwaps;
         public List<PMPMetaManipulationJson> Manipulations;
     }
 

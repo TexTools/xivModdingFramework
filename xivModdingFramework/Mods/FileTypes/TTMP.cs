@@ -869,7 +869,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 progress.Report((0, 0, "Updating Destination Items..."));
 
                 tx.ModPack = modPack;
-                await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, sourceApplication);
+                await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, sourceApplication, progress);
                 tx.ModPack = null;
             }
             var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();

@@ -159,11 +159,16 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="itemModel">The item to get the avfx path for</param>
         /// <param name="itemType">The type of the item</param>
         /// <returns>A tuple containing the path folder and file</returns>
-        public static async Task<(string Folder, string File)> GetVfxPath(IItemModel itemModel)
+        public static async Task<(string Folder, string File)> GetVfxPath(IItemModel itemModel, bool forceDefault = false, ModTransaction tx = null)
         {
             // get the vfx version from the imc file
             var imc = new Imc(XivCache.GameInfo.GameDirectory);
-            var imcInfo = await imc.GetImcInfo(itemModel);
+            var imcInfo = await imc.GetImcInfo(itemModel, forceDefault, tx);
+            if(imcInfo == null)
+            {
+                return ("", "");
+            }
+
             int vfx = imcInfo.Vfx;
 
             var root = itemModel.GetRootInfo();

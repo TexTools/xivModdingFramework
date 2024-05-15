@@ -308,13 +308,13 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<Dictionary<string, string>> GetMapAvailableTex(string path)
+        public async Task<Dictionary<string, string>> GetMapAvailableTex(string path, ModTransaction tx)
         {
             var mapNamePathDictonary = new Dictionary<string, string>();
 
             var folderPath = $"ui/map/{path}";
 
-            var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folderPath), XivDataFile._06_Ui);
+            var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folderPath), XivDataFile._06_Ui, tx);
 
             foreach (var mapType in MapTypeDictionary)
             {

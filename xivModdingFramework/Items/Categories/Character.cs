@@ -353,7 +353,7 @@ namespace xivModdingFramework.Items.Categories
         /// <param name="race">The race</param>
         /// <param name="num">The character item number</param>
         /// <returns>A dictionary containing</returns>
-        public async Task<Dictionary<string, char[]>> GetTypePartForTextures(XivCharacter charaItem, XivRace race, int num)
+        public async Task<Dictionary<string, char[]>> GetTypePartForTextures(XivCharacter charaItem, XivRace race, int num, ModTransaction tx)
         {
             var typePartDictionary = new Dictionary<string, char[]>();
 
@@ -384,7 +384,7 @@ namespace xivModdingFramework.Items.Categories
                 file = XivStrings.EarsMtrlFile;
             }
 
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
+            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
 
             foreach (var type in typeDict)
             {
@@ -411,91 +411,13 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
-        /// Gets the Part for a given Character Item
-        /// </summary>
-        /// <remarks>
-        /// For Body and Tail Character Items since they don't have Types
-        /// </remarks>
-        /// <param name="charaItem">The character item</param>
-        /// <param name="race">The race</param>
-        /// <param name="num">The character item number</param>
-        /// <param name="variant">the variant for the mtrl folder</param>
-        /// <returns>An array of characters containing the parts for the texture</returns>
-        public async Task<char[]> GetPartForTextures(XivCharacter charaItem, XivRace race, int num, int variant = 1)
-        {
-            var folder = "";
-            var file = "";
-
-            var parts = Constants.Alphabet;
-
-            if (charaItem.SecondaryCategory == XivStrings.Body)
-            {
-                folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), variant.ToString().PadLeft(4, '0'));
-                file = XivStrings.BodyMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Tail)
-            {
-                folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-                file = XivStrings.TailMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Ear)
-            {
-                folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-
-                file = XivStrings.EarsMtrlFile;
-            }
-
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
-
-            return (from part in parts
-                let mtrlFile = string.Format(file, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), part)
-                where fileList.Contains(HashGenerator.GetHash(mtrlFile))
-                select part).ToArray();
-        }
-
-        public async Task<List<int>> GetVariantsForTextures(XivCharacter charaItem, XivRace race, int num)
-        {
-            var variantList = new List<int>();
-
-            if (charaItem.SecondaryCategory == XivStrings.Body)
-            {
-                var testDictionary = new Dictionary<int, int>();
-
-                for (var i = 0; i < 50; i++)
-                {
-                    var folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
-                    testDictionary.Add(HashGenerator.GetHash(folder), i);
-
-                    variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                    variantList.Sort();
-                }
-            }
-
-            if (charaItem.SecondaryCategory == XivStrings.Tail)
-            {
-                var testDictionary = new Dictionary<int, int>();
-
-                for (var i = 0; i < 50; i++)
-                {
-                    var folder = string.Format(XivStrings.TailMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
-                    testDictionary.Add(HashGenerator.GetHash(folder), i);
-
-                    variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                    variantList.Sort();
-                }
-            }
-
-            return variantList;
-        }
-
-        /// <summary>
         /// Gets the Type of models for a given Character Item
         /// </summary>
         /// <param name="charaItem">The character item</param>
         /// <param name="race">The race</param>
         /// <param name="num">The character item number</param>
         /// <returns>A dictionary containging [</returns>
-        public async Task<List<string>> GetTypeForModels(XivCharacter charaItem, XivRace race, int num)
+        public async Task<List<string>> GetTypeForModels(XivCharacter charaItem, XivRace race, int num, ModTransaction tx)
         {
             var folder = "";
             var file = "";
@@ -537,7 +459,7 @@ namespace xivModdingFramework.Items.Categories
                 file = XivStrings.EarsMDLFile;
             }
 
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
+            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
 
             var typeList = new List<string>();
             foreach (var type in typeDict)
@@ -559,7 +481,7 @@ namespace xivModdingFramework.Items.Categories
             FacePaint, 
             Equipment
         };
-        public async Task<List<string>> GetDecalPaths(XivDecalType type)
+        public async Task<List<string>> GetDecalPaths(XivDecalType type, ModTransaction tx)
         {
 
             const int decalMax = 300;
@@ -568,7 +490,7 @@ namespace xivModdingFramework.Items.Categories
             if (type == XivDecalType.FacePaint)
             {
                 var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
-                    XivDataFile._04_Chara);
+                    XivDataFile._04_Chara, tx);
 
                 for (int i = 0; i < decalMax; i++)
                 {
@@ -584,7 +506,7 @@ namespace xivModdingFramework.Items.Categories
             else if(type == XivDecalType.Equipment)
             {
                 var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
-                    XivDataFile._04_Chara);
+                    XivDataFile._04_Chara, tx);
 
 
                 for (int i = 0; i < decalMax; i++)

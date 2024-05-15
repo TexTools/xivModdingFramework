@@ -1931,7 +1931,7 @@ namespace xivModdingFramework.Models.FileTypes
             try
             {
                 var _imc = new Imc(_gameDirectory);
-                mtrlVariant = (await _imc.GetImcInfo(item)).MaterialSet;
+                mtrlVariant = (await _imc.GetImcInfo(item, false, tx)).MaterialSet;
             }
             catch (Exception ex)
             {
