@@ -130,10 +130,11 @@ namespace xivModdingFramework.Models.FileTypes
 
         /// <summary>
         /// Retrieve the list of all possible skeletal selections for a given type.
+        /// Use NULL force original to read and merge both modded and unmodded options.
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<XivRace, HashSet<int>>> GetAllExtraSkeletons(EstType type, XivRace raceFilter = XivRace.All_Races, bool includeNpcs = false, ModTransaction tx = null)
+        public static async Task<Dictionary<XivRace, HashSet<int>>> GetAllExtraSkeletons(EstType type, XivRace raceFilter = XivRace.All_Races, bool? forceOriginal = false, bool includeNpcs = false, ModTransaction tx = null)
         {
             var ret = new Dictionary<XivRace, HashSet<int>>();
             var races = includeNpcs ? Eqp.PlayableRacesWithNPCs : Eqp.PlayableRaces;
@@ -144,19 +145,45 @@ namespace xivModdingFramework.Models.FileTypes
                 races.Add(raceFilter);
             }
 
-            var entries = await GetEstFile(type, false, tx);
-
-            foreach (var race in races)
+            if (forceOriginal == null || forceOriginal == true)
             {
-                ret.Add(race, new HashSet<int>());
-                if (!entries.ContainsKey(race)) continue;
-
-                var dict = entries[race];
-                foreach (var kv in dict)
+                var entries = await GetEstFile(type, true, tx);
+                foreach (var race in races)
                 {
-                    ret[race].Add(kv.Value.SkelId);
+                    if (!ret.ContainsKey(race))
+                    {
+                        ret.Add(race, new HashSet<int>());
+                    }
+
+                    if (!entries.ContainsKey(race)) continue;
+
+                    var dict = entries[race];
+                    foreach (var kv in dict)
+                    {
+                        ret[race].Add(kv.Value.SkelId);
+                    }
                 }
             }
+            if (forceOriginal == null || forceOriginal == false)
+            {
+                var entries = await GetEstFile(type, false, tx);
+                foreach (var race in races)
+                {
+                    if (!ret.ContainsKey(race))
+                    {
+                        ret.Add(race, new HashSet<int>());
+                    }
+
+                    if (!entries.ContainsKey(race)) continue;
+
+                    var dict = entries[race];
+                    foreach (var kv in dict)
+                    {
+                        ret[race].Add(kv.Value.SkelId);
+                    }
+                }
+            }
+
 
             return ret;
         }
@@ -170,38 +197,45 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task SaveExtraSkeletonEntries(EstType type, List<ExtraSkeletonEntry> modifiedEntries, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var entries = await GetEstFile(type, false, tx);
+            var fileEntries = await GetEstFile(type, false, tx);
 
             // Add/Remove entries.
-            foreach (var entry in modifiedEntries)
+            foreach (var modifiedEntry in modifiedEntries)
             {
-                if (entry.SkelId == 0)
+                if (modifiedEntry.SkelId == 0)
                 {
-                    if (!entries.ContainsKey(entry.Race)) {
+                    if (!fileEntries.ContainsKey(modifiedEntry.Race)) {
                         continue;
                     }
                     // Remove this entry.
-                    if (entries[entry.Race].ContainsKey(entry.SetId))
+                    if (fileEntries[modifiedEntry.Race].ContainsKey(modifiedEntry.SetId))
                     {
-                        entries[entry.Race].Remove(entry.SetId);
+                        fileEntries[modifiedEntry.Race].Remove(modifiedEntry.SetId);
                     }
                 }
                 else
                 {
-                    // Add or update this entry.
-                    if (entries[entry.Race].ContainsKey(entry.SetId))
+                    if (!fileEntries.ContainsKey(modifiedEntry.Race))
                     {
-                        entries[entry.Race][entry.SetId] = entry;
+                        // Rare case, but primarily occurs from modifying the Majestic Dress, which is the
+                        // only Viera F Body Extra-Skeleton item.  So if you remove that, they no longer have any entries.
+                        fileEntries.Add(modifiedEntry.Race, new Dictionary<ushort, ExtraSkeletonEntry>());
+                    }
+
+                    // Add or update this entry.
+                    if (fileEntries[modifiedEntry.Race].ContainsKey(modifiedEntry.SetId))
+                    {
+                        fileEntries[modifiedEntry.Race][modifiedEntry.SetId] = modifiedEntry;
                     }
                     else
                     {
-                        entries[entry.Race].Add(entry.SetId, entry);
+                        fileEntries[modifiedEntry.Race].Add(modifiedEntry.SetId, modifiedEntry);
                     }
                 }
             }
 
             // Save file.
-            await SaveEstFile(type, entries, referenceItem, tx);
+            await SaveEstFile(type, fileEntries, referenceItem, tx);
         }
 
         public static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> GetExtraSkeletonEntries(IItem item, bool forceDefault = false, ModTransaction tx = null)

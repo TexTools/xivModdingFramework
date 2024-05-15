@@ -163,6 +163,20 @@ namespace xivModdingFramework.Models.FileTypes
 
         #region High-Level Model Accessors
 
+        public struct MeshIndexAndCount
+        {
+            public ushort MeshIndex;
+            public ushort MeshCount;
+
+            public static MeshIndexAndCount Read(BinaryReader br)
+            {
+                var mi = new MeshIndexAndCount();
+                mi.MeshIndex = br.ReadUInt16();
+                mi.MeshCount = br.ReadUInt16();
+                return mi;
+            }
+        }
+
         /// <summary>
         /// Resolves the model path for a given item and race.
         /// </summary>
@@ -383,7 +397,7 @@ namespace xivModdingFramework.Models.FileTypes
                     ModelClipOutDistance = br.ReadSingle(),
                     ShadowClipOutDistance = br.ReadSingle(),
 
-                    UnknownBoundingBoxCount = br.ReadUInt16(),
+                    ExtraBoundingBoxCount = br.ReadUInt16(),
                     TerrainShadowSubmeshCount = br.ReadInt16(),
                     ExtraLoDCount = br.ReadByte(),
 
@@ -399,6 +413,8 @@ namespace xivModdingFramework.Models.FileTypes
                     Unknown16 = br.ReadInt16(),
                     Unknown17 = br.ReadInt16()
                 };
+
+                var bytes = BitConverter.GetBytes(mdlModelData.ModelClipOutDistance);
 
                 // Finished reading all MdlModelData
                 // Adding to xivMdl
@@ -489,7 +505,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var lod = new LevelOfDetail
                     {
-                        MeshOffset = br.ReadUInt16(),
+                        MeshIndex = br.ReadUInt16(),
                         MeshCount = br.ReadInt16(),
                         ModelLoDRange = br.ReadSingle(),
                         TextureLoDRange = br.ReadSingle(),
@@ -512,8 +528,8 @@ namespace xivModdingFramework.Models.FileTypes
                         MeshDataList = new List<MeshData>()
                     };
 
-                    // Finished reading LoD
-                    var meshSum = lod.MeshCount + lod.ShadowMeshCount + lod.FogMeshCount + lod.WaterMeshCount;
+                    // Placeholder value.
+                    lod.ExtraMeshIndex = (ushort) (lod.WaterMeshIndex + lod.WaterMeshCount);
 
                     //Adding to xivMdl
                     xivMdl.LoDList.Add(lod);
@@ -521,45 +537,33 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (mdlModelData.ExtraLoDEnabled)
                 {
-                    for (var i = 0; i < mdlModelData.ExtraLoDCount; i++)
+                    for (var i = 0; i < mdlModelData.LoDCount; i++)
                     {
-                        if (xivMdl.ExtraLoDList == null)
+                        // This is /absolutely/ not the correct way to read this struct.
+                        // But it /does/ work... Somehow...
+                        var list = new Dictionary<int, MeshIndexAndCount>(15);
+                        var start = br.BaseStream.Position;
+                        for (int mi = 0; mi < 15; mi++)
                         {
-                            xivMdl.ExtraLoDList = new List<LevelOfDetail>();
+                            var entry = MeshIndexAndCount.Read(br);
+                            list.Add(mi, entry);
+                            if(entry.MeshIndex > 0 || entry.MeshCount > 0)
+                            {
+                                var pos = br.BaseStream.Position - start - 4;
+                                var z = 254;
+                            }
                         }
 
-                        var lod = new LevelOfDetail
+                        var withValues = list.Where(x => x.Value.MeshIndex > 0 || x.Value.MeshCount > 0).ToList();
+
+                        if(withValues.Count > 0)
                         {
-                            MeshOffset = br.ReadUInt16(),
-                            MeshCount = br.ReadInt16(),
-                            ModelLoDRange = br.ReadInt32(),
-                            TextureLoDRange = br.ReadInt32(),
-                            WaterMeshIndex = br.ReadInt16(),
-                            WaterMeshCount = br.ReadInt16(),
-                            ShadowMeshIndex = br.ReadInt16(),
-                            ShadowMeshCount = br.ReadInt16(),
-                            TerrainShadowMeshIndex = br.ReadInt16(),
-                            TerrainShadowMeshCount = br.ReadInt16(),
-                            FogMeshIndex = br.ReadInt16(),
-                            FogMeshCount = br.ReadInt16(),
-                            EdgeGeometrySize = br.ReadInt32(),
-                            EdgeGeometryOffset = br.ReadInt32(),
-                            Unknown6 = br.ReadInt32(),
-                            Unknown7 = br.ReadInt32(),
-                            VertexDataSize = br.ReadInt32(),
-                            IndexDataSize = br.ReadInt32(),
-                            VertexDataOffset = br.ReadInt32(),
-                            IndexDataOffset = br.ReadInt32(),
-                            MeshDataList = new List<MeshData>()
-                        };
-
-                        xivMdl.ExtraLoDList.Add(lod);
+                            var extraMeshOffset = withValues.First(x => x.Value.MeshCount > 0).Value.MeshCount;
+                            var extraMeshCount = withValues.Sum(x => x.Value.MeshCount);
+                            xivMdl.LoDList[i].ExtraMeshIndex = (ushort) extraMeshOffset;
+                            xivMdl.LoDList[i].ExtraMeshCount = (ushort) extraMeshCount;
+                        }
                     }
-
-                    // HACKHACK - Grade 3 Picture Frame
-                    // These Models seem to have one more mesh than can be accounted for normally.
-                    // Not sure why.  Could be related to the extra LoD stuff?
-                    xivMdl.LoDList[0].MeshCount += 1;
                 }
 
 
@@ -573,7 +577,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // for each mesh in each lod
                 for (var i = 0; i < xivMdl.LoDList.Count; i++)
                 {
-                    var totalMeshCount = xivMdl.LoDList[i].MeshCount + xivMdl.LoDList[i].WaterMeshCount + xivMdl.LoDList[i].FogMeshCount + xivMdl.LoDList[i].ShadowMeshCount;
+                    var totalMeshCount = xivMdl.LoDList[i].TotalMeshCount;
 
 
                     for (var j = 0; j < totalMeshCount; j++)
@@ -630,7 +634,8 @@ namespace xivModdingFramework.Models.FileTypes
                 for(int l = 0; l < xivMdl.LoDList.Count; l++)
                 {
                     var lod = xivMdl.LoDList[l];
-                    var totalMeshCount = lod.MeshCount + lod.WaterMeshCount + lod.ShadowMeshCount + lod.FogMeshCount;
+                    var totalMeshCount = xivMdl.LoDList[l].TotalMeshCount;
+
 
                     for (var i = 0; i < totalMeshCount; i++)
                     {
@@ -651,6 +656,7 @@ namespace xivModdingFramework.Models.FileTypes
                             VertexDataEntrySize2 = br.ReadByte(),
                             VertexStreamCountUnknown = br.ReadByte()
                         };
+                        var mType = lod.GetMeshType(meshNum);
 
                         //if(meshDataInfo.ver)
 
@@ -937,11 +943,11 @@ namespace xivModdingFramework.Models.FileTypes
                 // Bone Bounding Box Data.
                 xivMdl.BoneBoundingBoxes = new List<List<Vector4>>();
                 var transformCount = xivMdl.ModelData.BoneCount;
-                /*
+                
                 if (transformCount == 0)
                 {
-                    transformCount = (short) xivMdl.ModelData.UnknownBoundingBoxCount;
-                }*/
+                    transformCount = (short) xivMdl.ModelData.ExtraBoundingBoxCount;
+                }
 
                 xivMdl.BoneBoundingBoxes = new List<List<Vector4>>();
                 for (var i = 0; i < transformCount; i++)
@@ -959,9 +965,9 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var meshDataList = lod.MeshDataList;
 
-                    if (lod.MeshOffset != totalMeshNum)
+                    if (lod.MeshIndex != totalMeshNum)
                     {
-                        //throw new Exception("Failed to parse some meshes in previous LoD level.");
+                        throw new Exception("Failed to parse some meshes in previous LoD level.");
                     }
 
                     // Seek to the start of the LoD.
@@ -3324,7 +3330,7 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.AddRange(BitConverter.GetBytes(0));
 
                 // Largely unknown stuff.
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.UnknownBoundingBoxCount));
+                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ExtraBoundingBoxCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.TerrainShadowSubmeshCount));
                 basicModelBlock.Add(ogModelData.ExtraLoDCount);
                 
@@ -3370,7 +3376,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     foreach (var ld in ogMdl.ExtraLoDList)
                     {
-                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.MeshOffset));
+                        extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.MeshIndex));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.MeshCount));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.ModelLoDRange));
                         extraLodDataBlock.AddRange(BitConverter.GetBytes(ld.TextureLoDRange));

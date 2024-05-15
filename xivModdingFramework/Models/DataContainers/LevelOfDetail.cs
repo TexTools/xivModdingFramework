@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
+using xivModdingFramework.Materials.DataContainers;
 
 namespace xivModdingFramework.Models.DataContainers
 {
@@ -23,15 +25,50 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class LevelOfDetail
     {
+        public int TotalMeshCount 
+        {
+            get
+            {
+                return MeshCount
+                    + WaterMeshCount
+                    + ExtraMeshCount
+                    + ShadowMeshCount
+                    + TerrainShadowMeshCount
+                    + FogMeshCount;
+            }
+        }
+
+        public EMeshType GetMeshType(int offset)
+        {
+            if (offset < MeshIndex) {
+                throw new Exception("Invalid Mesh Offset");
+            } else if (offset < WaterMeshIndex) {
+                return EMeshType.Normal;
+            } else if (offset < ExtraMeshIndex) {
+                return EMeshType.Water;
+            } else if (offset < ShadowMeshIndex) {
+                return EMeshType.Extra;
+            } else if (offset < TerrainShadowMeshIndex || (TerrainShadowMeshIndex == 0 && offset < FogMeshIndex)) {
+                return EMeshType.Shadow;
+            } else if(offset < FogMeshIndex && TerrainShadowMeshCount > 0) {
+                return EMeshType.TerrainShadow;
+            } else {
+                return EMeshType.Fog;
+            }
+        }
+
         /// <summary>
         /// The offset to the mesh data block
         /// </summary>
-        public ushort MeshOffset { get; set; }
+        public ushort MeshIndex { get; set; }
 
         /// <summary>
         /// The number of meshes to use
         /// </summary>
         public short MeshCount { get; set; }
+
+        public ushort ExtraMeshIndex { get; set; }
+        public ushort ExtraMeshCount { get; set; }
 
         /// <summary>
         /// Unknown Usage

@@ -136,7 +136,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public ushort UnknownBoundingBoxCount { get; set; }
+        public ushort ExtraBoundingBoxCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
