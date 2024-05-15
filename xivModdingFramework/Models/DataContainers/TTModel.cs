@@ -27,6 +27,25 @@ namespace xivModdingFramework.Models.DataContainers
 {
 
     /// <summary>
+    /// Represents the 'type' of a Mesh Group, when stored in MDL format.
+    /// </summary>
+    public enum EMeshType
+    {
+        // Standard Mesh
+        Normal,
+
+        Water,
+        Fog,
+        Shadow,
+        TerrainShadow,
+
+        // Strange un-labeled mesh type.
+        // Seems to be only included when the ExtraLoD setting is turned on.
+        // But doesn't actually have data in the LoD header for it?
+        Extra
+    }
+
+    /// <summary>
     /// Class representing a fully qualified, Square-Enix style Vertex.
     /// In SE's system, these values are all keyed to the same index value, 
     /// so none of them can be separated from the others without creating
@@ -84,6 +103,12 @@ namespace xivModdingFramework.Models.DataContainers
         public static bool operator !=(TTVertex a, TTVertex b)
         {
             return !(a == b);
+        }
+
+        public override int GetHashCode()
+        {
+            
+            return base.GetHashCode();
         }
 
         public override bool Equals(object obj)
@@ -197,6 +222,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// Purely semantic.
         /// </summary>
         public string Name;
+
+        /// <summary>
+        /// The type of this mesh when stored in MDL format.
+        /// </summary>
+        public EMeshType MeshType = EMeshType.Normal;
 
 
         /// <summary>
@@ -758,7 +788,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// Calling/building this data is somewhat expensive, and should only be done
         /// if actually needed in this specified format.
         /// </summary>
-
         internal (List<(string ShapeName, int MeshId, Dictionary<int, int> IndexReplacements)> ShapeList, List<List<TTVertex>> Vertices) GetRawShapeParts()
         {
             // This is the final list of ShapeParts that will be written to file.
@@ -968,6 +997,15 @@ namespace xivModdingFramework.Models.DataContainers
             }
         }
 
+        /// <summary>
+        /// Get the # of mesh groups by mesh type
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public int GetMeshGroupCount(EMeshType type)
+        {
+            return MeshGroups.Count(x => x.MeshType == type);
+        }
 
         /// <summary>
         /// Creates a bone set from the model and group information.
@@ -1115,6 +1153,16 @@ namespace xivModdingFramework.Models.DataContainers
                             {
                                 model.MeshGroups.Add(new TTMeshGroup());
                             }
+                            var t = reader.GetString("type");
+
+                            if (string.IsNullOrWhiteSpace(t))
+                            {
+                                model.MeshGroups[meshNum].MeshType = EMeshType.Normal;
+                            }
+                            else
+                            {
+                                model.MeshGroups[meshNum].MeshType = (EMeshType) Enum.Parse(typeof(EMeshType), t);
+                            }
 
                             model.MeshGroups[meshNum].Name = reader.GetString("name");
                         }
@@ -1134,7 +1182,7 @@ namespace xivModdingFramework.Models.DataContainers
                             var partNum = reader.GetInt32("part");
 
                             // Spawn mesh groups if needed.
-                            while(model.MeshGroups.Count <= meshNum)
+                            while (model.MeshGroups.Count <= meshNum)
                             {
                                 model.MeshGroups.Add(new TTMeshGroup());
                             }
@@ -1145,7 +1193,16 @@ namespace xivModdingFramework.Models.DataContainers
                                 model.MeshGroups[meshNum].Parts.Add(new TTMeshPart());
 
                             }
+                            
+                            var attribs = reader.GetString("attributes");
+                            var attributes = new string[0];
+                            if (!String.IsNullOrWhiteSpace(attribs))
+                            {
+                                attributes = attribs.Split(',');
+                            }
 
+                            // Load attributes
+                            model.MeshGroups[meshNum].Parts[partNum].Attributes = new HashSet<string>(attributes);
                             model.MeshGroups[meshNum].Parts[partNum].Name = reader.GetString("name");
                         }
                     }
@@ -1493,7 +1550,7 @@ namespace xivModdingFramework.Models.DataContainers
 
 
                             // Groups
-                            query = @"insert into meshes (mesh, name, material_id, model) values ($mesh, $name, $material_id, $model);";
+                            query = @"insert into meshes (mesh, name, material_id, model, type) values ($mesh, $name, $material_id, $model, $type);";
                             using (var cmd = new SQLiteCommand(query, db))
                             {
                                 cmd.Parameters.AddWithValue("name", m.Name);
@@ -1502,6 +1559,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 // This is always 0 for now.  Support element for Liinko's work on multi-model export.
                                 cmd.Parameters.AddWithValue("model", 0);
                                 cmd.Parameters.AddWithValue("material_id", GetMaterialIndex(meshIdx));
+                                cmd.Parameters.AddWithValue("type", (int) m.MeshType);
                                 cmd.ExecuteScalar();
                             }
 
@@ -1511,12 +1569,13 @@ namespace xivModdingFramework.Models.DataContainers
                             foreach (var p in m.Parts)
                             {
                                 // Parts
-                                query = @"insert into parts (mesh, part, name) values ($mesh, $part, $name);";
+                                query = @"insert into parts (mesh, part, name, attributes) values ($mesh, $part, $name, $attributes);";
                                 using (var cmd = new SQLiteCommand(query, db))
                                 {
                                     cmd.Parameters.AddWithValue("name", p.Name);
                                     cmd.Parameters.AddWithValue("part", partIdx);
                                     cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                    cmd.Parameters.AddWithValue("attributes", String.Join(",", p.Attributes));
                                     cmd.ExecuteScalar();
                                 }
 
@@ -1945,6 +2004,7 @@ namespace xivModdingFramework.Models.DataContainers
                                     cmd.Parameters.AddWithValue("model", modelIdx);
                                     cmd.Parameters.AddWithValue("mesh", meshIdx);
                                     cmd.Parameters.AddWithValue("material_id", tempMatDict[Path.GetFileNameWithoutExtension(m.Material)]);
+                                    cmd.Parameters.AddWithValue("type", (int)m.MeshType);
                                     cmd.ExecuteScalar();
                                 }
 
@@ -1960,6 +2020,7 @@ namespace xivModdingFramework.Models.DataContainers
                                         cmd.Parameters.AddWithValue("name", p.Name);
                                         cmd.Parameters.AddWithValue("part", partIdx);
                                         cmd.Parameters.AddWithValue("mesh", meshIdx);
+                                        cmd.Parameters.AddWithValue("attributes", String.Join(",", p.Attributes));
                                         cmd.ExecuteScalar();
                                     }
 
