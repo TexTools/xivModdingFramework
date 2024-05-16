@@ -1499,14 +1499,6 @@ namespace xivModdingFramework.Models.Helpers
             if (model == null) return;
 
             loggingFunction(false, "Calculating Tangents...");
-            var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
-            var hasBinormals = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Binormal != Vector3.Zero)));
-
-            if(hasTangents && hasBinormals && !forceRecalculation)
-            {
-                // Why are we here?  Go away.
-                return;
-            }
 
             var resetShapes = new List<string>();
             if(model.ActiveShapes.Count != 0)
@@ -1514,19 +1506,6 @@ namespace xivModdingFramework.Models.Helpers
                 resetShapes = model.ActiveShapes.ToList();
             }
             ModelModifiers.ApplyShapes(model, new List<string>(), true, loggingFunction);
-
-            // If we already have binormal data, we can just use the cheaper function.
-            if (hasBinormals && !forceRecalculation)
-            {
-                CalculateTangentsFromBinormals(model, loggingFunction);
-                CopyShapeTangents(model, loggingFunction);
-                return;
-            }
-
-            // Technically we could have another shortcut case here if we have tangent but not binormal data.
-            // But that never happens in ffxiv.
-
-
 
             foreach (var m in model.MeshGroups)
             {
@@ -1538,6 +1517,23 @@ namespace xivModdingFramework.Models.Helpers
                         continue;
                     }
 
+                    var hasTangents = p.Vertices.Any(x => x.Tangent != Vector3.Zero);
+                    var hasBinormals = p.Vertices.Any(x => x.Binormal != Vector3.Zero);
+
+                    if (hasTangents && hasBinormals && !forceRecalculation)
+                    {
+                        continue;
+                    }
+
+                    // If we already have binormal data, we can just use the cheaper function.
+                    // (Technically we could have another shortcut case here if we have tangent but not binormal data.
+                    //  But that never happens in ffxiv.)
+                    if (hasBinormals && !forceRecalculation)
+                    {
+                        CalculateTangentsFromBinormals(p);
+                        CopyShapeTangents(p);
+                        continue;
+                    }
 
                     // Compile lists of connected vertices.
                     Dictionary<int, HashSet<int>> connectedVertices = new Dictionary<int, HashSet<int>>();
@@ -1762,10 +1758,10 @@ namespace xivModdingFramework.Models.Helpers
                         }
 
                     }
+
+                    CopyShapeTangents(p);
                 }
             }
-
-            CopyShapeTangents(model, loggingFunction);
 
             if(resetShapes.Count > 0)
             {
@@ -1773,60 +1769,32 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
-        private static void CopyShapeTangents(TTModel model, Action<bool, string> loggingFunction = null)
+        private static void CopyShapeTangents(TTMeshPart meshPart)
         {
-            if (loggingFunction == null)
+            foreach(var shpKv in meshPart.ShapeParts)
             {
-                loggingFunction = NoOp;
-            }
-            loggingFunction(false, "Copying Tangent information to shape data vertices...");
-
-            foreach (var m in model.MeshGroups)
-            {
-                foreach(var p in m.Parts)
+                foreach(var vKv in shpKv.Value.VertexReplacements)
                 {
-                    foreach(var shpKv in p.ShapeParts)
-                    {
-                        foreach(var vKv in shpKv.Value.VertexReplacements)
-                        {
-                            var shpVertex = shpKv.Value.Vertices[vKv.Value];
-                            var pVertex = p.Vertices[vKv.Key];
-                            shpVertex.Tangent = pVertex.Tangent;
-                            shpVertex.Binormal = pVertex.Binormal;
-                            shpVertex.Handedness = pVertex.Handedness;
-                        }
-                    }
+                    var shpVertex = shpKv.Value.Vertices[vKv.Value];
+                    var pVertex = meshPart.Vertices[vKv.Key];
+                    shpVertex.Tangent = pVertex.Tangent;
+                    shpVertex.Binormal = pVertex.Binormal;
+                    shpVertex.Handedness = pVertex.Handedness;
                 }
             }
         }
 
         /// <summary>
-        /// Calculates the tangent data, assuming we already have the binormal data available.
+        /// Unconditonally calculates tangent data, assuming we already have the binormal data available.
         /// </summary>
-        /// <param name="normals"></param>
-        /// <param name="binormals"></param>
-        /// <param name="handedness"></param>
         /// <returns></returns>
-        public static void CalculateTangentsFromBinormals(TTModel model, Action<bool, string> loggingFunction = null)
+        private static void CalculateTangentsFromBinormals(TTMeshPart meshPart)
         {
-            if (loggingFunction == null)
+            foreach(var v in meshPart.Vertices)
             {
-                loggingFunction = NoOp;
-            }
-            loggingFunction(false, "Calculating Tangents from Binormal Data...");
-
-            foreach ( var m in model.MeshGroups)
-            {
-                foreach(var p in m.Parts)
-                {
-                    foreach(var v in p.Vertices)
-                    {
-
-                        var tangent = Vector3.Cross(v.Normal, v.Binormal);
-                        tangent *= (v.Handedness == true ? -1 : 1);
-                        v.Tangent = tangent;
-                    }
-                }
+                var tangent = Vector3.Cross(v.Normal, v.Binormal);
+                tangent *= (v.Handedness == true ? -1 : 1);
+                v.Tangent = tangent;
             }
         }
 
