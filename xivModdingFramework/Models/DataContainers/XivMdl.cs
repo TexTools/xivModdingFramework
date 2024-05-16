@@ -33,29 +33,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public string MdlPath { get; set; }
 
-        /// <summary>
-        /// Special indicator that says the mesh does not use parts at all.
-        /// This is the case for some furniture/background models.
-        /// </summary>
-        public bool Partless
-        {
-            get
-            {
-                var anyParts = false;
-                var anyIndices = false;
-                foreach(var m in LoDList[0].MeshDataList)
-                {
-                    anyParts = anyParts || m.MeshPartList.Count > 0;
-                    if(m.MeshInfo.IndexCount > 0)
-                    {
-                        anyIndices = true;
-                    }
-                }
-                var noParts = !anyParts;
-                return noParts && (!HasShapeData) && anyIndices;
-            }
-        }
-
         public ushort MdlVersion { get; set;  }
 
         /// <summary>
@@ -141,7 +118,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Bone Bounding Boxes
         /// </summary>
-        public List<List<Vector4>> CullingGrids { get; set; }
+        public List<List<Vector4>> BonelessPartBoundingBoxes { get; set; }
 
         /// <summary>
         /// Flag set when the model has shape data

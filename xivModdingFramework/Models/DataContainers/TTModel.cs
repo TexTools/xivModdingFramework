@@ -185,6 +185,31 @@ namespace xivModdingFramework.Models.DataContainers
 
         public Dictionary<string, TTShapePart> ShapeParts = new Dictionary<string, TTShapePart>();
 
+        public List<Vector3> GetBoundingBox()
+        {
+            var bb = new List<Vector3>();
+
+            // Calculate Radius here for convenience.
+            // These values also used in writing bounding boxes later.
+            float minX = 9999.0f, minY = 9999.0f, minZ = 9999.0f;
+            float maxX = -9999.0f, maxY = -9999.0f, maxZ = -9999.0f;
+            foreach (var v in Vertices)
+            {
+                minX = minX < v.Position.X ? minX : v.Position.X;
+                minY = minY < v.Position.Y ? minY : v.Position.Y;
+                minZ = minZ < v.Position.Z ? minZ : v.Position.Z;
+
+                maxX = maxX > v.Position.X ? maxX : v.Position.X;
+                maxY = maxY > v.Position.Y ? maxY : v.Position.Y;
+                maxZ = maxZ > v.Position.Z ? maxZ : v.Position.Z;
+            }
+            var minVect = new Vector3(minX, minY, minZ);
+            var maxVect = new Vector3(maxX, maxY, maxZ);
+            bb.Add(minVect);
+            bb.Add(maxVect);
+
+            return bb;
+        }
 
         /// <summary>
         /// Updates all shapes in this part to any updated UV/Normal/etc. data from the base model.

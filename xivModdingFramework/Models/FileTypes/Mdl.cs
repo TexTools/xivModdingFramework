@@ -387,19 +387,19 @@ namespace xivModdingFramework.Models.FileTypes
 
                     LoDCount = br.ReadByte(),
 
-                    Flags1 = br.ReadByte(),
+                    Flags1 = (EMeshFlags1) br.ReadByte(),
 
                     ElementIdCount = br.ReadUInt16(),
                     TerrainShadowMeshCount = br.ReadByte(),
 
-                    Flags2 = br.ReadByte(),
+                    Flags2 = (EMeshFlags2) br.ReadByte(),
 
                     ModelClipOutDistance = br.ReadSingle(),
                     ShadowClipOutDistance = br.ReadSingle(),
 
-                    CullingGridCount = br.ReadUInt16(),
-                    TerrainShadowSubmeshCount = br.ReadInt16(),
-                    Flags3 = br.ReadByte(),
+                    FurniturePartBoundingBoxCount = br.ReadUInt16(),
+                    TerrainShadowPartCount = br.ReadInt16(),
+                    Flags3 = (EMeshFlags3) br.ReadByte(),
 
                     BgChangeMaterialIndex = br.ReadByte(),
                     BgCrestChangeMaterialIndex = br.ReadByte(),
@@ -542,7 +542,7 @@ namespace xivModdingFramework.Models.FileTypes
                     xivMdl.LoDList.Add(lod);
                 }
 
-                if (mdlModelData.ExtraMeshesEnabled)
+                if ((mdlModelData.Flags2 & EMeshFlags2.HasExtraMeshes) > 0)
                 {
                     for (var i = 0; i < 3; i++)
                     {
@@ -626,6 +626,7 @@ namespace xivModdingFramework.Models.FileTypes
                 br.BaseStream.Seek(savePosition, SeekOrigin.Begin);
                 #endregion
 
+                #region Mesh Group Headers
                 // Mesh Data Information
                 var meshNum = 0;
                 for(int l = 0; l < xivMdl.LoDList.Count; l++)
@@ -682,6 +683,9 @@ namespace xivModdingFramework.Models.FileTypes
                         meshNum++;
                     }
                 }
+                #endregion
+
+                #region Attributes and Terrain Shadow Mesh Headers
 
                 // Data block for attributes offset paths
                 var attributeDataBlock = new AttributeDataBlock
@@ -696,29 +700,32 @@ namespace xivModdingFramework.Models.FileTypes
 
                 xivMdl.AttrDataBlock = attributeDataBlock;
 
-                // Unknown data block
-                // This is commented out to allow housing items to display, the data does not exist for housing items
-                // more investigation needed as to what this data is
+                // Terrain Shadow Meshes
                 var unkData1 = new UnknownData1
                 {
-                    //Unknown = br.ReadBytes(xivMdl.ModelData.Unknown3 * 20)
+                    //Unknown = br.ReadBytes(TerrainShadowMeshCount * 20)
                 };
                 xivMdl.UnkData1 = unkData1;
+                #endregion
 
+                #region Mesh Part Headers
                 // Mesh Parts
-                for(int l = 0; l < xivMdl.LoDList.Count; l++)
+                for (int l = 0; l < xivMdl.LoDList.Count; l++)
                 {
                     var lod = xivMdl.LoDList[l];
                     foreach (var meshData in lod.MeshDataList)
                     {
+                        // 16 Bytes each
                         meshData.MeshPartList = ReadMeshParts(br, meshData.MeshInfo.MeshPartCount);
                     }
                 }
+                #endregion
 
+                #region Unknown Block 2 and Material Offset Pointers
                 // Unknown data block
                 var unkData2 = new UnknownData2
                 {
-                    Unknown = br.ReadBytes(xivMdl.ModelData.TerrainShadowSubmeshCount * 12)
+                    Unknown = br.ReadBytes(xivMdl.ModelData.TerrainShadowPartCount * 12)
                 };
                 xivMdl.UnkData2 = unkData2;
 
@@ -735,7 +742,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 xivMdl.MatDataBlock = matDataBlock;
-
+                #endregion
 
                 #region Bone Data Block
                 var boneDataBlock = new BoneDataBlock
@@ -900,6 +907,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
+                #region Part Bone Sets & Padding
                 // Bone index for Parts
                 var partBoneSet = new BoneSet
                 {
@@ -917,7 +925,9 @@ namespace xivModdingFramework.Models.FileTypes
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
                 xivMdl.PaddedBytes = br.ReadBytes(xivMdl.PaddingSize);
+                #endregion
 
+                #region Bounding Boxes
 
                 // There are 4 bounding boxes in sequence, defined by a min and max point.
                 // The 4 boxes are:
@@ -943,13 +953,16 @@ namespace xivModdingFramework.Models.FileTypes
                     xivMdl.BoneBoundingBoxes.Add(new List<Vector4>() { minPoint, maxPoint });
                 }
 
-                xivMdl.CullingGrids = new List<List<Vector4>>();
-                for (var i = 0; i < xivMdl.ModelData.CullingGridCount; i++)
+                xivMdl.BonelessPartBoundingBoxes = new List<List<Vector4>>();
+                for (var i = 0; i < xivMdl.ModelData.FurniturePartBoundingBoxCount; i++)
                 {
                     var minPoint = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
                     var maxPoint = new Vector4(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
-                    xivMdl.CullingGrids.Add(new List<Vector4>() { minPoint, maxPoint });
+                    xivMdl.BonelessPartBoundingBoxes.Add(new List<Vector4>() { minPoint, maxPoint });
                 }
+                #endregion
+
+                #region Base Geometry Data 
 
                 var lodNum = 0;
                 var totalMeshNum = 0;
@@ -1662,8 +1675,15 @@ namespace xivModdingFramework.Models.FileTypes
 
                     #endregion
                 }
+
+                #endregion
             }
 
+            if (xivMdl.ModelData.FurniturePartBoundingBoxCount  > 0 || xivMdl.ModelData.MeshPartCount > 0)
+            {
+                Debug.WriteLine("Hmm");
+                var z = 1234;
+            }
             return xivMdl;
         }
 
@@ -2883,7 +2903,11 @@ namespace xivModdingFramework.Models.FileTypes
                 ttModel.OrderMeshGroupsForImport();
                 var rawShapeData = ttModel.GetRawShapeParts();
 
-                #region Radius and Bounding Box Calculation
+                var useParts = ttModel.HasWeights || ttModel.MeshGroups.Any(x => x.Parts.Count > 1);
+                var useFurnitureBBs = useParts && (!ttModel.HasWeights);
+                var furnitureBBCount = useFurnitureBBs ? ttModel.MeshGroups.Sum(x => x.Parts.Count) : 0;
+
+                #region Radius and Bounding Box Calculations
 
                 // Calculate Radius here for convenience.
                 // These values also used in writing bounding boxes later.
@@ -3125,7 +3149,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-
+                // Base Geometry Data Compilation
                 #region Geometry Data Blocks
                 // We can calculate these as soon as we know the data types we're writing.
                 // Though the data will eventually go at the very end of the MDL file.
@@ -3177,7 +3201,6 @@ namespace xivModdingFramework.Models.FileTypes
                     Dat.Pad(indexDataBlock, 16);
                 }
                 #endregion
-
 
                 // Path Data
                 #region Path Info Block
@@ -3290,14 +3313,7 @@ namespace xivModdingFramework.Models.FileTypes
                 meshCount += higherLodMeshCount;
                 ogModelData.MeshCount = meshCount;
                 // Recalculate total number of parts.
-                short meshPartCount  = 0;
-                if (!ogMdl.Partless)
-                {
-                    foreach (var m in ttModel.MeshGroups)
-                    {
-                        meshPartCount += (short)m.Parts.Count;
-                    }
-                }
+                short meshPartCount = (short) ttModel.MeshGroups.Sum(x => x.Parts.Count);
 
                 // Geometry-related stuff that we have actual values for.
                 var boneListCount = ttModel.HasWeights ? (short)ttModel.MeshGroups.Count : 0;
@@ -3305,7 +3321,7 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.AddRange(BitConverter.GetBytes(modelRadius));
                 basicModelBlock.AddRange(BitConverter.GetBytes(meshCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Attributes.Count));
-                basicModelBlock.AddRange(BitConverter.GetBytes(meshPartCount));
+                basicModelBlock.AddRange(BitConverter.GetBytes(useParts ? meshPartCount : (short) 0));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Materials.Count));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)ttModel.Bones.Count));
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)boneListCount)); // Bone List Count is 1x # of groups for us.
@@ -3315,8 +3331,12 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.Add(_LoDCount); // LoD count, set to 1 since we only use the highest LoD
 
 
-                // Largely unknown stuff.  Flag definitions have comments for their values, but typically are just 0 on most normal things.
-                basicModelBlock.Add(ogModelData.Flags1);
+                var flags1 = ogModelData.Flags1;
+
+                basicModelBlock.Add((byte) ogModelData.Flags1);
+
+
+                // Weird bonus data/mesh block stuff.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ElementIdCount));
                 basicModelBlock.Add(ogModelData.TerrainShadowMeshCount);
 
@@ -3324,29 +3344,49 @@ namespace xivModdingFramework.Models.FileTypes
                 var flags2 = ogModelData.Flags2;
                 if (ttModel.HasExtraMeshes)
                 {
-                    flags2 = (byte)(flags2 | 0x10);
+                    flags2 |= EMeshFlags2.HasExtraMeshes;
                 }
                 else
                 {
-                    flags2 = (byte)(flags2 & ~0x10);
+                    flags2 &= ~EMeshFlags2.HasExtraMeshes;
                 }
-                basicModelBlock.Add(flags2);
+                basicModelBlock.Add((byte) flags2);
                 
                 // Model and Shadow Clip-Out distances.  Can set these to 0 to disable.
-                basicModelBlock.AddRange(BitConverter.GetBytes(0));    // Magic number, wooo~
+                basicModelBlock.AddRange(BitConverter.GetBytes(0));
                 basicModelBlock.AddRange(BitConverter.GetBytes(0));
 
                 // Largely unknown stuff.
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.CullingGridCount));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.TerrainShadowSubmeshCount));
+                basicModelBlock.AddRange(BitConverter.GetBytes((short) furnitureBBCount));
+                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.TerrainShadowPartCount));
 
 
-                // Remove Crashflag for now...
                 var flags3 = ogModelData.Flags3;
-                flags2 = (byte)(flags3 & ~0x02);
 
-                basicModelBlock.Add(flags3);
-                //basicModelBlock.Add((byte)0);
+                // Crest Change Flag
+                if(ttModel.MeshGroups.Any(x => x.MeshType == EMeshType.CrestChange))
+                {
+                    flags3 |= EMeshFlags3.UseCrestChange;
+                } else
+                {
+
+                    flags3 &= ~EMeshFlags3.UseCrestChange;
+                }
+
+                // Material Change Flag
+                if (ttModel.MeshGroups.Any(x => x.MeshType == EMeshType.MaterialChange))
+                {
+                    flags3 |= EMeshFlags3.UseMaterialChange;
+                }
+                else
+                {
+
+                    flags3 &= ~EMeshFlags3.UseMaterialChange;
+                }
+
+
+
+                basicModelBlock.Add((byte) flags3);
 
                 // Handles which materials get some variable data (Ex. FC crests?)
                 basicModelBlock.Add(ogModelData.BgChangeMaterialIndex);
@@ -3470,7 +3510,7 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                         // Partless models strictly cannot have parts divisions.
-                        if (ogMdl.Partless)
+                        if (!useParts)
                         {
                             partCount = 0;
                         }
@@ -3512,7 +3552,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
-                #region Attribute Sets
+                // Attribute Offsets
+                #region Attribute Offsets
 
                 var attrPathOffsetList = attributeOffsetList;
 
@@ -3532,11 +3573,11 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
 
                 // Mesh Part
-                #region Mesh Part Data Block
+                #region Mesh Part Headers
 
                 var meshPartDataBlock = new List<byte>();
 
-                if (!ogMdl.Partless)
+                if (useParts)
                 {
 
                     short currentBoneOffset = 0;
@@ -3546,6 +3587,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     var lod = ogMdl.LoDList[0];
                     var partPadding = 0;
+                    var boundingBoxIdx = 0;
 
                     // Identify the correct # of meshes
                     var meshMax = ttModel.MeshGroups.Count;
@@ -3624,10 +3666,16 @@ namespace xivModdingFramework.Models.FileTypes
                                 }
                             }
 
+                            if ((ogMdl.ModelData.Flags2 & EMeshFlags2.HasBonelessParts) > 0)
+                            {
+                                attributeMask = (uint)boundingBoxIdx;
+                                boundingBoxIdx++;
+                            }
+
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(indexOffset));
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(indexCount));
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(attributeMask));
-                            meshPartDataBlock.AddRange(BitConverter.GetBytes(currentBoneOffset));
+                            meshPartDataBlock.AddRange(BitConverter.GetBytes(ttModel.HasWeights ? currentBoneOffset : (short)-1));
                             meshPartDataBlock.AddRange(BitConverter.GetBytes(boneCount));
 
                             previousIndexCount = indexCount;
@@ -3767,6 +3815,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
+                // Shape Data Thingss
                 #region Shape Stuff
 
                 var FullShapeDataBlock = new List<byte>();
@@ -3871,7 +3920,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // These are referential arrays to subsets of their parent mesh bone set.
                 // Their length is determined by the Part header's BoneCount field.
                 var partBoneSetsBlock = new List<byte>();
-                if (!ogMdl.Partless)
+                if (ttModel.HasWeights)
                 {
                     {
                         var bones = ttModel.Bones;
@@ -3959,26 +4008,33 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Additional culling data.  Seems to be for some furnishings.
                 // Unsure exactly when or why.
-                for (var i = 0; i < ogMdl.CullingGrids.Count; i++)
+
+                if (useFurnitureBBs)
                 {
-                    var cMinVect = ogMdl.CullingGrids[i][0];
-                    var cMaxVect = ogMdl.CullingGrids[i][1];
+                    foreach(var m in ttModel.MeshGroups)
+                    {
+                        foreach(var p in m.Parts)
+                        {
+                            var bb = p.GetBoundingBox();
+                            var cMinVect = bb[0];
+                            var cMaxVect = bb[1];
 
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.Z));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.W));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.X));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.Y));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMinVect.Z));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
 
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.Z));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.W));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.X));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.Y));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(cMaxVect.Z));
+                            boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
+                        }
+                    }
                 }
 
 
 
                 #endregion
-
 
                 // Extra Mesh Info
                 #region Extra Meshes Block
@@ -4008,7 +4064,9 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                // LoD Headers
                 #region LoD Block
+
                 // LoD block is the most complex block, and so we write it last, even though it's actually pretty early on in the file.
 
                 // Combined Data Block Sizes
@@ -4070,6 +4128,7 @@ namespace xivModdingFramework.Models.FileTypes
                 lodDataBlock.AddRange(new byte[120]);
                 #endregion
 
+                // Final Data Compilation
                 #region Model Data Segment Compliation
 
                 // Combine all the data blocks included in the final compressed model data block.
@@ -4103,8 +4162,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
-
-                // Create the MDL Header and compile the final data.
+                // Create and Prepend the MDL Header.
                 #region MDL File Header Creation
                 var header = new List<byte>();
 

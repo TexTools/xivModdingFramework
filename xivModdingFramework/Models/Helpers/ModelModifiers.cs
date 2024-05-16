@@ -377,7 +377,7 @@ namespace xivModdingFramework.Models.Helpers
                 var totalParts = baseMesh.MeshPartList.Count;
 
                 // This is a furniture or other mesh that doesn't use the part system.
-                if (rawMdl.Partless)
+                if ((rawMdl.ModelData.Flags2 & EMeshFlags2.HasBonelessParts) == 0 && rawMdl.MeshBoneSets.Count == 0)
                 {
                     fakePart = true;
                     totalParts = 1;

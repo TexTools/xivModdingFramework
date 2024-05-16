@@ -397,7 +397,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (offset == 0)
             {
-                throw new Exception($"Could not find offset for {skelBPath}");
+                throw new FileNotFoundException($"Could not find offset for {skelBPath}");
             }
 
             var sklbData = await dat.ReadSqPackType2(offset, dataFile, tx);

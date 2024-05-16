@@ -14,8 +14,52 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+using xivModdingFramework.Mods.DataContainers;
+
 namespace xivModdingFramework.Models.DataContainers
 {
+
+    [Flags]
+    public enum EMeshFlags1 : byte
+    {
+        ShadowDisabled = 0x01,
+        LightShadowDisabled = 0x02,
+        WavingAnimationDisabled = 0x04,
+        LightingReflectionEnabled = 0x08,
+        Unknown10 = 0x10,
+        RainOcclusionEnabled = 0x20,
+        SnowOcclusionEnabled = 0x40,
+        DustOcclusionEnabled = 0x80,
+    };
+
+    [Flags]
+    public enum EMeshFlags2 : byte
+    {
+        HasBonelessParts = 0x01,
+        EdgeGeometryEnabled = 0x02,
+        ForceLodRangeEnabled = 0x04,
+        ShadowMaskEnabled = 0x08,
+        HasExtraMeshes = 0x10,
+        EnableForceNonResident = 0x20,
+        BgUvScrollEnabled = 0x40,
+        Unknown80 = 0x80,
+    };
+
+    [Flags]
+    public enum EMeshFlags3 : byte
+    {
+        Unknown01 = 0x01,
+        UseMaterialChange = 0x02,
+        UseCrestChange = 0x04,
+        Unknown08 = 0x08,
+        Unknown10 = 0x10,
+        Unknown20 = 0x20,
+        Unknown40 = 0x40,
+        Unknown80 = 0x80,
+    };
+
+
     /// <summary>
     /// This class cotains the properties for the MDL model data
     /// </summary>
@@ -85,43 +129,15 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public byte LoDCount { get; set; }
 
-        /*
-         From Lumina:
-            DustOcclusionEnabled = 0x80,
-            SnowOcclusionEnabled = 0x40,
-            RainOcclusionEnabled = 0x20,
-            Unknown1 = 0x10,
-            LightingReflectionEnabled = 0x08,
-            WavingAnimationDisabled = 0x04,
-            LightShadowDisabled = 0x02,
-            ShadowDisabled = 0x01,
-        */
-        public byte Flags1 { get; set; }
+        public EMeshFlags1 Flags1 { get; set; }
 
         public ushort ElementIdCount { get; set; }
 
         public byte TerrainShadowMeshCount { get; set; }
 
-        /*
-         From Lumina:
-            Unknown2 = 0x80,
-            BgUvScrollEnabled = 0x40,
-            EnableForceNonResident = 0x20,
-            ExtraLodEnabled = 0x10,
-            ShadowMaskEnabled = 0x08,
-            ForceLodRangeEnabled = 0x04,
-            EdgeGeometryEnabled = 0x02,
-            Unknown3 = 0x01
-         */
-        public byte Flags2 { get; set; }
 
-        public bool ExtraMeshesEnabled
-        {
-            get
-            {
-                return (Flags2 & 0x10) > 0;
-            }
-        }
+        public EMeshFlags2 Flags2 { get; set; }
+
 
         /// <summary>
         /// Unknown Usage
@@ -134,28 +150,16 @@ namespace xivModdingFramework.Models.DataContainers
         public float ShadowClipOutDistance { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Bounding boxes for LoD0 Mesh0 parts for furniture/Non-Boned items with multiple parts.
         /// </summary>
-        public ushort CullingGridCount { get; set; }
+        public ushort FurniturePartBoundingBoxCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short TerrainShadowSubmeshCount { get; set; }
+        public short TerrainShadowPartCount { get; set; }
 
-        /// <summary>
-        /// Bitflags relating to Extra Meshes
-        /// 
-        /// 0x01 -  
-        /// 0x02 - Use MaterialChange - Crashes the game with current implementation of our model write?
-        /// 0x04 - Use CrestChange
-        /// 0x08 - 
-        /// 0x10 - 
-        /// 0x20 - 
-        /// 0x40 - 
-        /// 0x80 - 
-        /// </summary>
-        public byte Flags3 { get; set; }
+        public EMeshFlags3 Flags3 { get; set; }
 
         /// <summary>
         /// Unknown Usage
