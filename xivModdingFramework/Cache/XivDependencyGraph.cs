@@ -1,6 +1,8 @@
-﻿using System;
+﻿using SharpDX;
+using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -1717,6 +1719,145 @@ namespace xivModdingFramework.Cache
         }
 
 
+        private static Task<List<XivDependencyRootInfo>> TestAllSubRoots(Dictionary<uint, HashSet<uint>> Hashes, XivDependencyRootInfo root)
+        {
+            return Task.Run(() =>
+            {
+                var usesImc = Imc.UsesImc(root);
+                var slots = XivItemTypes.GetAvailableSlots(root.SecondaryType.Value);
+                if(slots.Count == 0)
+                {
+                    slots.Add("");
+                }
+                var result = new List<XivDependencyRootInfo>(5);
+
+                for (int s = 0; s < 10000; s++)
+                {
+                    root.SecondaryId = s;
+                    var folder = root.GetRootFolder();
+                    folder = folder.Substring(0, folder.Length - 1);
+
+                    // If their root folder exists (has an IMC entry in it) they're valid.
+                    if (usesImc)
+                    {
+                        // Test to see if the IMC file exists.
+                        var folderHash = (uint)HashGenerator.GetHash(folder);
+                        var imcName = XivItemTypes.GetSystemPrefix((XivItemType)root.SecondaryType) + root.SecondaryId.ToString().PadLeft(4, '0') + ".imc";
+                        var imcHash = (uint)HashGenerator.GetHash(imcName);
+
+                        if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(imcHash))
+                        {
+                            foreach (var slot in slots)
+                            {
+                                var sl = slot == "" ? null : slot;
+                                var nRoot = new XivDependencyRootInfo()
+                                {
+                                    PrimaryId = root.PrimaryId,
+                                    PrimaryType = root.PrimaryType,
+                                    SecondaryId = root.SecondaryId,
+                                    SecondaryType = root.SecondaryType,
+                                    Slot = sl
+                                };
+                                result.Add(nRoot);
+                            }
+                        }
+                    }
+                    else if (!usesImc)
+                    {
+
+                        var mfolder = folder + "/model";
+                        var mfolderHash = (uint)HashGenerator.GetHash(mfolder);
+                        var matFolder = folder + "/material";
+                        var matFolderHash = (uint)HashGenerator.GetHash(matFolder);
+                        var matFolder1 = folder + "/material/v0001";
+                        var matFolder1Hash = (uint)HashGenerator.GetHash(matFolder1);
+                        var texFolder = folder + "/texture";
+                        var texFolderHash = (uint)HashGenerator.GetHash(texFolder);
+
+                        // Things that don't use IMC files are basically only the human tree, which is a complete mess.
+                        foreach (var slot in slots)
+                        {
+                            var sl = slot == "" ? null : slot;
+                            var nRoot = new XivDependencyRootInfo()
+                            {
+                                PrimaryId = root.PrimaryId,
+                                PrimaryType = root.PrimaryType,
+                                SecondaryId = root.SecondaryId,
+                                SecondaryType = root.SecondaryType,
+                                Slot = sl
+                            };
+
+                            // If they have an MDL or MTRL we can resolve, they're valid.
+
+                            var mdlFile = nRoot.GetBaseFileName(true) + ".mdl";
+                            var mdlFileHash = (uint)HashGenerator.GetHash(mdlFile);
+
+                            var mtrlFile = "mt_" + nRoot.GetBaseFileName(true) + "_a.mtrl";
+                            if (root.SecondaryType == XivItemType.tail)
+                            {
+                                // Tail materials don't actually use their slot name, even though their model does,
+                                // for whatever reason.
+                                mtrlFile = "mt_" + nRoot.GetBaseFileName(false) + "_a.mtrl";
+                            }
+
+                            var mtrlFileHash = (uint)HashGenerator.GetHash(mtrlFile);
+
+                            var hasModel = Hashes.ContainsKey(mfolderHash) && Hashes[mfolderHash].Contains(mdlFileHash);
+                            var hasMat = Hashes.ContainsKey(matFolderHash) && Hashes[matFolderHash].Contains(mtrlFileHash);
+                            var hasMat1 = Hashes.ContainsKey(matFolder1Hash) && Hashes[matFolder1Hash].Contains(mtrlFileHash);
+                            var hasTex = Hashes.ContainsKey(texFolderHash);
+
+
+                            if (hasMat || hasMat1 || hasModel)
+                            {
+                                if (root.SecondaryType == XivItemType.body)
+                                {
+                                    var nRoot2 = new XivDependencyRootInfo()
+                                    {
+                                        PrimaryId = root.PrimaryId,
+                                        PrimaryType = root.PrimaryType,
+                                        SecondaryId = root.SecondaryId,
+                                        SecondaryType = root.SecondaryType,
+                                        Slot = null
+                                    };
+                                    result.Add(nRoot2);
+                                }
+                                else
+                                {
+                                    foreach (var slot2 in slots)
+                                    {
+                                        var sl2 = slot2 == "" ? null : slot2;
+                                        var nRoot2 = new XivDependencyRootInfo()
+                                        {
+                                            PrimaryId = root.PrimaryId,
+                                            PrimaryType = root.PrimaryType,
+                                            SecondaryId = root.SecondaryId,
+                                            SecondaryType = root.SecondaryType,
+                                            Slot = sl2
+                                        };
+                                        result.Add(nRoot2);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (result.Count > 0)
+                {
+                    Console.WriteLine(root.PrimaryType.ToString() + "#" + root.PrimaryId + " \t\t" + root.SecondaryType.ToString() + "\t\tFound: " + result.Count);
+                }
+                if(root.PrimaryId % 100 == 0)
+                {
+
+                    Console.WriteLine(root.PrimaryType.ToString() + "#" + root.PrimaryId + " \t\t" + root.SecondaryType.ToString() + "\t\tCompleted.");
+                }
+                return result;
+            });
+        }
+
+
         /// <summary>
         /// Tests all roots of the given type for existence.
         /// This is an o(10,000 * 10,000) operation. Needless to say, it is very slow
@@ -1730,7 +1871,7 @@ namespace xivModdingFramework.Cache
 
 
             var result = new List<XivDependencyRootInfo>(3000);
-            await Task.Run(() => {
+            await Task.Run(async () => {
                 try
                 {
                     Console.WriteLine("Starting Search for type: " + primary.ToString() + " " + secondary.ToString());
@@ -1758,6 +1899,8 @@ namespace xivModdingFramework.Cache
 
                     var usesImc = Imc.UsesImc(root);
 
+                    var capacity = secondary == XivItemType.none ? 0 : 10000;
+                    var tasks = new List<Task<List<XivDependencyRootInfo>>>(capacity);
                     for (int p = 0; p < 10000; p++)
                     {
                         root.PrimaryId = p;
@@ -1807,118 +1950,16 @@ namespace xivModdingFramework.Cache
                         }
                         else
                         {
-                            for (int s = 0; s < 10000; s++)
-                            {
-                                root.SecondaryId = s;
-                                var folder = root.GetRootFolder();
-                                folder = folder.Substring(0, folder.Length - 1);
+                            tasks.Add(TestAllSubRoots(Hashes, root));
+                        }
+                    }
 
-                                // If their root folder exists (has an IMC entry in it) they're valid.
-                                if (usesImc)
-                                {
-                                    // Test to see if the IMC file exists.
-                                    var folderHash = (uint)HashGenerator.GetHash(folder);
-                                    var imcName = XivItemTypes.GetSystemPrefix((XivItemType)root.SecondaryType) + root.SecondaryId.ToString().PadLeft(4,'0') + ".imc";
-                                    var imcHash = (uint)HashGenerator.GetHash(imcName);
-
-                                    if (Hashes.ContainsKey(folderHash) && Hashes[folderHash].Contains(imcHash))
-                                    {
-                                        foreach (var slot in slots)
-                                        {
-                                            var sl = slot == "" ? null : slot;
-                                            var nRoot = new XivDependencyRootInfo()
-                                            {
-                                                PrimaryId = root.PrimaryId,
-                                                PrimaryType = root.PrimaryType,
-                                                SecondaryId = root.SecondaryId,
-                                                SecondaryType = root.SecondaryType,
-                                                Slot = sl
-                                            };
-                                            result.Add(nRoot);
-                                        }
-                                    }
-                                }
-                                else if(!usesImc)
-                                {
-
-                                    var mfolder = folder + "/model";
-                                    var mfolderHash = (uint)HashGenerator.GetHash(mfolder);
-                                    var matFolder = folder + "/material";
-                                    var matFolderHash = (uint)HashGenerator.GetHash(matFolder);
-                                    var matFolder1 = folder + "/material/v0001";
-                                    var matFolder1Hash = (uint)HashGenerator.GetHash(matFolder1);
-                                    var texFolder = folder + "/texture";
-                                    var texFolderHash = (uint)HashGenerator.GetHash(texFolder);
-
-                                    // Things that don't use IMC files are basically only the human tree, which is a complete mess.
-                                    foreach (var slot in slots)
-                                    {
-                                        var sl = slot == "" ? null : slot;
-                                        var nRoot = new XivDependencyRootInfo()
-                                        {
-                                            PrimaryId = root.PrimaryId,
-                                            PrimaryType = root.PrimaryType,
-                                            SecondaryId = root.SecondaryId,
-                                            SecondaryType = root.SecondaryType,
-                                            Slot = sl
-                                        };
-
-                                        // If they have an MDL or MTRL we can resolve, they're valid.
-
-                                        var mdlFile = nRoot.GetBaseFileName(true) + ".mdl";
-                                        var mdlFileHash = (uint)HashGenerator.GetHash(mdlFile);
-
-                                        var mtrlFile = "mt_" + nRoot.GetBaseFileName(true)  + "_a.mtrl";
-                                        if(secondary == XivItemType.tail)
-                                        {
-                                            // Tail materials don't actually use their slot name, even though their model does,
-                                            // for whatever reason.
-                                            mtrlFile = "mt_" + nRoot.GetBaseFileName(false) + "_a.mtrl";
-                                        }
-
-                                        var mtrlFileHash = (uint)HashGenerator.GetHash(mtrlFile);
-
-                                        var hasModel = Hashes.ContainsKey(mfolderHash) && Hashes[mfolderHash].Contains(mdlFileHash);
-                                        var hasMat = Hashes.ContainsKey(matFolderHash) && Hashes[matFolderHash].Contains(mtrlFileHash);
-                                        var hasMat1 = Hashes.ContainsKey(matFolder1Hash) && Hashes[matFolder1Hash].Contains(mtrlFileHash);
-                                        var hasTex = Hashes.ContainsKey(texFolderHash);
-
-
-                                        if (hasMat || hasMat1 || hasModel)
-                                        {
-                                            if (secondary == XivItemType.body)
-                                            {
-                                                var nRoot2 = new XivDependencyRootInfo()
-                                                {
-                                                    PrimaryId = root.PrimaryId,
-                                                    PrimaryType = root.PrimaryType,
-                                                    SecondaryId = root.SecondaryId,
-                                                    SecondaryType = root.SecondaryType,
-                                                    Slot = null
-                                                };
-                                                result.Add(nRoot2);
-                                            }
-                                            else
-                                            {
-                                                foreach (var slot2 in slots)
-                                                {
-                                                    var sl2 = slot2 == "" ? null : slot2;
-                                                    var nRoot2 = new XivDependencyRootInfo()
-                                                    {
-                                                        PrimaryId = root.PrimaryId,
-                                                        PrimaryType = root.PrimaryType,
-                                                        SecondaryId = root.SecondaryId,
-                                                        SecondaryType = root.SecondaryType,
-                                                        Slot = sl2
-                                                    };
-                                                    result.Add(nRoot2);
-                                                }
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
+                    if(tasks.Count > 0)
+                    {
+                        await Task.WhenAll(tasks);
+                        foreach(var task in tasks)
+                        {
+                            result.AddRange(task.Result);
                         }
                     }
                 } catch(Exception Ex) {
