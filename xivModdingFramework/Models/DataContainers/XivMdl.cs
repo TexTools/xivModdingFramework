@@ -139,6 +139,11 @@ namespace xivModdingFramework.Models.DataContainers
         public List<List<Vector4>> BoneBoundingBoxes { get; set; }
 
         /// <summary>
+        /// Bone Bounding Boxes
+        /// </summary>
+        public List<List<Vector4>> CullingGrids { get; set; }
+
+        /// <summary>
         /// Flag set when the model has shape data
         /// </summary>
         public bool HasShapeData { get; set; }

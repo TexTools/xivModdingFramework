@@ -136,7 +136,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public ushort ExtraBoundingBoxCount { get; set; }
+        public ushort CullingGridCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
@@ -146,7 +146,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public byte Unknown9 { get; set; }
+        public byte Flags3 { get; set; }
 
         /// <summary>
         /// Unknown Usage
