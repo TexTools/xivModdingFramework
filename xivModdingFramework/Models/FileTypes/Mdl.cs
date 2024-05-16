@@ -3340,7 +3340,7 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ElementIdCount));
                 basicModelBlock.Add(ogModelData.TerrainShadowMeshCount);
 
-                // Set or remove extra mesh flag as needed.
+                // Set or Flag2 Flags as needed...
                 var flags2 = ogModelData.Flags2;
                 if (ttModel.HasExtraMeshes)
                 {
@@ -3350,6 +3350,15 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     flags2 &= ~EMeshFlags2.HasExtraMeshes;
                 }
+                
+                if(useFurnitureBBs)
+                {
+                    flags2 |= EMeshFlags2.HasBonelessParts;
+                } else
+                {
+                    flags2 &= ~EMeshFlags2.HasBonelessParts;
+                }
+
                 basicModelBlock.Add((byte) flags2);
                 
                 // Model and Shadow Clip-Out distances.  Can set these to 0 to disable.
@@ -3389,8 +3398,14 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.Add((byte) flags3);
 
                 // Handles which materials get some variable data (Ex. FC crests?)
-                basicModelBlock.Add(ogModelData.BgChangeMaterialIndex);
-                basicModelBlock.Add(ogModelData.BgCrestChangeMaterialIndex);
+                byte bgChangeIdx = (byte) ttModel.MeshGroups.FindIndex(x => x.MeshType == EMeshType.MaterialChange);
+                byte crestChangeIdx = (byte)ttModel.MeshGroups.FindIndex(x => x.MeshType == EMeshType.CrestChange);
+
+                bgChangeIdx = bgChangeIdx == 255 ? (byte) 0 : bgChangeIdx;
+                crestChangeIdx = crestChangeIdx == 255 ? (byte) 0 : crestChangeIdx;
+
+                basicModelBlock.Add(bgChangeIdx);
+                basicModelBlock.Add(crestChangeIdx);
 
                 // More Unknowns
                 basicModelBlock.Add(ogModelData.Unknown12);
