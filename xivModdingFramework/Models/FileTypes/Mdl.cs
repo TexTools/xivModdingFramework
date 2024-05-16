@@ -3320,7 +3320,7 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.ElementIdCount));
                 basicModelBlock.Add(ogModelData.TerrainShadowMeshCount);
 
-                // Set extra mesh flag as needed.
+                // Set or remove extra mesh flag as needed.
                 var flags2 = ogModelData.Flags2;
                 if (ttModel.HasExtraMeshes)
                 {
@@ -3333,14 +3333,19 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.Add(flags2);
                 
                 // Model and Shadow Clip-Out distances.  Can set these to 0 to disable.
-                basicModelBlock.AddRange(BitConverter.GetBytes(ttModel.HasWeights ? 0 : 9216f));    // Magic number, wooo~
+                basicModelBlock.AddRange(BitConverter.GetBytes(0));    // Magic number, wooo~
                 basicModelBlock.AddRange(BitConverter.GetBytes(0));
 
                 // Largely unknown stuff.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.CullingGridCount));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.TerrainShadowSubmeshCount));
 
-                basicModelBlock.Add(ogModelData.Flags3);
+
+                // Remove Crashflag for now...
+                var flags3 = ogModelData.Flags3;
+                flags2 = (byte)(flags3 & ~0x02);
+
+                basicModelBlock.Add(flags3);
                 //basicModelBlock.Add((byte)0);
 
                 // Handles which materials get some variable data (Ex. FC crests?)

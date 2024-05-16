@@ -144,7 +144,16 @@ namespace xivModdingFramework.Models.DataContainers
         public short TerrainShadowSubmeshCount { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Bitflags relating to Extra Meshes
+        /// 
+        /// 0x01 -  
+        /// 0x02 - Use MaterialChange - Crashes the game with current implementation of our model write?
+        /// 0x04 - Use CrestChange
+        /// 0x08 - 
+        /// 0x10 - 
+        /// 0x20 - 
+        /// 0x40 - 
+        /// 0x80 - 
         /// </summary>
         public byte Flags3 { get; set; }
 
