@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -31,6 +32,52 @@ namespace xivModdingFramework.Textures.FileTypes
     /// </summary>
     public static class DDS
     {
+        // Flags value indicating DWFourCC has real data.
+        internal const uint _DDS_PixelFormatOffset = 76;
+        internal const uint _DWFourCCFlag = 0x04;
+
+        internal static uint _DX10 = (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DX10"), 0);
+        /// <summary>
+        /// A dictionary containing the int represntations of known file types for DDS
+        /// </summary>
+        internal static readonly Dictionary<uint, XivTexFormat> DdsTypeToXivTex = new Dictionary<uint, XivTexFormat>
+        {
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT1"), 0) , XivTexFormat.DXT1 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT3"), 0) , XivTexFormat.DXT3 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT5"), 0) , XivTexFormat.DXT5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI2"), 0) , XivTexFormat.BC5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
+
+            //ARGB 16F
+            { 113, XivTexFormat.A16B16G16R16F },
+
+            //Uncompressed RGBA
+            { 0, XivTexFormat.A8R8G8B8 }
+        };
+
+        internal static uint GetDDSType(XivTexFormat format)
+        {
+            return DdsTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
+        }
+
+        /// <summary>
+        /// A dictionary containing the int represntations of known DXGI formats for DDS
+        /// </summary>
+        internal static readonly Dictionary<uint, XivTexFormat> DxgiTypeToXivTex = new Dictionary<uint, XivTexFormat>
+        {
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, XivTexFormat.DXT1 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM, XivTexFormat.DXT3 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM, XivTexFormat.DXT5 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM, XivTexFormat.BC5 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM, XivTexFormat.BC7 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, XivTexFormat.A8R8G8B8 }
+        };
+        internal static uint GetDxgiType(XivTexFormat format)
+        {
+            return DxgiTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
+        }
+
         /// <summary>
         /// Creates a DDS file for the given Texture
         /// </summary>
@@ -114,7 +161,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
         private static byte[] CreateDDSHeader(XivTexFormat format, int width, int height, int layers, int mipCount)
         {
-            uint dwPitchOrLinearSize, pfFlags, dwFourCC;
+            uint dwPitchOrLinearSize, pfFlags;
             var header = new List<byte>();
 
             // DDS header magic number
@@ -140,9 +187,6 @@ namespace xivModdingFramework.Textures.FileTypes
             // Surface width (in pixels).
             var dwWidth = (uint)width;
             header.AddRange(BitConverter.GetBytes(dwWidth));
-
-            // DX10 format magic number
-            const uint fourccDX10 = 0x30315844;
 
             // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
             if (format == XivTexFormat.A16B16G16R16F)
@@ -204,38 +248,11 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             header.AddRange(BitConverter.GetBytes(pfFlags));
 
-            switch (format)
-            {
-                // Four-character codes for specifying compressed or custom formats.
-                case XivTexFormat.DXT1:
-                    dwFourCC = 0x31545844;
-                    break;
-                case XivTexFormat.DXT5:
-                    dwFourCC = 0x35545844;
-                    break;
-                case XivTexFormat.DXT3:
-                    dwFourCC = 0x33545844;
-                    break;
-                case XivTexFormat.BC5:
-                case XivTexFormat.BC7:
-                    dwFourCC = fourccDX10;
-                    break;
-                case XivTexFormat.A16B16G16R16F:
-                    dwFourCC = 0x71;
-                    break;
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.A8:
-                case XivTexFormat.A4R4G4B4:
-                case XivTexFormat.A1R5G5B5:
-                    dwFourCC = 0;
-                    break;
-                default:
-                    return null;
-            }
+            uint dwFourCC = GetDDSType(format);
 
             if(layers > 1)
             {
-                dwFourCC = fourccDX10;
+                dwFourCC = _DX10;
             }
 
             header.AddRange(BitConverter.GetBytes(dwFourCC));
@@ -390,7 +407,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             // Need to write DX10 header here.
-            if(dwFourCC == fourccDX10)
+            if(dwFourCC == _DX10)
             {
                 // DXGI_FORMAT dxgiFormat
                 uint dxgiFormat = 0;

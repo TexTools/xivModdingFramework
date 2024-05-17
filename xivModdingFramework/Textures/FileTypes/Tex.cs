@@ -791,8 +791,6 @@ namespace xivModdingFramework.Textures.FileTypes
                 offset = ddsStream.BaseStream.Position;
             }
 
-            // DX10 Format Flag
-            const uint fourccDX10 = 0x4;
 
             ddsStream.BaseStream.Seek(offset + 12, SeekOrigin.Begin);
 
@@ -806,37 +804,45 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new Exception("Resolution must be a multiple of 2");
             }
 
-            ddsStream.BaseStream.Seek(offset + 80, SeekOrigin.Begin);
+            ddsStream.BaseStream.Seek(offset + DDS._DDS_PixelFormatOffset, SeekOrigin.Begin);
 
-            var textureFlags = ddsStream.ReadInt32();
-            var texType = ddsStream.ReadInt32();
-
+            var pixelFormatSize = ddsStream.ReadInt32();
+            var flags = ddsStream.ReadUInt32();
+            var fourCC = ddsStream.ReadUInt32();
             XivTexFormat textureType;
 
-            if ((texType & fourccDX10) > 0)
+            if ((flags & DDS._DWFourCCFlag) != 0)
             {
-                ddsStream.BaseStream.Seek(128, SeekOrigin.Begin);
-                var dxgiTexType = ddsStream.ReadInt32();
-
-                if (DXGIType.ContainsKey(dxgiTexType))
+                if (fourCC == DDS._DX10)
                 {
-                    textureType = DXGIType[dxgiTexType];
+                    ddsStream.BaseStream.Seek(offset + 128, SeekOrigin.Begin);
+                    var dxgiTexType = ddsStream.ReadUInt32();
+
+                    if (DDS.DxgiTypeToXivTex.ContainsKey(dxgiTexType))
+                    {
+                        textureType = DDS.DxgiTypeToXivTex[dxgiTexType];
+                    }
+                    else
+                    {
+                        throw new Exception($"DXGI format ({dxgiTexType}) not recognized.");
+                    }
+                }
+                else if (DDS.DdsTypeToXivTex.ContainsKey(fourCC))
+                {
+                    textureType = DDS.DdsTypeToXivTex[fourCC];
                 }
                 else
                 {
-                    throw new Exception($"DXGI format ({dxgiTexType}) not recognized.");
+                    throw new Exception($"DDS Type ({fourCC}) not recognized.");
                 }
-            }
-            else if (DDSType.ContainsKey(texType))
+            } else
             {
-                textureType = DDSType[texType];
-            }
-            else
-            {
-                throw new Exception($"DDS Type ({texType}) not recognized.");
+                // Uncompressed.
+                textureType = XivTexFormat.A8R8G8B8;
             }
 
-            switch (textureFlags)
+
+            switch (flags)
             {
                 case 2 when textureType == XivTexFormat.A8R8G8B8:
                     textureType = XivTexFormat.A8;
@@ -993,15 +999,20 @@ namespace xivModdingFramework.Textures.FileTypes
                 br.BaseStream.Seek(offset, SeekOrigin.Begin);
             }
 
-            br.BaseStream.Seek(80, SeekOrigin.Begin);
-            var texType = br.ReadInt32();
+            br.BaseStream.Seek(offset + DDS._DDS_PixelFormatOffset, SeekOrigin.Begin);
+            var pixfmtSize = br.ReadUInt32();
+            var pixfmtFlags = br.ReadUInt32();
+            var dwFourCc= br.ReadUInt32();
 
             var headerLength = _DDSHeaderSize;
 
-            // DX10 DDS Files have a 20 byte header extension.
-            const uint fourccDX10 = 0x04;
-            uint extraHeaderBytes = (uint)((texType & fourccDX10) > 0? 20 : 0); // sizeof DDS_HEADER_DXT10
-            headerLength += extraHeaderBytes;
+            if((pixfmtFlags & DDS._DWFourCCFlag) != 0)
+            {
+                if(dwFourCc == DDS._DX10)
+                {
+                    headerLength += 20;
+                }
+            }
 
             br.BaseStream.Seek(headerLength, SeekOrigin.Begin);
 
@@ -1148,14 +1159,14 @@ namespace xivModdingFramework.Textures.FileTypes
             using (var br = new BinaryReader(File.OpenRead(ddsPath)))
             {
                 // Check DDS type
-                br.BaseStream.Seek(84, SeekOrigin.Begin);
+                br.BaseStream.Seek(DDS._DDS_PixelFormatOffset + 8, SeekOrigin.Begin);
 
-                var texType = br.ReadInt32();
+                var texType = br.ReadUInt32();
                 XivTexFormat textureType;
 
-                if (DDSType.ContainsKey(texType))
+                if (DDS.DdsTypeToXivTex.ContainsKey(texType))
                 {
-                    textureType = DDSType[texType];
+                    textureType = DDS.DdsTypeToXivTex[texType];
                 }
                 else
                 {
@@ -1231,44 +1242,7 @@ namespace xivModdingFramework.Textures.FileTypes
         #endregion
 
         #region Static Dictionaries
-        /// <summary>
-        /// A dictionary containing the int represntations of known file types for DDS
-        /// </summary>
-        private static readonly Dictionary<int, XivTexFormat> DDSType = new Dictionary<int, XivTexFormat>
-        {
-            //DXT1
-            {827611204, XivTexFormat.DXT1 },
 
-            //DXT3
-            {861165636, XivTexFormat.DXT3 },
-
-            //DXT5
-            {894720068, XivTexFormat.DXT5 },
-
-            //ATI2 (BC5)
-            {843666497, XivTexFormat.BC5 },
-
-            //ARGB 16F
-            {113, XivTexFormat.A16B16G16R16F },
-
-            //Uncompressed RGBA
-            {0, XivTexFormat.A8R8G8B8 }
-
-        };
-
-        /// <summary>
-        /// A dictionary containing the int represntations of known DXGI formats for DDS
-        /// </summary>
-        private static readonly Dictionary<int, XivTexFormat> DXGIType = new Dictionary<int, XivTexFormat>
-        {
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, XivTexFormat.DXT1 },
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM, XivTexFormat.DXT3 },
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM, XivTexFormat.DXT5 },
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM, XivTexFormat.BC5 },
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM, XivTexFormat.BC7 },
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
-            {(int)DDS.DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, XivTexFormat.A8R8G8B8 }
-        };
 
         /// <summary>
         /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
