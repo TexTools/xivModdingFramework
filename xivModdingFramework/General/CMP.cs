@@ -77,7 +77,7 @@ namespace xivModdingFramework.General
                 var path = GetRgspPath(race, gender);
 
 
-                var modlist = await Modding.GetModList();
+                var modlist = await tx.GetModList();
                 var mod = modlist.GetMod(path);
                 if (mod != null)
                 {

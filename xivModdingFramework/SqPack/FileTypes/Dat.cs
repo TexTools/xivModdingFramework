@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -142,9 +143,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="dataFile">The data file to create a new dat for.</param>
         /// <returns>The new dat number.</returns>
-        private int CreateNewDat(XivDataFile dataFile, bool alreadyLocked = false)
+        private int CreateNewDat(XivDataFile dataFile)
         {
-            var nextDatNumber = GetLargestDatNumber(dataFile, alreadyLocked) + 1;
+            var nextDatNumber = GetLargestDatNumber(dataFile) + 1;
 
             if (nextDatNumber == 8)
             {
@@ -170,25 +171,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check.</param>
         /// <returns>The largest dat number for the given data file.</returns>
-        internal static int GetLargestDatNumber(XivDataFile dataFile, bool alreadyLocked = false)
+        internal static int GetLargestDatNumber(XivDataFile dataFile)
         {
 
-            string[] allFiles = null;
-            if (!alreadyLocked)
-            {
-                _lock.Wait();
-            }
-            try
-            {
-                allFiles = Directory.GetFiles(dataFile.GetContainingFolder());
-            }
-            finally
-            {
-                if (!alreadyLocked)
-                {
-                    _lock.Release();
-                }
-            }
+            string[] allFiles = Directory.GetFiles(dataFile.GetContainingFolder());
 
             var dataFiles = from file in allFiles where file.Contains(dataFile.GetFileName()) && file.Contains(".dat") select file;
 
@@ -216,77 +202,97 @@ namespace xivModdingFramework.SqPack.FileTypes
         // As such, we can cache that information, rather than having to constantly re-check the filesystem (somewhat expensive operation)
         private static Dictionary<XivDataFile, Dictionary<int, bool>> OriginalDatStatus = new Dictionary<XivDataFile, Dictionary<int, bool>>();
 
-        /// <summary>
-        /// Determines whether a mod dat already exists
-        /// </summary>
-        /// <param name="dataFile">The dat file to check.</param>
-        /// <returns>True if it is original, false otherwise</returns>
-        private async Task<bool> IsOriginalDat(XivDataFile dataFile, int datNum, bool alreadyLocked = false)
+
+        internal bool IsOriginalDat(XivDataFile df, int datNumber)
         {
-            if(!OriginalDatStatus.ContainsKey(dataFile))
+            var datFilePath = Dat.GetDatPath(df, datNumber);
+
+            if (!File.Exists(datFilePath))
             {
-                OriginalDatStatus.Add(dataFile, new Dictionary<int, bool>());
+                throw new FileNotFoundException("DAT File does not exist: " + df.ToString() + " #" + datNumber);
             }
 
-            if(OriginalDatStatus[dataFile].ContainsKey(datNum))
+            using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
             {
-                return OriginalDatStatus[dataFile][datNum];
+                binaryReader.BaseStream.Seek(_MODDED_DAT_MARK_OFFSET, SeekOrigin.Begin);
+                var one = binaryReader.ReadInt32();
+                var two = binaryReader.ReadInt32();
+
+                if (one == _MODDED_DAT_MARK && two == _MODDED_DAT_MARK)
+                {
+                    return false;
+                }
+                else if(one == 0 && two == 0)
+                {
+#if ENDWALKER
+                    // Detection for old TexTools DATs.
+                    if (IsOldTTDat(binaryReader))
+                    {
+                        return false;
+                    }
+#endif
+                    return true;
+                } else
+                {
+                    throw new Exception("Unknown Format or corrupt DAT: " + df.ToString());
+                }
             }
-
-            var unmoddedList = await GetUnmoddedDatList(dataFile, alreadyLocked);
-            var datPath = Dat.GetDatPath(dataFile, datNum);
-
-            var result = unmoddedList.Contains(datPath);
-            OriginalDatStatus[dataFile][datNum] = result;
-
-            return result;
         }
+
+#if ENDWALKER
+        private static bool IsOldTTDat(BinaryReader br)
+        {
+            var _DataSizeOffset = 1024 + 12;
+            br.BaseStream.Seek(_DataSizeOffset, SeekOrigin.Begin);
+
+            var dataSize = br.ReadInt32();
+            if(dataSize != 2048)
+            {
+                // Old TexTools dats always set a Data Size of 2048
+                return false;
+            }
+
+            var datNumber = br.ReadInt32();
+            if (datNumber != 2)
+            {
+                // Old TexTools dats always set a DAT # of 2.
+                return false;
+            }
+
+            var _DataHashOffset = 1024 + 32;
+            br.BaseStream.Seek(_DataHashOffset, SeekOrigin.Begin);
+            var bytes = br.ReadBytes(64);
+
+            if(bytes.Any(x => x != 0))
+            {
+                // Old TexTools dats never wrote a data hash.
+                return false;
+            }
+
+            return true;
+        }
+
+#endif
 
         /// <summary>
         /// Gets the modded dat files
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        private async Task<List<string>> GetUnmoddedDatList(XivDataFile dataFile, bool alreadyLocked = false)
+        internal List<string> GetOriginalDatList(XivDataFile dataFile)
         {
             var datList = new List<string>();
-
-            await Task.Run(async () =>
+            for (var i = 0; i < 8; i++)
             {
-                if (!alreadyLocked)
+                var datFilePath = Dat.GetDatPath(dataFile, i);
+                if (File.Exists(datFilePath))
                 {
-                    await _lock.WaitAsync();
-                }
-                try
-                {
-                    for (var i = 0; i < 20; i++)
+                    if (IsOriginalDat(dataFile, i))
                     {
-                        var datFilePath = Dat.GetDatPath(dataFile, i);
-
-                        if (File.Exists(datFilePath))
-                        {
-                            using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
-                            {
-                                binaryReader.BaseStream.Seek(_MODDED_DAT_MARK_OFFSET, SeekOrigin.Begin);
-                                var one = binaryReader.ReadInt32();
-                                var two = binaryReader.ReadInt32();
-
-                                if(one != _MODDED_DAT_MARK  || two != _MODDED_DAT_MARK)
-                                {
-                                    datList.Add(datFilePath);
-                                }
-                            }
-                        }
+                        datList.Add(datFilePath);
                     }
                 }
-                finally
-                {
-                    if (!alreadyLocked)
-                    {
-                        _lock.Release();
-                    }
-                }
-            });
+            }
             return datList;
         }
 
@@ -295,48 +301,20 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        internal async Task<List<string>> GetModdedDatList(XivDataFile dataFile, bool alreadyLocked = false)
+        internal List<string> GetModdedDatList(XivDataFile dataFile)
         {
             var datList = new List<string>();
-
-            await Task.Run(async () =>
+            for (var i = 0; i < 8; i++)
             {
-                if (!alreadyLocked)
+                var datFilePath = Dat.GetDatPath(dataFile, i);
+                if (File.Exists(datFilePath))
                 {
-                    await _lock.WaitAsync();
-                }
-                try
-                {
-                    for (var i = 1; i < 20; i++)
+                    if (!IsOriginalDat(dataFile, i))
                     {
-                        var datFilePath = Dat.GetDatPath(dataFile, i);
-
-                        if (File.Exists(datFilePath))
-                        {
-
-                            using (var binaryReader = new BinaryReader(File.OpenRead(datFilePath)))
-                            {
-                                binaryReader.BaseStream.Seek(_MODDED_DAT_MARK_OFFSET, SeekOrigin.Begin);
-                                var one = binaryReader.ReadInt32();
-                                var two = binaryReader.ReadInt32();
-
-                                // Check the magic numbers
-                                if(one == _MODDED_DAT_MARK && two == _MODDED_DAT_MARK)
-                                {
-                                    datList.Add(datFilePath);
-                                }
-                            }
-                        }
+                        datList.Add(datFilePath);
                     }
                 }
-                finally
-                {
-                    if (!alreadyLocked)
-                    {
-                        _lock.Release();
-                    }
-                }
-            });
+            }
             return datList;
         }
 
@@ -497,9 +475,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             byte[] type2Bytes = null;
-
-            // This formula is used to obtain the dat number in which the offset is located
-            var parts = IOUtil.Offset8xToParts(offset);
 
             if(tx == null)
             {
@@ -1895,7 +1870,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        private async Task<int> GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0, bool alreadyLocked = false)
+        private int GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0)
         {
             if(fileSize < 0)
             {
@@ -1915,12 +1890,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Scan all the dat numbers...
             for (int i = 0; i < 8; i++)
             {
-                var original = await IsOriginalDat(dataFile, i, alreadyLocked);
+                var datPath = Dat.GetDatPath(dataFile, i);
+                if (!File.Exists(datPath))
+                    continue;
+
+                var original = IsOriginalDat(dataFile, i);
 
                 // Don't let us inject to original dat files.
                 if (original) continue;
 
-                var datPath = Dat.GetDatPath(dataFile, i);
 
 
                 var fInfo = new FileInfo(datPath);
@@ -1951,7 +1929,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Didn't find a DAT file with space, gotta create a new one.
             if (targetDat < 0)
             {
-                targetDat = CreateNewDat(dataFile, alreadyLocked);
+                targetDat = CreateNewDat(dataFile);
             }
 
             if(targetDat > 7 || targetDat < 0)
@@ -2046,7 +2024,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="importData"></param>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        internal async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, long targetOffset = 0)
+        internal async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile)
         {
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
@@ -2060,42 +2038,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Attempted to write Invalid data to DAT files.");
             }
 
-            long seekPointer = 0;
-            if(targetOffset >= 2048)
-            {
-                seekPointer = (targetOffset >> 7) << 7;
-
-                // If the space we're told to write to would require modification,
-                // don't allow writing to it, because we might potentially write
-                // past the end of this safe slot.
-                if(seekPointer % 256 != 0)
-                {
-                    seekPointer = 0;
-                    targetOffset = 0;
-                }
-            }
-
             long filePointer = 0;
             await _lock.WaitAsync();
             try
             {
                 // This finds the first dat with space, OR creates one if needed.
-                var datNum = 0;
-                if (targetOffset >= 2048)
-                {
-                    datNum = (int)(((targetOffset / 8) & 0xF) >> 1);
-                    var defaultDats = (await GetUnmoddedDatList(dataFile, true)).Count;
-
-                    if(datNum < defaultDats)
-                    {
-                        // Safety check.  No writing to default dats, even with an explicit offset.
-                        datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
-                        targetOffset = 0;
-                    }
-                } else
-                {
-                    datNum = await GetFirstDatWithSpace(dataFile, importData.Length, true);
-                }
+                var datNum = GetFirstDatWithSpace(dataFile, importData.Length);
 
                 var datPath = Dat.GetDatPath(dataFile, datNum);
 
@@ -2120,14 +2068,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         bw = new BinaryWriter(File.OpenWrite(datPath));
                     }
 
-                    if (targetOffset >= 2048)
-                    {
-                        bw.BaseStream.Seek(seekPointer, SeekOrigin.Begin);
-                    }
-                    else
-                    {
-                        bw.BaseStream.Seek(0, SeekOrigin.End);
-                    }
+                    bw.BaseStream.Seek(0, SeekOrigin.End);
 
                     // Make sure we're starting on an actual accessible interval.
                     while ((bw.BaseStream.Position % 256) != 0)
@@ -2361,10 +2302,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
-            var moddedDats = await _dat.GetModdedDatList(df);
+            var moddedDats = _dat.GetModdedDatList(df);
 
             var slots = new Dictionary<long, long>();
-            var modlist = await Modding.GetModList();
+            var modlist = await Modding.GetModList(false);
 
             var modsByFile = modlist.GetMods().GroupBy(x => {
                 long offset = x.ModOffset8x;
@@ -2435,7 +2376,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Cannot defragment DATs while DAT writing is disabled.");
             }
 
-            var modlist = await Modding.GetModList();
+            var modlist = await Modding.GetModList(true);
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
 
@@ -2505,7 +2446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 foreach (var dKv in modsByDf)
                 {
                     // Now we need to delete the current modded dat files.
-                    var moddedDats = await _dat.GetModdedDatList(dKv.Key);
+                    var moddedDats = _dat.GetModdedDatList(dKv.Key);
                     foreach (var file in moddedDats)
                     {
                         File.Delete(file);
@@ -2563,7 +2504,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var moddedDats = await _dat.GetModdedDatList(df);
+            var moddedDats = _dat.GetModdedDatList(df);
             var tempDats = moddedDats.Select(x => x + ".temp");
             var maxSize = Dat.GetMaximumDatSize();
 
@@ -2621,7 +2562,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             long size = 0;
             foreach (var df in dataFiles)
             {
-                var moddedDats = await _dat.GetModdedDatList(df);
+                var moddedDats = _dat.GetModdedDatList(df);
                 foreach (var dat in moddedDats)
                 {
                     var finfo = new FileInfo(dat);

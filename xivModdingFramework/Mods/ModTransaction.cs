@@ -320,7 +320,7 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                var idx = await __Index.GetIndexFile(dataFile, false, _ReadOnly);
+                var idx = await __Index.GetIndexFile(dataFile, false, ReadOnly);
                 _IndexFiles.Add(dataFile, idx);
 
             }
@@ -331,8 +331,9 @@ namespace xivModdingFramework.Mods
         {
             if(_ModList == null)
             {
+                // TODO: Should store modified times here to validate like we do for Index Files.
                 _ModListModifiedTime = File.GetLastWriteTimeUtc(Modding.ModListDirectory);
-                _ModList = await Modding.GetModList();
+                _ModList = await Modding.GetModList(!ReadOnly);
             }
             return _ModList;
         }

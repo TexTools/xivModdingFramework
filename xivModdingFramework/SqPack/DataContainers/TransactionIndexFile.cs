@@ -20,6 +20,12 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
             // Loop back to notify the Transaction of our changes.
             var tx = ModTransaction.ActiveTransaction;
+            if(tx != null && tx.State == ETransactionState.Closed)
+            {
+                throw new AccessViolationException("Cannot read data from a closed transaction.");
+            }
+
+
             var originalOffset = Get8xDataOffset(filePath);
             if(tx != null && originalOffset != newRawOffsetWithDatNumEmbed)
             {

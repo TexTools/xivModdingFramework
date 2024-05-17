@@ -117,36 +117,39 @@ namespace xivModdingFramework.Mods
             SaveModList(modList);
         }
 
-        internal static async Task<ModList> GetModList()
+        internal static async Task<ModList> GetModList(bool writeEnabled)
         {
             await _modlistSemaphore.WaitAsync();
             try
             {
-                var lastUpdatedTime = new FileInfo(ModListDirectory).LastWriteTimeUtc;
-
-                if (_CachedModList == null)
+                if (writeEnabled)
                 {
-                    // First access
+                    // Always get a clean file when doing write actions so it doesn't pollute our cached copy.
                     var modlistText = File.ReadAllText(ModListDirectory);
-                    _CachedModList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
-                    _ModListLastModifiedTime = lastUpdatedTime;
-                } else if (lastUpdatedTime > _ModListLastModifiedTime)
-                {
-                    // Cache is stale.
-                    var modlistText = File.ReadAllText(ModListDirectory);
-                    _CachedModList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
-                    _ModListLastModifiedTime = lastUpdatedTime;
+                    var modList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
+                    modList.RebuildModPackList();
+                    return modList;
                 }
-                _CachedModList.RebuildModPackList();
+                else
+                {
+                    var lastUpdatedTime = new FileInfo(ModListDirectory).LastWriteTimeUtc;
+                    if (_CachedModList == null || lastUpdatedTime > _ModListLastModifiedTime)
+                    {
+                        // First access or cache is stale.
+                        var modlistText = File.ReadAllText(ModListDirectory);
+                        _CachedModList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
+                        _ModListLastModifiedTime = lastUpdatedTime;
+                    }
+                    _CachedModList.RebuildModPackList();
+                }
+            }
+            catch(Exception ex)
+            {
+                throw new FileNotFoundException("Failedto find or parse modlist file.\n\n" + ex.Message);
             }
             finally
             {
                 _modlistSemaphore.Release();
-            }
-
-            if (_CachedModList == null)
-            {
-                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
             }
 
             return _CachedModList;
@@ -541,7 +544,20 @@ namespace xivModdingFramework.Mods
             try
             {
                 var modList = await tx.GetModList();
-                await SetModStates(state, modList.Mods.Select(x => x.Value.FilePath), progress, tx);
+                var toRemove = modList.Mods.Where(x => !x.Value.IsInternal()).Select(x => x.Value.FilePath);
+                await SetModStates(state, toRemove, progress, tx);
+
+                toRemove = modList.Mods.Where(x => x.Value.IsInternal()).Select(x => x.Value.FilePath);
+
+                // If we're clearing or disabling everything, delete all our internal files.
+                // This both helps reduce IMC bloat and helps ensure clean states are actually /clean/
+                if(state == EModState.UnModded || state == EModState.Disabled)
+                {
+                    foreach (var mod in toRemove) {
+                        await INTERNAL_DeleteMod(mod, true, tx);
+                    }
+                }
+
 
                 if (ownTransaction)
                 {
@@ -618,6 +634,63 @@ namespace xivModdingFramework.Mods
                 }
             }
 
+        }
+
+
+        /// <summary>
+        /// Determines if any mods, at all, are enabled currently.
+        /// </summary>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task<bool> AnyModsEnabled(ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+            var ml = await tx.GetModList();
+
+            var mods = ml.GetMods().ToList();
+            if (mods.Count == 0) return false;
+
+            foreach (var mod in mods)
+            {
+                var state = await mod.GetState(tx);
+                if (state == EModState.Enabled || state == EModState.Invalid)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
+        /// <summary>
+        /// Retrieves the list of enabled or invalid state mods.
+        /// </summary>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task<List<Mod>> GetActiveMods(ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+            var ml = await tx.GetModList();
+            var mods = ml.GetMods().ToList();
+
+            var active = new List<Mod>();
+            foreach (var x in mods)
+            {
+                var state = await x.GetState(tx);
+                if (state == EModState.Enabled || state == EModState.Invalid)
+                {
+                    active.Add(x);
+                }
+            }
+            return active;
         }
 
         #endregion
@@ -809,11 +882,6 @@ namespace xivModdingFramework.Mods
                 item = root.GetFirstItem();
                 return (item.GetModlistItemName(), item.GetModlistItemCategory());
             }
-        }
-
-        internal static async Task SetAllModStates(object emodState)
-        {
-            throw new NotImplementedException();
         }
 
         #endregion

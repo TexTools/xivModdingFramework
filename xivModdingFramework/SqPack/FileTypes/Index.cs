@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -255,6 +256,115 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
             return ret;
+        }
+
+
+        private static SHA1 sha = SHA1.Create();
+
+        /// <summary>
+        /// Forcibly resets all Index DAT counts back to their original FFXIV values.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        internal static void UNSAFE_ResetAllIndexDatCounts()
+        {
+            foreach(XivDataFile df in Enum.GetValues(typeof(XivDataFile))) {
+                UNSAFE_ResetIndexDatCount(df);
+            }
+        }
+
+        /// <summary>
+        /// Restores all Index's DAT count values back to normal.
+        /// </summary>
+        internal static void UNSAFE_NormalizeAllIndexDatCounts()
+        {
+            foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+            {
+                UNSAFE_NormalizeIndexDatCount(df);
+            }
+        }
+
+
+        /// <summary>
+        /// Forcibly sets an index file's DAT Count back to the original value.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="datCount"></param>
+        private static void UNSAFE_ResetIndexDatCount(XivDataFile index)
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var datCount = (_dat.GetOriginalDatList(index)).Count;
+            UNSAFE_SetIndexDatCount(index, datCount);
+        }
+
+
+        /// <summary>
+        /// Restores a given Index's DAT count values back to normal.
+        /// </summary>
+        /// <param name="index"></param>
+        private static void UNSAFE_NormalizeIndexDatCount(XivDataFile index)
+        {
+            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
+            var datCount = Dat.GetLargestDatNumber(index) + 1;
+            UNSAFE_SetIndexDatCount(index, datCount);
+        }
+
+
+        /// <summary>
+        /// Forcibly sets an Index File's DAT Count.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="datCount"></param>
+        private static void UNSAFE_SetIndexDatCount(XivDataFile index, int value)
+        {
+            var index1Path = XivDataFiles.GetFullPath(index, Index.IndexExtension);
+            var index2Path = XivDataFiles.GetFullPath(index, Index.Index2Extension);
+            UNSAFE_SetIndexDatCount(index1Path, value);
+            UNSAFE_SetIndexDatCount(index2Path, value);
+        }
+
+        /// <summary>
+        /// Forcibly set a given Index File's DAT count, including recalculating the new header hash.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="value"></param>
+        private static void UNSAFE_SetIndexDatCount(string path, int value)
+        {
+            const int _IndexHeaderStart = 1024;
+            const int _IndexHeaderSize = 1024;
+            const int _DatCountOffset = 80;
+            const int _DatCountFullOffset = _IndexHeaderStart + _DatCountOffset;
+
+            byte[] indexHeader;
+
+            using (var br = new BinaryReader(File.OpenRead(path)))
+            {
+                br.BaseStream.Seek(_DatCountFullOffset, SeekOrigin.Begin);
+
+                var currentValue = br.ReadUInt32();
+
+                if (currentValue == value)
+                {
+                    // No update needed.
+                    return;
+                }
+
+                br.BaseStream.Seek(_IndexHeaderStart, SeekOrigin.Begin);
+                indexHeader = br.ReadBytes(_IndexHeaderSize);
+            }
+
+            // Copy in new value.
+            Array.Copy(BitConverter.GetBytes(value), 0, indexHeader, _DatCountOffset, sizeof(int));
+
+            // Compute new hash.
+            var headerHash = sha.ComputeHash(indexHeader, 0, indexHeader.Length - 64);
+            Array.Copy(headerHash, 0, indexHeader, indexHeader.Length - 64, headerHash.Length);
+
+            // Write updated header.
+            using (var bw = new BinaryWriter(File.OpenWrite(path))) { 
+                bw.BaseStream.Seek(_IndexHeaderStart, SeekOrigin.Begin);
+                bw.Write(indexHeader);
+            }
         }
 
     }

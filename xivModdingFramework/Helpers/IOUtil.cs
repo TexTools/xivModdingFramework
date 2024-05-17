@@ -327,21 +327,21 @@ namespace xivModdingFramework.Helpers
             }
             if (dir.StartsWith(Path.GetTempPath()))
             {
-                RecursiveDelete(dir);
+                RecursiveDeleteDirectory(dir);
             }
         }
-        public static void RecursiveDelete(string dir)
+        public static void RecursiveDeleteDirectory(string dir)
         {
-            RecursiveDelete(new DirectoryInfo(dir));
+            RecursiveDeleteDirectory(new DirectoryInfo(dir));
         }
-        public static void RecursiveDelete(DirectoryInfo baseDir)
+        public static void RecursiveDeleteDirectory(DirectoryInfo baseDir)
         {
             if (!baseDir.Exists)
                 return;
 
             foreach (var dir in baseDir.EnumerateDirectories())
             {
-                RecursiveDelete(dir);
+                RecursiveDeleteDirectory(dir);
             }
             baseDir.Delete(true);
         }
@@ -404,6 +404,11 @@ namespace xivModdingFramework.Helpers
         public static (long Offset, int DatNum) RawOffsetToParts(uint sqpackOffset)
         {
             return Offset8xToParts(sqpackOffset * 8L);
+        }
+
+        public static string[] GetFilesInFolder(string path, string format = "*.*")
+        {
+            return Directory.GetFiles(path, format, SearchOption.AllDirectories);
         }
 
     }

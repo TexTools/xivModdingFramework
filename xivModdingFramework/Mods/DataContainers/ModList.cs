@@ -308,7 +308,6 @@ namespace xivModdingFramework.Mods.DataContainers
             return _ModPacks.Where(newPred).Select(x => x.Value);
         }
 
-
         /// <summary>
         /// Regenerate the internal list of mods-per-modpack.
         /// Used after deserializing the json modpack file.

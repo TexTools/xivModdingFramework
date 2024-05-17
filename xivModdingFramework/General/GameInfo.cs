@@ -22,7 +22,7 @@ namespace xivModdingFramework
 {
     public class GameInfo
     {
-        private const string GameVersionFile = "ffxivgame.ver";
+        public const string GameVersionFileName = "ffxivgame.ver";
 
         /// <summary>
         /// The directory in which the game is installed.
@@ -48,6 +48,12 @@ namespace xivModdingFramework
         /// The current version of the game.
         /// </summary>
         public Version GameVersion { get; }
+
+        public string GameVersionFile { get
+            {
+                return GetGameVersionFile();
+            } 
+        }
 
 
         /// <summary>
@@ -82,6 +88,41 @@ namespace xivModdingFramework
             }
         }
 
+        private string GetGameVersionFile()
+        {
+            try
+            {
+                var versionBasePath = GameDirectory.FullName.Substring(0, GameDirectory.FullName.IndexOf("sqpack", StringComparison.Ordinal));
+                var versionFile = Path.Combine(versionBasePath, GameVersionFileName);
+
+                if (!File.Exists(versionFile))
+                {
+                    return null;
+                }
+
+                return versionFile;
+            }
+            catch
+            {
+                return null;
+            }
+
+        }
+
+        public static Version ReadVersionFile(string file)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
+                {
+                    return new Version();
+                }
+                var versionData = File.ReadAllLines(file);
+                return new Version(versionData[0].Substring(0, versionData[0].LastIndexOf(".", StringComparison.Ordinal)));
+            } catch {
+                return new Version();
+            }
+        }
 
         /// <summary>
         /// Gets the games current version.
@@ -89,11 +130,19 @@ namespace xivModdingFramework
         /// <returns>The game version.</returns>
         private Version GetGameVersion()
         {
-            var versionBasePath = GameDirectory.FullName.Substring(0, GameDirectory.FullName.IndexOf("sqpack", StringComparison.Ordinal));
-            var versionFile = Path.Combine(versionBasePath, GameVersionFile);
-
-            var versionData = File.ReadAllLines(versionFile);
-            return new Version(versionData[0].Substring(0, versionData[0].LastIndexOf(".", StringComparison.Ordinal)));
+            try
+            {
+                var file = GetGameVersionFile();
+                if (string.IsNullOrWhiteSpace(file))
+                {
+                    return new Version();
+                }
+                return ReadVersionFile(file);
+            }
+            catch
+            {
+                return new Version();
+            }
         }
     }
 }

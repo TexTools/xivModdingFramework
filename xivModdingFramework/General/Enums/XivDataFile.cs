@@ -58,7 +58,7 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex2/020201", "bg/ex2/01_")] _EX2_BG_01,
         [XivDataFileDescription("ex2/020202", "bg/ex2/02_")] _EX2_BG_02,
         [XivDataFileDescription("ex2/020203", "bg/ex2/03_")] _EX2_BG_03,
-        [XivDataFileDescription("ex2/020204", "bg/ex2/04_")] _EX2_BG_04,
+        //[XivDataFileDescription("ex2/020204", "bg/ex2/04_")] _EX2_BG_04,  // Doesn't actually exist? They skipped a number...
         [XivDataFileDescription("ex2/020205", "bg/ex2/05_")] _EX2_BG_05,
         [XivDataFileDescription("ex2/030200", "cut/ex2/")] _EX2_Cut,
         [XivDataFileDescription("ex2/0c0200", "music/ex2/")] _EX2_Music,
@@ -67,7 +67,7 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex3/020300", "bg/ex3/00_")] _EX3_BG_00,
         [XivDataFileDescription("ex3/020301", "bg/ex3/01_")] _EX3_BG_01,
         [XivDataFileDescription("ex3/020302", "bg/ex3/02_")] _EX3_BG_02,
-        [XivDataFileDescription("ex3/020303", "bg/ex3/03_")] _EX3_BG_03,
+        //[XivDataFileDescription("ex3/020303", "bg/ex3/03_")] _EX3_BG_03, // Doesn't exist
         [XivDataFileDescription("ex3/020304", "bg/ex3/04_")] _EX3_BG_04,
         [XivDataFileDescription("ex3/020305", "bg/ex3/05_")] _EX3_BG_05,
         [XivDataFileDescription("ex3/030300", "cut/ex3/")] _EX3_Cut,
