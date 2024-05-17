@@ -95,8 +95,8 @@ namespace xivModdingFramework.SqPack.DataContainers
         public virtual void Save() {
 
             var dir = XivCache.GameInfo.GameDirectory;
-            var index1Path = Path.Combine(dir.FullName, $"{DataFile.GetDataFileName()}{FileTypes.Index.IndexExtension}");
-            var index2Path = Path.Combine(dir.FullName, $"{DataFile.GetDataFileName()}{FileTypes.Index.Index2Extension}");
+            var index1Path = XivDataFiles.GetFullPath(DataFile, Index.IndexExtension);
+            var index2Path = XivDataFiles.GetFullPath(DataFile, Index.Index2Extension);
             using (var index1Stream = new BinaryWriter(File.OpenWrite(index1Path)))
             {
                 using (var index2Stream = new BinaryWriter(File.OpenWrite(index2Path)))

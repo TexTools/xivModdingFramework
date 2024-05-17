@@ -273,8 +273,8 @@ namespace xivModdingFramework.Mods
             foreach (var ik in _IndexFiles)
             {
                 var df = ik.Key;
-                var index1Path = Path.Combine(_GameDirectory.FullName, $"{df.GetDataFileName()}{Index.IndexExtension}");
-                var index2Path = Path.Combine(_GameDirectory.FullName, $"{df.GetDataFileName()}{Index.Index2Extension}");
+                var index1Path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
+                var index2Path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
 
                 try
                 {
@@ -297,8 +297,8 @@ namespace xivModdingFramework.Mods
             {
                 if (!_ReadOnly)
                 {
-                    var index1Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.IndexExtension}");
-                    var index2Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.Index2Extension}");
+                    var index1Path = XivDataFiles.GetFullPath(dataFile, Index.IndexExtension);
+                    var index2Path = XivDataFiles.GetFullPath(dataFile, Index.Index2Extension);
 
                     _Index1ModifiedTimes.Add(dataFile, File.GetLastWriteTimeUtc(index1Path));
                     _Index2ModifiedTimes.Add(dataFile, File.GetLastWriteTimeUtc(index2Path));
@@ -761,8 +761,8 @@ namespace xivModdingFramework.Mods
             foreach (var kv in _IndexFiles)
             {
                 var dataFile = kv.Key;
-                var index1Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.IndexExtension}");
-                var index2Path = Path.Combine(_GameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index.Index2Extension}");
+                var index1Path = XivDataFiles.GetFullPath(dataFile, Index.IndexExtension);
+                var index2Path = XivDataFiles.GetFullPath(dataFile, Index.Index2Extension);
 
                 var index1Time = File.GetLastWriteTimeUtc(index1Path);
                 var index2Time = File.GetLastWriteTimeUtc(index2Path);

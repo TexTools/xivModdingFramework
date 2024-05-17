@@ -172,7 +172,7 @@ namespace xivModdingFramework.Mods
                 IsDefault = modData.IsDefault,
                 ModSize = -1, // Will be updated on Write()
                 ModOffset = -1, // Will be updated on Write()
-                DatFile = dataFile.GetDataFileName()
+                DatFile = dataFile.GetFileName()
             };
 
             option.ModsJsons.Add(modsJson);

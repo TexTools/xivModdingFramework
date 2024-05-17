@@ -172,6 +172,7 @@ namespace xivModdingFramework.Helpers
 
         public async Task BackupIndexFiles(DirectoryInfo backupsDirectory)
         {
+            throw new NotImplementedException("Needs to be updated.");
             await Task.Run(async () => {
                 var indexFiles = new XivDataFile[] { XivDataFile._0A_Exd, XivDataFile._04_Chara, XivDataFile._06_Ui, XivDataFile._01_Bgcommon };
                 var index = new Index(_gameDirectory);
@@ -246,14 +247,17 @@ namespace xivModdingFramework.Helpers
 
             return Task.Run(async () =>
             {
+                throw new NotImplementedException("Needs to be updated.");
                 var backupFiles = Directory.GetFiles(backupsDirectory.FullName);
                 var filesToCheck = new XivDataFile[] { XivDataFile._0A_Exd, XivDataFile._04_Chara, XivDataFile._06_Ui, XivDataFile._01_Bgcommon };
                 var outdated = false;
 
                 foreach (var xivDataFile in filesToCheck)
                 {
-                    var backupFile = new DirectoryInfo($"{backupsDirectory.FullName}\\{xivDataFile.GetDataFileName()}.win32.index");
+                    var path = Path.Combine(backupsDirectory.FullName, xivDataFile.GetFilePath());
+                    var backupFile = new DirectoryInfo($"{path}{Index.IndexExtension}");
 
+                    Directory.CreateDirectory(backupFile.Parent.FullName);
                     if (!File.Exists(backupFile.FullName)) continue;
 
                     try

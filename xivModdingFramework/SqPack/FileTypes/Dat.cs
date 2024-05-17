@@ -180,7 +180,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             try
             {
-                allFiles = Directory.GetFiles(XivCache.GameInfo.GameDirectory.FullName);
+                allFiles = Directory.GetFiles(dataFile.GetContainingFolder());
             }
             finally
             {
@@ -190,7 +190,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
 
-            var dataFiles = from file in allFiles where file.Contains(dataFile.GetDataFileName()) && file.Contains(".dat") select file;
+            var dataFiles = from file in allFiles where file.Contains(dataFile.GetFileName()) && file.Contains(".dat") select file;
 
             try
             {
@@ -1785,7 +1785,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         internal static string GetDatPath(XivDataFile dataFile, int datNumber)
         {
-            var datPath = $"{XivCache.GameInfo.GameDirectory}/{dataFile.GetDataFileName()}{Dat.DatExtension}{datNumber}";
+            var datPath = XivDataFiles.GetFullPath(dataFile, $"{Dat.DatExtension}{datNumber}");
             return datPath;
         }
 
@@ -1956,7 +1956,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             if(targetDat > 7 || targetDat < 0)
             {
-                throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetDataFileName());
+                throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetFileName());
             }
             return targetDat;
         }

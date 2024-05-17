@@ -29,6 +29,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 
 namespace xivModdingFramework.SqPack.FileTypes
@@ -138,8 +139,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         internal async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
         {
-            var index1Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{IndexExtension}");
-            var index2Path = Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}{Index2Extension}");
+            var index1Path = XivDataFiles.GetFullPath(dataFile, IndexExtension);
+            var index2Path = XivDataFiles.GetFullPath(dataFile, Index2Extension);
 
             if (!alreadySemaphoreLocked)
             {
@@ -205,7 +206,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>True if locked</returns>
         public bool IsIndexLocked(XivDataFile dataFile)
         {
-            var fileName = dataFile.GetDataFileName();
+            var fileName = dataFile.GetFilePath();
             var isLocked = false;
 
             var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");

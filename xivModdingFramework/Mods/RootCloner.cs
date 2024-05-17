@@ -513,7 +513,7 @@ namespace xivModdingFramework.Mods
                         {
                             Name = iName,
                             FullPath = mod.FilePath,
-                            DatFile = df.GetDataFileName(),
+                            DatFile = df.GetFileName(),
                             Category = iCat,
                             IsDefault = false,
                             ModOffset = mod.ModOffset8x

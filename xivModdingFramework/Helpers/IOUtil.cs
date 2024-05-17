@@ -258,13 +258,15 @@ namespace xivModdingFramework.Helpers
         public static XivDataFile GetDataFileFromPath(string path)
         {
             var files = Enum.GetValues(typeof(XivDataFile));
+
+            // Scan them in reverse as the most specific ones are listed last.
+            Array.Reverse(files);
             foreach (var f in files)
             {
                 var file = (XivDataFile)f;
                 var prefix = file.GetFolderKey();
 
-                var match = Regex.Match(path, "^" + prefix);
-                if (match.Success)
+                if (path.StartsWith(prefix))
                 {
                     return file;
                 }
