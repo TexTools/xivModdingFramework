@@ -97,9 +97,9 @@ namespace xivModdingFramework.SqPack.DataContainers
             var dir = XivCache.GameInfo.GameDirectory;
             var index1Path = XivDataFiles.GetFullPath(DataFile, Index.IndexExtension);
             var index2Path = XivDataFiles.GetFullPath(DataFile, Index.Index2Extension);
-            using (var index1Stream = new BinaryWriter(File.OpenWrite(index1Path)))
+            using (var index1Stream = new BinaryWriter(File.Open(index1Path, FileMode.OpenOrCreate, FileAccess.Write)))
             {
-                using (var index2Stream = new BinaryWriter(File.OpenWrite(index2Path)))
+                using (var index2Stream = new BinaryWriter(File.Open(index2Path, FileMode.OpenOrCreate, FileAccess.Write)))
                 {
                     Save(index1Stream, index2Stream);
                 }
@@ -445,6 +445,9 @@ namespace xivModdingFramework.SqPack.DataContainers
             stream.Write(synonymTableSegment);
             stream.Write(EmptyBlock[indexId]);
             stream.Write(folderSegment);
+
+            // Truncate any extra data in the file.
+            stream.BaseStream.SetLength(stream.BaseStream.Position);
         }
 
         /// <summary>

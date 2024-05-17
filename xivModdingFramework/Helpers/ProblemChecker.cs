@@ -249,7 +249,7 @@ namespace xivModdingFramework.Helpers
                         throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
                     }
 
-                    using (var tx = ModTransaction.BeginTransaction())
+                    using (var tx = ModTransaction.BeginTransaction(true))
                     {
                         enabledMods = await Modding.GetActiveMods(tx);
                         await Modding.SetAllModStates(EModState.Disabled, null, tx);
@@ -295,7 +295,7 @@ namespace xivModdingFramework.Helpers
                     if (enabledMods.Count > 0)
                     {
                         // Re-Enable mods.
-                        using (var tx = ModTransaction.BeginTransaction())
+                        using (var tx = ModTransaction.BeginTransaction(true))
                         {
                             var paths = enabledMods.Select(x => x.FilePath);
                             await Modding.SetModStates(EModState.Enabled, paths, null, tx);
