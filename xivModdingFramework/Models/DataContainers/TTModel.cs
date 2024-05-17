@@ -2745,12 +2745,12 @@ namespace xivModdingFramework.Models.DataContainers
 
                     if (anyWeirdUV1s)
                     {
-                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV1 data.  This can have unexpected results on texture placement.  Was this inteneded?");
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV1 data.  This can have unexpected results on texture placement.  Was this intended?");
                     }
 
                     if (anyWeirdUV2s)
                     {
-                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this inteneded?");
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this intended?");
                     }
 
                     pIdx++;

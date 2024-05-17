@@ -233,6 +233,29 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return isLocked;
         }
+
+
+        /// <summary>
+        /// Tests if the given formatted paths exist, returning the ones that do.
+        /// </summary>
+        /// <param name="tx"></param>
+        /// <param name="format"></param>
+        /// <param name="values"></param>
+        /// <returns></returns>
+        public static async Task<List<int>> CheckExistsMultiple(ModTransaction tx, string format, int min, int max)
+        {
+            var ret = new List<int>();
+            for(int i = min; i < max; i++)
+            {
+                var s = string.Format(format, i.ToString("D4"));
+                if (await tx.FileExists(s))
+                {
+                    ret.Add(i);
+                }
+            }
+            return ret;
+        }
+
     }
 }
  

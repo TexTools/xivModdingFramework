@@ -80,7 +80,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <summary>
         /// The Icon Number associated with the gear item
         /// </summary>
-        public uint IconNumber { get; set; }
+        public uint IconId { get; set; }
 
         /// <summary>
         /// The gear EquipSlotCategory key

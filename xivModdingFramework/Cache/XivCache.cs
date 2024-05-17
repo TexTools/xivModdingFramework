@@ -526,6 +526,7 @@ namespace xivModdingFramework.Cache
                 list.AddRange(await _ui.GetStatusList(tx));
                 list.AddRange(await _ui.GetWeatherList(tx));
                 list.AddRange(await _ui.GetUldList(tx));
+                list.AddRange(await _ui.GetPaintingUiImages(tx));
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -585,8 +586,8 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into furniture ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
-                                          values($name, $category, $subcategory, $primary_id, $icon_id, $root)";
+                            insert into furniture ( name,  category,  subcategory,  primary_id,  icon_id,  root, secondary_id) 
+                                          values($name, $category, $subcategory, $primary_id, $icon_id, $root, $secondary_id)";
 
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
@@ -594,8 +595,9 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("name", item.Name);
                             cmd.Parameters.AddWithValue("category", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
-                            cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("icon_id", item.IconId);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                            cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                             if (root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
@@ -852,7 +854,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                             cmd.Parameters.AddWithValue("name", item.Name);
-                            cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("icon_id", item.IconId);
                             if(root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
@@ -1227,7 +1229,7 @@ namespace xivModdingFramework.Cache
             };
 
             item.Name = reader.GetString("name");
-            item.IconNumber = (uint)reader.GetInt32("icon_id");
+            item.IconId = (uint)reader.GetInt32("icon_id");
             //primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
             primaryMi.PrimaryID = reader.GetInt32("primary_id");
             primaryMi.SecondaryID = reader.GetInt32("secondary_id");
@@ -1269,10 +1271,11 @@ namespace xivModdingFramework.Cache
                 SecondaryCategory = reader.GetString("category"),
                 TertiaryCategory = reader.GetString("subcategory"),
                 Name = reader.GetString("name"),
-                IconNumber = (uint)reader.GetInt32("icon_id"),
+                IconId = (uint)reader.GetInt32("icon_id"),
                 ModelInfo = new XivModelInfo()
                 {
-                    PrimaryID = reader.GetInt32("primary_id")
+                    PrimaryID = reader.GetInt32("primary_id"),
+                    SecondaryID = reader.GetInt32("secondary_id")
                 }
             };
             return item;

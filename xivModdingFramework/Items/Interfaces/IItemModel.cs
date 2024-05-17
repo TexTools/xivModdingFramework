@@ -15,7 +15,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.Interfaces
 {
@@ -27,6 +30,21 @@ namespace xivModdingFramework.Items.Interfaces
         /// <summary>
         /// The Primary Model Information of the Item
         /// </summary>
-        XivModelInfo ModelInfo { get; set; }
+        public XivModelInfo ModelInfo { get; set; }
+
+        public uint IconId { get; set; }
+    }
+
+    public static class IItemModelExtensions
+    {
+        public static bool HasRealModel(this IItemModel item)
+        {
+            // Catch for paintings being dumb.
+            if(item.ModelInfo != null && item.SecondaryCategory != XivStrings.Paintings)
+            {
+                return true;
+            }
+            return false;
+        }
     }
 }

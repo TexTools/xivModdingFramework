@@ -58,7 +58,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// </remarks>
         public string TertiaryCategory { get; set; }
 
-        public ushort IconId { get; set; }
+        public uint IconId { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

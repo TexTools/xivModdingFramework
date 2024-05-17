@@ -76,6 +76,8 @@ namespace xivModdingFramework.Exd.FileTypes
                     return GetFieldMarkerExpectations(language);
                 case XivEx.vfx:
                     return GetVfxExpectations(language);
+                case XivEx.aquariumfish:
+                    return GetAquariumFishExpectations(language);
                 default:
                     return columnExpectations;
             }
@@ -172,6 +174,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "PrimaryId", ( 0, ExcelColumnDataType.Int32 ) },
+                { "SecondaryId", ( 1, ExcelColumnDataType.Int32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -627,6 +630,27 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Path", ( 0, ExcelColumnDataType.String ) },
+            };
+
+            if (language == XivLanguage.Korean)
+            {
+                // Set up overrides here if necessary for KR.
+            }
+            else if (language == XivLanguage.Chinese)
+            {
+                // Set up overrides here if necessary for CN.
+            }
+
+            return columnExpectations;
+        }
+        private static Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)> GetAquariumFishExpectations(XivLanguage language = XivLanguage.English)
+        {
+
+            var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
+            {
+                { "ItemId", ( 2, ExcelColumnDataType.UInt32) },
+                { "Size", ( 1, ExcelColumnDataType.UInt8) },
+                { "FishId", ( 3, ExcelColumnDataType.UInt16) },
             };
 
             if (language == XivLanguage.Korean)

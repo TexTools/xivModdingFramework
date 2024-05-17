@@ -975,4 +975,13 @@
   <data name="Minimap" xml:space="preserve">
     <value>Minimap</value>
   </data>
+  <data name="Fish" xml:space="preserve">
+    <value>Fish</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>Painting</value>
+  </data>
+  <data name="Painting Icons" xml:space="preserve">
+    <value>Painting Icons</value>
+  </data>
 </root>

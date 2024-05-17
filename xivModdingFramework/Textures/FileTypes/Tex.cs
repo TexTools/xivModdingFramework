@@ -250,11 +250,11 @@ namespace xivModdingFramework.Textures.FileTypes
             uint iconNumber = 0;
             if (type == typeof(XivGear))
             {
-                iconNumber = ((XivGear)iconItem).IconNumber;
+                iconNumber = ((XivGear)iconItem).IconId;
             }
             else if (type == typeof(XivFurniture))
             {
-                iconNumber = ((XivFurniture)iconItem).IconNumber;
+                iconNumber = ((XivFurniture)iconItem).IconId;
             }
 
             if (iconNumber <= 0)

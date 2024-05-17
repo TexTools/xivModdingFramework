@@ -251,7 +251,9 @@ namespace xivModdingFramework.Models.FileTypes
                         mdlFile = $"c{race}z{bodyVer}_zer{MdlExtension}";
                     }
                     break;
-                case XivItemType.furniture:
+                case XivItemType.indoor:
+                case XivItemType.outdoor:
+                case XivItemType.fish:
                     // Language doesn't matter for this call.
                     var housing = new Housing(_gameDirectory, XivLanguage.None);
                     var mdlPath = "";

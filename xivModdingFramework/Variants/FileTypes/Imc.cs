@@ -75,7 +75,8 @@ namespace xivModdingFramework.Variants.FileTypes
             {
                 return false;
             }
-            else if (root.PrimaryType == XivItemType.indoor || root.PrimaryType == XivItemType.outdoor)
+            else if (root.PrimaryType == XivItemType.indoor || root.PrimaryType == XivItemType.outdoor
+                || root.PrimaryType == XivItemType.fish || root.PrimaryType == XivItemType.painting)
             {
                 return false;
             }
@@ -134,6 +135,11 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <returns>The XivImc Data</returns>
         public async Task<XivImc> GetImcInfo(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
+            if (item == null || !Imc.UsesImc(item))
+            {
+                return null;
+            }
+
             var info = await GetFullImcInfo(item, forceOriginal, tx);
             if(info == null)
             {

@@ -1033,6 +1033,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Fish.
+        /// </summary>
+        internal static string Fish {
+            get {
+                return ResourceManager.GetString("Fish", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Food.
         /// </summary>
         internal static string Food {
@@ -2073,6 +2082,24 @@ namespace xivModdingFramework.Resources {
         internal static string OuterEar {
             get {
                 return ResourceManager.GetString("OuterEar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Painting.
+        /// </summary>
+        internal static string Painting {
+            get {
+                return ResourceManager.GetString("Painting", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Painting Icons.
+        /// </summary>
+        internal static string Painting_Icons {
+            get {
+                return ResourceManager.GetString("Painting Icons", resourceCulture);
             }
         }
         

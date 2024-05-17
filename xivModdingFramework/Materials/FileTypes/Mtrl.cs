@@ -1446,6 +1446,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 var im = item as IItemModel;
                 if (im != null && im.ModelInfo != null && Imc.UsesImc(im))
                 {
+                    if (!Imc.UsesImc(im)){
+                        return 0;
+                    }
                     var imc = new Imc(XivCache.GameInfo.GameDirectory);
                     var entry = await imc.GetImcInfo((IItemModel)item, false, tx);
                     if(entry== null)

@@ -56,6 +56,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// The Model Information for the gear item
         /// </summary>
         public XivModelInfo ModelInfo { get; set; }
+        public uint IconId { get; set; }
 
         /// <summary>
         /// Gets the item's name as it should be written to the modlist/modpack files.

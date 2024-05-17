@@ -26,6 +26,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Helpers
@@ -369,8 +370,6 @@ namespace xivModdingFramework.Helpers
                 return System.Text.Encoding.ASCII.GetString(data.ToArray());
             }
         }
-
-
 
         /// <summary>
         /// Wipes the bottom 7 bits the given offset, matching it to SE style expected file increments.

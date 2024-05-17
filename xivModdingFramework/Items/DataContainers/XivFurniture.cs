@@ -22,6 +22,204 @@ using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
 {
+    public class XivFish : IItemModel
+    {
+        /// <summary>
+        /// The name of the furniture item
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// The Main Category
+        /// </summary>
+        /// <remarks>
+        /// For Furniture, the main category is "Furniture"
+        /// </remarks>
+        public string PrimaryCategory { get; set; }
+
+        /// <summary>
+        /// The furniture item Category
+        /// </summary>
+        public string SecondaryCategory { get; set; }
+
+        /// <summary>
+        /// The furniture item SubCategory
+        /// </summary>
+        /// <remarks>
+        /// This is currently not used for Furniture, but may be used in the future
+        /// </remarks>
+        public string TertiaryCategory { get; set; }
+
+        /// <summary>
+        /// The Primary Model Information for the furniture item
+        /// </summary>
+        public XivModelInfo ModelInfo { get; set; }
+
+
+        public static int StringSizeToInt(string size)
+        {
+            switch (size)
+            {
+                case "sm":
+                    return 1;
+                case "mi":
+                    return 2;
+                case "la":
+                    return 3;
+                case "ll":
+                    return 4;
+            }
+            return 0;
+        }
+
+        public static string IntSizeToString(int? size)
+        {
+            switch (size)
+            {
+                case 1:
+                    return "sm";
+                case 2:
+                    return "mi";
+                case 3:
+                    return"la";
+                case 4:
+                    return "ll";
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// The data file the item belongs to
+        /// </summary>
+        /// <remarks>
+        /// Housing items are either in 010000
+        /// </remarks>
+        public XivDataFile DataFile { get; set; } = XivDataFile._01_Bgcommon;
+        public uint IconId { get; set; }
+
+        internal static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        {
+            var item = new XivFish();
+            item.Name = root.Info.GetBaseFileName();
+            item.PrimaryCategory = XivStrings.Housing;
+            item.SecondaryCategory = XivStrings.Fish;
+
+            return item;
+        }
+
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown Painting";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return XivStrings.Housing;
+        }
+
+        public int CompareTo(object obj)
+        {
+            return string.Compare(Name, ((XivFish)obj).Name, StringComparison.Ordinal);
+        }
+
+        public object Clone()
+        {
+            var copy = (XivFish)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
+            return copy;
+        }
+    }
+    public class XivFramePicture : IItemModel
+    {
+        /// <summary>
+        /// The name of the furniture item
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// The Main Category
+        /// </summary>
+        /// <remarks>
+        /// For Furniture, the main category is "Furniture"
+        /// </remarks>
+        public string PrimaryCategory { get; set; }
+
+        /// <summary>
+        /// The furniture item Category
+        /// </summary>
+        public string SecondaryCategory { get; set; }
+
+        /// <summary>
+        /// The furniture item SubCategory
+        /// </summary>
+        /// <remarks>
+        /// This is currently not used for Furniture, but may be used in the future
+        /// </remarks>
+        public string TertiaryCategory { get; set; }
+
+        /// <summary>
+        /// The Primary Model Information for the furniture item
+        /// </summary>
+        public XivModelInfo ModelInfo { get; set; }
+
+        /// <summary>
+        /// The data file the item belongs to
+        /// </summary>
+        /// <remarks>
+        /// Housing items are either in 010000
+        /// </remarks>
+        public XivDataFile DataFile { get; set; } = XivDataFile._01_Bgcommon;
+        public uint IconId { get; set; }
+
+        internal static IItemModel FromDependencyRoot(XivDependencyRoot root)
+        {
+            var item = new XivFramePicture();
+            item.Name = root.Info.GetBaseFileName();
+            item.PrimaryCategory = XivStrings.Housing;
+            item.SecondaryCategory = XivStrings.Paintings;
+
+            return item;
+        }
+
+        /// <summary>
+        /// Gets the item's name as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemName()
+        {
+            return Name != null ? Name : "Unknown Painting";
+        }
+
+        /// <summary>
+        /// Gets the item's category as it should be written to the modlist/modpack files.
+        /// </summary>
+        /// <returns></returns>
+        public string GetModlistItemCategory()
+        {
+            return XivStrings.Housing;
+        }
+
+        public int CompareTo(object obj)
+        {
+            return string.Compare(Name, ((XivFramePicture)obj).Name, StringComparison.Ordinal);
+        }
+
+        public object Clone()
+        {
+            var copy = (XivFramePicture)this.MemberwiseClone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
+            return copy;
+        }
+    }
+
     public class XivFurniture : IItemModel
     {
         /// <summary>
@@ -66,7 +264,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// <summary>
         /// The Icon Number associated with the furniture item
         /// </summary>
-        public uint IconNumber { get; set; }
+        public uint IconId { get; set; }
 
         internal static IItemModel FromDependencyRoot(XivDependencyRoot root)
         {

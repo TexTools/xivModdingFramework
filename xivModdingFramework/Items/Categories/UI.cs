@@ -651,5 +651,60 @@ namespace xivModdingFramework.Items.Categories
             return loadingImageList;
         }
 
+        public async Task<List<XivUi>> GetPaintingUiImages(ModTransaction tx = null)
+        {
+            var paintingsLock = new object();
+
+            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var pictureDictionary = await ex.ReadExData(XivEx.picture, tx);
+            var itemDictionary = await ex.ReadExData(XivEx.item, tx);
+
+            var paintingList = new List<XivUi>();
+
+            await Task.Run(() => Parallel.ForEach(itemDictionary.Values, (itemRow) =>
+            {
+
+                var pictureId = (uint)itemRow.GetColumnByName("PictureId");
+                if (pictureId == 0 || pictureId > pictureDictionary.Count)
+                    return;
+
+                var name = (string)itemRow.GetColumnByName("Name");
+                if (string.IsNullOrEmpty(name))
+                {
+                    return;
+                }
+
+                var filterGroup = (byte)itemRow.GetColumnByName("FilterGroup");
+                if (filterGroup != 34)
+                {
+                    return;
+                }
+
+                var pictureRow = pictureDictionary[(int)pictureId];
+
+                var id = (int)pictureRow.GetColumnByName("PrimaryId");
+                var painting = new XivUi
+                {
+                    PrimaryCategory = XivStrings.UI,
+                    SecondaryCategory = XivStrings.Painting_Icons,
+                    UiPath = "ui/icon/" + (id).ToString("D6"),
+                    IconNumber = id,
+                };
+                //painting.IconId = (ushort)itemRow.GetColumnByName("Icon");
+                painting.Name = (string)itemRow.GetColumnByName("Name") + " Icon";
+
+
+                lock (paintingsLock)
+                {
+                    paintingList.Add(painting);
+                }
+            }));
+
+            paintingList.Sort();
+
+            return paintingList;
+
+        }
+
     }
 }

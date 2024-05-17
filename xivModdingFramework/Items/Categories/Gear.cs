@@ -117,7 +117,7 @@ namespace xivModdingFramework.Items.Categories
                         ExdID = item.Key,
                         PrimaryCategory = XivStrings.Gear,
                         ModelInfo = primaryMi,
-                        IconNumber = icon,
+                        IconId = icon,
                     };
 
 

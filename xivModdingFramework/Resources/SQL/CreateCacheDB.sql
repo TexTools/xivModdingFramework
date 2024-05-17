@@ -49,6 +49,7 @@ CREATE TABLE "furniture" (
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,
 	"primary_id"	INTEGER NOT NULL,
+	"secondary_id"	INTEGER,
 	"icon_id"	INTEGER NOT NULL,
 	"root"		TEXT,
 	

@@ -44,9 +44,10 @@ namespace xivModdingFramework.Items.Enums
         [Description("human")] human,
         [Description("")] decal,
         [Description("")] ui,
-        [Description("")] furniture, // This one's a little vague and encompasses really all of /bgcommon/
-        [Description("indoor")] indoor,     // These are the clearer versions, but only used by the dependency graph.
-        [Description("outdoor")] outdoor
+        [Description("indoor")] indoor,
+        [Description("outdoor")] outdoor,
+        [Description("pic")] painting,
+        [Description("gyo")] fish
     }
 
     public static class XivItemTypes {
@@ -68,9 +69,10 @@ namespace xivModdingFramework.Items.Enums
             { XivItemType.human, XivStrings.Human },
             { XivItemType.decal, XivStrings.Decal },
             { XivItemType.ui, XivStrings.UI },
-            { XivItemType.furniture, XivStrings.Housing },
             { XivItemType.indoor, XivStrings.Furniture_Indoor },
-            { XivItemType.outdoor, XivStrings.Furniture_Outdoor }
+            { XivItemType.outdoor, XivStrings.Furniture_Outdoor },
+            { XivItemType.painting, XivStrings.Paintings },
+            { XivItemType.fish, XivStrings.Fish },
         };
 
         private static Dictionary<XivItemType, string> typeToSystemNameDict = new();
@@ -201,7 +203,7 @@ namespace xivModdingFramework.Items.Enums
 
         public static XivDataFile GetDataFile(this XivItemType type)
         {
-            if(type == XivItemType.furniture || type == XivItemType.indoor || type == XivItemType.outdoor)
+            if(type == XivItemType.indoor || type == XivItemType.outdoor || type == XivItemType.fish || type == XivItemType.painting)
             {
                 return XivDataFile._01_Bgcommon;
             }

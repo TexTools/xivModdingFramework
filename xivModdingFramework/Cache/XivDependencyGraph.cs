@@ -5,6 +5,7 @@ using System.Data.SQLite;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
@@ -210,6 +211,7 @@ namespace xivModdingFramework.Cache
         private static readonly string RootFolderFormatSecondary = "obj/{0}/{1}{2}/";
 
         private static readonly string HousingRootFolderFormat = "bgcommon/hou/{0}/general/{1}/";
+        private static readonly string FishPaintingRootFolderFormat = "bgcommon/hou/indoor/{0}/{1}/{2}/";
 
 
         // pPrefix => pId => sPrefix => sId => Slot
@@ -262,6 +264,16 @@ namespace xivModdingFramework.Cache
                 // BGCommon Dat stuff.
                 var pId = PrimaryId.ToString().PadLeft(4, '0');
                 return String.Format(HousingRootFolderFormat, new string[] { XivItemTypes.GetSystemName(PrimaryType), pId });
+            } else if (PrimaryType == XivItemType.fish || PrimaryType == XivItemType.painting)
+            {
+                var folder = "ta";
+                if(PrimaryType == XivItemType.fish)
+                {
+                    folder = XivFish.IntSizeToString(SecondaryId.Value);
+                }
+
+                var pId = PrimaryId.ToString().PadLeft(4, '0');
+                return String.Format(FishPaintingRootFolderFormat, new string[] { XivItemTypes.GetSystemName(PrimaryType), folder, pId });
             }
             else
             {
@@ -597,12 +609,14 @@ namespace xivModdingFramework.Cache
                     models.Add(Info.GetRootFolder() + "model/" + Info.GetRacialModelName(race));
                 }
                 return models;
-            } else if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+            } else if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor ||  Info.PrimaryType == XivItemType.fish)
             {
                 var _housing = new Housing(XivCache.GameInfo.GameDirectory, XivCache.GameInfo.GameLanguage);
-                var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.PrimaryType, tx);
+                var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.SecondaryId, Info.PrimaryType, tx);
                 return housingAssets.Select(x => x.Value).ToList();
-            } else {
+            }
+            else
+            {
 
 
                 // The rest of the types just have a single, calculateable model path.
@@ -694,6 +708,14 @@ namespace xivModdingFramework.Cache
                 }
 
                 materialVariant = -1;
+            }
+            else if(Info.PrimaryType == XivItemType.painting)
+            {
+
+                var pId = Info.PrimaryId.ToString().PadLeft(4, '0');
+                var mtrl = Info.GetRootFolder() + "material/pic_ta_2" + pId + "a.mtrl";
+                // TODO : Should we check for existence here or not?
+                materials.Add(mtrl);
             }
             else
             {
@@ -934,7 +956,8 @@ namespace xivModdingFramework.Cache
                     return XivMount.FromDependencyRoot(this, defaultImcSubset);
                 case XivItemType.indoor:
                 case XivItemType.outdoor:
-                case XivItemType.furniture:
+                case XivItemType.fish:
+                case XivItemType.painting:
                     return XivFurniture.FromDependencyRoot(this);
                 case XivItemType.human:
                     return XivCharacter.FromDependencyRoot(this);
@@ -987,7 +1010,7 @@ namespace xivModdingFramework.Cache
                         }
                     }
 
-                } else if(Info.PrimaryType == XivItemType.furniture || Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+                } else if(Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor || Info.PrimaryType == XivItemType.fish || Info.PrimaryType == XivItemType.painting)
                 {
                     var query = "select * from furniture where root = $root order by name asc;";
                     using (var cmd = new SQLiteCommand(query, db))
@@ -1058,7 +1081,7 @@ namespace xivModdingFramework.Cache
                         }
                     }
                 }
-                else if (Info.PrimaryType == XivItemType.furniture || Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+                else if (Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor || Info.PrimaryType == XivItemType.fish || Info.PrimaryType == XivItemType.painting)
                 {
                     var query = "select * from furniture where root = $root order by name asc;";
                     using (var cmd = new SQLiteCommand(query, db))
@@ -1175,6 +1198,8 @@ namespace xivModdingFramework.Cache
             XivItemType.human,
             XivItemType.indoor,
             XivItemType.outdoor,
+            XivItemType.painting,
+            XivItemType.fish,
         };
 
         // Captures the file extension of a file (even if it has a binary extension)
@@ -1198,9 +1223,15 @@ namespace xivModdingFramework.Cache
 
         // Group 0 == Full File path
         // Group 1 == Type (indoor/outdoor)
+        // Group 2 == Furnishing/Fish/Painting (general/gyo/pic)
         // Group 2 == Primary Id
-        private static readonly Regex HousingExtractionRegex = new Regex("^bgcommon/hou/([a-z]+)/general/([0-9]+)/?.*$");
+        private static readonly Regex HousingExtractionRegex = new Regex("^bgcommon\\/hou\\/([a-z]+)\\/([a-z]+)\\/([0-9]+)\\/?.*$");
 
+        // Group 1 == Type (indoor/outdoor)
+        // Group 2 == Furnishing/Fish/Painting (general/gyo/pic)
+        // Group 2 == Fish/Painting Size (ta/lg/ll/sm/mi)
+        // Group 2 == Primary Id
+        private static readonly Regex HousingExtractionRegex2 = new Regex("^bgcommon\\/hou\\/([a-z]+)\\/([a-z]+)\\/([a-z]+)\\/([0-9]+)\\/?.*$");
         /// <summary>
         /// Returns all parent files that this child file depends on as part of its rendering process.
         /// </summary>
@@ -1543,7 +1574,11 @@ namespace xivModdingFramework.Cache
 
             // Only these types can get away without a secondary type.
             if(info.SecondaryType == null) {
-                if (info.PrimaryType != XivItemType.equipment && info.PrimaryType != XivItemType.accessory && info.PrimaryType != XivItemType.indoor && info.PrimaryType != XivItemType.outdoor) {
+                if (info.PrimaryType != XivItemType.equipment && info.PrimaryType != XivItemType.accessory 
+                    && info.PrimaryType != XivItemType.indoor 
+                    && info.PrimaryType != XivItemType.outdoor
+                    && info.PrimaryType != XivItemType.fish
+                    && info.PrimaryType != XivItemType.painting) {
                     return null;
                 }
             }
@@ -1676,8 +1711,23 @@ namespace xivModdingFramework.Cache
                 match = HousingExtractionRegex.Match(internalFilePath);
                 if (match.Success)
                 {
+                        // Normal indoor/outdoor furnishing.
                     info.PrimaryType = XivItemTypes.FromSystemName(match.Groups[1].Value);
-                    info.PrimaryId = Int32.Parse(match.Groups[2].Value);
+                    info.PrimaryId = Int32.Parse(match.Groups[3].Value);
+                }
+
+                match = HousingExtractionRegex2.Match(internalFilePath);
+                if (match.Success)
+                {
+
+                    var subtype = XivItemTypes.FromSystemName(match.Groups[2].Value);
+                    var size = match.Groups[3].Value;
+                    info.PrimaryId = Int32.Parse(match.Groups[4].Value);
+
+                    // Fish/Picture
+                    info.PrimaryType = subtype;
+
+                    info.SecondaryId = XivFish.StringSizeToInt(size);
                 }
             }
 
