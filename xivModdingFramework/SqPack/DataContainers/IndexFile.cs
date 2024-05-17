@@ -156,10 +156,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             // Rest of the file is padding and self-hash.
         }
-        /// <summary>
-        /// Reads the index offset data in index1 format mode.
-        /// </summary>
-        /// <param name="br"></param>
+
         protected virtual void ReadIndex1Data(BinaryReader br)
         {
             int segmentOffset = br.ReadInt32();
@@ -189,10 +186,6 @@ namespace xivModdingFramework.SqPack.DataContainers
             br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
         }
 
-        /// <summary>
-        /// Reads the index offset data in index2 format mode.
-        /// </summary>
-        /// <param name="br"></param>
         protected virtual void ReadIndex2Data(BinaryReader br)
         {
             int segmentOffset = br.ReadInt32();
@@ -218,7 +211,6 @@ namespace xivModdingFramework.SqPack.DataContainers
             // Skip past the hash.
             br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
         }
-
 
         protected virtual void ReadSynTable(BinaryReader br, int indexId)
         {
