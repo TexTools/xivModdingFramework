@@ -128,14 +128,6 @@ namespace xivModdingFramework.Cache
                 {
                     Thread.Sleep(10);
                     duration += 10;
-
-                    if (duration >= 5000)
-                    {
-                        // Something went wrong with the shutdown of the cache worker thread.
-                        // Hopefully whatever went wrong fully crashed the thread.
-                        // Or Dispose will hard kill it.
-                        break;
-                    }
                 }
             });
         }
