@@ -517,8 +517,8 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
                 case XivTexFormat.DXT5:
                 case XivTexFormat.BC5:
-                case XivTexFormat.BC7:
                 case XivTexFormat.A8:
+                case XivTexFormat.BC7:
                     mipLength = newWidth * newHeight;
                     break;
                 case XivTexFormat.A1R5G5B5:

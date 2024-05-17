@@ -90,6 +90,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             public byte ArraySize;
 
+            // 3 Ints, representing which MipMaps to use at each LoD level.
             uint[] LoDMips;
 
             uint[] MipMapOffsets;
@@ -790,10 +791,10 @@ namespace xivModdingFramework.Textures.FileTypes
                 offset = ddsStream.BaseStream.Position;
             }
 
-            // DX10 format magic number
-            const uint fourccDX10 = 0x30315844;
+            // DX10 Format Flag
+            const uint fourccDX10 = 0x4;
 
-            ddsStream.BaseStream.Seek(12, SeekOrigin.Begin);
+            ddsStream.BaseStream.Seek(offset + 12, SeekOrigin.Begin);
 
             var newHeight = ddsStream.ReadInt32();
             var newWidth = ddsStream.ReadInt32();
@@ -805,14 +806,14 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new Exception("Resolution must be a multiple of 2");
             }
 
-            ddsStream.BaseStream.Seek(80, SeekOrigin.Begin);
+            ddsStream.BaseStream.Seek(offset + 80, SeekOrigin.Begin);
 
             var textureFlags = ddsStream.ReadInt32();
             var texType = ddsStream.ReadInt32();
 
             XivTexFormat textureType;
 
-            if (texType == fourccDX10)
+            if ((texType & fourccDX10) > 0)
             {
                 ddsStream.BaseStream.Seek(128, SeekOrigin.Begin);
                 var dxgiTexType = ddsStream.ReadInt32();
@@ -961,9 +962,21 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <exception cref="Exception"></exception>
         public (byte[] TexHeader, uint DDSHeaderSize) DDSHeaderToTexHeader(BinaryReader br, long offset = -1)
         {
+            if(offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            } else
+            {
+                offset = br.BaseStream.Position;
+            }
+
             // DDS Header Reference: https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header
-            var texFormat = GetDDSTexFormat(br);
-            br.BaseStream.Seek(12, SeekOrigin.Begin);
+            var texFormat = GetDDSTexFormat(br, offset);
+
+            br.BaseStream.Seek(offset + 4, SeekOrigin.Begin);
+            var flags = br.ReadInt32();
+
+            br.BaseStream.Seek(offset + 12, SeekOrigin.Begin);
 
             var newHeight = br.ReadInt32();
             var newWidth = br.ReadInt32();
@@ -986,8 +999,8 @@ namespace xivModdingFramework.Textures.FileTypes
             var headerLength = _DDSHeaderSize;
 
             // DX10 DDS Files have a 20 byte header extension.
-            const uint fourccDX10 = 0x30315844;
-            uint extraHeaderBytes = (uint)(texType == fourccDX10 ? 20 : 0); // sizeof DDS_HEADER_DXT10
+            const uint fourccDX10 = 0x04;
+            uint extraHeaderBytes = (uint)((texType & fourccDX10) > 0? 20 : 0); // sizeof DDS_HEADER_DXT10
             headerLength += extraHeaderBytes;
 
             br.BaseStream.Seek(headerLength, SeekOrigin.Begin);
