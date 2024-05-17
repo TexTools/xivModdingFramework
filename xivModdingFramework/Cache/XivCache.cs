@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -110,24 +111,33 @@ namespace xivModdingFramework.Cache
                 {
                     // Sleep until the cache worker actually stops.
                     _cacheWorker.CancelAsync();
-                    var duration = 0;
                     while (_cacheWorker != null)
                     {
                         Thread.Sleep(10);
-                        duration += 10;
-
-                        if (duration >= 3000)
-                        {
-                            // Something went wrong with the shutdown of the cache worker thread.
-                            // Hopefully whatever went wrong fully crashed the thread.
-                            // Or Dispose will hard kill it.
-                            _cacheWorker.Dispose();
-                            _cacheWorker = null;
-                            break;
-                        }
                     }
                 }
             }
+        }
+
+        public static async Task WaitForWorkerStop()
+        {
+            await Task.Run(() =>
+            {
+                var duration = 0;
+                while (_cacheWorker != null)
+                {
+                    Thread.Sleep(10);
+                    duration += 10;
+
+                    if (duration >= 5000)
+                    {
+                        // Something went wrong with the shutdown of the cache worker thread.
+                        // Hopefully whatever went wrong fully crashed the thread.
+                        // Or Dispose will hard kill it.
+                        break;
+                    }
+                }
+            });
         }
 
         public enum CacheRebuildReason
@@ -2224,6 +2234,8 @@ namespace xivModdingFramework.Cache
         {
             // Note: The Cache worker only runs when Transactions are not active.
 
+            Trace.WriteLine("Starting Cache Worker on thread: " + Thread.CurrentThread.ManagedThreadId);
+
             // This will be executed on another thread.
             BackgroundWorker worker = (BackgroundWorker)sender;
             while (!worker.CancellationPending)
@@ -2307,6 +2319,7 @@ namespace xivModdingFramework.Cache
                 }
             }
 
+            Trace.WriteLine("Stopping Cache Worker on thread: " + Thread.CurrentThread.ManagedThreadId);
 
             // Ensure we're good and clean up after ourselves.
             SQLiteConnection.ClearAllPools();
@@ -2750,6 +2763,6 @@ namespace xivModdingFramework.Cache
                 Dispose(false);
             }
         }
-    }
 
+    }
 }
