@@ -734,7 +734,7 @@ namespace xivModdingFramework.Cache
                                     var m = mat;
 
                                     // Human types have their material ID automatically changed over.
-                                    if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                                    if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
                                     {
                                         m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
                                     }
@@ -765,33 +765,6 @@ namespace xivModdingFramework.Cache
                     }
                 }
             }
-
-            /*
-            // This includes orphaned modded materials, but I don't think there's any reason to do so anymore.
-            var rootFolder = Info.GetRootFolder();
-            var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
-            foreach (var mod in modlist.Mods)
-            {
-                if (!mod.enabled) continue;
-
-                // We need to get all of the modded materials in this root, even if they're
-                // orphaned materials.
-                if(mod.fullPath.StartsWith(rootFolder) && mod.fullPath.EndsWith(".mtrl"))
-                {
-                    if (Info.Slot == null || mod.fullPath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
-                    {
-                        var material = mod.fullPath;
-                        if (materialVariant >= 0)
-                        {
-                            materials.Add(_materialSetRegex.Replace(material, variantRep));
-                        }
-                        else
-                        {
-                            materials.Add(material);
-                        }
-                    }
-                }
-            }*/
 
             return materials.ToList();
         }
@@ -1388,6 +1361,7 @@ namespace xivModdingFramework.Cache
                 {
                     var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
                     var mdlChildren = await _mdl.GetReferencedMaterialPaths(internalFilePath, -1, false, false, tx);
+
                     return mdlChildren;
                 } catch
                 {
@@ -1414,6 +1388,57 @@ namespace xivModdingFramework.Cache
                 // Textures have no child files.
                 return new List<string>();
             }
+        }
+
+        /// <summary>
+        /// Handles stupid exceptions in child file references due to the chara/human/ tree being a hardcoded nightmare.
+        /// </summary>
+        /// <param name="internalFilePath"></param>
+        /// <param name="mdlChildren"></param>
+        /// <param name="tx"></param>
+        internal static async Task<List<string>> HandleVieraFaceExceptions(string internalFilePath, IEnumerable<string> mdlChildren, ModTransaction tx)
+        {
+            var additional = new List<string>();
+            if (internalFilePath.StartsWith("chara/human/") && internalFilePath.Contains("/obj/face/"))
+            {
+                // Stupid hard-coded exception-riddled tree.
+                var regex = new Regex("/f([0-9]{4})/");
+                var match = regex.Match(internalFilePath);
+                if (match.Success)
+                {
+                    var oldFaceNumber = Int32.Parse(match.Groups[1].Value);
+                    if (oldFaceNumber < 200)
+                    {
+                        var newFaceNumber = oldFaceNumber + 100;
+                        var oldFaceString = string.Format("f{0:D4}", oldFaceNumber);
+                        var newFaceString = string.Format("f{0:D4}", newFaceNumber);
+                        var otherModelPath = internalFilePath.Replace(oldFaceString, newFaceString);
+                        if (tx == null)
+                        {
+                            // Readonly TX if we don't have one.
+                            tx = ModTransaction.BeginTransaction();
+                        }
+
+                        if (!await tx.FileExists(otherModelPath))
+                        {
+                            // We're getting child files for a 00xx Face, which does not have a 01xx Face
+                            // These use a shared model, but have a second set of materials higher up for their alt-clan.
+
+                            var mtrls = mdlChildren.ToList();
+                            foreach (var mtrl in mtrls)
+                            {
+                                var newMtrlPath = mtrl.Replace(oldFaceString, newFaceString);
+                                if (await tx.FileExists(newMtrlPath))
+                                {
+                                    // Add the 01xx Mtrl to our child files.
+                                    additional.Add(newMtrlPath);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return additional;
         }
 
         /// <summary>
