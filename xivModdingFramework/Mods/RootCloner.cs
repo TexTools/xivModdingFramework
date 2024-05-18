@@ -15,6 +15,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.DataContainers;
@@ -101,7 +102,7 @@ namespace xivModdingFramework.Mods
                 var originalTexturePaths = await Source.GetTextureFiles(-1, tx);
 
                 var originalVfxPaths = new HashSet<string>();
-                if (Imc.UsesImc(Source))
+                if (Imc.UsesImc(Source) && Imc.UsesImc(Destination))
                 {
                     var avfxSets = originalMetadata.ImcEntries.Select(x => x.Vfx).Distinct();
                     foreach (var avfx in avfxSets)
@@ -118,35 +119,60 @@ namespace xivModdingFramework.Mods
                 }
 
                 // Time to start editing things.
+                bool crossTypeSwap = false;
 
                 // First, get a new, clean copy of the metadata, pointed at the new root.
-                var newMetadata = await GetCachedMetadata(Source, tx);
-                newMetadata.Root = Destination.Info.ToFullRoot();
+                ItemMetadata newMetadata;
                 ItemMetadata originalDestinationMetadata = null;
+
                 try
                 {
                     originalDestinationMetadata = await GetCachedMetadata(Destination, tx);
-                } catch
+                }
+                catch
                 {
                     originalDestinationMetadata = new ItemMetadata(Destination);
                 }
 
-                // Set 0 needs special handling.
-                if(Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
+                if (Source.Info.PrimaryType == Destination.Info.PrimaryType)
                 {
-                    var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
-                    var set1Metadata = await GetCachedMetadata(set1Root, tx);
+                    newMetadata = await GetCachedMetadata(Source, tx);
+                    newMetadata.Root = Destination.Info.ToFullRoot();
 
-                    newMetadata.EqpEntry = set1Metadata.EqpEntry;
-
-                    if (Source.Info.Slot == "met")
+                    // Set 0 needs special handling.
+                    if (Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
                     {
-                        newMetadata.GmpEntry = set1Metadata.GmpEntry;
+                        var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
+                        var set1Metadata = await GetCachedMetadata(set1Root, tx);
+
+                        newMetadata.EqpEntry = set1Metadata.EqpEntry;
+
+                        if (Source.Info.Slot == "met")
+                        {
+                            newMetadata.GmpEntry = set1Metadata.GmpEntry;
+                        }
                     }
-                } else if (Destination.Info.PrimaryType == XivItemType.equipment && Destination.Info.PrimaryId == 0)
+                    else if (Destination.Info.PrimaryType == XivItemType.equipment && Destination.Info.PrimaryId == 0)
+                    {
+                        newMetadata.EqpEntry = null;
+                        newMetadata.GmpEntry = null;
+                    }
+
+                }
+                else if((Source.Info.PrimaryType == XivItemType.equipment || Source.Info.PrimaryType == XivItemType.accessory) && Destination.Info.PrimaryType == XivItemType.accessory)
                 {
-                    newMetadata.EqpEntry = null;
-                    newMetadata.GmpEntry = null;
+                    crossTypeSwap = true;
+
+                    // For this we have to work from a fresh copy the destination and alter it to resemble the source.
+                    newMetadata = await ItemMetadata.GetMetadata(Destination, true, tx);
+                    var sourceMetadata = await ItemMetadata.GetMetadata(Source, false, tx);
+
+                    // Accessories only have these two types of metadata, which don't internally care about where they came from.
+                    newMetadata.ImcEntries = sourceMetadata.ImcEntries;
+                    newMetadata.EqdpEntries = sourceMetadata.EqdpEntries;
+                } else
+                {
+                    throw new InvalidDataException("Cannot convert non-same-type root other than Equipment => Accessory.");
                 }
 
 
@@ -266,6 +292,21 @@ namespace xivModdingFramework.Mods
                         }
                     }
 
+                    if(crossTypeSwap && Destination.Info.PrimaryType == XivItemType.accessory)
+                    {
+                        // We want to remove any skin meshes here.
+                        var groups = tmdl.MeshGroups.ToList();
+                        var rex = ModelModifiers.SkinMaterialRegex;
+                        foreach (var mg in groups)
+                        {
+                            var match = rex.Match(mg.Material);
+                            if (match.Success)
+                            {
+                                tmdl.MeshGroups.Remove(mg);
+                            }
+                        }
+                    }
+
                     // Save new Model.
                     var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl);
                     var newMdlOffset = await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
@@ -338,6 +379,7 @@ namespace xivModdingFramework.Mods
                 {
                     ProgressReporter.Report("Creating missing variants...");
                 }
+
                 // Check to see if we need to add any variants
                 var cloneNum = newMetadata.ImcEntries.Count >= 2 ? 1 : 0;
                 while (originalDestinationMetadata.ImcEntries.Count > newMetadata.ImcEntries.Count)
@@ -584,8 +626,6 @@ namespace xivModdingFramework.Mods
                 return path;
             }
 
-            // Things that live in the common folder get to stay there/don't get copied.
-
             var file = UpdateFileName(Source, Destination, path);
             var folder = UpdateFolder(Source, Destination, path);
 
@@ -655,20 +695,39 @@ namespace xivModdingFramework.Mods
                 return file;
             }
 
-            var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");
+            var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})(_[a-z]{3})?");
             var match = rex.Match(file);
             if(!match.Success)
             {
+                // Doesn't contain a root name reference, can just copy it through.
                 return file;
             }
 
             if (Source.Info.SecondaryType == null)
             {
-                // Equipment/Accessory items. Only replace the back half of the file names.
+                // Equipment/Accessory items. Only replace the front half of the file names and the slot.
                 var srcString = match.Groups[1].Value;
                 var dstString = Destination.Info.GetBaseFileName(false);
 
                 file = file.Replace(srcString, dstString);
+
+                // Has slotname.
+                if(match.Groups.Count >= 3 && Destination.Info.Slot != null)
+                {
+                    var srcSlot = match.Groups[2].Value;
+                    var dstSlot = "_" + Destination.Info.Slot;
+
+                    if(srcSlot != "_" + Source.Info.Slot)
+                    {
+                        // Naughty modders cross-referencing materials and such.
+                        // Can't leave name intact b/c it might bash.
+                        dstSlot = srcSlot + dstSlot;
+                    }
+
+                    file = file.Replace(srcSlot, dstSlot);
+                }
+
+
             } else
             {
                 // Replace the entire root chunk for roots that have two identifiers.
