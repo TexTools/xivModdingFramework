@@ -157,6 +157,74 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
 
+
+        /// <summary>
+        /// Extremely simple function for creating a modpack from a single file and its children.
+        /// </summary>
+        /// <param name="rootFile"></param>
+        /// <param name="includeChildren"></param>
+        /// <param name="tx"></param>
+        /// <param name="settings"></param>
+        /// <returns></returns>
+        public static async Task<int> CreateModpackFromFile(string rootFile, string destination, bool includeChildren = true, ModPack? settings = null, ModTransaction tx = null)
+        {
+            var files = new List<string>();
+
+            if (includeChildren)
+            {
+                files.AddRange(await XivCache.GetChildrenRecursive(rootFile, tx));
+            }
+            else
+            {
+                files.Add(rootFile);
+            }
+
+            var mp = new SimpleModPackData()
+            {
+                Name = settings != null ? settings.Value.Name : Path.GetFileNameWithoutExtension(rootFile),
+                Author = settings != null ? settings.Value.Author : "Unknown", 
+                Version = settings != null ? new Version(settings.Value.Version) : new Version("1.0"),
+                Url = settings != null ? settings.Value.Url : "",
+                Description = "A simple modpack export created from the file: " + rootFile,
+                SimpleModDataList = new List<SimpleModData>(),
+            };
+
+            var root = await XivCache.GetFirstRoot(rootFile);
+            
+            var itemName = "Unknown Item";
+            var itemCategory = "Unknown Category";
+
+            if(root != null)
+            {
+                var item = root.GetFirstItem();
+                itemName = item.Name;
+                itemCategory = item.PrimaryCategory;
+            }
+            
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            foreach(var file in files)
+            {
+                var md = new SimpleModData()
+                {
+                    Name = itemName,
+                    Category = itemCategory,
+                    DatFile = IOUtil.GetDataFileFromPath(rootFile).GetFileName(),
+                    FullPath = file,
+                    ModOffset = await tx.Get8xDataOffset(file),
+                    // Size is plucked by the TTMP creator, we don't need to set them here.
+                };
+                mp.SimpleModDataList.Add(md);
+            }
+
+            var _ttmp = new TTMP(new DirectoryInfo(destination));
+            return await _ttmp.CreateSimpleModPack(mp, null, true, tx);
+        }
+
         /// <summary>
         /// Creates a mod pack that uses a wizard for installation
         /// </summary>

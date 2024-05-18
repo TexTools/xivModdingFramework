@@ -203,7 +203,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static Dictionary<XivDataFile, Dictionary<int, bool>> OriginalDatStatus = new Dictionary<XivDataFile, Dictionary<int, bool>>();
 
 
-        internal bool IsOriginalDat(XivDataFile df, int datNumber)
+        public static bool IsOriginalDat(XivDataFile df, int datNumber)
         {
             var datFilePath = Dat.GetDatPath(df, datNumber);
 
@@ -1440,7 +1440,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             br.BaseStream.Seek(offset + 4, SeekOrigin.Begin);
-            return br.ReadUInt32();
+            var type = br.ReadUInt32();
+            return type;
         }
 
         /// <summary>
