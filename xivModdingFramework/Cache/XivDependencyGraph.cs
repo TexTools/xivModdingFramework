@@ -656,7 +656,7 @@ namespace xivModdingFramework.Cache
         /// Subsets of this data may be accessed with XivDependencyGraph::GetChildFiles(internalFilePath).
         /// </summary>
         /// <returns></returns>
-        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1, ModTransaction tx = null)
+        public async Task<List<string>> GetMaterialFiles(int materialVariant = -1, ModTransaction tx = null, bool includeOrphans = true)
         {
             var df = Info.PrimaryType.GetDataFile();
             IndexFile index;
@@ -787,6 +787,33 @@ namespace xivModdingFramework.Cache
                     }
                 }
             }
+
+
+            if (includeOrphans)
+            {
+                // Add orphaned modded materials into the root.
+                var rootFolder = Info.GetRootFolder();
+                var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
+                var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl"));
+                foreach (var mod in mods)
+                {
+                    var state = await mod.GetState(tx);
+                    if (state == Mods.Enums.EModState.Enabled) continue;
+                    if (Info.Slot == null || mod.FilePath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
+                    {
+                        var material = mod.FilePath;
+                        if (materialVariant >= 0)
+                        {
+                            materials.Add(_materialSetRegex.Replace(material, variantRep));
+                        }
+                        else
+                        {
+                            materials.Add(material);
+                        }
+                    }
+                }
+            }
+
 
             return materials.ToList();
         }
@@ -1419,6 +1446,11 @@ namespace xivModdingFramework.Cache
                 // Textures have no child files.
                 return new List<string>();
             }
+        }
+
+        public static List<string> GetOrphans(string filePath)
+        {
+            return null;
         }
 
         /// <summary>

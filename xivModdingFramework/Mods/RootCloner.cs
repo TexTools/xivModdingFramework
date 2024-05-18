@@ -97,7 +97,7 @@ namespace xivModdingFramework.Mods
 
 
                 var originalModelPaths = await Source.GetModelFiles(tx);
-                var originalMaterialPaths = await Source.GetMaterialFiles(-1, tx);
+                var originalMaterialPaths = await Source.GetMaterialFiles(-1, tx, false);
                 var originalTexturePaths = await Source.GetTextureFiles(-1, tx);
 
                 var originalVfxPaths = new HashSet<string>();
