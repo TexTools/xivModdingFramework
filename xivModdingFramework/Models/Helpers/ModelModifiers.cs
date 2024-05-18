@@ -2004,5 +2004,14 @@ namespace xivModdingFramework.Models.Helpers
             // No-Op
         }
 
+        public static void MergeModels(TTModel destination, TTModel mergeIn)
+        {
+            // Because TTModels are a high level representation where mesh groups are self contained, that's all we have to do.
+            foreach(var mg in mergeIn.MeshGroups)
+            {
+                destination.MeshGroups.Add(mg);
+            }
+        }
+
     }
 }

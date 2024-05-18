@@ -5437,6 +5437,224 @@ namespace xivModdingFramework.Models.FileTypes
                 throw;
             }
         }
+
+
+        public async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, string sourceApplication, bool copyTextures = false, ModTransaction tx = null)
+        {
+            var _dat = new Dat(_gameDirectory);
+            var _index = new Index(_gameDirectory);
+
+            var mainRoot = await XivCache.GetFirstRoot(primaryModel);
+            var mergeInRoot = await XivCache.GetFirstRoot(mergeIn);
+
+            IItem item = null;
+            if (mainRoot != null)
+            {
+                item = mainRoot.GetFirstItem();
+            }
+
+            var df = IOUtil.GetDataFileFromPath(primaryModel);
+
+            var ownTx = false;
+            if (tx == null)
+            {
+                ownTx = true;
+                tx = tx = ModTransaction.BeginTransaction(true);
+            }
+
+            try
+            {
+
+                var index = await tx.GetIndexFile(df);
+                var modlist = await tx.GetModList();
+
+                var xMdl = await GetXivMdl(mergeIn, false, tx);
+                var mergeInModel = TTModel.FromRaw(xMdl);
+
+                var xMdl2 = await GetXivMdl(primaryModel, false, tx);
+                var mainModel = TTModel.FromRaw(xMdl2);
+
+
+                if (mergeInModel == null)
+                {
+                    throw new InvalidDataException("Primary model file does not exist.");
+                }
+
+                if (mergeInModel == null)
+                {
+                    throw new InvalidDataException("Merge model file does not exist.");
+                }
+
+
+                var allFiles = new HashSet<string>() { primaryModel };
+
+                var mainRace = IOUtil.GetRaceFromPath(primaryModel);
+                var mergeInRace = IOUtil.GetRaceFromPath(mergeIn);
+
+
+                if (mainRace != mergeInRace)
+                {
+                    // Convert the model to the new race.
+                    ModelModifiers.RaceConvert(mergeInModel, mainRace, mergeIn);
+                    ModelModifiers.FixUpSkinReferences(mergeInModel, mergeIn);
+                }
+
+                // Language is irrelevant here.
+                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
+
+                // Get all variant materials of the mesh we want to merge in.
+                var materialPaths = await GetReferencedMaterialPaths(mergeIn, mergeInImcVariant, false, false, tx);
+
+
+                var _raceRegex = new Regex("c[0-9]{4}");
+
+                Dictionary<string, string> validNewMaterials = new Dictionary<string, string>();
+                HashSet<string> copiedPaths = new HashSet<string>();
+
+                // Update Material References and clone materials.
+                foreach (var material in materialPaths)
+                {
+
+                    // Get the new path.
+                    var path = RootCloner.UpdatePath(mergeInRoot, mainRoot, material);
+
+                    // Adjust race code entries if needed.
+                    if (mainRoot.Info.PrimaryType == XivItemType.equipment || mainRoot.Info.PrimaryType == XivItemType.accessory)
+                    {
+                        path = _raceRegex.Replace(path, "c" + mergeInRace.GetRaceCode());
+                    }
+
+                    // Shenanigans time.  Add a suffix for our source root.
+                    // Not really the right way to do it, but works.
+                    path = path.Replace(".mtrl", "_" + mergeInRoot.Info.GetBaseFileName() + ".mtrl");
+
+                    
+
+
+                    // Get file names.
+                    var io = material.LastIndexOf("/", StringComparison.Ordinal);
+                    var originalMatName = material.Substring(io, material.Length - io);
+
+                    io = path.LastIndexOf("/", StringComparison.Ordinal);
+                    var newMatName = path.Substring(io, path.Length - io);
+
+
+                    // Time to copy the materials!
+                    try
+                    {
+                        var mtrl = await _mtrl.GetXivMtrl(material, false, tx);
+
+                        if (copyTextures)
+                        {
+                            for (int i = 0; i < mtrl.Textures.Count; i++)
+                            {
+                                var tex = mtrl.Textures[i].TexturePath;
+                                var ntex = RootCloner.UpdatePath(mergeInRoot, mainRoot, tex);
+                                if (mainRoot.Info.PrimaryType == XivItemType.equipment || mainRoot.Info.PrimaryType == XivItemType.accessory)
+                                {
+                                    ntex = _raceRegex.Replace(ntex, "c" + mergeInRace.GetRaceCode());
+                                }
+
+                                // Shenanigans time.  Add a suffix for our source root.
+                                // Not really the right way to do it, but works.
+                                ntex = ntex.Replace(".tex", "_" + mergeInRoot.Info.GetBaseFileName() + ".tex");
+
+                                mtrl.Textures[i].TexturePath = ntex;
+
+                                allFiles.Add(ntex);
+                                await _dat.CopyFile(tex, ntex, primaryModel, true, item, tx);
+                            }
+                        }
+
+                        mtrl.MTRLPath = path;
+                        allFiles.Add(mtrl.MTRLPath);
+                        await _mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
+
+                        if (!validNewMaterials.ContainsKey(newMatName))
+                        {
+                            validNewMaterials.Add(newMatName, path);
+                        }
+                        copiedPaths.Add(path);
+
+
+                        // Switch out any material references to the material in the model file.
+                        foreach (var m in mergeInModel.MeshGroups)
+                        {
+                            if (m.Material == originalMatName)
+                            {
+                                m.Material = newMatName;
+                            }
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        // Hmmm.  The original material didn't exist.   This is pretty not awesome, but I guess a non-critical error...?
+                    }
+                }
+
+                // Copy the materials through to all the destination IMC sets as needed.
+                if (Imc.UsesImc(mainRoot) && Imc.UsesImc(mergeInRoot))
+                {
+                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
+
+                    var toEntries = await _imc.GetEntries(await mainRoot.GetImcEntryPaths(), false, tx);
+                    var fromEntries = await _imc.GetEntries(await mergeInRoot.GetImcEntryPaths(), false, tx);
+
+                    var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
+                    var fromSet = fromEntries[mergeInImcVariant];
+
+                    if (toSets.Count > 0)
+                    {
+                        var vReplace = new Regex("/v[0-9]{4}/");
+
+                        // Validate that sufficient material sets have been created at the destination root.
+                        foreach (var mkv in validNewMaterials)
+                        {
+                            var validPath = mkv.Value;
+                            foreach (var msetId in toSets)
+                            {
+                                var testPath = vReplace.Replace(validPath, "/v" + msetId.ToString().PadLeft(4, '0') + "/");
+                                var copied = copiedPaths.Contains(testPath);
+
+                                // Missing a material set, copy in the known valid material.
+                                if (!copied)
+                                {
+                                    allFiles.Add(testPath);
+                                    await _dat.CopyFile(validPath, testPath, primaryModel, true, item, tx);
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                // Merging the actual models is the simplest part of this whole affair...
+                ModelModifiers.MergeModels(mainModel, mergeInModel);
+
+                // Fix the skin refs just to ensure they're all identical to reduce material bloat.
+                ModelModifiers.FixUpSkinReferences(mainModel, primaryModel);
+
+                // Save the final modified mdl.
+                var data = await MakeCompressedMdlFile(mainModel, xMdl);
+                var offset = await _dat.WriteModFile(data, primaryModel, sourceApplication, item, tx);
+
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
+                }
+                XivCache.QueueDependencyUpdate(allFiles.ToList());
+                return offset;
+            }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+                throw;
+            }
+        }
         #endregion
 
         #region Dawntrail Model Fix
