@@ -180,10 +180,11 @@ namespace xivModdingFramework.Helpers
                 throw new FileNotFoundException("No Index Backups found to restore.");
             }
 
+            var basePath = XivCache.GameInfo.GameDirectory.Parent.FullName;
             foreach(var backup in backups)
             {
-                var parentPath = new DirectoryInfo(backup).Parent.Parent;
-                Trace.WriteLine(parentPath);
+                var target = Path.GetFullPath(Path.Combine(basePath, new DirectoryInfo(backup).Parent.ToString(), Path.GetFileName(backup)));
+                File.Copy(backup, target, true);
 
             }
         }
