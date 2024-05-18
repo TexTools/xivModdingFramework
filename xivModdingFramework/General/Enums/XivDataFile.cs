@@ -44,6 +44,8 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ffxiv/0a0000", "exd/")] _0A_Exd,
         [XivDataFileDescription("ffxiv/0c0000", "music/")] _0C_Music,
 
+#if ENDWALKER
+
         // Heavensward
         [XivDataFileDescription("ex1/020100", "bg/ex1/00_")] _EX1_BG_00,
         [XivDataFileDescription("ex1/020101", "bg/ex1/01_")] _EX1_BG_01,
@@ -87,7 +89,7 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex4/030400", "cut/ex4/")] _EX4_Cut,
         [XivDataFileDescription("ex4/0c0400", "music/ex4/")] _EX4_Music,
 
-#if DAWNTRAIL
+#else
         // Dawntrail (Benchmark)
         [XivDataFileDescription("ex4/020502", "bg/ex4/02")] _EX5_BG_02,
 #endif
