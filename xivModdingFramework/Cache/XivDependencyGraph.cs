@@ -798,7 +798,7 @@ namespace xivModdingFramework.Cache
                 foreach (var mod in mods)
                 {
                     var state = await mod.GetState(tx);
-                    if (state == Mods.Enums.EModState.Enabled) continue;
+                    if (state != Mods.Enums.EModState.Enabled) continue;
                     if (Info.Slot == null || mod.FilePath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
                     {
                         var material = mod.FilePath;
