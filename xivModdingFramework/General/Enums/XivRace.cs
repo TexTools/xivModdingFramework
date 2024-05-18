@@ -581,11 +581,11 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static int GetSubRaceId(this XivSubRace subrace)
         {
-            return (int)subrace % 2;
+            return (((int)subrace) -1) % 2;
         }
         public static XivBaseRace GetBaseRace(this XivSubRace subrace)
         {
-            byte rId = (byte) ((byte)subrace / 2);
+            byte rId = (byte) (((int)subrace - 1) / 2);
             return (XivBaseRace) rId;
         }
 
