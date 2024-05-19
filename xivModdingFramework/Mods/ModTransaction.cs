@@ -328,7 +328,7 @@ namespace xivModdingFramework.Mods
                         }
                     }
 
-                    var idx = await Index.GetIndexFile(dataFile, false, ReadOnly);
+                    var idx = await Index.INTERNAL_GetIndexFile(dataFile, false, ReadOnly);
                     _IndexFiles.Add(dataFile, idx);
                 }
                 finally
@@ -355,7 +355,7 @@ namespace xivModdingFramework.Mods
                 try
                 {
                     _ModListModifiedTime = File.GetLastWriteTimeUtc(Modding.ModListDirectory);
-                    _ModList = await Modding.GetModList(!ReadOnly);
+                    _ModList = await Modding.INTERNAL_GetModList(!ReadOnly);
                 }
                 finally
                 {
@@ -683,7 +683,7 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                await Modding.SaveModListAsync(_ModList);
+                await Modding.INTERNAL_SaveModlist(_ModList);
 
                 foreach (var index in _IndexFiles)
                 {

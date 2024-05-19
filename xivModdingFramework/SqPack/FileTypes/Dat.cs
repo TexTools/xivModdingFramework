@@ -2329,8 +2329,11 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var moddedDats = Dat.GetModdedDatList(df);
 
+            // Clean Readonly TX.
+            var tx = ModTransaction.BeginTransaction();
+
             var slots = new Dictionary<long, long>();
-            var modlist = await Modding.GetModList(false);
+            var modlist = await tx.GetModList();
 
             var modsByFile = modlist.GetMods().GroupBy(x => {
                 long offset = x.ModOffset8x;
@@ -2401,7 +2404,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Cannot defragment DATs while DAT writing is disabled.");
             }
 
-            var modlist = await Modding.GetModList(true);
+            var modlist = await Modding.INTERNAL_GetModList(true);
 
             var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
 
@@ -2423,7 +2426,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 foreach (var dKv in modsByDf)
                 {
                     var df = dKv.Key;
-                    indexFiles.Add(df, await Index.GetIndexFile(df));
+                    indexFiles.Add(df, await Index.INTERNAL_GetIndexFile(df));
 
                     foreach (var oMod in dKv)
                     {
@@ -2498,7 +2501,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 progressReporter?.Report((0, 0, "Saving updated Modlist..."));
 
                 // Save modList
-                await Modding.SaveModListAsync(modlist);
+                await Modding.INTERNAL_SaveModlist(modlist);
 
 
                 var finalSize = await GetTotalModDataSize();

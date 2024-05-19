@@ -89,24 +89,15 @@ namespace xivModdingFramework.Mods
                 {
                     var modlistText = File.ReadAllText(ModListDirectory);
                     var res = JsonConvert.DeserializeObject<ModList>(modlistText);
-                    if (res == null)
+                    if (res != null)
                     {
-                        throw new Exception("Null Modlist");
+                        return;
                     }
                 }
                 catch (Exception ex)
                 {
                     // Broken.  Regenerate modlist.
-                    var newModList = new ModList(true)
-                    {
-                        Version = _modlistVersion.ToString(),
-                    };
-
-                    SaveModList(newModList);
                 }
-
-
-                return;
             }
 
             var modList = new ModList(true)
@@ -114,10 +105,19 @@ namespace xivModdingFramework.Mods
                 Version = _modlistVersion.ToString(),
             };
 
-            SaveModList(modList);
+            File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(modList, Formatting.Indented));
         }
 
-        internal static async Task<ModList> GetModList(bool writeEnabled)
+        /// <summary>
+        /// Retrieve the base modlist file.
+        /// Should not be called directly unless you really know what you're doing.
+        /// 
+        /// </summary>
+        /// <param name="writeEnabled"></param>
+        /// <returns></returns>
+        /// <exception cref="FileNotFoundException"></exception>
+
+        internal static async Task<ModList> INTERNAL_GetModList(bool writeEnabled)
         {
             await _modlistSemaphore.WaitAsync();
             try
@@ -155,21 +155,11 @@ namespace xivModdingFramework.Mods
             return _CachedModList;
         }
 
-        internal static void SaveModList(ModList ml)
-        {
-            _modlistSemaphore.Wait();
-
-            try
-            {
-                File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(ml, Formatting.Indented));
-            }
-            finally
-            {
-                _modlistSemaphore.Release();
-            }
-        }
-
-        internal static async Task SaveModListAsync(ModList ml)
+        /// <summary>
+        /// Save the base modlist file.  Should not be called unless you really know what you're doing.
+        /// </summary>
+        /// <param name="ml"></param>
+        internal static async Task INTERNAL_SaveModlist(ModList ml)
         {
             await _modlistSemaphore.WaitAsync();
 
@@ -832,6 +822,15 @@ namespace xivModdingFramework.Mods
                 }
             }
         }
+
+        /// <summary>
+        /// Fluff function for resolving item name/category for MTRLs based on their material set folder.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="root"></param>
+        /// <param name="ImcEntriesCache"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
         private static async Task<(string Name, string Category)> ResolveMtrlModInfo(string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache, ModTransaction tx = null)
         {
             IItem item;

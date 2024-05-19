@@ -73,9 +73,12 @@ namespace xivModdingFramework.Helpers
                             {
                                 // Index backup failed for some reason.
                                 // Try at least deleting all existing mods.
-
-                                progress?.Report("Index restore failed, attempting to delete all mods instead...");
-                                await Modding.SetAllModStates(EModState.UnModded, null);
+                                using (var tx = ModTransaction.BeginTransaction(true))
+                                {
+                                    progress?.Report("Index restore failed, attempting to delete all mods instead...");
+                                    await Modding.SetAllModStates(EModState.UnModded, null, tx);
+                                    await ModTransaction.CommitTransaction(tx);
+                                }
                             }
                             catch (Exception ex2)
                             {

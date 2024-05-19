@@ -138,7 +138,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        internal static async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
+        internal static async Task<IndexFile> INTERNAL_GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
         {
             var index1Path = XivDataFiles.GetFullPath(dataFile, IndexExtension);
             var index2Path = XivDataFiles.GetFullPath(dataFile, Index2Extension);
