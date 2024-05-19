@@ -60,8 +60,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             try
             {
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                var data = await _dat.ReadSqPackType2(BoneDeformFile, false, tx);
+                var data = await Dat.ReadSqPackType2(BoneDeformFile, false, tx);
 
                 var result = new BoneDeform();
                 var numSets = 0;

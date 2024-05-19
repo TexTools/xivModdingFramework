@@ -38,8 +38,7 @@ namespace xivModdingFramework.General
         /// <returns></returns>
         internal static async Task ApplyRgspFile(string filePath, bool forceDefault = false, ModTransaction tx = null)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var rgspData = await _dat.ReadSqPackType2(filePath, forceDefault, tx);
+            var rgspData = await Dat.ReadSqPackType2(filePath, forceDefault, tx);
 
             await ApplyRgspFile(rgspData, tx);
         }
@@ -173,8 +172,7 @@ namespace xivModdingFramework.General
             dummyItem.Name = rgsp.Race.GetDisplayName() + " - " + rgsp.Gender.ToString();
             dummyItem.SecondaryCategory = "Racial Scaling";
 
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            await _dat.ImportType2Data(bytes, rgspFilePath, sourceApplication, dummyItem , tx);
+            await Dat.ImportType2Data(bytes, rgspFilePath, sourceApplication, dummyItem , tx);
         }
 
 
@@ -202,9 +200,8 @@ namespace xivModdingFramework.General
 
         private static async Task<CharaMakeParameterSet> GetCharaMakeParameterSet(bool forceOriginal = false, ModTransaction tx = null)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
-            var data = await _dat.ReadSqPackType2(HumanCmpPath, forceOriginal, tx);
+            var data = await Dat.ReadSqPackType2(HumanCmpPath, forceOriginal, tx);
             var cmp = new CharaMakeParameterSet(data);
 
 
@@ -213,12 +210,11 @@ namespace xivModdingFramework.General
 
         private static async Task SaveCharaMakeParameterSet(CharaMakeParameterSet cmp, ModTransaction tx = null)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var dummyItem = new XivGenericItemModel();
             dummyItem.Name = "human.cmp";
             dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
-            await _dat.ImportType2Data(cmp.GetBytes(), HumanCmpPath, Constants.InternalModSourceName, dummyItem, tx);
+            await Dat.ImportType2Data(cmp.GetBytes(), HumanCmpPath, Constants.InternalModSourceName, dummyItem, tx);
         }
 
     }

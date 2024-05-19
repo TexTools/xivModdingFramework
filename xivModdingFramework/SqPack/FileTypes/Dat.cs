@@ -43,11 +43,10 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// The core workhorse class for working with SQPacked data, whether in an actual .DAT file or elsewhere.
     /// Contains many functions for compressing, uncompressing, and manipulating binary files.
     /// </summary>
-    public class Dat
+    public static class Dat
     {
         internal const string DatExtension = ".win32.dat";
         internal const int _MAX_DATS = 8;
-        private readonly DirectoryInfo _gameDirectory;
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
 
         private const int _MODDED_DAT_MARK_OFFSET = 0x200;
@@ -71,11 +70,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
                 return true;
             }
-        }
-
-        public Dat(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
         }
 
         public static long GetMaximumDatSize()
@@ -143,7 +137,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </remarks>
         /// <param name="dataFile">The data file to create a new dat for.</param>
         /// <returns>The new dat number.</returns>
-        private int CreateNewDat(XivDataFile dataFile)
+        private static int CreateNewDat(XivDataFile dataFile)
         {
             var nextDatNumber = GetLargestDatNumber(dataFile) + 1;
 
@@ -279,7 +273,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        internal List<string> GetOriginalDatList(XivDataFile dataFile)
+        internal static List<string> GetOriginalDatList(XivDataFile dataFile)
         {
             var datList = new List<string>();
             for (var i = 0; i < 8; i++)
@@ -301,7 +295,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        internal List<string> GetModdedDatList(XivDataFile dataFile)
+        internal static List<string> GetModdedDatList(XivDataFile dataFile)
         {
             var datList = new List<string>();
             for (var i = 0; i < 8; i++)
@@ -452,7 +446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
             return await ReadSqPackType2(info.Offset, info.DataFile, tx);
@@ -467,7 +461,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">The offset where the data is located.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        internal async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile, ModTransaction tx = null)
+        internal static async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -489,7 +483,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return type2Bytes;
         }
 
-        internal async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
+        internal static async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
         {
             using (var ms = new MemoryStream(data))
             {
@@ -499,7 +493,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
         }
-        internal async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
+        internal static async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
         {
             if(offset >= 0)
             {
@@ -561,7 +555,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
             return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, tx);
         }
@@ -576,7 +570,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="cachedIndexFile">Cached index file, if available</param>
         /// <param name="cachedModList">Cached modlist file, if available</param>
         /// <returns></returns>
-        public async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
 
             var newData = (await CompressType2Data(dataToImport));
@@ -597,7 +591,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataToCreate">Bytes to Type 2data</param>
         /// <returns></returns>
-        public async Task<byte[]> CompressType2Data(byte[] dataToCreate)
+        public static async Task<byte[]> CompressType2Data(byte[] dataToCreate)
         {
             var newData = new List<byte>();
             var headerData = new List<byte>();
@@ -694,7 +688,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="tx"></param>
         /// <returns></returns>
         /// <exception cref="FileNotFoundException"></exception>
-        private async Task<(long Offset, XivDataFile DataFile)> ResolveOffsetAndDataFile(string internalPath, bool forceOriginal, ModTransaction tx)
+        private static async Task<(long Offset, XivDataFile DataFile)> ResolveOffsetAndDataFile(string internalPath, bool forceOriginal, ModTransaction tx)
         {
             if (tx == null)
             {
@@ -719,7 +713,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
             return await ReadSqPackType3(info.Offset, info.DataFile, tx);
@@ -734,7 +728,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the type 3 data</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public async Task<byte[]> ReadSqPackType3(long offset, XivDataFile dataFile, ModTransaction tx = null)
+        public static async Task<byte[]> ReadSqPackType3(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -749,7 +743,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await tx.ReadFile(dataFile, offset);
         }
 
-        public async Task<byte[]> ReadSqPackType3(byte[] data)
+        public static async Task<byte[]> ReadSqPackType3(byte[] data)
         {
             using (var ms = new MemoryStream(data))
             {
@@ -759,7 +753,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
         }
-        public async Task<byte[]> ReadSqPackType3(BinaryReader br, long offset = -1)
+        public static async Task<byte[]> ReadSqPackType3(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
             {
@@ -955,7 +949,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         // Begins decompressing a sequence of blocks in parallel
         // Returns a list of tasks that should be passed to CompleteReadCompressedBlocks()
-        public List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        public static List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
         {
             if(blockCount == 0)
             {
@@ -1051,7 +1045,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         // Completes all provided tasks from BeginReadCompressedBlocks and writes them sequentially in to destBuffer
         // Returns the number of bytes written in to destBuffer
-        public async Task<int> CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
+        public static async Task<int> CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
         {
             int currentOffset = destOffset;
             foreach (var task in tasks)
@@ -1065,7 +1059,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return currentOffset - destOffset;
         }
 
-        public async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
+        public static async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
         {
             if (offset > 0)
             {
@@ -1132,7 +1126,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return data;
         }
 
-        public async Task<byte[]> ReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        public static async Task<byte[]> ReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
         {
             if (blockCount == 0)
             {
@@ -1153,7 +1147,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return ret.ToArray();
         }
 
-        public async Task<uint> GetReportedType4UncompressedSize(string path, bool forceOrginal = false, ModTransaction tx = null)
+        public static async Task<uint> GetReportedType4UncompressedSize(string path, bool forceOrginal = false, ModTransaction tx = null)
         {
             if (tx == null)
             {
@@ -1164,7 +1158,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await GetReportedType4UncompressedSize(df, offset, tx);
 
         }
-        public async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offset8x, ModTransaction tx = null)
+        public static async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offset8x, ModTransaction tx = null)
         {
             if(tx == null)
             {
@@ -1217,7 +1211,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// Returns true if the file was modified.
         /// </summary>
         /// <returns></returns>
-        public async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
+        public static async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
         {
             var ownTx = false;
             if(tx == null)
@@ -1269,7 +1263,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item</param>
         /// <param name="forceOriginal">Flag used to get original game data</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetTexFromDat(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivTex> GetTexFromDat(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
 
             var dataFile = IOUtil.GetDataFileFromPath(internalPath);
@@ -1318,7 +1312,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="offset">Offset to the texture data.</param>
         /// <param name="dataFile">The data file that contains the data.</param>
         /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public async Task<XivTex> GetTexFromDat(long offset, XivDataFile dataFile, ModTransaction tx = null)
+        public static async Task<XivTex> GetTexFromDat(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -1329,7 +1323,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return XivTex.FromUncompressedTex(data);
         }
 
-        public async Task<byte[]> ReadSqPackType4(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<byte[]> ReadSqPackType4(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
             return await ReadSqPackType4(info.Offset, info.DataFile);
@@ -1344,7 +1338,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="tx"></param>
         /// <returns></returns>
         /// <exception cref="InvalidDataException"></exception>
-        internal async Task<byte[]> ReadSqPackType4(long offset, XivDataFile dataFile, ModTransaction tx = null)
+        internal static async Task<byte[]> ReadSqPackType4(long offset, XivDataFile dataFile, ModTransaction tx = null)
         {
             if (offset <= 0)
             {
@@ -1358,7 +1352,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await tx.ReadFile(dataFile, offset);
         }
 
-        internal async Task<byte[]> ReadSqPackType4(byte[] data)
+        internal static async Task<byte[]> ReadSqPackType4(byte[] data)
         {
             using (var ms = new MemoryStream(data))
             {
@@ -1375,7 +1369,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="br"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        internal async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
+        internal static async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
             {
@@ -1449,7 +1443,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="sqpackData"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public async Task<byte[]> GetUncompressedData(byte[] sqpackData)
+        public static async Task<byte[]> GetUncompressedData(byte[] sqpackData)
         {
             using (var ms = new MemoryStream(sqpackData))
             {
@@ -1481,7 +1475,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="br"></param>
         /// <returns></returns>
-        public async Task<byte[]> GetUncompressedData(BinaryReader br, long offset = -1)
+        public static async Task<byte[]> GetUncompressedData(BinaryReader br, long offset = -1)
         {
             if(offset >= 0)
             {
@@ -1806,7 +1800,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <returns>The created header data.</returns>
-        public byte[] MakeType4DatHeader(XivTexFormat format, List<List<byte[]>> ddsParts, int uncompressedLength, int newWidth, int newHeight)
+        public static byte[] MakeType4DatHeader(XivTexFormat format, List<List<byte[]>> ddsParts, int uncompressedLength, int newWidth, int newHeight)
         {
             var headerData = new List<byte>();
 
@@ -1903,7 +1897,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        private int GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0)
+        private static int GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0)
         {
             if(fileSize < 0)
             {
@@ -1979,7 +1973,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="targetPath"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        public async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
         {
             var ownTx = false;
             if(tx == null)
@@ -2057,7 +2051,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="importData"></param>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        internal async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile)
+        internal static async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile)
         {
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
@@ -2155,7 +2149,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalFilePath"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        public async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
         {
 
             var _index = new Index(XivCache.GameInfo.GameDirectory);
@@ -2297,7 +2291,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="data"></param>
         /// <param name="internalPath"></param>
         /// <returns></returns>
-        private async Task ExpandMetadata(byte[] data, string internalPath, ModTransaction tx = null)
+        private static async Task ExpandMetadata(byte[] data, string internalPath, ModTransaction tx = null)
         {
             // Perform metadata expansion if needed.
             var ext = Path.GetExtension(internalPath);
@@ -2333,9 +2327,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         private static async Task<Dictionary<long, long>> ComputeOpenSlots(XivDataFile df)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
-            var moddedDats = _dat.GetModdedDatList(df);
+            var moddedDats = Dat.GetModdedDatList(df);
 
             var slots = new Dictionary<long, long>();
             var modlist = await Modding.GetModList(false);
@@ -2410,7 +2403,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var modlist = await Modding.GetModList(true);
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
 
             var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
@@ -2479,7 +2471,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 foreach (var dKv in modsByDf)
                 {
                     // Now we need to delete the current modded dat files.
-                    var moddedDats = _dat.GetModdedDatList(dKv.Key);
+                    var moddedDats = Dat.GetModdedDatList(dKv.Key);
                     foreach (var file in moddedDats)
                     {
                         File.Delete(file);
@@ -2536,8 +2528,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Cannot defragment DATs while DAT writing is disabled.");
             }
 
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var moddedDats = _dat.GetModdedDatList(df);
+            var moddedDats = Dat.GetModdedDatList(df);
             var tempDats = moddedDats.Select(x => x + ".temp");
             var maxSize = Dat.GetMaximumDatSize();
 
@@ -2589,13 +2580,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<long> GetTotalModDataSize()
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
 
             long size = 0;
             foreach (var df in dataFiles)
             {
-                var moddedDats = _dat.GetModdedDatList(df);
+                var moddedDats = Dat.GetModdedDatList(df);
                 foreach (var dat in moddedDats)
                 {
                     var finfo = new FileInfo(dat);

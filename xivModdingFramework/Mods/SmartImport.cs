@@ -123,7 +123,6 @@ namespace xivModdingFramework.Mods
             await Task.Run(async () =>
             {
                 var data = await CreateCompressedFile(externalPath, internalPath);
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
                 // Establish an item to associate the mod import with, if one exists.
                 var root = await XivCache.GetFirstRoot(internalPath);
@@ -132,7 +131,7 @@ namespace xivModdingFramework.Mods
                     item = root.GetFirstItem();
                 }
 
-                await _dat.WriteModFile(data, internalPath, sourceApplication, item, tx);
+                await Dat.WriteModFile(data, internalPath, sourceApplication, item, tx);
                 XivCache.QueueDependencyUpdate(internalPath);
             });
         }
@@ -244,11 +243,10 @@ namespace xivModdingFramework.Mods
 
             var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(XivCache.GameInfo.GameDirectory);
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             if (forceType2)
             {
-                return await _dat.CompressType2Data(data);
+                return await Dat.CompressType2Data(data);
             }
 
 
@@ -289,7 +287,7 @@ namespace xivModdingFramework.Mods
 
 
             // This some kind of binary data to get type 2 compressed.
-            return await _dat.CompressType2Data(data);
+            return await Dat.CompressType2Data(data);
         }
 
         private static bool IsPowerOfTwo(ulong x)

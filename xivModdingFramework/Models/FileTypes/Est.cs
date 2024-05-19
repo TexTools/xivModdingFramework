@@ -361,8 +361,7 @@ namespace xivModdingFramework.Models.FileTypes
 
         private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false, ModTransaction tx = null)
         {
-            var _dat = new Dat(_gameDirectory);
-            var data = await _dat.ReadSqPackType2(EstFiles[type], forceDefault, tx);
+            var data = await Dat.ReadSqPackType2(EstFiles[type], forceDefault, tx);
 
             var count = BitConverter.ToUInt32(data, 0);
 
@@ -411,8 +410,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            var _dat = new Dat(_gameDirectory);
-            await _dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, tx);
+            await Dat.ImportType2Data(data, EstFiles[type], Constants.InternalModSourceName, referenceItem, tx);
         }
 
     }

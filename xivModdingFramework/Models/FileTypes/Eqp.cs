@@ -119,12 +119,9 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.NPC_Female
         };
 
-        private Dat _dat;
-
         public Eqp(DirectoryInfo gameDirectory)
         {
             _gameDirectory = gameDirectory;
-            _dat = new Dat(_gameDirectory);
             _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
         }
 
@@ -268,11 +265,11 @@ namespace xivModdingFramework.Models.FileTypes
 
         private async Task SaveGimmickParameterFile(byte[] bytes, IItem referenceItem = null, ModTransaction tx = null)
         {
-            await _dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, tx);
+            await Dat.ImportType2Data(bytes, GimmickParameterFile, Constants.InternalModSourceName, referenceItem, tx);
         }
         private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false, ModTransaction tx = null)
         {
-            return await _dat.ReadSqPackType2(GimmickParameterFile, forceDefault, tx);
+            return await Dat.ReadSqPackType2(GimmickParameterFile, forceDefault, tx);
         }
 
         /// <summary>
@@ -338,7 +335,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, tx);
+            await Dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, tx);
         }
 
         /// <summary>
@@ -384,7 +381,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             IOUtil.ReplaceBytesAt(file, bytes, offset);
 
-            await _dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, tx);
+            await Dat.ImportType2Data(file.ToArray(), EquipmentParameterFile, Constants.InternalModSourceName, referenceItem, tx);
         }
 
 
@@ -516,12 +513,12 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false, ModTransaction tx = null)
         {
-            return await _dat.ReadSqPackType2(EquipmentParameterFile, forceDefault, tx);
+            return await Dat.ReadSqPackType2(EquipmentParameterFile, forceDefault, tx);
         }
 
 
         public async Task SaveRawEquipmentParameters(int equipmentId, BitArray entry, ModTransaction tx = null) {
-            var file = new List<byte>(await _dat.ReadSqPackType2(EquipmentParameterFile, false, tx)).ToArray();
+            var file = new List<byte>(await Dat.ReadSqPackType2(EquipmentParameterFile, false, tx)).ToArray();
 
 
             var start = (equipmentId * EquipmentParameterEntrySize);
@@ -535,7 +532,7 @@ namespace xivModdingFramework.Models.FileTypes
         private async Task SaveEquipmentParameterFile(byte[] file, ModTransaction tx = null)
         {
 
-            await _dat.ImportType2Data(file, EquipmentParameterFile, Constants.InternalModSourceName, null, tx);
+            await Dat.ImportType2Data(file, EquipmentParameterFile, Constants.InternalModSourceName, null, tx);
 
             return;
         }
@@ -806,7 +803,7 @@ namespace xivModdingFramework.Models.FileTypes
                     data[offset + byteOffset] = byteToModify;
                 }
 
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
+                await Dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
             }
 
             // Loop Accessories
@@ -879,7 +876,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     data[offset + byteOffset] = byteToModify;
                 }
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
+                await Dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
 
             }
 
@@ -964,7 +961,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 data[offset + byteOffset] = byteToModify;
 
-                await _dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
+                await Dat.ImportType2Data(data, fileName, Constants.InternalModSourceName, referenceItem, tx);
             }
         }
 
@@ -1244,7 +1241,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            return await _dat.ReadSqPackType2(fileName, forceDefault, tx);
+            return await Dat.ReadSqPackType2(fileName, forceDefault, tx);
         }
 
         /// <summary>

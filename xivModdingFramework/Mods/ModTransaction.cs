@@ -1305,9 +1305,8 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<long> WriteFile(string path, byte[] data, string sourceApplication = "Unknown")
         {
-            var dat = new Dat(XivCache.GameInfo.GameDirectory);
 
-            return await dat.WriteModFile(data, path, sourceApplication, null, this);
+            return await Dat.WriteModFile(data, path, sourceApplication, null, this);
         }
 
 

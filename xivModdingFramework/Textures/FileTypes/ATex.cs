@@ -103,8 +103,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>An XivTex with all the texture data</returns>
         public async Task<XivTex> GetATexData(long offset, XivDataFile df, ModTransaction tx = null)
         {
-            var dat = new Dat(_gameDirectory);
-            var atexData = await dat.ReadSqPackType2(offset, df, tx);
+            var atexData = await Dat.ReadSqPackType2(offset, df, tx);
 
             var xivTex = new XivTex();
             xivTex.Layers = 1;

@@ -605,8 +605,6 @@ namespace xivModdingFramework.Mods.FileTypes
                 long p2Start = 0;
                 string _tempMPD;
 
-                var dat = new Dat(XivCache.GameInfo.GameDirectory);
-
                 // Loop through all the incoming mod entries, and only take
                 // the *LAST* mod json entry for each file path.
                 // This keeps us from having to constantly re-query the mod list file, and filters out redundant imports.

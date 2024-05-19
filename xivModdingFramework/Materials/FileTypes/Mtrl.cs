@@ -155,9 +155,8 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             // Get uncompressed mtrl data
-            var dat = new Dat(_gameDirectory);
             var df = IOUtil.GetDataFileFromPath(mtrlPath);
-            var mtrlData = await dat.ReadSqPackType2(mtrlOffset, df, tx);
+            var mtrlData = await Dat.ReadSqPackType2(mtrlOffset, df, tx);
 
             XivMtrl xivMtrl = null;
             await Task.Run((Func<Task>)(async () =>
@@ -429,8 +428,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns></returns>
         public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, ModTransaction tx = null)
         {
-            var dat = new Dat(_gameDirectory);
-            var mtrlData = await dat.ReadSqPackType2(mtrlPath, forceOriginal, tx);
+            var mtrlData = await Dat.ReadSqPackType2(mtrlPath, forceOriginal, tx);
             var uniqueTextures = new HashSet<string>();
             var texRegex = new Regex(".*\\.tex$");
 
@@ -831,10 +829,9 @@ namespace xivModdingFramework.Materials.FileTypes
             try
             {
                 var mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
-                var dat = new Dat(_gameDirectory);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, tx);
+                long offset = await Dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, tx);
 
                 if (validateTextures)
                 {
@@ -891,8 +888,6 @@ namespace xivModdingFramework.Materials.FileTypes
 #if ENDWALKER
             return;
 #endif
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
             var total = paths.Count;
 
             progress?.Report((0, total, "Updating Materials..."));
@@ -948,7 +943,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 var results = tasks.Select(x => x.Result).ToList();
                 foreach (var texData in results)
                 {
-                    await _dat.WriteModFile(texData.data, texData.indexFilePath, source, null, tx);
+                    await Dat.WriteModFile(texData.data, texData.indexFilePath, source, null, tx);
                 }
             }
 
@@ -1156,7 +1151,6 @@ namespace xivModdingFramework.Materials.FileTypes
         private async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
         {
             var _tex = new Tex(_gameDirectory);
-            var _dat = new Dat(_gameDirectory);
 
             // Read normal file.
             var normalTex = await _tex.GetXivTex(sourceNormalPath, false, tx);
@@ -1844,7 +1838,6 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var materials = new List<SimplifiedMtrlInfo>();
-            var _Dat = new Dat(XivCache.GameInfo.GameDirectory);
             var count = 0;
             var total = files.Count;
 
@@ -1876,7 +1869,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
                 try
                 {
-                    var mtrlData = (await _Dat.ReadSqPackType2(br, file.DataOffset)).ToArray();
+                    var mtrlData = (await Dat.ReadSqPackType2(br, file.DataOffset)).ToArray();
                     if (mtrlData.Length < 4)
                     {
                         continue;

@@ -379,7 +379,6 @@ namespace xivModdingFramework.Items.Categories
             /// <returns>A HousingAssets object containing the asset info</returns>
         private async Task<HousingAssets> GetFurnitureAssets(int modelID, int? secondaryId, XivItemType type, ModTransaction tx = null)
         {
-            var dat = new Dat(_gameDirectory);
             if(tx == null)
             {
                 // Readonly TX if we don't have one;
@@ -415,7 +414,7 @@ namespace xivModdingFramework.Items.Categories
                 return null;
             }
 
-            var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon, tx);
+            var assetData = await Dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon, tx);
 
             var housingAssets = new HousingAssets();
 
@@ -510,7 +509,6 @@ namespace xivModdingFramework.Items.Categories
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var dat = new Dat(_gameDirectory);
 
             foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
             {
@@ -518,7 +516,7 @@ namespace xivModdingFramework.Items.Categories
                 var assetFile = Path.GetFileName(additionalAsset);
 
                 var assetOffset = await tx.Get8xDataOffset(additionalAsset);
-                var assetData = await dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon, tx);
+                var assetData = await Dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon, tx);
 
                 await Task.Run(() =>
                 {

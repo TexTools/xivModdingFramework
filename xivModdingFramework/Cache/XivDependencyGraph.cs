@@ -519,7 +519,6 @@ namespace xivModdingFramework.Cache
 
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
             var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var _index = new Index(XivCache.GameInfo.GameDirectory);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _atex = new ATex(XivCache.GameInfo.GameDirectory);
@@ -910,7 +909,6 @@ namespace xivModdingFramework.Cache
 
 
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
-            var dat = new Dat(_gameDirectory);
 
             if (tx != null)
             {
@@ -926,7 +924,7 @@ namespace xivModdingFramework.Cache
                 return imcEntries;
             } 
 
-            var imcByteData = await dat.ReadSqPackType2(imcOffset, IOUtil.GetDataFileFromPath(imcPath), tx);
+            var imcByteData = await Dat.ReadSqPackType2(imcOffset, IOUtil.GetDataFileFromPath(imcPath), tx);
 
             var subsetCount = 0;
             ImcType identifier = ImcType.Unknown;

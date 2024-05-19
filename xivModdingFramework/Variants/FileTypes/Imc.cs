@@ -189,7 +189,6 @@ namespace xivModdingFramework.Variants.FileTypes
         public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false, ModTransaction tx = null)
         {
             var entries = new List<XivImc>();
-            var dat = new Dat(_gameDirectory);
 
             var lastPath = "";
             byte[] imcByteData = new byte[0];
@@ -209,7 +208,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 // Only reload this data if we need to.
                 if (path != lastPath)
                 {
-                    imcByteData = await dat.ReadSqPackType2(path, forceDefault, tx);
+                    imcByteData = await Dat.ReadSqPackType2(path, forceDefault, tx);
                 }
                 lastPath = path;
 
@@ -352,8 +351,7 @@ namespace xivModdingFramework.Variants.FileTypes
         public async Task<FullImcInfo> GetFullImcInfo(string path, ModTransaction tx = null)
         {
 
-            var dat = new Dat(_gameDirectory);
-            var imcByteData = await dat.ReadSqPackType2(path, false, tx);
+            var imcByteData = await Dat.ReadSqPackType2(path, false, tx);
 
             return await Task.Run(() =>
             {
@@ -459,9 +457,6 @@ namespace xivModdingFramework.Variants.FileTypes
             {
                 throw new InvalidDataException("Cannot save invalid IMC file.");
             }
-
-            var dat = new Dat(_gameDirectory);
-
             var data = new List<byte>();
 
 
@@ -486,7 +481,7 @@ namespace xivModdingFramework.Variants.FileTypes
             // That's it.
             source ??= "Unknown";
 
-            await dat.ImportType2Data(data.ToArray(), path, source, referenceItem, tx);
+            await Dat.ImportType2Data(data.ToArray(), path, source, referenceItem, tx);
         }
 
         /// <summary>

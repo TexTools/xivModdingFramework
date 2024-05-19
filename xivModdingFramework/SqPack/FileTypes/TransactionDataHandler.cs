@@ -206,9 +206,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     } else
                     {
                         // Open file, navigate to the offset(or start of file), read and decompress SQPack file.
-                        var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                         br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                        return await _dat.GetUncompressedData(br, info.RealOffset);
+                        return await Dat.GetUncompressedData(br, info.RealOffset);
                     }
                 }
             }
@@ -255,9 +254,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 using (var br = new BinaryReader(File.OpenRead(info.RealPath)))
                 {
                     // Open file, navigate to the offset(or start of file), read and decompress SQPack file.
-                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                     br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                    data = await _dat.GetUncompressedData(br, info.RealOffset);
+                    data = await Dat.GetUncompressedData(br, info.RealOffset);
                 }
 
                 // Return new stream.
@@ -448,8 +446,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             else if ((storageInfo.StorageType == EFileStorageType.UncompressedIndividual || storageInfo.StorageType == EFileStorageType.UncompressedBlob) && preCompressed == true)
             {
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                data = await _dat.GetUncompressedData(data);
+                data = await Dat.GetUncompressedData(data);
             }
 
             if(storageInfo.StorageType == EFileStorageType.CompressedIndividual || storageInfo.StorageType == EFileStorageType.UncompressedIndividual)
@@ -551,7 +548,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var offsets = new Dictionary<string, (long RealOffset, long TempOffset)>();
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             // TODO - Could paralellize this by datafile, but pretty rare that would get any gains.
             foreach (var dkv in OffsetMapping)
@@ -582,7 +578,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var data = await GetCompressedFile(file, forceType2);
 
                         // We now have everything we need for DAT writing.
-                        var realOffset = (await _dat.Unsafe_WriteToDat(data, df)) * 8L;
+                        var realOffset = (await Dat.Unsafe_WriteToDat(data, df)) * 8L;
 
                         offsets.Add(path, (realOffset, tempOffset));
                     }

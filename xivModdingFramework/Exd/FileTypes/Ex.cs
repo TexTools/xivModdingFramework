@@ -74,7 +74,6 @@ namespace xivModdingFramework.Exd.FileTypes
 
         private readonly DirectoryInfo _gameDirectory;
 
-        private readonly Dat _dat;
 
         /// <summary>
         /// Columns, keyed by data offset.
@@ -98,7 +97,6 @@ namespace xivModdingFramework.Exd.FileTypes
         {
             _gameDirectory = gameDirectory;
             _langCode = lang.GetLanguageCode();
-            _dat = new Dat(_gameDirectory);
             _language = lang;
         }
 
@@ -113,7 +111,6 @@ namespace xivModdingFramework.Exd.FileTypes
         {
             _gameDirectory = gameDirectory;
             _langCode = XivLanguage.English.GetLanguageCode();
-            _dat = new Dat(_gameDirectory);
         }
 
         /// <summary>
@@ -139,7 +136,7 @@ namespace xivModdingFramework.Exd.FileTypes
                 throw new Exception($"Could not find offset for exd/{exFile}{ExhExtension}");
             }
 
-            var exhData = await _dat.ReadSqPackType2(offset, XivDataFile._0A_Exd, tx);
+            var exhData = await Dat.ReadSqPackType2(offset, XivDataFile._0A_Exd, tx);
 
             await Task.Run(() =>
             {
@@ -237,7 +234,7 @@ namespace xivModdingFramework.Exd.FileTypes
                             continue;
 
                         // Always read the original base game file for now.
-                        var exData = await _dat.ReadSqPackType2(exdFile, false, tx);
+                        var exData = await Dat.ReadSqPackType2(exdFile, false, tx);
 
                         // Big Endian Byte Order 
                         using (var br = new BinaryReaderBE(new MemoryStream(exData)))

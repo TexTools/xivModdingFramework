@@ -44,9 +44,8 @@ namespace xivModdingFramework.VFX.FileTypes
         {
             var atexList = new List<string>();
 
-            var dat = new Dat(_gameDirectory);
 
-            var avfxData = await dat.ReadSqPackType2(path, forceOriginal, tx);
+            var avfxData = await Dat.ReadSqPackType2(path, forceOriginal, tx);
 
             await Task.Run(() =>
             {

@@ -292,8 +292,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="datCount"></param>
         private static void UNSAFE_ResetIndexDatCount(XivDataFile index)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var datCount = (_dat.GetOriginalDatList(index)).Count;
+            var datCount = (Dat.GetOriginalDatList(index)).Count;
             UNSAFE_SetIndexDatCount(index, datCount);
         }
 
@@ -304,7 +303,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="index"></param>
         private static void UNSAFE_NormalizeIndexDatCount(XivDataFile index)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
             var datCount = Dat.GetLargestDatNumber(index) + 1;
             UNSAFE_SetIndexDatCount(index, datCount);
         }

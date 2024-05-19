@@ -83,7 +83,6 @@ namespace xivModdingFramework.Mods
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 var _index = new Index(XivCache.GameInfo.GameDirectory);
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
@@ -309,7 +308,7 @@ namespace xivModdingFramework.Mods
 
                     // Save new Model.
                     var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl);
-                    var newMdlOffset = await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
+                    var newMdlOffset = await Dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
@@ -323,7 +322,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
+                    await Dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
                 }
 
 
@@ -372,7 +371,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
+                    await Dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
@@ -480,7 +479,7 @@ namespace xivModdingFramework.Mods
                             if (existentCopy == null) continue;
 
                             // Copy the material over.
-                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, tx);
+                            await Dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, tx);
                         }
                     }
                 }
@@ -596,7 +595,6 @@ namespace xivModdingFramework.Mods
             var index = await tx.GetIndexFile(df);
             var originalMetadataOffset = index.Get8xDataOffset(root.Info.GetRootFile());
 
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
 
             ItemMetadata originalMetadata = null;
@@ -606,7 +604,7 @@ namespace xivModdingFramework.Mods
             }
             else
             {
-                var data = await _dat.ReadSqPackType2(originalMetadataOffset, df, tx);
+                var data = await Dat.ReadSqPackType2(originalMetadataOffset, df, tx);
                 originalMetadata = await ItemMetadata.Deserialize(data);
             }
             return originalMetadata;

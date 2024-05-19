@@ -87,11 +87,9 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static async Task<StainingTemplateFile> GetStainingTemplateFile(EStainingTemplate template, bool forceOriginal = false, ModTransaction tx = null)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
             var path = STMFilePaths[template];
 
-            var data = await _dat.ReadSqPackType2(path, forceOriginal, tx);
+            var data = await Dat.ReadSqPackType2(path, forceOriginal, tx);
 
             var ret = new StainingTemplateFile(data, template);
             return ret;

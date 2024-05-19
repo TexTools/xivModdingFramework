@@ -287,7 +287,6 @@ namespace xivModdingFramework.Models.FileTypes
         public async Task<TTModel> GetTTModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
         {
             var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
@@ -330,10 +329,9 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var getShapeData = true;
-            var dat = new Dat(_gameDirectory);
 
 
-            var mdlData = await dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(mdlPath), tx);
+            var mdlData = await Dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(mdlPath), tx);
 
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
@@ -1867,7 +1865,6 @@ namespace xivModdingFramework.Models.FileTypes
         public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             var materials = new List<string>();
-            var dat = new Dat(_gameDirectory);
 
             if (tx == null)
             {
@@ -1875,7 +1872,7 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var mdlData = await dat.ReadSqPackType3(mdlPath, getOriginal, tx);
+            var mdlData = await Dat.ReadSqPackType3(mdlPath, getOriginal, tx);
             var meshCount = BitConverter.ToUInt16(mdlData, 12);
 
             using (var br = new BinaryReader(new MemoryStream(mdlData)))
@@ -2380,7 +2377,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
             #endregion
 
-            var dat = new Dat(_gameDirectory);
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
 
             var bytes = await FileToModelBytes(path, mdlPath, options, loggingFunction, intermediaryFunction, tx);
@@ -2390,7 +2386,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (!rawDataOnly)
             {
                 loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                await dat.WriteModFile(compressed, mdlPath, source, item, tx);
+                await Dat.WriteModFile(compressed, mdlPath, source, item, tx);
             } else
             {
                 ret = compressed;
@@ -4765,9 +4761,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // We know by default that a mod entry exists for this file if we're actually doing the check process on it.
                 var mod = (await tx.GetMod(mdlPath)).Value;
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
                 
-                await _dat.WriteModFile(bytes, mdlPath, mod.SourceApplication, null, tx);
+                await Dat.WriteModFile(bytes, mdlPath, mod.SourceApplication, null, tx);
 
             }
 
@@ -5253,7 +5248,6 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, ModTransaction tx = null)
         {
-            var _dat = new Dat(_gameDirectory);
             var _index = new Index(_gameDirectory);
 
             var fromRoot = await XivCache.GetFirstRoot(originalPath);
@@ -5352,7 +5346,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 mtrl.Textures[i].TexturePath = ntex;
 
                                 allFiles.Add(ntex);
-                                await _dat.CopyFile(tex, ntex, source, true, item, tx);
+                                await Dat.CopyFile(tex, ntex, source, true, item, tx);
                             }
                         }
 
@@ -5410,7 +5404,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 if (!copied)
                                 {
                                     allFiles.Add(testPath);
-                                    await _dat.CopyFile(validPath, testPath, source, true, item, tx);
+                                    await Dat.CopyFile(validPath, testPath, source, true, item, tx);
                                 }
                             }
                         }
@@ -5420,7 +5414,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Save the final modified mdl.
                 var data = await MakeCompressedMdlFile(model, xMdl);
-                var offset = await _dat.WriteModFile(data, newPath, source, item, tx);
+                var offset = await Dat.WriteModFile(data, newPath, source, item, tx);
 
                 if (ownTx) {
                     await ModTransaction.CommitTransaction(tx);
@@ -5441,7 +5435,6 @@ namespace xivModdingFramework.Models.FileTypes
 
         public async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, string sourceApplication, bool copyTextures = false, ModTransaction tx = null)
         {
-            var _dat = new Dat(_gameDirectory);
             var _index = new Index(_gameDirectory);
 
             var mainRoot = await XivCache.GetFirstRoot(primaryModel);
@@ -5562,7 +5555,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 mtrl.Textures[i].TexturePath = ntex;
 
                                 allFiles.Add(ntex);
-                                await _dat.CopyFile(tex, ntex, primaryModel, true, item, tx);
+                                await Dat.CopyFile(tex, ntex, primaryModel, true, item, tx);
                             }
                         }
 
@@ -5621,7 +5614,7 @@ namespace xivModdingFramework.Models.FileTypes
                                 if (!copied)
                                 {
                                     allFiles.Add(testPath);
-                                    await _dat.CopyFile(validPath, testPath, primaryModel, true, item, tx);
+                                    await Dat.CopyFile(validPath, testPath, primaryModel, true, item, tx);
                                 }
                             }
                         }
@@ -5637,7 +5630,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Save the final modified mdl.
                 var data = await MakeCompressedMdlFile(mainModel, xMdl);
-                var offset = await _dat.WriteModFile(data, primaryModel, sourceApplication, item, tx);
+                var offset = await Dat.WriteModFile(data, primaryModel, sourceApplication, item, tx);
 
                 if (ownTx)
                 {
@@ -5660,14 +5653,12 @@ namespace xivModdingFramework.Models.FileTypes
         #region Dawntrail Model Fix
         public async Task FixPreDawntrailMdl(string path, string source = "Unknown", ModTransaction tx = null)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
             // HACKHACK: This is going to be extremely inefficient, but works for the moment.
             var ttMdl = await GetTTModel(path, false, tx);
             var xivMdl = await GetXivMdl(path, false, tx);
 
             var bytes = await MakeCompressedMdlFile(ttMdl, xivMdl);
-            await _dat.WriteModFile(bytes, path, source, null, tx);
+            await Dat.WriteModFile(bytes, path, source, null, tx);
         }
         #endregion
 

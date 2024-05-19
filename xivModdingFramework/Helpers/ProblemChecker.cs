@@ -86,12 +86,11 @@ namespace xivModdingFramework.Helpers
 
                         progress?.Report("Deleting modded dat files...");
 
-                        var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
                         // Delete modded dat files
                         foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
                         {
-                            var datFiles = _dat.GetModdedDatList(xivDataFile);
+                            var datFiles = Dat.GetModdedDatList(xivDataFile);
 
                             foreach (var datFile in datFiles)
                             {

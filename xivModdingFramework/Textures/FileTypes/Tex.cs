@@ -62,9 +62,6 @@ namespace xivModdingFramework.Textures.FileTypes
     {
         #region Consts, Structs, & Constructor
         private const string TexExtension = ".tex";
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly Index _index;
-        private readonly Dat _dat;
 
         public const uint _DDSHeaderSize = 128;
         public const uint _TexHeaderSize = 80;
@@ -152,11 +149,8 @@ namespace xivModdingFramework.Textures.FileTypes
             return new DirectoryInfo(strings[0]);
         }
 
-        public Tex(DirectoryInfo gameDirectory)
+        public Tex(DirectoryInfo gameDirectory = null)
         {
-            _gameDirectory = gameDirectory;
-            _index = new Index(_gameDirectory);
-            _dat = new Dat(_gameDirectory);
         }
         #endregion
 
@@ -206,12 +200,12 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (path.Contains(".atex"))
                 {
-                    var atex = new ATex(_gameDirectory);
+                    var atex = new ATex(XivCache.GameInfo.GameDirectory);
                     xivTex = await atex.GetATexData(offset, df, tx);
                 }
                 else
                 {
-                    xivTex = await _dat.GetTexFromDat(offset, df, tx);
+                    xivTex = await Dat.GetTexFromDat(offset, df, tx);
                 }
             }
             catch (Exception ex)
@@ -315,6 +309,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var folderPath = $"ui/map/{path}";
 
+            var _index = new Index(XivCache.GameInfo.GameDirectory);
             var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folderPath), XivDataFile._06_Ui, tx);
 
             foreach (var mapType in MapTypeDictionary)
@@ -381,7 +376,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var path = internalPath;
 
             var data = await MakeCompressedTex(path, externalPath, XivTexFormat.INVALID, tx);
-            var offset = await _dat.WriteModFile(data, path, source, item, tx);
+            var offset = await Dat.WriteModFile(data, path, source, item, tx);
             return offset;
         }
 
@@ -452,7 +447,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 if (texFormat == XivTexFormat.INVALID)
                 {
                     // Use the current internal format.
-                    var xivt = await _dat.GetTexFromDat(internalPath, false, tx);
+                    var xivt = await Dat.GetTexFromDat(internalPath, false, tx);
                     texFormat = xivt.TextureFormat;
                 }
 
@@ -1069,7 +1064,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 br.BaseStream.Seek(offset, SeekOrigin.Begin);
 
                 // Type 4 Header
-                newTex.AddRange(_dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
+                newTex.AddRange(Dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
 
                 // Texture file header.
                 newTex.AddRange(br.ReadBytes((int)_TexHeaderSize));
@@ -1090,7 +1085,7 @@ namespace xivModdingFramework.Textures.FileTypes
             else
             {
                 // ATex are just compressed as a Type 2(Binary) file.
-                var data = await _dat.CompressType2Data(br.ReadAllBytes());
+                var data = await Dat.CompressType2Data(br.ReadAllBytes());
                 return data;
             }
         }

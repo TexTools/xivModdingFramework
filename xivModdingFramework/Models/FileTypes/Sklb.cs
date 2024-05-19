@@ -390,7 +390,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var index = new Index(XivCache.GameInfo.GameDirectory);
-            var dat = new Dat(XivCache.GameInfo.GameDirectory);
             var dataFile = IOUtil.GetDataFileFromPath(skelBPath);
 
             var offset = await tx.Get8xDataOffset(skelBPath);
@@ -400,7 +399,7 @@ namespace xivModdingFramework.Models.FileTypes
                 throw new FileNotFoundException($"Could not find offset for {skelBPath}");
             }
 
-            var sklbData = await dat.ReadSqPackType2(offset, dataFile, tx);
+            var sklbData = await Dat.ReadSqPackType2(offset, dataFile, tx);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))
             {

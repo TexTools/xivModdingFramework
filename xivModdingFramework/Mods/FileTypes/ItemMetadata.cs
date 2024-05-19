@@ -218,12 +218,11 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         public static async Task SaveMetadata(ItemMetadata meta, string source, ModTransaction tx = null)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
 
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            await _dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
+            await Dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
         }
 
         /// <summary>
