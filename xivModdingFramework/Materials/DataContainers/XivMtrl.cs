@@ -27,6 +27,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Materials.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
@@ -608,9 +609,9 @@ namespace xivModdingFramework.Materials.DataContainers
         public TextureSampler Sampler { get; set; }
 
         // Shortcut accessor for the texture data.
-        public async Task<XivTex> GetTexData()
+        public async Task<XivTex> GetTexData(bool forceOriginal = false, ModTransaction tx = null)
         {
-            return await Tex.GetXivTex(this);
+            return await Tex.GetXivTex(this, forceOriginal, tx);
         }
 
         public MtrlTexture()

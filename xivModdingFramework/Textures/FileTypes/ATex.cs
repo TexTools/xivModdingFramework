@@ -51,7 +51,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var itemType = ItemType.GetPrimaryItemType(itemModel);
 
-            var vfxPath = await GetVfxPath(itemModel);
+            var vfxPath = await GetVfxPath(itemModel, false, tx);
             return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File, forceOriginal, tx);
         }
         public static async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)

@@ -555,9 +555,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalPath">The internal file path of the item.</param>
         /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
-        public static async Task<long> ImportType2Data(DirectoryInfo importFilePath, string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task<long> ImportType2Data(string externalFilePath, string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
-            return await ImportType2Data(File.ReadAllBytes(importFilePath.FullName), internalPath, source, referenceItem, tx);
+            return await ImportType2Data(File.ReadAllBytes(externalFilePath), internalPath, source, referenceItem, tx);
         }
 
         /// <summary>
@@ -1326,7 +1326,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         public static async Task<byte[]> ReadSqPackType4(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
-            return await ReadSqPackType4(info.Offset, info.DataFile);
+            return await ReadSqPackType4(info.Offset, info.DataFile, tx);
         }
 
 
@@ -2412,6 +2412,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var total = modlist.Mods.Count();
 
             var originalSize = await GetTotalModDataSize();
+
 
             var workerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;

@@ -542,7 +542,7 @@ namespace xivModdingFramework.Cache
                     if (await tx.FileExists(path))
                     {
                         originalVfxPaths.Add(path);
-                        var ttpaths = await ATex.GetAtexPaths(path);
+                        var ttpaths = await ATex.GetAtexPaths(path, false, tx);
                         foreach (var ttp in ttpaths)
                         {
                             originalVfxPaths.Add(ttp.Path);
@@ -2078,9 +2078,12 @@ namespace xivModdingFramework.Cache
                 ResetRootCache();
                 // Stop the worker, in case it was reading from the file for some reason.
 
+                // Readonly TX
+                var tx = ModTransaction.BeginTransaction();
 
-                var hashes = await Index.GetAllHashes(XivDataFile._04_Chara);
-                var bgcHashes = await Index.GetAllHashes(XivDataFile._01_Bgcommon);
+
+                var hashes = await Index.GetAllHashes(XivDataFile._04_Chara, tx);
+                var bgcHashes = await Index.GetAllHashes(XivDataFile._01_Bgcommon, tx);
 
 
                 var types = new Dictionary<XivItemType, List<XivItemType>>();

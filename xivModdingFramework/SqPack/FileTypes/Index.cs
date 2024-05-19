@@ -111,9 +111,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Gets the entire universe of hash pairs (folder, file) for a datafile.
         /// </summary>
-        internal static async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile)
+        internal static async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile, ModTransaction tx = null)
         {
-            var index = await GetIndexFile(dataFile, false, true);
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+            var index = await tx.GetIndexFile(dataFile);
             return index.GetAllHashes();
         }
 
@@ -129,6 +133,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Creates an Index File object from the game index files.
+        /// This should typically not be called unless you really know what you're doing.
+        /// Currently only used by internal transaction handler and DefragmentDats function.
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>

@@ -1662,7 +1662,9 @@ namespace xivModdingFramework.Materials.FileTypes
             var OffsetToIndex2Dictionary = new Dictionary<uint, uint>();
             var gameDirectory = XivCache.GameInfo.GameDirectory;
 
-            var index = await Index.GetIndexFile(dataFile, false, true);
+            var tx = ModTransaction.BeginTransaction();
+
+            var index = await tx.GetIndexFile(dataFile);
 
 
             // Populate dictionaries.

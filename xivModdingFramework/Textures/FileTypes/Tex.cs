@@ -1230,15 +1230,15 @@ namespace xivModdingFramework.Textures.FileTypes
         /// Retreives the associated .dat file for colorset dye data, if it exists.
         /// Takes either a .dat file directly or the .dds file adjacent to it.
         /// </summary>
-        /// <param name="file"></param>
+        /// <param name="externalFilePath"></param>
         /// <returns></returns>
-        public static byte[] GetColorsetDyeInformationFromFile(string file)
+        public static byte[] GetColorsetDyeInformationFromFile(string externalFilePath)
         {
-            var flagsPath = file;
-            if (file.EndsWith(".dds"))
+            var flagsPath = externalFilePath;
+            if (externalFilePath.EndsWith(".dds"))
             {
-                flagsPath = Path.Combine(Path.GetDirectoryName(file), (Path.GetFileNameWithoutExtension(file) + ".dat"));
-            } else if (!file.EndsWith(".dat"))
+                flagsPath = Path.Combine(Path.GetDirectoryName(externalFilePath), (Path.GetFileNameWithoutExtension(externalFilePath) + ".dat"));
+            } else if (!externalFilePath.EndsWith(".dat"))
             {
                 throw new FileNotFoundException("File for Dye data extraction must be either .dat or .dds");
             }
