@@ -46,16 +46,9 @@ namespace xivModdingFramework.Variants.FileTypes
     /// <summary>
     /// This class contains the methods that deal with the .imc file type 
     /// </summary>
-    public class Imc
+    public static class Imc
     {
         private const string ImcExtension = ".imc";
-        private readonly DirectoryInfo _gameDirectory;
-
-        public Imc(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
-
         public static bool UsesImc(IItemModel item)
         {
             var root = item.GetRoot();
@@ -94,7 +87,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        public async Task<int> GetMaterialSetId(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<int> GetMaterialSetId(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
             var root = item.GetRoot();
             if (root == null) return -1;
@@ -133,7 +126,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item">The item to get the version for</param>
         /// <param name="modelInfo">The model info of the item</param>
         /// <returns>The XivImc Data</returns>
-        public async Task<XivImc> GetImcInfo(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivImc> GetImcInfo(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
             if (item == null || !Imc.UsesImc(item))
             {
@@ -151,7 +144,7 @@ namespace xivModdingFramework.Variants.FileTypes
             return result;
         }
 
-        public async Task<FullImcInfo> GetFullImcInfo(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<FullImcInfo> GetFullImcInfo(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
             if(item == null || !UsesImc(item))
             {
@@ -186,7 +179,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// </summary>
         /// <param name="pathsWithOffsets"></param>
         /// <returns></returns>
-        public async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false, ModTransaction tx = null)
+        public static async Task<List<XivImc>> GetEntries(List<string> pathsWithOffsets, bool forceDefault = false, ModTransaction tx = null)
         {
             var entries = new List<XivImc>();
 
@@ -243,7 +236,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="path"></param>
         /// <param name="entries"></param>
         /// <returns></returns>
-        internal async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, ModTransaction tx = null)
+        internal static async Task SaveEntries(string path, string slot, List<XivImc> entries, IItem referenceItem = null, ModTransaction tx = null)
         {
             if(tx == null)
             {
@@ -348,7 +341,7 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item"></param>
         /// <param name="useSecondary">Determines if the SecondaryModelInfo should be used instead.(XivGear only)</param>
         /// <returns>The ImcData data</returns>
-        public async Task<FullImcInfo> GetFullImcInfo(string path, ModTransaction tx = null)
+        public static async Task<FullImcInfo> GetFullImcInfo(string path, ModTransaction tx = null)
         {
 
             var imcByteData = await Dat.ReadSqPackType2(path, false, tx);
@@ -451,7 +444,7 @@ namespace xivModdingFramework.Variants.FileTypes
         }
 
 
-        public async Task SaveFullImcInfo(FullImcInfo info, string path, string source, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task SaveFullImcInfo(FullImcInfo info, string path, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
             if (info == null || info.TypeIdentifier != ImcType.Set && info.TypeIdentifier != ImcType.NonSet)
             {

@@ -720,8 +720,6 @@ namespace xivModdingFramework.Mods
             {
                 var modlist = await tx.GetModList();
 
-                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-
                 // IMC entries cache so we're not having to constantly re-load the IMC data.
                 Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
 
@@ -770,7 +768,7 @@ namespace xivModdingFramework.Mods
                         IItem item = null;
                         if (Imc.UsesImc(root) && ext == ".mtrl")
                         {
-                            var data = await ResolveMtrlModInfo(_imc, mod.FilePath, root, ImcEntriesCache, tx);
+                            var data = await ResolveMtrlModInfo(mod.FilePath, root, ImcEntriesCache, tx);
                             mod.ItemName = data.Name;
                             mod.ItemCategory = data.Category;
 
@@ -789,7 +787,7 @@ namespace xivModdingFramework.Mods
 
                             var parent = parents[0];
 
-                            var data = await ResolveMtrlModInfo(_imc, parent, root, ImcEntriesCache, tx);
+                            var data = await ResolveMtrlModInfo(parent, root, ImcEntriesCache, tx);
                             mod.ItemName = data.Name;
                             mod.ItemCategory = data.Category;
                         }
@@ -834,7 +832,7 @@ namespace xivModdingFramework.Mods
                 }
             }
         }
-        private static async Task<(string Name, string Category)> ResolveMtrlModInfo(Imc _imc, string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache, ModTransaction tx = null)
+        private static async Task<(string Name, string Category)> ResolveMtrlModInfo(string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache, ModTransaction tx = null)
         {
             IItem item;
             var mSetRegex = new Regex("/v([0-9]{4})/");
@@ -855,7 +853,7 @@ namespace xivModdingFramework.Mods
                         tx = ModTransaction.BeginTransaction();
                     }
 
-                    imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths(), false, tx);
+                    imcEntries = await Imc.GetEntries(await root.GetImcEntryPaths(), false, tx);
                     ImcEntriesCache.Add(root, imcEntries);
                 }
                 var mSetId = Int32.Parse(match.Groups[1].Value);

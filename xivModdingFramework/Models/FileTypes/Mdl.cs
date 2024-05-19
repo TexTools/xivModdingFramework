@@ -1694,7 +1694,6 @@ namespace xivModdingFramework.Models.FileTypes
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
             var useCached = false;
 
             if (tx == null)
@@ -1753,7 +1752,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
                     try
                     {
-                        var info = await _imc.GetFullImcInfo(imcPath, tx);
+                        var info = await Imc.GetFullImcInfo(imcPath, tx);
                         var slotRegex = new Regex("_([a-z]{3}).mdl$");
                         var slot = "";
                         var m = slotRegex.Match(mdlPath);
@@ -1916,8 +1915,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mtrlVariant = 1;
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-            var imcInfo = (await _imc.GetImcInfo(item, false, tx));
+            var imcInfo = (await Imc.GetImcInfo(item, false, tx));
             if (imcInfo != null) {
                 mtrlVariant = imcInfo.MaterialSet;
             }
@@ -5367,10 +5365,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
                 {
-                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-
-                    var toEntries = await _imc.GetEntries(await toRoot.GetImcEntryPaths(), false, tx);
-                    var fromEntries = await _imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, tx);
+                    var toEntries = await Imc.GetEntries(await toRoot.GetImcEntryPaths(), false, tx);
+                    var fromEntries = await Imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, tx);
 
                     var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
                     var fromSets = fromEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
@@ -5574,10 +5570,8 @@ namespace xivModdingFramework.Models.FileTypes
                 // Copy the materials through to all the destination IMC sets as needed.
                 if (Imc.UsesImc(mainRoot) && Imc.UsesImc(mergeInRoot))
                 {
-                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-
-                    var toEntries = await _imc.GetEntries(await mainRoot.GetImcEntryPaths(), false, tx);
-                    var fromEntries = await _imc.GetEntries(await mergeInRoot.GetImcEntryPaths(), false, tx);
+                    var toEntries = await Imc.GetEntries(await mainRoot.GetImcEntryPaths(), false, tx);
+                    var fromEntries = await Imc.GetEntries(await mergeInRoot.GetImcEntryPaths(), false, tx);
 
                     var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
                     var fromSet = fromEntries[mergeInImcVariant];

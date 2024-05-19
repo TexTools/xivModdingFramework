@@ -152,8 +152,7 @@ namespace xivModdingFramework.Textures.FileTypes
         public static async Task<(string Folder, string File)> GetVfxPath(IItemModel itemModel, bool forceDefault = false, ModTransaction tx = null)
         {
             // get the vfx version from the imc file
-            var imc = new Imc(XivCache.GameInfo.GameDirectory);
-            var imcInfo = await imc.GetImcInfo(itemModel, forceDefault, tx);
+            var imcInfo = await Imc.GetImcInfo(itemModel, forceDefault, tx);
             if(imcInfo == null)
             {
                 return ("", "");

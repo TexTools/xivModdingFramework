@@ -76,13 +76,12 @@ namespace xivModdingFramework.Materials.FileTypes
         public static async Task<XivMtrl> GetXivMtrl(string mtrlFileOrPath, IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
 
-            var imc = new Imc(XivCache.GameInfo.GameDirectory);
             var materialSet = 0;
             try
             {
                 if (Imc.UsesImc(item))
                 {
-                    var imcEntry = await imc.GetImcInfo(item, false, tx);
+                    var imcEntry = await Imc.GetImcInfo(item, false, tx);
                     materialSet = imcEntry.MaterialSet;
                 }
             }
@@ -1437,8 +1436,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     if (!Imc.UsesImc(im)){
                         return 0;
                     }
-                    var imc = new Imc(XivCache.GameInfo.GameDirectory);
-                    var entry = await imc.GetImcInfo((IItemModel)item, false, tx);
+                    var entry = await Imc.GetImcInfo((IItemModel)item, false, tx);
                     if(entry== null)
                     {
                         return 0;

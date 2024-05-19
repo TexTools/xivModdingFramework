@@ -333,8 +333,7 @@ namespace xivModdingFramework.Items.Categories
 
             var equipPartDictionary = new Dictionary<string, char[]>();
 
-            var imc = new Imc(_gameDirectory);
-            var version = (await imc.GetImcInfo(itemModel, false, tx)).MaterialSet.ToString().PadLeft(4, '0');
+            var version = (await Imc.GetImcInfo(itemModel, false, tx)).MaterialSet.ToString().PadLeft(4, '0');
 
             var id = itemModel.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var bodyVer = itemModel.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');

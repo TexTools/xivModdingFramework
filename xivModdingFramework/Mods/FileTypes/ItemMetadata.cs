@@ -187,7 +187,6 @@ namespace xivModdingFramework.Mods.FileTypes
         {
 
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
 
             // These functions generate the path::offset to each of our
             // contiguous metadata entries.
@@ -197,7 +196,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             if (imcPaths.Count > 0)
             {
-                ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault, tx);
+                ret.ImcEntries = await Imc.GetEntries(imcPaths, forceDefault, tx);
             }
 
             ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault, tx);
@@ -302,9 +301,8 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 if (meta.ImcEntries.Count > 0)
                 {
-                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                     var imcPath = meta.Root.GetRawImcFilePath();
-                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, tx);
+                    await Imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, tx);
                 }
             }
         }
@@ -352,9 +350,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (meta.ImcEntries.Count > 0)
                 {
-                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                     var imcPath = meta.Root.GetRawImcFilePath();
-                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, tx);
+                    await Imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, tx);
                 }
 
                 var preOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);

@@ -81,7 +81,6 @@ namespace xivModdingFramework.Mods
                 var index = await tx.GetIndexFile(df);
                 var modlist = await tx.GetModList();
 
-                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
 
 
                 if (ProgressReporter != null)

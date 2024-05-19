@@ -81,11 +81,10 @@ namespace xivModdingFramework.Cache
             {
                 var sameMaterialItems = new List<IItemModel>();
 
-                var imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var originalInfo = await imc.GetImcInfo(item, false, tx);
+                var originalInfo = await Imc.GetImcInfo(item, false, tx);
                 foreach (var i in sameModelItems)
                 {
-                    var info = await imc.GetImcInfo(i, false, tx);
+                    var info = await Imc.GetImcInfo(i, false, tx);
                     if (info.MaterialSet == originalInfo.MaterialSet)
                     {
                         sameMaterialItems.Add(i);
@@ -516,8 +515,6 @@ namespace xivModdingFramework.Cache
         {
 
             var df = IOUtil.GetDataFileFromPath(Info.GetRootFile());
-
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
 
             var files = new HashSet<string>();
 
@@ -1117,9 +1114,8 @@ namespace xivModdingFramework.Cache
             /// For these types we also want to read their IMC file to fill in any missing NPC only versions.
             if (Imc.UsesImc(this))
             {
-                var imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var imcPaths = await GetImcEntryPaths();
-                var imcEntries = await imc.GetEntries(imcPaths, false, tx);
+                var imcEntries = await Imc.GetEntries(imcPaths, false, tx);
 
                 // Need to verify all of our IMC sets are properly represented in the item list.
                 for (int i = 0; i <  imcEntries.Count; i++)
