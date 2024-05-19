@@ -15,6 +15,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 using System.ComponentModel.Design;
+using System.Linq;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -584,6 +585,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                 }
             }
+
 
             return offsets;
 

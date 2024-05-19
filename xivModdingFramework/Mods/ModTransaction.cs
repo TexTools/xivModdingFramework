@@ -614,9 +614,11 @@ namespace xivModdingFramework.Mods
             // Write data from the transaction store to the real data target.
             var pathMap = await _DataHandler.WriteAllToTarget(Settings, this);
 
+            await WriteDisabledMods(pathMap);
+
             // If the data handler returned a null, that means we aren't doing
             // anything else to the base game files/modlist here.
-            if (pathMap != null)
+            if (pathMap != null || !AffectsGameFiles)
             {
                 foreach(var kv in _PrePrepStates)
                 {
@@ -634,7 +636,9 @@ namespace xivModdingFramework.Mods
                     var lastOffset = await Set8xDataOffset(kv.Key, kv.Value.RealOffset);
                     if (lastOffset != kv.Value.TempOffset)
                     {
-                        throw new Exception("Temp-Real Offset mismatch.");
+                        // This occurs when a new mod was added, then disabled, but not deleted.
+                        // So we still write the Disabled data to the DATs, but don't update indexes.
+                        continue;
                     }
                     var df = IOUtil.GetDataFileFromPath(kv.Key);
 
@@ -645,46 +649,46 @@ namespace xivModdingFramework.Mods
 
                     _TempToRealOffsetMapping[df].Add(kv.Value.TempOffset, kv.Value.RealOffset);
                 }
-
-                // We only write to the modlist for actual game data saves.
-                if (_ModList != null && AffectsGameFiles)
+                
+                if(_ModList == null)
                 {
-                    // Update the modlist with the real, post-write offsets.
-                    foreach(var kv in pathMap)
-                    {
-                        if (IsPrepFile(kv.Key))
-                        {
-                            // TODO: Need to restore the Mod entry here.
-                            // But that involves Wrapping the Modlist class...
-                            // That's going to be a pain.
-                            continue;
-                        }
-
-                        var mod = _ModList.GetMod(kv.Key);
-                        if (mod != null)
-                        {
-                            var m = mod.Value;
-                            m.ModOffset8x = kv.Value.RealOffset;
-                            if(m.OriginalOffset8x == kv.Value.TempOffset)
-                            {
-                                m.OriginalOffset8x = kv.Value.RealOffset;
-                            }
-                            _ModList.AddOrUpdateMod(m);
-                        }
-                    }
-
-                    await Modding.SaveModListAsync(_ModList);
+                    await GetModList();
                 }
 
-                // We only write index files if we're writing to a game file store.
-                if (Settings.Target == ETransactionTarget.GameFiles)
+                // Update the modlist with the real, post-write offsets.
+                foreach(var kv in pathMap)
                 {
-                    foreach (var index in _IndexFiles)
+                    var mod = _ModList.GetMod(kv.Key);
+                    if (mod != null)
                     {
-                        index.Value.Save();
+                        var m = mod.Value;
+                        if(m.ModOffset8x != kv.Value.TempOffset)
+                        {
+                            throw new InvalidDataException("Mod entry has mismatching temporary offset: " + kv.Key);
+                        }
+
+                        m.ModOffset8x = kv.Value.RealOffset;
+                        if(m.OriginalOffset8x == kv.Value.TempOffset)
+                        {
+                            // Don't think we ever use this path now that we set original value to 0 for custom file mods.
+                            // But it's good to leave it in for safety.
+                            m.OriginalOffset8x = kv.Value.RealOffset;
+                        }
+
+                        _ModList.AddOrUpdateMod(m);
+                    } else
+                    {
+                        // User deleted the mod... But we updated the index file to new data?
+                        throw new InvalidDataException("Missing mod entry for imported file: " + kv.Key);
                     }
                 }
 
+                await Modding.SaveModListAsync(_ModList);
+
+                foreach (var index in _IndexFiles)
+                {
+                    index.Value.Save();
+                }
 
                 // We have to queue all of the touched files up as possibly changed in the Mod Cache to be safe.
                 HashSet<string> files = new HashSet<string>();
@@ -1115,6 +1119,50 @@ namespace xivModdingFramework.Mods
             return _TempToRealOffsetMapping[df][temporary8xOffset];
         }
 
+
+        private async Task WriteDisabledMods(Dictionary<string, (long RealOffset, long TempOffset)> writtenOffsets)
+        {
+            if(Settings.Target != ETransactionTarget.GameFiles || !AffectsGameFiles)
+            {
+                return;
+            }
+
+            var ret = new Dictionary<string, long>();
+
+            // Here we have to handle writing disabled mods.
+            var modlist = await GetModList();
+            var mods = modlist.GetMods().ToList();
+            foreach (var mod in mods)
+            {
+                if (writtenOffsets.ContainsKey(mod.FilePath))
+                {
+                    // Mod was already written.
+                    continue;
+                }
+
+                var df = mod.DataFile;
+                if (!_TemporaryOffsetMapping.ContainsKey(df))
+                    continue;
+
+                if (!_TemporaryOffsetMapping[df].ContainsKey(mod.ModOffset8x))
+                    continue;
+
+                // Ok, if we got here, we have a mod with a temporary transaction offset.
+                // But the mod data didn't get written yet, because it wasn't enabled in the indexes,
+                // And the data didn't already exist in the DATs to start.
+
+                var path = mod.FilePath;
+                var tempOffset = mod.ModOffset8x;
+
+                var forceType2 = path.EndsWith(".atex");
+                
+                // Retrieve the compressed data and write it to the DATs.
+                var data = await _DataHandler.GetCompressedFile(df, tempOffset, forceType2);
+                var realOffset = (await Dat.Unsafe_WriteToDat(data, df)) * 8L;
+
+                writtenOffsets.Add(path, (realOffset, tempOffset));
+            }
+        }
 
 
         /// <summary>
