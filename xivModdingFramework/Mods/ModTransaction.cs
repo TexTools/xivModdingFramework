@@ -1120,6 +1120,15 @@ namespace xivModdingFramework.Mods
         }
 
 
+        /// <summary>
+        /// Handles an edge case when commiting transaction data.
+        /// In specific, the case where...
+        ///  - A new file is imported, then disabled, but not deleted, while using the game files as the Transaction target.
+        ///  In which case, we want to commit the disabled mod data to the DATs, with a real offset, but not update the index.
+        ///  The file will have been skipped by the normal write process b/c it doesn't exist in the indexes, so we write it here.
+        /// </summary>
+        /// <param name="writtenOffsets"></param>
+        /// <returns></returns>
         private async Task WriteDisabledMods(Dictionary<string, (long RealOffset, long TempOffset)> writtenOffsets)
         {
             if(Settings.Target != ETransactionTarget.GameFiles || !AffectsGameFiles)
