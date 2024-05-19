@@ -35,21 +35,14 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
-    public class ATex
+    public static class ATex
     {
-        private readonly DirectoryInfo _gameDirectory;
-
-        public ATex(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
-
         /// <summary>
         /// Gets the atex paths for a given item
         /// </summary>
         /// <param name="itemModel">The item to get the atex paths for</param>
         /// <returns>A list of TexTypePath containing the atex info</returns>
-        public async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel, bool forceOriginal = false, ModTransaction tx = null)
         {
             // Gear is the only type we know how to retrieve atex information for.
             if (itemModel.GetType() != typeof(XivGear)) return new List<TexTypePath>();
@@ -61,10 +54,9 @@ namespace xivModdingFramework.Textures.FileTypes
             var vfxPath = await GetVfxPath(itemModel);
             return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File, forceOriginal, tx);
         }
-        public async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var df = IOUtil.GetDataFileFromPath(vfxPath);
-            var avfx = new Avfx(_gameDirectory, df);
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
@@ -78,7 +70,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             var atexTexTypePathList = new List<TexTypePath>();
-            var aTexPaths = await avfx.GetATexPaths(vfxPath, forceOriginal, tx);          
+            var aTexPaths = await Avfx.GetATexPaths(vfxPath, forceOriginal, tx);          
 
             foreach (var atexPath in aTexPaths)
             {
@@ -100,7 +92,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="offset">The offset to the ATex file</param>
         /// <returns>An XivTex with all the texture data</returns>
-        public async Task<XivTex> GetATexData(long offset, XivDataFile df, ModTransaction tx = null)
+        public static async Task<XivTex> GetATexData(long offset, XivDataFile df, ModTransaction tx = null)
         {
             var atexData = await Dat.ReadSqPackType2(offset, df, tx);
 

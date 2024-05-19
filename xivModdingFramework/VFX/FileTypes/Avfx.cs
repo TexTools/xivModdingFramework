@@ -24,23 +24,15 @@ using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.VFX.FileTypes
 {
-    public class Avfx
+    public static class Avfx
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
-
-        public Avfx(DirectoryInfo gameDirectory, XivDataFile dataFile)
-        {
-            _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
-        }
 
         /// <summary>
         /// Gets the .atex paths that are within the .avfx file
         /// </summary>
         /// <param name="offset">The offset to the avfx file</param>
         /// <returns>A list of atex paths</returns>
-        public async Task<List<string>> GetATexPaths(string path, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<List<string>> GetATexPaths(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
             var atexList = new List<string>();
 

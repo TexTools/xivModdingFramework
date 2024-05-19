@@ -518,7 +518,6 @@ namespace xivModdingFramework.Cache
             var df = IOUtil.GetDataFileFromPath(Info.GetRootFile());
 
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-            var _atex = new ATex(XivCache.GameInfo.GameDirectory);
 
             var files = new HashSet<string>();
 
@@ -546,7 +545,7 @@ namespace xivModdingFramework.Cache
                     if (await tx.FileExists(path))
                     {
                         originalVfxPaths.Add(path);
-                        var ttpaths = await _atex.GetAtexPaths(path);
+                        var ttpaths = await ATex.GetAtexPaths(path);
                         foreach (var ttp in ttpaths)
                         {
                             originalVfxPaths.Add(ttp.Path);

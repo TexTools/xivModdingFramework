@@ -200,8 +200,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (path.Contains(".atex"))
                 {
-                    var atex = new ATex(XivCache.GameInfo.GameDirectory);
-                    xivTex = await atex.GetATexData(offset, df, tx);
+                    xivTex = await ATex.GetATexData(offset, df, tx);
                 }
                 else
                 {
