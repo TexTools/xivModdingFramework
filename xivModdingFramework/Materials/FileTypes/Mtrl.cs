@@ -741,7 +741,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, bool validateTextures = true, ModTransaction tx = null)
+        public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item = null, string source = "Unknown", bool validateTextures = true, ModTransaction tx = null)
         {
             var ownTx = false;
             if(tx == null)

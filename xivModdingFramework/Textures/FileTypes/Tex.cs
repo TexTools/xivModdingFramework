@@ -52,6 +52,7 @@ using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Helper;
 using xivModdingFramework.Exd.Enums;
 using SharpDX.Toolkit.Graphics;
+using xivModdingFramework.Models.DataContainers;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -1094,23 +1095,14 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
         /// <summary>
-        /// Imports a ColorSet file
+        /// Imports a ColorSet DDS file into the given base Material, saving it to the given transaction or game files.
         /// </summary>
-        /// <param name="xivMtrl">The XivMtrl data of the original</param>
-        /// <param name="ddsFileDirectory">The dds directory of the new ColorSet</param>
-        /// <param name="item">The item</param>
-        /// <param name="source">The source importing the file</param>
-        /// <returns>The new offset</returns>
-        public static async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, string ddsFilePath, IItem item, string source, ModTransaction tx = null)
+        public static async Task<long> ImportColorsetTexture(string mtrlPath, string ddsFilePath, bool forceOriginal = false, bool saveColorset = true, bool saveDye = true, IItem item = null, string source = "Unknown", ModTransaction tx = null)
         {
-            var cset = GetColorsetDataFromDDS(ddsFilePath);
-
-            // Replace the color set data with the imported data
-            xivMtrl.ColorSetData = cset.ColorsetData;
-            xivMtrl.ColorSetDyeData = cset.DyeData;
+            var xivMtrl = await Mtrl.GetXivMtrl(mtrlPath, false, tx);
 
             var doSave = false;
-            if(tx == null)
+            if (tx == null)
             {
                 doSave = true;
                 // Open a transaction if needed since we're performing multiple operations.
@@ -1118,10 +1110,13 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             try
             {
+                ImportColorsetTexture(xivMtrl, ddsFilePath);
+#if DAWNTRAIL
                 if (xivMtrl.ColorSetData.Count < 1024)
                 {
                     await Mtrl.FixPreDawntrailMaterial(xivMtrl, source, tx);
                 }
+#endif
 
                 var offset = await Mtrl.ImportMtrl(xivMtrl, item, source, false, tx);
                 if (doSave)
@@ -1132,11 +1127,42 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             catch
             {
-                if (doSave) {
+                if (doSave)
+                {
                     ModTransaction.CancelTransaction(tx);
                 }
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Imports a colorset DDS file into an xivMTRL.  Does not save the result.
+        /// </summary>
+        /// <param name="xivMtrl"></param>
+        /// <param name="ddsFilePath"></param>
+        /// <param name="item"></param>
+        /// <param name="source"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static void ImportColorsetTexture(XivMtrl xivMtrl, string ddsFilePath, bool saveColorset = true, bool saveDye = true)
+        { 
+            if(!saveDye && !saveColorset)
+            {
+                return;
+            }
+
+            var cset = GetColorsetDataFromDDS(ddsFilePath);
+
+            // Replace the color set data with the imported data
+            if (saveColorset)
+            {
+                xivMtrl.ColorSetData = cset.ColorsetData;
+            }
+            if (saveDye)
+            {
+                xivMtrl.ColorSetDyeData = cset.DyeData == null ? new byte[0] : cset.DyeData;
+            }
+
         }
 
 
@@ -1225,12 +1251,12 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             else
             {
-                // If we have no dye data, return empty Array.
-                colorSetExtraData = new byte[0];
+                // If we have no dye data, return NULL
+                colorSetExtraData = null;
             }
             return colorSetExtraData;
         }
-        #endregion
+#endregion
 
         #region Static Dictionaries
 
