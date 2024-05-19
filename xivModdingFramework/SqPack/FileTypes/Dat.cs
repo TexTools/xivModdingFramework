@@ -2152,7 +2152,6 @@ namespace xivModdingFramework.SqPack.FileTypes
         public static async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
         {
 
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
 
             // Open a transaction if we don't have one.
@@ -2403,7 +2402,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var modlist = await Modding.GetModList(true);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
 
             var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
 
@@ -2424,7 +2422,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 foreach (var dKv in modsByDf)
                 {
                     var df = dKv.Key;
-                    indexFiles.Add(df, await _index.GetIndexFile(df));
+                    indexFiles.Add(df, await Index.GetIndexFile(df));
 
                     foreach (var oMod in dKv)
                     {

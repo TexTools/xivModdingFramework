@@ -191,7 +191,6 @@ namespace xivModdingFramework.Mods
 
         private TransactionDataHandler _DataHandler;
 
-        private SqPack.FileTypes.Index __Index;
         private DirectoryInfo _GameDirectory;
 
         public ModTransactionSettings Settings { get; private set; }
@@ -329,7 +328,7 @@ namespace xivModdingFramework.Mods
                         }
                     }
 
-                    var idx = await __Index.GetIndexFile(dataFile, false, ReadOnly);
+                    var idx = await Index.GetIndexFile(dataFile, false, ReadOnly);
                     _IndexFiles.Add(dataFile, idx);
                 }
                 finally
@@ -378,7 +377,6 @@ namespace xivModdingFramework.Mods
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
-            __Index = new SqPack.FileTypes.Index(XivCache.GameInfo.GameDirectory);
 
             _ReadOnly = !writeEnabled;
             State = ETransactionState.Preparing;

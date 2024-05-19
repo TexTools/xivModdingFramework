@@ -64,7 +64,6 @@ namespace xivModdingFramework.Textures.FileTypes
         public async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var df = IOUtil.GetDataFileFromPath(vfxPath);
-            var index = new Index(_gameDirectory);
             var avfx = new Avfx(_gameDirectory, df);
             if(tx == null)
             {

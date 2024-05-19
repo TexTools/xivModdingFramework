@@ -389,7 +389,6 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var index = new Index(XivCache.GameInfo.GameDirectory);
             var dataFile = IOUtil.GetDataFileFromPath(skelBPath);
 
             var offset = await tx.Get8xDataOffset(skelBPath);

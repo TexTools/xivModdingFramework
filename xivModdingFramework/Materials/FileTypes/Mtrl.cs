@@ -836,11 +836,10 @@ namespace xivModdingFramework.Materials.FileTypes
                 if (validateTextures)
                 {
                     // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
-                    var _index = new Index(_gameDirectory);
                     var _tex = new Tex(_gameDirectory);
 
                     var dataFile = IOUtil.GetDataFileFromPath(xivMtrl.MTRLPath);
-                    IndexFile index = tx == null ? await _index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
+                    IndexFile index = tx == null ? await Index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
 
                     foreach (var tex in xivMtrl.Textures)
                     {
@@ -1715,8 +1714,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var OffsetToIndex2Dictionary = new Dictionary<uint, uint>();
             var gameDirectory = XivCache.GameInfo.GameDirectory;
 
-            var _index = new Index(gameDirectory);
-            var index = await _index.GetIndexFile(dataFile, false, true);
+            var index = await Index.GetIndexFile(dataFile, false, true);
 
 
             // Populate dictionaries.

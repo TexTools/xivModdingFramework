@@ -50,14 +50,12 @@ namespace xivModdingFramework.Items.Categories
     {
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivLanguage _xivLanguage;
-        private readonly Index _index;
         private static object _gearLock = new object();
 
         public Gear(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
         {
             _gameDirectory = gameDirectory;
             _xivLanguage = xivLanguage;
-            _index = new Index(_gameDirectory);
         }
         public async Task<List<XivGear>> GetGearList(string substring = null)
         {

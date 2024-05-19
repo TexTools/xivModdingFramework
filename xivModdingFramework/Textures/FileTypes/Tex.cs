@@ -309,8 +309,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             var folderPath = $"ui/map/{path}";
 
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-            var files = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folderPath), XivDataFile._06_Ui, tx);
+            var files = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folderPath), XivDataFile._06_Ui, tx);
 
             foreach (var mapType in MapTypeDictionary)
             {

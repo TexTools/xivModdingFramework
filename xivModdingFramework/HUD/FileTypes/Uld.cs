@@ -50,10 +50,9 @@ namespace xivModdingFramework.HUD.FileTypes
         {
             var uldLock = new object();
             var hashedFolder = HashGenerator.GetHash("ui/uld");
-            var index = new Index(_gameDirectory);
 
             var uldStringList = new HashSet<string>();
-            var uldOffsetList = await index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui, tx);
+            var uldOffsetList = await Index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui, tx);
 
             await Task.Run(() => Parallel.ForEach(uldOffsetList, async (offset) =>
             {

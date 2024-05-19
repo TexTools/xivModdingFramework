@@ -519,20 +519,14 @@ namespace xivModdingFramework.Cache
 
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
             var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _atex = new ATex(XivCache.GameInfo.GameDirectory);
 
             var files = new HashSet<string>();
 
-            IndexFile index;
             if (tx == null)
             {
-                index = await _index.GetIndexFile(df);
-            }
-            else
-            {
-                index = await tx.GetIndexFile(df);
+                tx = ModTransaction.BeginTransaction();
             }
 
             ItemMetadata originalMetadata = await ItemMetadata.GetMetadata(this, false, tx);
@@ -551,7 +545,7 @@ namespace xivModdingFramework.Cache
                     if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
 
                     var path = avfxStuff.Folder + "/" + avfxStuff.File;
-                    if (index.FileExists(path))
+                    if (await tx.FileExists(path))
                     {
                         originalVfxPaths.Add(path);
                         var ttpaths = await _atex.GetAtexPaths(path);
@@ -2095,10 +2089,9 @@ namespace xivModdingFramework.Cache
                 ResetRootCache();
                 // Stop the worker, in case it was reading from the file for some reason.
 
-                var index = new Index(XivCache.GameInfo.GameDirectory);
 
-                var hashes = await index.GetAllHashes(XivDataFile._04_Chara);
-                var bgcHashes = await index.GetAllHashes(XivDataFile._01_Bgcommon);
+                var hashes = await Index.GetAllHashes(XivDataFile._04_Chara);
+                var bgcHashes = await Index.GetAllHashes(XivDataFile._01_Bgcommon);
 
 
                 var types = new Dictionary<XivItemType, List<XivItemType>>();

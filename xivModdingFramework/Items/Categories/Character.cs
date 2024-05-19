@@ -35,14 +35,12 @@ namespace xivModdingFramework.Items.Categories
 
         private readonly DirectoryInfo _gameDirectory;
         private readonly XivLanguage _language;
-        private readonly Index _index;
 
         public Character(DirectoryInfo gameDirectory, XivLanguage lang)
         {
             _gameDirectory = gameDirectory;
             _language = lang;
 
-            _index = new Index(_gameDirectory);
         }
 
         public async Task<List<XivCharacter>> GetCharacterList(string substring = null)
@@ -228,7 +226,7 @@ namespace xivModdingFramework.Items.Categories
                     testDictionary.Add(HashGenerator.GetHash(mtrl), i);
                 }
 
-                var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
                 numList.Sort();
 
                 if (numList.Count > 0)
@@ -277,7 +275,7 @@ namespace xivModdingFramework.Items.Categories
                 testDictionary.Add(HashGenerator.GetHash(mtrl), i);
             }
 
-            var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara, tx);
+            var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara, tx);
             numList.Sort();
             return numList.ToArray();
         }
@@ -332,7 +330,7 @@ namespace xivModdingFramework.Items.Categories
                     testDictionary.Add(HashGenerator.GetHash(mtrl), i);
                 }
 
-                var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
 
                 if (numList.Count > 0)
                 {
@@ -384,7 +382,7 @@ namespace xivModdingFramework.Items.Categories
                 file = XivStrings.EarsMtrlFile;
             }
 
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
+            var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
 
             foreach (var type in typeDict)
             {
@@ -459,7 +457,7 @@ namespace xivModdingFramework.Items.Categories
                 file = XivStrings.EarsMDLFile;
             }
 
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
+            var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
 
             var typeList = new List<string>();
             foreach (var type in typeDict)
@@ -489,7 +487,7 @@ namespace xivModdingFramework.Items.Categories
             List<string> ret = new List<string>();
             if (type == XivDecalType.FacePaint)
             {
-                var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
+                var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
                     XivDataFile._04_Chara, tx);
 
                 for (int i = 0; i < decalMax; i++)
@@ -505,7 +503,7 @@ namespace xivModdingFramework.Items.Categories
             }
             else if(type == XivDecalType.Equipment)
             {
-                var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
+                var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
                     XivDataFile._04_Chara, tx);
 
 

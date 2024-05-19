@@ -286,7 +286,6 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<TTModel> GetTTModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
         {
-            var index = new Index(_gameDirectory);
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
@@ -2104,7 +2103,6 @@ namespace xivModdingFramework.Models.FileTypes
             // Language doesn't actually matter here.
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(gameDirectory);
-            var _index = new Index(gameDirectory);
             var materialIdx = 0;
 
 
@@ -5167,7 +5165,6 @@ namespace xivModdingFramework.Models.FileTypes
             try
             {
 
-                var _index = new Index(_gameDirectory);
                 var isAccessory = EquipmentDeformationParameterSet.SlotsAsList(true).Contains(slot);
 
                 if (!isAccessory)
@@ -5248,7 +5245,6 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, ModTransaction tx = null)
         {
-            var _index = new Index(_gameDirectory);
 
             var fromRoot = await XivCache.GetFirstRoot(originalPath);
             var toRoot = await XivCache.GetFirstRoot(newPath);
@@ -5435,7 +5431,6 @@ namespace xivModdingFramework.Models.FileTypes
 
         public async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, string sourceApplication, bool copyTextures = false, ModTransaction tx = null)
         {
-            var _index = new Index(_gameDirectory);
 
             var mainRoot = await XivCache.GetFirstRoot(primaryModel);
             var mergeInRoot = await XivCache.GetFirstRoot(mergeIn);

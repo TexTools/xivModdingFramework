@@ -39,17 +39,11 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// Class for manipulating Index files.
     /// Primarily this holds a number of weird one-off Index parsing functions for use in data scraping.
     /// </summary>
-    internal class Index
+    internal static class Index
     {
         internal const string IndexExtension = ".win32.index";
         internal const string Index2Extension = ".win32.index2";
-        private readonly DirectoryInfo _gameDirectory;
         internal static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
-
-        internal Index(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
 
         /// <summary>
         /// Checks whether the index file contains any of the folders passed in
@@ -64,7 +58,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashNumDictionary">A Dictionary containing the folder hash and item number</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns></returns>
-        internal async Task<List<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile, ModTransaction tx = null)
+        internal static async Task<List<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile, ModTransaction tx = null)
         {
             if(tx == null)
             {
@@ -90,7 +84,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFolder">The hashed value of the folder path</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>A list of all of the offsets in the given folder</returns>
-        internal async Task<List<long>> GetAllFileOffsetsInFolder(int hashedFolder, XivDataFile dataFile, ModTransaction tx)
+        internal static async Task<List<long>> GetAllFileOffsetsInFolder(int hashedFolder, XivDataFile dataFile, ModTransaction tx)
         {
             var index = await tx.GetIndexFile(dataFile);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
@@ -105,7 +99,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashedFolder">The hashed value of the folder path</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns>A list containing the hashed values of the files in the given folder</returns>
-        internal async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile, ModTransaction tx)
+        internal static async Task<List<int>> GetAllHashedFilesInFolder(int hashedFolder, XivDataFile dataFile, ModTransaction tx)
         {
             var index = await tx.GetIndexFile(dataFile);
             var entries = index.GetEntriesInFolder((uint)hashedFolder);
@@ -117,7 +111,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Gets the entire universe of hash pairs (folder, file) for a datafile.
         /// </summary>
-        internal async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile)
+        internal static async Task<Dictionary<uint, HashSet<uint>>> GetAllHashes(XivDataFile dataFile)
         {
             var index = await GetIndexFile(dataFile, false, true);
             return index.GetAllHashes();
@@ -127,7 +121,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         private static Dictionary<XivDataFile, long> _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
         private static Dictionary<XivDataFile, IndexFile> _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
 
-        internal void ClearIndexCache()
+        internal static void ClearIndexCache()
         {
             _ReadOnlyIndexLastModifiedTime = new Dictionary<XivDataFile, long>();
             _CachedReadOnlyIndexFiles = new Dictionary<XivDataFile, IndexFile>();
@@ -138,7 +132,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        internal async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
+        internal static async Task<IndexFile> GetIndexFile(XivDataFile dataFile, bool alreadySemaphoreLocked = false, bool readOnly = false)
         {
             var index1Path = XivDataFiles.GetFullPath(dataFile, IndexExtension);
             var index2Path = XivDataFiles.GetFullPath(dataFile, Index2Extension);
@@ -205,13 +199,13 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>True if locked</returns>
-        public bool IsIndexLocked(XivDataFile dataFile)
+        public static bool IsIndexLocked(XivDataFile dataFile)
         {
             var fileName = dataFile.GetFilePath();
             var isLocked = false;
 
-            var indexPath = Path.Combine(_gameDirectory.FullName, $"{fileName}{IndexExtension}");
-            var index2Path = Path.Combine(_gameDirectory.FullName, $"{fileName}{Index2Extension}");
+            var indexPath = Path.Combine(XivCache.GameInfo.GameDirectory.FullName, $"{fileName}{IndexExtension}");
+            var index2Path = Path.Combine(XivCache.GameInfo.GameDirectory.FullName, $"{fileName}{Index2Extension}");
 
             FileStream stream = null;
             FileStream stream1 = null;

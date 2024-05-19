@@ -83,7 +83,6 @@ namespace xivModdingFramework.Mods
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
                 var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
-                var _index = new Index(XivCache.GameInfo.GameDirectory);
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
 
