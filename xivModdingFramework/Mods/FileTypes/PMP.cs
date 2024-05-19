@@ -24,6 +24,8 @@ using xivModdingFramework.Variants.DataContainers;
 using Ionic.Zip;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.FileTypes;
+using SharpDX.Direct2D1;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -116,17 +118,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// </summary>
         /// <param name="path">System path to .PMP, .JSON, or Folder</param>
         /// <returns></returns>
-        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(string path, ModTransaction tx = null, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress1 = null,
-
-            // This cursed arg is a function that takes the file list and our TX
-            // And returns a dictionary of root conversion information.
-            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> GetRootConversionsFunction = null)
+        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(string path, ModPackImportSettings settings = null, ModTransaction tx = null)
         {
             path = await ResolvePMPBasePath(path);
             var pmpData = await LoadPMP(path);
             try
             {
-                return await ImportPMP(pmpData.pmp, pmpData.path, tx, sourceApplication);
+                return await ImportPMP(pmpData.pmp, pmpData.path, settings, tx);
             }
             finally
             {
@@ -141,16 +139,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// Will automatically clean up unzippedPath after if it is in the user's TEMP directory.
         /// </summary>
         /// <returns></returns>
-        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(PMPJson pmp, string unzippedPath, ModTransaction tx = null, string sourceApplication = "Unknown", IProgress<(int, int, string)> progress = null,
-
-            // This cursed arg is a function that takes the file list and our TX
-            // And returns a dictionary of root conversion information.
-            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> GetRootConversionsFunction = null)
+        public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportPMP(PMPJson pmp, string unzippedPath, ModPackImportSettings settings = null, ModTransaction tx = null)
         {
+
             if (_ImportActive)
             {
                 throw new Exception("Cannot import multiple Modpacks simultaneously.");
             }
+
+            if (settings == null)
+            {
+                settings = new ModPackImportSettings();
+            }    
 
             var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             var needsCleanup = false;
@@ -164,6 +164,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 prevPack = tx.ModPack;
             }
+
+            var progress = settings.ProgressReporter;
+            var GetRootConversionsFunction = settings.RootConversionFunction;
+            _Source = settings.SourceApplication;
 
             try
             {
@@ -189,7 +193,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 _ImportActive = true;
                 _MetaFiles = new HashSet<string>();
                 _RgspRaceGenders = new HashSet<uint>();
-                _Source = String.IsNullOrWhiteSpace(sourceApplication) ? "Unknown" : sourceApplication;
 
                 var modPack = new ModPack(null);
                 modPack.Name = pmp.Meta.Name;
@@ -263,7 +266,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (GetRootConversionsFunction != null)
                 {
                     var files = new HashSet<string>(imported.Keys);
-                    rootDuration = await TTMP.HandleRootConversion(files, imported, tx, modPack, sourceApplication, GetRootConversionsFunction, progress);
+                    rootDuration = await TTMP.HandleRootConversion(files, imported, tx, settings, modPack);
                     if (rootDuration < 0)
                     {
                         // User cancelled the process.
@@ -288,7 +291,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (pmp.Meta.FileVersion <= 3)
                 {
                     progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
-                    await TTMP.FixPreDawntrailImports(imported.Keys, sourceApplication, progress, tx);
+                    await TTMP.FixPreDawntrailImports(imported.Keys, _Source, progress, tx);
                 }
 
                 if (ownTx)
@@ -542,6 +545,287 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     continue;
                 original.Add(entry.Key, entry.Value);
             }
+        }
+
+        /// <summary>
+        /// Makes all slashes into backslashes for consistency.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        private static string ReplaceSlashes(string path)
+        {
+            return path.Replace("/", "\\");
+        }
+
+        /// <summary>
+        /// Unpacks a PMP into a single dictionary of [File Path] => [File Storage Info]
+        /// Only works if the PMP has no options/a single option.
+        /// </summary>
+        /// <param name="modpackPath"></param>
+        /// <returns></returns>
+        internal static async Task<Dictionary<string, FileStorageInformation>> UnpackPMP(string modpackPath, bool includeData = true, ModTransaction tx = null)
+        {
+            try
+            {
+                var pmpAndPath = await LoadPMP(modpackPath, true);
+                var pmp = pmpAndPath.pmp;
+
+                var defMod = pmp.DefaultMod;
+                PMPOptionJson option = null;
+                if (defMod != null && (defMod.FileSwaps.Count > 0 || defMod.Manipulations.Count > 0 || defMod.Files.Count > 0))
+                {
+                    // Valid Default Mod Option
+                    option = defMod;
+                }
+                else
+                {
+                    if (pmp.Groups.Count == 1)
+                    {
+                        var group = pmp.Groups[0];
+                        if (group.Options.Count == 1)
+                        {
+                            option = group.Options[0];
+                        }
+                    }
+                }
+
+                if (option == null)
+                {
+                    // Too may options or no options.
+                    return null;
+                }
+
+
+                return await UnpackPmpOption(option, modpackPath, includeData, tx);
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Unzips and Unpacks a given PMP option into a dictionary of [Internal File Path] => [File Storage Information]
+        /// </summary>
+        /// <param name="option"></param>
+        /// <param name="pmpPath"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public static async Task<Dictionary<string, FileStorageInformation>> UnpackPmpOption(PMPOptionJson option, string pmpPath, bool includeData = true, ModTransaction tx = null)
+        {
+            // Task wrapper since we might be doing some heavy lifting.
+            return await Task.Run(async () =>
+            {
+                // Resolve the base path we're working, and unzip if needed...
+                HashSet<string> files = new HashSet<string>();
+                foreach(var kv in option.Files)
+                {
+                    files.Add(ReplaceSlashes(kv.Value));
+                }
+                var basePath = pmpPath;
+
+                if (pmpPath.EndsWith(".json"))
+                {
+                    // PMP Folder by Json reference at root level.
+                    basePath = Path.GetDirectoryName(pmpPath);
+                }
+                else if (pmpPath.EndsWith(".pmp"))
+                {
+                    // Compressed PMP file.  Decompress it first.
+                    if (tx != null)
+                    {
+                        // Unzip to TX store if we have one.
+                        basePath = tx.UNSAFE_GetTransactionStore();
+                    }
+                    else
+                    {
+                        basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    }
+
+                    if (includeData)
+                    {
+                        // Run Zip extract on a new thread.
+                        await Task.Run(async () =>
+                        {
+                            // Just JSON files.
+                            using (var zip = new Ionic.Zip.ZipFile(pmpPath))
+                            {
+                                var toUnzip = zip.Entries.Where(x => files.Contains(ReplaceSlashes(x.FileName)));
+                                foreach (var e in toUnzip)
+                                {
+                                    e.Extract(basePath);
+                                }
+                            }
+                        });
+                    }
+                } else
+                {
+                    // Already unzipped folder path.
+                    basePath = pmpPath;
+                }
+
+                var ret = new Dictionary<string, FileStorageInformation>();
+
+                if (tx == null)
+                {
+                    // Grab a readonly TX here to read base game files when needed.
+                    tx = ModTransaction.BeginTransaction();
+                }
+
+
+                // File Swaps from base game files.
+                foreach (var kv in option.FileSwaps)
+                {
+                    var src = kv.Key;
+
+                    // For some reason the destination value is backslashed instead of forward-slashed.
+                    var dest = kv.Value.Replace("\\", "/");
+
+                    if (!CanImport(src) || !CanImport(dest))
+                    {
+                        continue;
+                    }
+
+                    if (!includeData)
+                    {
+                        ret.Add(src, new FileStorageInformation());
+                        continue;
+                    }
+
+
+                    // This is dangerous to hand potentially unknown code a direct file pointer to raw game files.
+                    // So we'll copy it to a temp file instead.
+
+                    // Get original SqPacked file.
+                    var data = await tx.ReadFile(src, true, true);
+                    var tempFilePath = Path.GetTempFileName();
+                    File.WriteAllBytes(tempFilePath, data);
+
+                    var fileInfo = new FileStorageInformation()
+                    {
+                        FileSize = data.Length,
+                        StorageType = EFileStorageType.CompressedIndividual,
+                        RealPath = tempFilePath,
+                        RealOffset = 0,
+                    };
+
+                    ret.Add(src, fileInfo);
+                }
+
+                // Custom Files from the .pmp Zip Archive.
+                foreach (var file in option.Files)
+                {
+                    var internalPath = file.Key;
+                    var externalPath = Path.Combine(basePath, file.Value);
+                    // Safety checks.
+                    if (!CanImport(file.Key))
+                    {
+                        continue;
+                    }
+
+                    if (!includeData)
+                    {
+                        ret.Add(internalPath, new FileStorageInformation());
+                        continue;
+                    }
+
+                    if (!File.Exists(externalPath))
+                    {
+                        continue;
+                    }
+
+
+                    var fSize = new FileInfo(externalPath).Length;
+
+                    var fileInfo = new FileStorageInformation()
+                    {
+                        FileSize = (int) fSize,
+                        StorageType = EFileStorageType.UncompressedIndividual,
+                        RealPath = externalPath,
+                        RealOffset = 0,
+                    };
+
+                    ret.Add(internalPath, fileInfo);
+                }
+
+                // Metadata files.
+                if (option.Manipulations != null && option.Manipulations.Count > 0)
+                {
+                    // RSP Options resolve by race/gender pairing.
+                    var rspOptions = option.Manipulations.Select(x => x.Manipulation as PMPRspManipulationJson).Where(x => x != null);
+                    var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
+
+                    var total = byRg.Count();
+                    foreach (var group in byRg)
+                    {
+                        var rg = group.First().GetRaceGender();
+
+                        var path = CMP.GetRgspPath(rg.Race, rg.Gender);
+                        if (!includeData)
+                        {
+                            ret.Add(path, new FileStorageInformation());
+                            continue;
+                        }
+
+                        var cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, true, tx);
+
+                        var data = cmp.GetBytes();
+
+                        var tempFilePath = Path.GetTempFileName();
+                        File.WriteAllBytes(tempFilePath, data);
+
+                        var fileInfo = new FileStorageInformation()
+                        {
+                            FileSize = data.Length,
+                            StorageType = EFileStorageType.UncompressedIndividual,
+                            RealPath = tempFilePath,
+                            RealOffset = 0,
+                        };
+
+                        ret.Add(path, fileInfo);
+                    }
+
+                    // Metadata.
+                    var metaOptions = option.Manipulations.Select(x => x.Manipulation as IPMPItemMetadata).Where(x => x != null);
+                    var byRoot = metaOptions.GroupBy(x => x.GetRoot());
+                    total = byRoot.Count();
+
+                    // Create the metadata files and save them to disk.
+                    foreach (var group in byRoot)
+                    {
+                        var root = group.Key;
+                        var metaPath = root.Info.GetRootFile();
+                        if (!includeData)
+                        {
+                            ret.Add(metaPath, new FileStorageInformation());
+                            continue;
+                        }
+
+                        var metaData = await ItemMetadata.GetMetadata(metaPath, true, tx);
+
+                        foreach (var meta in group)
+                        {
+                            meta.ApplyToMetadata(metaData);
+                        }
+
+                        var data = await ItemMetadata.Serialize(metaData);
+                        var tempFilePath = Path.GetTempFileName();
+                        File.WriteAllBytes(tempFilePath, data);
+
+                        var fileInfo = new FileStorageInformation()
+                        {
+                            FileSize = data.Length,
+                            StorageType = EFileStorageType.UncompressedIndividual,
+                            RealPath = tempFilePath,
+                            RealOffset = 0,
+                        };
+
+                        ret.Add(metaPath, fileInfo);
+                    }
+                }
+
+                return ret;
+            });
         }
 
     }

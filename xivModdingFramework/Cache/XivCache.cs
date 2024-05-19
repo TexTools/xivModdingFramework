@@ -1602,6 +1602,17 @@ namespace xivModdingFramework.Cache
             return null;
         }
 
+        /// <summary>
+        /// Attempts to resolve the item's root purely by file path.
+        /// Not always accurate, but fast/synchronous.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static XivDependencyRoot GetFilePathRoot(string path)
+        {
+            return XivDependencyGraph.CreateDependencyRoot(XivDependencyGraph.ExtractRootInfo(path));
+        }
+
         public static async Task<List<XivDependencyRoot>> GetRoots(string internalPath)
         {
             return await XivDependencyGraph.GetDependencyRoots(internalPath);

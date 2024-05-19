@@ -291,49 +291,77 @@ namespace xivModdingFramework.Mods
             return true;
         }
 
+        private bool _LoadingIndexFiles;
         public async Task<IndexFile> GetIndexFile(XivDataFile dataFile)
         {
+            while (_LoadingIndexFiles)
+            {
+                Thread.Sleep(1);
+            }
+            
             if(!_IndexFiles.ContainsKey(dataFile))
             {
-                if (!_ReadOnly)
+                _LoadingIndexFiles = true;
+                try
                 {
-                    var index1Path = XivDataFiles.GetFullPath(dataFile, Index.IndexExtension);
-                    var index2Path = XivDataFiles.GetFullPath(dataFile, Index.Index2Extension);
-
-                    _Index1ModifiedTimes.Add(dataFile, File.GetLastWriteTimeUtc(index1Path));
-                    _Index2ModifiedTimes.Add(dataFile, File.GetLastWriteTimeUtc(index2Path));
-
-                    // Store the file sizes of the DAT files on encounter.
-                    // This allows us to truncate transaction data from the end on Transaction Cancel,
-                    // as transaction data is always written to the end of the DAT files.
-                    _DatFileSizes.Add(dataFile, new List<long>());
-                    for (int i = 0; i < Dat._MAX_DATS; i++)
+                    if (!_ReadOnly)
                     {
-                        var datPath = Dat.GetDatPath(dataFile, i);
-                        if (!File.Exists(datPath))
+                        var index1Path = XivDataFiles.GetFullPath(dataFile, Index.IndexExtension);
+                        var index2Path = XivDataFiles.GetFullPath(dataFile, Index.Index2Extension);
+
+                        _Index1ModifiedTimes.Add(dataFile, File.GetLastWriteTimeUtc(index1Path));
+                        _Index2ModifiedTimes.Add(dataFile, File.GetLastWriteTimeUtc(index2Path));
+
+                        // Store the file sizes of the DAT files on encounter.
+                        // This allows us to truncate transaction data from the end on Transaction Cancel,
+                        // as transaction data is always written to the end of the DAT files.
+                        _DatFileSizes.Add(dataFile, new List<long>());
+                        for (int i = 0; i < Dat._MAX_DATS; i++)
                         {
-                            break;
+                            var datPath = Dat.GetDatPath(dataFile, i);
+                            if (!File.Exists(datPath))
+                            {
+                                break;
+                            }
+
+                            var size = new FileInfo(datPath).Length;
+                            _DatFileSizes[dataFile].Add(size);
                         }
-
-                        var size = new FileInfo(datPath).Length;
-                        _DatFileSizes[dataFile].Add(size);
                     }
-                }
 
-                var idx = await __Index.GetIndexFile(dataFile, false, ReadOnly);
-                _IndexFiles.Add(dataFile, idx);
+                    var idx = await __Index.GetIndexFile(dataFile, false, ReadOnly);
+                    _IndexFiles.Add(dataFile, idx);
+                }
+                finally
+                {
+                    _LoadingIndexFiles = false;
+                }
 
             }
             return _IndexFiles[dataFile];
-        } 
+        }
 
+        private bool _LoadingModlist;
         public async Task<ModList> GetModList()
         {
+            while (_LoadingModlist)
+            {
+                Thread.Sleep(1);
+            }
+
             if(_ModList == null)
             {
                 // TODO: Should store modified times here to validate like we do for Index Files.
-                _ModListModifiedTime = File.GetLastWriteTimeUtc(Modding.ModListDirectory);
-                _ModList = await Modding.GetModList(!ReadOnly);
+                _LoadingModlist = true;
+                try
+                {
+                    _ModListModifiedTime = File.GetLastWriteTimeUtc(Modding.ModListDirectory);
+                    _ModList = await Modding.GetModList(!ReadOnly);
+                }
+                finally
+                {
+                    _LoadingModlist = false;
+                }
             }
             return _ModList;
         }

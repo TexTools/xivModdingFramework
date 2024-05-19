@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using Ionic.Zip;
 using Newtonsoft.Json;
 using SharpDX;
@@ -46,6 +47,35 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Mods.FileTypes
 {
+    public class ModPackImportSettings
+    {
+        /// <summary>
+        /// The source application that should be considered as the owner of the mod files.
+        /// </summary>
+        public string SourceApplication = "Unknown";
+
+        /// <summary>
+        /// Should skin auto-assignment be processed for these files?
+        /// </summary>
+        public bool AutoAssignSkinMaterials = true;
+
+        /// <summary>
+        /// Should the Materials/Models be processed for Dawntrail updates?
+        /// </summary>
+        public bool UpdateDawntrailMaterials = true;
+
+        /// <summary>
+        /// Function that should be called to determine root conversions based on the incoming file paths.
+        /// Will be called during import once the final file list has been resolved.
+        /// </summary>
+        public Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> RootConversionFunction;
+
+        /// <summary>
+        /// Progress reporter, if desired.  May not always get reported to depending on the function in question.
+        /// </summary>
+        public IProgress<(int current, int total, string message)> ProgressReporter = null;
+    }
+
     public class TTMP
     {
         public enum EModpackType
@@ -542,11 +572,16 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="AutoAssignBodyMaterials">Whether models should be scanned for auto material assignment or not.</param>
         /// <returns>The number of total mods imported</returns>
         public static async Task<(List<string> Imported, List<string> NotImported, float Duration)> ImportModPackAsync(
-            string modpackPath, List<ModsJson> modsJson, string sourceApplication, IProgress<(int current, int total, string message)> progress = null, 
-            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>>  GetRootConversionsFunction = null,
-            bool AutoAssignBodyMaterials = false, bool fixPreDawntrailMods = true, ModTransaction tx = null)
+            string modpackPath, List<ModsJson> modsJson, ModPackImportSettings settings = null, ModTransaction tx = null)
         {
             if (modsJson == null || modsJson.Count == 0) return (null, null, 0);
+            if(settings == null)
+            {
+                settings = new ModPackImportSettings();
+            }
+
+            var progress = settings.ProgressReporter;
+            var GetRootConversionsFunction = settings.RootConversionFunction;
 
             var ownTx = false;
             if (tx == null) {
@@ -653,6 +688,16 @@ namespace xivModdingFramework.Mods.FileTypes
                             FileSize = modJson.ModSize
                         };
 
+                        if (needsTexFix && modJson.FullPath.EndsWith(".tex"))
+                        {
+                            // Have to fix old busted textures.
+                            var size = Dat.UpdateCompressedSize(storeInfo);
+                            if(size >= 0)
+                            {
+                                storeInfo.FileSize = size;
+                            }
+                        }
+
 
                         // And get an in-system data offset for them...
                         var offset = tx.UNSAFE_AddFileInfo(storeInfo, IOUtil.GetDataFileFromPath(modJson.FullPath));
@@ -679,6 +724,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         mod.ModOffset8x = offset;
                         mod.OriginalOffset8x = oldOffset;
                         mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
+                        mod.SourceApplication = settings.SourceApplication;
 
                         modList.AddOrUpdateMod(mod);
 
@@ -717,7 +763,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         // Modpack to list conversions under.
                         var modPack = filteredModsJson[0].ModPackEntry;
-                        rootDuration = await HandleRootConversion(filePaths, originalStates, tx, modPack, sourceApplication, GetRootConversionsFunction, progress);
+                        rootDuration = await HandleRootConversion(filePaths, originalStates, tx, settings, modPack);
 
                         // User cancelled the import.
                         if(rootDuration < 0)
@@ -730,7 +776,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     p2Start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
                     // Auto assign body materials
-                    if (AutoAssignBodyMaterials)
+                    if (settings.AutoAssignSkinMaterials)
                     {
                         progress.Report((0, 0, "Scanning for body material corrections..."));
 
@@ -757,12 +803,12 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     // Fix Pre-Dawntrail files.
-                    if (fixPreDawntrailMods)
+                    if (settings.UpdateDawntrailMaterials)
                     {
                         if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
                         {
                             var modPack = filteredModsJson[0].ModPackEntry;
-                            await FixPreDawntrailImports(filePaths, sourceApplication, progress, tx);
+                            await FixPreDawntrailImports(filePaths, settings.SourceApplication, progress, tx);
                         }
                     }
 
@@ -899,19 +945,16 @@ namespace xivModdingFramework.Mods.FileTypes
             HashSet<string> filePaths,
             Dictionary<string, TxFileState> originalStates,
             ModTransaction tx,
-            ModPack? modPack = null,
-            string sourceApplication = "Unknown",
-            // This cursed arg is a function that takes the file list and our TX
-            // And returns a dictionary of root conversion information.
-            Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> GetRootConversionsFunction = null,
-            IProgress < (int current, int total, string message)> progress = null)
+            ModPackImportSettings settings,
+            ModPack? modPack = null)
         {
 
-            if (GetRootConversionsFunction == null)
+            if (settings.RootConversionFunction == null)
             {
                 return 0;
             }
 
+            var progress = settings.ProgressReporter;
             if(progress == null)
             {
                 progress = IOUtil.NoOpImportProgress;
@@ -923,7 +966,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 progress.Report((0, 0, "Waiting on Destination Item Selection..."));
 
-                rootConversions = await GetRootConversionsFunction(filePaths, tx);
+                rootConversions = await settings.RootConversionFunction(filePaths, tx);
             }
             catch (OperationCanceledException ex)
             {
@@ -937,11 +980,379 @@ namespace xivModdingFramework.Mods.FileTypes
                 progress.Report((0, 0, "Updating Destination Items..."));
 
                 tx.ModPack = modPack;
-                await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, sourceApplication, progress);
+                await RootCloner.CloneAndResetRoots(rootConversions, filePaths, tx, originalStates, settings.SourceApplication, progress);
                 tx.ModPack = null;
             }
             var endTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             return endTime - startTime;
+        }
+
+
+        public static async Task<(ModPack ModPack, string Description)> GetModpackInfo(string modpackFile)
+        {
+            if (!File.Exists(modpackFile))
+            {
+                throw new FileNotFoundException("Modpack does not exist: " + modpackFile);
+            }
+
+            var modpack = new ModPack();
+            var description = "";
+            if (modpackFile.EndsWith(".ttmp2")) {
+                var mpl = await GetModpackList(modpackFile);
+                modpack.Author = mpl.Author;
+                modpack.Name = mpl.Name;
+                modpack.Url = mpl.Url;
+                modpack.Version = mpl.Version;
+                description = mpl.Description;
+
+            } else if(modpackFile.EndsWith(".pmp") || modpackFile.EndsWith(".json") || modpackFile.EndsWith("/"))
+            {
+                var pmpAndPath = await PMP.PMP.LoadPMP(modpackFile, true);
+                var pmp = pmpAndPath.pmp;
+
+                modpack.Name = pmp.Meta.Name;
+                modpack.Author = pmp.Meta.Author;
+                modpack.Url = pmp.Meta.Website;
+                modpack.Version = pmp.Meta.Version;
+                description = pmp.Meta.Description;
+            }
+            return (modpack, description);
+        }
+
+        /// <summary>
+        /// Attempts to perform the most basic merge of modpack data.
+        /// Takes a collection of file storage informations, and applies them to the associated internal file paths.
+        /// </summary>
+        /// <param name="modpackPath"></param>
+        /// <returns></returns>
+        public static async Task ImportFiles(Dictionary<string, FileStorageInformation> files, ModPack? modpack = null, ModPackImportSettings settings = null, ModTransaction tx = null)
+        {
+            var ownTx = false;
+            ModPack? lastModpack = null;
+            if(settings == null)
+            {
+                settings = new ModPackImportSettings();
+            }
+
+            if(tx == null)
+            {
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction(true);
+            }
+            else
+            {
+                lastModpack = tx.ModPack;
+            }
+
+            try
+            {
+                tx.ModPack = modpack;
+
+                var mpName = modpack == null ? "" : modpack.Value.Name;
+                var ml = await tx.GetModList();
+                if (modpack != null)
+                {
+                    ml.AddOrUpdateModpack(modpack.Value);
+                }
+
+                var originalStates = new Dictionary<string, TxFileState>();
+
+                var i = 0;
+                foreach(var kv in files)
+                {
+
+                    settings.ProgressReporter?.Report((i, files.Count, "Writing Mod Files..."));
+                    var internalPath = kv.Key;
+                    var fileInfo = kv.Value;
+
+                    originalStates.Add(internalPath, await tx.SaveFileState(internalPath));
+
+                    var df = IOUtil.GetDataFileFromPath(internalPath);
+
+                    // Inject file info to data store.
+                    var offset = tx.UNSAFE_AddFileInfo(fileInfo, df);
+
+                    // Inject Index offset pointer
+                    var ogOffset = await tx.Set8xDataOffset(internalPath, offset);
+
+                    // Get compressed file size.
+                    var compSize = fileInfo.FileSize;
+                    if (fileInfo.StorageType == EFileStorageType.UncompressedIndividual || fileInfo.StorageType == EFileStorageType.UncompressedBlob) {
+                        compSize = await tx.GetCompressedFileSize(df, offset);
+                    }
+
+                    // Resolve name and category for modlist.
+                    var root = await XivCache.GetFirstRoot(internalPath);
+                    var itemName = "Unknown";
+                    var itemCategory = "Unknown";
+                    if (root != null)
+                    {
+                        var im = root.GetFirstItem();
+                        if(im != null)
+                        {
+                            itemName = im.Name;
+                            itemCategory = im.PrimaryCategory;
+                        }
+                    }
+
+                    // Create and inject mod entry.
+                    Mod mod = new Mod()
+                    {
+                        FilePath = internalPath,
+                        ItemName = itemName,
+                        ItemCategory = itemCategory,
+                        FileSize = compSize,
+                        ModPack = mpName,
+                        ModOffset8x = offset,
+                        SourceApplication = settings.SourceApplication,
+                        OriginalOffset8x = ogOffset,
+                    };
+                    await tx.AddOrUpdateMod(mod);
+
+                    // Expand metadata entries.
+                    if (internalPath.EndsWith(".meta"))
+                    {
+                        await ItemMetadata.ApplyMetadata(internalPath, false, tx);
+                    } else if (internalPath.EndsWith(".rgsp"))
+                    {
+                        await CMP.ApplyRgspFile(internalPath, false, tx);
+                    }
+                }
+
+                var paths = new HashSet<string>(files.Keys);
+                if (settings.AutoAssignSkinMaterials)
+                {
+                    // Find all relevant models..
+                    var modelFiles = paths.Where(x => x.EndsWith(".mdl"));
+                    var usableModels = modelFiles.Where(x => Mdl.IsAutoAssignableModel(x)).ToList();
+
+                    if (usableModels.Any())
+                    {
+                        var modelCount = usableModels.Count;
+                        settings.ProgressReporter?.Report((0, modelCount, "Scanning and updating body models..."));
+                        var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory);
+
+                        // Loop them to perform heuristic check.
+                        i = 0;
+                        foreach (var mdlEntry in usableModels)
+                        {
+                            i++;
+                            settings.ProgressReporter?.Report((i, modelCount, "Scanning and updating body models..."));
+                            var changed = await _mdl.CheckSkinAssignment(mdlEntry, tx);
+                        }
+                    }
+                }
+                if (settings.UpdateDawntrailMaterials)
+                {
+                    await HandleRootConversion(paths, originalStates, tx, settings, modpack);
+
+                }
+
+
+                if (ownTx)
+                {
+                    settings.ProgressReporter?.Report((0, 0, "Committing Transaction..."));
+                    await ModTransaction.CommitTransaction(tx);
+                }
+            }
+            catch
+            {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+            }
+            finally
+            {
+                if (!ownTx)
+                {
+                    tx.ModPack = lastModpack;
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Takes an external modpack file, and reads it to see if it can be compiled into a single simple file list.
+        /// If it can, it will unzip the modpack (if necessary), and convert it into a dictionary of
+        /// [Internal file path] => [File storage information]
+        /// 
+        /// Returns NULL if the modpack could not be read for any reason 
+        ///     or the modpack could not be converted into a simple file list. (Ex. Has multiple options)
+        ///     
+        /// If (includeData) is false, blank file storage information will be returned instead.
+        ///     (May include compressed file size per file for TTMPs)
+        ///     
+        /// NOTE: A TX is not actually needed for operation here, but if one is supplied the temp files will be unzipped
+        /// into the Transaction's temporary file store.  If one is not supplied, care should be taken to ensure that the files
+        /// are properly deleted after usage via looping the FileStorageInformation.RealPath values.
+        /// 
+        /// </summary>
+        /// <param name="modpackPath"></param>
+        /// <returns></returns>
+        public static async Task<Dictionary<string, FileStorageInformation>> ModPackToSimpleFileList(string modpackPath, bool includeData = true, ModTransaction tx = null)
+        {
+            if (!File.Exists(modpackPath))
+                return null;
+
+            if (modpackPath.EndsWith(".pmp") || modpackPath.EndsWith(".json") || modpackPath.EndsWith("/"))
+            {
+                return await PMP.PMP.UnpackPMP(modpackPath, includeData, tx);
+            }
+            if (!modpackPath.EndsWith(".ttmp2"))
+            {
+                throw new InvalidDataException("File must be .TTMP2 or .PMP");
+            }
+
+
+            // TTMP Path
+            var modpackMpl = await GetModpackList(modpackPath);
+
+            if(modpackMpl.SimpleModsList != null && modpackMpl.SimpleModsList.Count > 0 && !modpackMpl.Version.EndsWith("b"))
+            {
+                return await UnpackSimpleModlist(modpackPath, modpackMpl, includeData, tx);
+            } else if(modpackMpl.ModPackPages != null && modpackMpl.ModPackPages.Count > 0)
+            {
+                return await UnpackWizardModlist(modpackPath, modpackMpl, includeData, tx);
+            }
+            else
+            {
+                // Empty Modpack
+                return null;
+            }
+        }
+        private static async Task<Dictionary<string, FileStorageInformation>> UnpackSimpleModlist(string modpackPath, ModPackJson mpl, bool includeData = true, ModTransaction tx = null)
+        {
+            // Wrapped to task since we're going to be potentially unzipping a large file.
+            return await Task.Run(() =>
+            {
+
+                var _tempMPD = "";
+                var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
+                if (includeData)
+                {
+                    string tempFolder;
+                    if (tx != null)
+                    {
+                        // Unzip to TX store if we have one.
+                        tempFolder = tx.UNSAFE_GetTransactionStore();
+                    }
+                    else
+                    {
+                        tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    }
+
+                    // First, unzip the TTMP into our transaction data store folder.
+                    using (var zf = ZipFile.Read(modpackPath))
+                    {
+                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
+                        _tempMPD = Path.Combine(tempFolder, Guid.NewGuid().ToString());
+
+                        using (var fs = new FileStream(_tempMPD, FileMode.Create))
+                        {
+                            mpd.Extract(fs);
+                        }
+                    }
+                }
+
+                return MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, needsTexFix, includeData);
+            });
+        }
+        private static async Task<Dictionary<string, FileStorageInformation>> UnpackWizardModlist(string modpackPath, ModPackJson mpl, bool includeData = true, ModTransaction tx = null)
+        {
+            var ret = new Dictionary<string, FileStorageInformation>();
+            
+            if(mpl.ModPackPages.Count > 1)
+            {
+                return null;
+            }
+
+            if (mpl.ModPackPages[0].ModGroups.Count > 1)
+            {
+                return null;
+            }
+
+            if (mpl.ModPackPages[0].ModGroups[0].OptionList.Count > 1)
+            {
+                return null;
+            }
+
+            return await Task.Run(() =>
+            {
+
+                var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
+
+                var _tempMPD = "";
+                var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
+                if (includeData)
+                {
+                    string tempFolder;
+                    if (tx != null)
+                    {
+                        // Unzip to TX store if we have one.
+                        tempFolder = tx.UNSAFE_GetTransactionStore();
+                    }
+                    else
+                    {
+                        tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    }
+
+                    Directory.CreateDirectory(tempFolder);
+
+                    // First, unzip the TTMP into our transaction data store folder.
+                    using (var zf = ZipFile.Read(modpackPath))
+                    {
+                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
+                        _tempMPD = Path.Combine(tempFolder, Guid.NewGuid().ToString());
+
+                        using (var fs = new FileStream(_tempMPD, FileMode.Create))
+                        {
+                            mpd.Extract(fs);
+                        }
+                    }
+                }
+
+                return MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, needsTexFix);
+
+            });
+        }
+
+        private static Dictionary<string, FileStorageInformation> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, bool needsTexFix, bool includeData = true)
+        {
+            var ret = new Dictionary<string, FileStorageInformation>();
+            foreach (var file in mods)
+            {
+                if (!includeData)
+                {
+                    ret.Add(file.FullPath, new FileStorageInformation() { 
+                        FileSize = file.ModSize
+                    });
+                    continue;
+                }
+
+                var storeInfo = new FileStorageInformation()
+                {
+                    StorageType = EFileStorageType.CompressedBlob,
+                    RealPath = mpdPath,
+                    RealOffset = file.ModOffset,
+                    FileSize = file.ModSize
+                };
+
+
+                // Ancient bug issues....
+                if (needsTexFix && file.FullPath.EndsWith(".tex"))
+                {
+                    // Have to fix old busted textures.
+                    var size = Dat.UpdateCompressedSize(storeInfo);
+                    if (size >= 0)
+                    {
+                        storeInfo.FileSize = size;
+                    }
+                }
+
+                ret.Add(file.FullPath, storeInfo);
+            }
+            return ret;
         }
     }
 }

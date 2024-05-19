@@ -593,7 +593,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Create compressed type 2 data from uncompressed binary data.
+        /// Create compressed type 2 SqPack data from uncompressed binary data.
         /// </summary>
         /// <param name="dataToCreate">Bytes to Type 2data</param>
         /// <returns></returns>
@@ -1176,6 +1176,38 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var size = br.ReadUInt32();
                 return size;
             }
+        }
+
+        /// <summary>
+        /// Updates the compressed file size of the file at the given file storage information offset.
+        /// Returns -1 if the request is invalid, otherwise returns the real file size.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="bw"></param>
+        /// <param name="offset"></param>
+        /// <exception cref="Exception"></exception>
+        internal static int UpdateCompressedSize(FileStorageInformation info)
+        {
+            if(info.StorageType == EFileStorageType.UncompressedIndividual || info.StorageType == EFileStorageType.UncompressedBlob)
+            {
+                return -1;
+            }
+
+            int realSize = 0;
+            using (var br = new BinaryReader(File.OpenRead(info.RealPath)))
+            {
+                br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                realSize = Dat.GetCompressedFileSize(br, info.RealOffset);
+            }
+
+            using (var bw = new BinaryWriter(File.OpenWrite(info.RealPath)))
+            {
+                bw.BaseStream.Seek(info.RealOffset + 8, SeekOrigin.Begin);
+                bw.Write(BitConverter.GetBytes(realSize));
+            }
+
+            return realSize;
+
         }
 
         /// <summary>

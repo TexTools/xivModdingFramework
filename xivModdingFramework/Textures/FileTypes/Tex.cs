@@ -1100,6 +1100,14 @@ namespace xivModdingFramework.Textures.FileTypes
         #region Colorset Import Handling
         // Special one-off functions for importing colorsets as image files.
 
+        public static (List<Half> ColorsetData, byte[] DyeData) GetColorsetDataFromDDS(string ddsFilePath)
+        {
+            var colorSetData = DDSToColorset(ddsFilePath);
+            var dyeData = GetColorsetDyeInformationFromFile(ddsFilePath);
+
+            return new (colorSetData, dyeData);
+        }
+
         /// <summary>
         /// Imports a ColorSet file
         /// </summary>
@@ -1110,12 +1118,11 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>The new offset</returns>
         public async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, string ddsFilePath, IItem item, string source, ModTransaction tx = null)
         {
-            var colorSetData = DDSToColorset(ddsFilePath);
-            var colorSetExtraData = GetColorsetDyeInformationFromFile(ddsFilePath);
+            var cset = GetColorsetDataFromDDS(ddsFilePath);
 
             // Replace the color set data with the imported data
-            xivMtrl.ColorSetData = colorSetData;
-            xivMtrl.ColorSetDyeData = colorSetExtraData;
+            xivMtrl.ColorSetData = cset.ColorsetData;
+            xivMtrl.ColorSetDyeData = cset.DyeData;
 
             var doSave = false;
             if(tx == null)
