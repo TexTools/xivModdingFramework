@@ -182,7 +182,6 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
 
@@ -200,7 +199,7 @@ namespace xivModdingFramework.Mods
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.
-                return await _mdl.FileToModelBytes(externalPath, internalPath);
+                return await Mdl.FileToModelBytes(externalPath, internalPath);
             }
 
             // This is either a binary file for type 2 compression or an already compressed file.
@@ -241,7 +240,6 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
             if (forceType2)
@@ -264,7 +262,7 @@ namespace xivModdingFramework.Mods
             // Signatures for MDL version 5 and 6.
             if(possiblySignatureB == 256 && (possiblySignatureA == 5 || possiblySignatureA == 6))
             {
-                return await _mdl.CompressMdlFile(data);
+                return await Mdl.CompressMdlFile(data);
             }
 
             // Try our best to tell if it's an uncompressed Texture.

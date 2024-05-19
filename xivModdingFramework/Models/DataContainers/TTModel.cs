@@ -1234,10 +1234,10 @@ namespace xivModdingFramework.Models.DataContainers
         /// Re-Loads the XivMDL at the source path for this model, if it exists.
         /// </summary>
         /// <returns></returns>
-        public async Task<XivMdl> GetRawMdl(Mdl _mdl, ModTransaction tx = null)
+        public async Task<XivMdl> GetRawMdl(ModTransaction tx = null)
         {
             if (!IsInternal) return null;
-            return await _mdl.GetXivMdl(Source, false, tx);
+            return await Mdl.GetXivMdl(Source, false, tx);
         }
         #endregion
 

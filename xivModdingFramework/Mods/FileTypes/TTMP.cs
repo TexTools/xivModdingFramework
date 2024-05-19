@@ -786,7 +786,6 @@ namespace xivModdingFramework.Mods.FileTypes
                         {
                             var modelCount = usableModels.Count;
                             progress.Report((0, modelCount, "Scanning and updating body models..."));
-                            var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory);
 
                             // Loop them to perform heuristic check.
                             var i = 0;
@@ -795,7 +794,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 i++;
                                 var file = mdlEntry.FullPath;
                                 progress.Report((i, modelCount, "Scanning and updating body models..."));
-                                var changed = await _mdl.CheckSkinAssignment(mdlEntry.FullPath, tx);
+                                var changed = await Mdl.CheckSkinAssignment(mdlEntry.FullPath, tx);
                             }
                         }
                     }
@@ -914,7 +913,6 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
 
             await _mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
 
@@ -923,7 +921,7 @@ namespace xivModdingFramework.Mods.FileTypes
             foreach (var path in fixableMdls)
             {
                 progress?.Report((idx, total, "Fixing Pre-Dawntrail Models..."));
-                await _mdl.FixPreDawntrailMdl(path, source, tx);
+                await Mdl.FixPreDawntrailMdl(path, source, tx);
             }
         }
 
@@ -1128,7 +1126,6 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         var modelCount = usableModels.Count;
                         settings.ProgressReporter?.Report((0, modelCount, "Scanning and updating body models..."));
-                        var _mdl = new Models.FileTypes.Mdl(XivCache.GameInfo.GameDirectory);
 
                         // Loop them to perform heuristic check.
                         i = 0;
@@ -1136,7 +1133,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         {
                             i++;
                             settings.ProgressReporter?.Report((i, modelCount, "Scanning and updating body models..."));
-                            var changed = await _mdl.CheckSkinAssignment(mdlEntry, tx);
+                            var changed = await Mdl.CheckSkinAssignment(mdlEntry, tx);
                         }
                     }
                 }

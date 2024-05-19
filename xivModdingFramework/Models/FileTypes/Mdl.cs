@@ -57,18 +57,17 @@ using System.Security.Cryptography;
 
 namespace xivModdingFramework.Models.FileTypes
 {
-    public class Mdl
+    public static class Mdl
     {
         #region Constants/Structures/Constructors
         private const string MdlExtension = ".mdl";
-        private readonly DirectoryInfo _gameDirectory;
 
         // Some constant pointers/sizes
         private const int _MdlHeaderSize = 0x44; // 68 Decimal
         private const int _vertexDataHeaderSize = 0x88; // 136 Decimal
 
-        private string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
-        private string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
+        private static string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
+        private static string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
 
 
         // Simple internal use hashable pair of Halfs.
@@ -106,7 +105,7 @@ namespace xivModdingFramework.Models.FileTypes
         private static Dictionary<string, HashSet<HalfUV>> BodyHashes;
 
         // Retrieve hash list of UVs for use in heuristics.
-        private HashSet<HalfUV> GetUVHashSet(string key)
+        private static HashSet<HalfUV> GetUVHashSet(string key)
         {
             if (BodyHashes == null)
             {
@@ -155,10 +154,6 @@ namespace xivModdingFramework.Models.FileTypes
             return null;
         }
 
-        public Mdl(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
         #endregion
 
         #region High-Level Model Accessors
@@ -184,7 +179,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xivRace">The selected race for the given item</param>
         /// <param name="submeshId">The submesh ID - Only used for furniture items which contain multiple meshes, like the Ahriman Clock.</param>
         /// <returns>The path in string format.  Not a fucking tuple.</returns>
-        public async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null, ModTransaction tx = null)
+        public static async Task<string> GetMdlPath(IItemModel itemModel, XivRace xivRace, string submeshId = null, ModTransaction tx = null)
         {
             string mdlFolder = "", mdlFile = "";
 
@@ -255,7 +250,7 @@ namespace xivModdingFramework.Models.FileTypes
                 case XivItemType.outdoor:
                 case XivItemType.fish:
                     // Language doesn't matter for this call.
-                    var housing = new Housing(_gameDirectory, XivLanguage.None);
+                    var housing = new Housing(XivCache.GameInfo.GameDirectory, XivLanguage.None);
                     var mdlPath = "";
                     var assetDict = await housing.GetFurnitureModelParts(itemModel, tx);
 
@@ -284,7 +279,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="submeshId"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<TTModel> GetTTModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task<TTModel> GetTTModel(IItemModel item, XivRace race, string submeshId = null, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
@@ -299,7 +294,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="getOriginal"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public async Task<TTModel> GetTTModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task<TTModel> GetTTModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
             var ttModel = TTModel.FromRaw(mdl);
@@ -310,7 +305,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// Retrieves the raw XivMdl file at a given internal file path.
         /// </summary>
         /// <returns>An XivMdl structure containing all mdl data.</returns>
-        public async Task<XivMdl> GetXivMdl(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task<XivMdl> GetXivMdl(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             long offset = 0;
             var df = IOUtil.GetDataFileFromPath(mdlPath);
@@ -1695,12 +1690,12 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, ModTransaction tx = null)
+        public static async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, ModTransaction tx = null)
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
             var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-            var _imc = new Imc(_gameDirectory);
+            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
             var useCached = false;
 
             if (tx == null)
@@ -1861,7 +1856,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task<List<string>> GetReferencedMaterialNames(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             var materials = new List<string>();
 
@@ -1918,11 +1913,11 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="race"></param>
         /// <param name="submeshId"></param>
         /// <returns></returns>
-        public async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mtrlVariant = 1;
-            var _imc = new Imc(_gameDirectory);
+            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
             var imcInfo = (await _imc.GetImcInfo(item, false, tx));
             if (imcInfo != null) {
                 mtrlVariant = imcInfo.MaterialSet;
@@ -1939,7 +1934,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="outputFilePath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
         {
             // Importers and exporters currently use the same criteria.
             // Any available exporter is assumed to be able to import and vice versa.
@@ -1968,7 +1963,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
         /// <returns></returns>
-        public async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, ModTransaction tx = null)
+        public static async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, ModTransaction tx = null)
         {
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
@@ -1995,7 +1990,7 @@ namespace xivModdingFramework.Models.FileTypes
             // So we don't need to do any heavy lifting for that stuff.
             if (fileFormat == "obj")
             {
-                var obj = new Obj(_gameDirectory);
+                var obj = new Obj(XivCache.GameInfo.GameDirectory);
                 obj.ExportObj(model, outputFilePath);
                 return;
             }
@@ -2020,7 +2015,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
-                await ExportMaterialsForModel(model, outputFilePath, _gameDirectory, mtrlVariant, XivRace.All_Races, tx);
+                await ExportMaterialsForModel(model, outputFilePath, XivCache.GameInfo.GameDirectory, mtrlVariant, XivRace.All_Races, tx);
             }
 
 
@@ -2206,7 +2201,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// Retreieves the available list of file extensions the framework has exporters available for.
         /// </summary>
         /// <returns></returns>
-        public List<string> GetAvailableExporters()
+        public static List<string> GetAvailableExporters()
         {
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             cwd = cwd.Replace("\\", "/");
@@ -2235,7 +2230,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// Retreieves the available list of file extensions the framework has importers available for.
         /// </summary>
         /// <returns></returns>
-        public List<string> GetAvailableImporters()
+        public static List<string> GetAvailableImporters()
         {
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             cwd = cwd.Replace("\\", "/");
@@ -2256,12 +2251,12 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         // Just a default no-op function if we don't care about warning messages.
-        private void NoOp(bool isWarning, string message)
+        private static void NoOp(bool isWarning, string message)
         {
             //No-Op.
         }
 
-        private async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
+        private static async Task<string> RunExternalImporter(string importerName, string filePath, Action<bool, string> loggingFunction = null)
         {
 
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
@@ -2341,7 +2336,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </param>
         /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
         /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public async Task<byte[]> ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false, ModTransaction tx = null)
+        public static async Task<byte[]> ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false, ModTransaction tx = null)
         {
 
             #region Setup and Validation
@@ -2408,7 +2403,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="InvalidDataException"></exception>
-        public async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, ModTransaction tx = null)
+        public static async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, ModTransaction tx = null)
         {
 
             if (options == null)
@@ -2558,7 +2553,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="ogMdl"></param>
         /// <param name="loggingFunction"></param>
         /// <returns></returns>
-        public async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public static async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdl = MakeUncompressedMdlFile(ttModel, ogMdl, loggingFunction);
             var compressed = await CompressMdlFile(mdl);
@@ -2570,7 +2565,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task<byte[]> CompressMdlFile(byte[] data)
+        public static async Task<byte[]> CompressMdlFile(byte[] data)
         {
 
             #region MDL Header Reading
@@ -2874,7 +2869,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        public byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public static byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
 
@@ -4249,7 +4244,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="colladaMeshDataList">The list of mesh data obtained from the imported collada file</param>
         /// <param name="itemType">The item type</param>
         /// <returns>A dictionary containing the vertex byte data per mesh</returns>
-        private Dictionary<int, VertexByteData> GetBasicGeometryData(TTModel ttModel, List<Dictionary<VertexUsageType, List<VertexDataType>>> vertexInfoDict, Action<bool, string> loggingFunction)
+        private static Dictionary<int, VertexByteData> GetBasicGeometryData(TTModel ttModel, List<Dictionary<VertexUsageType, List<VertexDataType>>> vertexInfoDict, Action<bool, string> loggingFunction)
         {
             var importDataDictionary = new Dictionary<int, VertexByteData>();
 
@@ -4348,7 +4343,7 @@ namespace xivModdingFramework.Models.FileTypes
             return bytes;
         }
 
-        private bool WriteVectorData(List<byte> buffer, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, VertexUsageType usage, TTVertex v)
+        private static bool WriteVectorData(List<byte> buffer, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, VertexUsageType usage, TTVertex v)
         {
             if(!vertexInfoList.ContainsKey(usage) || vertexInfoList[usage].Count <= 0)
             {
@@ -4387,7 +4382,7 @@ namespace xivModdingFramework.Models.FileTypes
             return WriteVectorData(buffer, dataType, value, handedness, wDefault);
         }
 
-        private bool WriteVectorData(List<byte> buffer, VertexDataType dataType, Vector3 data, bool handedness = true, int wDefault = 0)
+        private static bool WriteVectorData(List<byte> buffer, VertexDataType dataType, Vector3 data, bool handedness = true, int wDefault = 0)
         {
             Half hx, hy, hz;
 
@@ -4430,7 +4425,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="v"></param>
         /// <returns></returns>
-        private int WriteVertex(VertexByteData importData, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, TTModel model, TTVertex v, Action<bool, string> loggingFunction)
+        private static int WriteVertex(VertexByteData importData, Dictionary<VertexUsageType, List<VertexDataType>> vertexInfoList, TTModel model, TTVertex v, Action<bool, string> loggingFunction)
         {
             // Positions for Weapon and Monster item types are half precision floating points
             var start0 = importData.VertexData0.Count;
@@ -4725,7 +4720,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="mdlPath"></param>
         /// <returns></returns>
-        public async Task<bool> CheckSkinAssignment(string mdlPath, ModTransaction tx)
+        public static async Task<bool> CheckSkinAssignment(string mdlPath, ModTransaction tx)
         {
             if(!IsAutoAssignableModel(mdlPath))
             {
@@ -4772,7 +4767,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// everything was successful.
         /// </summary>
         /// <returns></returns>
-        public async Task<int> CheckAllModsSkinAssignments()
+        public static async Task<int> CheckAllModsSkinAssignments()
         {
             using (var tx = ModTransaction.BeginTransaction(true))
             { 
@@ -4796,7 +4791,7 @@ namespace xivModdingFramework.Models.FileTypes
                 return count;
             }
         }
-        private bool SkinCheckGen2()
+        private static bool SkinCheckGen2()
         {
             // If something is on Mat A, we can just assume it's fine realistically to save time.
 
@@ -4805,7 +4800,7 @@ namespace xivModdingFramework.Models.FileTypes
             return false;
         }
 
-        private bool SkinCheckGen3(TTModel ttMdl)
+        private static bool SkinCheckGen3(TTModel ttMdl)
         {
             // Standard forward check.  Primarily this is looking for Mat D materials that are 'gen3 compat patch' for bibo.
             // To pull them back onto mat B.
@@ -4898,7 +4893,7 @@ namespace xivModdingFramework.Models.FileTypes
             return anyChanges;
         }
 
-        private bool SkinCheckBibo(TTModel ttMdl, IndexFile _index)
+        private static bool SkinCheckBibo(TTModel ttMdl, IndexFile _index)
         {
             // Standard forward check.  Primarily this is looking for standard Mat B bibo materials,
             // To pull them onto mat D.
@@ -5025,7 +5020,7 @@ namespace xivModdingFramework.Models.FileTypes
             return anyChanges;
         }
 
-        private bool SkinCheckAndrofirm(TTModel ttMdl)
+        private static bool SkinCheckAndrofirm(TTModel ttMdl)
         {
             // AF is a bit of a special case.
             // It's a derivative of Gen2, that only varies on the legs.
@@ -5135,7 +5130,7 @@ namespace xivModdingFramework.Models.FileTypes
             return anyChanges;
         }
 
-        private bool SkinCheckUNFConnector()
+        private static bool SkinCheckUNFConnector()
         {
             // Standard forward check.
 
@@ -5154,7 +5149,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="slot"></param>
         /// <param name="newRace"></param>
         /// <returns></returns>
-        public async Task AddRacialModel(int setId, string slot, XivRace newRace, string source, ModTransaction tx = null)
+        public static async Task AddRacialModel(int setId, string slot, XivRace newRace, string source, ModTransaction tx = null)
         {
             var ownTx = false;
             if (tx == null)
@@ -5192,7 +5187,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // File already exists, no adjustments needed.
                 if ((await tx.FileExists(path))) return;
 
-                var _eqp = new Eqp(_gameDirectory);
+                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
                 var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
                 var baseModelOrder = newRace.GetModelPriorityList();
 
@@ -5243,7 +5238,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="originalPath"></param>
         /// <param name="newPath"></param>
         /// <returns></returns>
-        public async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, ModTransaction tx = null)
+        public static async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, ModTransaction tx = null)
         {
 
             var fromRoot = await XivCache.GetFirstRoot(originalPath);
@@ -5429,7 +5424,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
-        public async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, string sourceApplication, bool copyTextures = false, ModTransaction tx = null)
+        public static async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, string sourceApplication, bool copyTextures = false, ModTransaction tx = null)
         {
 
             var mainRoot = await XivCache.GetFirstRoot(primaryModel);
@@ -5646,7 +5641,7 @@ namespace xivModdingFramework.Models.FileTypes
         #endregion
 
         #region Dawntrail Model Fix
-        public async Task FixPreDawntrailMdl(string path, string source = "Unknown", ModTransaction tx = null)
+        public static async Task FixPreDawntrailMdl(string path, string source = "Unknown", ModTransaction tx = null)
         {
             // HACKHACK: This is going to be extremely inefficient, but works for the moment.
             var ttMdl = await GetTTModel(path, false, tx);

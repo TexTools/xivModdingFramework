@@ -82,7 +82,6 @@ namespace xivModdingFramework.Mods
                 var modlist = await tx.GetModList();
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory);
                 var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
 
@@ -272,7 +271,7 @@ namespace xivModdingFramework.Mods
                 {
                     var src = kv.Key;
                     var dst = kv.Value;
-                    var xmdl = await _mdl.GetXivMdl(src, false, tx);
+                    var xmdl = await Mdl.GetXivMdl(src, false, tx);
                     var tmdl = TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
@@ -306,7 +305,7 @@ namespace xivModdingFramework.Mods
                     }
 
                     // Save new Model.
-                    var bytes = await _mdl.MakeCompressedMdlFile(tmdl, xmdl);
+                    var bytes = await Mdl.MakeCompressedMdlFile(tmdl, xmdl);
                     var newMdlOffset = await Dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
                 }
 
