@@ -594,7 +594,7 @@ namespace xivModdingFramework.Mods
             ItemMetadata originalMetadata = null;
             if (originalMetadataOffset == 0)
             {
-                originalMetadata = await ItemMetadata.GetMetadata(root);
+                originalMetadata = await ItemMetadata.GetMetadata(root, true, tx);
             }
             else
             {

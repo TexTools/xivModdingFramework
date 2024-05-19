@@ -404,6 +404,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <summary>
         /// Applies this Metadata object to the FFXIV file system.
         /// This should only called by Dat.WriteToDat() / RestoreDefaultMetadata()
+        /// and sufficiently advanced/complex functions that are doing raw data writes (Ex. Modpack imports)
         /// </summary>
         internal static async Task ApplyMetadata(ItemMetadata meta, ModTransaction tx)
         {

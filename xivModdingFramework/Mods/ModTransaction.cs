@@ -1405,7 +1405,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        internal async Task<long> WriteData(XivDataFile dataFile, byte[] data, bool compressed = false)
+        public async Task<long> UNSAFE_WriteData(XivDataFile dataFile, byte[] data, bool compressed = false)
         {
             var offset = GetNextTempOffset(dataFile);
             await WriteData(dataFile, offset, data, compressed);
