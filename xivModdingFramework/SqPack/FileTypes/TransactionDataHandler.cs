@@ -690,8 +690,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             // Create the actual TTMP.
-            var _ttmp = new TTMP(new DirectoryInfo(settings.TargetPath));
-            await _ttmp.CreateSimpleModPack(simplePack, null, false, tx);
+            await TTMP.CreateSimpleModPack(simplePack, settings.TargetPath, null, false, tx);
 
             // Don't have real offsets to update to, since we don't write to game files.
             return null;

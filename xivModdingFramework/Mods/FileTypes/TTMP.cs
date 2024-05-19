@@ -76,7 +76,7 @@ namespace xivModdingFramework.Mods.FileTypes
         public IProgress<(int current, int total, string message)> ProgressReporter = null;
     }
 
-    public class TTMP
+    public static class TTMP
     {
         public enum EModpackType
         {
@@ -107,13 +107,6 @@ namespace xivModdingFramework.Mods.FileTypes
         internal const char _typeCodeBackup = 'b';
 
         internal const string _minimumAssembly = "1.3.0.0";
-
-        private readonly DirectoryInfo _modPackDirectory;
-
-        public TTMP(DirectoryInfo modPackDirectory)
-        {
-            _modPackDirectory = modPackDirectory;
-        }
 
         public static EModpackType GetModpackType(string path)
         {
@@ -251,8 +244,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 mp.SimpleModDataList.Add(md);
             }
 
-            var _ttmp = new TTMP(new DirectoryInfo(destination));
-            return await _ttmp.CreateSimpleModPack(mp, null, true, tx);
+            return await TTMP.CreateSimpleModPack(mp, destination, null, true, tx);
         }
 
         /// <summary>
@@ -261,7 +253,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="modPackData">The data that will go into the mod pack</param>
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <returns>The number of pages created for the mod pack</returns>
-        public async Task<int> CreateWizardModPack(ModPackData modPackData, IProgress<double> progress, bool overwriteModpack)
+        public static async Task<int> CreateWizardModPack(ModPackData modPackData, string destination, IProgress<double> progress, bool overwriteModpack)
         {
             return await Task.Run(async () =>
             {
@@ -284,7 +276,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 // Actually executes the work of deduplicating mods and writing the TTMP file
-                await ttmpWriter.Write(new WizardProgressWrapper(progress), _modPackDirectory, overwriteModpack);
+                await ttmpWriter.Write(new WizardProgressWrapper(progress), destination, overwriteModpack);
                 return ttmpWriter.PageCount;
             });
         }
@@ -296,7 +288,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="gameDirectory">The game directory</param>
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <returns>The number of mods processed for the mod pack</returns>
-        public async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, IProgress<(int current, int total, string message)> progress = null, bool overwriteModpack = false, ModTransaction tx = null)
+        public static async Task<int> CreateSimpleModPack(SimpleModPackData modPackData, string destination, IProgress<(int current, int total, string message)> progress = null, bool overwriteModpack = false, ModTransaction tx = null)
         {
 
             if(progress == null)
@@ -331,7 +323,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         modJson.ModPackEntry = mp;
                 }
 
-                await writer.Write(progress, _modPackDirectory, overwriteModpack);
+                await writer.Write(progress, destination, overwriteModpack);
                 return writer.ModCount;
             });
         }
@@ -344,7 +336,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <param name="progress">The progress of the mod pack creation</param>
         /// <param name="overwriteModpack">Whether or not to overwrite an existing modpack with the same name</param>
         /// <returns>The number of mods processed for the mod pack</returns>
-        public async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, IProgress<(int current, int total, string message)> progress, bool overwriteModpack, ModTransaction tx = null)
+        public static async Task<int> CreateBackupModpack(BackupModPackData backupModpackData, string destination, IProgress<(int current, int total, string message)> progress, bool overwriteModpack, ModTransaction tx = null)
         {
             if (tx == null)
             {
@@ -362,7 +354,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         modJson.ModPackEntry = mod.ModPack;
                 }
 
-                await writer.Write(progress, _modPackDirectory, overwriteModpack);
+                await writer.Write(progress, destination, overwriteModpack);
                 return writer.ModCount;
             });
         }
@@ -485,7 +477,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A list containing original mod pack json data</returns>
-        public Task<List<OriginalModPackJson>> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
+        public static Task<List<OriginalModPackJson>> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
         {
             return Task.Run(() =>
             {

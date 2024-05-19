@@ -280,26 +280,26 @@ namespace xivModdingFramework.Mods
         }
 
         // Determine the filename for a mod pack to be written to
-        private string _determineModPackPath(DirectoryInfo modPackDirectory, bool overwriteModpack)
+        private string _determineModPackPath(string destination, bool overwriteModpack)
         {
             var modPackName = _modPackJson.Name;
-            var modPackPath = Path.Combine(modPackDirectory.FullName, $"{modPackName}.ttmp2");
+            var modPackPath = Path.Combine(destination, $"{modPackName}.ttmp2");
 
-            if (modPackDirectory.FullName.EndsWith(".ttmp2"))
+            if (destination.EndsWith(".ttmp2"))
             {
                 // Explicit path already provided.
-                modPackPath = modPackDirectory.FullName;
+                modPackPath = destination;
                 modPackName = Path.GetFileNameWithoutExtension(modPackPath);
             }
 
             if (File.Exists(modPackPath) && !overwriteModpack)
             {
                 var fileNum = 1;
-                modPackPath = Path.Combine(modPackDirectory.FullName, $"{modPackName}({fileNum}).ttmp2");
+                modPackPath = Path.Combine(destination, $"{modPackName}({fileNum}).ttmp2");
                 while (File.Exists(modPackPath))
                 {
                     fileNum++;
-                    modPackPath = Path.Combine(modPackDirectory.FullName, $"{modPackName}({fileNum}).ttmp2");
+                    modPackPath = Path.Combine(destination, $"{modPackName}({fileNum}).ttmp2");
                 }
             }
             else if (File.Exists(modPackPath) && overwriteModpack)
@@ -310,7 +310,7 @@ namespace xivModdingFramework.Mods
             return modPackPath;
         }
 
-        public async Task Write(IProgress<(int current, int total, string message)> progress, DirectoryInfo modPackDirectory, bool overwriteModpack)
+        public async Task Write(IProgress<(int current, int total, string message)> progress, string destination, bool overwriteModpack)
         {
             string tempMPD = Path.Combine(_tmpDir, "TTMPD.mpd");
             string tempMPL = Path.Combine(_tmpDir, "TTMPL.mpl");
@@ -322,7 +322,7 @@ namespace xivModdingFramework.Mods
             File.WriteAllText(tempMPL, JsonConvert.SerializeObject(_modPackJson));
 
             // Write TTMP (zip)
-            var modPackPath = _determineModPackPath(modPackDirectory, overwriteModpack);
+            var modPackPath = _determineModPackPath(destination, overwriteModpack);
 
             progress?.Report((_addedFiles.Count, _addedFiles.Count, GeneralStrings.TTMP_Creating));
             var zf = new ZipFile();

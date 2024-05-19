@@ -532,8 +532,6 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Creating TTMP File...");
                     var desc = "Item Converter Modpack - " + srcItem.Name + " -> " + iName + "\nCreated at: " + DateTime.Now.ToString();
                     // Time to save the modlist to file.
-                    var dir = new DirectoryInfo(saveDirectory);
-                    var _ttmp = new TTMP(dir);
                     var smpd = new SimpleModPackData()
                     {
                         Author = modPack.Author,
@@ -558,7 +556,7 @@ namespace xivModdingFramework.Mods
                         smpd.SimpleModDataList.Add(smd);
                     }
 
-                    await _ttmp.CreateSimpleModPack(smpd, null, true, tx);
+                    await TTMP.CreateSimpleModPack(smpd, saveDirectory, null, true, tx);
                 }
 
 

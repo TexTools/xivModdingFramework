@@ -46,14 +46,9 @@ namespace xivModdingFramework.Models.FileTypes
     /// <summary>
     /// This class deals with .sklb Skeleton files
     /// </summary>
-    public class Sklb
+    public static class Sklb
     {
-        private readonly DirectoryInfo _gameDirectory;
         private const string SkeletonsFolder = "Skeletons";
-        public Sklb(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
 
         /// <summary>
         /// Retrieves the base racial or body skeleton for a given model file, parsing it from the base
