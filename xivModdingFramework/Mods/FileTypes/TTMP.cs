@@ -221,7 +221,7 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 var item = root.GetFirstItem();
                 itemName = item.Name;
-                itemCategory = item.PrimaryCategory;
+                itemCategory = item.SecondaryCategory;
             }
             
             if(tx == null)
@@ -1078,7 +1078,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         if(im != null)
                         {
                             itemName = im.Name;
-                            itemCategory = im.PrimaryCategory;
+                            itemCategory = im.SecondaryCategory;
                         }
                     }
 
