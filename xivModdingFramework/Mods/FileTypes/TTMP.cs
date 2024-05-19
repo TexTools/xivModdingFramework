@@ -912,9 +912,8 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
-            await _mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
+            await Mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
 
             var idx = 0;
             var total = fixableMdls.Count;

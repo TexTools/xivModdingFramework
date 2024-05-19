@@ -82,7 +82,6 @@ namespace xivModdingFramework.Mods
                 var modlist = await tx.GetModList();
 
                 var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
 
                 if (ProgressReporter != null)
@@ -339,7 +338,7 @@ namespace xivModdingFramework.Mods
                     {
                         var exists = await tx.FileExists(src);
                         if (!exists) continue;
-                        var xivMtrl = await _mtrl.GetXivMtrl(src, false, tx);
+                        var xivMtrl = await Mtrl.GetXivMtrl(src, false, tx);
                         xivMtrl.MTRLPath = dst;
 
                         for (int i = 0; i < xivMtrl.Textures.Count; i++)
@@ -350,7 +349,7 @@ namespace xivModdingFramework.Mods
                             }
                         }
 
-                        await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, false, tx);
+                        await Mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, false, tx);
                         CopiedMaterials.Add(dst);
                     }
                     catch (Exception ex)

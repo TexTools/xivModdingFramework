@@ -54,20 +54,15 @@ namespace xivModdingFramework.Materials.FileTypes
     /// <summary>
     /// This class contains the methods that deal with the .mtrl file type 
     /// </summary>
-    public class Mtrl
+    public static class Mtrl
     {
         #region Consts and Constructor
         private const string MtrlExtension = ".mtrl";
-        private readonly DirectoryInfo _gameDirectory;
 
         public const string EmptySamplerPrefix = "_EMPTY_SAMPLER_";
         private static Regex _dummyTextureRegex = new Regex("^bgcommon/texture/dummy_[a-z]\\.tex$");
 
 
-        public Mtrl(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
         #endregion
 
         #region High-Level XivMtrl Accessors
@@ -78,10 +73,10 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="mtrlFile">The Mtrl file</param>
         /// <returns>XivMtrl containing all the mtrl data</returns>
-        public async Task<XivMtrl> GetXivMtrl(string mtrlFileOrPath, IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivMtrl> GetXivMtrl(string mtrlFileOrPath, IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
 
-            var imc = new Imc(_gameDirectory);
+            var imc = new Imc(XivCache.GameInfo.GameDirectory);
             var materialSet = 0;
             try
             {
@@ -117,7 +112,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="forceOriginal"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public async Task<XivMtrl> GetXivMtrl(string mtrlFileOrPath, int materialSet, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivMtrl> GetXivMtrl(string mtrlFileOrPath, int materialSet, bool forceOriginal = false, ModTransaction tx = null)
         {
             // Get the root from the material file in specific.
             var root = XivDependencyGraph.ExtractRootInfo(mtrlFileOrPath);
@@ -140,7 +135,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="mtrlPath"></param>
         /// <param name="materialSet"></param>
         /// <returns></returns>
-        public async Task<XivMtrl> GetXivMtrl(string mtrlPath, bool forceOriginal = false, ModTransaction tx = null) { 
+        public static async Task<XivMtrl> GetXivMtrl(string mtrlPath, bool forceOriginal = false, ModTransaction tx = null) { 
 
             if (tx == null)
             {
@@ -175,7 +170,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="bytes"></param>
         /// <param name="internalMtrlPath">Path that is stapled onto the </param>
         /// <returns></returns>
-        public XivMtrl GetXivMtrl(byte[] bytes, string internalMtrlPath = "")
+        public static XivMtrl GetXivMtrl(byte[] bytes, string internalMtrlPath = "")
         {
             var xivMtrl = new XivMtrl();
             using (var br = new BinaryReader(new MemoryStream(bytes)))
@@ -426,7 +421,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="mtrlPath"></param>
         /// <returns></returns>
-        public async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, ModTransaction tx = null)
         {
             var mtrlData = await Dat.ReadSqPackType2(mtrlPath, forceOriginal, tx);
             var uniqueTextures = new HashSet<string>();
@@ -530,7 +525,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// </summary>
         /// <param name="xivMtrl">The XivMtrl with the ColorSet data</param>
         /// <returns>The XivTex of the ColorSet</returns>
-        public Task<XivTex> GetColorsetXivTex(XivMtrl xivMtrl)
+        public static Task<XivTex> GetColorsetXivTex(XivMtrl xivMtrl)
         {
             return Task.Run(() =>
             {
@@ -581,14 +576,14 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivMtrl">The XivMtrl for the ColorSet</param>
         /// <param name="saveDirectory">The save directory</param>
         /// <param name="race">The selected race for the item</param>
-        public void SaveColorsetDyeData(IItem item, XivMtrl xivMtrl, DirectoryInfo saveDirectory, XivRace race)
+        public static void SaveColorsetDyeData(IItem item, XivMtrl xivMtrl, DirectoryInfo saveDirectory, XivRace race)
         {
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
             var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivMtrl.MTRLPath) + ".dat");
             SaveColorsetDyeData(xivMtrl, savePath);
         }
 
-        public void SaveColorsetDyeData(XivMtrl xivMtrl, string path)
+        public static void SaveColorsetDyeData(XivMtrl xivMtrl, string path)
         {
             var toWrite = xivMtrl.ColorSetDyeData != null ? xivMtrl.ColorSetDyeData : new byte[0];
             var dir = Directory.GetParent(path);
@@ -606,7 +601,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivMtrl">The XivMtrl containing the mtrl data</param>
         /// <param name="item">The item</param>
         /// <returns>The new mtrl file byte data</returns>
-        public byte[] XivMtrlToUncompressedMtrl(XivMtrl xivMtrl)
+        public static byte[] XivMtrlToUncompressedMtrl(XivMtrl xivMtrl)
         {
             var mtrlBytes = new List<byte>();
 
@@ -824,7 +819,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="item">The item whos mtrl is being imported</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, bool validateTextures = true, ModTransaction tx = null)
+        public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, bool validateTextures = true, ModTransaction tx = null)
         {
             try
             {
@@ -836,7 +831,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 if (validateTextures)
                 {
                     // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
-                    var _tex = new Tex(_gameDirectory);
+                    var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
                     var dataFile = IOUtil.GetDataFileFromPath(xivMtrl.MTRLPath);
                     IndexFile index = tx == null ? await Index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
@@ -882,7 +877,7 @@ namespace xivModdingFramework.Materials.FileTypes
         #endregion
 
         #region Endwalker => Dawntrail Material Conversion
-        public async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress = null)
+        public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress = null)
         {
 #if ENDWALKER
             return;
@@ -969,7 +964,7 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
-        public async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
+        public static async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
         {
 #if ENDWALKER
             return (null, null);
@@ -1006,7 +1001,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="updateShaders"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        private async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
+        private static async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
@@ -1147,9 +1142,9 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
-        private async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
+        private static async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
         {
-            var _tex = new Tex(_gameDirectory);
+            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
             // Read normal file.
             var normalTex = await _tex.GetXivTex(sourceNormalPath, false, tx);
@@ -1213,7 +1208,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        private Half[] GetDefaultColorsetRow()
+        private static Half[] GetDefaultColorsetRow()
         {
             var row = new Half[32];
 
@@ -1301,7 +1296,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="materialSet">Which material variant folder.  Defaulted to 1.</param>
         /// <returns></returns>
-        public string GetMtrlPath(string mdlPath, string mtrlName, int materialSet = 1)
+        public static string GetMtrlPath(string mdlPath, string mtrlName, int materialSet = 1)
         {
             var mtrlFolder = "";
 
@@ -1414,7 +1409,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="xivRace"></param>
         /// <param name="variant"></param>
         /// <returns></returns>
-        public string GetMtrlFolder(IItemModel itemModel, int materialSet = 0)
+        public static string GetMtrlFolder(IItemModel itemModel, int materialSet = 0)
         {
             var root = itemModel.GetRootInfo();
             return GetMtrlFolder(root, materialSet);
@@ -1460,7 +1455,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
         }
-        public string GetMtrlFolder(XivDependencyRootInfo root, int materialSet = -1) 
+        public static string GetMtrlFolder(XivDependencyRootInfo root, int materialSet = -1) 
         {
             // These types have exactly one material set, but don't have an IMC file saying so.
             if((root.SecondaryType == XivItemType.hair ||
@@ -1541,7 +1536,7 @@ namespace xivModdingFramework.Materials.FileTypes
         #endregion
 
         #region Shader DB Compilation
-        public async Task UpdateShaderDB(bool useIndex2 = false)
+        public static async Task UpdateShaderDB(bool useIndex2 = false)
         {
             const string _ShaderDbFilePath = "./Resources/DB/shader_info.db";
             const string _ShaderDbCreationScript = "CreateShaderDB.sql";
@@ -1676,7 +1671,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// Not Transaction Safe
         /// </summary>
         /// <returns></returns>
-        public async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
+        public static async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
         {
             if(ModTransaction.ActiveTransaction != null)
             {
@@ -1701,7 +1696,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="dataFile"></param>
         /// <param name="useIndex2"></param>
         /// <returns></returns>
-        public async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(XivDataFile dataFile, bool useIndex2 = false)
+        public static async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(XivDataFile dataFile, bool useIndex2 = false)
         {
             if (ModTransaction.ActiveTransaction != null)
             {
@@ -1828,7 +1823,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="index1Dict"></param>
         /// <param name="index2Dict"></param>
         /// <returns></returns>
-        private async Task<List<SimplifiedMtrlInfo>> GetMaterials(XivDataFile dataFile, List<IndexEntry> files, byte[] datData, Dictionary<uint, (uint FolderHash, uint FileHash)> index1Dict, Dictionary<uint, uint> index2Dict)
+        private static async Task<List<SimplifiedMtrlInfo>> GetMaterials(XivDataFile dataFile, List<IndexEntry> files, byte[] datData, Dictionary<uint, (uint FolderHash, uint FileHash)> index1Dict, Dictionary<uint, uint> index2Dict)
         {
             if (ModTransaction.ActiveTransaction != null)
             {

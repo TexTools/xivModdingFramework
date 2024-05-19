@@ -518,7 +518,6 @@ namespace xivModdingFramework.Cache
             var df = IOUtil.GetDataFileFromPath(Info.GetRootFile());
 
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _atex = new ATex(XivCache.GameInfo.GameDirectory);
 
             var files = new HashSet<string>();
@@ -833,8 +832,7 @@ namespace xivModdingFramework.Cache
 
                         if (index.Get8xDataOffset(mat) != 0)
                         {
-                            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-                            mtrlTexs = await _mtrl.GetTexturePathsFromMtrlPath(mat, false, false, tx);
+                            mtrlTexs = await Mtrl.GetTexturePathsFromMtrlPath(mat, false, false, tx);
                         }
                     }
 
@@ -1421,8 +1419,7 @@ namespace xivModdingFramework.Cache
                 try
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
-                    var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-                    var mtrlChildren = await _mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false, false, tx);
+                    var mtrlChildren = await Mtrl.GetTexturePathsFromMtrlPath(internalFilePath, false, false, tx);
                     return mtrlChildren;
                 } catch
                 {

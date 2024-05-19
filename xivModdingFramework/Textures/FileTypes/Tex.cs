@@ -1127,13 +1127,12 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             try
             {
-                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
                 if (xivMtrl.ColorSetData.Count < 1024)
                 {
-                    await _mtrl.FixPreDawntrailMaterial(xivMtrl, source, tx);
+                    await Mtrl.FixPreDawntrailMaterial(xivMtrl, source, tx);
                 }
 
-                var offset = await _mtrl.ImportMtrl(xivMtrl, item, source, false, tx);
+                var offset = await Mtrl.ImportMtrl(xivMtrl, item, source, false, tx);
                 if (doSave)
                 {
                     await ModTransaction.CommitTransaction(tx);

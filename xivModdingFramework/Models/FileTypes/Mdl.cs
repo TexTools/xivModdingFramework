@@ -1694,7 +1694,6 @@ namespace xivModdingFramework.Models.FileTypes
         {
             // Language is irrelevant here.
             var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _imc = new Imc(XivCache.GameInfo.GameDirectory);
             var useCached = false;
 
@@ -1792,7 +1791,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // Material ID 0 is SE's way of saying it doesn't exist.
                     if (mVariant != 0)
                     {
-                        var path = _mtrl.GetMtrlPath(mdlPath, mName, mVariant);
+                        var path = Mtrl.GetMtrlPath(mdlPath, mName, mVariant);
                         uniqueMaterialPaths.Add(path);
                     }
                 }
@@ -2096,7 +2095,6 @@ namespace xivModdingFramework.Models.FileTypes
             var directory = Path.GetDirectoryName(outputFilePath);
 
             // Language doesn't actually matter here.
-            var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
             var _tex = new Tex(gameDirectory);
             var materialIdx = 0;
 
@@ -2138,8 +2136,8 @@ namespace xivModdingFramework.Models.FileTypes
                     }
 
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
-                    var mtrlPath = _mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
-                    var mtrl = await _mtrl.GetXivMtrl(mtrlPath, false, tx);
+                    var mtrlPath = Mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
+                    var mtrl = await Mtrl.GetXivMtrl(mtrlPath, false, tx);
                     var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl, null, -1, tx);
 
                     // Outgoing file names.
@@ -5287,7 +5285,6 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 // Language is irrelevant here.
-                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
                 // Get all variant materials.
                 var materialPaths = await GetReferencedMaterialPaths(originalPath, -1, false, false, tx);
@@ -5321,7 +5318,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // Time to copy the materials!
                     try
                     {
-                        var mtrl = await _mtrl.GetXivMtrl(material, false, tx);
+                        var mtrl = await Mtrl.GetXivMtrl(material, false, tx);
 
                         if (copyTextures)
                         {
@@ -5343,7 +5340,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         mtrl.MTRLPath = path;
                         allFiles.Add(mtrl.MTRLPath);
-                        await _mtrl.ImportMtrl(mtrl, item, source, false, tx);
+                        await Mtrl.ImportMtrl(mtrl, item, source, false, tx);
 
                         if (!validNewMaterials.ContainsKey(newMatName))
                         {
@@ -5482,8 +5479,6 @@ namespace xivModdingFramework.Models.FileTypes
                     ModelModifiers.FixUpSkinReferences(mergeInModel, mergeIn);
                 }
 
-                // Language is irrelevant here.
-                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
 
                 // Get all variant materials of the mesh we want to merge in.
                 var materialPaths = await GetReferencedMaterialPaths(mergeIn, mergeInImcVariant, false, false, tx);
@@ -5525,7 +5520,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // Time to copy the materials!
                     try
                     {
-                        var mtrl = await _mtrl.GetXivMtrl(material, false, tx);
+                        var mtrl = await Mtrl.GetXivMtrl(material, false, tx);
 
                         if (copyTextures)
                         {
@@ -5551,7 +5546,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         mtrl.MTRLPath = path;
                         allFiles.Add(mtrl.MTRLPath);
-                        await _mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
+                        await Mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
 
                         if (!validNewMaterials.ContainsKey(newMatName))
                         {
