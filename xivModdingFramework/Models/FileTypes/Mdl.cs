@@ -2093,7 +2093,6 @@ namespace xivModdingFramework.Models.FileTypes
             var directory = Path.GetDirectoryName(outputFilePath);
 
             // Language doesn't actually matter here.
-            var _tex = new Tex(gameDirectory);
             var materialIdx = 0;
 
 
@@ -2136,7 +2135,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
                     var mtrlPath = Mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
                     var mtrl = await Mtrl.GetXivMtrl(mtrlPath, false, tx);
-                    var modelMaps = await ModelTexture.GetModelMaps(gameDirectory, mtrl, null, -1, tx);
+                    var modelMaps = await ModelTexture.GetModelMaps(mtrl, null, -1, tx);
 
                     // Outgoing file names.
                     var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";

@@ -125,20 +125,6 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 
 
-        /// <summary>
-        /// Gets the customized texture map data for a model.
-        /// Null custom model colors uses the defaults at ModelTexture.GetCustomColors().
-        /// </summary>
-        /// <param name="gameDirectory"></param>
-        /// <param name="mtrl"></param>
-        /// <param name="colors"></param>
-        /// <returns></returns>
-        public static async Task<ModelTextureData> GetModelMaps(DirectoryInfo gameDirectory, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
-        {
-            var tex = new Tex(gameDirectory);
-            return await GetModelMaps(tex, mtrl, colors, highlightedRow, tx);
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static float Clamp(float value, float min = 0.0f, float max = 1.0f)
         {
@@ -159,12 +145,12 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public static async Task<ModelTextureData> GetModelMaps(Tex tex, XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
+        public static async Task<ModelTextureData> GetModelMaps(XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
         {
             if (colors == null)
                 colors = GetCustomColors();
 
-            var texMapData = await GetTexMapData(tex, mtrl, tx);
+            var texMapData = await GetTexMapData(mtrl, tx);
             var dimensions = await EqualizeTextureSizes(texMapData);
 
             var diffusePixels = texMapData.Diffuse?.Data;
@@ -294,7 +280,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Retreives the raw pixel data for each texture, collated into a class to hold them.
         /// </summary>
         /// <returns>The texure map data</returns>
-        private static async Task<TexMapData> GetTexMapData(Tex tex, XivMtrl mtrl, ModTransaction tx = null)
+        private static async Task<TexMapData> GetTexMapData(XivMtrl mtrl, ModTransaction tx = null)
         {
             var texMapData = new TexMapData();
 
@@ -319,7 +305,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     continue;
                 }
 
-                var texData = await tex.GetXivTex(ttp.Path, ttp.Type, false, tx);
+                var texData = await Tex.GetXivTex(ttp.Path, ttp.Type, false, tx);
                 var imageData = await texData.GetRawPixels();
 
                 switch (ttp.Type)

@@ -84,7 +84,6 @@ namespace xivModdingFramework.Textures.DataContainers
         /// <returns></returns>
         public static XivTex FromUncompressedTex(byte[] texData, int offset = 0)
         {
-            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
             using (var ms = new MemoryStream(texData)) {
                 using (var br = new BinaryReader(ms))
                 {

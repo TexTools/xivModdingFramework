@@ -182,7 +182,6 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
 
             byte[] result = null;
@@ -192,10 +191,10 @@ namespace xivModdingFramework.Mods
                 if (magic32 != DDSMagic)
                 {
                     // Our DDS Converter can't operate on Streams, so...
-                    ddsPath = await _tex.ConvertToDDS(externalPath, internalPath, XivTexFormat.INVALID, tx);
+                    ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, XivTexFormat.INVALID, tx);
                 }
 
-                return _tex.DDSToUncompressedTex(ddsPath);
+                return Tex.DDSToUncompressedTex(ddsPath);
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.
@@ -240,7 +239,6 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
             if (forceType2)
             {
@@ -278,7 +276,7 @@ namespace xivModdingFramework.Mods
                     if (IsPowerOfTwo(possiblyHeight) && possiblyHeight <= _SaneMaxImageSize)
                     {
                         // There's an extremely high chance this is an uncompressed tex file.
-                        return await _tex.CompressTexFile(data);
+                        return await Tex.CompressTexFile(data);
                     }
                 }
             }

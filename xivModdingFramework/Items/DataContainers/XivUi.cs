@@ -147,9 +147,7 @@ namespace xivModdingFramework.Items.DataContainers
 
             if(SecondaryCategory == XivStrings.Maps)
             {
-                var _tex = new Tex(XivCache.GameInfo.GameDirectory);
-
-                var mapNamePaths = await _tex.GetMapAvailableTex(UiPath, tx);
+                var mapNamePaths = await Tex.GetMapAvailableTex(UiPath, tx);
                 return mapNamePaths;
             } else if(SecondaryCategory == XivStrings.HUD)
             {

@@ -830,7 +830,6 @@ namespace xivModdingFramework.Materials.FileTypes
                 if (validateTextures)
                 {
                     // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
-                    var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
                     var dataFile = IOUtil.GetDataFileFromPath(xivMtrl.MTRLPath);
                     IndexFile index = tx == null ? await Index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
@@ -861,7 +860,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         var di = Tex.GetDefaultTexturePath(tex.Usage);
 
-                        var newOffset = await _tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, tx);
+                        var newOffset = await Tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, tx);
 
                     }
                 }
@@ -1143,10 +1142,9 @@ namespace xivModdingFramework.Materials.FileTypes
 
         private static async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
         {
-            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
 
             // Read normal file.
-            var normalTex = await _tex.GetXivTex(sourceNormalPath, false, tx);
+            var normalTex = await Tex.GetXivTex(sourceNormalPath, false, tx);
             var texData = await normalTex.GetRawPixels();
 
             // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
@@ -1196,9 +1194,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 // - Compressed Tex (Type4) Data
 
                 // In theory, a streamlined function could be created to combine some of these steps.
-                var ddsBytes = await _tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, true);
-                ddsBytes = _tex.DDSToUncompressedTex(ddsBytes);
-                ddsBytes = await _tex.CompressTexFile(ddsBytes);
+                var ddsBytes = await Tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, true);
+                ddsBytes = Tex.DDSToUncompressedTex(ddsBytes);
+                ddsBytes = await Tex.CompressTexFile(ddsBytes);
                 return (indexPath, ddsBytes);
             }
             catch (Exception ex)

@@ -58,17 +58,12 @@ namespace xivModdingFramework.Textures.FileTypes
     /// <summary>
     /// This class contains the methods that deal with the .tex file type 
     /// </summary>
-    public class Tex
+    public static class Tex
     {
         #region Consts, Structs, & Constructor
-        private const string TexExtension = ".tex";
 
         public const uint _DDSHeaderSize = 128;
         public const uint _TexHeaderSize = 80;
-
-        // The 'magic number' for PNG file headers, indicating that the following data is a PNG file.
-        private readonly byte[] _PNG_MAGIC = { 137, 80, 78, 71, 13, 10, 26, 10 };
-
         public struct TexHeader
         {
             // Bitflags
@@ -149,22 +144,19 @@ namespace xivModdingFramework.Textures.FileTypes
             return new DirectoryInfo(strings[0]);
         }
 
-        public Tex(DirectoryInfo gameDirectory = null)
-        {
-        }
         #endregion
 
         #region High-Level XixTex Accessors
 
-        public async Task<XivTex> GetXivTex(MtrlTexture tex, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivTex> GetXivTex(MtrlTexture tex, bool forceOriginal = false, ModTransaction tx = null)
         {
             return await GetXivTex(tex.TexturePath, tex.Usage, forceOriginal, tx);
         }
-        public async Task<XivTex> GetXivTex(TexTypePath ttp, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivTex> GetXivTex(TexTypePath ttp, bool forceOriginal = false, ModTransaction tx = null)
         {
             return await GetXivTex(ttp.Path, ttp.Type, forceOriginal, tx);
         }
-        public async Task<XivTex> GetXivTex(string path, XivTexType usage, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivTex> GetXivTex(string path, XivTexType usage, bool forceOriginal = false, ModTransaction tx = null)
         {
             var dataFile = IOUtil.GetDataFileFromPath(path);
             var ttp = new TexTypePath()
@@ -177,7 +169,7 @@ namespace xivModdingFramework.Textures.FileTypes
             xivTex.TextureTypeAndPath = ttp;
             return xivTex;
         }
-        public async Task<XivTex> GetXivTex(string path, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<XivTex> GetXivTex(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
             if(tx == null)
             {
@@ -232,7 +224,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="gearItem">The gear item</param>
         /// <returns>A list of TexTypePath containing Icon Info</returns>
-        public async Task<List<TexTypePath>> GetItemIcons(IItemModel iconItem, ModTransaction tx = null)
+        public static async Task<List<TexTypePath>> GetItemIcons(IItemModel iconItem, ModTransaction tx = null)
         {
             if (tx == null)
             {
@@ -302,7 +294,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public async Task<Dictionary<string, string>> GetMapAvailableTex(string path, ModTransaction tx)
+        public static async Task<Dictionary<string, string>> GetMapAvailableTex(string path, ModTransaction tx)
         {
             var mapNamePathDictonary = new Dictionary<string, string>();
 
@@ -334,13 +326,13 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="forceoriginal"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public async Task SaveTexAsDDS(string internalPath, string externalPath, bool forceoriginal = false, ModTransaction tx = null)
+        public static async Task SaveTexAsDDS(string internalPath, string externalPath, bool forceoriginal = false, ModTransaction tx = null)
         {
             var tex = await GetXivTex(internalPath, forceoriginal, tx);
             SaveTexAsDDS(externalPath, tex);
         }
 
-        public void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
+        public static void SaveTexAsDDS(IItem item, XivTex xivTex, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races)
         {
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
             Directory.CreateDirectory(path);
@@ -348,7 +340,7 @@ namespace xivModdingFramework.Textures.FileTypes
             SaveTexAsDDS(savePath, xivTex);
         }
 
-        public void SaveTexAsDDS(string path, XivTex xivTex)
+        public static void SaveTexAsDDS(string path, XivTex xivTex)
         {
             DDS.MakeDDS(xivTex, path);
         }
@@ -369,7 +361,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, ModTransaction tx = null)
+        public static async Task<long> ImportTex(string internalPath, string externalPath, IItem item, string source, ModTransaction tx = null)
         {
             var path = internalPath;
 
@@ -387,7 +379,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="texFormat"></param>
         /// <returns></returns>
-        public async Task<byte[]> MakeCompressedTex(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
+        public static async Task<byte[]> MakeCompressedTex(string internalPath, string externalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
             // Ensure file exists.
             if (!File.Exists(externalPath))
@@ -418,7 +410,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="externalPath"></param>
         /// <param name="internalPath"></param>
         /// <returns></returns>
-        public async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
+        public static async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
             var root = await XivCache.GetFirstRoot(internalPath);
             bool useMips = root != null;
@@ -513,7 +505,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="data">8.8.8.8 Pixel format data.</param>
         /// <param name="allowNonsense">Cursed argument that allows generating fake DDS files for speed.</param>
         /// <returns></returns>
-        public async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int height, int width, bool allowFast8888 = true)
+        public static async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int height, int width, bool allowFast8888 = true)
         {
             if(allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
             {
@@ -593,7 +585,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="height"></param>
         /// <param name="width"></param>
         /// <returns></returns>
-        private byte[] CreateFast8888DDS(byte[] data, int height, int width)
+        private static byte[] CreateFast8888DDS(byte[] data, int height, int width)
         {
             var header = new byte[128];
             var pixelSizeBits = 32;
@@ -710,7 +702,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="externalDdsPath"></param>
         /// <returns></returns>
-        public byte[] DDSToUncompressedTex(string externalDdsPath)
+        public static byte[] DDSToUncompressedTex(string externalDdsPath)
         {
             var ddsSize = (uint)(new FileInfo(externalDdsPath).Length);
             byte[] uncompTex;
@@ -737,7 +729,7 @@ namespace xivModdingFramework.Textures.FileTypes
             return uncompTex;
         }
 
-        public byte[] DDSToUncompressedTex(byte[] data)
+        public static byte[] DDSToUncompressedTex(byte[] data)
         {
             var uncompressedLength = data.Length;
             using (var ms = new MemoryStream(data))
@@ -756,7 +748,7 @@ namespace xivModdingFramework.Textures.FileTypes
             }
         }
 
-        public void DDSToUncompressedTex(BinaryReader br, BinaryWriter bw, uint ddsSize)
+        public static void DDSToUncompressedTex(BinaryReader br, BinaryWriter bw, uint ddsSize)
         {
             var uncompressedLength = ddsSize;
             var header = DDSHeaderToTexHeader(br);
@@ -959,7 +951,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="br">Total size of the DDS Data (including header)</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public (byte[] TexHeader, uint DDSHeaderSize) DDSHeaderToTexHeader(BinaryReader br, long offset = -1)
+        public static (byte[] TexHeader, uint DDSHeaderSize) DDSHeaderToTexHeader(BinaryReader br, long offset = -1)
         {
             if(offset >= 0)
             {
@@ -1022,7 +1014,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="br"></param>
         /// <param name="extentionOrInternalPath"></param>
         /// <returns></returns>
-        public async Task<byte[]> CompressTexFile(byte[] data, string extentionOrInternalPath = ".tex")
+        public static async Task<byte[]> CompressTexFile(byte[] data, string extentionOrInternalPath = ".tex")
         {
             using (var ms = new MemoryStream(data)) {
                 using (var br = new BinaryReader(ms))
@@ -1040,7 +1032,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="br"></param>
         /// <param name="extentionOrInternalPath"></param>
         /// <returns></returns>
-        public async Task<byte[]> CompressTexFile(BinaryReader br, uint lengthIncludingHeader, string extentionOrInternalPath = ".tex", long offset = -1)
+        public static async Task<byte[]> CompressTexFile(BinaryReader br, uint lengthIncludingHeader, string extentionOrInternalPath = ".tex", long offset = -1)
         {
             if(offset >= 0)
             {
@@ -1109,7 +1101,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="item">The item</param>
         /// <param name="source">The source importing the file</param>
         /// <returns>The new offset</returns>
-        public async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, string ddsFilePath, IItem item, string source, ModTransaction tx = null)
+        public static async Task<long> ImportColorsetTexture(XivMtrl xivMtrl, string ddsFilePath, IItem item, string source, ModTransaction tx = null)
         {
             var cset = GetColorsetDataFromDDS(ddsFilePath);
 

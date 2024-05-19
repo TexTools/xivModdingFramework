@@ -610,8 +610,7 @@ namespace xivModdingFramework.Materials.DataContainers
         // Shortcut accessor for the texture data.
         public async Task<XivTex> GetTexData()
         {
-            var _tex = new Tex(XivCache.GameInfo.GameDirectory);
-            return await _tex.GetXivTex(this);
+            return await Tex.GetXivTex(this);
         }
 
         public MtrlTexture()
