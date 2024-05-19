@@ -1,4 +1,5 @@
-﻿using System;
+﻿using HelixToolkit.SharpDX.Core.Model;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -16,6 +17,8 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.Enums;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
@@ -121,6 +124,29 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
         /// <summary>
+        /// Alter this metdata to properly point to a new root.
+        /// </summary>
+        /// <param name="newRoot"></param>
+        /// <exception cref="InvalidDataException"></exception>
+        public void AlterRoot(XivDependencyRoot newRoot)
+        {
+            if (newRoot.Info.PrimaryType != Root.Info.PrimaryType 
+                || newRoot.Info.SecondaryType != Root.Info.SecondaryType 
+                || newRoot.Info.Slot != Root.Info.Slot)
+            {
+                throw new InvalidDataException("Cannot alter metadata to different item type.");
+            }
+
+            Root = newRoot;
+
+            // Swap EST pointers.
+            foreach (var entry in EstEntries)
+            {
+                entry.Value.SetId = (ushort)newRoot.Info.PrimaryId;
+            }
+        }
+
+        /// <summary>
         /// Gets the metadata file for an IItem entry
         /// </summary>
         /// <param name="item"></param>
@@ -222,6 +248,60 @@ namespace xivModdingFramework.Mods.FileTypes
             var item = meta.Root.GetFirstItem();
 
             await Dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
+        }
+
+        /// <summary>
+        /// Fills any files that are missing for this metadata.
+        /// In specific, this adds additional materials for missing sets,
+        /// and adds additional models for missing models.
+        /// </summary>
+        /// <param name="source"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public async Task FillMissingFiles(string source, ModTransaction tx)
+        {
+
+            foreach (var kv in EqdpEntries)
+            {
+                if (kv.Value.bit1 == false) continue;
+                // Here we have a new race, we need to create a model for it.
+                await Mdl.AddRacialModel(Root.Info.PrimaryId, Root.Info.Slot, kv.Key, source, tx);
+            }
+
+            if (ImcEntries.Count > 0)
+            {
+                // We have new materials to add.
+
+                // First find the base files to copy. (Just always copy from set 1 for simplicity)
+                var copySource = await Root.GetMaterialFiles(1);
+                var item = Root.GetFirstItem();
+
+                var newMaterialSetMax = ImcEntries.Select(x => x.MaterialSet).Max();
+
+                for (int i = 1; i <= newMaterialSetMax; i++)
+                {
+                    foreach (var material in copySource)
+                    {
+                        var dest = material.Replace("v0001", "v" + i.ToString().PadLeft(4, '0'));
+                        if (await tx.FileExists(dest))
+                        {
+                            // File exists.  No need to modify.
+                            return;
+                        }
+
+                        var mod = await tx.GetMod(dest);
+                        if (mod != null)
+                        {
+                            // Mod exists.  Just re-enable it.
+                            await Modding.SetModState(EModState.Enabled, mod.Value, tx);
+                            return;
+                        }
+
+                        // Material doesn't exist at all, have to copy in a new one.
+                        await Dat.CopyFile(material, dest, source, false, item, tx);
+                    }
+                }
+            }
         }
 
         /// <summary>

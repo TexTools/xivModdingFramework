@@ -483,7 +483,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return type2Bytes;
         }
 
-        internal static async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
+        public static async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
         {
             using (var ms = new MemoryStream(data))
             {
@@ -493,7 +493,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
         }
-        internal static async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
+        public static async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
         {
             if(offset >= 0)
             {
