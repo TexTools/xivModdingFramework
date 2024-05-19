@@ -619,6 +619,33 @@ namespace xivModdingFramework.Materials.DataContainers
             Sampler = new TextureSampler();
         }
 
+        public string Dx11Path
+        {
+            get
+            {
+                var texpath = TexturePath;
+                if((Flags & 0x8000) != 0)
+                {
+                    var path = Path.GetDirectoryName(TexturePath).Replace("\\","/");
+                    var file = Path.GetFileName(TexturePath);
+                    texpath = path + "/--" + file;
+                }
+                return texpath;
+            }
+        }
+
+        public string Dx9Path
+        {
+            get
+            {
+                if ((Flags & 0x8000) != 0)
+                {
+                    return TexturePath;
+                }
+                return null;
+            }
+        }
+
         /// <summary>
         /// Retrieves this texture's usage type based on the sampler id.
         /// </summary>

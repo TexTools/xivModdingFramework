@@ -26,6 +26,7 @@ using System.Data.SQLite;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -415,97 +416,25 @@ namespace xivModdingFramework.Materials.FileTypes
 
         #region One-Off Functions
         /// <summary>
-        /// Retrieves the list of texture paths used by the given mtrl path (significantly faster than loading the entire material and scanning it).
-        /// Could probably get rid of this these days since our MTRL reading has improved significantly, but doesn't hurt to keep it.
+        /// Retrieves the list of texture paths used by the given mtrl.
         /// </summary>
         /// <param name="mtrlPath"></param>
         /// <returns></returns>
         public static async Task<List<string>> GetTexturePathsFromMtrlPath(string mtrlPath, bool includeDummies = false, bool forceOriginal = false, ModTransaction tx = null)
         {
-            var mtrlData = await Dat.ReadSqPackType2(mtrlPath, forceOriginal, tx);
             var uniqueTextures = new HashSet<string>();
-            var texRegex = new Regex(".*\\.tex$");
+            var mtrl = await Mtrl.GetXivMtrl(mtrlPath, forceOriginal, tx);
 
-            using (var br = new BinaryReader(new MemoryStream(mtrlData)))
+            foreach(var tex in mtrl.Textures)
             {
-                // Texture count position.
-                br.BaseStream.Seek(8, SeekOrigin.Begin);
-                var materialDataSize = br.ReadUInt16();
-                var pathsDataSize = br.ReadUInt16();
-                var textureCount = br.ReadByte();
-                var mapCount = br.ReadByte();
-                var cSetCount = br.ReadByte();
-                var dxInfoDataSize = br.ReadByte();
+                uniqueTextures.Add(tex.Dx11Path);
 
-                var offset = 0;
-
-                var dataOffsetBase = 16 + (mapCount * 4) + (cSetCount * 4) + (textureCount * 4);
-
-                var textureDxInfo = new Dictionary<string, ushort>();
-                for(int i = 0; i < textureCount; i++)
+                if(tex.Dx9Path != null)
                 {
-                    // Jump to the texture name offset.
-                    br.BaseStream.Seek(16 + offset, SeekOrigin.Begin);
-                    var textureNameOffset = br.ReadInt16();
-                    var texDxInfo = br.ReadUInt16();
-
-                    // Jump to the texture name.
-                    br.BaseStream.Seek(dataOffsetBase + textureNameOffset, SeekOrigin.Begin);
-
-                    // Read the texture name.
-                    byte a;
-                    List<byte> bytes = new List<byte>(); ;
-                    while ((a = br.ReadByte()) != 0)
-                    {
-                        bytes.Add(a);
-                    }
-
-                    var st = Encoding.ASCII.GetString(bytes.ToArray()).Replace("\0", "");
-
-                    if (texRegex.IsMatch(st))
-                    {
-                        uniqueTextures.Add(st);
-                    }
-                    textureDxInfo[st] = texDxInfo;
-
-                    // Bump to next texture name offset.
-                    offset += 4;
-                }
-
-
-                //var dxInfoOffset = dataOffsetBase + materialDataSize;
-                //br.BaseStream.Seek(dxInfoOffset, SeekOrigin.Begin);
-                //var dxInfoByte = br.ReadByte();
-
-                // Check for DX9/11 Conversion textures.
-                List<string> add = new List<string>();
-                foreach(var texture in uniqueTextures)
-                {
-                    // If this is a texture that has a DX Conversion.
-                    if (textureDxInfo[texture] != 0)
-                    {
-                        if (texture.Contains("--"))
-                        {
-                            add.Add(texture.Replace("--", ""));
-                        }
-                        else
-                        {
-                            add.Add(texture.Insert(texture.LastIndexOf("/") + 1, "--"));
-                        }
-                    }
-                    else
-                    {
-                        // This texture does not have a DX 11 conversion texture.
-                    }
-                }
-
-                foreach(var s in add)
-                {
-                    uniqueTextures.Add(s);
+                    uniqueTextures.Add(tex.Dx9Path);
                 }
             }
 
-            var rem = new List<string>();
             List<string> ret;
             if (includeDummies)
             {
@@ -636,12 +565,6 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 textureOffsets.Add(stringBlock.Count);
                 var path = tex.TexturePath;
-                // This is an old style DX9/DX11 Mixed Texture reference, make sure to clean it up if needed.
-                if (tex.Flags != 0)
-                {
-                    // TODO: Is this still needed in Dawntrail?
-                    path = path.Replace("--", string.Empty);
-                }
 
                 stringBlock.AddRange(Encoding.UTF8.GetBytes(path));
                 stringBlock.Add(0);
@@ -820,6 +743,12 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new offset</returns>
         public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item, string source, bool validateTextures = true, ModTransaction tx = null)
         {
+            var ownTx = false;
+            if(tx == null)
+            {
+                ownTx = true;
+                tx = ModTransaction.BeginTransaction(true);
+            }
             try
             {
                 var mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
@@ -830,22 +759,33 @@ namespace xivModdingFramework.Materials.FileTypes
                 if (validateTextures)
                 {
                     // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
-
                     var dataFile = IOUtil.GetDataFileFromPath(xivMtrl.MTRLPath);
-                    IndexFile index = tx == null ? await Index.GetIndexFile(dataFile, false, true) : await tx.GetIndexFile(dataFile);
 
                     foreach (var tex in xivMtrl.Textures)
                     {
+                        if (tex.Dx9Path != null)
+                        {
+                            // Remove DX9 Flag if we have one but not both textures set up correctly. (User input error most likely)
+                            if (await tx.FileExists(tex.Dx9Path) && !await tx.FileExists(tex.Dx11Path))
+                            {
+                                unchecked
+                                {
+                                    tex.Flags &= (ushort)~0x8000;
+                                }
+                            }
+                        }
+
                         var path = tex.TexturePath;
 
                         // Ignore empty samplers.
                         if (path.StartsWith(EmptySamplerPrefix)) continue;
 
-                        var exists = index.FileExists(tex.TexturePath);
+                        var exists = await tx.FileExists(path);
                         if (exists)
                         {
                             continue;
                         }
+
 
                         var format = XivTexFormat.A8R8G8B8;
 
@@ -860,15 +800,32 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         var di = Tex.GetDefaultTexturePath(tex.Usage);
 
-                        var newOffset = await Tex.ImportTex(xivTex.TextureTypeAndPath.Path, di.FullName, item, source, tx);
+                        await Tex.ImportTex(path, di.FullName, item, source, tx);
+                        if(tex.Dx9Path != null)
+                        {
+                            // Create a fresh DX11 texture as well if we're in split DX9/11 tex mode.
+                            await Tex.ImportTex(tex.Dx11Path, di.FullName, item, source, tx);
+                        }
+
+
 
                     }
+                }
+
+                if (ownTx)
+                {
+                    await ModTransaction.CommitTransaction(tx);
                 }
 
                 return offset;
             }
             catch(Exception ex)
             {
+                if (ownTx)
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+
                 throw ex;
             }
         }

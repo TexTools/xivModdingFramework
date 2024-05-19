@@ -34,6 +34,10 @@ namespace xivModdingFramework.Textures.Enums
         Vfx,
         UI,
         Decal,
+
+        // Legacy Unused DX9 Textures
+        DX9,
+
         Other
     }
 }
