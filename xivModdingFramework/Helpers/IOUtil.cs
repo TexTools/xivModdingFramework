@@ -91,6 +91,10 @@ namespace xivModdingFramework.Helpers
         /// <returns>A string containing the full save path for the given item</returns>
         public static string MakeItemSavePath(IItem item, DirectoryInfo saveDirectory, XivRace race = XivRace.All_Races, int primaryNumber = -1)
         {
+            if(item == null)
+            {
+                return saveDirectory.FullName;
+            }
             string path, validItemName;
 
             // Check for invalid characters and replace with dash 
@@ -394,6 +398,27 @@ namespace xivModdingFramework.Helpers
             var datNum = (int)(((ulong)offset8xWithDatNumEmbed >> 4) & 0b111);
             var offset = RemoveDatNumberEmbed(offset8xWithDatNumEmbed);
             return (offset, datNum);
+        }
+
+        public static long PartsTo8xDataOffset(long explicitFilePointer, int datNumber)
+        {
+            explicitFilePointer = RemoveDatNumberEmbed(explicitFilePointer);
+
+            var unum = (uint)datNumber;
+
+            return explicitFilePointer | (unum << 4);
+        }
+        public static uint PartsToRawDataOffset(uint dataPointer, int datNumber)
+        {
+
+            var unum = (uint)datNumber;
+
+            unchecked
+            {
+                dataPointer = dataPointer & ((uint)~0x0F);
+            }
+
+            return dataPointer | (unum << 1);
         }
 
         /// <summary>

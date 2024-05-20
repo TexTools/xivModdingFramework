@@ -515,16 +515,18 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <summary>
         /// Writes all the files in this data store to the given transaction target.
         /// If the target is the main game files, store the new offsets we write the data to.
+        /// 
+        /// The [openSlots] arg is only used when writing to base game files.
         /// </summary>
         /// <param name="target"></param>
         /// <param name="targetPath"></param>
         /// <returns></returns>
-        internal async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteAllToTarget(ModTransactionSettings settings, ModTransaction tx)
+        internal async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteAllToTarget(ModTransactionSettings settings, ModTransaction tx, Dictionary<XivDataFile, Dictionary<long, uint>> openSlots = null)
         {
             var offsets = new Dictionary<string, (long RealOffset, long TempOffset)>();
             if(settings.Target == ETransactionTarget.GameFiles)
             {
-                return await WriteToGameFiles(tx, settings);
+                return await WriteToGameFiles(tx, settings, openSlots);
             } 
             else if(settings.Target == ETransactionTarget.LuminaFolders)
             {
@@ -541,7 +543,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             throw new InvalidDataException("Invalid Transaction Target");
         }
 
-        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToGameFiles(ModTransaction tx, ModTransactionSettings settings)
+        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToGameFiles(ModTransaction tx, ModTransactionSettings settings, Dictionary<XivDataFile, Dictionary<long, uint>> openSlots)
         {
             if(settings.TargetPath != XivCache.GameInfo.GameDirectory.FullName)
             {
@@ -579,7 +581,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                         var data = await GetCompressedFile(file, forceType2);
 
                         // We now have everything we need for DAT writing.
-                        var realOffset = (await Dat.Unsafe_WriteToDat(data, df)) * 8L;
+                        var realOffset = (await Dat.Unsafe_WriteToDat(data, df, openSlots[df]));
 
                         offsets.Add(path, (realOffset, tempOffset));
                     }

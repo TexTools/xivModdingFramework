@@ -1352,7 +1352,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return await tx.ReadFile(dataFile, offset);
         }
 
-        internal static async Task<byte[]> ReadSqPackType4(byte[] data)
+        public static async Task<byte[]> ReadSqPackType4(byte[] data)
         {
             using (var ms = new MemoryStream(data))
             {
@@ -1369,7 +1369,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="br"></param>
         /// <param name="offset"></param>
         /// <returns></returns>
-        internal static async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
+        public static async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
             {
@@ -1892,29 +1892,48 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Gets the first DAT file with space to add a new file to it.
-        /// Ignores default DAT files, and creates a new DAT file if necessary.
+        /// Gets a writable offset for a file of the given size in the target data file.
         /// </summary>
         /// <param name="dataFile"></param>
+        /// <param name="fileSize"></param>
+        /// <param name="availableSlots"></param>
         /// <returns></returns>
-        private static int GetFirstDatWithSpace(XivDataFile dataFile, int fileSize = 0)
+        private static long GetWritableOffset(XivDataFile dataFile, int fileSize, Dictionary<long, uint> availableSlots)
         {
-            if(fileSize < 0)
+            if (fileSize < 0)
             {
                 throw new InvalidDataException("Cannot check space for a negative size file.");
             }
 
-            if(fileSize % 256 != 0)
+            fileSize = Dat.Pad(fileSize, 256);
+
+            // Scan available slots first.
+            var slot = availableSlots.FirstOrDefault(x => x.Value >= fileSize);
+            if(slot.Key > 0 && slot.Value > 0)
             {
-                // File will be rounded up to 256 bytes on entry, so we have to account for that.
-                var remainder = 256 - (fileSize % 256);
-                fileSize += remainder;
+                // Take the slot.
+                availableSlots.Remove(slot.Key);
+
+                var slotParts = IOUtil.Offset8xToParts(slot.Key);
+                var remainingSize = slot.Value - fileSize;
+
+                // We have extra usable space remaining.
+                if(remainingSize > 256)
+                {
+                    // Write the remainder slot back.
+                    var newSlotOffset = IOUtil.PartsTo8xDataOffset(slotParts.Offset + fileSize, slotParts.DatNum);
+                    availableSlots.Add(newSlotOffset, (uint)remainingSize);
+
+                }
+
+                return slot.Key;
             }
 
-            var targetDat = -1;
-            Dictionary<int, FileInfo> finfos = new Dictionary<int, FileInfo>(8);
+            // Otherwise we're looking to find a modded dat with space at the end.
 
             // Scan all the dat numbers...
+            var datWithSpace = -1;
+            long offset = -1;
             for (int i = 0; i < 8; i++)
             {
                 var datPath = Dat.GetDatPath(dataFile, i);
@@ -1929,43 +1948,36 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
                 var fInfo = new FileInfo(datPath);
-                finfos[i] = fInfo;
 
                 // If the DAT doesn't exist at all, we can assume we need to create a new DAT.
                 if (fInfo == null || !fInfo.Exists) break;
 
 
-                var datSize = fInfo.Length;
-
-                // Files will only be injected on multiples of 256 bytes, so we have to account for the potential
-                // extra padding space to get to that point.
-                if(datSize % 256 != 0)
-                {
-                    var remainder = 256 - (datSize % 256);
-                    datSize += remainder;
-                }
+                // Offsets must be on 256 byte intervals.
+                var datSize = Dat.Pad(fInfo.Length, 256);
 
                 // Dat is too large to fit this file, we can't write to it.
                 if (datSize + fileSize >= GetMaximumDatSize()) continue;
 
-
                 // Found an existing dat that has space.
-                targetDat = i;
-                break;
-            }
-            // Didn't find a DAT file with space, gotta create a new one.
-            if (targetDat < 0)
-            {
-                targetDat = CreateNewDat(dataFile);
+                offset = IOUtil.PartsTo8xDataOffset(datSize, i);
+                return offset;
             }
 
-            if(targetDat > 7 || targetDat < 0)
+
+            // Didn't find a DAT file with space, gotta create a new one.
+            datWithSpace = CreateNewDat(dataFile);
+
+            if(datWithSpace > 7 || datWithSpace  < 0)
             {
                 throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetFileName());
             }
-            return targetDat;
-        }
 
+            // Offsets start at 2048
+            offset = IOUtil.PartsTo8xDataOffset(2048, datWithSpace);
+
+            return offset;
+        }
 
         /// <summary>
         /// Copies a file from a given offset to a new path in the game files.
@@ -2051,7 +2063,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="importData"></param>
         /// <param name="dataFile"></param>
         /// <returns></returns>
-        internal static async Task<uint> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile)
+        internal static async Task<long> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, Dictionary<long, uint> openSlots)
         {
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
@@ -2069,69 +2081,35 @@ namespace xivModdingFramework.SqPack.FileTypes
             await _lock.WaitAsync();
             try
             {
-                // This finds the first dat with space, OR creates one if needed.
-                var datNum = GetFirstDatWithSpace(dataFile, importData.Length);
+                // Get our new target offset...
+                var offset = GetWritableOffset(dataFile, importData.Length, openSlots);
 
-                var datPath = Dat.GetDatPath(dataFile, datNum);
+                var parts = IOUtil.Offset8xToParts(offset);
 
-                // Copy the data into the file.
-                BinaryWriter bw = null;
+                var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
 
-                try
+                using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
                 {
-                    try
-                    {
-                        bw = new BinaryWriter(File.OpenWrite(datPath));
-                    }
-                    catch
-                    {
-                        if(bw != null)
-                        {
-                            bw.Dispose();
-                        }
-
-                        // Wait just a bit and try again.
-                        await Task.Delay(100);
-                        bw = new BinaryWriter(File.OpenWrite(datPath));
-                    }
-
-                    bw.BaseStream.Seek(0, SeekOrigin.End);
-
-                    // Make sure we're starting on an actual accessible interval.
-                    while ((bw.BaseStream.Position % 256) != 0)
-                    {
-                        bw.Write((byte)0);
-                    }
+                    // Seek to the target location.
+                    bw.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
 
                     filePointer = bw.BaseStream.Position;
 
                     // Write data.
                     bw.Write(importData);
 
-                    // Make sure we end on an accessible interval as well to be safe.
+                    // Write out remaining padding as needed.
                     while ((bw.BaseStream.Position % 256) != 0)
                     {
                         bw.Write((byte)0);
                     }
 
-                    var size = bw.BaseStream.Length;
-                    UpdateDatHeader(bw, datNum, size);
-
-                }
-                finally
-                {
-                    if (bw != null)
-                    {
-                        bw.Dispose();
-                    }
+                    var datSize = bw.BaseStream.Length;
+                    UpdateDatHeader(bw, parts.DatNum, datSize);
                 }
 
-                var intFormat = (uint)(filePointer / 8);
-                uint datIdentifier = (uint)(datNum * 2);
 
-                uint indexOffset = (uint) (intFormat | datIdentifier);
-
-                return indexOffset;
+                return offset;
             } finally
             {
                 _lock.Release();
@@ -2317,69 +2295,71 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only).
-        /// NOT TRANSACTION SAFE - This reads from the baseline DATS for this determinant.
-        /// 
-        /// Currently Unused.  Could use this during TX Commit phase to help avoid empty blocks?
+        /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only),
+        /// which can be safely written to without disrupting existing files, even if the commit goes badly.
         /// </summary>
         /// <param name="df"></param>
         /// <returns></returns>
-        private static async Task<Dictionary<long, long>> ComputeOpenSlots(XivDataFile df)
+        internal static Dictionary<long, uint> ComputeOpenSlots(XivDataFile df, ModList modlist)
         {
 
             var moddedDats = Dat.GetModdedDatList(df);
+            var slots = new Dictionary<long, uint>();
 
-            // Clean Readonly TX.
-            var tx = ModTransaction.BeginTransaction();
-
-            var slots = new Dictionary<long, long>();
-            var modlist = await tx.GetModList();
-
-            var modsByFile = modlist.GetMods().GroupBy(x => {
-                long offset = x.ModOffset8x;
-                var rawOffset = offset / 8;
-                var datNum = (rawOffset & 0xF) >> 1;
-                return (int)datNum;
-            });
-
-            foreach(var kv in modsByFile)
+            var allModsByOffset = modlist.GetModsByOffset();
+            if (!allModsByOffset.ContainsKey(df))
             {
-                var file = kv.Key;
-                long fileOffsetKey = file << 4;
+                return slots;
+            }
 
-                // Order by their offset, ascending.
-                var ordered = kv.OrderBy(x => x.ModOffset8x);
+            // Make sure they're sorted.
 
-                // Scan through each mod, and any time there's a gap, add it to the listing.
-                long lastEndPoint = 2048;
-                foreach (var mod in ordered) {
-                    var fileOffset = (mod.ModOffset8x >> 7) << 7;
+            var groupedByFile = allModsByOffset[df].Select(x => x.Value).GroupBy(x => IOUtil.Offset8xToParts(x.ModOffset8x).DatNum);
 
-                    var size = mod.FileSize;
-                    if(size <= 0)
+            var groupedAndOrderedMods = groupedByFile.ToDictionary(x => x.Key, x => x.OrderBy(x => x.ModOffset8x));
+
+
+            const uint _DAT_PADDING_VALUE = 256;
+
+            long lastEndPoint = 2048;
+            foreach (var datNumKv in groupedAndOrderedMods)
+            {
+                var datNum = datNumKv.Key;
+                var mods = datNumKv.Value;
+                foreach (var mod in mods)
+                {
+                    var parts = IOUtil.Offset8xToParts(mod.ModOffset8x);
+                    // If there's a space between previous mod and this one, it's from end of previous file to this offset.
+                    var slotSize = parts.Offset - lastEndPoint;
+                    if (slotSize > _DAT_PADDING_VALUE)
                     {
-                        var parts = IOUtil.Offset8xToParts(mod.ModOffset8x);
+                        var mergedStart = IOUtil.PartsTo8xDataOffset(lastEndPoint, datNum);
+                        slots.Add(mergedStart, (uint) slotSize);
+                    }
+
+
+                    uint size = (uint)mod.FileSize;
+                    if (size <= 0)
+                    {
+                        // Force filesize read.
                         using (var br = new BinaryReader(File.OpenRead(Dat.GetDatPath(df, parts.DatNum))))
                         {
                             // Check size.
                             br.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
-                            Dat.GetCompressedFileSize(br);
+                            Dat.GetCompressedFileSize(br, parts.Offset);
                         }
                     }
 
-                    if(size % 256 != 0)
+                    // Account for required DAT padding.
+                    if (size % _DAT_PADDING_VALUE != 0)
                     {
-                        size += (256 - (size % 256));
+                        size += (_DAT_PADDING_VALUE - (size % _DAT_PADDING_VALUE));
                     }
 
-                    var slotSize = fileOffset - lastEndPoint;
-                    if (slotSize > 256)
-                    {
-                        var mergedStart = lastEndPoint | fileOffsetKey;
-                        slots.Add(mergedStart, slotSize);
-                    }
+                    // Mark the actual file end.
+                    lastEndPoint = parts.Offset + size;
 
-                    lastEndPoint = fileOffset + size;
+
                 }
             }
 

@@ -1378,6 +1378,16 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static async Task<List<string>> GetChildFiles(string internalFilePath, ModTransaction tx = null)
         {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            if(string.IsNullOrEmpty(internalFilePath) || !await tx.FileExists(internalFilePath))
+            {
+                return new List<string>();
+            }
 
             var level = GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid)

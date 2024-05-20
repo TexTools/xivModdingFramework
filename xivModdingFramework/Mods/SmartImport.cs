@@ -177,10 +177,13 @@ namespace xivModdingFramework.Mods
                     magic = BitConverter.ToUInt64(header, 0);
                     magic32 = BitConverter.ToUInt32(header, 0);
                     magic16 = BitConverter.ToUInt16(header, 0);
-                    magic20b = BitConverter.ToString(header, 0, 20);
-                    magic16b = BitConverter.ToString(header, 0, 16);
+                    magic20b = ASCIIEncoding.ASCII.GetString(header, 0, 20);
+                    magic16b = ASCIIEncoding.ASCII.GetString(header, 0, 16);
                 }
             }
+
+            var asAscii = ASCIIEncoding.ASCII.GetString(BitConverter.GetBytes(magic));
+            var pngMagicAsAscii = ASCIIEncoding.ASCII.GetString(BitConverter.GetBytes(PNGMagic));
 
 
 
@@ -294,7 +297,7 @@ namespace xivModdingFramework.Mods
 
         const ushort BMPMagic = 0x424D;
         const uint DDSMagic = 0x20534444;
-        const ulong PNGMagic = 0x89504E470D0A1A0A;
+        const ulong PNGMagic = 0x0A1A0A0D474E5089;
         const string FBXMagic = "Kaydara FBX Binary  ";
         const string SQLiteMagic = "SQLite format 3\0";
     }

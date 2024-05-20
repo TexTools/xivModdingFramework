@@ -33,6 +33,10 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
 
             var ret = base.INTERNAL_SetDataOffset(filePath, newRawOffsetWithDatNumEmbed, allowRepair);
+            if (tx != null && originalOffset != newRawOffsetWithDatNumEmbed)
+            {
+                tx.INTERNAL_OnFileChanged(filePath, true);
+            }
             return ret;
         }
     }

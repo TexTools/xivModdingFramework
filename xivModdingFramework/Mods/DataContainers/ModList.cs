@@ -294,6 +294,32 @@ namespace xivModdingFramework.Mods.DataContainers
         }
 
         /// <summary>
+        /// Retrieves a structured dictionary of all mod offsets.
+        /// </summary>
+        /// <returns></returns>
+        internal Dictionary<XivDataFile, Dictionary<long, Mod>> GetModsByOffset()
+        {
+            var ret = new Dictionary<XivDataFile, Dictionary<long, Mod>>();
+            foreach(var x in _Mods)
+            {
+                var df = x.Value.DataFile;
+                if (!ret.ContainsKey(df))
+                {
+                    ret.Add(df, new Dictionary<long, Mod>());
+                }
+
+                var offset = x.Value.ModOffset8x;
+                if (ret[df].ContainsKey(offset))
+                {
+                    continue;
+                }
+
+                ret[df].Add(offset, x.Value);
+            }
+            return ret;
+        }
+
+        /// <summary>
         /// Retrieves a subset of mods based on a given predicate.
         /// </summary>
         /// <param name="predicate"></param>

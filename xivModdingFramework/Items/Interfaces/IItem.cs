@@ -29,7 +29,7 @@ namespace xivModdingFramework.Items.Interfaces
         /// <summary>
         /// The item Name
         /// </summary>
-        string Name { get; }
+        string Name { get; set;  }
 
         /// <summary>
         /// The top level category
@@ -39,7 +39,7 @@ namespace xivModdingFramework.Items.Interfaces
         /// <remarks>
         /// This would be a category such as Gear, Character, Companion, and UI
         /// </remarks>
-        string PrimaryCategory { get; }
+        string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The second level category.
@@ -47,7 +47,7 @@ namespace xivModdingFramework.Items.Interfaces
         /// <remarks>
         /// This would be a category such as Body, Legs, Ears, Hair, Minions, Maps
         /// </remarks>
-        string SecondaryCategory { get; }
+        string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The third level category.
@@ -84,22 +84,19 @@ namespace xivModdingFramework.Items.Interfaces
     /// </summary>
     public class SimpleIItem : IItem
     {
-        public string Name => GetModlistItemName();
+        public string Name { get; set; } = "";
 
-        public string PrimaryCategory => GetModlistItemCategory();
+        public string PrimaryCategory { get; set; } = "";
 
-        public string SecondaryCategory => "";
+        public string SecondaryCategory { get; set; } = "";
 
-        public string TertiaryCategory => "";
+        public string TertiaryCategory { get; set; } = "";
 
         public XivDataFile DataFile => XivDataFile._04_Chara;
-
-        private string _Name;
-        private string _Category;
         public SimpleIItem(string name, string category)
         {
-            _Name = name;
-            _Category = category;
+            Name  = name;
+            SecondaryCategory = category;
         }
 
         public int CompareTo(object obj)
@@ -107,14 +104,14 @@ namespace xivModdingFramework.Items.Interfaces
             return 0;
         }
 
-        public string GetModlistItemCategory()
-        {
-            return _Category;
-        }
-
         public string GetModlistItemName()
         {
-            return _Name;
+            return Name;
+        }
+
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory;
         }
     }
 

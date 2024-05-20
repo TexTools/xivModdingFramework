@@ -129,6 +129,7 @@ namespace xivModdingFramework.Mods
     {
 
         #region Events
+        public delegate void FileChangedEventHandler(string internalFilePath);
         public delegate void TransactionEventHandler(ModTransaction sender);
         public delegate void TransactionCancelledEventHandler(ModTransaction sender, bool graceful);
         public delegate void TransactionStateChangedEventHandler(ModTransaction sender, ETransactionState oldState, ETransactionState newState);
@@ -138,10 +139,16 @@ namespace xivModdingFramework.Mods
         public event TransactionEventHandler TransactionClosed;
         public event TransactionStateChangedEventHandler TransactionStateChanged;
 
+        // Called during TX when a file is changed internally.
+        public event FileChangedEventHandler FileChanged;
+
         public static event TransactionEventHandler ActiveTransactionCommitted;
         public static event TransactionCancelledEventHandler ActiveTransactionCancelled;
         public static event TransactionEventHandler ActiveTransactionClosed;
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
+
+        // Called when a commit is completed that changed files.
+        public static event FileChangedEventHandler FileChangedOnCommit;
 
         public static event TransactionEventHandler ActiveTransactionBlocked;
 
@@ -602,6 +609,18 @@ namespace xivModdingFramework.Mods
                 if (cancelled) return;
             }
 
+            Dictionary<XivDataFile, Dictionary<long, uint>> openSlots = null;
+
+            if(Settings.Target == ETransactionTarget.GameFiles)
+            {
+                // We need the current file-state of the modlist for this.
+                var originalModList = await Modding.INTERNAL_GetModList(false);
+                openSlots = new Dictionary<XivDataFile, Dictionary<long, uint>>();
+                foreach(var df in _IndexFiles.Keys)
+                {
+                    openSlots.Add(df, Dat.ComputeOpenSlots(df, originalModList));
+                }
+            }
 
             // Perform, in order...
             // DATA WRITE => MODLIST WRITE => INDEX WRITE
@@ -612,9 +631,9 @@ namespace xivModdingFramework.Mods
             // Once Index save is done, so are we.
 
             // Write data from the transaction store to the real data target.
-            var pathMap = await _DataHandler.WriteAllToTarget(Settings, this);
+            var pathMap = await _DataHandler.WriteAllToTarget(Settings, this, openSlots);
 
-            await WriteDisabledMods(pathMap);
+            await WriteDisabledMods(pathMap, openSlots);
 
             // If the data handler returned a null, that means we aren't doing
             // anything else to the base game files/modlist here.
@@ -691,10 +710,17 @@ namespace xivModdingFramework.Mods
                 }
 
                 // We have to queue all of the touched files up as possibly changed in the Mod Cache to be safe.
-                HashSet<string> files = new HashSet<string>();
-                files.Union(_PrePrepStates.Keys);
-                files.Union(_OriginalStates.Keys);
+                IEnumerable<string> files = new HashSet<string>();
+                files = files.Union(_PrePrepStates.Keys);
+                files = files.Union(_OriginalStates.Keys);
+                files = new HashSet<string>(files);
                 XivCache.QueueDependencyUpdate(files);
+
+                // Notify the world of all the files that changed in this transaction.
+                foreach(var file in files)
+                {
+                    INTERNAL_OnFileChanged(file, false);
+                }
             }
 
             TransactionCommitted?.Invoke(this);
@@ -1129,7 +1155,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="writtenOffsets"></param>
         /// <returns></returns>
-        private async Task WriteDisabledMods(Dictionary<string, (long RealOffset, long TempOffset)> writtenOffsets)
+        private async Task WriteDisabledMods(Dictionary<string, (long RealOffset, long TempOffset)> writtenOffsets, Dictionary<XivDataFile, Dictionary<long, uint>> openSlots)
         {
             if(Settings.Target != ETransactionTarget.GameFiles || !AffectsGameFiles)
             {
@@ -1167,7 +1193,7 @@ namespace xivModdingFramework.Mods
                 
                 // Retrieve the compressed data and write it to the DATs.
                 var data = await _DataHandler.GetCompressedFile(df, tempOffset, forceType2);
-                var realOffset = (await Dat.Unsafe_WriteToDat(data, df)) * 8L;
+                var realOffset = (await Dat.Unsafe_WriteToDat(data, df, openSlots[df]));
 
                 writtenOffsets.Add(path, (realOffset, tempOffset));
             }
@@ -1264,6 +1290,20 @@ namespace xivModdingFramework.Mods
             if (_TemporaryOffsetMapping[dataFile].ContainsKey(originalOffset))
             {
                 _TemporaryOffsetMapping[dataFile][originalOffset].Remove(path);
+            }
+
+        }
+
+        internal void INTERNAL_OnFileChanged(string path, bool fromIndex)
+        {
+            if (fromIndex && State != ETransactionState.Closing)
+            {
+                // Notify the followers of /this/ TX that there was a change.
+                FileChanged?.Invoke(path);
+            } else if (!fromIndex && State == ETransactionState.Closing)
+            {
+                // Notify the whole world of commit-time changes.
+                FileChangedOnCommit?.Invoke(path);
             }
         }
 
