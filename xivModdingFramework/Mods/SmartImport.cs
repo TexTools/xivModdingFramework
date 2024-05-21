@@ -201,7 +201,7 @@ namespace xivModdingFramework.Mods
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.
-                return await Mdl.FileToModelBytes(externalPath, internalPath);
+                return await Mdl.FileToUncompressedMdl(externalPath, internalPath);
             }
 
             // This is either a binary file for type 2 compression or an already compressed file.

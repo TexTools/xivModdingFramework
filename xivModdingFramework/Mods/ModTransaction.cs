@@ -841,9 +841,12 @@ namespace xivModdingFramework.Mods
                     var datPath = Dat.GetDatPath(dataFile, i);
                     if (File.Exists(datPath) && _DatFileSizes[dataFile].Count > i)
                     {
-                        using (var fs = File.Open(datPath, FileMode.Open))
+                        if (new FileInfo(datPath).Length != _DatFileSizes[dataFile][i])
                         {
-                            fs.SetLength(_DatFileSizes[dataFile][i]);
+                            using (var fs = File.Open(datPath, FileMode.Open))
+                            {
+                                fs.SetLength(_DatFileSizes[dataFile][i]);
+                            }
                         }
                     }
                 }

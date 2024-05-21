@@ -2138,7 +2138,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (!AllowDatAlteration)
                 {
-                    throw new Exception("Cannot Write non-transaction modded file while DAT Writing is disabled.");
+                    throw new Exception("Cannot Write file while DAT Writing is disabled.");
                 }
 
                 doDatSave = true;

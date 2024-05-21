@@ -257,6 +257,11 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <returns></returns>
         public Mod? GetMod(string path)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
             Mod? ret = _Mods.ContainsKey(path) ? _Mods[path] : null;
             return ret;
         }

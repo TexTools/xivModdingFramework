@@ -301,6 +301,13 @@ namespace xivModdingFramework.Models.FileTypes
             return ttModel;
         }
 
+        public static TTModel GetTTModel(byte[] mdlData, string mdlPath = "", ModTransaction tx = null)
+        {
+            var mdl = GetXivMdl(mdlData, mdlPath);
+            var ttModel = TTModel.FromRaw(mdl);
+            return ttModel;
+        }
+
         /// <summary>
         /// Retrieves the raw XivMdl file at a given internal file path.
         /// </summary>
@@ -310,7 +317,7 @@ namespace xivModdingFramework.Models.FileTypes
             long offset = 0;
             var df = IOUtil.GetDataFileFromPath(mdlPath);
 
-            if(tx == null)
+            if (tx == null)
             {
                 // Readonly TX if we don't already have one.
                 tx = ModTransaction.BeginTransaction();
@@ -322,13 +329,16 @@ namespace xivModdingFramework.Models.FileTypes
                 return null;
             }
 
-            var getShapeData = true;
-
-
             var mdlData = await Dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(mdlPath), tx);
+            return GetXivMdl(mdlData, mdlPath);
+        }
+
+        public static XivMdl GetXivMdl(byte[] mdlData, string mdlPath = "")
+        {
 
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
+            var getShapeData = true;
 
             var meshCount = BitConverter.ToUInt16(mdlData, 12);
 
@@ -1690,51 +1700,36 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="mdlPath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialVariant = -1, bool getOriginal = false, bool includeSkin = true, ModTransaction tx = null)
+        public static async Task<List<string>> GetReferencedMaterialPaths(string mdlPath, int materialSetId = -1, bool getOriginal = false, bool includeSkin = true, ModTransaction tx = null)
         {
-            // Language is irrelevant here.
-            var dataFile = IOUtil.GetDataFileFromPath(mdlPath);
-            var useCached = false;
-
             if (tx == null)
             {
-                // If TX is null, this is probably coming from the internal mod cache resolver.
-                // Just use a readonly transaction.
-                useCached = true;
+                // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var materials = new List<string>();
-
             // Read the raw Material names from the file.
             var materialNames = await GetReferencedMaterialNames(mdlPath, getOriginal, tx);
-            var root = await XivCache.GetFirstRoot(mdlPath);
-            if(materialNames.Count == 0)
+
+            return await GetReferencedMaterialPaths(materialNames, mdlPath, materialSetId, getOriginal, includeSkin, tx);
+        }
+
+        public static async Task<List<string>> GetReferencedMaterialPaths(List<string> materialNames, string mdlPath, int materialSetId = -1, bool getOriginal = false, bool includeSkin = true, ModTransaction tx = null)
+        {
+            var materials = new List<string>();
+            if (materialNames.Count == 0)
             {
                 return materials;
             }
 
-            var materialVariants = new HashSet<int>();
-            if (materialVariant >= 0)
+            var root = await XivCache.GetFirstRoot(mdlPath);
+
+            var materialSets = new HashSet<int>();
+            if (materialSetId >= 0)
             {
                 // If we had a specific variant to get, just use that.
-                materialVariants.Add(materialVariant);
+                materialSets.Add(materialSetId);
 
-            }
-            else if(useCached && root != null)
-            {
-                var metadata = await ItemMetadata.GetMetadata(root, false, tx);
-                if (metadata.ImcEntries.Count == 0 || !Imc.UsesImc(root))
-                {
-                    materialVariants.Add(1);
-                }
-                else
-                {
-                    foreach (var entry in metadata.ImcEntries)
-                    {
-                        materialVariants.Add(entry.MaterialSet);
-                    }
-                }
             }
             else
             {
@@ -1744,7 +1739,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (imcPath == null)
                 {
                     // No IMC file means this Mdl doesn't use variants/only has a single variant.
-                    materialVariants.Add(1);
+                    materialSets.Add(1);
                 }
                 else
                 {
@@ -1752,30 +1747,35 @@ namespace xivModdingFramework.Models.FileTypes
                     // We need to get the IMC info for this MDL so that we can pull every possible Material Variant.
                     try
                     {
-                        var info = await Imc.GetFullImcInfo(imcPath, tx);
-                        var slotRegex = new Regex("_([a-z]{3}).mdl$");
-                        var slot = "";
-                        var m = slotRegex.Match(mdlPath);
-                        if (m.Success)
-                        {
-                            slot = m.Groups[1].Value;
-                        }
-
-                        // We have to get all of the material variants used for this item now.
-                        var imcInfos = info.GetAllEntries(slot, true);
-                        foreach (var i in imcInfos)
-                        {
-                            if (i.MaterialSet != 0)
+                        if (Imc.UsesImc(root)) {
+                            var info = await Imc.GetFullImcInfo(imcPath, tx);
+                            var slotRegex = new Regex("_([a-z]{3}).mdl$");
+                            var slot = "";
+                            var m = slotRegex.Match(mdlPath);
+                            if (m.Success)
                             {
-                                materialVariants.Add(i.MaterialSet);
+                                slot = m.Groups[1].Value;
                             }
+
+                            // We have to get all of the material variants used for this item now.
+                            var imcInfos = info.GetAllEntries(slot, true);
+                            foreach (var i in imcInfos)
+                            {
+                                if (i.MaterialSet != 0)
+                                {
+                                    materialSets.Add(i.MaterialSet);
+                                }
+                            }
+                        } else
+                        {
+                            materialSets.Add(1);
                         }
                     }
                     catch
                     {
                         // Some Dual Wield weapons don't have any IMC entry at all.
                         // In these cases they just use Material Variant 1 (Which is usually a simple dummy material)
-                        materialVariants.Add(1);
+                        materialSets.Add(1);
                     }
                 }
             }
@@ -1783,7 +1783,7 @@ namespace xivModdingFramework.Models.FileTypes
             // We have to get every material file that this MDL references.
             // That means every variant of every material referenced.
             var uniqueMaterialPaths = new HashSet<string>();
-            foreach (var mVariant in materialVariants)
+            foreach (var mVariant in materialSets)
             {
                 foreach (var mName in materialNames)
                 {
@@ -2314,74 +2314,41 @@ namespace xivModdingFramework.Models.FileTypes
             });
         }
 
-        /// <summary>
-        /// Import a given model
-        /// </summary>
-        /// <param name="item">The current item being imported</param>
-        /// <param name="race">The racial model to replace of the item</param>
-        /// <param name="path">The location of the file to import</param>
-        /// <param name="source">The source/application that is writing to the dat.</param>
-        /// <param name="intermediaryFunction">Function to call after populating the TTModel but before converting it to a Mdl.
-        ///     Takes in the new TTModel we're importing, and the old model we're overwriting.
-        ///     Should return a boolean indicating whether the process should continue or cancel (false to cancel)
-        /// </param>
-        /// <param name="loggingFunction">
-        /// Function to call when the importer receives a new log line.
-        /// Takes in [bool isWarning, string message].
-        /// </param>
-        /// <param name="rawDataOnly">If this function should not actually finish the import and only return the raw byte data.</param>
-        /// <returns>A dictionary containing any warnings encountered during import.</returns>
-        public static async Task<byte[]> ImportModel(IItemModel item, XivRace race, string path, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, string source = "Unknown", string submeshId = null, bool rawDataOnly = false, ModTransaction tx = null)
+
+        public static async Task<long> ImportModel(string externalFile, IItemModel item, XivRace race, string submeshId = null, ModelImportOptions options = null, ModTransaction tx = null)
+        {
+
+            var mdlPath = await GetMdlPath(item, race, submeshId, tx);
+            return await ImportModel(externalFile, mdlPath, options, tx);
+
+
+        }
+        public static async Task<long> ImportModel(string externalFile, string internalFile, ModelImportOptions options = null, ModTransaction tx = null)
         {
 
             #region Setup and Validation
             if (options == null)
             {
-                options = new ModelModifierOptions();
+                options = new ModelImportOptions();
             }
 
-            if (loggingFunction == null)
+            if (options.LoggingFunction == null)
             {
-                loggingFunction = NoOp;
-            }
-
-            // Test the Path.
-            if (path != null && path != "")
-            {
-                DirectoryInfo fileLocation = null;
-                try
-                {
-                    fileLocation = new DirectoryInfo(path);
-                }
-                catch (Exception ex)
-                {
-                    throw new IOException("Invalid file path.");
-                }
-
-                if (!File.Exists(fileLocation.FullName))
-                {
-                    throw new IOException("The file provided for import does not exist");
-                }
+                options.LoggingFunction = NoOp;
             }
             #endregion
 
-            var mdlPath = await GetMdlPath(item, race, submeshId, tx);
-
-            var bytes = await FileToModelBytes(path, mdlPath, options, loggingFunction, intermediaryFunction, tx);
+            var bytes = await FileToUncompressedMdl(externalFile, internalFile, options, tx);
             var compressed = await CompressMdlFile(bytes);
 
-            byte[] ret = null;
-            if (!rawDataOnly)
-            {
-                loggingFunction(false, "Writing MDL File to FFXIV File System...");
-                await Dat.WriteModFile(compressed, mdlPath, source, item, tx);
-            } else
-            {
-                ret = compressed;
-            }
 
-            loggingFunction(false, "Job done!");
-            return ret;
+            byte[] ret = null;
+
+            options.LoggingFunction(false, "Writing MDL File to FFXIV File System...");
+            var offset = await Dat.WriteModFile(compressed, internalFile, options.SourceApplication, options.ReferenceItem, tx);
+
+            options.LoggingFunction(false, "Job done!");
+            return offset;
         }
 
         /// <summary>
@@ -2398,17 +2365,24 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         /// <exception cref="InvalidDataException"></exception>
-        public static async Task<byte[]> FileToModelBytes(string externalPath, string internalPath, ModelModifierOptions options = null, Action<bool, string> loggingFunction = null, Func<TTModel, TTModel, Task<bool>> intermediaryFunction = null, ModTransaction tx = null)
+        public static async Task<byte[]> FileToUncompressedMdl(string externalPath, string internalPath, ModelImportOptions options = null, ModTransaction tx = null)
         {
 
             if (options == null)
             {
-                options = new ModelModifierOptions();
+                options = new ModelImportOptions();
             }
 
-            if (loggingFunction == null)
+            if (options.LoggingFunction == null)
             {
-                loggingFunction = NoOp;
+                options.LoggingFunction = NoOp;
+            }
+            var loggingFunction = options.LoggingFunction;
+
+            // Test the Path.
+            if (string.IsNullOrWhiteSpace(externalPath) || !File.Exists(externalPath))
+            {
+                throw new IOException("Invalid file path.");
             }
 
             if (tx == null)
@@ -2505,17 +2479,17 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 // Apply our Model Modifier options to the model.
-                options.Apply(ttModel, currentMdl, originalMdl, loggingFunction);
+                options.Apply(ttModel, currentMdl, originalMdl);
 
 
                 // Call the user function, if one was provided.
-                if (intermediaryFunction != null)
+                if (options.IntermediaryFunction != null)
                 {
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
                     var oldModel = TTModel.FromRaw(originalMdl);
-                    bool cont = await intermediaryFunction(ttModel, oldModel);
+                    bool cont = await options.IntermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
                         loggingFunction(false, "User cancelled import process.");

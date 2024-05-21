@@ -18,6 +18,8 @@ using System.Runtime.CompilerServices;
 using HelixToolkit.SharpDX.Core.ShaderManager;
 using System.Globalization;
 using SharpDX.Direct2D1;
+using System.Diagnostics;
+using xivModdingFramework.Items.Interfaces;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -25,7 +27,7 @@ namespace xivModdingFramework.Models.Helpers
     /// <summary>
     /// Simple booleans to determine behavior of the gobal level model modifiers.
     /// </summary>
-    public class ModelModifierOptions
+    public class ModelImportOptions
     {
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
@@ -37,12 +39,25 @@ namespace xivModdingFramework.Models.Helpers
         public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
         public XivRace SourceRace { get; set; }
+        public IItem ReferenceItem { get; set; }
+
+        public string SourceApplication { get; set; }
+
+        /// <summary>
+        /// Logging output function.
+        /// </summary>
+        public Action<bool, string> LoggingFunction { get; set; }
+
+        /// <summary>
+        /// Function that is called for any additional processing during import, if desired.
+        /// </summary>
+        public Func<TTModel, TTModel, Task<bool>> IntermediaryFunction { get; set; }
 
 
         /// <summary>
         /// Default constructor explicitly establishes option defaults.
         /// </summary>
-        public ModelModifierOptions()
+        public ModelImportOptions()
         {
             CopyAttributes = true;
             CopyMaterials = true;
@@ -54,6 +69,10 @@ namespace xivModdingFramework.Models.Helpers
             ClearVAlpha = false;
             AutoScale = true;
             SourceRace = XivRace.All_Races;
+            LoggingFunction = null;
+            IntermediaryFunction = null;
+            SourceApplication = "Unknown";
+            ReferenceItem = null;
         }
 
         /// <summary>
@@ -61,11 +80,11 @@ namespace xivModdingFramework.Models.Helpers
         /// originalMdl is optional as it's only used when copying shape data.
         /// </summary>
         /// <param name="ttModel"></param>
-        public void Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null, Action<bool, string> loggingFunction = null)
+        public void Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null)
         {
-            if (loggingFunction == null)
+            if (LoggingFunction == null)
             {
-                loggingFunction = ModelModifiers.NoOp;
+                LoggingFunction = ModelModifiers.NoOp;
             }
 
             if(originalMdl == null)
@@ -80,8 +99,8 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot copy settings from null MDL.");
                 }
-                ModelModifiers.MergeMeshTypes(ttModel, currentMdl, loggingFunction);
-                ModelModifiers.MergeAttributeData(ttModel, currentMdl, loggingFunction);
+                ModelModifiers.MergeMeshTypes(ttModel, currentMdl, LoggingFunction);
+                ModelModifiers.MergeAttributeData(ttModel, currentMdl, LoggingFunction);
             }
 
             if (CopyMaterials)
@@ -90,32 +109,32 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot copy settings from null MDL.");
                 }
-                ModelModifiers.MergeMaterialData(ttModel, currentMdl, loggingFunction);
+                ModelModifiers.MergeMaterialData(ttModel, currentMdl, LoggingFunction);
             }
 
             if (ForceUVQuadrant)
             {
-                ModelModifiers.ForceUVQuadrant(ttModel, loggingFunction);
+                ModelModifiers.ForceUVQuadrant(ttModel, LoggingFunction);
             }
 
             if (ClearUV2)
             {
-                ModelModifiers.ClearUV2(ttModel, loggingFunction);
+                ModelModifiers.ClearUV2(ttModel, LoggingFunction);
             }
 
             if (CloneUV2)
             {
-                ModelModifiers.CloneUV2(ttModel, loggingFunction);
+                ModelModifiers.CloneUV2(ttModel, LoggingFunction);
             }
 
             if (ClearVColor)
             {
-                ModelModifiers.ClearVColor(ttModel, loggingFunction);
+                ModelModifiers.ClearVColor(ttModel, LoggingFunction);
             }
 
             if (ClearVAlpha)
             {
-                ModelModifiers.ClearVAlpha(ttModel, loggingFunction);
+                ModelModifiers.ClearVAlpha(ttModel, LoggingFunction);
             }
 
             if(SourceRace != XivRace.All_Races)
@@ -124,7 +143,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot racially convert from null MDL.");
                 }
-                ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, loggingFunction);
+                ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, LoggingFunction);
             }
 
             // We need to load the original unmodified model to get the shape data.
@@ -134,10 +153,10 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot copy settings from null MDL.");
                 }
-                ModelModifiers.ClearShapeData(ttModel, loggingFunction);
+                ModelModifiers.ClearShapeData(ttModel, LoggingFunction);
                 try
                 {
-                    ModelModifiers.MergeShapeData(ttModel, originalMdl, loggingFunction);
+                    ModelModifiers.MergeShapeData(ttModel, originalMdl, LoggingFunction);
                 }
                 catch
                 {
@@ -153,7 +172,7 @@ namespace xivModdingFramework.Models.Helpers
                 }
 
                 var oldModel = TTModel.FromRaw(originalMdl);
-                ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, loggingFunction);
+                ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, LoggingFunction);
             }
 
             // Ensure shape data is updated with our various changes.
@@ -1917,6 +1936,11 @@ namespace xivModdingFramework.Models.Helpers
 
         }
 
+        public static bool IsSkinMaterial(string path)
+        {
+            var name = "/" + Path.GetFileName(path);
+            return SkinMaterialRegex.IsMatch(name);
+        }
 
         /// <summary>
         /// Applies a given set of shapes in order to the model.
