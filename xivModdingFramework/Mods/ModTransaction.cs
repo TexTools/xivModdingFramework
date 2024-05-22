@@ -142,6 +142,7 @@ namespace xivModdingFramework.Mods
         // Called during TX when a file is changed internally.
         public event FileChangedEventHandler FileChanged;
 
+        public static event TransactionEventHandler ActiveTransactionCreated;
         public static event TransactionEventHandler ActiveTransactionCommitted;
         public static event TransactionCancelledEventHandler ActiveTransactionCancelled;
         public static event TransactionEventHandler ActiveTransactionClosed;
@@ -219,11 +220,15 @@ namespace xivModdingFramework.Mods
 
         private static bool _WorkerStatus = false;
         private static ModTransaction _ActiveTransaction = null;
-        internal static ModTransaction ActiveTransaction
+        public static ModTransaction ActiveTransaction
         {
             get
             {
                 return _ActiveTransaction;
+            }
+            private set
+            {
+                _ActiveTransaction = value;
             }
         }
         public List<XivDataFile> ActiveDataFiles
@@ -258,6 +263,12 @@ namespace xivModdingFramework.Mods
                     if (isActiveTx)
                     {
                         ActiveTransactionClosed?.Invoke(this);
+                    }
+                } else if(oldState == ETransactionState.Invalid)
+                {
+                    if (isActiveTx)
+                    {
+                        ActiveTransactionCreated?.Invoke(this);
                     }
                 }
             }
@@ -380,13 +391,19 @@ namespace xivModdingFramework.Mods
         {
             throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
         }
-        private ModTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
+        private ModTransaction(bool writeEnabled, ModPack? modpack, ModTransactionSettings? settings, bool waitToStart)
         {
             _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
 
             _ReadOnly = !writeEnabled;
-            State = ETransactionState.Preparing;
+
+            if (!_ReadOnly)
+            {
+                _ActiveTransaction = this;
+            }
+
+
 
 
 
@@ -437,6 +454,8 @@ namespace xivModdingFramework.Mods
             {
                 throw new NotImplementedException("Prep-File support for game file writing is not yet implemented (Need to wrap ModList to prevent mod bashing).");
             }
+
+            State = ETransactionState.Preparing;
 
             if (!waitToStart)
             {
@@ -498,7 +517,7 @@ namespace xivModdingFramework.Mods
             {
                 // Read-Only Transactions don't block anything else, and really just serve as
                 // caches for index/modlist data.
-                var readonlyTx = new ModTransaction(writeEnabled, modpack);
+                var readonlyTx = new ModTransaction(writeEnabled, modpack, null, false);
                 return readonlyTx;
             }
 
@@ -511,14 +530,21 @@ namespace xivModdingFramework.Mods
             _WorkerStatus = XivCache.CacheWorkerEnabled;
             XivCache.CacheWorkerEnabled = false;
 
-            var tx = new ModTransaction(writeEnabled, modpack, settings, waitToStart);
-            if (!Dat.AllowDatAlteration && tx.Settings.Target == ETransactionTarget.GameFiles)
+
+            if (writeEnabled)
             {
-                _ActiveTransaction = tx;
-                CancelTransaction(tx);
-                throw new Exception("Cannot open write transaction while DAT writing is disabled.");
+                if(settings == null)
+                {
+                    settings = GetDefaultSettings();
+                }
+                if(settings.Value.Target == ETransactionTarget.GameFiles && !Dat.AllowDatAlteration)
+                {
+                    throw new Exception("Cannot open write transaction while DAT writing is disabled.");
+
+                }
             }
-            _ActiveTransaction = tx;
+
+            var tx = new ModTransaction(writeEnabled, modpack, settings, waitToStart);
 
 
             return tx;
@@ -557,8 +583,8 @@ namespace xivModdingFramework.Mods
             }
             finally
             {
-                _ActiveTransaction = null;
                 tx.State = ETransactionState.Closed;
+                _ActiveTransaction = null;
                 _CANCEL_BLOCKED_TX = false;
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
@@ -764,8 +790,8 @@ namespace xivModdingFramework.Mods
             }
             finally
             {
-                _ActiveTransaction = null;
                 tx.State = ETransactionState.Closed;
+                _ActiveTransaction = null;
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
