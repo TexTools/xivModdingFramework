@@ -192,6 +192,57 @@ namespace xivModdingFramework.Helpers
             return xivRace;
         }
 
+
+        private static Regex SimpleRootExtractRegex = new Regex("([a-z][0-9]{4}[a-z][0-9]{4})");
+        private static Regex SeconaryExtractionRegex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");
+
+        /// <summary>
+        /// Extracts just the secondary ID portion of a file name,
+        /// Ex. [c0101b1234_sho.mdl] => b1234
+        /// </summary>
+        /// <param name="filenameOrPath"></param>
+        /// <returns></returns>
+        public static string GetSecondaryIdFromFileName(string filenameOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(filenameOrPath))
+            {
+                return "";
+            }
+            filenameOrPath = Path.GetFileNameWithoutExtension(filenameOrPath);
+
+            var match = SeconaryExtractionRegex.Match(filenameOrPath);
+            if (!match.Success)
+            {
+                return "";
+            }
+
+            return match.Groups[1].Value;
+        }
+
+        /// <summary>
+        /// Extracts the primary and secondary ID portion of a filename
+        /// Ex. [c0101b1234_sho.mdl] => c0101b1234
+        /// </summary>
+        /// <param name="filenameOrPath"></param>
+        /// <returns></returns>
+        public static string GetPrimarySecondaryFromFilename(string filenameOrPath)
+        {
+
+            if (string.IsNullOrWhiteSpace(filenameOrPath))
+            {
+                return "";
+            }
+            filenameOrPath = Path.GetFileNameWithoutExtension(filenameOrPath);
+
+            var match = SimpleRootExtractRegex.Match(filenameOrPath);
+            if (!match.Success)
+            {
+                return "";
+            }
+
+            return match.Groups[1].Value;
+        }
+
         /// <summary>
         /// Creates a row-by-row Matrix from a column order float set.
         /// </summary>

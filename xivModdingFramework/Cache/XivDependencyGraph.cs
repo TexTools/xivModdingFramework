@@ -1,10 +1,12 @@
-﻿using SharpDX;
+﻿using HelixToolkit.SharpDX.Core;
+using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -28,7 +30,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 using static xivModdingFramework.Cache.XivCache;
-
+using Constants = xivModdingFramework.Helpers.Constants;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Cache
@@ -628,7 +630,11 @@ namespace xivModdingFramework.Cache
 
                         return await alteredRoot.GetModelFiles(tx);
                     }
+                }
 
+                if(!await tx.FileExists(modelPath))
+                {
+                    return new List<string>();
                 }
 
                 return new List<string>() { modelPath };
@@ -712,64 +718,11 @@ namespace xivModdingFramework.Cache
                     var dataFile = IOUtil.GetDataFileFromPath(models[0]);
 
 
-                    Regex secondaryRex = null;
-                    string secondaryTypePrefix = null;
-                    if (Info.PrimaryType == XivItemType.human) {
-                        secondaryTypePrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
-                        secondaryRex = new Regex("(" + secondaryTypePrefix +"[0-9]{4})");
-                    }
 
                     foreach (var model in models)
                     {
-                        List<string> mdlMats = null;
-                        if (useCache)
-                        {
-                            mdlMats = await XivCache.GetChildFiles(model, tx);
-                        } else
-                        {
-                            if (index.FileExists(model))
-                            {
-                                mdlMats = await Mdl.GetReferencedMaterialPaths(model, -1, false, false, tx);
-                            }
-                        }
-
-                        if (mdlMats != null)
-                        {
-                            if (materialVariant <= 0)
-                            {
-                                foreach (var mat in mdlMats)
-                                {
-                                    var m = mat;
-
-                                    // Human types have their material ID automatically changed over.
-                                    if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
-                                    {
-                                        m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
-                                    }
-                                    materials.Add(m);
-                                }
-                            }
-                            else
-                            {
-                                var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
-                                foreach (var mat in mdlMats)
-                                {
-                                    // Replace any material set references with the new one.
-                                    // The hash set will scrub us down to just a single copy.
-                                    // This is faster than re-scanning the MDL file.
-                                    // And a little more thorough than simply skipping over non-matching refs.
-                                    // Since some materials may not have variant references.
-                                    var m = _materialSetRegex.Replace(mat, replacement);
-
-                                    // Human types have their material ID automatically fixed to match.
-                                    if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
-                                    {
-                                        m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
-                                    }
-                                    materials.Add(m);
-                                }
-                            }
-                        }
+                        var modelMats = await GetVariantShiftedMaterials(model, materialVariant, tx);
+                        materials.UnionWith(modelMats);
                     }
                 }
             }
@@ -777,31 +730,105 @@ namespace xivModdingFramework.Cache
 
             if (includeOrphans)
             {
-                // Add orphaned modded materials into the root.
-                var rootFolder = Info.GetRootFolder();
-                var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
-                var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl"));
-                foreach (var mod in mods)
-                {
-                    var state = await mod.GetState(tx);
-                    if (state != Mods.Enums.EModState.Enabled) continue;
-                    if (Info.Slot == null || mod.FilePath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
-                    {
-                        var material = mod.FilePath;
-                        if (materialVariant >= 0)
-                        {
-                            materials.Add(_materialSetRegex.Replace(material, variantRep));
-                        }
-                        else
-                        {
-                            materials.Add(material);
-                        }
-                    }
-                }
+                var orphans = await GetOrphanMaterials(materialVariant, tx);
+                materials.UnionWith(orphans);
             }
 
 
             return materials.ToList();
+        }
+
+        public async Task<HashSet<string>> GetVariantShiftedMaterials(string modelPath, int materialVariant = -1, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            List<string> mdlMats = null;
+            mdlMats = await XivCache.GetChildFiles(modelPath, tx);
+            return GetVariantShiftedMaterials(mdlMats, materialVariant);
+        }
+        public HashSet<string> GetVariantShiftedMaterials(List<string> mdlMats, int materialVariant = -1)
+        { 
+            HashSet<string> materials = new HashSet<string>();
+
+            if (mdlMats != null)
+            {
+                if (materialVariant <= 0)
+                {
+                    foreach (var mat in mdlMats)
+                    {
+                        var m = mat;
+
+                        // Human types have their material ID automatically changed over.
+                        if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
+                        {
+                            var secondaryTypePrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
+                            var secondaryRex = new Regex("(" + secondaryTypePrefix + "[0-9]{4})");
+                            m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                        }
+                        materials.Add(m);
+                    }
+                }
+                else
+                {
+                    var replacement = "v" + materialVariant.ToString().PadLeft(4, '0');
+                    foreach (var mat in mdlMats)
+                    {
+                        // Replace any material set references with the new one.
+                        // The hash set will scrub us down to just a single copy.
+                        // This is faster than re-scanning the MDL file.
+                        // And a little more thorough than simply skipping over non-matching refs.
+                        // Since some materials may not have variant references.
+                        var m = _materialSetRegex.Replace(mat, replacement);
+
+                        // Human types have their material ID automatically fixed to match.
+                        if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair)
+                        {
+                            var secondaryTypePrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
+                            var secondaryRex = new Regex("(" + secondaryTypePrefix + "[0-9]{4})");
+                            m = secondaryRex.Replace(m, secondaryTypePrefix + Info.SecondaryId.ToString().PadLeft(4, '0'));
+                        }
+                        materials.Add(m);
+                    }
+                }
+            }
+            return materials;
+        }
+
+        public async Task<HashSet<string>> GetOrphanMaterials(int materialVariant = -1, ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+            var materials = new HashSet<string>();
+
+            // Add orphaned modded materials into the root.
+            var rootFolder = Info.GetRootFolder();
+            var variantRep = "v" + materialVariant.ToString().PadLeft(4, '0');
+            var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl"));
+            foreach (var mod in mods)
+            {
+                var state = await mod.GetState(tx);
+                if (state != Mods.Enums.EModState.Enabled) continue;
+                if (Info.Slot == null || mod.FilePath.Contains(Info.Slot) || Info.PrimaryType == XivItemType.human)
+                {
+                    var material = mod.FilePath;
+                    if (materialVariant >= 0)
+                    {
+                        materials.Add(_materialSetRegex.Replace(material, variantRep));
+                    }
+                    else
+                    {
+                        materials.Add(material);
+                    }
+                }
+            }
+            return materials;
         }
 
         /// <summary>

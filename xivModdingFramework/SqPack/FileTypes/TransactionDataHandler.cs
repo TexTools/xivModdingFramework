@@ -187,6 +187,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             else
             {
+                // Shouldn't normally get here, but... Return empty data I guess?
+                if(offset8x == 0)
+                {
+                    throw new InvalidDataException("Cannot read data from base game files with invalid offset.");
+                }
+
                 // Create standard Game DAT file request info.
                 info = MakeGameStorageInfo(dataFile, offset8x);
             }

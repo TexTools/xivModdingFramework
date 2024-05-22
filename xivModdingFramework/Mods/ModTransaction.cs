@@ -1374,6 +1374,11 @@ namespace xivModdingFramework.Mods
             var df = IOUtil.GetDataFileFromPath(path);
             var offset = await Get8xDataOffset(path, forceOriginal);
 
+            if(offset == 0)
+            {
+                throw new FileNotFoundException("File does not currently exist: " + path);
+            }
+
             return await ReadFile(df, offset, compressed);
         }
 
@@ -1385,6 +1390,11 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<byte[]> ReadFile(XivDataFile dataFile, long offset8x, bool compressed = false)
         {
+            if(offset8x <= 0)
+            {
+                throw new InvalidDataException("Cannot read file with invalid offset: " + offset8x.ToString());
+            }
+
             if (compressed)
             {
                 return await _DataHandler.GetCompressedFile(dataFile, offset8x);

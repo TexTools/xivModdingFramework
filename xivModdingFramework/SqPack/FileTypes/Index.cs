@@ -58,14 +58,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="hashNumDictionary">A Dictionary containing the folder hash and item number</param>
         /// <param name="dataFile">The data file to look in</param>
         /// <returns></returns>
-        internal static async Task<List<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile, ModTransaction tx = null)
+        internal static async Task<SortedSet<int>> GetFolderExistsList(Dictionary<int, int> hashNumDictionary, XivDataFile dataFile, ModTransaction tx = null)
         {
             if(tx == null)
             {
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var ret = new List<int>();
+            var ret = new SortedSet<int>();
             var index = await tx.GetIndexFile(dataFile);
             foreach (var hashKv in hashNumDictionary)
             {

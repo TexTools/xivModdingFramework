@@ -1748,7 +1748,7 @@ namespace xivModdingFramework.Models.FileTypes
                     try
                     {
                         if (Imc.UsesImc(root)) {
-                            var info = await Imc.GetFullImcInfo(imcPath, tx);
+                            var info = await Imc.GetFullImcInfo(imcPath, getOriginal, tx);
                             var slotRegex = new Regex("_([a-z]{3}).mdl$");
                             var slot = "";
                             var m = slotRegex.Match(mdlPath);

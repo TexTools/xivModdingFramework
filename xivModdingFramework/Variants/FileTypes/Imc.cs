@@ -166,7 +166,7 @@ namespace xivModdingFramework.Variants.FileTypes
             }
             else
             {
-                return await GetFullImcInfo(path, tx);
+                return await GetFullImcInfo(path, forceOriginal, tx);
             }
         }
 
@@ -249,7 +249,7 @@ namespace xivModdingFramework.Variants.FileTypes
             FullImcInfo info;
             if(exists)
             {
-                info = await GetFullImcInfo(path, tx);
+                info = await GetFullImcInfo(path, false, tx);
             } else
             {
                 var ri = XivDependencyGraph.ExtractRootInfo(path);
@@ -341,10 +341,10 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <param name="item"></param>
         /// <param name="useSecondary">Determines if the SecondaryModelInfo should be used instead.(XivGear only)</param>
         /// <returns>The ImcData data</returns>
-        public static async Task<FullImcInfo> GetFullImcInfo(string path, ModTransaction tx = null)
+        public static async Task<FullImcInfo> GetFullImcInfo(string path, bool forceDefault = false, ModTransaction tx = null)
         {
 
-            var imcByteData = await Dat.ReadSqPackType2(path, false, tx);
+            var imcByteData = await Dat.ReadSqPackType2(path, forceDefault, tx);
 
             return await Task.Run(() =>
             {
