@@ -72,17 +72,18 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
 
-                    // Only add to this listing if there is any data.
-                    var matNumbers = await GetNumbersForCharacterItem(c, true, tx);
-                    if (matNumbers.Length > 0)
+                    var root = c.GetRoot();
+                    var ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else { 
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
-                        if(mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
 
@@ -90,73 +91,77 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Hair };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Tail };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Ear };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c, true, tx);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false, tx);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
                 }
 
 

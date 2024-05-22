@@ -763,7 +763,7 @@ namespace xivModdingFramework.Cache
                         var m = mat;
 
                         // Human types have their material ID automatically changed over.
-                        if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
+                        if (Info.PrimaryType == XivItemType.human && (Info.SecondaryType == XivItemType.body || Info.SecondaryType == XivItemType.hair))
                         {
                             var secondaryTypePrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
                             var secondaryRex = new Regex("(" + secondaryTypePrefix + "[0-9]{4})");

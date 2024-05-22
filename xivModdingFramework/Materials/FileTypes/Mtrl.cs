@@ -424,6 +424,10 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             var uniqueTextures = new HashSet<string>();
             var mtrl = await Mtrl.GetXivMtrl(mtrlPath, forceOriginal, tx);
+            if(mtrl == null)
+            {
+                return new List<string>();
+            }
 
             foreach(var tex in mtrl.Textures)
             {

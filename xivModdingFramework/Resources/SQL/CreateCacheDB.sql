@@ -12,7 +12,9 @@ CREATE TABLE "characters" (
 	"primary_id"	INTEGER NOT NULL,
 	"slot"		TEXT,
 	"slot_full"	TEXT NOT NULL,
-	"root"		TEXT
+	"root"		TEXT,
+	"race"		TEXT,
+	"secondary_id" INTEGER
 );
 
 -- All Equipment, Accessory, and Human type entries.

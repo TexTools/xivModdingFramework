@@ -37,7 +37,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.2.8");
+        public static readonly Version CacheVersion = new Version("1.0.2.9");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -791,21 +791,24 @@ namespace xivModdingFramework.Cache
                 {
                     foreach (var item in items)
                     {
-                        var query = @"insert into characters ( primary_id, slot, slot_full, name, root) 
-                                                  values    ( $primary_id,$slot,$slot_full,$name,$root)";
+                        var query = @"insert into characters ( primary_id, slot, slot_full, name, root, race, secondary_id) 
+                                                  values    ( $primary_id,$slot,$slot_full,$name,$root,$race,$secondary_id)";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             if (item.ModelInfo != null)
                             {
                                 cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                                cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                             } else
                             {
                                 cmd.Parameters.AddWithValue("primary_id", 0);
+                                cmd.Parameters.AddWithValue("secondary_id", null);
                             }
                             cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("name", item.Name);
+                            cmd.Parameters.AddWithValue("race", item.TertiaryCategory);
                             if (root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
@@ -1204,12 +1207,13 @@ namespace xivModdingFramework.Cache
             {
                 PrimaryCategory = XivStrings.Character,
                 SecondaryCategory = reader.GetString("slot_full"),
+                TertiaryCategory = reader.GetString("race"),
                 ModelInfo = mi,
             };
 
             item.Name = reader.GetString("name");
             mi.PrimaryID = reader.GetInt32("primary_id");
-            mi.SecondaryID = 0;
+            mi.SecondaryID = reader.GetInt32("secondary_id");
             return item;
         }
 

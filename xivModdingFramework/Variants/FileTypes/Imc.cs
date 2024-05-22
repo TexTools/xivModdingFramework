@@ -95,8 +95,7 @@ namespace xivModdingFramework.Variants.FileTypes
             if(root.Info.PrimaryType == XivItemType.human)
             {
                 if(root.Info.SecondaryType == XivItemType.hair
-                    || root.Info.SecondaryType == XivItemType.tail
-                    || root.Info.SecondaryType == XivItemType.body)
+                    || root.Info.SecondaryType == XivItemType.tail)
                 {
                     // These use material sets (always set 1), but have no IMC file.
                     return 1;
@@ -112,6 +111,10 @@ namespace xivModdingFramework.Variants.FileTypes
                 try
                 {
                     var entry = await GetImcInfo(item, forceOriginal, tx);
+                    if(entry == null)
+                    {
+                        return -1;
+                    }
                     return entry.MaterialSet;
                 } catch
                 {
