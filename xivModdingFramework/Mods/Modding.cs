@@ -259,9 +259,10 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Mod State to Invalid.");
             }
 
-            bool commit = tx == null;
+            bool ownTx = false;
             if (tx == null)
             {
+                ownTx = true;
                 tx = ModTransaction.BeginTransaction(true);
             }
             try
@@ -283,6 +284,10 @@ namespace xivModdingFramework.Mods
                 if (state == curState)
                 {
                     // No change.
+                    if (ownTx)
+                    {
+                        ModTransaction.CancelTransaction(tx, true);
+                    }
                     return false;
                 }
 
@@ -299,6 +304,10 @@ namespace xivModdingFramework.Mods
                 if(mod.IsInternal() && !allowInternal)
                 {
                     // Don't allow toggling internal mods unless we were specifically told to.
+                    if (ownTx)
+                    {
+                        ModTransaction.CancelTransaction(tx, true);
+                    }
                     return false;
                 }
 
@@ -345,14 +354,14 @@ namespace xivModdingFramework.Mods
                     await INTERNAL_DeleteMod(path, allowInternal, tx);
                 }
 
-                if (commit)
+                if (ownTx)
                 {
                     await ModTransaction.CommitTransaction(tx);
                 }
             }
             catch(Exception ex)
             {
-                if (commit)
+                if (ownTx)
                 {
                     ModTransaction.CancelTransaction(tx);
                 }
