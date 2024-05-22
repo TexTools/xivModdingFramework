@@ -522,6 +522,9 @@ namespace xivModdingFramework.Materials.FileTypes
         #endregion
 
         #region Material Import Pipeline
+
+        private static int _LastColorsetOffset = 0;
+
         /// <summary>
         /// Converts an XivMtrl object into the raw bytes of an uncompressed MTRL file.
         /// Should probably be an extension/member method of xivMtrl.
@@ -643,7 +646,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             mtrlBytes.AddRange(xivMtrl.AdditionalData);
 
-
+            _LastColorsetOffset = mtrlBytes.Count;
             // Colorset and Dye info.
             foreach (var colorSetHalf in xivMtrl.ColorSetData)
             {
@@ -829,6 +832,101 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw ex;
             }
         }
+
+
+        /// <summary>
+        /// Does a fairly dirty file analysis of two material files to determine where their differences are contained.
+        /// Use for merging colorsets into active materials in cases where only the colorset changed, and vice versa.
+        /// </summary>
+        /// <param name="baseMaterial"></param>
+        /// <param name="otherMaterial"></param>
+        /// <returns></returns>
+        public static (bool ColorsetDifferences, bool OtherDifferences) CompareMaterials(XivMtrl baseMaterial,  XivMtrl otherMaterial)
+        {
+            // Jank method to get these offsets, but efficient and safe.
+            var originalData = XivMtrlToUncompressedMtrl(baseMaterial);
+            var originalColorsetOffset = _LastColorsetOffset;
+            var newData = XivMtrlToUncompressedMtrl(otherMaterial);
+            var newColorsetOffset = _LastColorsetOffset;
+
+            var originalRemStart = (originalColorsetOffset + baseMaterial.ColorSetDataSize);
+            var newRemStart = (newColorsetOffset + otherMaterial.ColorSetDataSize);
+            var originalRemSize = originalData.Length - originalRemStart;
+            var newRemSize = newData.Length - newRemStart;
+
+            var colorsetDifferences = false;
+            var otherDifferences = false;
+
+            if(baseMaterial.ColorSetDataSize != otherMaterial.ColorSetDataSize)
+            {
+                colorsetDifferences = true;
+            }
+
+            if (!colorsetDifferences)
+            {
+                // Both have colorsets of same size.
+                for(int i = 0; i < baseMaterial.ColorSetData.Count; i++)
+                {
+                    if (baseMaterial.ColorSetDyeData[i] != otherMaterial.ColorSetData[i])
+                    {
+                        colorsetDifferences = true;
+                        break;
+                    }
+                }
+
+                if(!colorsetDifferences && baseMaterial.ColorSetDyeData != null)
+                {
+                    for (int i = 0; i < baseMaterial.ColorSetDyeData.Length; i++)
+                    {
+                        if (baseMaterial.ColorSetDyeData[i] != otherMaterial.ColorSetDyeData[i])
+                        {
+                            colorsetDifferences = true;
+                            break;
+                        }
+
+                    }
+                }
+            }
+
+            // Colorset differences are sorted.
+
+            if(originalColorsetOffset != newColorsetOffset || originalRemSize != newRemSize)
+            {
+                otherDifferences = true;
+            } else
+            {
+                // Check first half of file.
+                for(int i = 0; i < originalColorsetOffset; i++)
+                {
+                    if (originalData[i] != newData[i])
+                    {
+                        otherDifferences = true;
+                        break;
+                    }
+                }
+
+                if (!otherDifferences)
+                {
+                    // Check back half of file.
+                    for(int i = 0; i < originalRemSize; i++)
+                    {
+                        var originalOffset = i + originalRemStart;
+                        var newOffset = i + newRemStart;
+
+                        if (originalData[originalOffset] != newData[newOffset])
+                        {
+                            otherDifferences = true;
+                            break;
+                        }
+                    }
+
+                }
+            }
+
+
+            return (colorsetDifferences, otherDifferences);
+        }
+
         #endregion
 
         #region Endwalker => Dawntrail Material Conversion
