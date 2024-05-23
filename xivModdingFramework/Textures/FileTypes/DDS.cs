@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,7 +50,7 @@ namespace xivModdingFramework.Textures.FileTypes
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
 
             //ARGB 16F
-            { 113, XivTexFormat.A16B16G16R16F },
+            { 0x71, XivTexFormat.A16B16G16R16F },
 
             //Uncompressed RGBA
             { 0, XivTexFormat.A8R8G8B8 }
@@ -85,32 +86,14 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="xivTex">The Texture information</param>
         public static void MakeDDS(XivTex xivTex, string savePath)
         {
-            var DDS = new List<byte>();
-            switch (xivTex.TextureTypeAndPath.Type)
-            {
-                case XivTexType.ColorSet:
-                    DDS.AddRange(CreateColorDDSHeader(xivTex));
-                    DDS.AddRange(xivTex.TexData);
-                    break;
-                case XivTexType.Vfx:
-                case XivTexType.Diffuse:
-                case XivTexType.Specular:
-                case XivTexType.Normal:
-                case XivTexType.Mask:
-                case XivTexType.Skin:
-                case XivTexType.Map:
-                case XivTexType.Icon:
-                default:
-                    DDS.AddRange(CreateDDSHeader(xivTex));
+            var DDS = CreateDDSHeader(xivTex).ToList();
 
-                    var data = xivTex.TexData;
-                    if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8 && xivTex.Layers > 1)
-                    {
-                        data = ShiftLayers(data);
-                    }
-                    DDS.AddRange(data);
-                    break;
+            var data = xivTex.TexData;
+            if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8 && xivTex.Layers > 1)
+            {
+                data = ShiftLayers(data);
             }
+            DDS.AddRange(data);
 
             File.WriteAllBytes(savePath, DDS.ToArray());
         }
@@ -638,11 +621,13 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.A8:
                         imageData = await Read8bitImage(DdsCompressedPixelData, width, height * layers);
                         break;
+                    case XivTexFormat.A16B16G16R16F:
+                        imageData = await ReadHalfFloatImage(DdsCompressedPixelData, width, height * layers);
+                        break;
                     case XivTexFormat.X8R8G8B8:
                     case XivTexFormat.R32F:
                     case XivTexFormat.G16R16F:
                     case XivTexFormat.G32R32F:
-                    case XivTexFormat.A16B16G16R16F:
                     case XivTexFormat.A32B32G32R32F:
                     case XivTexFormat.D16:
                     default:
@@ -774,6 +759,44 @@ namespace xivModdingFramework.Textures.FileTypes
                                 convertedBytes.Add((byte)pixel);
                                 convertedBytes.Add((byte)pixel);
                                 convertedBytes.Add(255);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+        internal static async Task<byte[]> ReadHalfFloatImage(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(async () =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var r = new Half(br.ReadUInt16());
+                                var g = new Half(br.ReadUInt16());
+                                var b = new Half(br.ReadUInt16());
+                                var a = new Half(br.ReadUInt16());
+
+                                // 255 * value, clamped to 0-255.
+                                var byteR = (byte)Math.Max(0, Math.Min(255, Math.Round(r * 255.0f)));
+                                var byteG = (byte)Math.Max(0, Math.Min(255, Math.Round(g * 255.0f)));
+                                var byteB = (byte)Math.Max(0, Math.Min(255, Math.Round(b * 255.0f)));
+                                var byteA = (byte)Math.Max(0, Math.Min(255, Math.Round(a * 255.0f)));
+
+                                convertedBytes.Add(byteR);
+                                convertedBytes.Add(byteG);
+                                convertedBytes.Add(byteB);
+                                convertedBytes.Add(byteA);
                             }
                         }
                     }

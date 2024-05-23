@@ -71,10 +71,12 @@ namespace xivModdingFramework.Textures.DataContainers
         /// </summary>
         public byte[] TexData { get; set; }
 
+
         /// <summary>
-        /// The type and path of the texture
+        /// The base path this texture originated from/is destined for.
+        /// May or may not always be populated, depending on construction format.
         /// </summary>
-        public TexTypePath TextureTypeAndPath { get; set; }
+        public string FilePath { get; set; }
 
 
         /// <summary>

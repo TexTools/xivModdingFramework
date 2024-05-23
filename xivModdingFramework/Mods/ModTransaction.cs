@@ -129,7 +129,7 @@ namespace xivModdingFramework.Mods
     {
 
         #region Events
-        public delegate void FileChangedEventHandler(string internalFilePath);
+        public delegate void FileChangedEventHandler(string internalFilePath, long newOffset);
         public delegate void TransactionEventHandler(ModTransaction sender);
         public delegate void TransactionCancelledEventHandler(ModTransaction sender, bool graceful);
         public delegate void TransactionStateChangedEventHandler(ModTransaction sender, ETransactionState oldState, ETransactionState newState);
@@ -745,7 +745,7 @@ namespace xivModdingFramework.Mods
                 // Notify the world of all the files that changed in this transaction.
                 foreach(var file in files)
                 {
-                    INTERNAL_OnFileChanged(file, false);
+                    INTERNAL_OnFileChanged(file, await Get8xDataOffset(file, false), false);
                 }
             }
 
@@ -1323,16 +1323,16 @@ namespace xivModdingFramework.Mods
 
         }
 
-        internal void INTERNAL_OnFileChanged(string path, bool fromIndex)
+        internal void INTERNAL_OnFileChanged(string path, long offset8x, bool fromIndex)
         {
             if (fromIndex && State != ETransactionState.Closing)
             {
                 // Notify the followers of /this/ TX that there was a change.
-                FileChanged?.Invoke(path);
+                FileChanged?.Invoke(path, offset8x);
             } else if (!fromIndex && State == ETransactionState.Closing)
             {
                 // Notify the whole world of commit-time changes.
-                FileChangedOnCommit?.Invoke(path);
+                FileChangedOnCommit?.Invoke(path, offset8x);
             }
         }
 

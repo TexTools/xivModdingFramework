@@ -487,5 +487,17 @@ namespace xivModdingFramework.Helpers
             return Directory.GetFiles(path, format, SearchOption.AllDirectories);
         }
 
+        public static bool IsFFXIVInternalPath(string path)
+        {
+            foreach(XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+            {
+                if (path.StartsWith(df.GetFolderKey()))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
     }
 }

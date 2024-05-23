@@ -151,24 +151,11 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public static async Task<XivTex> GetXivTex(MtrlTexture tex, bool forceOriginal = false, ModTransaction tx = null)
         {
-            return await GetXivTex(tex.TexturePath, tex.Usage, forceOriginal, tx);
+            return await GetXivTex(tex.TexturePath, forceOriginal, tx);
         }
         public static async Task<XivTex> GetXivTex(TexTypePath ttp, bool forceOriginal = false, ModTransaction tx = null)
         {
-            return await GetXivTex(ttp.Path, ttp.Type, forceOriginal, tx);
-        }
-        public static async Task<XivTex> GetXivTex(string path, XivTexType usage, bool forceOriginal = false, ModTransaction tx = null)
-        {
-            var dataFile = IOUtil.GetDataFileFromPath(path);
-            var ttp = new TexTypePath()
-            {
-                DataFile = dataFile,
-                Path = path,
-                Type = usage
-            };
-            var xivTex = await GetXivTex(ttp.Path, forceOriginal, tx);
-            xivTex.TextureTypeAndPath = ttp;
-            return xivTex;
+            return await GetXivTex(ttp.Path, forceOriginal, tx);
         }
         public static async Task<XivTex> GetXivTex(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
@@ -205,12 +192,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 throw new Exception($"There was an error reading texture data at offset {offset}");
             }
 
-            var ttp = new TexTypePath();
-            ttp.DataFile = IOUtil.GetDataFileFromPath(path);
-            ttp.Name = Path.GetFileName(path);
-            ttp.Type = XivTexType.Other;
-            ttp.Path = path;
-            xivTex.TextureTypeAndPath = ttp;
+            xivTex.FilePath = path;
 
             return xivTex;
         }
@@ -337,7 +319,7 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             var path = IOUtil.MakeItemSavePath(item, saveDirectory, race);
             Directory.CreateDirectory(path);
-            var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivTex.TextureTypeAndPath.Path) + ".dds");
+            var savePath = Path.Combine(path, Path.GetFileNameWithoutExtension(xivTex.FilePath) + ".dds");
             SaveTexAsDDS(savePath, xivTex);
         }
 

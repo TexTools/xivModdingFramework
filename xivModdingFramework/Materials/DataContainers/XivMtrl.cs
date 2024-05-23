@@ -248,8 +248,7 @@ namespace xivModdingFramework.Materials.DataContainers
 
         /// <summary>
         /// Get the 'TexTypePath' List that TT expects to populate the texture listing.
-        /// Generated via using GetAllMapInfos to scan based on actual MTRL settings,
-        /// Rather than file names.
+        /// Generated via the actual sampler and shader key settings.
         /// </summary>
         /// <returns></returns>
         public List<TexTypePath> GetTextureTypePathList()
@@ -328,6 +327,10 @@ namespace xivModdingFramework.Materials.DataContainers
         public string GetTextureRootDirectoy()
         {
             string root = "";
+            if(MTRLPath == null)
+            {
+                return "";
+            }
             // Attempt to logically deduce base texture path.
             if (MTRLPath.Contains("material/"))
             {

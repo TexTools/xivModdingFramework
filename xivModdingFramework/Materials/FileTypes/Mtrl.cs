@@ -489,12 +489,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     MipMapCount = 0,
                     TexData = colorSetData.ToArray(),
                     TextureFormat = XivTexFormat.A16B16G16R16F,
-                    TextureTypeAndPath = new TexTypePath()
-                    {
-                        Type = XivTexType.ColorSet,
-                        Path = xivMtrl.MTRLPath,
-                        DataFile = df
-                    }
+                    FilePath = xivMtrl.MTRLPath,
                 };
 
                 return xivTex;
@@ -797,12 +792,7 @@ namespace xivModdingFramework.Materials.FileTypes
                         var format = XivTexFormat.A8R8G8B8;
 
                         var xivTex = new XivTex();
-                        xivTex.TextureTypeAndPath = new TexTypePath()
-                        {
-                            DataFile = IOUtil.GetDataFileFromPath(path),
-                            Path = path,
-                            Type = tex.Usage
-                        };
+                        xivTex.FilePath = path;
                         xivTex.TextureFormat = format;
 
                         var di = Tex.GetDefaultTexturePath(tex.Usage);
