@@ -575,11 +575,8 @@ namespace xivModdingFramework.Mods.FileTypes
             var progress = settings.ProgressReporter;
             var GetRootConversionsFunction = settings.RootConversionFunction;
 
-            var ownTx = false;
-            if (tx == null) {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            Dictionary<string, TxFileState> originalStates = new Dictionary<string, TxFileState>();
             try
             {
 
@@ -626,7 +623,6 @@ namespace xivModdingFramework.Mods.FileTypes
                 var totalFiles = filePaths.Count;
                 bool cancelled = false;
                 long rootDuration = 0;
-                Dictionary<string, TxFileState> originalStates = new Dictionary<string, TxFileState>();
 
                 await Task.Run(async () =>
                 {
@@ -811,26 +807,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if(cancelled)
                 {
-                    if (ownTx)
-                    {
-                        ModTransaction.CancelTransaction(tx, true);
-                    } else
-                    {
-                        // Larger TX with an import cancel.
-                        foreach (var file in originalStates)
-                        {
-                            // Restore all the changed files before returning.
-                            await tx.RestoreFileState(file.Value);
-                        }
-                    }
+                    await boiler.Cancel(true, originalStates);
                     return (null, null, -1);
                 }
 
-                if (ownTx)
+                if (boiler.OwnTx)
                 {
                     progress.Report((0, 0, "Committing Transaction..."));
-                    await ModTransaction.CommitTransaction(tx);
                 }
+
+                await boiler.Commit();
 
                 progress.Report((totalFiles, totalFiles, "Job Done."));
 
@@ -844,10 +830,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 return (filePaths.ToList(), new List<string>(), seconds);
             } catch(Exception ex)
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Catch(originalStates);
                 throw;
             }
         }
@@ -1012,25 +995,16 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modpackPath"></param>
         /// <returns></returns>
-        public static async Task ImportFiles(Dictionary<string, FileStorageInformation> files, ModPack? modpack = null, ModPackImportSettings settings = null, ModTransaction tx = null)
+        public static async Task<bool> ImportFiles(Dictionary<string, FileStorageInformation> files, ModPack? modpack = null, ModPackImportSettings settings = null, ModTransaction tx = null)
         {
-            var ownTx = false;
-            ModPack? lastModpack = null;
             if(settings == null)
             {
                 settings = new ModPackImportSettings();
             }
 
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
-            else
-            {
-                lastModpack = tx.ModPack;
-            }
 
+            var originalStates = new Dictionary<string, TxFileState>();
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
             try
             {
                 tx.ModPack = modpack;
@@ -1042,7 +1016,6 @@ namespace xivModdingFramework.Mods.FileTypes
                     ml.AddOrUpdateModpack(modpack.Value);
                 }
 
-                var originalStates = new Dictionary<string, TxFileState>();
 
                 var i = 0;
                 foreach(var kv in files)
@@ -1130,30 +1103,26 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
                 if (settings.UpdateDawntrailMaterials)
                 {
-                    await HandleRootConversion(paths, originalStates, tx, settings, modpack);
-
+                    var res = await HandleRootConversion(paths, originalStates, tx, settings, modpack);
+                    if(res < 0)
+                    {
+                        await boiler.Cancel(true, originalStates);
+                        return false;
+                    }
                 }
 
 
-                if (ownTx)
+                if (boiler.OwnTx)
                 {
                     settings.ProgressReporter?.Report((0, 0, "Committing Transaction..."));
-                    await ModTransaction.CommitTransaction(tx);
                 }
+                await boiler.Commit();
+                return true;
             }
             catch
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
-            }
-            finally
-            {
-                if (!ownTx)
-                {
-                    tx.ModPack = lastModpack;
-                }
+                await boiler.Catch(originalStates);
+                return false;
             }
         }
 

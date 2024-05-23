@@ -185,6 +185,8 @@ namespace xivModdingFramework.Mods
         // File sizes of the .DAT files the first time we encountered them.
         private Dictionary<XivDataFile, List<long>> _DatFileSizes = new Dictionary<XivDataFile, List<long>>();
 
+        private Dictionary<string, long> BatchedNotifications;
+
         private DateTime _ModListModifiedTime;
 
         private ModList _ModList;
@@ -603,6 +605,9 @@ namespace xivModdingFramework.Mods
 
 
             State = ETransactionState.Closing;
+
+            // Batched notifications are irrelevant here since we're about to send out notifications from the commit phase.
+            BatchedNotifications = null;
 
             CheckWriteTimes();
 
@@ -1327,8 +1332,16 @@ namespace xivModdingFramework.Mods
         {
             if (fromIndex && State != ETransactionState.Closing)
             {
-                // Notify the followers of /this/ TX that there was a change.
-                FileChanged?.Invoke(path, offset8x);
+                if (BatchedNotifications != null)
+                {
+                    // Just add to the batching for later.
+                    BatchedNotifications.Add(path, offset8x);
+                }
+                else
+                {
+                    // Notify the followers of /this/ TX that there was a change.
+                    FileChanged?.Invoke(path, offset8x);
+                }
             } else if (!fromIndex && State == ETransactionState.Closing)
             {
                 // Notify the whole world of commit-time changes.
@@ -1382,6 +1395,57 @@ namespace xivModdingFramework.Mods
             long longOffset = offset * 8L;
 
             return longOffset;
+        }
+
+        internal bool IsBatchingNotifications { get
+            {
+                return BatchedNotifications != null;
+            } 
+        }
+
+        /// <summary>
+        /// Begin batching outbound notifications about file changes.
+        /// Mostly this is useful when we're doing multiple updates in sequence, but the updates
+        /// don't actually make sense/resolve sanely until they're all completed.
+        /// 
+        /// Ex. Modpack installs, Material-Texture validation, Metadata unpacking, etc.
+        /// 
+        /// Unlike Transactions, this should not be held open for a long time.  Only for the minimum discrete increment to resolve sanely.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        internal void INTERNAL_BeginBatchingNotifications()
+        {
+            if (IsBatchingNotifications)
+            {
+                // This is a dangerous state, but Throwing here is even worse.  If we miss some notifications it's not the end of the world.
+                Trace.WriteLine("DANGER -- BEGINNING BATCH WHEN BATCH ALREADY OPEN.");
+            }
+            else {
+                BatchedNotifications = new Dictionary<string, long>();
+            }
+        }
+
+        /// <summary>
+        /// Ships all notifications about file changes.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        internal void INTERNAL_EndBatchingNotifications()
+        {
+            if(State == ETransactionState.Closing || State == ETransactionState.Closed)
+            {
+                // Batching got squished by transaction close.
+                return;
+            }
+
+            if (!IsBatchingNotifications)
+            {
+                throw new Exception("Cannot end notification batching that was never started.");
+            }
+
+            foreach(var kv in BatchedNotifications)
+            {
+                FileChanged?.Invoke(kv.Key, kv.Value);
+            }
         }
 
         #endregion
@@ -1694,4 +1758,5 @@ namespace xivModdingFramework.Mods
 
         #endregion
     }
+
 }

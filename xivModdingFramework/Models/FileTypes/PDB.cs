@@ -52,129 +52,117 @@ namespace xivModdingFramework.Models.FileTypes
 
         public static async Task<Dictionary<ushort, BoneDeformSet>> GetBoneDeformSets(ModTransaction tx = null)
         {
-            var ownTx = false;
-            if (tx == null)
+            if(tx == null)
             {
-                ownTx = true;
+                // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
-            try
+            var data = await Dat.ReadSqPackType2(BoneDeformFile, false, tx);
+
+            var result = new BoneDeform();
+            var numSets = 0;
+            Dictionary<ushort, BoneDeformSet> DeformSets = new Dictionary<ushort, BoneDeformSet>();
+            using (var br = new BinaryReader(new MemoryStream(data)))
             {
-                var data = await Dat.ReadSqPackType2(BoneDeformFile, false, tx);
+                numSets = br.ReadInt32();
 
-                var result = new BoneDeform();
-                var numSets = 0;
-                Dictionary<ushort, BoneDeformSet> DeformSets = new Dictionary<ushort, BoneDeformSet>();
-                using (var br = new BinaryReader(new MemoryStream(data)))
+                // Read Set Headers
+                for (int setId = 0; setId < numSets; setId++)
                 {
-                    numSets = br.ReadInt32();
-
-                    // Read Set Headers
-                    for (int setId = 0; setId < numSets; setId++)
+                    var bs = new BoneDeformSet();
+                    bs.RaceId = br.ReadUInt16();
+                    bs.TreeIndex = br.ReadUInt16();
+                    bs.DataOffset = br.ReadUInt32();
+                    bs.Scale = br.ReadSingle();
+                    if (bs.RaceId == ushort.MaxValue)
                     {
-                        var bs = new BoneDeformSet();
-                        bs.RaceId = br.ReadUInt16();
-                        bs.TreeIndex = br.ReadUInt16();
-                        bs.DataOffset = br.ReadUInt32();
-                        bs.Scale = br.ReadSingle();
-                        if (bs.RaceId == ushort.MaxValue)
-                        {
-                            continue;
-                        }
-
-                        if (DeformSets.ContainsKey(bs.RaceId))
-                        {
-                            throw new Exception("Multiple entries of same Race ID in Deformation PDB File.");
-                        }
-
-                        DeformSets.Add(bs.RaceId, bs);
+                        continue;
                     }
 
-                    // Read Tree entries.
-                    for (int treeId = 0; treeId < numSets; treeId++)
+                    if (DeformSets.ContainsKey(bs.RaceId))
                     {
-                        var te = new BoneDeformTreeEntry();
-
-                        te.ParentIndex = br.ReadUInt16();
-                        te.FirstChildIndex = br.ReadUInt16();
-                        te.NextSiblingIndex = br.ReadUInt16();
-                        te.DeformerIndex = br.ReadUInt16();
-
-                        var owner = DeformSets.FirstOrDefault(x => x.Value.TreeIndex == treeId).Value;
-                        if (owner.RaceId == 0)
-                        {
-                            throw new Exception("Un-owned deformation tree entry in Deformation PDB File.");
-                        }
-                        owner.TreeEntry = te;
-                        DeformSets[owner.RaceId] = owner;
+                        throw new Exception("Multiple entries of same Race ID in Deformation PDB File.");
                     }
 
-                    // Read Data for each set.
-                    foreach (var kv in DeformSets)
-                    {
-                        var bs = kv.Value;
-                        if (bs.DataOffset == 0)
-                        {
-                            continue;
-                        }
-
-                        br.BaseStream.Seek(bs.DataOffset, SeekOrigin.Begin);
-                        var start = br.BaseStream.Position;
-
-                        var numBones = br.ReadInt32();
-
-                        // Read bone names.
-                        List<uint> boneOffsets = new List<uint>();
-                        List<string> bones = new List<string>();
-                        for (int i = 0; i < numBones; i++)
-                        {
-                            boneOffsets.Add(br.ReadUInt16() + (uint)start);
-                        }
-
-                        var current = br.BaseStream.Position;
-                        for (int i = 0; i < numBones; i++)
-                        {
-                            br.BaseStream.Seek(boneOffsets[i], SeekOrigin.Begin);
-                            bones.Add(IOUtil.ReadNullTerminatedString(br));
-                        }
-                        br.BaseStream.Seek(current, SeekOrigin.Begin);
-
-                        // Padded to 4 bytes.
-                        while (br.BaseStream.Position % 4 != 0)
-                        {
-                            br.ReadByte();
-                        }
-
-                        // Read the deformation matrix for every bone.
-                        for (int i = 0; i < numBones; i++)
-                        {
-                            float[] matrixData = new float[16];
-                            for (int fi = 0; fi < 12; fi++)
-                            {
-                                var f = br.ReadSingle();
-                                matrixData[fi] = f;
-                            }
-                            // SE doesn't store the final row (or column, depending on how you look at it), which is 0,0,0,1 for a standard transform matrix.
-                            matrixData[15] = 1;
-
-                            var defEntry = new BoneDeform();
-                            defEntry.Matrix = matrixData;
-                            defEntry.Name = bones[i];
-                            bs.Deforms.Add(bones[i], defEntry);
-                        }
-                    }
+                    DeformSets.Add(bs.RaceId, bs);
                 }
 
-                return DeformSets;
-            }
-            finally
-            {
-                if (ownTx)
+                // Read Tree entries.
+                for (int treeId = 0; treeId < numSets; treeId++)
                 {
-                    ModTransaction.CancelTransaction(tx);
+                    var te = new BoneDeformTreeEntry();
+
+                    te.ParentIndex = br.ReadUInt16();
+                    te.FirstChildIndex = br.ReadUInt16();
+                    te.NextSiblingIndex = br.ReadUInt16();
+                    te.DeformerIndex = br.ReadUInt16();
+
+                    var owner = DeformSets.FirstOrDefault(x => x.Value.TreeIndex == treeId).Value;
+                    if (owner.RaceId == 0)
+                    {
+                        throw new Exception("Un-owned deformation tree entry in Deformation PDB File.");
+                    }
+                    owner.TreeEntry = te;
+                    DeformSets[owner.RaceId] = owner;
+                }
+
+                // Read Data for each set.
+                foreach (var kv in DeformSets)
+                {
+                    var bs = kv.Value;
+                    if (bs.DataOffset == 0)
+                    {
+                        continue;
+                    }
+
+                    br.BaseStream.Seek(bs.DataOffset, SeekOrigin.Begin);
+                    var start = br.BaseStream.Position;
+
+                    var numBones = br.ReadInt32();
+
+                    // Read bone names.
+                    List<uint> boneOffsets = new List<uint>();
+                    List<string> bones = new List<string>();
+                    for (int i = 0; i < numBones; i++)
+                    {
+                        boneOffsets.Add(br.ReadUInt16() + (uint)start);
+                    }
+
+                    var current = br.BaseStream.Position;
+                    for (int i = 0; i < numBones; i++)
+                    {
+                        br.BaseStream.Seek(boneOffsets[i], SeekOrigin.Begin);
+                        bones.Add(IOUtil.ReadNullTerminatedString(br));
+                    }
+                    br.BaseStream.Seek(current, SeekOrigin.Begin);
+
+                    // Padded to 4 bytes.
+                    while (br.BaseStream.Position % 4 != 0)
+                    {
+                        br.ReadByte();
+                    }
+
+                    // Read the deformation matrix for every bone.
+                    for (int i = 0; i < numBones; i++)
+                    {
+                        float[] matrixData = new float[16];
+                        for (int fi = 0; fi < 12; fi++)
+                        {
+                            var f = br.ReadSingle();
+                            matrixData[fi] = f;
+                        }
+                        // SE doesn't store the final row (or column, depending on how you look at it), which is 0,0,0,1 for a standard transform matrix.
+                        matrixData[15] = 1;
+
+                        var defEntry = new BoneDeform();
+                        defEntry.Matrix = matrixData;
+                        defEntry.Name = bones[i];
+                        bs.Deforms.Add(bones[i], defEntry);
+                    }
                 }
             }
 
+            return DeformSets;
         }
     }
 }

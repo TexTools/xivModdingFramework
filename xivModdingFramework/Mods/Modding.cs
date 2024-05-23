@@ -259,12 +259,7 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Mod State to Invalid.");
             }
 
-            bool ownTx = false;
-            if (tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
             try
             {
                 var nMod = await tx.GetMod(path);
@@ -283,11 +278,7 @@ namespace xivModdingFramework.Mods
 
                 if (state == curState)
                 {
-                    // No change.
-                    if (ownTx)
-                    {
-                        ModTransaction.CancelTransaction(tx, true);
-                    }
+                    boiler.Cancel(true);
                     return false;
                 }
 
@@ -304,10 +295,7 @@ namespace xivModdingFramework.Mods
                 if(mod.IsInternal() && !allowInternal)
                 {
                     // Don't allow toggling internal mods unless we were specifically told to.
-                    if (ownTx)
-                    {
-                        ModTransaction.CancelTransaction(tx, true);
-                    }
+                    boiler.Cancel(true);
                     return false;
                 }
 
@@ -354,21 +342,15 @@ namespace xivModdingFramework.Mods
                     await INTERNAL_DeleteMod(path, allowInternal, tx);
                 }
 
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                XivCache.QueueDependencyUpdate(path);
+                await boiler.Commit();
             }
             catch(Exception ex)
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
                 throw;
             }
 
-            XivCache.QueueDependencyUpdate(path);
 
             return true;
         }
@@ -459,12 +441,8 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task SetModpackState(EModState state, string modPackName, ModTransaction tx = null)
         {
-            var ownTx = false;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
             try
             {
                 var ml = await tx.GetModList();
@@ -487,17 +465,11 @@ namespace xivModdingFramework.Mods
                     ml.RemoveModpack(pack);
                 }
 
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
             }
             catch
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
                 throw;
             }
 
@@ -582,12 +554,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task SetModStates(EModState state, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-            var ownTx = false;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
             try
             {
                 var total = 0;
@@ -620,17 +587,11 @@ namespace xivModdingFramework.Mods
                     count++;
                 }
 
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
             }
             catch
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
             }
 
         }

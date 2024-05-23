@@ -154,21 +154,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             var startTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             var needsCleanup = false;
-            var ownTx = false;
-            ModPack? prevPack = null;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }else
-            {
-                prevPack = tx.ModPack;
-            }
 
             var progress = settings.ProgressReporter;
             var GetRootConversionsFunction = settings.RootConversionFunction;
             _Source = settings.SourceApplication;
 
+
+            var imported = new Dictionary<string, TxFileState>();
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
             try
             {
 
@@ -188,7 +181,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     unzippedPath = info.path;
                 }
 
-                var imported = new Dictionary<string, TxFileState>();
                 var notImported = new HashSet<string>();
                 _ImportActive = true;
                 _MetaFiles = new HashSet<string>();
@@ -269,19 +261,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     rootDuration = await TTMP.HandleRootConversion(files, imported, tx, settings, modPack);
                     if (rootDuration < 0)
                     {
-                        // User cancelled the process.
-                        if (ownTx)
-                        {
-                            ModTransaction.CancelTransaction(tx, true);
-                        } else
-                        {
-                            // Larger TX with an import cancel.
-                            foreach (var file in imported)
-                            {
-                                // Restore all the changed files before returning.
-                                await tx.RestoreFileState(file.Value);
-                            }
-                        }
+                        await boiler.Cancel(true, imported);
                         return (null, null, -1);
                     }
                 }
@@ -294,11 +274,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     await TTMP.FixPreDawntrailImports(imported.Keys, _Source, progress, tx);
                 }
 
-                if (ownTx)
+                if (boiler.OwnTx)
                 {
                     progress?.Report((0, 0, "Committing Transaction..."));
-                    await ModTransaction.CommitTransaction(tx);
                 }
+                await boiler.Commit();
 
                 progress?.Report((0, 0, "Job Done!"));
 
@@ -313,19 +293,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
             catch
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Catch(imported);
                 throw;
             }
             finally
             {
-                if(tx != null)
-                {
-                    tx.ModPack = prevPack;
-                }
-
                 if (needsCleanup)
                 {
                     IOUtil.DeleteTempDirectory(unzippedPath);

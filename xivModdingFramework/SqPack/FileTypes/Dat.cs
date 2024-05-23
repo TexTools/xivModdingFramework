@@ -36,6 +36,7 @@ using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
+using Constants = xivModdingFramework.Helpers.Constants;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -1213,12 +1214,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
         {
-            var ownTx = false;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+
+            var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
                 var reportedSize = await tx.GetCompressedFileSize(dataFile, offset);
@@ -1227,10 +1224,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 if(reportedSize == realSize)
                 {
-                    if (ownTx)
-                    {
-                        ModTransaction.CancelTransaction(tx, true);
-                    }
+                    boiler.Cancel(true);
                     return false;
                 }
 
@@ -1238,18 +1232,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Array.Copy(BitConverter.GetBytes(realSize), 0, data, 8, sizeof(uint));
                 await tx.WriteFile(path, data, sourceApplication);
 
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
                 return true;
             }
             catch(Exception ex)
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
                 throw;
             }
         }
@@ -1987,12 +1975,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var ownTx = false;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
                 var exists = await tx.FileExists(targetPath);
@@ -2037,18 +2020,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
 
                 var newOffset = await WriteModFile(data, targetPath, source, referenceItem, tx);
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
                 return newOffset;
             }
             catch
             {
-                if(ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
                 throw;
             }
         }
@@ -2144,9 +2121,16 @@ namespace xivModdingFramework.SqPack.FileTypes
                 doDatSave = true;
                 tx = ModTransaction.BeginTransaction(true);
             }
+
+            var ownBatch = false;
+            if (sourceApplication != Constants.InternalModSourceName && !tx.IsBatchingNotifications)
+            {
+                ownBatch = true;
+                tx.INTERNAL_BeginBatchingNotifications();
+            }
+
             try
             {
-
                 var modList = await tx.GetModList();
                 var index = await tx.GetIndexFile(IOUtil.GetDataFileFromPath(internalFilePath));
 
@@ -2242,12 +2226,15 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Always expand metadata.
                 await ExpandMetadata(fileData, internalFilePath, tx);
 
+                XivCache.QueueDependencyUpdate(internalFilePath);
+
+
+
                 if (doDatSave)
                 {
                     // Commit the transaction if we're doing a single file save.
                     await ModTransaction.CommitTransaction(tx);
                 }
-                XivCache.QueueDependencyUpdate(internalFilePath);
 
                 // Job done.
                 return offset8x;
@@ -2259,6 +2246,14 @@ namespace xivModdingFramework.SqPack.FileTypes
                     ModTransaction.CancelTransaction(tx);
                 }
                 throw;
+            }
+            finally
+            {
+                if (ownBatch && tx != null)
+                {
+                    // Ship the combined notifications only once the metadata expansion is complete, and all the data updated.
+                    tx.INTERNAL_EndBatchingNotifications();
+                }
             }
         }
 

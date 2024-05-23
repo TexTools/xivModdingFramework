@@ -68,35 +68,27 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task ImportBatch(List<(string ExternalPath, string InternalPath)> files, string sourceApplication = "Unknown", ModTransaction tx = null)
         {
-            var ownTx = false;
-            if(tx == null)
+
+            var modPack = new ModPack(null)
             {
-                ownTx = true;
-                var modPack = new ModPack(null)
-                {
-                    Name = "Unknown Batch Import",
-                    Author = "Unknown",
-                    Version = "1.0",
-                };
-                tx = ModTransaction.BeginTransaction(true, modPack);
-            }
+                Name = "Unknown Batch Import",
+                Author = "Unknown",
+                Version = "1.0",
+            };
+
+            var boiler = TxBoiler.BeginWrite(ref tx, true, modPack);
             try
             {
                 foreach(var file in files)
                 {
                     await Import(file.ExternalPath, file.InternalPath, sourceApplication, tx);
                 }
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+
+                await boiler.Commit();
             }
             catch
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
                 throw;
             }
         }

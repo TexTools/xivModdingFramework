@@ -65,12 +65,7 @@ namespace xivModdingFramework.General
         /// <returns></returns>
         public static async Task DisableRgspMod(XivSubRace race, XivGender gender, ModTransaction tx = null)
         {
-            var ownTx = false;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
                 var path = GetRgspPath(race, gender);
@@ -92,16 +87,10 @@ namespace xivModdingFramework.General
                     await SetScalingParameter(def);
                 }
 
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
             } catch(Exception ex)
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Cancel();
                 throw;
             }
 

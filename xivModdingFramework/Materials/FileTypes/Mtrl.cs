@@ -745,14 +745,11 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new offset</returns>
         public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item = null, string source = "Unknown", bool validateTextures = true, ModTransaction tx = null)
         {
-            var ownTx = false;
-            if(tx == null)
-            {
-                ownTx = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            List<TxFileState> states = new List<TxFileState>();
             try
             {
+                states.Add(await tx.SaveFileState(xivMtrl.MTRLPath));
                 var mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
@@ -797,31 +794,24 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         var di = Tex.GetDefaultTexturePath(tex.Usage);
 
+                        states.Add(await tx.SaveFileState(path));
                         await Tex.ImportTex(path, di.FullName, item, source, tx);
                         if(tex.Dx9Path != null)
                         {
+                            states.Add(await tx.SaveFileState(tex.Dx11Path));
                             // Create a fresh DX11 texture as well if we're in split DX9/11 tex mode.
                             await Tex.ImportTex(tex.Dx11Path, di.FullName, item, source, tx);
                         }
-
-
-
                     }
                 }
 
-                if (ownTx)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
 
                 return offset;
             }
             catch(Exception ex)
             {
-                if (ownTx)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Catch(states);
 
                 throw ex;
             }

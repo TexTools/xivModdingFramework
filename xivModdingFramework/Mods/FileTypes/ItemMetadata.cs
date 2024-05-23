@@ -241,13 +241,29 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="meta"></param>
         /// <returns></returns>
-        public static async Task SaveMetadata(ItemMetadata meta, string source, ModTransaction tx = null)
+        public static async Task SaveMetadata(ItemMetadata meta, string source, ModTransaction tx = null, bool fillMissing = false)
         {
 
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            await Dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
+            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            try
+            {
+
+                await Dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
+
+                if (fillMissing)
+                {
+                    await meta.FillMissingFiles(source, tx);
+                }
+
+                await boiler.Commit();
+            }
+            catch
+            {
+                boiler.Catch();
+            }
         }
 
         /// <summary>
