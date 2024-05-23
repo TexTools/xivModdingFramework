@@ -900,6 +900,9 @@ namespace xivModdingFramework.Models.FileTypes
             var original = new Dictionary<XivRace, EquipmentDeformationParameter>();
             foreach (var race in races)
             {
+                // Future race that this version doesn't know about (Ex. Hrothgar F on Endwalker builds)
+                if (race == XivRace.All_Races) continue;
+
                 var set = await GetEquipmentDeformationSet((int)primaryId, race, isAccessory);
                 original.Add(race, set.Parameters[slot]);
             }
