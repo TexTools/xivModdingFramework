@@ -370,6 +370,18 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+
+        public static Regex MtrlSuffixExtractionRegex = new Regex("\\/?mt_[a-z][0-9]{4}[a-z][0-9]{4}(?:_[a-z]{2,4})_([a-z]+)\\.mtrl");
+        public static string GetMaterialSuffix(string mtrlNameOrPath)
+        {
+            var match = MtrlSuffixExtractionRegex.Match(mtrlNameOrPath);
+            if (!match.Success)
+            {
+                return "";
+            }
+            return match.Groups[1].Value;
+        }
+
         /// <summary>
         /// Safely checks if the given directory is a temporary directory, and deletes it IF and only IF it is a temporary file directory.
         /// </summary>

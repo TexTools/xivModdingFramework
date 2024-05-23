@@ -1300,14 +1300,14 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="slot"></param>
         /// <param name="suffix"></param>
         /// <returns></returns>
-        public static string GetMtrlNameByRootRaceSlotSuffix(XivDependencyRootInfo root, XivRace race, string slot = null, string suffix = null)
+        public static string GetMtrlNameByRootRaceSlotSuffix(XivDependencyRootInfo root, XivRace race = XivRace.All_Races, string slot = null, string suffix = null)
         {
             if (root.SecondaryType == null)
             {
-                root.PrimaryId = race.GetRaceCodeInt();
-                root.PrimaryType = XivItemType.human;
                 root.SecondaryType = root.PrimaryType;
                 root.SecondaryId = root.PrimaryId;
+                root.PrimaryId = race.GetRaceCodeInt();
+                root.PrimaryType = XivItemType.human;
             }
 
             if (slot == null && root.Slot != null)
