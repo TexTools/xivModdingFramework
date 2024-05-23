@@ -194,7 +194,7 @@ namespace xivModdingFramework.Helpers
 
 
         private static Regex SimpleRootExtractRegex = new Regex("([a-z][0-9]{4}[a-z][0-9]{4})");
-        private static Regex SeconaryExtractionRegex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");
+        private static Regex PrimaryExtractionRegex = new Regex("([a-z][0-9]{4})[a-z][0-9]{4}");
 
         /// <summary>
         /// Extracts just the secondary ID portion of a file name,
@@ -202,7 +202,7 @@ namespace xivModdingFramework.Helpers
         /// </summary>
         /// <param name="filenameOrPath"></param>
         /// <returns></returns>
-        public static string GetSecondaryIdFromFileName(string filenameOrPath)
+        public static string GetPrimaryIdFromFileName(string filenameOrPath)
         {
             if (string.IsNullOrWhiteSpace(filenameOrPath))
             {
@@ -210,7 +210,7 @@ namespace xivModdingFramework.Helpers
             }
             filenameOrPath = Path.GetFileNameWithoutExtension(filenameOrPath);
 
-            var match = SeconaryExtractionRegex.Match(filenameOrPath);
+            var match = PrimaryExtractionRegex.Match(filenameOrPath);
             if (!match.Success)
             {
                 return "";
