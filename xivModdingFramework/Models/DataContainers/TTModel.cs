@@ -103,6 +103,16 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] BoneIds = new byte[_BONE_ARRAY_LENGTH];
         public byte[] Weights = new byte[_BONE_ARRAY_LENGTH];
 
+        public static List<TTVertex> CloneVertexList(List<TTVertex> verts)
+        {
+            var newVerts = new List<TTVertex>(verts.Count);
+            foreach(var vert in verts)
+            {
+                newVerts.Add((TTVertex)vert.Clone());
+            }
+            return newVerts;
+        }
+
         public static bool operator ==(TTVertex a, TTVertex b)
         {
             // Memberwise equality.
@@ -169,7 +179,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// Class representing the base infromation for a Mesh Part, unrelated
     /// to the Item or anything else above the level of the base 3D model.
     /// </summary>
-    public class TTMeshPart
+    public class TTMeshPart : ICloneable
     {
         // Purely semantic/not guaranteed to be unique.
         public string Name = null;
@@ -184,6 +194,22 @@ namespace xivModdingFramework.Models.DataContainers
         public HashSet<string> Attributes = new HashSet<string>();
 
         public Dictionary<string, TTShapePart> ShapeParts = new Dictionary<string, TTShapePart>();
+
+        public object Clone()
+        {
+            var part = (TTMeshPart) MemberwiseClone();
+
+            part.Vertices = TTVertex.CloneVertexList(Vertices);
+            part.TriangleIndices = new List<int>(TriangleIndices);
+            part.Attributes = new HashSet<string>(Attributes);
+            part.ShapeParts = new Dictionary<string, TTShapePart>(ShapeParts.Count);
+            foreach (var sh in ShapeParts)
+            {
+                part.ShapeParts.Add(sh.Key, (TTShapePart)sh.Value.Clone());
+            }
+
+            return part;
+        }
 
         public List<Vector3> GetBoundingBox()
         {
@@ -238,7 +264,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// A MeshGroup may have any amount of these, including
     /// multiple that have the same shape name.
     /// </summary>
-    public class TTShapePart
+    public class TTShapePart : ICloneable
     {
         /// <summary>
         /// The raw shp_ identifier.
@@ -253,7 +279,20 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Dictionary of [Part Level Vertex #] => [Shape Part Level Vertex #] to replace it with.
         /// </summary>
-        public Dictionary<int, int> VertexReplacements = new Dictionary<int, int>(); 
+        public Dictionary<int, int> VertexReplacements = new Dictionary<int, int>();
+
+        public object Clone()
+        {
+            var shape = (TTShapePart) MemberwiseClone();
+            shape.Vertices = TTVertex.CloneVertexList(Vertices);
+
+            shape.VertexReplacements = new Dictionary<int, int>(VertexReplacements.Count);
+            foreach (var kv in VertexReplacements)
+            {
+                shape.VertexReplacements.Add(kv.Key, kv.Value);
+            }
+            return shape;
+        }
     }
 
     /// <summary>
@@ -261,7 +300,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// At the FFXIV level, all the parts are crushed down together into one
     /// Singular 'Mesh'.
     /// </summary>
-    public class TTMeshGroup
+    public class TTMeshGroup : ICloneable
     {
         public List<TTMeshPart> Parts = new List<TTMeshPart>();
 
@@ -286,6 +325,22 @@ namespace xivModdingFramework.Models.DataContainers
         /// List of bones used by this mesh group's vertices.
         /// </summary>
         public List<string> Bones = new List<string>();
+
+
+        public object Clone()
+        {
+            var mesh = (TTMeshGroup) MemberwiseClone();
+
+            mesh.Bones = new List<string>(Bones);
+            mesh.Parts = new List<TTMeshPart>(Parts.Count);
+            foreach(var part in Parts)
+            {
+                mesh.Parts.Add((TTMeshPart) part.Clone());
+            }
+
+            return mesh;
+        }
+
 
         public int GetVertexCount()
         {
@@ -510,7 +565,6 @@ namespace xivModdingFramework.Models.DataContainers
                 p.UpdateShapeData();
             }
         }
-
         /// <summary>
         /// When stacked together, this is the list of points which the Triangle Index pointer would start for each part.
         /// </summary>
@@ -604,7 +658,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// padding bytes or unknown bytes unless this is data the end user can 
     /// manipulate to some effect.
     /// </summary>
-    public class TTModel
+    public class TTModel : ICloneable
     {
         public static string _SETTINGS_KEY_EXPORT_ALL_BONES = "setting_export_all_bones";
 
@@ -624,6 +678,19 @@ namespace xivModdingFramework.Models.DataContainers
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
 
         public HashSet<string> ActiveShapes = new HashSet<string>();
+
+        public object Clone()
+        {
+            var model = (TTModel) MemberwiseClone();
+
+            model.ActiveShapes = new HashSet<string>(ActiveShapes);
+            model.MeshGroups = new List<TTMeshGroup>(MeshGroups.Count);
+            foreach(var mg in MeshGroups)
+            {
+                model.MeshGroups.Add((TTMeshGroup) mg.Clone());
+            }
+            return model;
+        }
 
 
         /// <summary>
