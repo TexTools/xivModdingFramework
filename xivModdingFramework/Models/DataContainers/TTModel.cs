@@ -1229,16 +1229,6 @@ namespace xivModdingFramework.Models.DataContainers
             return mask;
         }
 
-
-        /// <summary>
-        /// Re-Loads the XivMDL at the source path for this model, if it exists.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<XivMdl> GetRawMdl(ModTransaction tx = null)
-        {
-            if (!IsInternal) return null;
-            return await Mdl.GetXivMdl(Source, false, tx);
-        }
         #endregion
 
         #region Major Public Functions

@@ -54,6 +54,7 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -2831,6 +2832,26 @@ namespace xivModdingFramework.Models.FileTypes
 
         }
 
+        public static async Task<byte[]> MakeUncompressedMdlFile(TTModel model, string targetPath = null, bool useOriginal = false, ModTransaction tx = null, Action<bool, string> loggingFunction = null)
+        {
+            if(targetPath == null)
+            {
+                if (!IOUtil.IsFFXIVInternalPath(model.Source))
+                {
+                    throw new InvalidDataException("A valid internal path is when converting a model to uncompressed mdl.");
+                }
+                targetPath = model.Source;
+            }
+
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            var xivMdl = await Mdl.GetXivMdl(targetPath, useOriginal, tx);
+            return MakeUncompressedMdlFile(model, xivMdl, loggingFunction);
+
+        }
         /// <summary>
         /// Creates a new Uncompressed MDL file from the given information.
         /// OGMdl is used to fill in gaps in data types we do not know about.
