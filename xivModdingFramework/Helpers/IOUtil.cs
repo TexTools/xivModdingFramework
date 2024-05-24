@@ -163,36 +163,20 @@ namespace xivModdingFramework.Helpers
             {
                 xivRace = XivRace.Monster;
             }
-            else if (path.Contains(".tex") || path.Contains(".mdl") || path.Contains(".atex"))
+            else
             {
-                if (path.Contains("weapon") || path.Contains("/common/"))
+                var res = ExtractRaceRegex.Match(path);
+                if (res.Success)
                 {
-                    xivRace = XivRace.All_Races;
+                    xivRace = XivRaces.GetXivRace(res.Groups[1].Value);
                 }
-                else
-                {
-                    if (path.Contains("demihuman"))
-                    {
-                        xivRace = XivRace.DemiHuman;
-                    }
-                    else if (path.Contains("/v"))
-                    {
-                        var raceCode = path.Substring(path.IndexOf("_c") + 2, 4);
-                        xivRace = XivRaces.GetXivRace(raceCode);
-                    }
-                    else
-                    {
-                        var raceCode = path.Substring(path.IndexOf("/c") + 2, 4);
-                        xivRace = XivRaces.GetXivRace(raceCode);
-                    }
-                }
-
             }
 
             return xivRace;
         }
 
 
+        private static Regex ExtractRaceRegex = new Regex("c([0-9]{4})");
         private static Regex SimpleRootExtractRegex = new Regex("([a-z][0-9]{4}[a-z][0-9]{4})");
         private static Regex PrimaryExtractionRegex = new Regex("([a-z][0-9]{4})[a-z][0-9]{4}");
 

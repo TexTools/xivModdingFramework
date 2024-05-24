@@ -1617,6 +1617,18 @@ namespace xivModdingFramework.Cache
             return XivDependencyGraph.CreateDependencyRoot(XivDependencyGraph.ExtractRootInfo(path));
         }
 
+        /// <summary>
+        /// Very fast, but possibly innacurate method for establishing an item's root information.
+        /// Mostly useful for resolving information about materials or models quickly.
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
+        public static XivDependencyRootInfo GetFileNameRootInfo(string fileName, bool validate = true)
+        {
+            var name = Path.GetFileNameWithoutExtension(fileName);
+            return XivDependencyGraph.ExtractRootInfoFilenameOnly(name, validate);
+        }
+
         public static async Task<List<XivDependencyRoot>> GetRoots(string internalPath)
         {
             return await XivDependencyGraph.GetDependencyRoots(internalPath);

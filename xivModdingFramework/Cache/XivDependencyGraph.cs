@@ -392,6 +392,45 @@ namespace xivModdingFramework.Cache
         {
             return XivDependencyGraph.CreateDependencyRoot(this);
         }
+
+        public XivDependencyRootInfo Validate()
+        {
+            var newRoot = (XivDependencyRootInfo)this.Clone();
+            if (PrimaryType == XivItemType.human && (SecondaryType == XivItemType.equipment || SecondaryType == XivItemType.accessory))
+            {
+                // These need to be inverted and blanked.
+                newRoot.PrimaryType = SecondaryType.Value;
+                newRoot.PrimaryId = SecondaryId.Value;
+                newRoot.SecondaryId = null;
+                newRoot.SecondaryType = null;
+            }
+
+            if (Slot == null)
+            {
+                // Safety checks.  Custom-name textures can often end up with set being resolvable
+                // but slot non-resolvable.  Either way it's irrelevant, as 
+                // they'll have their root resolved via modlist, if one exists for them.
+                if (PrimaryType == XivItemType.equipment
+                    || PrimaryType == XivItemType.accessory
+                    || PrimaryType == XivItemType.demihuman)
+                {
+                    return new XivDependencyRootInfo();
+                }
+            }
+
+            // Only these types can get away without a secondary type.
+            if(SecondaryType == null) {
+                if (PrimaryType != XivItemType.equipment && PrimaryType != XivItemType.accessory 
+                    && PrimaryType != XivItemType.indoor 
+                    && PrimaryType != XivItemType.outdoor
+                    && PrimaryType != XivItemType.fish
+                    && PrimaryType != XivItemType.painting) {
+                    return new XivDependencyRootInfo();
+                }
+            }
+
+            return newRoot;
+        }
     }
 
     /// <summary>
@@ -1604,36 +1643,14 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public static XivDependencyRoot CreateDependencyRoot(XivDependencyRootInfo info)
         {
+            var newRoot = info.Validate();
             if(!DependencySupportedTypes.Contains(info.PrimaryType) || info.PrimaryId < 0)
             {
                 return null;
             }
 
-            if (info.Slot == null)
-            {
-                // Safety checks.  Custom-name textures can often end up with set being resolvable
-                // but slot non-resolvable.  Either way it's irrelevant, as 
-                // they'll have their root resolved via modlist, if one exists for them.
-                if (info.PrimaryType == XivItemType.equipment
-                    || info.PrimaryType == XivItemType.accessory
-                    || info.PrimaryType == XivItemType.demihuman)
-                {
-                        return null;
-                }
-            }
 
-            // Only these types can get away without a secondary type.
-            if(info.SecondaryType == null) {
-                if (info.PrimaryType != XivItemType.equipment && info.PrimaryType != XivItemType.accessory 
-                    && info.PrimaryType != XivItemType.indoor 
-                    && info.PrimaryType != XivItemType.outdoor
-                    && info.PrimaryType != XivItemType.fish
-                    && info.PrimaryType != XivItemType.painting) {
-                    return null;
-                }
-            }
-
-            return new XivDependencyRoot(info);
+            return new XivDependencyRoot(newRoot);
 
         }
 
@@ -1673,19 +1690,19 @@ namespace xivModdingFramework.Cache
         }
 
         /// <summary>
-        /// Extracts dependency root info from purely a file name.  This is primarily useful when looking at 
-        /// .mtrl files, where we want to find what actual folder they're contained in based upon their name reference
-        /// in a .mdl file.
+        /// Extracts dependency root info from purely a file name, without modification.
+        /// This generates potentially invalid roots, but is very useful for quickly and efficiently
+        /// resolving information about MTRLs and MDLs from their filenames.
         /// </summary>
         /// <param name="filenameWithoutExtension"></param>
         /// <returns></returns>
-        public static XivDependencyRootInfo ExtractRootInfoFilenameOnly(string filenameWithoutExtension)
+        public static XivDependencyRootInfo ExtractRootInfoFilenameOnly(string filenameWithoutExtension, bool validate = true)
         {
             if(String.IsNullOrEmpty(filenameWithoutExtension))
             {
                 return new XivDependencyRootInfo();
             }
-            var regex = new Regex("([a-z])([0-9]{4})([a-z])([0-9]{4})");
+            var regex = new Regex("([a-z])([0-9]{4})([a-z])([0-9]{4})_?([a-z]{3})?");
             var match = regex.Match(filenameWithoutExtension);
             if(!match.Success)
             {
@@ -1696,6 +1713,12 @@ namespace xivModdingFramework.Cache
             var primaryId = Int32.Parse(match.Groups[2].Value);
             var secondaryPrefix = match.Groups[3].Value;
             var secondaryId = Int32.Parse(match.Groups[4].Value);
+            string slot = null;
+
+            if(match.Groups.Count > 5)
+            {
+                slot = match.Groups[5].Value;
+            }
 
             var root = new XivDependencyRootInfo();
 
@@ -1703,14 +1726,11 @@ namespace xivModdingFramework.Cache
             root.PrimaryId = primaryId;
             root.SecondaryType = XivItemTypes.FromSystemPrefix(secondaryPrefix[0]);
             root.SecondaryId = secondaryId;
+            root.Slot = slot;
 
-            if ((root.SecondaryType == XivItemType.equipment || root.SecondaryType == XivItemType.accessory)&& root.PrimaryType == XivItemType.human)
+            if (validate)
             {
-                // Flip flop time for these.
-                root.SecondaryType = null;
-                root.SecondaryId = null;
-                root.PrimaryType = XivItemTypes.FromSystemPrefix(secondaryPrefix[0]);
-                root.PrimaryId = secondaryId;
+                root = root.Validate();
             }
 
             return root;
