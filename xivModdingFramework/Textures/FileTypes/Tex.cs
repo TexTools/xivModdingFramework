@@ -382,7 +382,13 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 throw new IOException($"Could not find file: {externalPath}");
             }
-            var ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat, tx);
+
+            string ddsFilePath = null;
+            await Task.Run(async () =>
+            {
+                ddsFilePath = await ConvertToDDS(externalPath, internalPath, texFormat, tx);
+            });
+
             try
             {
                 var data = DDSToUncompressedTex(ddsFilePath);
