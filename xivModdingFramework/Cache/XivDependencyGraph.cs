@@ -544,10 +544,10 @@ namespace xivModdingFramework.Cache
                     if (await tx.FileExists(path))
                     {
                         originalVfxPaths.Add(path);
-                        var ttpaths = await ATex.GetAtexPaths(path, false, tx);
-                        foreach (var ttp in ttpaths)
+                        var paths = await ATex.GetAtexPaths(path, false, tx);
+                        foreach (var p in paths)
                         {
-                            originalVfxPaths.Add(ttp.Path);
+                            originalVfxPaths.Add(p);
                         }
                     }
                 }

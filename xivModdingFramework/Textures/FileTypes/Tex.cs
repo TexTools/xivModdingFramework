@@ -207,33 +207,21 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="gearItem">The gear item</param>
         /// <returns>A list of TexTypePath containing Icon Info</returns>
-        public static async Task<List<TexTypePath>> GetItemIcons(IItemModel iconItem, ModTransaction tx = null)
+        public static async Task<List<string>> GetItemIcons(IItemModel iconItem, ModTransaction tx = null)
         {
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
-
-            var type = iconItem.GetType();
-            uint iconNumber = 0;
-            if (type == typeof(XivGear))
+            if (iconItem.IconId <= 0)
             {
-                iconNumber = ((XivGear)iconItem).IconId;
-            }
-            else if (type == typeof(XivFurniture))
-            {
-                iconNumber = ((XivFurniture)iconItem).IconId;
+                return new List<string>();
             }
 
-            if (iconNumber <= 0)
-            {
-                return new List<TexTypePath>();
-            }
+            var iconString = iconItem.IconId.ToString();
 
-            var iconString = iconNumber.ToString();
-
-            var ttpList = new List<TexTypePath>();
+            var ttpList = new List<string>();
 
 
             var iconBaseNum = iconString.Substring(0, 2).PadRight(iconString.Length, '0');
@@ -244,26 +232,51 @@ namespace xivModdingFramework.Textures.FileTypes
             var path = iconFolder + "/" + iconFile;
             if (await tx.FileExists(path))
             {
-                ttpList.Add(new TexTypePath
-                {
-                    Name = "Icon",
-                    Path = $"{iconFolder}/{iconFile}",
-                    Type = XivTexType.Icon,
-                    DataFile = XivDataFile._06_Ui
-                });
+                ttpList.Add($"{iconFolder}/{iconFile}");
             }
 
 
             path = iconHQFolder + "/" + iconFile;
             if (await tx.FileExists(path))
             {
-                ttpList.Add(new TexTypePath
-                {
-                    Name = "HQ Icon",
-                    Path = $"{iconHQFolder}/{iconFile}",
-                    Type = XivTexType.Icon,
-                    DataFile = XivDataFile._06_Ui
-                });
+                ttpList.Add($"{iconHQFolder}/{iconFile}");
+            }
+
+            return ttpList;
+        }
+        public static async Task<List<string>> GetItemIcons(uint iconId, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+            if (iconId <= 0)
+            {
+                return new List<string>();
+            }
+
+            var iconString = iconId.ToString();
+
+            var ttpList = new List<string>();
+
+
+            var iconBaseNum = iconString.Substring(0, 2).PadRight(iconString.Length, '0');
+            var iconFolder = $"ui/icon/{iconBaseNum.PadLeft(6, '0')}";
+            var iconHQFolder = $"{iconFolder}/hq";
+            var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
+
+            var path = iconFolder + "/" + iconFile;
+            if (await tx.FileExists(path))
+            {
+                ttpList.Add($"{iconFolder}/{iconFile}");
+            }
+
+
+            path = iconHQFolder + "/" + iconFile;
+            if (await tx.FileExists(path))
+            {
+                ttpList.Add($"{iconHQFolder}/{iconFile}");
             }
 
             return ttpList;

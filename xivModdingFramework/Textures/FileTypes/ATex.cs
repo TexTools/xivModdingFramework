@@ -42,10 +42,10 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="itemModel">The item to get the atex paths for</param>
         /// <returns>A list of TexTypePath containing the atex info</returns>
-        public static async Task<List<TexTypePath>> GetAtexPaths(IItemModel itemModel, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<List<string>> GetAtexPaths(IItemModel itemModel, bool forceOriginal = false, ModTransaction tx = null)
         {
             // Gear is the only type we know how to retrieve atex information for.
-            if (itemModel.GetType() != typeof(XivGear)) return new List<TexTypePath>();
+            if (itemModel.GetType() != typeof(XivGear)) return new List<string>();
 
 
 
@@ -54,7 +54,7 @@ namespace xivModdingFramework.Textures.FileTypes
             var vfxPath = await GetVfxPath(itemModel, false, tx);
             return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File, forceOriginal, tx);
         }
-        public static async Task<List<TexTypePath>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
+        public static async Task<List<string>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var df = IOUtil.GetDataFileFromPath(vfxPath);
             if(tx == null)
@@ -66,25 +66,11 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (!await tx.FileExists(vfxPath))
             {
-                return new List<TexTypePath>();
+                return new List<string>();
             }
 
             var atexTexTypePathList = new List<TexTypePath>();
-            var aTexPaths = await Avfx.GetATexPaths(vfxPath, forceOriginal, tx);          
-
-            foreach (var atexPath in aTexPaths)
-            {
-                var ttp = new TexTypePath
-                {
-                    DataFile = df,
-                    Name = "VFX: " + Path.GetFileNameWithoutExtension(atexPath),
-                    Path = atexPath
-                };
-
-                atexTexTypePathList.Add(ttp);
-            }
-
-            return atexTexTypePathList;
+            return await Avfx.GetATexPaths(vfxPath, forceOriginal, tx);
         }
 
         /// <summary>
