@@ -218,7 +218,16 @@ namespace xivModdingFramework.Materials.DataContainers
                                     var len = reader.GetInt64("length");
                                     var name = reader.GetString("name");
 
-                                    var info = new ShaderConstantInfo((uint)key, name, new List<float>());
+                                    
+                                    var ct = reader.GetFloat("length");
+                                    var def = new List<float>();
+                                    for(int i = 0 ; i < len; i++)
+                                    {
+
+                                        def.Add(reader.GetFloat("value" + i));
+                                    }
+
+                                    var info = new ShaderConstantInfo((uint)key, name, def);
                                     ShaderConstants[shpk].Add((uint)key, info);
                                 }
                             }
