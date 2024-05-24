@@ -186,7 +186,10 @@ namespace xivModdingFramework.Mods
                 if (magic32 != DDSMagic)
                 {
                     // Our DDS Converter can't operate on Streams, so...
-                    ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, XivTexFormat.INVALID, tx);
+                    await Task.Run(async () =>
+                    {
+                        ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, XivTexFormat.INVALID, tx);
+                    });
                 }
 
                 return Tex.DDSToUncompressedTex(ddsPath);
