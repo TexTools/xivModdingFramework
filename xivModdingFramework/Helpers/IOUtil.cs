@@ -485,6 +485,8 @@ namespace xivModdingFramework.Helpers
 
         public static bool IsFFXIVInternalPath(string path)
         {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+
             foreach(XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
             {
                 if (path.StartsWith(df.GetFolderKey()))

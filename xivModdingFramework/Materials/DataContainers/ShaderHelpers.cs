@@ -127,6 +127,19 @@ namespace xivModdingFramework.Materials.DataContainers
             Task.Run(LoadShaderInfo);
         }
 
+        public static bool UsesColorset(this EShaderPack shpk)
+        {
+            switch (shpk)
+            {
+                case EShaderPack.Character:
+                case EShaderPack.CharacterLegacy:
+                case EShaderPack.DyeableFurniture:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
 
         /// <summary>
         /// Asynchronously (re)loads all shader reference info from the Shader DB.
