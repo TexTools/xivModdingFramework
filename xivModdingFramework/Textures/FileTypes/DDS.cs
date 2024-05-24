@@ -232,8 +232,7 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(pfFlags));
 
             uint dwFourCC = GetDDSType(format);
-
-            if(layers > 1)
+            if (layers > 1 || dwFourCC == 0)
             {
                 dwFourCC = _DX10;
             }
