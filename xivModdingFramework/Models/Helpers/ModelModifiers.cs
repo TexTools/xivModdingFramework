@@ -1607,13 +1607,10 @@ namespace xivModdingFramework.Models.Helpers
                             
 
                             // The only things that matter in tangent calculation are the 
-                            // UV1, Pos, Normal
-                            // So if the point was only split due to a UV2 or vColor difference, we want to re-weld them (unless they are a mirror-seam).
+                            // UV1, Pos, and Normal.  Any other differences don't matter and we can reweld them.
                             if(nVertex.Position == oVertex.Position 
                                 && nVertex.UV1 == oVertex.UV1
-                                && nVertex.Normal == oVertex.Normal
-                                && (nVertex.UV2 != oVertex.UV2
-                                || nVertex.VertexColor != oVertex.VertexColor))
+                                && nVertex.Normal == oVertex.Normal)
                             {
 
                                 // Calculate the set of already connected vertices.

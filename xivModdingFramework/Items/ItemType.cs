@@ -402,30 +402,8 @@ namespace xivModdingFramework.Items
             }
             else if (primaryType == XivItemType.ui)
             {
-                if (item.SecondaryCategory == XivStrings.Paintings)
-                {
-                    try
-                    {
-                        var furnitureItem = (IItemModel)item;
-                        modelInfo = furnitureItem.ModelInfo;
-
-                        var path = string.Format("bgcommon/hou/indoor/pic/ta{0}/texture/pic_ta_2{0}_d.tex", modelInfo.PrimaryID.ToString("D4"));
-                        return path;
-                        //return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
-
-                        //"bgcommon/hou/indoor/pic/ta/0002/texture/pic_ta_20002a_d.tex"
-                    }
-                    catch
-                    {
-                        var uiItem = (XivUi)item;
-                        return "ui/icon/" + uiItem.IconNumber.ToString().PadLeft(6, '0');
-                    }
-                }
-                else
-                {
-                    var uiItem = (XivUi)item;
-                    return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
-                }
+                var uiItem = (XivUi)item;
+                return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
             }
             else if (primaryType == XivItemType.indoor)
             {

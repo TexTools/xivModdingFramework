@@ -748,10 +748,15 @@ namespace xivModdingFramework.Mods
                 XivCache.QueueDependencyUpdate(files);
 
                 // Notify the world of all the files that changed in this transaction.
+                var start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                 foreach(var file in files)
                 {
                     INTERNAL_OnFileChanged(file, await Get8xDataOffset(file, false), false);
                 }
+                var end = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+                var duration = end - start;
+                var z = "dfas";
+
             }
 
             TransactionCommitted?.Invoke(this);
@@ -1332,7 +1337,7 @@ namespace xivModdingFramework.Mods
         {
             if (fromIndex && State != ETransactionState.Closing)
             {
-                if (BatchedNotifications != null)
+                if (BatchedNotifications != null && !BatchedNotifications.ContainsKey(path))
                 {
                     // Just add to the batching for later.
                     BatchedNotifications.Add(path, offset8x);

@@ -277,9 +277,9 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<string, string>> GetMapAvailableTex(string path, ModTransaction tx)
+        public static async Task<List<string>> GetMapAvailableTex(string path, ModTransaction tx)
         {
-            var mapNamePathDictonary = new Dictionary<string, string>();
+            var mapNamePathDictonary = new List<string>();
 
             var folderPath = $"ui/map/{path}";
 
@@ -291,7 +291,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 if (files.Contains(HashGenerator.GetHash(file)))
                 {
-                    mapNamePathDictonary.Add(mapType.Value, folderPath + "/" + file);
+                    mapNamePathDictonary.Add(folderPath + "/" + file);
                 }
             }
 

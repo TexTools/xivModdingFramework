@@ -14,15 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Cyotek.Drawing.BitmapFont;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.Textures.FileTypes;
+using Character = xivModdingFramework.Items.Categories.Character;
 
 namespace xivModdingFramework.Items.DataContainers
 {
@@ -141,33 +144,32 @@ namespace xivModdingFramework.Items.DataContainers
         /// <param name="addLowRes"></param>
         /// <param name="addHiRes"></param>
         /// <returns></returns>
-        public async Task<Dictionary<string, string>> GetTexPaths(bool addLowRes = true, bool addHiRes = false, ModTransaction tx = null)
+        public async Task<List<string>> GetTexPaths(bool addLowRes = true, bool addHiRes = false, ModTransaction tx = null)
         {
-            var resPaths = new Dictionary<string, string>();
+            var resPaths = new List<string>();
 
-            if(SecondaryCategory == XivStrings.Maps)
+            if (SecondaryCategory == XivStrings.Maps)
             {
                 var mapNamePaths = await Tex.GetMapAvailableTex(UiPath, tx);
                 return mapNamePaths;
-            } else if(SecondaryCategory == XivStrings.HUD)
+            } else if (SecondaryCategory == XivStrings.HUD)
             {
-                //ui/uld/aozactionlearned.tex
                 HasHiRes = true;
 
                 if (addHiRes && !addLowRes)
                 {
-                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
-                } else if(addHiRes && addLowRes)
+                    resPaths.Add("ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
+                } else if (addHiRes && addLowRes)
                 {
-                    resPaths.Add(Name + "SD", "ui/uld/" + Name.ToLower() + ".tex");
-                    resPaths.Add(Name + "HD", "ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
+                    resPaths.Add("ui/uld/" + Name.ToLower() + ".tex");
+                    resPaths.Add("ui/uld/" + Name.ToLower() + HiResUiExt + ".tex");
                 } else
                 {
-                    resPaths.Add(Name, "ui/uld/" + Name.ToLower() + ".tex");
+                    resPaths.Add("ui/uld/" + Name.ToLower() + ".tex");
                 }
-            } else if(SecondaryCategory == XivStrings.LoadingScreen)
+            } else if (SecondaryCategory == XivStrings.LoadingScreen)
             {
-                resPaths.Add(Name, UiPath + '/' + Name + ".tex");
+                resPaths.Add(UiPath + '/' + Name + ".tex");
             }
             else
             {
@@ -178,15 +180,15 @@ namespace xivModdingFramework.Items.DataContainers
 
                 if (addHiRes && !addLowRes)
                 {
-                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
+                    resPaths.Add("ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
                 }
                 else if (addHiRes && addLowRes)
                 {
-                    resPaths.Add(Name + "SD", "ui/icon/" + block + '/' + icon + ".tex");
-                    resPaths.Add(Name + "HD", "ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
+                    resPaths.Add("ui/icon/" + block + '/' + icon + ".tex");
+                    resPaths.Add("ui/icon/" + block + '/' + icon + HiResUiExt + ".tex");
                 } else
                 {
-                    resPaths.Add(Name, "ui/icon/" + block + '/' + icon + ".tex");
+                    resPaths.Add("ui/icon/" + block + '/' + icon + ".tex");
                 }
             }
 

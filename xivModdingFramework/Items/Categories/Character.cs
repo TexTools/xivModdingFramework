@@ -413,73 +413,6 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
-        /// Gets the Type and Part for a given Character Item
-        /// </summary>
-        /// <remarks>
-        /// Only Hair and Face Character Items have Types
-        /// </remarks>
-        /// <param name="charaItem">The character item</param>
-        /// <param name="race">The race</param>
-        /// <param name="num">The character item number</param>
-        /// <returns>A dictionary containing</returns>
-        public async Task<Dictionary<string, char[]>> GetTypePartForTextures(XivCharacter charaItem, XivRace race, int num, ModTransaction tx)
-        {
-            var typePartDictionary = new Dictionary<string, char[]>();
-
-            var folder = "";
-            var file = "";
-            var typeDict = HairSlotAbbreviationDictionary;
-
-            var parts = Constants.Alphabet;
-
-            if (charaItem.SecondaryCategory == XivStrings.Hair)
-            {
-                folder = string.Format(XivStrings.HairMtrlFolder, race.GetRaceCode(),
-                    num.ToString().PadLeft(4, '0'));
-                file = XivStrings.HairMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Face)
-            {
-                folder = string.Format(XivStrings.FaceMtrlFolder, race.GetRaceCode(),
-                    num.ToString().PadLeft(4, '0'));
-                typeDict = FaceSlotAbbreviationDictionary;
-                file = XivStrings.FaceMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Ear)
-            {
-                folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(),
-                    num.ToString().PadLeft(4, '0'));
-                typeDict = EarsSlotAbbreviationDictionary;
-                file = XivStrings.EarsMtrlFile;
-            }
-
-            var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
-
-            foreach (var type in typeDict)
-            {
-                var partList = new List<char>();
-
-                foreach (var part in parts)
-                {
-                    var mtrlFile = string.Format(file, race.GetRaceCode(), num.ToString().PadLeft(4, '0'),
-                        type.Value, part);
-
-                    if (fileList.Contains(HashGenerator.GetHash(mtrlFile)))
-                    {
-                        partList.Add(part);
-                    }
-                }
-
-                if (partList.Count > 0)
-                {
-                    typePartDictionary.Add(type.Key, partList.ToArray());
-                }
-            }
-
-            return typePartDictionary;
-        }
-
-        /// <summary>
         /// Gets the Type of models for a given Character Item
         /// </summary>
         /// <param name="charaItem">The character item</param>
@@ -550,10 +483,10 @@ namespace xivModdingFramework.Items.Categories
             FacePaint, 
             Equipment
         };
-        public async Task<List<string>> GetDecalPaths(XivDecalType type, ModTransaction tx)
+        public static async Task<List<string>> GetDecalPaths(XivDecalType type, ModTransaction tx)
         {
 
-            const int decalMax = 300;
+            const int decalMax = 500;
 
             List<string> ret = new List<string>();
             if (type == XivDecalType.FacePaint)
