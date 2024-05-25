@@ -27,6 +27,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -179,8 +180,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     MTRLPath = internalMtrlPath,
                     Signature = br.ReadInt32(),
-                    FileSize = br.ReadInt16(),
                 };
+                var fileSize = br.ReadInt16();
 
                 var colorSetDataSize = br.ReadUInt16();
                 var stringBlockSize = br.ReadUInt16();
@@ -262,7 +263,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 xivMtrl.AdditionalData = br.ReadBytes(additionalDataSize);
 
                 xivMtrl.ColorSetData = new List<Half>();
-
+                xivMtrl.ColorSetDyeData = new byte[0];
 
                 if (colorSetDataSize > 0)
                 {
@@ -728,8 +729,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             // Backfill the header data.
-            xivMtrl.FileSize = (short)mtrlBytes.Count;
-            IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes(xivMtrl.FileSize), fileSizePointer);
+            var fileSize = (short)mtrlBytes.Count;
+            IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes(fileSize), fileSizePointer);
             IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes((ushort)stringBlock.Count), materialDataSizePointer);
             IOUtil.ReplaceBytesAt(mtrlBytes, BitConverter.GetBytes(shaderNamePointer), shaderNamePointerPointer);
             return mtrlBytes.ToArray();
@@ -817,6 +818,60 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
+
+        public static XivMtrl CreateDefaultMaterial(string path)
+        {
+            var defaultFilePath = "Resources/DefaultTextures/default_material.mtrl";
+            if(!File.Exists(defaultFilePath))
+            {
+                var dud = new XivMtrl();
+                dud.MTRLPath = path;
+                return dud;
+            }
+
+            var mtrl = GetXivMtrl(File.ReadAllBytes(defaultFilePath), path);
+
+            var normSamp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
+            if(normSamp != null)
+            {
+                var texpath = path.Replace(".mtrl", "_n.tex");
+                normSamp.TexturePath = texpath;
+            }
+
+            var maskSamp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
+            if (maskSamp != null)
+            {
+                var texpath = path.Replace(".mtrl", "_m.tex");
+                maskSamp.TexturePath = texpath;
+            }
+
+            var idSamp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Index);
+            if (idSamp != null)
+            {
+                var texpath = path.Replace(".mtrl", "_id.tex");
+                idSamp.TexturePath = texpath;
+            }
+
+            return mtrl;
+
+        }
+
+        internal static async Task CreateMissingMaterial(List<string> knownMaterials,  string materialPath, IItem referenceItem, string sourceApplication, ModTransaction tx)
+        {
+            if(knownMaterials.Count == 0)
+            {
+                // Uhhh...
+                var fakeMtrl = CreateDefaultMaterial(materialPath);
+                await Mtrl.ImportMtrl(fakeMtrl, referenceItem, sourceApplication, true, tx);
+                return;
+            }
+
+            // Maybe one day we could use some fancy logic to guess a better base material, but for now this works.
+            var mtrl = CreateDefaultMaterial(materialPath);
+            await Mtrl.ImportMtrl(mtrl, referenceItem, sourceApplication, true, tx);
+            return;
+
+        }
 
         /// <summary>
         /// Does a fairly dirty file analysis of two material files to determine where their differences are contained.
@@ -1123,7 +1178,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
 
                 mtrl.ColorSetData = newData;
-                if (mtrl.ColorSetDyeData != null)
+                if (mtrl.ColorSetDyeData != null && mtrl.ColorSetDyeData.Length > 0)
                 {
                     // Update Dye information.
                     var newDyeData = new byte[128];

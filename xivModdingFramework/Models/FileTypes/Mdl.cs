@@ -2340,13 +2340,20 @@ namespace xivModdingFramework.Models.FileTypes
             #endregion
 
             var bytes = await FileToUncompressedMdl(externalFile, internalFile, options, tx);
+
+            if (options.ValidateMaterials)
+            {
+                // Kind of clunky to have to convert this back off bytes, but w/e.
+                // This codepath is basically unused at this point anyways.
+                var ttm = Mdl.GetTTModel(bytes, internalFile, tx);
+                await FillMissingMaterials(ttm, options.ReferenceItem, options.SourceApplication, tx);
+            }
+
             var compressed = await CompressMdlFile(bytes);
-
-
-            byte[] ret = null;
 
             options.LoggingFunction(false, "Writing MDL File to FFXIV File System...");
             var offset = await Dat.WriteModFile(compressed, internalFile, options.SourceApplication, options.ReferenceItem, tx);
+            //var offset = await ImportModel(bytes, internalFile, options.ValidateMaterials, options.ReferenceItem, options.SourceApplication, tx);
 
             options.LoggingFunction(false, "Job done!");
             return offset;
@@ -5206,6 +5213,64 @@ namespace xivModdingFramework.Models.FileTypes
             catch
             {
                 boiler.Cancel();
+                throw;
+            }
+        }
+
+
+        public static async Task FillMissingMaterials(TTModel model, IItem referenceItem = null, string sourceApplication = "Unknown", ModTransaction tx = null)
+        {
+
+            var root = await XivCache.GetFirstRoot(model.Source);
+            if (root == null)
+            {
+                return;
+            }
+
+            var rtx = tx;
+            if(rtx == null)
+            {
+                // Readonly tx for step 1 if we don't have one.
+                rtx = ModTransaction.BeginTransaction();
+            }
+
+                
+            var paths = await GetReferencedMaterialPaths(model.Materials, model.Source, -1, false, false, tx);
+
+            var missingPaths = new HashSet<string>();
+            foreach(var path in paths)
+            {
+                if(IOUtil.IsFFXIVInternalPath(path) && !await rtx.FileExists(path))
+                {
+                    missingPaths.Add(path);
+                }
+            }
+
+            if(missingPaths.Count == 0)
+            {
+                return;
+            }
+
+            var allRootMaterials = await root.GetMaterialFiles(-1, tx, true);
+
+
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            var originalStates = new List<TxFileState>();
+            try
+            {
+                foreach(var path in missingPaths)
+                {
+                    originalStates.Add(await tx.SaveFileState(path));
+                    await Mtrl.CreateMissingMaterial(allRootMaterials, path, referenceItem, sourceApplication, tx);
+                }
+
+
+
+                await boiler.Commit();
+            }
+            catch
+            {
+                await boiler.Catch(originalStates);
                 throw;
             }
         }

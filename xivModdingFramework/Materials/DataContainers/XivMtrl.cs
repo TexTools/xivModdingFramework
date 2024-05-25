@@ -51,12 +51,8 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <remarks>
         /// 0x00000301 (16973824)
         /// </remarks>
-        public int Signature { get; set; }
+        public int Signature { get; set; } = 0x00000301;
 
-        /// <summary>
-        /// The size of the MTRL file
-        /// </summary>
-        public short FileSize { get; set; }
 
         /// <summary>
         /// The size of the ColorSet Data section
@@ -70,9 +66,9 @@ namespace xivModdingFramework.Materials.DataContainers
             return (ushort) size;
         } }
 
-        public List<MtrlString> MapStrings { get; set; }
+        public List<MtrlString> MapStrings { get; set; } = new List<MtrlString>();
 
-        public List<MtrlString> ColorsetStrings { get; set; }
+        public List<MtrlString> ColorsetStrings { get; set; } = new List<MtrlString>();
 
         public EShaderPack ShaderPack
         {
@@ -89,22 +85,34 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The name of the shader used by the item
         /// </summary>
-        public string ShaderPackRaw { get; set; }
+        public string ShaderPackRaw { get; set; } = "character.shpk";
 
         /// <summary>
         /// Unknown value
         /// </summary>
-        public byte[] AdditionalData { get; set; }
+        public byte[] AdditionalData { get; set; } = new byte[4];
 
+#if DAWNTRAIL
         /// <summary>
         /// The list of half floats containing the ColorSet data
         /// </summary>
-        public List<Half> ColorSetData { get; set; }
-
+        public List<Half> ColorSetData { get; set; } = new List<Half>(new Half[1024]);
         /// <summary>
         /// The byte array containing the extra ColorSet data
         /// </summary>
-        public byte[] ColorSetDyeData { get; set; }
+        public byte[] ColorSetDyeData { get; set; } = new byte[128];
+
+#else
+        /// <summary>
+        /// The list of half floats containing the ColorSet data
+        /// </summary>
+        public List<Half> ColorSetData { get; set; } = new List<Half>(new Half[256]);
+        /// <summary>
+        /// The byte array containing the extra ColorSet data
+        /// </summary>
+        public byte[] ColorSetDyeData { get; set; } = new byte[32];
+
+#endif
 
         /// <summary>
         /// The size of the additional MTRL Data
@@ -149,7 +157,7 @@ namespace xivModdingFramework.Materials.DataContainers
             }
         }
 
-        public List<MtrlTexture> Textures;
+        public List<MtrlTexture> Textures = new List<MtrlTexture>();
 
         /// <summary>
         /// Shader flags, only partially known:
@@ -181,12 +189,12 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The list of Type 1 data structures
         /// </summary>
-        public List<ShaderKey> ShaderKeys { get; set; }
+        public List<ShaderKey> ShaderKeys { get; set; } = new List<ShaderKey>();
 
         /// <summary>
         /// The list of Type 2 data structures
         /// </summary>
-        public List<ShaderConstant> ShaderConstants { get; set; }
+        public List<ShaderConstant> ShaderConstants { get; set; } = new List<ShaderConstant>();
 
         /// <summary>
         /// The TexTools expected list of textures in the item, including colorset 'texture'.

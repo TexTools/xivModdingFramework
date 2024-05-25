@@ -41,6 +41,8 @@ namespace xivModdingFramework.Models.Helpers
         public XivRace SourceRace { get; set; }
         public IItem ReferenceItem { get; set; }
 
+        public bool ValidateMaterials { get; set; }
+
         public string SourceApplication { get; set; }
 
         /// <summary>
@@ -68,6 +70,7 @@ namespace xivModdingFramework.Models.Helpers
             ClearVColor = false;
             ClearVAlpha = false;
             AutoScale = true;
+            ValidateMaterials = true;
             SourceRace = XivRace.All_Races;
             LoggingFunction = null;
             IntermediaryFunction = null;
