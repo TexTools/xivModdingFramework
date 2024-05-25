@@ -821,8 +821,12 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static XivMtrl CreateDefaultMaterial(string path)
         {
+#if ENDWALKER
             var defaultFilePath = "Resources/DefaultTextures/default_material.mtrl";
-            if(!File.Exists(defaultFilePath))
+#else
+            var defaultFilePath = "Resources/DefaultTextures/default_material_dt.mtrl";
+#endif
+            if (!File.Exists(defaultFilePath))
             {
                 var dud = new XivMtrl();
                 dud.MTRLPath = path;
@@ -831,25 +835,46 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var mtrl = GetXivMtrl(File.ReadAllBytes(defaultFilePath), path);
 
-            var normSamp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
-            if(normSamp != null)
+            var samp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
+            if(samp != null)
             {
                 var texpath = path.Replace(".mtrl", "_n.tex");
-                normSamp.TexturePath = texpath;
+                samp.TexturePath = texpath;
             }
 
-            var maskSamp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
-            if (maskSamp != null)
+            samp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
+            if (samp != null)
             {
                 var texpath = path.Replace(".mtrl", "_m.tex");
-                maskSamp.TexturePath = texpath;
+                samp.TexturePath = texpath;
             }
 
-            var idSamp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Index);
-            if (idSamp != null)
+            samp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Index);
+            if (samp != null)
             {
                 var texpath = path.Replace(".mtrl", "_id.tex");
-                idSamp.TexturePath = texpath;
+                samp.TexturePath = texpath;
+            }
+
+            samp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Specular);
+            if (samp != null)
+            {
+                var texpath = path.Replace(".mtrl", "_s.tex");
+                samp.TexturePath = texpath;
+            }
+
+            samp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Diffuse);
+            if (samp != null)
+            {
+                var texpath = path.Replace(".mtrl", "_d.tex");
+                samp.TexturePath = texpath;
+            }
+
+            samp = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Reflection);
+            if (samp != null)
+            {
+                var texpath = path.Replace(".mtrl", "_r.tex");
+                samp.TexturePath = texpath;
             }
 
             return mtrl;
@@ -966,7 +991,7 @@ namespace xivModdingFramework.Materials.FileTypes
             return (colorsetDifferences, otherDifferences);
         }
 
-        #endregion
+#endregion
 
         #region Endwalker => Dawntrail Material Conversion
         public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress = null)

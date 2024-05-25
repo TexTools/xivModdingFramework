@@ -5282,7 +5282,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="originalPath"></param>
         /// <param name="newPath"></param>
         /// <returns></returns>
-        public static async Task<long> CopyModel(string originalPath, string newPath, string source, bool copyTextures = false, ModTransaction tx = null)
+        public static async Task<long> CopyModel(string originalPath, string newPath, string source, bool? copyTextures = null, ModTransaction tx = null)
         {
 
             var fromRoot = await XivCache.GetFirstRoot(originalPath);
@@ -5362,7 +5362,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var mtrl = await Mtrl.GetXivMtrl(material, false, tx);
 
-                        if (copyTextures)
+                        if (copyTextures == true)
                         {
                             for (int i = 0; i < mtrl.Textures.Count; i++)
                             {
@@ -5379,18 +5379,18 @@ namespace xivModdingFramework.Models.FileTypes
                                 states.Add(await tx.SaveFileState(ntex));
                                 await Dat.CopyFile(tex, ntex, source, true, item, tx);
                             }
-                        }
 
-                        mtrl.MTRLPath = path;
-                        allFiles.Add(mtrl.MTRLPath);
-                        states.Add(await tx.SaveFileState(mtrl.MTRLPath));
-                        await Mtrl.ImportMtrl(mtrl, item, source, false, tx);
+                            mtrl.MTRLPath = path;
+                            allFiles.Add(mtrl.MTRLPath);
+                            states.Add(await tx.SaveFileState(mtrl.MTRLPath));
+                            await Mtrl.ImportMtrl(mtrl, item, source, false, tx);
 
-                        if (!validNewMaterials.ContainsKey(newMatName))
-                        {
-                            validNewMaterials.Add(newMatName, path);
+                            if (!validNewMaterials.ContainsKey(newMatName))
+                            {
+                                validNewMaterials.Add(newMatName, path);
+                            }
+                            copiedPaths.Add(path);
                         }
-                        copiedPaths.Add(path);
 
 
                         // Switch out any material references to the material in the model file.
@@ -5409,7 +5409,7 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
-                if (Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
+                if (copyTextures == true && Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
                 {
                     var toEntries = await Imc.GetEntries(await toRoot.GetImcEntryPaths(), false, tx);
                     var fromEntries = await Imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, tx);
@@ -5442,6 +5442,12 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
+                if (copyTextures != false)
+                {
+                    // Fill in anything missing with at least stubs always.
+                    await FillMissingMaterials(model, item, source, tx);
+                }
+
                 // Save the final modified mdl.
                 var data = await MakeCompressedMdlFile(model, xMdl);
                 var offset = await Dat.WriteModFile(data, newPath, source, item, tx);
@@ -5458,7 +5464,18 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
-        public static async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, string sourceApplication, bool copyTextures = false, ModTransaction tx = null)
+        /// <summary>
+        /// Merge models together.  Various optional handling for the resulting textures/materials.
+        /// </summary>
+        /// <param name="primaryModel"></param>
+        /// <param name="mergeIn"></param>
+        /// <param name="mergeInImcVariant"></param>
+        /// <param name="meshTarget"></param>
+        /// <param name="copyTextures">True to copy everything.  Null to fill with stubs.  False to copy and validate nothing.</param>
+        /// <param name="sourceApplication"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task<long> MergeModels(string primaryModel, string mergeIn, int mergeInImcVariant, int meshTarget = -1, bool? copyTextures = null, string sourceApplication = "Unknown", ModTransaction tx = null)
         {
 
             var mainRoot = await XivCache.GetFirstRoot(primaryModel);
@@ -5495,6 +5512,14 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mergeInModel == null)
                 {
                     throw new InvalidDataException("Merge model file does not exist.");
+                }
+
+                if(meshTarget >= 0 && meshTarget < mergeInModel.MeshGroups.Count)
+                {
+                    // Yeet everything but the one we want to keep.
+                    var mgs = new List<TTMeshGroup>();
+                    mgs.Add(mergeInModel.MeshGroups[meshTarget]);
+                    mergeInModel.MeshGroups = mgs;
                 }
 
 
@@ -5555,7 +5580,7 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         var mtrl = await Mtrl.GetXivMtrl(material, false, tx);
 
-                        if (copyTextures)
+                        if (copyTextures == true)
                         {
                             for (int i = 0; i < mtrl.Textures.Count; i++)
                             {
@@ -5576,18 +5601,18 @@ namespace xivModdingFramework.Models.FileTypes
                                 allFiles.Add(ntex);
                                 await Dat.CopyFile(tex, ntex, primaryModel, true, item, tx);
                             }
-                        }
 
-                        mtrl.MTRLPath = path;
-                        allFiles.Add(mtrl.MTRLPath);
-                        states.Add(await tx.SaveFileState(mtrl.MTRLPath));
-                        await Mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
+                            mtrl.MTRLPath = path;
+                            allFiles.Add(mtrl.MTRLPath);
+                            states.Add(await tx.SaveFileState(mtrl.MTRLPath));
+                            await Mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
 
-                        if (!validNewMaterials.ContainsKey(newMatName))
-                        {
-                            validNewMaterials.Add(newMatName, path);
+                            if (!validNewMaterials.ContainsKey(newMatName))
+                            {
+                                validNewMaterials.Add(newMatName, path);
+                            }
+                            copiedPaths.Add(path);
                         }
-                        copiedPaths.Add(path);
 
 
                         // Switch out any material references to the material in the model file.
@@ -5606,34 +5631,37 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
-                // Copy the materials through to all the destination IMC sets as needed.
-                if (Imc.UsesImc(mainRoot) && Imc.UsesImc(mergeInRoot))
+                if (copyTextures == true)
                 {
-                    var toEntries = await Imc.GetEntries(await mainRoot.GetImcEntryPaths(), false, tx);
-                    var fromEntries = await Imc.GetEntries(await mergeInRoot.GetImcEntryPaths(), false, tx);
-
-                    var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
-                    var fromSet = fromEntries[mergeInImcVariant];
-
-                    if (toSets.Count > 0)
+                    // Copy the materials through to all the destination IMC sets as needed.
+                    if (Imc.UsesImc(mainRoot) && Imc.UsesImc(mergeInRoot))
                     {
-                        var vReplace = new Regex("/v[0-9]{4}/");
+                        var toEntries = await Imc.GetEntries(await mainRoot.GetImcEntryPaths(), false, tx);
+                        var fromEntries = await Imc.GetEntries(await mergeInRoot.GetImcEntryPaths(), false, tx);
 
-                        // Validate that sufficient material sets have been created at the destination root.
-                        foreach (var mkv in validNewMaterials)
+                        var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
+                        var fromSet = fromEntries[mergeInImcVariant];
+
+                        if (toSets.Count > 0)
                         {
-                            var validPath = mkv.Value;
-                            foreach (var msetId in toSets)
-                            {
-                                var testPath = vReplace.Replace(validPath, "/v" + msetId.ToString().PadLeft(4, '0') + "/");
-                                var copied = copiedPaths.Contains(testPath);
+                            var vReplace = new Regex("/v[0-9]{4}/");
 
-                                // Missing a material set, copy in the known valid material.
-                                if (!copied)
+                            // Validate that sufficient material sets have been created at the destination root.
+                            foreach (var mkv in validNewMaterials)
+                            {
+                                var validPath = mkv.Value;
+                                foreach (var msetId in toSets)
                                 {
-                                    allFiles.Add(testPath);
-                                    states.Add(await tx.SaveFileState(testPath));
-                                    await Dat.CopyFile(validPath, testPath, primaryModel, true, item, tx);
+                                    var testPath = vReplace.Replace(validPath, "/v" + msetId.ToString().PadLeft(4, '0') + "/");
+                                    var copied = copiedPaths.Contains(testPath);
+
+                                    // Missing a material set, copy in the known valid material.
+                                    if (!copied)
+                                    {
+                                        allFiles.Add(testPath);
+                                        states.Add(await tx.SaveFileState(testPath));
+                                        await Dat.CopyFile(validPath, testPath, primaryModel, true, item, tx);
+                                    }
                                 }
                             }
                         }
@@ -5650,6 +5678,13 @@ namespace xivModdingFramework.Models.FileTypes
                 // Save the final modified mdl.
                 var data = await MakeCompressedMdlFile(mainModel, xMdl);
                 var offset = await Dat.WriteModFile(data, primaryModel, sourceApplication, item, tx);
+
+                if (copyTextures != false)
+                {
+                    // Fill in anything missing with at least stubs always.
+                    await FillMissingMaterials(mainModel, item, sourceApplication, tx);
+                }
+
 
                 await boiler.Commit();
                 XivCache.QueueDependencyUpdate(allFiles.ToList());
