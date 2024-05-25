@@ -4424,7 +4424,7 @@ namespace xivModdingFramework.Models.FileTypes
             WriteVectorData(importData.VertexData0, vertexInfoList, VertexUsageType.Position, v);
 
             // Furniture items do not have bone data
-            if (model.HasWeights)
+            if (vertexInfoList.ContainsKey(VertexUsageType.BoneIndex))
             {
                 if (vertexInfoList[VertexUsageType.BoneIndex][0] == VertexDataType.UByte8)
                 {
