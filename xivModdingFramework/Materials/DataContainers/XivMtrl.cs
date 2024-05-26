@@ -197,17 +197,6 @@ namespace xivModdingFramework.Materials.DataContainers
         public List<ShaderConstant> ShaderConstants { get; set; } = new List<ShaderConstant>();
 
         /// <summary>
-        /// The TexTools expected list of textures in the item, including colorset 'texture'.
-        /// </summary>
-        public List<TexTypePath> TextureTypePathList
-        {
-            get
-            {
-                return GetTextureTypePathList();
-            }
-        }
-
-        /// <summary>
         /// The internal MTRL path
         /// </summary>
         public string MTRLPath { get; set; }
@@ -267,7 +256,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 var ttp = new TexTypePath()
                 {
                     DataFile = IOUtil.GetDataFileFromPath(tex.TexturePath),
-                    Path = tex.TexturePath,
+                    Path = tex.Dx11Path,
                     Type = ResolveFullUsage(tex),
                     Name = Path.GetFileNameWithoutExtension(tex.TexturePath)
                 };
