@@ -1463,7 +1463,7 @@ namespace xivModdingFramework.Materials.FileTypes
             row[0] = 1.0f;
             row[1] = 1.0f;
             row[2] = 1.0f;
-            for(int i =0 ; i < 7; i++)
+            for(int i =0 ; i < 8; i++)
             {
                 row[i] = 1.0f;
             }
@@ -1476,7 +1476,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             row[7 * 4 + 0] = 16.0f;
-            row[7 * 4 + 1] = 16.0f;
+            row[7 * 4 + 3] = 16.0f;
             return row;
         }
 
