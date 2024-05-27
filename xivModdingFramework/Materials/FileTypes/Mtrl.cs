@@ -1062,7 +1062,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 // Both have colorsets of same size.
                 for(int i = 0; i < baseMaterial.ColorSetData.Count; i++)
                 {
-                    if (baseMaterial.ColorSetDyeData[i] != otherMaterial.ColorSetData[i])
+                    if (baseMaterial.ColorSetData[i] != otherMaterial.ColorSetData[i])
                     {
                         colorsetDifferences = true;
                         break;
