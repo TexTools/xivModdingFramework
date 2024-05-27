@@ -552,7 +552,7 @@ namespace xivModdingFramework.Cache
         /// <param name="index"></param>
         /// <param name="modlist"></param>
         /// <returns></returns>
-        public async Task<SortedSet<string>> GetAllFiles(ModTransaction tx = null)
+        public async Task<SortedSet<string>> GetAllFiles(ModTransaction tx = null, bool includeOrphanMaterials = true)
         {
 
             var df = IOUtil.GetDataFileFromPath(Info.GetRootFile());
@@ -567,7 +567,7 @@ namespace xivModdingFramework.Cache
             ItemMetadata originalMetadata = await ItemMetadata.GetMetadata(this, false, tx);
 
             var originalModelPaths = await GetModelFiles(tx);
-            var originalMaterialPaths = await GetMaterialFiles(-1, tx);
+            var originalMaterialPaths = await GetMaterialFiles(-1, tx, includeOrphanMaterials);
             var originalTexturePaths = await GetTextureFiles(-1, tx);
 
             var originalVfxPaths = new HashSet<string>();
@@ -769,7 +769,7 @@ namespace xivModdingFramework.Cache
 
             if (includeOrphans)
             {
-                var orphans = await GetOrphanMaterials(materialVariant, tx);
+                var orphans = await GetModdedMaterials(materialVariant, tx);
                 materials.UnionWith(orphans);
             }
 
@@ -837,7 +837,33 @@ namespace xivModdingFramework.Cache
             return materials;
         }
 
-        public async Task<HashSet<string>> GetOrphanMaterials(int materialVariant = -1, ModTransaction tx = null)
+        public async Task<HashSet<string>> GetOrphanedFiles(ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            var keptFiles = await GetAllFiles(tx, false);
+
+            var ml = await tx.GetModList();
+
+
+            var orphans = new HashSet<string>();
+            var mods = ml.GetMods();
+            foreach (var mod in mods)
+            {
+                var modRoot = await XivCache.GetFirstRoot(mod.FilePath);
+                if(modRoot == this && !keptFiles.Contains(mod.FilePath))
+                {
+                    orphans.Add(mod.FilePath);
+                }
+            }
+            return orphans;
+        }
+
+        public async Task<HashSet<string>> GetModdedMaterials(int materialVariant = -1, ModTransaction tx = null)
         {
             if(tx == null)
             {
