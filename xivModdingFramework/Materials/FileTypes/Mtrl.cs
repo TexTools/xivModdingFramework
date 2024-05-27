@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Helper;
 using SharpDX;
 using SixLabors.ImageSharp;
@@ -28,13 +29,16 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.ComTypes;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Materials.DataContainers;
@@ -47,6 +51,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
+using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
@@ -818,6 +823,132 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
+
+        public static async Task ImportMtrlToAllVersions(XivMtrl mtrl, IItemModel item = null, string source = "Unknown", ModTransaction tx = null)
+        {
+            var originalStates = new List<TxFileState>();
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            try
+            {
+                var version = (int)mtrl.GetVersion();
+                var root = await XivCache.GetFirstRoot(mtrl.MTRLPath);
+                if (item == null && root != null)
+                {
+                    item = root.GetFirstItem(version);
+                }
+
+                if (item == null || !Imc.UsesImc(item) || version == 0)
+                {
+                    // No valid item, so no shared versions.
+                    // So just save the base material and call it a day.
+                    originalStates.Add(await tx.SaveFileState(mtrl.MTRLPath));
+                    await ImportMtrl(mtrl, item, source, true, tx);
+                    await boiler.Commit();
+                    return;
+                }
+
+                // Add new Materials for shared model items.    
+                var oldMaterialIdentifier = mtrl.GetMaterialIdentifier();
+                var oldMtrlName = Path.GetFileName(mtrl.MTRLPath);
+
+                // Ordering these by name ensures that we create textures for the new variants in the first
+                // item alphabetically, just for consistency's sake.
+                var sameModelItems = (await item.GetSharedModelItems()).OrderBy(x => x.Name, new ItemNameComparer());
+
+                var oldVariantString = "/v" + mtrl.GetVersion().ToString().PadLeft(4, '0') + '/';
+                var modifiedVariants = new List<int>();
+
+                var mtrlReplacementRegex = "_" + oldMaterialIdentifier + ".mtrl";
+
+
+                var imcEntries = new List<XivImc>();
+                var materialVersions = new HashSet<byte>();
+                var imcInfo = await Imc.GetFullImcInfo(item, false, tx);
+                imcEntries = imcInfo.GetAllEntries(root.Info.Slot, true);
+                materialVersions = new HashSet<byte>(imcEntries.Select(x => x.MaterialSet));
+
+                var count = 0;
+
+                var allItems = (await root.GetAllItems());
+
+                var matNumToItems = new Dictionary<int, List<IItemModel>>();
+                foreach (var i in allItems)
+                {
+                    if (imcEntries.Count <= i.ModelInfo.ImcSubsetID) continue;
+
+                    var matSet = imcEntries[i.ModelInfo.ImcSubsetID].MaterialSet;
+                    if (!matNumToItems.ContainsKey(matSet))
+                    {
+                        matNumToItems.Add(matSet, new List<IItemModel>());
+                    }
+
+                    var saveItem = i;
+
+                    matNumToItems[matSet].Add(saveItem);
+                }
+
+                var keys = matNumToItems.Keys.ToList();
+                foreach (var key in keys)
+                {
+                    var list = matNumToItems[key];
+                    matNumToItems[key] = list.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
+                }
+
+                var baseMtrl = (XivMtrl)mtrl.Clone();
+                foreach (var tex in baseMtrl.Textures)
+                {
+                    // Tokenize the paths before we copy things over, so {variant} texture keys will resolve properly.
+                    tex.TexturePath = baseMtrl.TokenizePath(tex.TexturePath, mtrl.ResolveFullUsage(tex));
+                }
+
+                // Load and modify all the MTRLs.
+                foreach (var materialVersionId in materialVersions)
+                {
+                    var variantPath = Mtrl.GetMtrlFolder(root.Info, materialVersionId);
+                    var oldMaterialPath = variantPath + "/" + oldMtrlName;
+
+                    // Don't create materials for set 0.  (SE sets the material ID to 0 when that particular set-slot doesn't actually exist as an item)
+                    if (materialVersionId == 0 && imcEntries.Count > 0) continue;
+
+                    XivMtrl itemXivMtrl = (XivMtrl)baseMtrl.Clone();
+
+                    // If we're an item that doesn't use IMC variants, make sure we don't accidentally move the material around.
+                    if (materialVersionId != 0)
+                    {
+                        // Shift the MTRL to the new variant folder.
+                        itemXivMtrl.MTRLPath = Regex.Replace(itemXivMtrl.MTRLPath, oldVariantString, "/v" + materialVersionId.ToString().PadLeft(4, '0') + "/");
+                    }
+
+                    IItem saveItem;
+
+                    if (matNumToItems.ContainsKey(materialVersionId))
+                    {
+                        saveItem = matNumToItems[materialVersionId].First();
+                    }
+                    else
+                    {
+                        saveItem = (await XivCache.GetFirstRoot(itemXivMtrl.MTRLPath)).GetFirstItem();
+                    }
+
+                    count++;
+
+                    foreach (var tex in itemXivMtrl.Textures)
+                    {
+                        tex.TexturePath = itemXivMtrl.DetokenizePath(tex.TexturePath, mtrl.ResolveFullUsage(tex));
+                    }
+
+                    originalStates.Add(await tx.SaveFileState(itemXivMtrl.MTRLPath));
+                    // Write the new Material
+                    await Mtrl.ImportMtrl(itemXivMtrl, saveItem, source, true, tx);
+                }
+                await boiler.Commit();
+            }
+            catch
+            {
+                await boiler.Catch(originalStates);
+                throw;
+            }
+        }
 
         public static XivMtrl CreateDefaultMaterial(string path)
         {
