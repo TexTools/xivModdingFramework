@@ -499,6 +499,71 @@ namespace xivModdingFramework.Textures.FileTypes
                 ddsContainer.Dispose();
             }
         }
+        public static async Task MergePixelData(XivTex tex, byte[] data)
+        {
+            var root = await XivCache.GetFirstRoot(tex.FilePath);
+            bool useMips = root != null;
+
+            // Ensure we're converting to a format we can actually process.
+            CompressionFormat compressionFormat = CompressionFormat.BGRA;
+            switch (tex.TextureFormat)
+            {
+                case XivTexFormat.DXT1:
+                    compressionFormat = CompressionFormat.BC1a;
+                    break;
+                case XivTexFormat.DXT5:
+                    compressionFormat = CompressionFormat.BC3;
+                    break;
+                case XivTexFormat.BC5:
+                    compressionFormat = CompressionFormat.BC5;
+                    break;
+                case XivTexFormat.A8R8G8B8:
+                    compressionFormat = CompressionFormat.BGRA;
+                    break;
+                default:
+                    tex.TextureFormat = XivTexFormat.A8R8G8B8;
+                    compressionFormat = CompressionFormat.BGRA;
+                    break;
+            }
+
+            byte[] ddsData = null;
+            unsafe
+            {
+                fixed (byte* p = data)
+                {
+                    var ptr = (IntPtr)p;
+                    using (var surface = Surface.LoadFromRawData(ptr, tex.Width, tex.Height, tex.Width*4, false, true))
+                    {
+                        if (surface == null)
+                            throw new FormatException($"Unsupported texture format");
+
+                        var maxMipCount = 1;
+                        if (useMips)
+                        {
+                            // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
+                            // (Ex. The Default Mat-Add textures)
+                            maxMipCount = -1;
+                        }
+
+                        using (var compressor = new Compressor())
+                        {
+                            using (var ms = new MemoryStream())
+                            {
+                                // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
+                                compressor.Input.SetMipmapGeneration(true, maxMipCount);
+                                compressor.Input.SetData(surface);
+                                compressor.Compression.Format = compressionFormat;
+                                compressor.Compression.SetBGRAPixelFormat();
+                                compressor.Output.OutputHeader = false;
+                                compressor.Process(ms);
+                                ddsData = ms.ToArray();
+                            }
+                        }
+                    }
+                }
+            }
+            tex.TexData = ddsData;
+        }
 
 
         /// <summary>
