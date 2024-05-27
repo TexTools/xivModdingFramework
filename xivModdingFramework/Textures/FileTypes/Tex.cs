@@ -532,7 +532,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 fixed (byte* p = data)
                 {
                     var ptr = (IntPtr)p;
-                    using (var surface = Surface.LoadFromRawData(ptr, tex.Width, tex.Height, tex.Width*4, false, true))
+                    using (var surface = Surface.LoadFromRawData(ptr, tex.Width, tex.Height, tex.Width*4, false, false))
                     {
                         if (surface == null)
                             throw new FormatException($"Unsupported texture format");
