@@ -91,7 +91,7 @@ namespace xivModdingFramework.General.Enums
 
 #else
         // Dawntrail (Benchmark)
-        [XivDataFileDescription("ex4/020502", "bg/ex4/02")] _EX5_BG_02,
+        [XivDataFileDescription("ex5/020502", "bg/ex5/02")] _EX5_BG_02,
 #endif
 
         //Empty Indexes
