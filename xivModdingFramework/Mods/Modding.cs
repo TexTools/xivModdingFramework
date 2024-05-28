@@ -828,7 +828,7 @@ namespace xivModdingFramework.Mods
                 var mSetId = Int32.Parse(match.Groups[1].Value);
 
                 // The list from this function is already sorted.
-                var allItems = await root.GetAllItems();
+                var allItems = await root.GetAllItems(-1, tx);
 
 
                 var variantItem = allItems.FirstOrDefault(x =>

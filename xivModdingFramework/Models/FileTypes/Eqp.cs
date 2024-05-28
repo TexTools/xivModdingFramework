@@ -903,7 +903,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Future race that this version doesn't know about (Ex. Hrothgar F on Endwalker builds)
                 if (race == XivRace.All_Races) continue;
 
-                var set = await GetEquipmentDeformationSet((int)primaryId, race, isAccessory);
+                var set = await GetEquipmentDeformationSet((int)primaryId, race, isAccessory, false, tx);
                 original.Add(race, set.Parameters[slot]);
             }
 

@@ -60,23 +60,19 @@ namespace xivModdingFramework.Mods
                 ProgressReporter.Report("Stopping Cache Worker...");
             }
 
-            var destItem = Destination.GetFirstItem();
-            var srcItem = (await Source.GetAllItems(singleVariant))[0];
-            var iCat = destItem.SecondaryCategory;
-            var iName = destItem.Name;
-
-            var modPack = new ModPack(null) { Author = "System", Name = "Item Copy - " + srcItem.Name + " to " + iName, Url = "", Version = "1.0" };
-
-            var doSave = false;
-            if (tx == null)
-            {
-                doSave = true;
-                tx = ModTransaction.BeginTransaction(true, modPack);
-            }
-
-
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            var states = new List<TxFileState>();
             try
             {
+                var destItem = Destination.GetFirstItem();
+                var srcItem = (await Source.GetAllItems(singleVariant, tx))[0];
+                var iCat = destItem.SecondaryCategory;
+                var iName = destItem.Name;
+
+                var modPack = new ModPack(null) { Author = "System", Name = "Item Copy - " + srcItem.Name + " to " + iName, Url = "", Version = "1.0" };
+                boiler.OwnModpack = modPack;
+
+
                 var df = IOUtil.GetDataFileFromPath(Source.ToString());
                 var index = await tx.GetIndexFile(df);
                 var modlist = await tx.GetModList();
@@ -222,9 +218,11 @@ namespace xivModdingFramework.Mods
                 foreach (var f in files)
                 {
                     allFiles.Add(f);
+                    states.Add(await tx.SaveFileState(f));
                 }
 
                 allFiles.Add(Destination.Info.GetRootFile());
+                states.Add(await tx.SaveFileState(Destination.Info.GetRootFile()));
 
                 if (ProgressReporter != null)
                 {
@@ -474,6 +472,12 @@ namespace xivModdingFramework.Mods
                             // Shouldn't ever actually hit this, but if we do, nothing to be done about it.
                             if (existentCopy == null) continue;
 
+                            if (!allFiles.Contains(destPath))
+                            {
+                                allFiles.Add(destPath);
+                                states.Add(await tx.SaveFileState(destPath));
+                            }
+
                             // Copy the material over.
                             await Dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, tx);
                         }
@@ -517,10 +521,7 @@ namespace xivModdingFramework.Mods
                 }
 
                 // Commit our transaction.
-                if (doSave)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
 
 
 
@@ -574,10 +575,7 @@ namespace xivModdingFramework.Mods
 
             } catch (Exception ex)
             {
-                if (doSave)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Catch(states);
                 throw;
             }
         }

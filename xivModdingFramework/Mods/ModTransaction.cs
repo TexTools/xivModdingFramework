@@ -405,11 +405,6 @@ namespace xivModdingFramework.Mods
                 _ActiveTransaction = this;
             }
 
-
-
-
-
-
             // NOTE: Readonly Transactions should not implement anything that requires disposal via IDisposable.
             // Readonly Tx are intended to be lightweight and used in non-disposable/standard memory managed contexts.
             if (_ReadOnly)

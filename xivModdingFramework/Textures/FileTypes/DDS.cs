@@ -814,34 +814,16 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>The raw byte data in 32bit</returns>
         internal static async Task<byte[]> SwapRBColors(byte[] textureData, int width, int height)
         {
-            var convertedBytes = new List<byte>();
-
-            await Task.Run(() =>
+            var data = new byte[width * height * 4];
+            await TextureHelpers.ModifyPixels((int offset) =>
             {
-                using (var ms = new MemoryStream(textureData))
-                {
-                    using (var br = new BinaryReader(ms))
-                    {
-                        for (var y = 0; y < height; y++)
-                        {
-                            for (var x = 0; x < width; x++)
-                            {
-                                var blue = br.ReadByte();
-                                var green = br.ReadByte();
-                                var red = br.ReadByte();
-                                var alpha = br.ReadByte();
+                data[offset + 0] = textureData[offset + 2];
+                data[offset + 1] = textureData[offset + 1];
+                data[offset + 2] = textureData[offset + 0];
+                data[offset + 3] = textureData[offset + 3];
+            }, width, height);
 
-                                convertedBytes.Add(red);
-                                convertedBytes.Add(green);
-                                convertedBytes.Add(blue);
-                                convertedBytes.Add(alpha);
-                            }
-                        }
-                    }
-                }
-            });
-
-            return convertedBytes.ToArray();
+            return data;
         }
         #endregion
 

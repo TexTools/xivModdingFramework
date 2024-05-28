@@ -216,7 +216,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             // These functions generate the path::offset to each of our
             // contiguous metadata entries.
-            var imcPaths = await root.GetImcEntryPaths();
+            var imcPaths = await root.GetImcEntryPaths(tx);
 
             var ret = new ItemMetadata(root);
 

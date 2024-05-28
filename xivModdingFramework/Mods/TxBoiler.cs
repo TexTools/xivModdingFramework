@@ -39,6 +39,11 @@ namespace xivModdingFramework.Mods
         public ModPack? OwnModpack
         {
             get => ownModpack;
+            set
+            {
+                ownModpack = value;
+                tx.ModPack = ownModpack;
+            }
         }
 
         private TxBoiler() { 

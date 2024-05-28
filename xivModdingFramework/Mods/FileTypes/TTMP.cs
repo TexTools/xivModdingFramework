@@ -894,7 +894,8 @@ namespace xivModdingFramework.Mods.FileTypes
             var total = fixableMdls.Count;
             foreach (var path in fixableMdls)
             {
-                progress?.Report((idx, total, "Fixing Pre-Dawntrail Models..."));
+                progress?.Report((idx, total, "Updating Endwalker Models..."));
+                idx++;
                 await Mdl.FixPreDawntrailMdl(path, source, tx);
             }
         }
@@ -1022,6 +1023,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
 
                     settings.ProgressReporter?.Report((i, files.Count, "Writing Mod Files..."));
+                    i++;
                     var internalPath = kv.Key;
                     var fileInfo = kv.Value;
 
@@ -1080,6 +1082,15 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 var paths = new HashSet<string>(files.Keys);
+
+                var res = await HandleRootConversion(paths, originalStates, tx, settings, modpack);
+                if (res < 0)
+                {
+                    await boiler.Cancel(true, originalStates);
+                    return false;
+                }
+
+
                 if (settings.AutoAssignSkinMaterials)
                 {
                     // Find all relevant models..
@@ -1103,12 +1114,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
                 if (settings.UpdateDawntrailMaterials)
                 {
-                    var res = await HandleRootConversion(paths, originalStates, tx, settings, modpack);
-                    if(res < 0)
-                    {
-                        await boiler.Cancel(true, originalStates);
-                        return false;
-                    }
+                    await FixPreDawntrailImports(paths, settings.SourceApplication, settings.ProgressReporter, tx);
                 }
 
 

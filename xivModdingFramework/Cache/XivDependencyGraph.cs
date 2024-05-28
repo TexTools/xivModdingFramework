@@ -107,7 +107,7 @@ namespace xivModdingFramework.Cache
             var root = item.GetRoot();
             var items = new List<IItemModel>();
             if (root != null) {
-                items = await root.GetAllItems();
+                items = await root.GetAllItems(-1, tx);
             }
             if (items.Count == 0) { 
                 items.Add((IItemModel)item.Clone());
@@ -998,7 +998,7 @@ namespace xivModdingFramework.Cache
 
             var _gameDirectory = XivCache.GameInfo.GameDirectory;
 
-            if (tx != null)
+            if (tx == null)
             {
                 // Readonly Tx if we don't have one.
                 tx = ModTransaction.BeginTransaction();
@@ -1221,7 +1221,7 @@ namespace xivModdingFramework.Cache
             /// For these types we also want to read their IMC file to fill in any missing NPC only versions.
             if (Imc.UsesImc(this))
             {
-                var imcPaths = await GetImcEntryPaths();
+                var imcPaths = await GetImcEntryPaths(tx);
                 var imcEntries = await Imc.GetEntries(imcPaths, false, tx);
 
                 // Need to verify all of our IMC sets are properly represented in the item list.

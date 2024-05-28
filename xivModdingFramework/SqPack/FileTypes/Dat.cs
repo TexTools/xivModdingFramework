@@ -2104,7 +2104,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="internalFilePath"></param>
         /// <param name="sourceApplication"></param>
         /// <returns></returns>
-        public static async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null)
+        public static async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null, bool compressed = true)
         {
 
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
@@ -2168,7 +2168,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // TODO: Should we manually pad the file to 256 increments or 128 increments here?
 
                 // Write to the Data store and update the index with the temporary offset.
-                var offset8x = await tx.UNSAFE_WriteData(df, fileData, true);
+                var offset8x = await tx.UNSAFE_WriteData(df, fileData, compressed);
                 var originalOffset = await tx.Set8xDataOffset(internalFilePath, offset8x);
                 
 

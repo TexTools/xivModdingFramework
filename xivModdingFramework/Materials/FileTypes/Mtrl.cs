@@ -48,6 +48,7 @@ using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
@@ -869,7 +870,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 var count = 0;
 
-                var allItems = (await root.GetAllItems());
+                var allItems = (await root.GetAllItems(-1, tx));
 
                 var matNumToItems = new Dictionary<int, List<IItemModel>>();
                 foreach (var i in allItems)
@@ -1132,114 +1133,134 @@ namespace xivModdingFramework.Materials.FileTypes
 #endif
             var total = paths.Count;
 
-            progress?.Report((0, total, "Updating Materials..."));
-
-            // Alter the MTRLs.
-            var indexesToCreate = new List<(string indexTextureToCreate, string normalToCreateFrom)>();
-            var indexToMtrlDictionary = new Dictionary<string, string>();
-
-            var count = 0;
-            foreach (var path in paths)
+            var materials = new List<XivMtrl>();
+            var i = 0;
+            foreach(var path in paths)
             {
-                var res = await FixPreDawntrailMaterial(await GetXivMtrl(path, false, tx), source, tx);
-                if(res.indexTextureToCreate != null)
+                progress?.Report((i, total, "Scanning for Endwalker Materials..."));
+                i++;
+                if (!await tx.FileExists(path))
                 {
-                    indexesToCreate.Add(res);
-
-                    if (!indexToMtrlDictionary.ContainsKey(res.indexTextureToCreate))
-                    {
-                        indexToMtrlDictionary.Add(res.indexTextureToCreate, path);
-                    }
-                }
-                count++;
-                progress?.Report((count, total, "Updating Materials..."));
-            }
-
-            count = 0;
-            progress?.Report((0, total, "Creating Index Textures..."));
-            // Create the new Index DDS files.
-
-            // Max we allow to run at a time.
-            // This is a safety measure to prevent us nuking the user's RAM by loading a zillion textures into memory at once.
-            const int _SIMULTANEOUS_MAX = 10;
-
-            for(int i = 0; i < indexesToCreate.Count; i += _SIMULTANEOUS_MAX)
-            {
-                var subList = indexesToCreate.Skip(i).Take(_SIMULTANEOUS_MAX).ToList();
-                
-                var tasks = new List<Task<(string indexFilePath, byte[] data)>>();                
-                foreach (var tup in subList)
-                {
-                    tasks.Add(Task.Run(async () =>
-                    {
-                        var val = await CreateIndexFromNormal(tup.indexTextureToCreate, tup.normalToCreateFrom, tx);
-                        count++;
-                        progress?.Report((count, total, "Creating Index Textures..."));
-                        return val;
-                    }));
-                }
-
-                await Task.WhenAll(tasks);
-
-                // Write this chunk of files to disk.
-                var results = tasks.Select(x => x.Result).ToList();
-                foreach (var texData in results)
-                {
-                    await Dat.WriteModFile(texData.data, texData.indexFilePath, source, null, tx);
-                }
-            }
-
-
-            // Fix their modpack references.
-            var modList = await tx.GetModList();
-            foreach (var kv in indexToMtrlDictionary)
-            {
-                var mtrlMod = modList.GetMod(kv.Value);
-
-                if (mtrlMod == null)
                     continue;
+                }
 
-                var indexMod = modList.GetMod(kv.Key);
+                var mtrl = await Mtrl.GetXivMtrl(path, false, tx);
+                if (!DoesMtrlNeedDawntrailUpdate(mtrl))
+                {
+                    continue;
+                }
 
-                if (indexMod == null)
-                    continue; // We -SHOULD- never hit this, but...
-
-
-                var mod = indexMod.Value;
-                mod.ModPack = mtrlMod.Value.ModPack;
-                modList.AddOrUpdateMod(mod);
+                materials.Add(mtrl);
             }
+
+            total = materials.Count;
+            i = 0;
+            foreach (var mtrl in materials)
+            {
+                progress?.Report((i, total, "Updating Endwalker Materials..."));
+                i++;
+                await UpdateEndwalkerMaterial(mtrl, null, source, tx);
+            }
+
         }
 
+        private const uint _OldShaderKey1 = 0x36080AD0; // == 1
+        private const uint _OldShaderKey2 = 0x992869AB; // == 3 (skin) or 4 (hair)
 
-        public static async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
+        public static bool DoesMtrlNeedDawntrailUpdate(XivMtrl mtrl)
         {
-#if ENDWALKER
-            return (null, null);
-#endif
-            if(mtrl == null)
+            if(mtrl.ColorSetData != null && mtrl.ColorSetData.Count == 256)
             {
-                return (null, null);
+                // Any old colorset, regardless of shader needs to be updated.
+                return true;
             }
 
-            if (mtrl.ColorSetData.Count != 256)
+            // OLD
+
+            if (mtrl.ShaderPack == EShaderPack.Skin)
             {
-                // Already updated or doesn't need updating.
-                return (null, null);
+                // NEW
+                var sheenRate = 0x800EE35F;
+                var SSAOMask = 0xB7FA33E2;
+
+
+                if(mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey1)
+                    && mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey2)
+                    && !mtrl.ShaderKeys.Any(x => x.KeyId == SSAOMask)
+                    && !mtrl.ShaderKeys.Any(x => x.KeyId == sheenRate))
+                {
+                    return true;
+                }
             }
 
-            if(mtrl.ShaderPack == EShaderPack.Character || mtrl.ShaderPack == EShaderPack.Skin)
+            if(mtrl.ShaderPack == EShaderPack.Hair)
             {
-                return await FixPreDawntrailCharacterMaterial(mtrl, source, tx);
+                if (mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey1)
+                    && mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey2))
+                {
+                    return true;
+                }
             }
 
-            if(mtrl.ShaderPack== EShaderPack.Hair)
-            {
-
-            }
-            return (null, null);
+            return false;
         }
 
+        public static async Task FixPreDawntrailMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null)
+        {
+            if (!createTextures)
+            {
+                // Should we really allow this?
+                throw new NotImplementedException();
+            }
+
+            if (!DoesMtrlNeedDawntrailUpdate(mtrl)) {
+                return;
+            }
+
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            var states = new List<TxFileState>();
+            try
+            {
+                await UpdateEndwalkerMaterial(mtrl, states, source, tx);
+                await boiler.Commit();
+            }
+            catch
+            {
+                await boiler.Catch(states);
+                throw;
+            }
+        }
+
+
+        /// <summary>
+        /// Updates an individual material, potentially as part of a larger block of tasks.
+        /// </summary>
+        /// <param name="mtrl"></param>
+        /// <param name="states"></param>
+        /// <param name="source"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, List<TxFileState> states, string source, ModTransaction tx)
+        {
+            states?.Add(await tx.SaveFileState(mtrl.MTRLPath));
+
+            if (mtrl.ColorSetDataSize > 0)
+            {
+                var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx);
+
+                states?.Add(await tx.SaveFileState(texInfo.indexTextureToCreate));
+
+                var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
+                await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
+            } else if(mtrl.ShaderPack == EShaderPack.Character)
+            {
+
+            }
+            else if(mtrl.ShaderPack == EShaderPack.Hair)
+            {
+
+            }
+        }
 
         /// <summary>
         /// Updates a given Endwalker style Material to a Dawntrail style material, returning a tuple containing the Index Map that should be created after,
@@ -1249,7 +1270,7 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="updateShaders"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        private static async Task<(string indexTextureToCreate, string normalToCreateFrom)> FixPreDawntrailCharacterMaterial(XivMtrl mtrl, string source, ModTransaction tx = null)
+        private static async Task<(string indexTextureToCreate, string normalToCreateFrom)> UpdateEndwalkerColorset(XivMtrl mtrl, string source, ModTransaction tx)
         {
             if(mtrl.ColorSetData.Count != 256)
             {
@@ -1260,116 +1281,122 @@ namespace xivModdingFramework.Materials.FileTypes
             if (mtrl.ShaderPack == EShaderPack.Character)
             {
                 mtrl.ShaderPack = EShaderPack.CharacterLegacy;
-            } else if(mtrl.ShaderPack == EShaderPack.Skin)
-            {
-                mtrl.ShaderPack = EShaderPack.SkinLegacy;
             } else
             {
-                // No upgrade protocol for other shaders.
+                // Don't need to change the shaderpack for anything else here.
+            }
+
+            if(mtrl.ColorSetData == null)
+            {
+                await ImportMtrl(mtrl, null, source, false, tx);
                 return (null, null);
             }
 
-            if (mtrl.ColorSetData != null)
+            // Update Colorset
+            List<Half> newData = new List<Half>(1024);
+            for (int i = 0; i < mtrl.ColorSetData.Count; i += 16)
             {
-                // Update Colorset
-                List<Half> newData = new List<Half>();
-                for (int i = 0; i < mtrl.ColorSetData.Count; i += 16)
-                {
-                    var pixel = i + 0;
+                var pixel = i + 0;
 
-                    // Diffuse Pixel
-                    newData.Add(mtrl.ColorSetData[pixel + 0]);
-                    newData.Add(mtrl.ColorSetData[pixel + 1]);
-                    newData.Add(mtrl.ColorSetData[pixel + 2]);
-                    newData.Add(mtrl.ColorSetData[pixel + 7]);  // SE flipped Specular Power and Gloss values for some reason.
+                // Diffuse Pixel
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(mtrl.ColorSetData[pixel + 7]);  // SE flipped Specular Power and Gloss values for some reason.
 
-                    pixel += 4;
+                pixel += 4;
 
-                    // Specular Pixel
-                    newData.Add(mtrl.ColorSetData[pixel + 0]);
-                    newData.Add(mtrl.ColorSetData[pixel + 1]);
-                    newData.Add(mtrl.ColorSetData[pixel + 2]);
-                    newData.Add(mtrl.ColorSetData[pixel - 1]);  // SE flipped Specular Power and Gloss values for some reason.
+                // Specular Pixel
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(mtrl.ColorSetData[pixel - 1]);  // SE flipped Specular Power and Gloss values for some reason.
 
-                    pixel += 4;
-                    // Emissive Pixel
-                    newData.Add(mtrl.ColorSetData[pixel + 0]);
-                    newData.Add(mtrl.ColorSetData[pixel + 1]);
-                    newData.Add(mtrl.ColorSetData[pixel + 2]);
-                    newData.Add(1.0f);
+                pixel += 4;
+                // Emissive Pixel
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(1.0f);
 
-                    //Unknown1
-                    newData.Add(0);
-                    newData.Add(0);
-                    newData.Add(2.0f);
-                    newData.Add(0);
+                //Unknown1
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(2.0f);
+                newData.Add(0);
 
-                    //Unknown2
-                    newData.Add(0.5f);
-                    newData.Add(0);
-                    newData.Add(0);
-                    newData.Add(0);
+                //Unknown2
+                newData.Add(0.5f);
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(0);
 
-                    //Unknown3
-                    newData.Add(0);
-                    newData.Add(0);
-                    newData.Add(0);
-                    newData.Add(0);
+                //Unknown3
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(0);
+                newData.Add(0);
 
-                    //Unknown + subsurface material id
-                    newData.Add(0);
-                    newData.Add(mtrl.ColorSetData[pixel + 3]);
-                    newData.Add(1.0f);  //  Subsurface Material Alpha
-                    newData.Add(0);
+                //Unknown + subsurface material id
+                newData.Add(0);
+                newData.Add(mtrl.ColorSetData[pixel + 3]);
+                newData.Add(1.0f);  //  Subsurface Material Alpha
+                newData.Add(0);
 
-                    pixel += 4;
-                    //Subsurface scaling data.
-                    newData.Add(mtrl.ColorSetData[pixel + 0]);
-                    newData.Add(mtrl.ColorSetData[pixel + 1]);
-                    newData.Add(mtrl.ColorSetData[pixel + 2]);
-                    newData.Add(mtrl.ColorSetData[pixel + 3]);
+                pixel += 4;
+                //Subsurface scaling data.
+                newData.Add(mtrl.ColorSetData[pixel + 0]);
+                newData.Add(mtrl.ColorSetData[pixel + 1]);
+                newData.Add(mtrl.ColorSetData[pixel + 2]);
+                newData.Add(mtrl.ColorSetData[pixel + 3]);
 
-                    // Add a blank row after, since only populating every other row.
-                    newData.AddRange(GetDefaultColorsetRow());
-                }
-
-                mtrl.ColorSetData = newData;
-                if (mtrl.ColorSetDyeData != null && mtrl.ColorSetDyeData.Length > 0)
-                {
-                    // Update Dye information.
-                    var newDyeData = new byte[128];
-                    // Update old dye information
-                    for (int i = 0; i < 16; i++)
-                    {
-                        var oldOffset = i * 2;
-                        var newOffset = (i * 2) * 4;
-
-                        var newDyeBlock = (uint)0;
-                        var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
-
-                        // Old dye bitmask was 5 bits long.
-                        uint dyeBits = (uint)(oldDyeBlock & 0x1F);
-                        uint oldTemplate = (uint)(oldDyeBlock >> 5);
-
-                        newDyeBlock |= (oldTemplate << 16);
-                        newDyeBlock |= dyeBits;
-
-                        var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
-
-                        Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
-                    }
-
-                    mtrl.ColorSetDyeData = newDyeData;
-                }
+                // Add a blank row after, since only populating every other row.
             }
 
-            var normalTex = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Normal);
-            var idTex = mtrl.Textures.FirstOrDefault(x => x.Usage == XivTexType.Index);
+            for(int i = 0; i < 16; i++)
+            {
+                // Add empty rows after.
+                newData.AddRange(GetDefaultColorsetRow());
+            }
+
+            mtrl.ColorSetData = newData;
+            if (mtrl.ColorSetDyeData != null && mtrl.ColorSetDyeData.Length > 0)
+            {
+                // Update Dye information.
+                var newDyeData = new byte[128];
+                // Update old dye information
+                for (int i = 0; i < 16; i++)
+                {
+                    var oldOffset = i * 2;
+                    var newOffset = (i * 2) * 4;
+
+                    var newDyeBlock = (uint)0;
+                    var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
+
+                    // Old dye bitmask was 5 bits long.
+                    uint dyeBits = (uint)(oldDyeBlock & 0x1F);
+                    uint oldTemplate = (uint)(oldDyeBlock >> 5);
+
+                    newDyeBlock |= (oldTemplate << 16);
+                    newDyeBlock |= dyeBits;
+
+                    var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
+
+                    Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                }
+
+                mtrl.ColorSetDyeData = newDyeData;
+            }
+
+
+            var normalTex = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
+            var idTex = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Index);
             string idPath = null;
             string normalPath = null;
 
+
             // If we don't have an ID Texture, and we have a colorset + normal map, create one.
-            if (normalTex != null && idTex == null && mtrl.ColorSetData != null && mtrl.ColorSetData.Count > 0)
+            if (normalTex != null && idTex == null)
             {
                 idPath = normalTex.TexturePath.Replace(".tex", "_id.tex");
                 normalPath = normalTex.TexturePath;
@@ -1390,64 +1417,46 @@ namespace xivModdingFramework.Materials.FileTypes
         }
 
 
+        /// <summary>
+        /// Creates the actual index file data from the constituent parts.
+        /// Returns the bytes of an uncompressed Tex file.
+        /// </summary>
+        /// <param name="indexPath"></param>
+        /// <param name="sourceNormalPath"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
         private static async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
         {
 
             // Read normal file.
             var normalTex = await Tex.GetXivTex(sourceNormalPath, false, tx);
-            var texData = await normalTex.GetRawPixels();
+            var normalData = await normalTex.GetRawPixels();
 
-            // The DDS Importer will implode with tiny files.  Just assume micro size files are single flat color.
-            var idPixels = new byte[texData.Length];
-            var width = normalTex.Width;
-            var height = normalTex.Height;
-            
-            if (height <= 32 || width <= 32)
+            var idTex = new XivTex()
             {
-                height = 64;
-                width = 64;
-                var pix = texData[3];
-                idPixels = new byte[64 * 64 * 4];
-                for (int i = 0; i < idPixels.Length; i += 4)
-                {
-                    // We're going from RGBA to BGRA here.
-                    idPixels[i] = 0;
-                    idPixels[i + 1] = 255;
-                    idPixels[i + 2] = pix;
-                    idPixels[i + 3] = 255;
-                }
-            }
-            else
-            {
-                for (int i = 0; i < idPixels.Length; i += 4)
-                {
-                    // We're going from RGBA to BGRA here,
-                    // And trying to copy over data.
-                    byte src = texData[i + 3];
+                TextureFormat = XivTexFormat.A8R8G8B8,
+                Height = normalTex.Height,
+                Width = normalTex.Width,
+                FilePath = indexPath,
+                Layers = 1,
+                MipMapCount = 1,
+            };
 
-                    idPixels[i] = 0;
-                    idPixels[i + 1] = 255;
-                    idPixels[i + 2] = src;
-                    idPixels[i + 3] = 255;
-                }
-            }
+
 
             try
             {
-                // This is very RAM heavy, given we're looping through many phases of alteration of the same pixel data.
-                // - Original Normal Map Compressed TEX Data.
-                // - Original Normal Map Uncompressed TEX Data.
-                // - Original Normal Map 8.8.8.8 format Pixel Data.
-                // - Altered Pixel Data
-                // - DDS Format Pixel Data
-                // - Uncompressed Tex Format Pixel Data
-                // - Compressed Tex (Type4) Data
 
-                // In theory, a streamlined function could be created to combine some of these steps.
-                var ddsBytes = await Tex.ConvertToDDS(idPixels, XivTexFormat.A8R8G8B8, true, height, width, true);
-                ddsBytes = Tex.DDSToUncompressedTex(ddsBytes);
-                ddsBytes = await Tex.CompressTexFile(ddsBytes);
-                return (indexPath, ddsBytes);
+                var indexData = new byte[normalTex.Width * normalTex.Height * 4];
+                await TextureHelpers.CreateIndexTexture(normalData, indexData, normalTex.Width, normalTex.Height);
+
+                // Create MipMaps (And DDS header that we don't really need)
+                indexData = await Tex.ConvertToDDS(indexData, XivTexFormat.A8R8G8B8, true, normalTex.Height, normalTex.Width, true);
+
+                // Convert DDS to uncompressed Tex
+                indexData = Tex.DDSToUncompressedTex(indexData);
+
+                return (indexPath, indexData);
             }
             catch (Exception ex)
             {
