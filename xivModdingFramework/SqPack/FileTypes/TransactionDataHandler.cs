@@ -551,7 +551,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             if (settings.Target == ETransactionTarget.PMP)
             {
-                return await WriteToTTMP(tx, settings);
+                return await WriteToPMP(tx, settings);
             }
             throw new InvalidDataException("Invalid Transaction Target");
         }
@@ -698,6 +698,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                             var md = new SimpleModData();
                             md.FullPath = path;
                             md.DatFile = df.ToString();
+                            md.ModOffset = tempOffset;
                             md.Category = mod != null ? mod.Value.ItemCategory : "Unknown";
                             md.Name = mod != null ? mod.Value.ItemName : "Unknown";
                             simplePack.SimpleModDataList.Add(md);

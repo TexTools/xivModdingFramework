@@ -290,6 +290,7 @@ namespace xivModdingFramework.Mods
                 // Explicit path already provided.
                 modPackPath = destination;
                 modPackName = Path.GetFileNameWithoutExtension(modPackPath);
+                overwriteModpack = true;
             }
 
             if (File.Exists(modPackPath) && !overwriteModpack)
