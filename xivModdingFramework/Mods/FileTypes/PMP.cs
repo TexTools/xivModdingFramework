@@ -497,15 +497,26 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
 
         /// <summary>
-        /// Write 
         /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
         public static Task CreatePMP(string destination, IModPackData data)
         {
-            // PMPs are either composed of a single option as a 'DefaultMod'
-            // or a collection of Groups, which each 
+            throw new NotImplementedException();
+        }
+
+        public static Task<PMPOptionJson> CreatePmpOption(string name, string description, Dictionary<string, FileStorageInformation> fileInfos)
+        {
+            var opt = new PMPOptionJson()
+            {
+                Name = name,
+                Description = description,
+            };
+
+            foreach(var kv in fileInfos)
+            {
+                var path = kv.Key;
+                var info = kv.Value;
+                //TransactionDataHandler
+            }
             throw new NotImplementedException();
         }
 

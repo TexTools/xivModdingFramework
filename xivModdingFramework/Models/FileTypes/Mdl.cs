@@ -1684,11 +1684,6 @@ namespace xivModdingFramework.Models.FileTypes
                 #endregion
             }
 
-            if (xivMdl.ModelData.FurniturePartBoundingBoxCount  > 0 || xivMdl.ModelData.MeshPartCount > 0)
-            {
-                Debug.WriteLine("Hmm");
-                var z = 1234;
-            }
             return xivMdl;
         }
 

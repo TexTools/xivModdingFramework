@@ -124,9 +124,18 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         private Dictionary<XivDataFile, Dictionary<long, FileStorageInformation>> OffsetMapping = new Dictionary<XivDataFile, Dictionary<long, FileStorageInformation>>();
 
+        public bool IsTempOffset(XivDataFile df, long offset)
+        {
+            if(OffsetMapping.ContainsKey(df) && OffsetMapping[df].ContainsKey(offset))
+            {
+                return true;
+            }
+            return false;
+        }
+
         private bool disposedValue;
 
-        private FileStorageInformation MakeGameStorageInfo(XivDataFile df, long offset8x)
+        internal static FileStorageInformation MakeGameStorageInfo(XivDataFile df, long offset8x)
         {
             // Create standard Game DAT file request info.
             var info = new FileStorageInformation();
@@ -200,7 +209,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetUncompressedFile(info);
         }
-        private async Task<byte[]> GetUncompressedFile(FileStorageInformation info)
+        internal static async Task<byte[]> GetUncompressedFile(FileStorageInformation info)
         {
             using (var fs = File.OpenRead(info.RealPath))
             {
@@ -220,7 +229,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
         }
-        public async Task<BinaryReader> GetUncompressedFileStream(XivDataFile dataFile, long offset8x, bool forceType2 = false)
+        internal async Task<BinaryReader> GetUncompressedFileStream(XivDataFile dataFile, long offset8x)
         {
             if (!OffsetMapping.ContainsKey(dataFile))
             {
@@ -244,9 +253,9 @@ namespace xivModdingFramework.SqPack.FileTypes
                 info = MakeGameStorageInfo(dataFile, offset8x);
             }
 
-            return await GetUncompressedFileStream(info, forceType2);
+            return await GetUncompressedFileStream(info);
         }
-        private async Task<BinaryReader> GetUncompressedFileStream(FileStorageInformation info, bool forceType2 = false)
+        internal static async Task<BinaryReader> GetUncompressedFileStream(FileStorageInformation info)
         {
             if (info.StorageType == EFileStorageType.UncompressedBlob || info.StorageType == EFileStorageType.UncompressedIndividual)
             {
@@ -265,9 +274,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
                     data = await Dat.GetUncompressedData(br, info.RealOffset);
                 }
-
-                // Return new stream.
-                data = await SmartImport.CreateCompressedFile(data, forceType2);
                 return new BinaryReader(new MemoryStream(data));
             }
         }
@@ -307,7 +313,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetCompressedFile(info, forceType2);
         }
-        private async Task<byte[]> GetCompressedFile(FileStorageInformation info, bool forceType2 = false)
+        internal static async Task<byte[]> GetCompressedFile(FileStorageInformation info, bool forceType2 = false)
         {
             using (var fs = File.OpenRead(info.RealPath))
             {
@@ -363,7 +369,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetCompressedFileStream(info, forceType2);
         }
-        private async Task<BinaryReader> GetCompressedFileStream(FileStorageInformation info, bool forceType2 = false)
+        internal static async Task<BinaryReader> GetCompressedFileStream(FileStorageInformation info, bool forceType2 = false)
         {
             if (info.StorageType == EFileStorageType.CompressedBlob || info.StorageType == EFileStorageType.CompressedIndividual)
             {

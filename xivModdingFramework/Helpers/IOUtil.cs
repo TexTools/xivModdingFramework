@@ -497,5 +497,27 @@ namespace xivModdingFramework.Helpers
             return false;
         }
 
+        /// <summary>
+        /// Returns whether or not this file is one of the constituent filetypes TT-controlled meta files.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static bool IsMetaInternalFile(string path)
+        {
+            var ext = Path.GetExtension(path).ToLower();
+            switch (ext)
+            {
+                case ".cmp":
+                case ".eqp":
+                case ".eqdp":
+                case ".gmp":
+                case ".est":
+                case ".imc":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
     }
 }

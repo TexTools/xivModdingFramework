@@ -54,7 +54,7 @@ namespace xivModdingFramework.Mods
         Open,
 
         // TX in the process of either cancelling or committing.
-        Closing,
+        Working,
 
         // TX has been cancelled or commited and is now closed.
         Closed
@@ -133,11 +133,13 @@ namespace xivModdingFramework.Mods
         public delegate void TransactionEventHandler(ModTransaction sender);
         public delegate void TransactionCancelledEventHandler(ModTransaction sender, bool graceful);
         public delegate void TransactionStateChangedEventHandler(ModTransaction sender, ETransactionState oldState, ETransactionState newState);
+        public delegate void TransactionSettingsChangedEventHandler(ModTransaction sender, ModTransactionSettings settings);
 
         public event TransactionEventHandler TransactionCommitted;
         public event TransactionCancelledEventHandler TransactionCancelled;
         public event TransactionEventHandler TransactionClosed;
         public event TransactionStateChangedEventHandler TransactionStateChanged;
+        public event TransactionSettingsChangedEventHandler TransactionSettingsChanged;
 
         // Called during TX when a file is changed internally.
         public event FileChangedEventHandler FileChanged;
@@ -147,6 +149,7 @@ namespace xivModdingFramework.Mods
         public static event TransactionCancelledEventHandler ActiveTransactionCancelled;
         public static event TransactionEventHandler ActiveTransactionClosed;
         public static event TransactionStateChangedEventHandler ActiveTransactionStateChanged;
+        public static event TransactionSettingsChangedEventHandler ActiveTransactionSettingsChanged;
 
         // Called when a commit is completed that changed files.
         public static event FileChangedEventHandler FileChangedOnCommit;
@@ -201,9 +204,18 @@ namespace xivModdingFramework.Mods
 
         private TransactionDataHandler _DataHandler;
 
-        private DirectoryInfo _GameDirectory;
-
-        public ModTransactionSettings Settings { get; private set; }
+        private ModTransactionSettings _Settings;
+        public ModTransactionSettings Settings { get => _Settings;
+            set
+            {
+                _Settings = value;
+                TransactionSettingsChanged?.Invoke(this, _Settings);
+                if(this == ActiveTransaction)
+                {
+                    ActiveTransactionSettingsChanged?.Invoke(this, _Settings);
+                }
+            }
+        }
         public bool AffectsGameFiles
         {
             get
@@ -218,6 +230,41 @@ namespace xivModdingFramework.Mods
 
         private bool _Disposed;
         public ModPack? ModPack { get; set; }
+
+        public List<string> PrepFiles
+        {
+            get
+            {
+                return _PrePrepStates.Keys.ToList();
+            }
+        }
+
+        public List<string> ModifiedFiles
+        {
+            get
+            {
+                HashSet<string> files = new HashSet<string>();
+                foreach(var dkv in _TemporaryOffsetMapping)
+                {
+                    foreach(var kv in dkv.Value)
+                    {
+                        if (!_DataHandler.IsTempOffset(dkv.Key, kv.Key))
+                        {
+                            continue;
+                        }
+                        files.UnionWith(kv.Value);
+                    }
+                }
+
+                var prepFiles = PrepFiles;
+                foreach(var file in prepFiles)
+                {
+                    files.Remove(file);
+                }
+
+                return files.ToList();
+            }
+        }
 
 
         private static bool _WorkerStatus = false;
@@ -395,7 +442,6 @@ namespace xivModdingFramework.Mods
         }
         private ModTransaction(bool writeEnabled, ModPack? modpack, ModTransactionSettings? settings, bool waitToStart)
         {
-            _GameDirectory = XivCache.GameInfo.GameDirectory;
             ModPack = modpack;
 
             _ReadOnly = !writeEnabled;
@@ -566,7 +612,7 @@ namespace xivModdingFramework.Mods
         /// This causes Index and Modlist writes to disk for all affected mods.
         /// </summary>
         /// <returns></returns>
-        public static async Task CommitTransaction(ModTransaction tx)
+        public static async Task CommitTransaction(ModTransaction tx, bool closeTransaction = true)
         {
             if (tx._ReadOnly)
             {
@@ -585,23 +631,36 @@ namespace xivModdingFramework.Mods
 
             try
             {
-                await tx.CommitTransaction();
+                var result = await tx.CommitTransaction(closeTransaction);
+                if(!result)
+                {
+                    throw new OperationCanceledException("Blocked transaction was cancelled.");
+                }
+
+                if (closeTransaction)
+                {
+                    tx.State = ETransactionState.Closed;
+                    _ActiveTransaction = null;
+                    _CANCEL_BLOCKED_TX = false;
+                    tx.Dispose();
+                    XivCache.CacheWorkerEnabled = _WorkerStatus;
+                }
+                else
+                {
+                    tx.State = ETransactionState.Open;
+                }
             }
             catch(Exception ex)
             {
+                tx.State = ETransactionState.Open;
                 Debug.WriteLine(ex);
                 throw;
             }
             finally
             {
-                tx.State = ETransactionState.Closed;
-                _ActiveTransaction = null;
-                _CANCEL_BLOCKED_TX = false;
-                tx.Dispose();
-                XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
-        private async Task CommitTransaction()
+        private async Task<bool> CommitTransaction(bool closeTransaction = true)
         {
             if (_ReadOnly)
             {
@@ -613,8 +672,13 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to write to game files while Lumina mode was enabled.");
             }
 
+            if(closeTransaction == false && Settings.Target == ETransactionTarget.GameFiles)
+            {
+                throw new Exception("Game File transactions must be closed on commit.");
+            }
 
-            State = ETransactionState.Closing;
+
+            State = ETransactionState.Working;
 
             // Batched notifications are irrelevant here since we're about to send out notifications from the commit phase.
             BatchedNotifications = null;
@@ -647,7 +711,7 @@ namespace xivModdingFramework.Mods
                     }
                     return false;
                 });
-                if (cancelled) return;
+                if (cancelled) return false;
             }
 
             Dictionary<XivDataFile, Dictionary<long, uint>> openSlots = null;
@@ -678,7 +742,7 @@ namespace xivModdingFramework.Mods
 
             // If the data handler returned a null, that means we aren't doing
             // anything else to the base game files/modlist here.
-            if (pathMap != null || !AffectsGameFiles)
+            if (pathMap != null && AffectsGameFiles)
             {
                 foreach(var kv in _PrePrepStates)
                 {
@@ -774,6 +838,7 @@ namespace xivModdingFramework.Mods
             {
                 ActiveTransactionCommitted?.Invoke(this);
             }
+            return true;
         }
 
         /// <summary>
@@ -820,7 +885,7 @@ namespace xivModdingFramework.Mods
         {
             if (!_ReadOnly && State != ETransactionState.Closed)
             {
-                State = ETransactionState.Closing;
+                State = ETransactionState.Working;
 
                 // Call this before cleanup.
                 // That way event handlers can potentially
@@ -1145,7 +1210,8 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task ResetFile(string file, bool prePrep = false)
         {
-            await RestoreFileState(await GetPreTransactionState(file, prePrep));
+            var state = await GetPreTransactionState(file, prePrep);
+            await RestoreFileState(state);
         }
         public async Task<TxFileState> GetPreTransactionState(string file, bool prePrep = false)
         {
@@ -1257,7 +1323,7 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to write to ModList inside a ReadOnly Transaction.");
             }
 
-            if (State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Closing)
+            if (State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Working)
             {
                 throw new Exception("Attempted to write to ModList during invalid Transaction State.");
             }
@@ -1283,7 +1349,7 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to write to index files inside a ReadOnly Transaction.");
             }
 
-            if(State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Closing)
+            if(State != ETransactionState.Open && State != ETransactionState.Preparing && State != ETransactionState.Working)
             {
                 throw new Exception("Attempted to write to index files during invalid Transaction State.");
             }
@@ -1339,7 +1405,7 @@ namespace xivModdingFramework.Mods
 
         internal void INTERNAL_OnFileChanged(string path, long offset8x, bool fromIndex)
         {
-            if (fromIndex && State != ETransactionState.Closing)
+            if (fromIndex && State != ETransactionState.Working)
             {
                 if (BatchedNotifications != null && !BatchedNotifications.ContainsKey(path))
                 {
@@ -1351,7 +1417,7 @@ namespace xivModdingFramework.Mods
                     // Notify the followers of /this/ TX that there was a change.
                     FileChanged?.Invoke(path, offset8x);
                 }
-            } else if (!fromIndex && State == ETransactionState.Closing)
+            } else if (!fromIndex && State == ETransactionState.Working)
             {
                 // Notify the whole world of commit-time changes.
                 FileChangedOnCommit?.Invoke(path, offset8x);
@@ -1440,7 +1506,7 @@ namespace xivModdingFramework.Mods
         /// <exception cref="Exception"></exception>
         internal void INTERNAL_EndBatchingNotifications()
         {
-            if(State == ETransactionState.Closing || State == ETransactionState.Closed)
+            if(State == ETransactionState.Working || State == ETransactionState.Closed)
             {
                 // Batching got squished by transaction close.
                 return;
@@ -1455,6 +1521,7 @@ namespace xivModdingFramework.Mods
             {
                 FileChanged?.Invoke(kv.Key, kv.Value);
             }
+            BatchedNotifications = null;
         }
 
         #endregion
@@ -1645,11 +1712,11 @@ namespace xivModdingFramework.Mods
         /// <param name="offset8x"></param>
         /// <param name="compressed"></param>
         /// <returns></returns>
-        public async Task<BinaryReader> GetFileStream(XivDataFile dataFile, long offset8x, bool compressed = false)
+        public async Task<BinaryReader> GetFileStream(XivDataFile dataFile, long offset8x, bool compressed = false, bool forceType2 = false)
         {
             if (compressed)
             {
-                return await _DataHandler.GetCompressedFileStream(dataFile, offset8x);
+                return await _DataHandler.GetCompressedFileStream(dataFile, offset8x, forceType2);
             }
             else
             {
