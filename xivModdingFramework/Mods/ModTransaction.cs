@@ -468,18 +468,32 @@ namespace xivModdingFramework.Mods
         {
             if (!_Disposed)
             {
-                if (State != ETransactionState.Closed)
+                if (disposing)
                 {
-                    if (_DataHandler != null)
+                    if (State != ETransactionState.Closed)
                     {
-                        // Clear data handler temp files.
-                        _DataHandler.Dispose();
-                        _DataHandler = null;
+                        // If we haven't been cancelled or committed, do so.
+                        if (ActiveTransaction == this)
+                        {
+                            ModTransaction.CancelTransaction(this);
+                        } else
+                        {
+                            // Skip the check if we're in a weird state and just make sure we close as best we can.
+                            CancelTransaction(this);
+                            State = ETransactionState.Closed;
+                        }
                     }
-
-                    // If we haven't been cancelled or committed, do so.
-                    ModTransaction.CancelTransaction(this);
                 }
+
+                if (_DataHandler != null)
+                {
+                    // Clear data handler temp files.
+                    _DataHandler.Dispose();
+                    _DataHandler = null;
+                }
+
+                _IndexFiles = null;
+                _ModList = null;
 
                 _Disposed = true;
             }
@@ -588,6 +602,7 @@ namespace xivModdingFramework.Mods
                 tx.State = ETransactionState.Closed;
                 _ActiveTransaction = null;
                 _CANCEL_BLOCKED_TX = false;
+                tx.Dispose();
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
@@ -802,6 +817,7 @@ namespace xivModdingFramework.Mods
             {
                 tx.State = ETransactionState.Closed;
                 _ActiveTransaction = null;
+                tx.Dispose();
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
@@ -835,14 +851,7 @@ namespace xivModdingFramework.Mods
                     // Reset our DAT sizes back to what they were before we started the Transaction.
                     TruncateDats();
                 }
-                if (_DataHandler != null)
-                {
-                    _DataHandler.Dispose();
-                }
             }
-            _IndexFiles = null;
-            _ModList = null;
-            ModPack = null;
         }
         private void CheckWriteTimes()
         {

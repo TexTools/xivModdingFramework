@@ -16,6 +16,7 @@ using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 using System.ComponentModel.Design;
 using System.Linq;
+using System.Diagnostics;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -720,7 +721,15 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                 }
 
-                IOUtil.DeleteTempDirectory(DefaultPathRoot);
+                try
+                {
+                    IOUtil.DeleteTempDirectory(DefaultPathRoot);
+                }
+                catch(Exception ex)
+                {
+                    // Well, fuck.  Can't do anything about that, other than make sure we don't throw in a finalizer.
+                    Trace.WriteLine(ex);
+                }
                 disposedValue = true;
             }
         }

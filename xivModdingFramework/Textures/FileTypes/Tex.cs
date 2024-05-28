@@ -1160,46 +1160,6 @@ namespace xivModdingFramework.Textures.FileTypes
             return new (colorSetData, dyeData);
         }
 
-        /// <summary>
-        /// Imports a ColorSet DDS file into the given base Material, saving it to the given transaction or game files.
-        /// </summary>
-        public static async Task<long> ImportColorsetTexture(string mtrlPath, string ddsFilePath, bool forceOriginal = false, bool saveColorset = true, bool saveDye = true, IItem item = null, string source = "Unknown", ModTransaction tx = null)
-        {
-            var xivMtrl = await Mtrl.GetXivMtrl(mtrlPath, false, tx);
-
-            var doSave = false;
-            if (tx == null)
-            {
-                doSave = true;
-                // Open a transaction if needed since we're performing multiple operations.
-                tx = ModTransaction.BeginTransaction(true);
-            }
-            try
-            {
-                ImportColorsetTexture(xivMtrl, ddsFilePath);
-#if DAWNTRAIL
-                if (xivMtrl.ColorSetData.Count < 1024)
-                {
-                    await Mtrl.FixPreDawntrailMaterial(xivMtrl, source, tx);
-                }
-#endif
-
-                var offset = await Mtrl.ImportMtrl(xivMtrl, item, source, false, tx);
-                if (doSave)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
-                return offset;
-            }
-            catch
-            {
-                if (doSave)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
-                throw;
-            }
-        }
 
         /// <summary>
         /// Imports a colorset DDS file into an xivMTRL.  Does not save the result.
