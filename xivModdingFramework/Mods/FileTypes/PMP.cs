@@ -1092,6 +1092,57 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 RspAttribute.BustMaxZ => PMPGender.Female,
                 _ => PMPGender.Unknown,
             };
+
+        public static List<PMPMetaManipulationJson> MetadataToManipulations(ItemMetadata m)
+        {
+            var ret = new List<PMPMetaManipulationJson>();
+            var root = m.Root.Info;
+
+            if (m.GmpEntry != null)
+            {
+                var entry = new PMPMetaManipulationJson() { Type = "GMP" };
+                entry.Manipulation = PMPGmpManipulationJson.FromGmpEntry(m.GmpEntry, root);
+                ret.Add(entry);
+            }
+
+            if(m.EqpEntry != null)
+            {
+                var entry = new PMPMetaManipulationJson() { Type = "EQP" };
+                entry.Manipulation = PMPEqpManipulationJson.FromEqpEntry(m.EqpEntry, root);
+                ret.Add(entry);
+            }
+
+            if(m.EstEntries != null && m.EstEntries.Count > 0)
+            {
+                foreach(var est in m.EstEntries)
+                {
+                    var entry = new PMPMetaManipulationJson() { Type = "EST" };
+                    entry.Manipulation = PMPEstManipulationJson.FromEstEntry(est.Value, root.Slot);
+                    ret.Add(entry);
+                }
+            }
+
+            if(m.EqdpEntries != null && m.EqdpEntries.Count > 0)
+            {
+                foreach (var eqdp in m.EqdpEntries) {
+                    var entry = new PMPMetaManipulationJson() { Type = "EQDP" };
+                    entry.Manipulation = PMPEqdpManipulationJson.FromEqdpEntry(eqdp.Value, root, eqdp.Key);
+                    ret.Add(entry);
+                }
+            }
+
+            if(m.ImcEntries != null && m.ImcEntries.Count > 0)
+            {
+                for(int i = 0; i < m.ImcEntries.Count; i++)
+                {
+                    var entry = new PMPMetaManipulationJson() { Type = "IMC" };
+                    entry.Manipulation = PMPImcManipulationJson.FromImcEntry(m.ImcEntries[i], i, root);
+                    ret.Add(entry);
+                }
+            }
+
+            return ret;
+        }
     }
     #endregion
 
@@ -1371,18 +1422,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             pEntry.Entry.AttributeMask = (ushort) (entry.Mask & 0x3FF);
 
             return pEntry;
-        }
-
-        public static List<PMPImcManipulationJson> FromFullImcEntry(Imc.FullImcInfo fullInfo, XivDependencyRootInfo root)
-        {
-            var ret = new List<PMPImcManipulationJson>();
-            for(int i = 0; i < fullInfo.SubsetCount; i++)
-            {
-                var subset = fullInfo.GetEntry(i, root.Slot);
-                var entry = FromImcEntry(subset, i, root);
-                ret.Add(entry);
-            }
-            return ret;
         }
     }
     public class PMPEqdpManipulationJson : IPMPItemMetadata
