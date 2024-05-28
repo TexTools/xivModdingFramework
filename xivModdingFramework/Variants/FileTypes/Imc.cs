@@ -651,7 +651,7 @@ namespace xivModdingFramework.Variants.FileTypes
             /// <param name="index">IMC Variant/Subset ID</param>
             /// <param name="slot">Slot Abbreviation</param>
             /// <returns></returns>
-            public XivImc GetEntry(int subsetID = -1, string slot = "")
+            public XivImc GetEntry(int subsetID = -1, string slot = null)
             {
                 // Variant IDs are 1 based, not 0 based.
                 var index = subsetID - 1;
@@ -664,7 +664,7 @@ namespace xivModdingFramework.Variants.FileTypes
 
                 // Test for getting default set.
                 var subset = DefaultSubset;
-                if(index >= 0)
+                if (index >= 0)
                 {
                     subset = SubsetList[index];
                 }

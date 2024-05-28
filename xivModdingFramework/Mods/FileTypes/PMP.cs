@@ -26,6 +26,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using SharpDX.Direct2D1;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -966,6 +967,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public static Dictionary<string, string> PenumbraTypeToGameType = new Dictionary<string, string>();
 
+
+        /// <summary>
+        /// Incomplete listing, only used for IMC-using types.
+        /// </summary>
+        public static Dictionary<XivItemType, PMPObjectType> XivItemTypeToPenumbraObject = new Dictionary<XivItemType, PMPObjectType>()
+        {
+            { XivItemType.weapon, PMPObjectType.Weapon },
+            { XivItemType.equipment, PMPObjectType.Equipment },
+            { XivItemType.accessory, PMPObjectType.Accessory },
+            { XivItemType.demihuman, PMPObjectType.DemiHuman },
+            { XivItemType.monster, PMPObjectType.Monster },
+        };
+
         public static XivDependencyRootInfo GetRootFromPenumbraValues(PMPObjectType objectType, uint primaryId, PMPObjectType bodySlot, uint secondaryId, PMPEquipSlot slot)
         {
             var info = new XivDependencyRootInfo();
@@ -984,9 +998,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             info.Slot = PenumbraSlotToGameSlot[slot];
 
+
             return info;
         }
-
 
         // We only really care about the ones used in IMC entries here.
         public static Dictionary<PMPEquipSlot, string> PenumbraSlotToGameSlot = new Dictionary<PMPEquipSlot, string>()
@@ -1224,7 +1238,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public ushort Entry = 0;
         public PMPGender Gender;
         public PMPModelRace Race;
-        public uint SetId;
+        public ushort SetId;
         public PMPEquipSlot Slot;
         
         public XivDependencyRoot GetRoot()
@@ -1249,9 +1263,31 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             entry.SkelId = Entry;
         }
 
-        public static PMPEstManipulationJson FromEstEntry(ExtraSkeletonEntry entry, XivDependencyRootInfo root, XivRace race)
+        public static PMPEstManipulationJson FromEstEntry(ExtraSkeletonEntry entry, string gameSlot)
         {
-            throw new NotImplementedException();
+            if(entry.Race == XivRace.All_Races)
+            {
+                return null;
+            }
+            if (string.IsNullOrWhiteSpace(gameSlot))
+            {
+                return null;
+            }
+
+            var rg = PMPExtensions.GetPMPRaceGenderFromXivRace(entry.Race);
+            var slot = PMPExtensions.PenumbraSlotToGameSlot.First(x => x.Value == gameSlot).Key;
+            var setId = (uint) entry.SetId;
+
+            var est = new PMPEstManipulationJson()
+            {
+                Entry = entry.SkelId,
+                Slot = slot,
+                Race = rg.Race,
+                Gender = rg.Gender,
+                SetId = entry.SetId
+            };
+
+            return est;
         }
     }
     public class PMPImcManipulationJson : IPMPItemMetadata
@@ -1309,9 +1345,44 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             imc.MaterialSet = Entry.MaterialId;
             imc.Mask = Entry.AttributeAndSound;
         }
-        public static PMPImcManipulationJson FromImcEntry(XivImc entry, XivDependencyRootInfo root)
+        public static PMPImcManipulationJson FromImcEntry(XivImc entry, int variant, XivDependencyRootInfo root)
         {
-            throw new NotImplementedException();
+            // TODO: Determine if Penumbra can handle extra IMC sets.
+            var pEntry = new PMPImcManipulationJson();
+
+            pEntry.ObjectType = PMPExtensions.XivItemTypeToPenumbraObject[root.PrimaryType];
+            pEntry.BodySlot = root.SecondaryType == null ? PMPObjectType.Unknown : PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
+            pEntry.PrimaryId = (uint) root.PrimaryId;
+            pEntry.SecondaryId = (uint) (root.SecondaryId == null ? 0 : root.SecondaryId);
+            pEntry.Variant = (uint)variant;
+
+            pEntry.EquipSlot = PMPEquipSlot.Unknown;
+            if (root.Slot != null) {
+                pEntry.EquipSlot = PMPExtensions.PenumbraSlotToGameSlot.First(x => x.Value == root.Slot).Key;
+            }
+
+            pEntry.Entry.AttributeAndSound = entry.Mask;
+            pEntry.Entry.MaterialId = entry.MaterialSet;
+            pEntry.Entry.DecalId = entry.Decal;
+            pEntry.Entry.VfxId = entry.Vfx;
+            pEntry.Entry.MaterialAnimationId = entry.Animation;
+
+            pEntry.Entry.SoundId = (byte)(entry.Mask >> 10);
+            pEntry.Entry.AttributeMask = (ushort) (entry.Mask & 0x3FF);
+
+            return pEntry;
+        }
+
+        public static List<PMPImcManipulationJson> FromFullImcEntry(Imc.FullImcInfo fullInfo, XivDependencyRootInfo root)
+        {
+            var ret = new List<PMPImcManipulationJson>();
+            for(int i = 0; i < fullInfo.SubsetCount; i++)
+            {
+                var subset = fullInfo.GetEntry(i, root.Slot);
+                var entry = FromImcEntry(subset, i, root);
+                ret.Add(entry);
+            }
+            return ret;
         }
     }
     public class PMPEqdpManipulationJson : IPMPItemMetadata
@@ -1349,13 +1420,41 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var shifted = Entry >> shift;
 
             // Tag bits.
-            metadata.EqdpEntries[xivRace].bit0 = (shifted & 0x01) > 0;
-            metadata.EqdpEntries[xivRace].bit1 = (shifted & 0x02) > 0;
+            metadata.EqdpEntries[xivRace].bit0 = (shifted & 0x01) != 0;
+            metadata.EqdpEntries[xivRace].bit1 = (shifted & 0x02) != 0;
         }
 
         public static PMPEqdpManipulationJson FromEqdpEntry(EquipmentDeformationParameter entry, XivDependencyRootInfo root, XivRace race)
         {
-            throw new NotImplementedException();
+            var isAccessory = EquipmentDeformationParameterSet.IsAccessory(root.Slot);
+            var slotNum = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(root.Slot);
+
+            // Penumbra stores the data masked in-place.  We need to shift it over.
+            var shift = slotNum * 2;
+            var bits = (ushort) 0;
+            if (entry.bit0)
+            {
+                bits |= 1;
+            }
+            if (entry.bit1)
+            {
+                bits |= 2;
+            }
+
+            bits = (ushort) (bits << shift);
+            var rg = PMPExtensions.GetPMPRaceGenderFromXivRace(race);
+            var slot = PMPExtensions.PenumbraSlotToGameSlot.First(x => x.Value == root.Slot).Key;
+            var setId = (uint)root.PrimaryId;
+
+            var pEntry = new PMPEqdpManipulationJson()
+            {
+                Entry = bits,
+                Gender = rg.Gender,
+                Race = rg.Race,
+                SetId = setId,
+                Slot = slot,
+            };
+            return pEntry;
         }
     }
     public class PMPEqpManipulationJson : IPMPItemMetadata
@@ -1391,7 +1490,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry, XivDependencyRootInfo root)
         {
-            throw new NotImplementedException();
+            var slot = PMPExtensions.PenumbraSlotToGameSlot.First(x => x.Value == entry.Slot).Key;
+            var offset = EquipmentParameterSet.EntryOffsets[entry.Slot];
+            var size = EquipmentParameterSet.EntrySizes[entry.Slot];
+
+            // Re-shift the value for Penumbra.
+            ulong value = BitConverter.ToUInt64(entry.GetBytes(), 0);
+            value = (ulong)(value << offset * 8);
+
+            var pEntry = new PMPEqpManipulationJson()
+            {
+                Entry = value,
+                SetId = (uint)root.PrimaryId,
+                Slot = slot
+            };
+
+            return pEntry;
         }
     }
     public class PMPGmpManipulationJson : IPMPItemMetadata
@@ -1409,7 +1523,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             public ushort UnknownTotal;
 
             // Full Value
-            public uint Value;
+            public ulong Value;
         }
 
         public PMPGmpEntry Entry;
@@ -1431,7 +1545,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
         public static PMPGmpManipulationJson FromGmpEntry(GimmickParameter entry, XivDependencyRootInfo root)
         {
-            throw new NotImplementedException();
+            var pEntry = new PMPGmpManipulationJson();
+
+            pEntry.SetId = (uint) root.PrimaryId;
+            pEntry.Entry.Value = BitConverter.ToUInt32(entry.GetBytes(), 0);
+            pEntry.Entry.Animated = entry.Animated;
+            pEntry.Entry.Enabled = entry.Enabled;
+            pEntry.Entry.RotationA = entry.RotationA;
+            pEntry.Entry.RotationB = entry.RotationB;
+            pEntry.Entry.RotationC = entry.RotationC;
+            pEntry.Entry.UnknownA = entry.UnknownLow;
+            pEntry.Entry.UnknownB = entry.UnknownHigh;
+
+            return pEntry;
         }
     }
     public class PMPRspManipulationJson
@@ -1516,9 +1642,45 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return;
         }
 
-        public static List<PMPRspManipulationJson> FromRgspEntry(RacialGenderScalingParameter entry)
+
+        private static PMPRspManipulationJson GetManip(PMPSubRace sr, RspAttribute attribute, float value)
         {
-            throw new NotImplementedException();
+            return new PMPRspManipulationJson()
+            {
+                Attribute = attribute,
+                Entry = value,
+                SubRace = sr,
+            };
+        }
+
+        public static List<PMPRspManipulationJson> FromRgspEntry(RacialGenderScalingParameter fullEntry)
+        {
+            var sr = PMPExtensions.PMPSubraceToXivSubrace.First(x => x.Value == fullEntry.Race).Key;
+            var male = fullEntry.Gender == XivGender.Male;
+
+            var manips = new List<PMPRspManipulationJson>();
+
+            if (male)
+            {
+                manips.Add(GetManip(sr, RspAttribute.MaleMinTail, fullEntry.MinTail));
+                manips.Add(GetManip(sr, RspAttribute.MaleMaxTail, fullEntry.MaxTail));
+                manips.Add(GetManip(sr, RspAttribute.MaleMinSize, fullEntry.MinSize));
+                manips.Add(GetManip(sr, RspAttribute.MaleMaxSize, fullEntry.MaxSize));
+            }
+            else
+            {
+                manips.Add(GetManip(sr, RspAttribute.BustMinX, fullEntry.BustMinX));
+                manips.Add(GetManip(sr, RspAttribute.BustMaxX, fullEntry.BustMaxX));
+                manips.Add(GetManip(sr, RspAttribute.BustMinY, fullEntry.BustMinY));
+                manips.Add(GetManip(sr, RspAttribute.BustMaxY, fullEntry.BustMaxY));
+                manips.Add(GetManip(sr, RspAttribute.BustMinZ, fullEntry.BustMinZ));
+                manips.Add(GetManip(sr, RspAttribute.BustMaxY, fullEntry.BustMaxZ));
+                manips.Add(GetManip(sr, RspAttribute.FemaleMinTail, fullEntry.MinTail));
+                manips.Add(GetManip(sr, RspAttribute.FemaleMaxTail, fullEntry.MaxTail));
+                manips.Add(GetManip(sr, RspAttribute.FemaleMinSize, fullEntry.MinSize));
+                manips.Add(GetManip(sr, RspAttribute.FemaleMaxSize, fullEntry.MaxSize));
+            }
+            return manips;
         }
 
     }
