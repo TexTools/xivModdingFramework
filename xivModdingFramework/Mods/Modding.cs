@@ -381,12 +381,7 @@ namespace xivModdingFramework.Mods
                 throw new ArgumentException("Deleted Mod Path cannot be blank.");
             }
 
-            var doSave = false;
-            if (tx == null)
-            {
-                doSave = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
                 var modList = await tx.GetModList();
@@ -405,17 +400,11 @@ namespace xivModdingFramework.Mods
                 await INTERNAL_SetModState(EModState.Disabled, path, allowInternal, tx);
                 modList.RemoveMod(modToRemove);
 
-                if (doSave)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
             }
             catch
             {
-                if (doSave)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                boiler.Catch();
                 throw;
             }
         }
@@ -506,12 +495,8 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Invalid Mod State.");
             }
 
-            var ownTransaction = false;
-            if (tx == null)
-            {
-                ownTransaction = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            var states = new List<TxFileState>();
             try
             {
                 var modList = await tx.GetModList();
@@ -525,22 +510,18 @@ namespace xivModdingFramework.Mods
                 if(state == EModState.UnModded || state == EModState.Disabled)
                 {
                     foreach (var mod in toRemove) {
+                        states.Add(await tx.SaveFileState(mod));
                         await INTERNAL_DeleteMod(mod, true, tx);
                     }
                 }
 
 
-                if (ownTransaction)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
             }
             catch
             {
-                if (ownTransaction)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Catch(states);
+                throw;
             }
         }
 

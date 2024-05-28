@@ -101,17 +101,22 @@ namespace xivModdingFramework.Textures
             {
                 var newGreen = (byte)(255 - maskPixelData[offset]);
 
-                // Normal Alpha
-                normalPixelData[offset + 3] = maskPixelData[offset + 3];
+                // Output is BGRA
 
-                // Mask Alpha
-                maskPixelData[offset + 3] = maskPixelData[offset];
-                // Mask Red
-                maskPixelData[offset + 0] = maskPixelData[offset + 1];
-                // Mask Green
+                // Normal Red (Swizzle)
+                normalPixelData[offset + 2] = maskPixelData[offset + 0];
+                // Normal Blue - Highlight Color
+                normalPixelData[offset + 0] = maskPixelData[offset + 3];
+
+
+                // Mask Red - Specular Power
+                maskPixelData[offset + 2] = maskPixelData[offset + 1];
+                // Mask Green - Roughness
                 maskPixelData[offset + 1] = newGreen;
-                // Mask Blue
-                maskPixelData[offset + 2] = 49;
+                // Mask Alpha - Albedo
+                maskPixelData[offset + 3] = maskPixelData[offset];
+                // Mask Blue - SSS Thickness Map
+                maskPixelData[offset + 0] = 49;
 
             }, width, height);
         }
@@ -122,7 +127,7 @@ namespace xivModdingFramework.Textures
         /// <param name="texA"></param>
         /// <param name="texB"></param>
         /// <returns></returns>
-        internal static async Task<(byte[] TexA, byte[] TexB)> ResizeImages(XivTex texA, XivTex texB)
+        internal static async Task<(byte[] TexA, byte[] TexB, int Width, int Height)> ResizeImages(XivTex texA, XivTex texB)
         {
             var maxW = Math.Max(texA.Width, texB.Width);
             var maxH = Math.Max(texA.Width, texB.Width);
@@ -132,7 +137,7 @@ namespace xivModdingFramework.Textures
 
             await Task.WhenAll(timgA, timgB);
 
-            return (timgA.Result, timgB.Result);
+            return (timgA.Result, timgB.Result, maxW, maxH);
         }
 
         /// <summary>

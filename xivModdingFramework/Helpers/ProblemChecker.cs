@@ -283,12 +283,14 @@ namespace xivModdingFramework.Helpers
                         File.Copy(index2path, index2backup);
                     }
 
+
                     var versionFile = XivCache.GameInfo.GameVersionFile;
-                    var fName = Path.GetFileName(versionFile);
-
-                    var versionTarget = Path.Combine(backupDirectory, fName);
-
-                    File.Copy(versionFile, versionTarget);
+                    if (!string.IsNullOrWhiteSpace(versionFile))
+                    {
+                        var fName = Path.GetFileName(versionFile);
+                        var versionTarget = Path.Combine(backupDirectory, fName);
+                        File.Copy(versionFile, versionTarget);
+                    }
                 }
                 finally
                 {

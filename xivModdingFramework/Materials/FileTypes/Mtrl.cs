@@ -1126,13 +1126,12 @@ namespace xivModdingFramework.Materials.FileTypes
 #endregion
 
         #region Endwalker => Dawntrail Material Conversion
-        public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress = null)
+        public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress, Dictionary<string, TxFileState> states)
         {
 #if ENDWALKER
             return;
 #endif
             var total = paths.Count;
-
             var materials = new List<XivMtrl>();
             var i = 0;
             foreach(var path in paths)
@@ -1159,13 +1158,13 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
                 i++;
-                await UpdateEndwalkerMaterial(mtrl, null, source, tx);
+                await UpdateEndwalkerMaterial(mtrl, states, source, tx);
             }
 
         }
 
-        private const uint _OldShaderKey1 = 0x36080AD0; // == 1
-        private const uint _OldShaderKey2 = 0x992869AB; // == 3 (skin) or 4 (hair)
+        private const uint _OldShaderConstant1 = 0x36080AD0; // == 1
+        private const uint _OldShaderConstant2 = 0x992869AB; // == 3 (skin) or 4 (hair)
 
         public static bool DoesMtrlNeedDawntrailUpdate(XivMtrl mtrl)
         {
@@ -1184,10 +1183,10 @@ namespace xivModdingFramework.Materials.FileTypes
                 var SSAOMask = 0xB7FA33E2;
 
 
-                if(mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey1)
-                    && mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey2)
-                    && !mtrl.ShaderKeys.Any(x => x.KeyId == SSAOMask)
-                    && !mtrl.ShaderKeys.Any(x => x.KeyId == sheenRate))
+                if(mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant1)
+                    && mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant2)
+                    && !mtrl.ShaderConstants.Any(x => x.ConstantId == SSAOMask)
+                    && !mtrl.ShaderConstants.Any(x => x.ConstantId == sheenRate))
                 {
                     return true;
                 }
@@ -1195,8 +1194,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
             if(mtrl.ShaderPack == EShaderPack.Hair)
             {
-                if (mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey1)
-                    && mtrl.ShaderKeys.Any(x => x.KeyId == _OldShaderKey2))
+                if (mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant1)
+                    && mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant2))
                 {
                     return true;
                 }
@@ -1218,7 +1217,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var boiler = TxBoiler.BeginWrite(ref tx);
-            var states = new List<TxFileState>();
+            var states = new Dictionary<string, TxFileState>();
             try
             {
                 await UpdateEndwalkerMaterial(mtrl, states, source, tx);
@@ -1231,6 +1230,14 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
+        private static async Task ConditionalSaveState(Dictionary<string, TxFileState> states, ModTransaction tx, string path)
+        {
+            if(states == null || states.ContainsKey(path))
+            {
+                return;
+            }
+            states.Add(path, await tx.SaveFileState(path));
+        }
 
         /// <summary>
         /// Updates an individual material, potentially as part of a larger block of tasks.
@@ -1240,25 +1247,23 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, List<TxFileState> states, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
         {
-            states?.Add(await tx.SaveFileState(mtrl.MTRLPath));
+            await ConditionalSaveState(states, tx, mtrl.MTRLPath);
 
             if (mtrl.ColorSetDataSize > 0)
             {
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx);
-
-                states?.Add(await tx.SaveFileState(texInfo.indexTextureToCreate));
+                await ConditionalSaveState(states, tx, texInfo.indexTextureToCreate);
 
                 var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
                 await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
             } else if(mtrl.ShaderPack == EShaderPack.Character)
             {
-
             }
             else if(mtrl.ShaderPack == EShaderPack.Hair)
             {
-
+                await UpdateEndwalkerHairMaterial(mtrl, states, source, tx);
             }
         }
 
@@ -1398,8 +1403,8 @@ namespace xivModdingFramework.Materials.FileTypes
             // If we don't have an ID Texture, and we have a colorset + normal map, create one.
             if (normalTex != null && idTex == null)
             {
-                idPath = normalTex.TexturePath.Replace(".tex", "_id.tex");
-                normalPath = normalTex.TexturePath;
+                idPath = normalTex.Dx11Path.Replace(".tex", "_id.tex");
+                normalPath = normalTex.Dx11Path;
 
                 var tex = new MtrlTexture();
                 tex.TexturePath = idPath;
@@ -1432,36 +1437,63 @@ namespace xivModdingFramework.Materials.FileTypes
             var normalTex = await Tex.GetXivTex(sourceNormalPath, false, tx);
             var normalData = await normalTex.GetRawPixels();
 
-            var idTex = new XivTex()
+            var indexData = new byte[normalTex.Width * normalTex.Height * 4];
+            await TextureHelpers.CreateIndexTexture(normalData, indexData, normalTex.Width, normalTex.Height);
+
+            // Create MipMaps (And DDS header that we don't really need)
+            indexData = await Tex.ConvertToDDS(indexData, XivTexFormat.A8R8G8B8, true, normalTex.Height, normalTex.Width, true);
+
+            // Convert DDS to uncompressed Tex
+            indexData = Tex.DDSToUncompressedTex(indexData);
+
+            return (indexPath, indexData);
+        }
+
+        private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
+        {
+
+            var normalTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
+            var maskTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
+
+            if(normalTexSampler == null || maskTexSampler == null)
             {
-                TextureFormat = XivTexFormat.A8R8G8B8,
-                Height = normalTex.Height,
-                Width = normalTex.Width,
-                FilePath = indexPath,
-                Layers = 1,
-                MipMapCount = 1,
-            };
-
-
-
-            try
-            {
-
-                var indexData = new byte[normalTex.Width * normalTex.Height * 4];
-                await TextureHelpers.CreateIndexTexture(normalData, indexData, normalTex.Width, normalTex.Height);
-
-                // Create MipMaps (And DDS header that we don't really need)
-                indexData = await Tex.ConvertToDDS(indexData, XivTexFormat.A8R8G8B8, true, normalTex.Height, normalTex.Width, true);
-
-                // Convert DDS to uncompressed Tex
-                indexData = Tex.DDSToUncompressedTex(indexData);
-
-                return (indexPath, indexData);
+                // Not Resolveable.
+                return;
             }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+
+            // Arbitrary base game hair file to use to replace our shader constants.
+            var constantBase = await GetXivMtrl("chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl", true, tx);
+            mtrl.ShaderConstants = constantBase.ShaderConstants;
+            var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+
+
+            // Read normal file.
+            var normalTex = await Tex.GetXivTex(normalTexSampler.Dx11Path, false, tx);
+            var maskTex = await Tex.GetXivTex(maskTexSampler.Dx11Path, false, tx);
+
+            // Resize to be same size.
+            var data = await TextureHelpers.ResizeImages(normalTex, maskTex);
+
+            // Create the final hair pixel data.
+            await TextureHelpers.CreateHairMaps(data.TexA, data.TexB, data.Width, data.Height);
+
+            // Create MipMaps (And DDS header that we don't really need)
+            var normalData = await Tex.ConvertToDDS(data.TexA, XivTexFormat.A8R8G8B8, true, data.Width, data.Height, true);
+            var maskData = await Tex.ConvertToDDS(data.TexB, XivTexFormat.A8R8G8B8, true, data.Width, data.Height, true);
+
+            // Convert DDS to uncompressed Tex
+            normalData = Tex.DDSToUncompressedTex(normalData);
+            maskData = Tex.DDSToUncompressedTex(maskData);
+
+            // Save states...
+            await ConditionalSaveState(states, tx, normalTexSampler.Dx11Path);
+            await ConditionalSaveState(states, tx, maskTexSampler.Dx11Path);
+            await ConditionalSaveState(states, tx, mtrl.MTRLPath);
+
+            // Write final files.
+            await Dat.WriteModFile(normalData, normalTexSampler.Dx11Path, source, null, tx, false);
+            await Dat.WriteModFile(maskData, maskTexSampler.Dx11Path, source, null, tx, false);
+            await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
         }
 
         private static Half[] GetDefaultColorsetRow()

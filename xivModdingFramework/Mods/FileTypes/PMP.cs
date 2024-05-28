@@ -271,7 +271,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (pmp.Meta.FileVersion <= 3)
                 {
                     progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
-                    await TTMP.FixPreDawntrailImports(imported.Keys, _Source, progress, tx);
+                    await TTMP.FixPreDawntrailImports(imported.Keys, _Source, imported, progress, tx);
                 }
 
                 if (boiler.OwnTx)

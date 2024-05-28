@@ -793,7 +793,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
                         {
                             var modPack = filteredModsJson[0].ModPackEntry;
-                            await FixPreDawntrailImports(filePaths, settings.SourceApplication, progress, tx);
+                            await FixPreDawntrailImports(filePaths, settings.SourceApplication, originalStates, progress, tx);
                         }
                     }
 
@@ -875,7 +875,7 @@ namespace xivModdingFramework.Mods.FileTypes
 	        tex[11] = buffer[3];
         }
 
-        public static async Task FixPreDawntrailImports(IEnumerable<string> filePaths, string source, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task FixPreDawntrailImports(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
 #if ENDWALKER
             return;
@@ -888,7 +888,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
 
-            await Mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
+            await Mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress, states);
 
             var idx = 0;
             var total = fixableMdls.Count;
@@ -1114,7 +1114,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
                 if (settings.UpdateDawntrailMaterials)
                 {
-                    await FixPreDawntrailImports(paths, settings.SourceApplication, settings.ProgressReporter, tx);
+                    await FixPreDawntrailImports(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
                 }
 
 
@@ -1128,7 +1128,7 @@ namespace xivModdingFramework.Mods.FileTypes
             catch
             {
                 await boiler.Catch(originalStates);
-                return false;
+                throw;
             }
         }
 
