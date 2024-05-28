@@ -1260,6 +1260,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
             } else if(mtrl.ShaderPack == EShaderPack.Character)
             {
+                await UpdateEndwalkerSkinMaterial(mtrl, states, source, tx);
             }
             else if(mtrl.ShaderPack == EShaderPack.Hair)
             {
@@ -1449,6 +1450,15 @@ namespace xivModdingFramework.Materials.FileTypes
             return (indexPath, indexData);
         }
 
+        private static async Task UpdateEndwalkerSkinMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
+        {
+            // ShaderPack update is all we have for this one for now.
+            mtrl.ShaderPack = EShaderPack.SkinLegacy;
+            await ConditionalSaveState(states, tx, mtrl.MTRLPath);
+            var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+            await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
+
+        }
         private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
         {
 
