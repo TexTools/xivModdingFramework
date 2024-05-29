@@ -126,17 +126,14 @@ namespace xivModdingFramework.Exd.FileTypes
             // Readonly TX.  We don't allow live modification of exd/exh files.
             var tx = ModTransaction.BeginTransaction();
 
-            var exdFolderHash = HashGenerator.GetHash("exd");
-            var exdFileHash = HashGenerator.GetHash(exFile + ExhExtension);
+            var file = "exd/" + exFile + ExhExtension;
 
-            var offset = await tx.Get8xDataOffset("exd/" + exFile + ExhExtension);
-
-            if (offset == 0)
+            if (!await tx.FileExists(file))
             {
-                throw new Exception($"Could not find offset for exd/{exFile}{ExhExtension}");
+                throw new FileNotFoundException($"Could not find offset for exd/{exFile}{ExhExtension}");
             }
 
-            var exhData = await Dat.ReadSqPackType2(offset, XivDataFile._0A_Exd, tx);
+            var exhData = await tx.ReadFile(file);
 
             await Task.Run(() =>
             {
@@ -234,7 +231,7 @@ namespace xivModdingFramework.Exd.FileTypes
                             continue;
 
                         // Always read the original base game file for now.
-                        var exData = await Dat.ReadSqPackType2(exdFile, false, tx);
+                        var exData = await tx.ReadFile(exdFile);
 
                         // Big Endian Byte Order 
                         using (var br = new BinaryReaderBE(new MemoryStream(exData)))

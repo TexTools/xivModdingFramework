@@ -1003,16 +1003,14 @@ namespace xivModdingFramework.Cache
                 // Readonly Tx if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
-            var df = IOUtil.GetDataFileFromPath(imcPath);
-            var imcOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(imcPath);
 
-            if (imcOffset == 0)
+            if (!await tx.FileExists(imcPath))
             {
                 // Some chains don't have IMC files.
                 return imcEntries;
             } 
 
-            var imcByteData = await Dat.ReadSqPackType2(imcOffset, IOUtil.GetDataFileFromPath(imcPath), tx);
+            var imcByteData = await Dat.ReadFile(imcPath, false, tx);
 
             var subsetCount = 0;
             ImcType identifier = ImcType.Unknown;

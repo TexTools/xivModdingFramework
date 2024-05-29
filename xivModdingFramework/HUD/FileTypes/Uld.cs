@@ -60,7 +60,7 @@ namespace xivModdingFramework.HUD.FileTypes
                 var type = await tx.GetSqPackType(XivDataFile._06_Ui, offset, false);
                 if (type == 2)
                 {
-                    uldData = Dat.ReadSqPackType2(offset, XivDataFile._06_Ui, tx).Result;
+                    uldData = await tx.ReadFile(XivDataFile._06_Ui, offset);
                 }
                 else
                 {

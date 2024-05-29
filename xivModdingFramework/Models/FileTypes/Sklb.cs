@@ -384,16 +384,12 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var dataFile = IOUtil.GetDataFileFromPath(skelBPath);
-
-            var offset = await tx.Get8xDataOffset(skelBPath);
-
-            if (offset == 0)
+            if (!await tx.FileExists(skelBPath))
             {
                 throw new FileNotFoundException($"Could not find offset for {skelBPath}");
             }
 
-            var sklbData = await Dat.ReadSqPackType2(offset, dataFile, tx);
+            var sklbData = await tx.ReadFile(skelBPath);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))
             {

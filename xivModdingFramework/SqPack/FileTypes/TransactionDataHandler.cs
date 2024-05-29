@@ -232,7 +232,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         // Open file, navigate to the offset(or start of file), read and decompress SQPack file.
                         br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                        return await Dat.GetUncompressedData(br, info.RealOffset);
+                        return await Dat.ReadSqPackFile(br, info.RealOffset);
                     }
                 }
             }
@@ -280,7 +280,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     // Open file, navigate to the offset(or start of file), read and decompress SQPack file.
                     br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                    data = await Dat.GetUncompressedData(br, info.RealOffset);
+                    data = await Dat.ReadSqPackFile(br, info.RealOffset);
                 }
                 return new BinaryReader(new MemoryStream(data));
             }
@@ -468,7 +468,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             else if ((storageInfo.StorageType == EFileStorageType.UncompressedIndividual || storageInfo.StorageType == EFileStorageType.UncompressedBlob) && preCompressed == true)
             {
-                data = await Dat.GetUncompressedData(data);
+                data = await Dat.ReadSqPackFile(data);
             }
 
             if(storageInfo.StorageType == EFileStorageType.CompressedIndividual || storageInfo.StorageType == EFileStorageType.UncompressedIndividual)

@@ -204,7 +204,7 @@ namespace xivModdingFramework.Variants.FileTypes
                 // Only reload this data if we need to.
                 if (path != lastPath)
                 {
-                    imcByteData = await Dat.ReadSqPackType2(path, forceDefault, tx);
+                    imcByteData = await Dat.ReadFile(path, forceDefault, tx);
                 }
                 lastPath = path;
 
@@ -347,7 +347,7 @@ namespace xivModdingFramework.Variants.FileTypes
         public static async Task<FullImcInfo> GetFullImcInfo(string path, bool forceDefault = false, ModTransaction tx = null)
         {
 
-            var imcByteData = await Dat.ReadSqPackType2(path, forceDefault, tx);
+            var imcByteData = await Dat.ReadFile(path, forceDefault, tx);
 
             return await Task.Run(() =>
             {

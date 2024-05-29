@@ -73,37 +73,6 @@ namespace xivModdingFramework.Textures.FileTypes
             return await Avfx.GetATexPaths(vfxPath, forceOriginal, tx);
         }
 
-        /// <summary>
-        /// Gets the ATex data
-        /// </summary>
-        /// <param name="offset">The offset to the ATex file</param>
-        /// <returns>An XivTex with all the texture data</returns>
-        public static async Task<XivTex> GetATexData(long offset, XivDataFile df, ModTransaction tx = null)
-        {
-            var atexData = await Dat.ReadSqPackType2(offset, df, tx);
-
-            var xivTex = new XivTex();
-            xivTex.Layers = 1;
-
-            using (var br = new BinaryReader(new MemoryStream(atexData)))
-            {
-                var signature = br.ReadInt32();
-                xivTex.TextureFormat = Tex.TextureTypeDictionary[br.ReadInt32()];
-                xivTex.Width = br.ReadInt16();
-                xivTex.Height = br.ReadInt16();
-
-                br.ReadBytes(2);
-
-                xivTex.MipMapCount = br.ReadInt16();
-
-                br.ReadBytes(64);
-
-                xivTex.TexData = br.ReadBytes(atexData.Length - 80);
-            }
-
-            return xivTex;
-        }
-
         public static char GetVfxPrefix(XivDependencyRootInfo root)
         {
             var itemType = root.PrimaryType;

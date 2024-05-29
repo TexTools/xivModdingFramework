@@ -57,7 +57,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
-            var data = await Dat.ReadSqPackType2(BoneDeformFile, false, tx);
+            var data = await Dat.ReadFile(BoneDeformFile, false, tx);
 
             var result = new BoneDeform();
             var numSets = 0;

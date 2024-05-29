@@ -165,9 +165,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var offset = (await tx.Get8xDataOffset(path, forceOriginal));
+            var exists = (await tx.FileExists(path, forceOriginal));
 
-            if (offset == 0)
+            if (!exists)
             {
                 throw new FileNotFoundException($"Could not find offset for {path}");
             }
@@ -176,20 +176,12 @@ namespace xivModdingFramework.Textures.FileTypes
 
             try
             {
-                var df = IOUtil.GetDataFileFromPath(path);
-
-                if (path.Contains(".atex"))
-                {
-                    xivTex = await ATex.GetATexData(offset, df, tx);
-                }
-                else
-                {
-                    xivTex = await Dat.GetTexFromDat(offset, df, tx);
-                }
+                var data = await tx.ReadFile(path, forceOriginal);
+                xivTex = XivTex.FromUncompressedTex(data);
             }
             catch (Exception ex)
             {
-                throw new Exception($"There was an error reading texture data at offset {offset}");
+                throw new Exception($"There was an error reading the file: " + path);
             }
 
             xivTex.FilePath = path;
@@ -439,7 +431,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 if (texFormat == XivTexFormat.INVALID)
                 {
                     // Use the current internal format.
-                    var xivt = await Dat.GetTexFromDat(internalPath, false, tx);
+                    var xivt = await Tex.GetXivTex(internalPath, false, tx);
                     texFormat = xivt.TextureFormat;
                 }
 

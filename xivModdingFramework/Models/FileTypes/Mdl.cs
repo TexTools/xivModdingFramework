@@ -315,22 +315,18 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns>An XivMdl structure containing all mdl data.</returns>
         public static async Task<XivMdl> GetXivMdl(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
-            long offset = 0;
-            var df = IOUtil.GetDataFileFromPath(mdlPath);
-
             if (tx == null)
             {
                 // Readonly TX if we don't already have one.
                 tx = ModTransaction.BeginTransaction();
             }
 
-            offset = await tx.Get8xDataOffset(mdlPath, getOriginal);
-            if (offset == 0)
+            if (!await tx.FileExists(mdlPath))
             {
                 return null;
             }
 
-            var mdlData = await Dat.ReadSqPackType3(offset, IOUtil.GetDataFileFromPath(mdlPath), tx);
+            var mdlData = await Dat.ReadFile(mdlPath, getOriginal, tx);
             return GetXivMdl(mdlData, mdlPath);
         }
 
@@ -1860,7 +1856,7 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginTransaction();
             }
 
-            var mdlData = await Dat.ReadSqPackType3(mdlPath, getOriginal, tx);
+            var mdlData = await Dat.ReadFile(mdlPath, getOriginal, tx);
             var meshCount = BitConverter.ToUInt16(mdlData, 12);
 
             using (var br = new BinaryReader(new MemoryStream(mdlData)))

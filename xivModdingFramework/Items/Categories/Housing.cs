@@ -407,14 +407,14 @@ namespace xivModdingFramework.Items.Categories
                 assetFile = $"fsh_{size}_m{id}.sgb";
             }
 
-            var assetOffset = await tx.Get8xDataOffset(assetFolder + "/" + assetFile);
-
-            if(assetOffset <= 0)
+            var path = assetFolder + "/" + assetFile;
+            
+            if(!await tx.FileExists(path))
             {
                 return null;
             }
 
-            var assetData = await Dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon, tx);
+            var assetData = await tx.ReadFile(path);
 
             var housingAssets = new HousingAssets();
 
@@ -512,11 +512,8 @@ namespace xivModdingFramework.Items.Categories
 
             foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
             {
-                var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
-                var assetFile = Path.GetFileName(additionalAsset);
 
-                var assetOffset = await tx.Get8xDataOffset(additionalAsset);
-                var assetData = await Dat.ReadSqPackType2(assetOffset, XivDataFile._01_Bgcommon, tx);
+                var assetData = await tx.ReadFile(additionalAsset);
 
                 await Task.Run(() =>
                 {

@@ -582,24 +582,24 @@ namespace xivModdingFramework.Mods
 
         private static async Task<ItemMetadata> GetCachedMetadata(XivDependencyRoot root, ModTransaction tx)
         {
-            var metaName = root.Info.GetRootFile();
-            var df = IOUtil.GetDataFileFromPath(metaName);
-            var index = await tx.GetIndexFile(df);
-            var originalMetadataOffset = index.Get8xDataOffset(root.Info.GetRootFile());
-
-
-
-            ItemMetadata originalMetadata = null;
-            if (originalMetadataOffset == 0)
+            if(tx == null)
             {
-                originalMetadata = await ItemMetadata.GetMetadata(root, true, tx);
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            var metaPath = root.Info.GetRootFile();
+            ItemMetadata metadata = null;
+
+            if (!await tx.FileExists(metaPath))
+            {
+                metadata = await ItemMetadata.GetMetadata(root, true, tx);
             }
             else
             {
-                var data = await Dat.ReadSqPackType2(originalMetadataOffset, df, tx);
-                originalMetadata = await ItemMetadata.Deserialize(data);
+                var data = await tx.ReadFile(metaPath);
+                metadata = await ItemMetadata.Deserialize(data);
             }
-            return originalMetadata;
+            return metadata;
         }
 
         const string CommonPath = "chara/common/";

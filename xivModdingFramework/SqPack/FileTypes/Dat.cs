@@ -73,6 +73,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
+        #region Functions for managing the actual DAT files themselves (Create, update headers, etc.)
+
         public static long GetMaximumDatSize()
         {
             var is64b = Environment.Is64BitOperatingSystem;
@@ -191,11 +193,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
         }
-
-
-        // Whether a DAT is an original dat or a Modded dat never changes during runtime.
-        // As such, we can cache that information, rather than having to constantly re-check the filesystem (somewhat expensive operation)
-        private static Dictionary<XivDataFile, Dictionary<int, bool>> OriginalDatStatus = new Dictionary<XivDataFile, Dictionary<int, bool>>();
 
 
         public static bool IsOriginalDat(XivDataFile df, int datNumber)
@@ -438,123 +435,15 @@ namespace xivModdingFramework.SqPack.FileTypes
             bw.BaseStream.Seek(pos, SeekOrigin.Begin);
         }
 
-        /// <summary>
-        /// Gets the original or modded data for type 2 files based on the path specified.
-        /// </summary>
-        /// <remarks>
-        /// Type 2 files vary in content.
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="forceOriginal">Flag used to get original game data</param>
-        /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        public static async Task<byte[]> ReadSqPackType2(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
-        {
-            var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
-            return await ReadSqPackType2(info.Offset, info.DataFile, tx);
-        }
+        #endregion
+
+
+        #region Type 2 (Binary) File Importing
 
         /// <summary>
-        /// Reads and decompresses the Type 2 Sqpack data from the transaction file store or game files.
+        /// Imports any Type 2 (Binary) data
         /// </summary>
-        /// <remarks>
-        /// Type 2 files vary in content.
-        /// </remarks>
-        /// <param name="offset">The offset where the data is located.</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>Byte array containing the decompressed type 2 data.</returns>
-        internal static async Task<byte[]> ReadSqPackType2(long offset, XivDataFile dataFile, ModTransaction tx = null)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file data without valid offset.");
-            }
-
-            byte[] type2Bytes = null;
-
-            if(tx == null)
-            {
-                tx = ModTransaction.BeginTransaction();
-            }
-            type2Bytes = await tx.ReadFile(dataFile, offset);
-            if (type2Bytes == null)
-            {
-                return new byte[0];
-            }
-
-            return type2Bytes;
-        }
-
-        public static async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
-        {
-            using (var ms = new MemoryStream(data))
-            {
-                using (var br = new BinaryReader(ms))
-                {
-                    return await ReadSqPackType2(br, offset);
-                }
-            }
-        }
-        public static async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
-        {
-            if(offset >= 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            } else
-            {
-                offset = br.BaseStream.Position;
-            }
-
-            var headerLength = br.ReadInt32();
-            var fileType = br.ReadInt32();
-            if(fileType != 2)
-            {
-                return null;
-            }
-            var uncompSize = br.ReadInt32();
-            var bufferInfoA = br.ReadInt32();
-            var bufferInfoB = br.ReadInt32();
-
-            var dataBlockCount = br.ReadInt32();
-
-            var type2Bytes = new List<byte>(uncompSize);
-            for (var i = 0; i < dataBlockCount; i++)
-            {
-                br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
-
-                var dataBlockOffset = br.ReadInt32();
-
-                br.BaseStream.Seek(offset + headerLength + dataBlockOffset, SeekOrigin.Begin);
-
-                br.ReadBytes(8);
-
-                var compressedSize = br.ReadInt32();
-                var uncompressedSize = br.ReadInt32();
-
-                // When the compressed size of a data block shows 32000, it is uncompressed.
-                if (compressedSize == 32000)
-                {
-                    type2Bytes.AddRange(br.ReadBytes(uncompressedSize));
-                }
-                else
-                {
-                    var compressedData = br.ReadBytes(compressedSize);
-
-                    var decompressedData = await IOUtil.Decompressor(compressedData, uncompressedSize);
-
-                    type2Bytes.AddRange(decompressedData);
-                }
-            }
-            return type2Bytes.ToArray();
-        }
-
-
-        /// <summary>
-        /// Imports any Type 2 data
-        /// </summary>
-        /// <param name="importFilePath">The file path where the file to be imported is located.</param>
-        /// <param name="itemName">The name of the item being imported.</param>
         /// <param name="internalPath">The internal file path of the item.</param>
-        /// <param name="category">The items category.</param>
         /// <param name="source">The source/application that is writing to the dat.</param>
         public static async Task<long> ImportType2Data(string externalFilePath, string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
@@ -562,14 +451,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
-        /// Imports type 2 data.
+        /// Imports type 2 (Binary) data.
         /// </summary>
         /// <param name="dataToImport">Raw data to import</param>
         /// <param name="internalPath">Internal path to update index for.</param>
         /// <param name="source">Source application making the changes/</param>
         /// <param name="referenceItem">Item to reference for name/category information, etc.</param>
-        /// <param name="cachedIndexFile">Cached index file, if available</param>
-        /// <param name="cachedModList">Cached modlist file, if available</param>
         /// <returns></returns>
         public static async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
@@ -679,69 +566,75 @@ namespace xivModdingFramework.SqPack.FileTypes
             return newData.ToArray();
         }
 
+        #endregion
 
-        /// <summary>
-        /// Boilerplate condenser for resolving offset information retrieval and null transaction handling.
-        /// </summary>
-        /// <param name="internalPath"></param>
-        /// <param name="forceOriginal"></param>
-        /// <param name="tx"></param>
-        /// <returns></returns>
-        /// <exception cref="FileNotFoundException"></exception>
-        private static async Task<(long Offset, XivDataFile DataFile)> ResolveOffsetAndDataFile(string internalPath, bool forceOriginal, ModTransaction tx)
+
+        #region SQPack Compressed File Reading/Decompressing
+
+        public static async Task<byte[]> ReadSqPackType2(byte[] data, long offset = 0)
         {
-            if (tx == null)
+            using (var ms = new MemoryStream(data))
             {
-                tx = ModTransaction.BeginTransaction();
+                using (var br = new BinaryReader(ms))
+                {
+                    return await ReadSqPackType2(br, offset);
+                }
             }
-            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
-            var offset = await tx.Get8xDataOffset(internalPath, forceOriginal);
+        }
+        public static async Task<byte[]> ReadSqPackType2(BinaryReader br, long offset = -1)
+        {
+            if (offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = br.BaseStream.Position;
+            }
 
-            if (offset == 0)
+            var headerLength = br.ReadInt32();
+            var fileType = br.ReadInt32();
+            if (fileType != 2)
             {
-                throw new FileNotFoundException($"Could not find offset for {internalPath}");
+                return null;
             }
-            return (offset, dataFile);
+            var uncompSize = br.ReadInt32();
+            var bufferInfoA = br.ReadInt32();
+            var bufferInfoB = br.ReadInt32();
+
+            var dataBlockCount = br.ReadInt32();
+
+            var type2Bytes = new List<byte>(uncompSize);
+            for (var i = 0; i < dataBlockCount; i++)
+            {
+                br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
+
+                var dataBlockOffset = br.ReadInt32();
+
+                br.BaseStream.Seek(offset + headerLength + dataBlockOffset, SeekOrigin.Begin);
+
+                br.ReadBytes(8);
+
+                var compressedSize = br.ReadInt32();
+                var uncompressedSize = br.ReadInt32();
+
+                // When the compressed size of a data block shows 32000, it is uncompressed.
+                if (compressedSize == 32000)
+                {
+                    type2Bytes.AddRange(br.ReadBytes(uncompressedSize));
+                }
+                else
+                {
+                    var compressedData = br.ReadBytes(compressedSize);
+
+                    var decompressedData = await IOUtil.Decompressor(compressedData, uncompressedSize);
+
+                    type2Bytes.AddRange(decompressedData);
+                }
+            }
+            return type2Bytes.ToArray();
         }
 
-        /// <summary>
-        /// Retrieves the uncompressed data for an SQPack type 3 file from the given path.
-        /// </summary>
-        /// <remarks>
-        /// Type 3 files are used for models
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="forceOriginal">Flag used to get original game data</param>
-        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public static async Task<byte[]> ReadSqPackType3(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
-        {
-            var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
-            return await ReadSqPackType3(info.Offset, info.DataFile, tx);
-        }
-
-        /// <summary>
-        /// Reads the uncompressed Type3 data from the given transaction store or game files.
-        /// </summary>
-        /// <remarks>
-        /// Type 3 files are used for models
-        /// </remarks>
-        /// <param name="offset">Offset to the type 3 data</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>A tuple containing the mesh count, material count, and decompressed data</returns>
-        public static async Task<byte[]> ReadSqPackType3(long offset, XivDataFile dataFile, ModTransaction tx = null)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file data without valid offset.");
-            }
-
-            var parts = IOUtil.Offset8xToParts(offset);
-            if(tx == null)
-            {
-                tx = new ModTransaction();
-            }
-            return await tx.ReadFile(dataFile, offset);
-        }
 
         public static async Task<byte[]> ReadSqPackType3(byte[] data)
         {
@@ -915,429 +808,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             return decompressedData;
         }
 
-        public static void Write3IntBuffer(List<byte> bufferTarget, uint[] dataToAdd)
-        {
-            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[0]));
-            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[1]));
-            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[2]));
-        }
-        public static uint[] Read3IntBuffer(BinaryReader br, bool shortOnly = false)
-        {
-            uint[] data = new uint[3];
-            if (shortOnly)
-            {
-                data[0] = br.ReadUInt16();
-                data[1] = br.ReadUInt16();
-                data[2] = br.ReadUInt16();
-            }
-            else
-            {
-                data[0] = br.ReadUInt32();
-                data[1] = br.ReadUInt32();
-                data[2] = br.ReadUInt32();
-            }
-            return data;
-        }
-        public static uint[] Read3IntBuffer(byte[] body, int offset)
-        {
-            uint[] data = new uint[3];
-            data[0] = BitConverter.ToUInt32(body, offset);
-            data[1] = BitConverter.ToUInt32(body, offset + 4);
-            data[2] = BitConverter.ToUInt32(body, offset + 8);
-            return data;
-        }
-
-        // Begins decompressing a sequence of blocks in parallel
-        // Returns a list of tasks that should be passed to CompleteReadCompressedBlocks()
-        public static List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
-        {
-            if(blockCount == 0)
-            {
-                return new();
-            }
-
-            if (offset > 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            }
-
-            var tasks = new List<Task<byte[]>>();
-
-            for (int i = 0; i < blockCount; i++)
-            {
-                byte[] data;
-
-                var start = br.BaseStream.Position;
-
-                // Some variety of magic numbers presumably?
-                var sixTeen = br.ReadByte();
-
-                // This is a shitty catch for old improperly spaced blocks generated by Endwalker and earlier TexTools.
-                while(sixTeen != 16 && sixTeen == 0)
-                {
-                    sixTeen = br.ReadByte();
-                }
-                var zeros = br.ReadBytes(3);
-
-                var zero = br.ReadInt32();
-
-                if (sixTeen != 16 || zero != 0 || zeros.Any(x => x != 0))
-                {
-                    throw new Exception("Unable to locate valid compressed block header.");
-                }
-
-                // Relevant info.
-                var partCompSize = br.ReadInt32();
-                var partDecompSize = br.ReadInt32();
-
-                Task<byte[]> task;
-
-                void readBlockPadding()
-                {
-                    var end = br.BaseStream.Position;
-                    var length = end - start;
-                    var targetLength = Pad((int)length, 128);
-                    var remaining = targetLength - length;
-
-                    var paddingData = br.ReadBytes((int)remaining);
-
-                    var sixTeenIndex = Array.IndexOf(paddingData, (byte)16);
-
-                    // Ugh.  This is an old broken TexTools import that has improper block spacing.
-                    // We have to rewind the stream to the start of the next block.
-                    if(sixTeenIndex != -1)
-                    {
-                        var rewind = paddingData.Length - sixTeenIndex;
-                        br.BaseStream.Position = br.BaseStream.Position - rewind;
-                    } else if (paddingData.Any(x => x != 0))
-                    {
-                        throw new Exception("Unexpected real data in compressed data block padding section.");
-                    }
-                }
-
-                if (partCompSize == 32000)
-                {
-                    data = br.ReadBytes(partDecompSize);
-                    readBlockPadding();
-                    var completedTask = new TaskCompletionSource<byte[]>();
-                    completedTask.SetResult(data);
-                    task = completedTask.Task;
-                }
-                else
-                {
-                    data = br.ReadBytes(partCompSize);
-                    readBlockPadding();
-
-                    // Not 100% sure this really needs to be shipped as Task.Run,
-                    // but Task.Run should ensure that we actually get scheduled on the thread pool
-                    // for potential new threads.
-                    task = Task.Run(async () =>
-                    {
-                        return await IOUtil.Decompressor(data, partDecompSize);
-                    });
-                }
-
-                tasks.Add(task);
-            }
-
-            return tasks;
-        }
-
-        // Completes all provided tasks from BeginReadCompressedBlocks and writes them sequentially in to destBuffer
-        // Returns the number of bytes written in to destBuffer
-        public static async Task<int> CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
-        {
-            int currentOffset = destOffset;
-            foreach (var task in tasks)
-            {
-                await task;
-                var result = task.Result;
-                result.CopyTo(destBuffer, currentOffset);
-                currentOffset += result.Length;
-            }
-
-            return currentOffset - destOffset;
-        }
-
-        public static async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
-        {
-            if (offset > 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            }
-
-            var start = br.BaseStream.Position;
-
-
-            byte[] data;
-
-            // Some variety of magic numbers presumably?
-            var sixTeen = br.ReadByte();
-
-            // This is a shitty catch for old improperly spaced blocks generated by Endwalker and earlier TexTools.
-            while (sixTeen != 16 && sixTeen == 0)
-            {
-                sixTeen = br.ReadByte();
-            }
-            var zeros = br.ReadBytes(3);
-
-            var zero = br.ReadInt32();
-
-            if (sixTeen != 16 || zero != 0 || zeros.Any(x => x != 0))
-            {
-                throw new Exception("Unable to locate valid compressed block header.");
-            }
-
-            // Relevant info.
-            var partCompSize = br.ReadInt32();
-            var partDecompSize = br.ReadInt32();
-
-            if (partCompSize == 32000)
-            {
-                data = br.ReadBytes(partDecompSize);
-            }
-            else
-            {
-                data = await IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
-            }
-
-            var end = br.BaseStream.Position;
-            var length = end - start;
-
-            var target = Pad((int)length, 128);
-            var remaining = target - length;
-
-            var paddingData = br.ReadBytes((int)remaining);
-
-            var sixTeenIndex = Array.IndexOf(paddingData, (byte)16);
-
-            // Ugh.  This is an old broken TexTools import that has improper block spacing.
-            // We have to rewind the stream to the start of the next block.
-            if (sixTeenIndex != -1)
-            {
-                var rewind = paddingData.Length - sixTeenIndex;
-                br.BaseStream.Position = br.BaseStream.Position - rewind;
-            }
-            else if (paddingData.Any(x => x != 0))
-            {
-                throw new Exception("Unexpected real data in compressed data block padding section.");
-            }
-
-            return data;
-        }
-
-        public static async Task<byte[]> ReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
-        {
-            if (blockCount == 0)
-            {
-                return new byte[0];
-            }
-
-            if (offset > 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            }
-
-            var ret = (IEnumerable<byte>)new List<byte>();
-            for (int i = 0; i < blockCount; i++)
-            {
-                var data = await ReadCompressedBlock(br);
-                ret = ret.Concat(data);
-            }
-            return ret.ToArray();
-        }
-
-        public static async Task<uint> GetReportedType4UncompressedSize(string path, bool forceOrginal = false, ModTransaction tx = null)
-        {
-            if (tx == null)
-            {
-                tx = ModTransaction.BeginTransaction();
-            }
-            var offset = await tx.Get8xDataOffset(path, forceOrginal);
-            var df = IOUtil.GetDataFileFromPath(path);
-            return await GetReportedType4UncompressedSize(df, offset, tx);
-
-        }
-        public static async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offset8x, ModTransaction tx = null)
-        {
-            if(tx == null)
-            {
-                tx = ModTransaction.BeginTransaction();
-            }
-            using (var br = await tx.GetFileStream(df, offset8x, true))
-            {
-                br.BaseStream.Seek(8, SeekOrigin.Current);
-                var size = br.ReadUInt32();
-                return size;
-            }
-        }
-
-        /// <summary>
-        /// Updates the compressed file size of the file at the given file storage information offset.
-        /// Returns -1 if the request is invalid, otherwise returns the real file size.
-        /// </summary>
-        /// <param name="br"></param>
-        /// <param name="bw"></param>
-        /// <param name="offset"></param>
-        /// <exception cref="Exception"></exception>
-        internal static int UpdateCompressedSize(FileStorageInformation info)
-        {
-            if(info.StorageType == EFileStorageType.UncompressedIndividual || info.StorageType == EFileStorageType.UncompressedBlob)
-            {
-                return -1;
-            }
-
-            int realSize = 0;
-            using (var br = new BinaryReader(File.OpenRead(info.RealPath)))
-            {
-                br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                realSize = Dat.GetCompressedFileSize(br, info.RealOffset);
-            }
-
-            using (var bw = new BinaryWriter(File.OpenWrite(info.RealPath)))
-            {
-                bw.BaseStream.Seek(info.RealOffset + 8, SeekOrigin.Begin);
-                bw.Write(BitConverter.GetBytes(realSize));
-            }
-
-            return realSize;
-
-        }
-
-        /// <summary>
-        /// This is a very specific fixer-function designed to handle a very specific error caused by very old TexTools builds that would
-        /// generate invalid compressed file sizes for texture files.
-        /// 
-        /// Returns true if the file was modified.
-        /// </summary>
-        /// <returns></returns>
-        public static async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
-        {
-
-            var boiler = TxBoiler.BeginWrite(ref tx);
-            try
-            {
-                var reportedSize = await tx.GetCompressedFileSize(dataFile, offset);
-                var data = await tx.ReadFile(dataFile, offset);
-                var realSize = data.Length;
-
-                if(reportedSize == realSize)
-                {
-                    boiler.Cancel(true);
-                    return false;
-                }
-
-                // Write the corrected size and save file.
-                Array.Copy(BitConverter.GetBytes(realSize), 0, data, 8, sizeof(uint));
-                await tx.WriteFile(path, data, sourceApplication);
-
-                await boiler.Commit();
-                return true;
-            }
-            catch(Exception ex)
-            {
-                boiler.Catch();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Gets the original or modded data for type 4 files based on the path specified.
-        /// </summary>
-        /// <remarks>
-        /// Type 4 files are used for Textures
-        /// </remarks>
-        /// <param name="internalPath">The internal file path of the item</param>
-        /// <param name="forceOriginal">Flag used to get original game data</param>
-        /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public static async Task<XivTex> GetTexFromDat(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
-        {
-
-            var dataFile = IOUtil.GetDataFileFromPath(internalPath);
-
-            if (tx == null)
-            {
-                // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
-            }
-
-            if (forceOriginal)
-            {
-                // Checks if the item being imported already exists in the modlist
-                (await tx.GetModList()).Mods.TryGetValue(internalPath, out var modEntry);
-
-                // If the file exists in the modlist, get the data from the original data
-                if (modEntry != null)
-                {
-                    return await GetTexFromDat(modEntry.OriginalOffset8x, dataFile, tx);
-                }
-            }
-
-            // If it doesn't exist in the modlist(the item is not modded) or force original is false,
-            // grab the data directly from them index file.
-
-            var folder = Path.GetDirectoryName(internalPath);
-            folder = folder.Replace("\\", "/");
-            var file = Path.GetFileName(internalPath);
-
-
-            var offset = (await tx.GetIndexFile(dataFile)).Get8xDataOffset(internalPath);
-            if (offset == 0)
-            {
-                throw new Exception($"Could not find offset for {internalPath}");
-            }
-
-            return await GetTexFromDat(offset, dataFile, tx);
-        }
-
-        /// <summary>
-        /// Gets the data for Type 4 (Texture) files.
-        /// </summary>
-        /// <remarks>
-        /// Type 4 files are used for Textures
-        /// </remarks>
-        /// <param name="offset">Offset to the texture data.</param>
-        /// <param name="dataFile">The data file that contains the data.</param>
-        /// <returns>An XivTex containing all the type 4 texture data</returns>
-        public static async Task<XivTex> GetTexFromDat(long offset, XivDataFile dataFile, ModTransaction tx = null)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file size data without valid offset.");
-            }
-            // Get the uncompressed .tex file.
-            var data = await ReadSqPackType4(offset, dataFile, tx);
-            return XivTex.FromUncompressedTex(data);
-        }
-
-        public static async Task<byte[]> ReadSqPackType4(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
-        {
-            var info = await ResolveOffsetAndDataFile(internalPath, forceOriginal, tx);
-            return await ReadSqPackType4(info.Offset, info.DataFile, tx);
-        }
-
-
-        /// <summary>
-        /// Retrieves the uncompressed type 4 bytes from a given transaction store or the game files.
-        /// </summary>
-        /// <param name="offset"></param>
-        /// <param name="dataFile"></param>
-        /// <param name="tx"></param>
-        /// <returns></returns>
-        /// <exception cref="InvalidDataException"></exception>
-        internal static async Task<byte[]> ReadSqPackType4(long offset, XivDataFile dataFile, ModTransaction tx = null)
-        {
-            if (offset <= 0)
-            {
-                throw new InvalidDataException("Cannot get file data without valid offset.");
-            }
-            var parts = IOUtil.Offset8xToParts(offset);
-            if (tx == null)
-            {
-                tx = new ModTransaction();
-            }
-            return await tx.ReadFile(dataFile, offset);
-        }
 
         public static async Task<byte[]> ReadSqPackType4(byte[] data)
         {
@@ -1349,13 +819,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
             }
         }
-
-        /// <summary>
-        /// Reads and decompresses an SQPack type 4 file from the given data stream.
-        /// </summary>
-        /// <param name="br"></param>
-        /// <param name="offset"></param>
-        /// <returns></returns>
         public static async Task<byte[]> ReadSqPackType4(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
@@ -1423,24 +886,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             return finalbytes;
         }
 
-
-        /// <summary>
-        /// Decompresses (De-SqPacks) a given block of data.
-        /// </summary>
-        /// <param name="sqpackData"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        public static async Task<byte[]> GetUncompressedData(byte[] sqpackData)
-        {
-            using (var ms = new MemoryStream(sqpackData))
-            {
-                using (var br = new BinaryReader(ms))
-                {
-                    return await GetUncompressedData(br);
-                }
-            }
-        }
-
         public static uint GetSqPackType(BinaryReader br, long offset = -1)
         {
             if (offset >= 0)
@@ -1457,12 +902,58 @@ namespace xivModdingFramework.SqPack.FileTypes
             return type;
         }
 
+
+        /// <summary>
+        /// Syntactic wrapper for tx.ReadFile()
+        /// </summary>
+        public static async Task<byte[]> ReadFile(string filePath, bool forceOriginal, ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            return await tx.ReadFile(filePath, forceOriginal, false);
+        }
+
+        /// <summary>
+        /// Syntactic wrapper for tx.ReadFile()
+        /// </summary>
+        public static async Task<byte[]> ReadFile(XivDataFile dataFile, long offset8x, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            return await tx.ReadFile(dataFile, offset8x, false);
+        }
+
+        /// <summary>
+        /// Decompresses (De-SqPacks) a given block of data.
+        /// </summary>
+        /// <param name="sqpackData"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public static async Task<byte[]> ReadSqPackFile(byte[] sqpackData)
+        {
+            using (var ms = new MemoryStream(sqpackData))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    return await ReadSqPackFile(br);
+                }
+            }
+        }
+
         /// <summary>
         /// Reads an SQPack file from the given data stream.
         /// </summary>
         /// <param name="br"></param>
         /// <returns></returns>
-        public static async Task<byte[]> GetUncompressedData(BinaryReader br, long offset = -1)
+        public static async Task<byte[]> ReadSqPackFile(BinaryReader br, long offset = -1)
         {
             if(offset >= 0)
             {
@@ -1472,10 +963,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 offset = br.BaseStream.Position;
             }
-            int type = -1;
 
             br.BaseStream.Seek(offset + 4, SeekOrigin.Begin);
-            type = br.ReadInt32();
+            var type = br.ReadInt32();
 
             br.BaseStream.Seek(offset, SeekOrigin.Begin);
             if (type == 2)
@@ -1493,293 +983,9 @@ namespace xivModdingFramework.SqPack.FileTypes
             throw new NotImplementedException("Unable to read invalid SQPack File Type.");
         }
 
-        /// <summary>
-        /// Pads a given byte list to the target padding interval with empty bytes.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="data"></param>
-        /// <param name="paddingTarget"></param>
-        /// <param name="forcePadding"></param>
-        public static void Pad<T>(List<T> data, int paddingTarget, bool forcePadding = false)
-        {
-            var pad = paddingTarget - (data.Count % paddingTarget);
-            if(pad == paddingTarget && !forcePadding)
-            {
-                return;
-            }
-            data.AddRange(new T[pad]);
-        }
-
-        /// <summary>
-        /// Pads a given byte array to the target padding interval with empty bytes.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="data"></param>
-        /// <param name="paddingTarget"></param>
-        /// <param name="forcePadding"></param>
-        public static T[] PadArray<T>(T[] data, int paddingTarget, bool forcePadding = false)
-        {
-            var pad = paddingTarget - (data.Length % paddingTarget);
-            if (pad == paddingTarget && !forcePadding)
-            {
-                return data;
-            }
-            var res = new T[data.Length + pad];
-            data.CopyTo(res, 0);
-            return res;
-        }
+        #endregion
 
 
-        /// <summary>
-        /// Pads a given int length to the next padding interval.
-        /// </summary>
-        /// <param name="size"></param>
-        /// <param name="paddingTarget"></param>
-        /// <returns></returns>
-        public static int Pad(int size, int paddingTarget, bool forcePadding = false)
-        {
-            var pad = paddingTarget - (size % paddingTarget);
-            if(pad == paddingTarget && !forcePadding)
-            {
-                return size;
-            }
-            return size + pad;
-        }
-
-        /// <summary>
-        /// Pads a given int length to the next padding interval.
-        /// </summary>
-        /// <param name="size"></param>
-        /// <param name="paddingTarget"></param>
-        /// <returns></returns>
-        public static long Pad(long size, long paddingTarget, bool forcePadding = false)
-        {
-            var pad = paddingTarget - (size % paddingTarget);
-            if (pad == paddingTarget && !forcePadding)
-            {
-                return size;
-            }
-            return size + pad;
-        }
-
-        /// <summary>
-        /// Compresses a single data block, returning the singular compressed byte array.
-        /// For blocks larger than 16,000, use CompressData() instead.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        public static async Task<byte[]> CompressSmallData(byte[] data)
-        {
-            if (data.Length > 16000)
-            {
-                throw new Exception("CompressSmallData() data is too large.");
-            }
-
-            // Vertex Info Compression
-            var compressedData = await IOUtil.Compressor(data);
-
-            var pad = 128 - ((compressedData.Length + 16) % 128);
-            if (pad == 128)
-            {
-                pad = 0;
-            }
-
-            var paddedSize = 16 + compressedData.Length + pad;
-
-            // Pre-allocate the array.
-            List<byte> result = new List<byte>(paddedSize);
-            result.AddRange(BitConverter.GetBytes(16));
-            result.AddRange(BitConverter.GetBytes(0));
-            result.AddRange(BitConverter.GetBytes(compressedData.Length));
-            result.AddRange(BitConverter.GetBytes(data.Length));
-            result.AddRange(compressedData);
-            result.AddRange(new byte[pad]);
-
-            return result.ToArray();
-        }
-
-        /// <summary>
-        /// Compresses data, returning the compressed byte arrays in parts.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        public static async Task<List<byte[]>> CompressData(List<byte> data)
-        {
-            var partCount = (int)Math.Ceiling(data.Count / 16000f);
-            var partSizes = new List<int>(partCount);
-            var remainingDataSize = data.Count;
-
-            for (var i = 0; i < partCount; i++)
-            {
-                if (remainingDataSize >= 16000)
-                {
-                    partSizes.Add(16000);
-                    remainingDataSize -= 16000;
-                }
-                else
-                {
-                    partSizes.Add(remainingDataSize);
-                }
-            }
-
-            var parts = new List<byte[]>();
-
-            var compressionTasks = new List<Task<byte[]>>();
-            for (var i = 0; i < partCount; i++)
-            {
-                // Hand the compression task to the thread scheduler.
-                var start = i * 16000;
-                var size = partSizes[i];
-                compressionTasks.Add(Task.Run(async () => {
-                    return await CompressSmallData(data.GetRange(start, size).ToArray());
-                }));
-            }
-            await Task.WhenAll(compressionTasks);
-
-            foreach(var task in compressionTasks)
-            {
-                parts.Add(task.Result);
-            }
-
-            return parts;
-        }
-
-        /// <summary>
-        /// Partially parses (without decompressing) the SQPack file in order to determine its total length.
-        /// </summary>
-        /// <param name="br"></param>
-        /// <param name="offset"></param>
-        /// <returns></returns>
-        /// <exception cref="NotSupportedException"></exception>
-        public static int GetCompressedFileSize(BinaryReader br, long offset = -1)
-        {
-            if (offset >= 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            }
-            else
-            {
-                offset = br.BaseStream.Position;
-            }
-
-            var headerLength = br.ReadInt32();
-            var fileType = br.ReadInt32();
-            var uncompSize = br.ReadInt32();
-            var unknown = br.ReadInt32();
-            var maxBufferSize = br.ReadInt32();
-            var blockCount = br.ReadInt16();
-
-            var endOfHeader = offset + headerLength;
-
-            if (fileType != 2 && fileType != 3 && fileType != 4)
-            {
-                throw new NotSupportedException("Cannot get compressed file size of unknown type.");
-            }
-
-            int compSize = 0;
-
-            // Ok, time to parse the block headers and figure out how long the compressed data runs.
-            if (fileType == 2)
-            {
-                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-                var lastSize = 0;
-                var lastOffset = 0;
-                for (int i = 0; i < blockCount; i++)
-                {
-                    br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
-                    var blockOffset = br.ReadInt32();
-                    var blockCompressedSize = br.ReadUInt16();
-
-                    lastOffset = blockOffset;
-                    lastSize = blockCompressedSize + 16;    // 16 bytes of header data per block.
-                }
-
-                // Pretty straight forward.  Header + Total size of the compressed data.
-                compSize = headerLength + lastOffset + lastSize;
-
-            }
-            else if (fileType == 3)
-            {
-
-                // 24 byte header, then 88 bytes to the first chunk offset.
-                br.BaseStream.Seek(offset + 112, SeekOrigin.Begin);
-                var firstOffset = br.ReadInt32();
-
-                // 24 byte header, then 178 bytes to the start of the block count.
-                br.BaseStream.Seek(offset + 178, SeekOrigin.Begin);
-
-                var totalBlocks = 0;
-                for (var i = 0; i < 11; i++)
-                {
-                    // 11 Segments.  Vertex Info, Model Data, [Vertex Data x3], [Edge Data x3], [Index Data x3]
-                    totalBlocks += br.ReadUInt16();
-                }
-
-
-                // 24 byte header, then 208 bytes to the list of block sizes.
-                br.BaseStream.Seek(offset + 208, SeekOrigin.Begin);
-
-                var blockSizes = new int[totalBlocks];
-                for (var i = 0; i < totalBlocks; i++)
-                {
-                    blockSizes[i] = br.ReadUInt16();
-                }
-
-                int totalCompressedSize = 0;
-                foreach (var size in blockSizes)
-                {
-                    totalCompressedSize += size;
-                }
-
-
-                // Header + Chunk headers + compressed data.
-                compSize = headerLength + firstOffset + totalCompressedSize;
-            }
-            else if (fileType == 4)
-            {
-                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
-                // Textures.
-                var lastOffset = 0;
-                var lastSize = 0;
-                var mipMapInfoOffset = offset + 24;
-                for (int i = 0, j = 0; i < blockCount; i++)
-                {
-                    br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
-
-                    j = j + 20;
-
-                    var offsetFromHeaderEnd = br.ReadInt32();
-                    var mipMapCompressedSize = br.ReadInt32();
-
-
-                    lastOffset = offsetFromHeaderEnd;
-                    lastSize = mipMapCompressedSize;
-                }
-
-                // Pretty straight forward.  Header + Total size of the compressed data.
-                compSize = headerLength + lastOffset + lastSize;
-
-            }
-
-
-            // Round out to the nearest 256 bytes.
-            if (compSize % 256 != 0)
-            {
-                var padding = 256 - (compSize % 256);
-                compSize += padding;
-            }
-            return compSize;
-
-        }
-
-        internal static string GetDatPath(XivDataFile dataFile, int datNumber)
-        {
-            var datPath = XivDataFiles.GetFullPath(dataFile, $"{Dat.DatExtension}{datNumber}");
-            return datPath;
-        }
-
-
-        /// <summary>
         /// Creates the header for the compressed texture data to be imported.
         /// </summary>
         /// <param name="uncompressedLength">Length of the uncompressed texture file.</param>
@@ -1787,7 +993,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <returns>The created header data.</returns>
-        public static byte[] MakeType4DatHeader(XivTexFormat format, List<List<byte[]>> ddsParts, int uncompressedLength, int newWidth, int newHeight)
+        internal static byte[] MakeType4DatHeader(XivTexFormat format, List<List<byte[]>> ddsParts, int uncompressedLength, int newWidth, int newHeight)
         {
             var headerData = new List<byte>();
 
@@ -1879,94 +1085,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
         /// <summary>
-        /// Gets a writable offset for a file of the given size in the target data file.
-        /// </summary>
-        /// <param name="dataFile"></param>
-        /// <param name="fileSize"></param>
-        /// <param name="availableSlots"></param>
-        /// <returns></returns>
-        private static long GetWritableOffset(XivDataFile dataFile, int fileSize, Dictionary<long, uint> availableSlots)
-        {
-            if (fileSize < 0)
-            {
-                throw new InvalidDataException("Cannot check space for a negative size file.");
-            }
-
-            fileSize = Dat.Pad(fileSize, 256);
-
-            // Scan available slots first.
-            var slot = availableSlots.FirstOrDefault(x => x.Value >= fileSize);
-            if(slot.Key > 0 && slot.Value > 0)
-            {
-                // Take the slot.
-                availableSlots.Remove(slot.Key);
-
-                var slotParts = IOUtil.Offset8xToParts(slot.Key);
-                var remainingSize = slot.Value - fileSize;
-
-                // We have extra usable space remaining.
-                if(remainingSize > 256)
-                {
-                    // Write the remainder slot back.
-                    var newSlotOffset = IOUtil.PartsTo8xDataOffset(slotParts.Offset + fileSize, slotParts.DatNum);
-                    availableSlots.Add(newSlotOffset, (uint)remainingSize);
-
-                }
-
-                return slot.Key;
-            }
-
-            // Otherwise we're looking to find a modded dat with space at the end.
-
-            // Scan all the dat numbers...
-            var datWithSpace = -1;
-            long offset = -1;
-            for (int i = 0; i < 8; i++)
-            {
-                var datPath = Dat.GetDatPath(dataFile, i);
-                if (!File.Exists(datPath))
-                    continue;
-
-                var original = IsOriginalDat(dataFile, i);
-
-                // Don't let us inject to original dat files.
-                if (original) continue;
-
-
-
-                var fInfo = new FileInfo(datPath);
-
-                // If the DAT doesn't exist at all, we can assume we need to create a new DAT.
-                if (fInfo == null || !fInfo.Exists) break;
-
-
-                // Offsets must be on 256 byte intervals.
-                var datSize = Dat.Pad(fInfo.Length, 256);
-
-                // Dat is too large to fit this file, we can't write to it.
-                if (datSize + fileSize >= GetMaximumDatSize()) continue;
-
-                // Found an existing dat that has space.
-                offset = IOUtil.PartsTo8xDataOffset(datSize, i);
-                return offset;
-            }
-
-
-            // Didn't find a DAT file with space, gotta create a new one.
-            datWithSpace = CreateNewDat(dataFile);
-
-            if(datWithSpace > 7 || datWithSpace  < 0)
-            {
-                throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetFileName());
-            }
-
-            // Offsets start at 2048
-            offset = IOUtil.PartsTo8xDataOffset(2048, datWithSpace);
-
-            return offset;
-        }
-
-        /// <summary>
         /// Copies a file from a given offset to a new path in the game files.
         /// </summary>
         /// <param name="targetPath"></param>
@@ -2030,74 +1148,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        /// <summary>
-        /// Writes a new block of data to the given data file, without changing
-        /// the indexes.  Returns the raw-index-style offset to the new data.
-        ///
-        /// A target offset of 0 or negative will append to the end of the first data file with space.
-        /// </summary>
-        /// <param name="importData"></param>
-        /// <param name="dataFile"></param>
-        /// <returns></returns>
-        internal static async Task<long> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, Dictionary<long, uint> openSlots)
-        {
-            // Perform basic validation.
-            if (importData == null || importData.Length < 8)
-            {
-                throw new Exception("Attempted to write NULL data to DAT files.");
-            }
-
-            var fileType = BitConverter.ToInt32(importData, 4);
-            if (fileType < 2 || fileType > 4)
-            {
-                throw new Exception("Attempted to write Invalid data to DAT files.");
-            }
-
-            long filePointer = 0;
-            await _lock.WaitAsync();
-            try
-            {
-                // Get our new target offset...
-                var offset = GetWritableOffset(dataFile, importData.Length, openSlots);
-
-                var parts = IOUtil.Offset8xToParts(offset);
-
-                var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
-
-                using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
-                {
-                    // Seek to the target location.
-                    bw.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
-
-                    filePointer = bw.BaseStream.Position;
-
-                    // Write data.
-                    bw.Write(importData);
-
-                    // Write out remaining padding as needed.
-                    while ((bw.BaseStream.Position % 256) != 0)
-                    {
-                        bw.Write((byte)0);
-                    }
-
-                    var datSize = bw.BaseStream.Length;
-                    UpdateDatHeader(bw, parts.DatNum, datSize);
-                }
-
-
-                return offset;
-            } finally
-            {
-                _lock.Release();
-            }
-        }
-
+        #region Core Mod File Writing
 
         /// <summary>
         /// Writes a given block of data to the DAT files or Transaction data store, updates the index to point to it for the given file path,
         /// creates or updates the modlist entry for the item, and triggers metadata expansion if needed.
         /// 
-        /// This is the main workhorse function for mod writing.
+        /// This is the main workhorse function for mod writing, and /almost/ all methods of writing data ultimately drill down to this function.
+        /// If a write call does not end up here, it is injected into the TX data store directly via the ModTransaction.UNSAFE_ functions.
         /// </summary>
         /// <param name="fileData"></param>
         /// <param name="internalFilePath"></param>
@@ -2255,6 +1313,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Expands the given .meta or .rgsp file.
+        /// Simplified wrapper for use in WriteModFile() in the cases where we already have the data on hand.
         /// </summary>
         /// <param name="data"></param>
         /// <param name="internalPath"></param>
@@ -2284,6 +1343,68 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         }
 
+        /// <summary>
+        /// Writes a new block of data to the given data file, without changing
+        /// the indexes.  Returns the raw-index-style offset to the new data.
+        ///
+        /// A target offset of 0 or negative will append to the end of the first data file with space.
+        /// </summary>
+        /// <param name="importData"></param>
+        /// <param name="dataFile"></param>
+        /// <returns></returns>
+        internal static async Task<long> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, Dictionary<long, uint> openSlots)
+        {
+            // Perform basic validation.
+            if (importData == null || importData.Length < 8)
+            {
+                throw new Exception("Attempted to write NULL data to DAT files.");
+            }
+
+            var fileType = BitConverter.ToInt32(importData, 4);
+            if (fileType < 2 || fileType > 4)
+            {
+                throw new Exception("Attempted to write Invalid data to DAT files.");
+            }
+
+            long filePointer = 0;
+            await _lock.WaitAsync();
+            try
+            {
+                // Get our new target offset...
+                var offset = GetWritableOffset(dataFile, importData.Length, openSlots);
+
+                var parts = IOUtil.Offset8xToParts(offset);
+
+                var datPath = Dat.GetDatPath(dataFile, parts.DatNum);
+
+                using (var bw = new BinaryWriter(File.OpenWrite(datPath)))
+                {
+                    // Seek to the target location.
+                    bw.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
+
+                    filePointer = bw.BaseStream.Position;
+
+                    // Write data.
+                    bw.Write(importData);
+
+                    // Write out remaining padding as needed.
+                    while ((bw.BaseStream.Position % 256) != 0)
+                    {
+                        bw.Write((byte)0);
+                    }
+
+                    var datSize = bw.BaseStream.Length;
+                    UpdateDatHeader(bw, parts.DatNum, datSize);
+                }
+
+
+                return offset;
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
 
         /// <summary>
         /// Computes a dictionary listing of all the open space in a given dat file (within the modded dats only),
@@ -2358,8 +1479,99 @@ namespace xivModdingFramework.SqPack.FileTypes
             return slots;
         }
 
+        /// <summary>
+        /// Gets a writable offset for a file of the given size in the target data file.
+        /// Used when committing a transaction to the game files to resolve an efficient write location per file.
+        /// </summary>
+        /// <param name="dataFile"></param>
+        /// <param name="fileSize"></param>
+        /// <param name="availableSlots"></param>
+        /// <returns></returns>
+        private static long GetWritableOffset(XivDataFile dataFile, int fileSize, Dictionary<long, uint> availableSlots)
+        {
+            if (fileSize < 0)
+            {
+                throw new InvalidDataException("Cannot check space for a negative size file.");
+            }
+
+            fileSize = Dat.Pad(fileSize, 256);
+
+            // Scan available slots first.
+            var slot = availableSlots.FirstOrDefault(x => x.Value >= fileSize);
+            if (slot.Key > 0 && slot.Value > 0)
+            {
+                // Take the slot.
+                availableSlots.Remove(slot.Key);
+
+                var slotParts = IOUtil.Offset8xToParts(slot.Key);
+                var remainingSize = slot.Value - fileSize;
+
+                // We have extra usable space remaining.
+                if (remainingSize > 256)
+                {
+                    // Write the remainder slot back.
+                    var newSlotOffset = IOUtil.PartsTo8xDataOffset(slotParts.Offset + fileSize, slotParts.DatNum);
+                    availableSlots.Add(newSlotOffset, (uint)remainingSize);
+
+                }
+
+                return slot.Key;
+            }
+
+            // Otherwise we're looking to find a modded dat with space at the end.
+
+            // Scan all the dat numbers...
+            var datWithSpace = -1;
+            long offset = -1;
+            for (int i = 0; i < 8; i++)
+            {
+                var datPath = Dat.GetDatPath(dataFile, i);
+                if (!File.Exists(datPath))
+                    continue;
+
+                var original = IsOriginalDat(dataFile, i);
+
+                // Don't let us inject to original dat files.
+                if (original) continue;
 
 
+
+                var fInfo = new FileInfo(datPath);
+
+                // If the DAT doesn't exist at all, we can assume we need to create a new DAT.
+                if (fInfo == null || !fInfo.Exists) break;
+
+
+                // Offsets must be on 256 byte intervals.
+                var datSize = Dat.Pad(fInfo.Length, 256);
+
+                // Dat is too large to fit this file, we can't write to it.
+                if (datSize + fileSize >= GetMaximumDatSize()) continue;
+
+                // Found an existing dat that has space.
+                offset = IOUtil.PartsTo8xDataOffset(datSize, i);
+                return offset;
+            }
+
+
+            // Didn't find a DAT file with space, gotta create a new one.
+            datWithSpace = CreateNewDat(dataFile);
+
+            if (datWithSpace > 7 || datWithSpace < 0)
+            {
+                throw new NotSupportedException("Maximum data size limit reached for DAT: " + dataFile.GetFileName());
+            }
+
+            // Offsets start at 2048
+            offset = IOUtil.PartsTo8xDataOffset(2048, datWithSpace);
+
+            return offset;
+        }
+
+        #endregion
+
+
+        #region RAW DAT File Manipulation Functions (Defragment, Delete Empty, etc.)
 
         /// <summary>
         /// This function will rewrite all the mod files to new DAT entries, replacing the existing modded DAT files with new, defragmented ones.
@@ -2385,7 +1597,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var count = 0;
             var total = modlist.Mods.Count();
 
-            var originalSize = await GetTotalModDataSize();
+            var originalSize = GetTotalModDataSize();
 
 
             var workerStatus = XivCache.CacheWorkerEnabled;
@@ -2419,7 +1631,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 data = br.ReadBytes(size);
                             }
 
-                            var newOffset = await WriteToTempDat(data, df);
+                            var newOffset = WriteToTempDat(data, df);
 
                             if (mod.IsCustomFile())
                             {
@@ -2475,7 +1687,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 await Modding.INTERNAL_SaveModlist(modlist);
 
 
-                var finalSize = await GetTotalModDataSize();
+                var finalSize = GetTotalModDataSize();
                 var saved = originalSize - finalSize;
                 saved = saved > 0 ? saved : 0;
                 return saved;
@@ -2494,7 +1706,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         }
 
-        private static async Task<long> WriteToTempDat(byte[] data, XivDataFile df)
+        private static long WriteToTempDat(byte[] data, XivDataFile df)
         {
             if (!Dat.AllowDatAlteration)
             {
@@ -2549,9 +1761,10 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Gets the sum total size in bytes of all modded dats.
+        /// Just used for user display purposes.
         /// </summary>
         /// <returns></returns>
-        public static async Task<long> GetTotalModDataSize()
+        public static long GetTotalModDataSize()
         {
             var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
 
@@ -2605,5 +1818,628 @@ namespace xivModdingFramework.SqPack.FileTypes
                 return emptyList;
             });
         }
+
+        #endregion
+
+
+        #region Handling for old/bad compressed type 4 file sizes
+        public static async Task<uint> GetReportedType4UncompressedSize(string path, bool forceOrginal = false, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+            var offset = await tx.Get8xDataOffset(path, forceOrginal);
+            var df = IOUtil.GetDataFileFromPath(path);
+            return await GetReportedType4UncompressedSize(df, offset, tx);
+
+        }
+        public static async Task<uint> GetReportedType4UncompressedSize(XivDataFile df, long offset8x, ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+            using (var br = await tx.GetFileStream(df, offset8x, true))
+            {
+                br.BaseStream.Seek(8, SeekOrigin.Current);
+                var size = br.ReadUInt32();
+                return size;
+            }
+        }
+
+        /// <summary>
+        /// Updates the compressed file size of the file at the given file storage information offset.
+        /// Returns -1 if the request is invalid, otherwise returns the real file size.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="bw"></param>
+        /// <param name="offset"></param>
+        /// <exception cref="Exception"></exception>
+        internal static int UpdateCompressedSize(FileStorageInformation info)
+        {
+            if (info.StorageType == EFileStorageType.UncompressedIndividual || info.StorageType == EFileStorageType.UncompressedBlob)
+            {
+                return -1;
+            }
+
+            int realSize = 0;
+            using (var br = new BinaryReader(File.OpenRead(info.RealPath)))
+            {
+                br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
+                realSize = Dat.GetCompressedFileSize(br, info.RealOffset);
+            }
+
+            using (var bw = new BinaryWriter(File.OpenWrite(info.RealPath)))
+            {
+                bw.BaseStream.Seek(info.RealOffset + 8, SeekOrigin.Begin);
+                bw.Write(BitConverter.GetBytes(realSize));
+            }
+
+            return realSize;
+
+        }
+
+        /// <summary>
+        /// This is a very specific fixer-function designed to handle a very specific error caused by very old TexTools builds that would
+        /// generate invalid compressed file sizes for texture files.
+        /// 
+        /// Returns true if the file was modified.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
+        {
+
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            try
+            {
+                var reportedSize = await tx.GetCompressedFileSize(dataFile, offset);
+                var data = await tx.ReadFile(dataFile, offset);
+                var realSize = data.Length;
+
+                if (reportedSize == realSize)
+                {
+                    boiler.Cancel(true);
+                    return false;
+                }
+
+                // Write the corrected size and save file.
+                Array.Copy(BitConverter.GetBytes(realSize), 0, data, 8, sizeof(uint));
+                await tx.WriteFile(path, data, sourceApplication);
+
+                await boiler.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                boiler.Catch();
+                throw;
+            }
+        }
+
+        #endregion
+
+
+        #region Basic File Writing Assistance Functions (Pad, Zip Compression, etc.)
+        /// <summary>
+        /// Pads a given byte list to the target padding interval with empty bytes.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="data"></param>
+        /// <param name="paddingTarget"></param>
+        /// <param name="forcePadding"></param>
+        public static void Pad<T>(List<T> data, int paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (data.Count % paddingTarget);
+            if (pad == paddingTarget && !forcePadding)
+            {
+                return;
+            }
+            data.AddRange(new T[pad]);
+        }
+
+        /// <summary>
+        /// Pads a given byte array to the target padding interval with empty bytes.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="data"></param>
+        /// <param name="paddingTarget"></param>
+        /// <param name="forcePadding"></param>
+        public static T[] PadArray<T>(T[] data, int paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (data.Length % paddingTarget);
+            if (pad == paddingTarget && !forcePadding)
+            {
+                return data;
+            }
+            var res = new T[data.Length + pad];
+            data.CopyTo(res, 0);
+            return res;
+        }
+
+
+        /// <summary>
+        /// Pads a given int length to the next padding interval.
+        /// </summary>
+        /// <param name="size"></param>
+        /// <param name="paddingTarget"></param>
+        /// <returns></returns>
+        public static int Pad(int size, int paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (size % paddingTarget);
+            if (pad == paddingTarget && !forcePadding)
+            {
+                return size;
+            }
+            return size + pad;
+        }
+
+        /// <summary>
+        /// Pads a given int length to the next padding interval.
+        /// </summary>
+        /// <param name="size"></param>
+        /// <param name="paddingTarget"></param>
+        /// <returns></returns>
+        public static long Pad(long size, long paddingTarget, bool forcePadding = false)
+        {
+            var pad = paddingTarget - (size % paddingTarget);
+            if (pad == paddingTarget && !forcePadding)
+            {
+                return size;
+            }
+            return size + pad;
+        }
+
+        /// <summary>
+        /// Compresses a single data block, returning the singular compressed byte array.
+        /// For blocks larger than 16,000, use CompressData() instead.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private static async Task<byte[]> CompressSmallData(byte[] data)
+        {
+            if (data.Length > 16000)
+            {
+                throw new Exception("CompressSmallData() data is too large.");
+            }
+
+            // Vertex Info Compression
+            var compressedData = await IOUtil.Compressor(data);
+
+            var pad = 128 - ((compressedData.Length + 16) % 128);
+            if (pad == 128)
+            {
+                pad = 0;
+            }
+
+            var paddedSize = 16 + compressedData.Length + pad;
+
+            // Pre-allocate the array.
+            List<byte> result = new List<byte>(paddedSize);
+            result.AddRange(BitConverter.GetBytes(16));
+            result.AddRange(BitConverter.GetBytes(0));
+            result.AddRange(BitConverter.GetBytes(compressedData.Length));
+            result.AddRange(BitConverter.GetBytes(data.Length));
+            result.AddRange(compressedData);
+            result.AddRange(new byte[pad]);
+
+            return result.ToArray();
+        }
+
+        /// <summary>
+        /// Zip-Compresses data, returning the compressed byte arrays in parts.
+        /// Used in SqPacking files.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        internal static async Task<List<byte[]>> CompressData(List<byte> data)
+        {
+            var partCount = (int)Math.Ceiling(data.Count / 16000f);
+            var partSizes = new List<int>(partCount);
+            var remainingDataSize = data.Count;
+
+            for (var i = 0; i < partCount; i++)
+            {
+                if (remainingDataSize >= 16000)
+                {
+                    partSizes.Add(16000);
+                    remainingDataSize -= 16000;
+                }
+                else
+                {
+                    partSizes.Add(remainingDataSize);
+                }
+            }
+
+            var parts = new List<byte[]>();
+
+            var compressionTasks = new List<Task<byte[]>>();
+            for (var i = 0; i < partCount; i++)
+            {
+                // Hand the compression task to the thread scheduler.
+                var start = i * 16000;
+                var size = partSizes[i];
+                compressionTasks.Add(Task.Run(async () => {
+                    return await CompressSmallData(data.GetRange(start, size).ToArray());
+                }));
+            }
+            await Task.WhenAll(compressionTasks);
+
+            foreach (var task in compressionTasks)
+            {
+                parts.Add(task.Result);
+            }
+
+            return parts;
+        }
+
+        /// <summary>
+        /// Partially parses (without decompressing) the SQPack file in order to determine its total length.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="offset"></param>
+        /// <returns></returns>
+        /// <exception cref="NotSupportedException"></exception>
+        internal static int GetCompressedFileSize(BinaryReader br, long offset = -1)
+        {
+            if (offset >= 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+            else
+            {
+                offset = br.BaseStream.Position;
+            }
+
+            var headerLength = br.ReadInt32();
+            var fileType = br.ReadInt32();
+            var uncompSize = br.ReadInt32();
+            var unknown = br.ReadInt32();
+            var maxBufferSize = br.ReadInt32();
+            var blockCount = br.ReadInt16();
+
+            var endOfHeader = offset + headerLength;
+
+            if (fileType != 2 && fileType != 3 && fileType != 4)
+            {
+                throw new NotSupportedException("Cannot get compressed file size of unknown type.");
+            }
+
+            int compSize = 0;
+
+            // Ok, time to parse the block headers and figure out how long the compressed data runs.
+            if (fileType == 2)
+            {
+                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+                var lastSize = 0;
+                var lastOffset = 0;
+                for (int i = 0; i < blockCount; i++)
+                {
+                    br.BaseStream.Seek(offset + (24 + (8 * i)), SeekOrigin.Begin);
+                    var blockOffset = br.ReadInt32();
+                    var blockCompressedSize = br.ReadUInt16();
+
+                    lastOffset = blockOffset;
+                    lastSize = blockCompressedSize + 16;    // 16 bytes of header data per block.
+                }
+
+                // Pretty straight forward.  Header + Total size of the compressed data.
+                compSize = headerLength + lastOffset + lastSize;
+
+            }
+            else if (fileType == 3)
+            {
+
+                // 24 byte header, then 88 bytes to the first chunk offset.
+                br.BaseStream.Seek(offset + 112, SeekOrigin.Begin);
+                var firstOffset = br.ReadInt32();
+
+                // 24 byte header, then 178 bytes to the start of the block count.
+                br.BaseStream.Seek(offset + 178, SeekOrigin.Begin);
+
+                var totalBlocks = 0;
+                for (var i = 0; i < 11; i++)
+                {
+                    // 11 Segments.  Vertex Info, Model Data, [Vertex Data x3], [Edge Data x3], [Index Data x3]
+                    totalBlocks += br.ReadUInt16();
+                }
+
+
+                // 24 byte header, then 208 bytes to the list of block sizes.
+                br.BaseStream.Seek(offset + 208, SeekOrigin.Begin);
+
+                var blockSizes = new int[totalBlocks];
+                for (var i = 0; i < totalBlocks; i++)
+                {
+                    blockSizes[i] = br.ReadUInt16();
+                }
+
+                int totalCompressedSize = 0;
+                foreach (var size in blockSizes)
+                {
+                    totalCompressedSize += size;
+                }
+
+
+                // Header + Chunk headers + compressed data.
+                compSize = headerLength + firstOffset + totalCompressedSize;
+            }
+            else if (fileType == 4)
+            {
+                br.BaseStream.Seek(endOfHeader + 4, SeekOrigin.Begin);
+                // Textures.
+                var lastOffset = 0;
+                var lastSize = 0;
+                var mipMapInfoOffset = offset + 24;
+                for (int i = 0, j = 0; i < blockCount; i++)
+                {
+                    br.BaseStream.Seek(mipMapInfoOffset + j, SeekOrigin.Begin);
+
+                    j = j + 20;
+
+                    var offsetFromHeaderEnd = br.ReadInt32();
+                    var mipMapCompressedSize = br.ReadInt32();
+
+
+                    lastOffset = offsetFromHeaderEnd;
+                    lastSize = mipMapCompressedSize;
+                }
+
+                // Pretty straight forward.  Header + Total size of the compressed data.
+                compSize = headerLength + lastOffset + lastSize;
+
+            }
+
+
+            // Round out to the nearest 256 bytes.
+            if (compSize % 256 != 0)
+            {
+                var padding = 256 - (compSize % 256);
+                compSize += padding;
+            }
+            return compSize;
+
+        }
+
+        internal static string GetDatPath(XivDataFile dataFile, int datNumber)
+        {
+            var datPath = XivDataFiles.GetFullPath(dataFile, $"{Dat.DatExtension}{datNumber}");
+            return datPath;
+        }
+
+        public static void Write3IntBuffer(List<byte> bufferTarget, uint[] dataToAdd)
+        {
+            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[0]));
+            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[1]));
+            bufferTarget.AddRange(BitConverter.GetBytes(dataToAdd[2]));
+        }
+        public static uint[] Read3IntBuffer(BinaryReader br, bool shortOnly = false)
+        {
+            uint[] data = new uint[3];
+            if (shortOnly)
+            {
+                data[0] = br.ReadUInt16();
+                data[1] = br.ReadUInt16();
+                data[2] = br.ReadUInt16();
+            }
+            else
+            {
+                data[0] = br.ReadUInt32();
+                data[1] = br.ReadUInt32();
+                data[2] = br.ReadUInt32();
+            }
+            return data;
+        }
+        public static uint[] Read3IntBuffer(byte[] body, int offset)
+        {
+            uint[] data = new uint[3];
+            data[0] = BitConverter.ToUInt32(body, offset);
+            data[1] = BitConverter.ToUInt32(body, offset + 4);
+            data[2] = BitConverter.ToUInt32(body, offset + 8);
+            return data;
+        }
+
+        // Begins decompressing a sequence of blocks in parallel
+        // Returns a list of tasks that should be passed to CompleteReadCompressedBlocks()
+        public static List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        {
+            if (blockCount == 0)
+            {
+                return new();
+            }
+
+            if (offset > 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+
+            var tasks = new List<Task<byte[]>>();
+
+            for (int i = 0; i < blockCount; i++)
+            {
+                byte[] data;
+
+                var start = br.BaseStream.Position;
+
+                // Some variety of magic numbers presumably?
+                var sixTeen = br.ReadByte();
+
+                // This is a shitty catch for old improperly spaced blocks generated by Endwalker and earlier TexTools.
+                while (sixTeen != 16 && sixTeen == 0)
+                {
+                    sixTeen = br.ReadByte();
+                }
+                var zeros = br.ReadBytes(3);
+
+                var zero = br.ReadInt32();
+
+                if (sixTeen != 16 || zero != 0 || zeros.Any(x => x != 0))
+                {
+                    throw new Exception("Unable to locate valid compressed block header.");
+                }
+
+                // Relevant info.
+                var partCompSize = br.ReadInt32();
+                var partDecompSize = br.ReadInt32();
+
+                Task<byte[]> task;
+
+                void readBlockPadding()
+                {
+                    var end = br.BaseStream.Position;
+                    var length = end - start;
+                    var targetLength = Pad((int)length, 128);
+                    var remaining = targetLength - length;
+
+                    var paddingData = br.ReadBytes((int)remaining);
+
+                    var sixTeenIndex = Array.IndexOf(paddingData, (byte)16);
+
+                    // Ugh.  This is an old broken TexTools import that has improper block spacing.
+                    // We have to rewind the stream to the start of the next block.
+                    if (sixTeenIndex != -1)
+                    {
+                        var rewind = paddingData.Length - sixTeenIndex;
+                        br.BaseStream.Position = br.BaseStream.Position - rewind;
+                    }
+                    else if (paddingData.Any(x => x != 0))
+                    {
+                        throw new Exception("Unexpected real data in compressed data block padding section.");
+                    }
+                }
+
+                if (partCompSize == 32000)
+                {
+                    data = br.ReadBytes(partDecompSize);
+                    readBlockPadding();
+                    var completedTask = new TaskCompletionSource<byte[]>();
+                    completedTask.SetResult(data);
+                    task = completedTask.Task;
+                }
+                else
+                {
+                    data = br.ReadBytes(partCompSize);
+                    readBlockPadding();
+
+                    // Not 100% sure this really needs to be shipped as Task.Run,
+                    // but Task.Run should ensure that we actually get scheduled on the thread pool
+                    // for potential new threads.
+                    task = Task.Run(async () =>
+                    {
+                        return await IOUtil.Decompressor(data, partDecompSize);
+                    });
+                }
+
+                tasks.Add(task);
+            }
+
+            return tasks;
+        }
+
+        // Completes all provided tasks from BeginReadCompressedBlocks and writes them sequentially in to destBuffer
+        // Returns the number of bytes written in to destBuffer
+        public static async Task<int> CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
+        {
+            int currentOffset = destOffset;
+            foreach (var task in tasks)
+            {
+                await task;
+                var result = task.Result;
+                result.CopyTo(destBuffer, currentOffset);
+                currentOffset += result.Length;
+            }
+
+            return currentOffset - destOffset;
+        }
+
+        public static async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
+        {
+            if (offset > 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+
+            var start = br.BaseStream.Position;
+
+
+            byte[] data;
+
+            // Some variety of magic numbers presumably?
+            var sixTeen = br.ReadByte();
+
+            // This is a shitty catch for old improperly spaced blocks generated by Endwalker and earlier TexTools.
+            while (sixTeen != 16 && sixTeen == 0)
+            {
+                sixTeen = br.ReadByte();
+            }
+            var zeros = br.ReadBytes(3);
+
+            var zero = br.ReadInt32();
+
+            if (sixTeen != 16 || zero != 0 || zeros.Any(x => x != 0))
+            {
+                throw new Exception("Unable to locate valid compressed block header.");
+            }
+
+            // Relevant info.
+            var partCompSize = br.ReadInt32();
+            var partDecompSize = br.ReadInt32();
+
+            if (partCompSize == 32000)
+            {
+                data = br.ReadBytes(partDecompSize);
+            }
+            else
+            {
+                data = await IOUtil.Decompressor(br.ReadBytes(partCompSize), partDecompSize);
+            }
+
+            var end = br.BaseStream.Position;
+            var length = end - start;
+
+            var target = Pad((int)length, 128);
+            var remaining = target - length;
+
+            var paddingData = br.ReadBytes((int)remaining);
+
+            var sixTeenIndex = Array.IndexOf(paddingData, (byte)16);
+
+            // Ugh.  This is an old broken TexTools import that has improper block spacing.
+            // We have to rewind the stream to the start of the next block.
+            if (sixTeenIndex != -1)
+            {
+                var rewind = paddingData.Length - sixTeenIndex;
+                br.BaseStream.Position = br.BaseStream.Position - rewind;
+            }
+            else if (paddingData.Any(x => x != 0))
+            {
+                throw new Exception("Unexpected real data in compressed data block padding section.");
+            }
+
+            return data;
+        }
+
+        public static async Task<byte[]> ReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        {
+            if (blockCount == 0)
+            {
+                return new byte[0];
+            }
+
+            if (offset > 0)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            }
+
+            var ret = (IEnumerable<byte>)new List<byte>();
+            for (int i = 0; i < blockCount; i++)
+            {
+                var data = await ReadCompressedBlock(br);
+                ret = ret.Concat(data);
+            }
+            return ret.ToArray();
+        }
+
+        #endregion
     }
 }

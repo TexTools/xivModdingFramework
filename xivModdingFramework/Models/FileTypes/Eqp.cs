@@ -269,7 +269,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
         private async Task<byte[]> LoadGimmickParameterFile(bool forceDefault = false, ModTransaction tx = null)
         {
-            return await Dat.ReadSqPackType2(GimmickParameterFile, forceDefault, tx);
+            return await Dat.ReadFile(GimmickParameterFile, forceDefault, tx);
         }
 
         /// <summary>
@@ -513,12 +513,12 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         private async Task<byte[]> LoadEquipmentParameterFile(bool forceDefault = false, ModTransaction tx = null)
         {
-            return await Dat.ReadSqPackType2(EquipmentParameterFile, forceDefault, tx);
+            return await Dat.ReadFile(EquipmentParameterFile, forceDefault, tx);
         }
 
 
         public async Task SaveRawEquipmentParameters(int equipmentId, BitArray entry, ModTransaction tx = null) {
-            var file = new List<byte>(await Dat.ReadSqPackType2(EquipmentParameterFile, false, tx)).ToArray();
+            var file = new List<byte>(await Dat.ReadFile(EquipmentParameterFile, false, tx)).ToArray();
 
 
             var start = (equipmentId * EquipmentParameterEntrySize);
@@ -1244,7 +1244,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            return await Dat.ReadSqPackType2(fileName, forceDefault, tx);
+            return await Dat.ReadFile(fileName, forceDefault, tx);
         }
 
         /// <summary>

@@ -38,7 +38,7 @@ namespace xivModdingFramework.General
         /// <returns></returns>
         internal static async Task ApplyRgspFile(string filePath, bool forceDefault = false, ModTransaction tx = null)
         {
-            var rgspData = await Dat.ReadSqPackType2(filePath, forceDefault, tx);
+            var rgspData = await Dat.ReadFile(filePath, forceDefault, tx);
 
             await ApplyRgspFile(rgspData, tx);
         }
@@ -190,7 +190,7 @@ namespace xivModdingFramework.General
         private static async Task<CharaMakeParameterSet> GetCharaMakeParameterSet(bool forceOriginal = false, ModTransaction tx = null)
         {
 
-            var data = await Dat.ReadSqPackType2(HumanCmpPath, forceOriginal, tx);
+            var data = await Dat.ReadFile(HumanCmpPath, forceOriginal, tx);
             var cmp = new CharaMakeParameterSet(data);
 
 

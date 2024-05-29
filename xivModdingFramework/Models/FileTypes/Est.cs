@@ -361,7 +361,7 @@ namespace xivModdingFramework.Models.FileTypes
 
         private static async Task<Dictionary<XivRace, Dictionary<ushort, ExtraSkeletonEntry>>> GetEstFile(EstType type, bool forceDefault = false, ModTransaction tx = null)
         {
-            var data = await Dat.ReadSqPackType2(EstFiles[type], forceDefault, tx);
+            var data = await Dat.ReadFile(EstFiles[type], forceDefault, tx);
 
             var count = BitConverter.ToUInt32(data, 0);
 

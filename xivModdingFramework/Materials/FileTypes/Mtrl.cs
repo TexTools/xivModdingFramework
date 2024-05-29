@@ -149,22 +149,16 @@ namespace xivModdingFramework.Materials.FileTypes
                 // Readonly tx if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
-            var mtrlOffset = await tx.Get8xDataOffset(mtrlPath, forceOriginal);
 
-            if(mtrlOffset == 0)
+            if(!await tx.FileExists(mtrlPath, forceOriginal))
             {
                 return null;
             }
 
             // Get uncompressed mtrl data
-            var df = IOUtil.GetDataFileFromPath(mtrlPath);
-            var mtrlData = await Dat.ReadSqPackType2(mtrlOffset, df, tx);
+            var mtrlData = await tx.ReadFile(mtrlPath, forceOriginal);
 
-            XivMtrl xivMtrl = null;
-            await Task.Run((Func<Task>)(async () =>
-            {
-                xivMtrl = GetXivMtrl(mtrlData, mtrlPath);
-            }));
+            XivMtrl xivMtrl = GetXivMtrl(mtrlData, mtrlPath);
 
             return xivMtrl;
         }
