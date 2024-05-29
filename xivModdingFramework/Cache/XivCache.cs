@@ -42,6 +42,9 @@ namespace xivModdingFramework.Cache
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
+
+        public delegate void WriteStateChangedEventHandler(bool newState);
+        public static event WriteStateChangedEventHandler GameWriteStateChanged;
         internal static string CacheConnectionString
         {
             get
@@ -72,6 +75,16 @@ namespace xivModdingFramework.Cache
             get
             {
                 return _gameInfo;
+            }
+        }
+
+        private static bool _GameWriteEnbled = false;
+        public static bool GameWriteEnabled {
+            get => _GameWriteEnbled;
+            set
+            {
+                _GameWriteEnbled = value;
+                GameWriteStateChanged?.Invoke(_GameWriteEnbled);
             }
         }
 
@@ -156,10 +169,9 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool enableCacheWorker = true,
-            DirectoryInfo luminaDirectory = null, bool useLumina = false)
+        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool enableCacheWorker = true)
         {
-            var gi = new GameInfo(gameDirectory, language, luminaDirectory, useLumina);
+            var gi = new GameInfo(gameDirectory, language);
             SetGameInfo(gi, enableCacheWorker);
         }
         public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
@@ -193,16 +205,7 @@ namespace xivModdingFramework.Cache
 
             Modding.CreateModlist();
 
-            if (GameInfo.UseLumina && GameInfo.LuminaDirectory != null)
-            {
-                var luminaTxSettings = new ModTransactionSettings()
-                {
-                    Target = ETransactionTarget.LuminaFolders,
-                    StorageType = EFileStorageType.UncompressedIndividual,
-                    TargetPath = GameInfo.LuminaDirectory.ToString()
-                };
-                ModTransaction.SetDefaultTransactionSettings(luminaTxSettings);
-            } else if(GameInfo != null)
+            if(GameInfo != null)
             {
                 var gameWritingTxSettings = new ModTransactionSettings()
                 {
@@ -235,6 +238,7 @@ namespace xivModdingFramework.Cache
             CacheWorkerEnabled = enableCacheWorker;
 
         }
+
 
         /// <summary>
         /// Tests if the cache needs to be rebuilt (and starts the process if it does.)

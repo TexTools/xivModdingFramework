@@ -644,9 +644,9 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task CleanUpModlistItems(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
+            if (XivCache.GameWriteEnabled)
             {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+                throw new Exception("Cannot alter game files while FFXIV file writing is disabled.");
             }
 
             progressReporter?.Report((0, 0, "Loading Modlist file..."));

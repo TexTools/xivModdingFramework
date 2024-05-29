@@ -65,6 +65,7 @@ namespace xivModdingFramework.Mods
         public EFileStorageType StorageType { get; set; }
         public ETransactionTarget Target { get; set; }
         public string TargetPath { get; set; }
+        public bool Unsafe { get; set; }
     }
     #endregion
 
@@ -438,9 +439,9 @@ namespace xivModdingFramework.Mods
         #region Constructor/Disposable Pattern
         public ModTransaction()
         {
-            throw new NotImplementedException("Mod Transactions must be created via ModTransaction.Begin()");
+            throw new NotImplementedException("Mod Transactions must be created via ModTransaction.BeginTransaction()");
         }
-        private ModTransaction(bool writeEnabled, ModPack? modpack, ModTransactionSettings? settings, bool waitToStart)
+        private ModTransaction(bool writeEnabled, ModPack? modpack, ModTransactionSettings? settings, bool waitToStart, bool safe)
         {
             ModPack = modpack;
 
@@ -462,6 +463,7 @@ namespace xivModdingFramework.Mods
                     StorageType = EFileStorageType.ReadOnly,
                     Target = ETransactionTarget.Invalid,
                     TargetPath = null,
+                    Unsafe = false,
                 };
                 State = ETransactionState.ReadOnly;
             } else
@@ -470,7 +472,11 @@ namespace xivModdingFramework.Mods
                 {
                     settings = GetDefaultSettings();
                 }
-                Settings = settings.Value;
+                var set = settings.Value; 
+
+                // Unsafe is always explicitly assigned.
+                set.Unsafe = !safe;
+                Settings = set;
 
                 if (Settings.Target == ETransactionTarget.Invalid)
                 {
@@ -493,9 +499,10 @@ namespace xivModdingFramework.Mods
                 _DataHandler = new TransactionDataHandler(EFileStorageType.UncompressedIndividual);
             }
 
-            if (waitToStart && Settings.Target == ETransactionTarget.GameFiles)
+
+            if(Settings.Target == ETransactionTarget.GameFiles && !XivCache.GameWriteEnabled && !Settings.Unsafe)
             {
-                throw new NotImplementedException("Prep-File support for game file writing is not yet implemented (Need to wrap ModList to prevent mod bashing).");
+                throw new Exception("Raw FFIV File Writing is currently disabled.");
             }
 
             State = ETransactionState.Preparing;
@@ -567,14 +574,14 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false)
+        public static ModTransaction BeginTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false, bool safe = true)
         {
 
             if (!writeEnabled)
             {
                 // Read-Only Transactions don't block anything else, and really just serve as
                 // caches for index/modlist data.
-                var readonlyTx = new ModTransaction(writeEnabled, modpack, null, false);
+                var readonlyTx = new ModTransaction(writeEnabled, modpack, null, false, true);
                 return readonlyTx;
             }
 
@@ -594,14 +601,13 @@ namespace xivModdingFramework.Mods
                 {
                     settings = GetDefaultSettings();
                 }
-                if(settings.Value.Target == ETransactionTarget.GameFiles && !Dat.AllowDatAlteration)
+                if((settings.Value.Target == ETransactionTarget.GameFiles && !Dat.AllowDatAlteration) && safe)
                 {
                     throw new Exception("Cannot open write transaction while DAT writing is disabled.");
-
                 }
             }
 
-            var tx = new ModTransaction(writeEnabled, modpack, settings, waitToStart);
+            var tx = new ModTransaction(writeEnabled, modpack, settings, waitToStart, safe);
 
 
             return tx;
@@ -667,9 +673,9 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Attempted to commit a Read Only Transaction.");
             }
 
-            if (XivCache.GameInfo.UseLumina && Settings.Target == ETransactionTarget.GameFiles)
+            if (!XivCache.GameWriteEnabled && !Settings.Unsafe && Settings.Target == ETransactionTarget.GameFiles)
             {
-                throw new Exception("Attempted to write to game files while Lumina mode was enabled.");
+                throw new Exception("Cannot write to FFXIV files while FFXIV file writing is disabled.");
             }
 
             if(closeTransaction == false && Settings.Target == ETransactionTarget.GameFiles)

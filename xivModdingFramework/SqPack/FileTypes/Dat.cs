@@ -65,7 +65,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     return false;
                 }
-                if (XivCache.GameInfo.UseLumina)
+                if (!XivCache.GameWriteEnabled)
                 {
                     return false;
                 }
@@ -577,8 +577,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var newData = (await CompressType2Data(dataToImport));
             var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, tx);
 
-            // This can be -1 after Lumina imports
-            if (newOffset == 0)
+            if (newOffset <= 0)
             {
                 throw new Exception("There was an error writing to the dat file. Offset returned was 0.");
             }
@@ -2115,7 +2114,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (!AllowDatAlteration)
                 {
-                    throw new Exception("Cannot Write file while DAT Writing is disabled.");
+                    throw new Exception("Cannot write file while DAT Writing is disabled.");
                 }
 
                 doDatSave = true;
