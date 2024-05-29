@@ -2170,9 +2170,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var offset8x = await tx.UNSAFE_WriteData(df, fileData, compressed);
                 var originalOffset = await tx.Set8xDataOffset(internalFilePath, offset8x);
                 
-
-                var fileType = BitConverter.ToInt32(fileData, 4);
-
                 ModPack? modPack;
                 if(tx.ModPack != null)
                 {
@@ -2248,7 +2245,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             finally
             {
-                if (ownBatch && tx != null)
+                if (ownBatch && tx != null && tx.IsBatchingNotifications)
                 {
                     // Ship the combined notifications only once the metadata expansion is complete, and all the data updated.
                     tx.INTERNAL_EndBatchingNotifications();

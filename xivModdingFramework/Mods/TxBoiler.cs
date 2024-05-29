@@ -55,7 +55,7 @@ namespace xivModdingFramework.Mods
             {
                 // It is not necessary to end any open batch here, as commit will already end it.
                 await ModTransaction.CommitTransaction(tx);
-            } else if (ownBatch)
+            } else if (ownBatch && tx.IsBatchingNotifications)
             {
                 tx.INTERNAL_EndBatchingNotifications();
             }

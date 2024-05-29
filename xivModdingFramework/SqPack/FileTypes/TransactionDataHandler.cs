@@ -221,7 +221,13 @@ namespace xivModdingFramework.SqPack.FileTypes
                     {
                         // This is the simplest one.  Just read the file back.
                         br.BaseStream.Seek(info.RealOffset, SeekOrigin.Begin);
-                        return br.ReadBytes(info.FileSize);
+                        if (info.StorageType == EFileStorageType.UncompressedIndividual)
+                        {
+                            return br.ReadAllBytes();
+                        } else
+                        {
+                            return br.ReadBytes(info.FileSize);
+                        }
                     } else
                     {
                         // Open file, navigate to the offset(or start of file), read and decompress SQPack file.

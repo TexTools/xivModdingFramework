@@ -318,41 +318,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var imported = new Dictionary<string, TxFileState>();
             var notImported = new HashSet<string>();
 
-            // File swaps first.
-            var i = 0;
-            foreach(var kv in option.FileSwaps)
-            {
-
-                progress?.Report((i, option.FileSwaps.Count, "Importing File Swaps from Option " + (optionIdx + 1) + "..."));
-
-                var src = kv.Key;
-
-                // For some reason the destination value is backslashed instead of forward-slashed.
-                var dest = kv.Value.Replace("\\", "/");
-
-                if (!CanImport(src) || !CanImport(dest))
-                {
-                    notImported.Add(dest);
-                    i++;
-                    continue;
-                }
-
-                // Save original state
-                if (!imported.ContainsKey(dest))
-                {
-                    imported.Add(dest, await tx.SaveFileState(dest));
-                }
-
-                // Get original SqPacked file.
-                var data = await tx.ReadFile(src, true, true);
-
-                // Write it back to TX.
-                var newOffset = await tx.WriteFile(dest, data, _Source);
-                i++;
-            }
-
             // Import files.
-            i = 0;
+            var i = 0;
             foreach (var file in option.Files)
             {
                 var internalPath = file.Key;
@@ -394,8 +361,42 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
             }
 
+
+            i = 0;
+            foreach (var kv in option.FileSwaps)
+            {
+
+                progress?.Report((i, option.FileSwaps.Count, "Importing File Swaps from Option " + (optionIdx + 1) + "..."));
+
+                var src = kv.Value.Replace("\\", "/");
+                var dest = kv.Key.Replace("\\", "/");
+
+                if (!CanImport(src) || !CanImport(dest))
+                {
+                    notImported.Add(dest);
+                    i++;
+                    continue;
+                }
+
+                // Save original state
+                if (!imported.ContainsKey(dest))
+                {
+                    imported.Add(dest, await tx.SaveFileState(dest));
+                }
+
+                byte[] data;
+                // Get original file
+                data = await tx.ReadFile(src, true, false);
+
+                // Write it back to TX for our update.
+                // Could potentially just do an index redirect, but this is safer.
+                await Dat.WriteModFile(data, dest, _Source, null, tx, false);
+                i++;
+            }
+
+
             // Setup Metadata.
-            if(option.Manipulations != null && option.Manipulations.Count > 0)
+            if (option.Manipulations != null && option.Manipulations.Count > 0)
             {
                 // RSP Options resolve by race/gender pairing.
                 var rspOptions = option.Manipulations.Select(x => x.Manipulation as PMPRspManipulationJson).Where(x => x != null);
@@ -766,45 +767,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
 
-                // File Swaps from base game files.
-                foreach (var kv in option.FileSwaps)
-                {
-                    var src = kv.Key;
-
-                    // For some reason the destination value is backslashed instead of forward-slashed.
-                    var dest = kv.Value.Replace("\\", "/");
-
-                    if (!CanImport(src) || !CanImport(dest))
-                    {
-                        continue;
-                    }
-
-                    if (!includeData)
-                    {
-                        ret.Add(src, new FileStorageInformation());
-                        continue;
-                    }
-
-
-                    // This is dangerous to hand potentially unknown code a direct file pointer to raw game files.
-                    // So we'll copy it to a temp file instead.
-
-                    // Get original SqPacked file.
-                    var data = await tx.ReadFile(src, true, true);
-                    var tempFilePath = Path.GetTempFileName();
-                    File.WriteAllBytes(tempFilePath, data);
-
-                    var fileInfo = new FileStorageInformation()
-                    {
-                        FileSize = data.Length,
-                        StorageType = EFileStorageType.CompressedIndividual,
-                        RealPath = tempFilePath,
-                        RealOffset = 0,
-                    };
-
-                    ret.Add(src, fileInfo);
-                }
-
                 // Custom Files from the .pmp Zip Archive.
                 foreach (var file in option.Files)
                 {
@@ -840,6 +802,42 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                     ret.Add(internalPath, fileInfo);
                 }
+
+                // File Swaps from base game files.
+                foreach (var kv in option.FileSwaps)
+                { 
+                    // For some reason the destination value is backslashed instead of forward-slashed.                
+                    var src = kv.Value.Replace("\\", "/");
+                    var dest = kv.Key.Replace("\\", "/");
+
+                    if (!CanImport(src) || !CanImport(dest))
+                    {
+                        continue;
+                    }
+
+                    if (!includeData)
+                    {
+                        ret.Add(src, new FileStorageInformation());
+                        continue;
+                    }
+
+                    // This is dangerous to hand potentially unknown code a direct file pointer to raw game files.
+                    // So we'll copy it to a temp file instead.
+                    var data = await tx.ReadFile(src, true, true);
+                    var tempFilePath = Path.GetTempFileName();
+                    File.WriteAllBytes(tempFilePath, data);
+
+                    var fileInfo = new FileStorageInformation()
+                    {
+                        FileSize = data.Length,
+                        StorageType = EFileStorageType.CompressedIndividual,
+                        RealPath = tempFilePath,
+                        RealOffset = 0,
+                    };
+
+                    ret.Add(src, fileInfo);
+                }
+
 
                 // Metadata files.
                 if (option.Manipulations != null && option.Manipulations.Count > 0)
@@ -1313,10 +1311,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <returns></returns>
         internal static async Task ResolveDuplicates(Dictionary<Guid, FileIdentifier> files, EFileStorageType defaultStorageType = EFileStorageType.CompressedIndividual)
         {
-            var pmpPathDict = new Dictionary<Guid, string>();
             using var sha1 = SHA1.Create();
 
-            // Mapping [Hash Key] => ...some file path?
+            // Internal Path => Sha Key
+            var pmpPathDict = new Dictionary<string, TTMPWriter.SHA1HashKey>();
+            // Sha Key => Out File.
             var seenFiles = new Dictionary<TTMPWriter.SHA1HashKey, string>();
 
             var idx = 1;
@@ -1338,24 +1337,23 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
                 var dedupeHash = new SHA1HashKey(sha1.ComputeHash(data));
-                var pmpPath = path;
+                var pmpPath = f.OptionPrefix + path;
 
                 if (seenFiles.ContainsKey(dedupeHash))
                 {
                     // Shift the target path into the common folder if we're used in multiple places.
-                    if (!seenFiles[dedupeHash].StartsWith("/common/"))
+                    if (!seenFiles[dedupeHash].StartsWith("common/"))
                     {
-                        seenFiles[dedupeHash] = "/common/" + idx.ToString() + "/" + Path.GetFileName(seenFiles[dedupeHash]);
+                        seenFiles[dedupeHash] = "common/" + idx.ToString() + "/" + Path.GetFileName(seenFiles[dedupeHash]);
                         idx++;
                     }
-
-                    pmpPath = f.OptionPrefix + seenFiles[dedupeHash];
                 }
                 else
                 {
-                    seenFiles.Add(dedupeHash, path);
+                    seenFiles.Add(dedupeHash, pmpPath);
                 }
-                pmpPathDict.Add(id, pmpPath);
+                pmpPath = seenFiles[dedupeHash];
+                pmpPathDict.Add(path, dedupeHash);
             }
 
 
@@ -1363,7 +1361,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             // Could do this more efficiently, but whatever.  Perf impact is de minimis.
             foreach(var fkv in files)
             {
-                files[fkv.Key].PmpPath = pmpPathDict[fkv.Key];
+                var hash = pmpPathDict[fkv.Value.Path];
+                var pmpPath = seenFiles[hash];
+                files[fkv.Key].PmpPath = pmpPath;
             }
         }
     }
@@ -1375,7 +1375,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public Guid Id = Guid.NewGuid();
         public string OptionPrefix = "";
 
-        public static Dictionary<Guid, FileIdentifier> IdentifierListFromDictionary(Dictionary<string, FileStorageInformation> files, string optionPrefix = "/files")
+        public static Dictionary<Guid, FileIdentifier> IdentifierListFromDictionary(Dictionary<string, FileStorageInformation> files, string optionPrefix = "")
         {
             var dict = new Dictionary<Guid, FileIdentifier>(files.Count);
             foreach (var f in files)

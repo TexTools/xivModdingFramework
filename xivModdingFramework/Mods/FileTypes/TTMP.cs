@@ -1153,7 +1153,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         public static async Task<Dictionary<string, FileStorageInformation>> ModPackToSimpleFileList(string modpackPath, bool includeData = true, ModTransaction tx = null)
         {
-            if (!File.Exists(modpackPath))
+            if (!File.Exists(modpackPath) && !Directory.Exists(modpackPath))
                 return null;
 
             if (modpackPath.EndsWith(".pmp") || modpackPath.EndsWith(".json") || modpackPath.EndsWith("/"))

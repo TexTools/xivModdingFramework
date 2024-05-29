@@ -686,11 +686,14 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Game File transactions must be closed on commit.");
             }
 
+            if(State != ETransactionState.Open)
+            {
+                throw new Exception("Cannot commit Transcation that is not in the Open state.");
+            }
+
 
             State = ETransactionState.Working;
 
-            // Batched notifications are irrelevant here since we're about to send out notifications from the commit phase.
-            BatchedNotifications = null;
 
             CheckWriteTimes();
 
@@ -838,15 +841,18 @@ namespace xivModdingFramework.Mods
                 }
                 var end = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                 var duration = end - start;
-                var z = "dfas";
 
+                // Reset notification batching to avoid double sends.
+                BatchedNotifications = null;
             }
+
 
             TransactionCommitted?.Invoke(this);
             if(ActiveTransaction == this)
             {
                 ActiveTransactionCommitted?.Invoke(this);
             }
+
             return true;
         }
 
