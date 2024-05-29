@@ -27,6 +27,9 @@ using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using SharpDX.Direct2D1;
 using xivModdingFramework.Variants.FileTypes;
+using System.Runtime.CompilerServices;
+using static xivModdingFramework.Mods.TTMPWriter;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -496,28 +499,130 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return true;
         }
 
+
+
         /// <summary>
+        /// Creates a simple single-option PMP from a given dictionary of file information at the target filepath.
         /// </summary>
-        public static Task CreatePMP(string destination, IModPackData data)
+        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos)
         {
-            throw new NotImplementedException();
+            if (!destination.ToLower().EndsWith(".pmp"))
+            {
+                throw new Exception("PMP Export must have .pmp extension.");
+            }
+
+            var workingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            try
+            {
+                Directory.CreateDirectory(workingPath);
+
+                var pmp = new PMPJson()
+                {
+                    Meta = new PMPMetaJson(),
+                    Groups = new List<PMPGroupJson>(),
+                    DefaultMod = new PMPOptionJson(),
+                };
+
+
+                var files = FileIdentifier.IdentifierListFromDictionary(fileInfos);
+                await PMPExtensions.ResolveDuplicates(files);
+
+                pmp.DefaultMod = await CreatePmpOption(workingPath, "Default", "The only option.", files.Values);
+
+                pmp.Meta.Author = modpackMeta.Author;
+                pmp.Meta.Name = modpackMeta.Name;
+                pmp.Meta.Description = modpackMeta.Description;
+                pmp.Meta.FileVersion = 3;
+                pmp.Meta.Version = modpackMeta.Version.ToString();
+                pmp.Meta.Website = modpackMeta.Url;
+
+
+                await WritePmp(pmp, workingPath, destination);
+            }
+            finally
+            {
+                IOUtil.DeleteTempDirectory(workingPath);
+            }
         }
 
-        public static Task<PMPOptionJson> CreatePmpOption(string name, string description, Dictionary<string, FileStorageInformation> fileInfos)
+        /// <summary>
+        /// Writes out the fully completed PMP json files, and optionally zips the final folder into a pmp.
+        /// </summary>
+        /// <param name="pmp"></param>
+        /// <param name="workingDirectory"></param>
+        /// <param name="zipPath"></param>
+        /// <returns></returns>
+        private static async Task WritePmp(PMPJson pmp, string workingDirectory, string zipPath = null)
+        {
+            var metapath = Path.Combine(workingDirectory, "meta.json");
+            var defaultModPath = Path.Combine(workingDirectory, "default_mod.json");
+
+            var metaString = JsonConvert.SerializeObject(pmp.Meta, Formatting.Indented);
+            File.WriteAllText(metapath, metaString);
+
+            var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
+            File.WriteAllText(defaultModPath, defaultModString);
+
+            for(int i = 0; i < pmp.Groups.Count; i++)
+            {
+                var gName = pmp.Groups[i].Name.ToLower();
+                var groupPath = Path.Combine(workingDirectory, "group_" + i.ToString("D3") + "_" + gName);
+                var groupString = JsonConvert.SerializeObject(gName, Formatting.Indented);
+                File.WriteAllText(groupPath, groupString);
+            }
+
+            if(zipPath != null)
+            {
+                File.Delete(zipPath);
+                System.IO.Compression.ZipFile.CreateFromDirectory(workingDirectory, zipPath);
+            }
+        }
+
+        public static async Task<PMPOptionJson> CreatePmpOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files)
         {
             var opt = new PMPOptionJson()
             {
                 Name = name,
                 Description = description,
+                Files = new Dictionary<string, string>(),
+                FileSwaps = new Dictionary<string, string>(),
+                Manipulations = new List<PMPMetaManipulationJson>(),
             };
 
-            foreach(var kv in fileInfos)
+            // TODO - Could paralell this? Unsure how big the gains would really be though,
+            // since the primary tasks are already paralelled internally, and there's little else heavy going on.
+            foreach(var fi in files)
             {
-                var path = kv.Key;
-                var info = kv.Value;
-                //TransactionDataHandler
+                var data = await TransactionDataHandler.GetUncompressedFile(fi.Info);
+                if (fi.Path.EndsWith(".meta"))
+                {
+                    var meta = await ItemMetadata.Deserialize(data);
+                    opt.Manipulations.AddRange(PMPExtensions.MetadataToManipulations(meta));
+                } 
+                else if (fi.Path.EndsWith(".rgsp"))
+                {
+                    var rgsp = new RacialGenderScalingParameter(data);
+                    opt.Manipulations.AddRange(PMPExtensions.RgspToManipulations(rgsp));
+                } 
+                else if (IOUtil.IsMetaInternalFile(fi.Path))
+                {
+                    // We don't allow writing these out directly, as it rapidly becomes chaos.
+                    continue;
+                } 
+                else
+                { 
+                    var writePath = Path.Combine(workingPath, fi.PmpPath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(writePath));
+                    File.WriteAllBytes(writePath, data);
+
+                    // Penumbra likes backslashes?  Or do they write with system separator?
+                    // Path.DirectorySeparatorChar
+                    opt.Files.Add(fi.Path, fi.PmpPath.Replace("/", "\\"));
+                    //opt.Files.Add(fi.Path, fi.PmpPath.Replace('/', Path.DirectorySeparatorChar));
+                }
+
             }
-            throw new NotImplementedException();
+            return opt;
         }
 
 
@@ -1046,6 +1151,34 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             => xivRace switch
             {
                 XivRace.Hyur_Midlander_Male => (PMPModelRace.Midlander, PMPGender.Male),
+                XivRace.Hyur_Midlander_Female => (PMPModelRace.Midlander, PMPGender.Female),
+
+                XivRace.Hyur_Highlander_Male => (PMPModelRace.Highlander, PMPGender.Male),
+                XivRace.Hyur_Highlander_Female => (PMPModelRace.Highlander, PMPGender.Female),
+
+                XivRace.Elezen_Male => (PMPModelRace.Elezen, PMPGender.Male),
+                XivRace.Elezen_Female => (PMPModelRace.Elezen, PMPGender.Female),
+
+                XivRace.Roegadyn_Male => (PMPModelRace.Roegadyn, PMPGender.Male),
+                XivRace.Roegadyn_Female => (PMPModelRace.Roegadyn, PMPGender.Female),
+
+                XivRace.Miqote_Male => (PMPModelRace.Miqote, PMPGender.Male),
+                XivRace.Miqote_Female => (PMPModelRace.Miqote, PMPGender.Female),
+
+                XivRace.Lalafell_Male => (PMPModelRace.Lalafell, PMPGender.Male),
+                XivRace.Lalafell_Female => (PMPModelRace.Lalafell, PMPGender.Female),
+
+                XivRace.AuRa_Male => (PMPModelRace.AuRa, PMPGender.Male),
+                XivRace.AuRa_Female => (PMPModelRace.AuRa, PMPGender.Female),
+
+                XivRace.Viera_Male => (PMPModelRace.Viera, PMPGender.Male),
+                XivRace.Viera_Female => (PMPModelRace.Viera, PMPGender.Female),
+
+                XivRace.Hrothgar_Male => (PMPModelRace.Hrothgar, PMPGender.Male),
+#if DAWNTRAIL
+                XivRace.Hrothgar_Female => (PMPModelRace.Hrothgar, PMPGender.Female),
+#endif
+
                 _ => (PMPModelRace.Unknown, PMPGender.Unknown)
             };
 
@@ -1104,6 +1237,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 _ => PMPGender.Unknown,
             };
 
+        public static List<PMPMetaManipulationJson> RgspToManipulations(RacialGenderScalingParameter rgsp)
+        {
+            var ret = new List<PMPMetaManipulationJson>();
+            var entries = PMPRspManipulationJson.FromRgspEntry(rgsp);
+            foreach(var e in entries)
+            {
+                var entry = new PMPMetaManipulationJson() { Type = "Rsp" };
+                entry.Manipulation = e;
+                ret.Add(entry);
+            }
+            return ret;
+        }
         public static List<PMPMetaManipulationJson> MetadataToManipulations(ItemMetadata m)
         {
             var ret = new List<PMPMetaManipulationJson>();
@@ -1111,14 +1256,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             if (m.GmpEntry != null)
             {
-                var entry = new PMPMetaManipulationJson() { Type = "GMP" };
+                var entry = new PMPMetaManipulationJson() { Type = "Gmp" };
                 entry.Manipulation = PMPGmpManipulationJson.FromGmpEntry(m.GmpEntry, root);
                 ret.Add(entry);
             }
 
             if(m.EqpEntry != null)
             {
-                var entry = new PMPMetaManipulationJson() { Type = "EQP" };
+                var entry = new PMPMetaManipulationJson() { Type = "Eqp" };
                 entry.Manipulation = PMPEqpManipulationJson.FromEqpEntry(m.EqpEntry, root);
                 ret.Add(entry);
             }
@@ -1127,7 +1272,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 foreach(var est in m.EstEntries)
                 {
-                    var entry = new PMPMetaManipulationJson() { Type = "EST" };
+                    var entry = new PMPMetaManipulationJson() { Type = "Est" };
                     entry.Manipulation = PMPEstManipulationJson.FromEstEntry(est.Value, root.Slot);
                     ret.Add(entry);
                 }
@@ -1136,7 +1281,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             if(m.EqdpEntries != null && m.EqdpEntries.Count > 0)
             {
                 foreach (var eqdp in m.EqdpEntries) {
-                    var entry = new PMPMetaManipulationJson() { Type = "EQDP" };
+                    var entry = new PMPMetaManipulationJson() { Type = "Eqdp" };
                     entry.Manipulation = PMPEqdpManipulationJson.FromEqdpEntry(eqdp.Value, root, eqdp.Key);
                     ret.Add(entry);
                 }
@@ -1146,7 +1291,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 for(int i = 0; i < m.ImcEntries.Count; i++)
                 {
-                    var entry = new PMPMetaManipulationJson() { Type = "IMC" };
+                    var entry = new PMPMetaManipulationJson() { Type = "Imc" };
                     entry.Manipulation = PMPImcManipulationJson.FromImcEntry(m.ImcEntries[i], i, root);
                     ret.Add(entry);
                 }
@@ -1154,8 +1299,95 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             return ret;
         }
+
+
+        /// <summary>
+        /// Resolves duplicate files and assigns PMP zip paths to all of the file Identifiers.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <param name="defaultStorageType"></param>
+        /// <returns></returns>
+        internal static async Task ResolveDuplicates(Dictionary<Guid, FileIdentifier> files, EFileStorageType defaultStorageType = EFileStorageType.CompressedIndividual)
+        {
+            var pmpPathDict = new Dictionary<Guid, string>();
+            using var sha1 = SHA1.Create();
+
+            // Mapping [Hash Key] => ...some file path?
+            var seenFiles = new Dictionary<TTMPWriter.SHA1HashKey, string>();
+
+            var idx = 1;
+            foreach(var fkv in files)
+            {
+                var f = fkv.Value;
+                var path = f.Path;
+                var info = f.Info;
+                var id = f.Id;
+
+                byte[] data;
+                if (defaultStorageType == EFileStorageType.CompressedIndividual || defaultStorageType == EFileStorageType.CompressedBlob)
+                {
+                    // Which we use here doesn't ultimately matter, but one will be faster than the other, depending on the way *most* files were stored.
+                    data = await TransactionDataHandler.GetCompressedFile(info);
+                } else
+                {
+                    data = await TransactionDataHandler.GetUncompressedFile(info);
+                }
+
+                var dedupeHash = new SHA1HashKey(sha1.ComputeHash(data));
+                var pmpPath = path;
+
+                if (seenFiles.ContainsKey(dedupeHash))
+                {
+                    // Shift the target path into the common folder if we're used in multiple places.
+                    if (!seenFiles[dedupeHash].StartsWith("/common/"))
+                    {
+                        seenFiles[dedupeHash] = "/common/" + idx.ToString() + "/" + Path.GetFileName(seenFiles[dedupeHash]);
+                        idx++;
+                    }
+
+                    pmpPath = f.OptionPrefix + seenFiles[dedupeHash];
+                }
+                else
+                {
+                    seenFiles.Add(dedupeHash, path);
+                }
+                pmpPathDict.Add(id, pmpPath);
+            }
+
+
+            // Re-loop to assign the final paths.
+            // Could do this more efficiently, but whatever.  Perf impact is de minimis.
+            foreach(var fkv in files)
+            {
+                files[fkv.Key].PmpPath = pmpPathDict[fkv.Key];
+            }
+        }
     }
-    #endregion
+    public class FileIdentifier
+    {
+        public FileStorageInformation Info;
+        public string Path;
+        public string PmpPath;
+        public Guid Id = Guid.NewGuid();
+        public string OptionPrefix = "";
+
+        public static Dictionary<Guid, FileIdentifier> IdentifierListFromDictionary(Dictionary<string, FileStorageInformation> files, string optionPrefix = "/files")
+        {
+            var dict = new Dictionary<Guid, FileIdentifier>(files.Count);
+            foreach (var f in files)
+            {
+                var fi = new FileIdentifier()
+                {
+                    Path = f.Key,
+                    Info = f.Value,
+                    OptionPrefix = optionPrefix,
+                };
+                dict.Add(fi.Id, fi);
+            }
+            return dict;
+        }
+    }
+#endregion
 
     #region Penumbra Simple JSON Classes
     public class PMPJson
@@ -1545,7 +1777,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var size = EquipmentParameterSet.EntrySizes[entry.Slot];
 
             // Re-shift the value for Penumbra.
-            ulong value = BitConverter.ToUInt64(entry.GetBytes(), 0);
+            var arr = new byte[8];
+            var ebytes = entry.GetBytes();
+            Array.Copy(ebytes, 0, arr, 0, ebytes.Length);
+
+            ulong value = BitConverter.ToUInt64(arr, 0);
             value = (ulong)(value << offset * 8);
 
             var pEntry = new PMPEqpManipulationJson()

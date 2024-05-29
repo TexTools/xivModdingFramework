@@ -17,6 +17,8 @@ using xivModdingFramework.Mods.FileTypes;
 using System.ComponentModel.Design;
 using System.Linq;
 using System.Diagnostics;
+using xivModdingFramework.Mods.FileTypes.PMP;
+using xivModdingFramework.Mods.Interfaces;
 
 namespace xivModdingFramework.SqPack.FileTypes
 {
@@ -693,6 +695,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                                 continue;
                             }
 
+                            if (IOUtil.IsMetaInternalFile(path))
+                            {
+                                // These don't go out in this format.
+                                continue;
+                            }
+
                             // Bind the offsets for paths/mod objects for the TTMP writer.
                             var mod = mList.GetMod(path);
                             var md = new SimpleModData();
@@ -716,7 +724,70 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToPMP(ModTransaction tx, ModTransactionSettings settings)
         {
-            throw new NotImplementedException("PMP Export not yet implemented. :(");
+            if (!settings.TargetPath.EndsWith(".pmp"))
+            {
+                // Directory instead of file path.
+                var fileName = "transaction.pmp";
+                settings.TargetPath = Path.Combine(settings.TargetPath, fileName);
+            }
+
+            var dir = Path.GetDirectoryName(settings.TargetPath);
+            Directory.CreateDirectory(dir);
+
+            var dict = await GetFinalWriteList(tx);
+
+            var mpack = new BaseModpackData()
+            {
+                Author = "Unknown",
+                Name = "Transaction Modpack",
+                Version = new Version("1.0"),
+                Description = "A Penumbra Modpack created from a TexTools transaction."
+            };
+
+            await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict);
+
+
+            // Don't have real offsets to update to, since we don't write to game files.
+            return null;
+        }
+
+        protected async virtual Task<Dictionary<string, FileStorageInformation>> GetFinalWriteList(ModTransaction tx)
+        {
+            var dict = new Dictionary<string, FileStorageInformation>();
+
+            foreach (var dkv in OffsetMapping)
+            {
+                var df = dkv.Key;
+                var files = dkv.Value;
+                if (files.Count == 0) continue;
+                var index = await tx.GetIndexFile(df);
+
+                foreach (var fkv in files)
+                {
+                    var tempOffset = fkv.Key;
+                    var file = fkv.Value;
+
+                    // Get the live paths this file is being used in...
+                    var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
+                    foreach (var path in paths)
+                    {
+                        if (tx.IsPrepFile(path))
+                        {
+                            // Prep files don't get written to final product.
+                            continue;
+                        }
+
+                        if (IOUtil.IsMetaInternalFile(path))
+                        {
+                            // These don't go out in this format.
+                            continue;
+                        }
+
+                        dict.Add(path, file);
+                    }
+                }
+            }
+            return dict;
         }
 
 

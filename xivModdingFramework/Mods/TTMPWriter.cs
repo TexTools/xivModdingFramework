@@ -231,7 +231,7 @@ namespace xivModdingFramework.Mods
             return modsJson;
         }
 
-        private struct SHA1HashKey
+        internal struct SHA1HashKey
         {
             public ulong A;
             public ulong B;

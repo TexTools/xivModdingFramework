@@ -29,4 +29,17 @@ namespace xivModdingFramework.Mods.Interfaces
         /// </summary>
         public string Url { get; set; }
     }
+
+    /// <summary>
+    /// Baseline modpack data, just used for handling metadata.
+    /// Only used in PMP creation currently.
+    /// </summary>
+    public class BaseModpackData : IModPackData
+    {
+        public string Name { get; set; }
+        public string Author { get; set; }
+        public Version Version { get; set; }
+        public string Description { get; set; }
+        public string Url { get; set; }
+    }
 }
