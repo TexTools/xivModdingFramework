@@ -28,13 +28,16 @@ namespace xivModdingFramework.Mods
         GameFiles,
 
         // Write the modified files to the given folder on transaction commit, in Lumina-style folder chains.
-        LuminaFolders,
+        FolderTree,
 
         // Write the modified files to a TTMP at the given destination on transaction commit.
         TTMP,
 
         // Write the modified files to PMP file at the given destination on transaction commit.
-        PMP
+        PMP,
+
+        // Write the modified files to a Penumbra style mod folder, and auto-queue a Penumbra Refresh after.
+        PenumbraModFolder,
     }
 
     public enum ETransactionState

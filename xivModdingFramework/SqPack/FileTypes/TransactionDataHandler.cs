@@ -543,7 +543,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 return await WriteToGameFiles(tx, settings, openSlots);
             } 
-            else if(settings.Target == ETransactionTarget.LuminaFolders)
+            else if(settings.Target == ETransactionTarget.FolderTree)
             {
                 return await WriteToLuminaFolders(tx, settings);
             }
@@ -551,9 +551,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 return await WriteToTTMP(tx, settings);
             }
-            if (settings.Target == ETransactionTarget.PMP)
+            else if (settings.Target == ETransactionTarget.PMP)
             {
                 return await WriteToPMP(tx, settings);
+            }
+            else if (settings.Target == ETransactionTarget.PenumbraModFolder)
+            {
+                return await WriteToPenumbraModFolder(tx, settings);
             }
             throw new InvalidDataException("Invalid Transaction Target");
         }
@@ -739,7 +743,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var mpack = new BaseModpackData()
             {
                 Author = "Unknown",
-                Name = "Transaction Modpack",
+                Name = Path.GetFileNameWithoutExtension(settings.TargetPath),
                 Version = new Version("1.0"),
                 Description = "A Penumbra Modpack created from a TexTools transaction."
             };
@@ -751,6 +755,47 @@ namespace xivModdingFramework.SqPack.FileTypes
             return null;
         }
 
+        private async Task<Dictionary<string, (long RealOffset, long TempOffset)>> WriteToPenumbraModFolder(ModTransaction tx, ModTransactionSettings settings)
+        {
+
+            var dir = settings.TargetPath;
+            Directory.CreateDirectory(dir);
+
+            var di = new DirectoryInfo(dir);
+
+            var i = 0;
+            if (di.EnumerateDirectories().Count() > 10)
+            {
+                // Sus...
+                throw new Exception("Target Penumbra Mod Directory seems invalid.  Please select an individual Penumbra mod folder or create a blank folder.");
+            }
+
+            var files = di.EnumerateFiles();
+            if (files.Any(x => x.Extension.ToLower() != ".json"))
+            {
+                // Sus...
+                throw new Exception("Target Penumbra Mod Directory seems invalid.  Please select an individual Penumbra mod folder or create a blank folder.");
+            }
+
+            var dict = await GetFinalWriteList(tx);
+
+            var pathName = di.Name;
+            var mpack = new BaseModpackData()
+            {
+                Author = "Unknown",
+                Name = di.Name,
+                Version = new Version("1.0"),
+                Description = "A Penumbra Modpack created from a TexTools transaction."
+            };
+
+            await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict, false);
+
+            await PenumbraAPI.ReloadMod(di.Name);
+            await PenumbraAPI.Redraw();
+
+            // Don't have real offsets to update to, since we don't write to game files.
+            return null;
+        }
         protected async virtual Task<Dictionary<string, FileStorageInformation>> GetFinalWriteList(ModTransaction tx)
         {
             var dict = new Dictionary<string, FileStorageInformation>();

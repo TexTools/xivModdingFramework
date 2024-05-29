@@ -33,9 +33,16 @@ namespace xivModdingFramework.Helpers
         {
             Dictionary<string, string> args = new Dictionary<string, string>();
 
-            args.Add("Name", name);
-            args.Add("Path", path);
-            return await Request("/redraw", args);
+            if (name != null)
+            {
+                args.Add("Name", name);
+            }
+            if (path != null)
+            {
+                args.Add("Path", path);
+            }
+
+            return await Request("/reloadmod", args);
         }
 
         private static HttpClient _Client = new HttpClient() { BaseAddress = new System.Uri("http://localhost:42069") };

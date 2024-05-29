@@ -504,14 +504,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Creates a simple single-option PMP from a given dictionary of file information at the target filepath.
         /// </summary>
-        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos)
+        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, bool zip = true)
         {
-            if (!destination.ToLower().EndsWith(".pmp"))
+            if (!destination.ToLower().EndsWith(".pmp") && zip)
             {
                 throw new Exception("PMP Export must have .pmp extension.");
             }
 
-            var workingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            var workingPath = destination;
+            if (zip)
+            {
+                workingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            }
             try
             {
                 Directory.CreateDirectory(workingPath);
@@ -537,7 +541,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 pmp.Meta.Website = modpackMeta.Url;
 
 
-                await WritePmp(pmp, workingPath, destination);
+                await WritePmp(pmp, workingPath, zip ? destination : null);
             }
             finally
             {
@@ -1131,7 +1135,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             // Accessory
             { PMPEquipSlot.Ears, "ear" },
             { PMPEquipSlot.Neck, "nek" },
-            { PMPEquipSlot.Wrists, "wri" },
+            { PMPEquipSlot.Wrists, "wrs" },
             { PMPEquipSlot.RFinger, "rir" },
             { PMPEquipSlot.LFinger, "ril" },
         };
