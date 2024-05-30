@@ -470,10 +470,15 @@ namespace xivModdingFramework.Helpers
                 return;
             }
 
-            var opt = PmpInfo.DefaultMod;
+            var opt = PmpInfo.DefaultMod as PmpStandardOptionJson;
             if (PmpInfo.Groups.Count > 0)
             {
-                opt = PmpInfo.Groups[0].Options[0];
+                opt = PmpInfo.Groups[0].Options[0] as PmpStandardOptionJson;
+            }
+
+            if(opt == null)
+            {
+                throw new NotImplementedException();
             }
 
             foreach (var swap in opt.Files)

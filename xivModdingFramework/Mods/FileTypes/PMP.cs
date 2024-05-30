@@ -30,6 +30,7 @@ using xivModdingFramework.Variants.FileTypes;
 using System.Runtime.CompilerServices;
 using static xivModdingFramework.Mods.TTMPWriter;
 using System.Security.Cryptography;
+using JsonSubTypes;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -92,8 +93,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var metaPath = Path.Combine(path, "meta.json");
 
             var text = File.ReadAllText(metaPath);
-            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text, new PMPMetaManipulationConverter());
-            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath), new PMPMetaManipulationConverter());
+            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text);
+
+
+            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath));
 
             var groups = new List<PMPGroupJson>();
 
@@ -316,10 +319,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
-        private static async Task<(Dictionary<string, TxFileState> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson option, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int optionIdx = 0)
+        private static async Task<(Dictionary<string, TxFileState> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson baseOption, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int optionIdx = 0)
         {
             var imported = new Dictionary<string, TxFileState>();
             var notImported = new HashSet<string>();
+
+            var option = baseOption as PmpStandardOptionJson;
+
+            if(option == null)
+            {
+                throw new NotImplementedException();
+            }
 
             // Import files.
             var i = 0;
@@ -402,7 +412,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             if (option.Manipulations != null && option.Manipulations.Count > 0)
             {
                 // RSP Options resolve by race/gender pairing.
-                var rspOptions = option.Manipulations.Select(x => x.Manipulation as PMPRspManipulationJson).Where(x => x != null);
+                var rspOptions = option.Manipulations.Select(x => x.GetManipulation() as PMPRspManipulationJson).Where(x => x != null);
                 var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
 
                 i = 0;
@@ -439,7 +449,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
                 // Metadata.
-                var metaOptions = option.Manipulations.Select(x => x.Manipulation as IPMPItemMetadata).Where(x => x != null);
+                var metaOptions = option.Manipulations.Select(x => x.GetManipulation() as IPMPItemMetadata).Where(x => x != null);
 
                 var byRoot = metaOptions.GroupBy(x => x.GetRoot());
 
@@ -588,7 +598,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         public static async Task<PMPOptionJson> CreatePmpOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files)
         {
-            var opt = new PMPOptionJson()
+            var opt = new PmpStandardOptionJson()
             {
                 Name = name,
                 Description = description,
@@ -667,8 +677,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var pmpAndPath = await LoadPMP(modpackPath, true);
                 var pmp = pmpAndPath.pmp;
 
-                var defMod = pmp.DefaultMod;
-                PMPOptionJson option = null;
+                var defMod = pmp.DefaultMod as PmpStandardOptionJson;
+                PmpStandardOptionJson option = null;
                 if (defMod != null && (defMod.FileSwaps.Count > 0 || defMod.Manipulations.Count > 0 || defMod.Files.Count > 0))
                 {
                     // Valid Default Mod Option
@@ -681,7 +691,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         var group = pmp.Groups[0];
                         if (group.Options.Count == 1)
                         {
-                            option = group.Options[0];
+                            option = group.Options[0] as PmpStandardOptionJson;
                         }
                     }
                 }
@@ -708,8 +718,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <param name="pmpPath"></param>
         /// <returns></returns>
         /// <exception cref="NotImplementedException"></exception>
-        public static async Task<Dictionary<string, FileStorageInformation>> UnpackPmpOption(PMPOptionJson option, string pmpPath, bool includeData = true, ModTransaction tx = null)
+        public static async Task<Dictionary<string, FileStorageInformation>> UnpackPmpOption(PMPOptionJson baseOption, string pmpPath, bool includeData = true, ModTransaction tx = null)
         {
+
+            var option = baseOption as PmpStandardOptionJson;
+
+            if (option == null)
+            {
+                throw new NotImplementedException();
+            }
+
             // Task wrapper since we might be doing some heavy lifting.
             return await Task.Run(async () =>
             {
@@ -846,7 +864,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (option.Manipulations != null && option.Manipulations.Count > 0)
                 {
                     // RSP Options resolve by race/gender pairing.
-                    var rspOptions = option.Manipulations.Select(x => x.Manipulation as PMPRspManipulationJson).Where(x => x != null);
+                    var rspOptions = option.Manipulations.Select(x => x.GetManipulation() as PMPRspManipulationJson).Where(x => x != null);
                     var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
 
                     var total = byRg.Count();
@@ -880,7 +898,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
 
                     // Metadata.
-                    var metaOptions = option.Manipulations.Select(x => x.Manipulation as IPMPItemMetadata).Where(x => x != null);
+                    var metaOptions = option.Manipulations.Select(x => x.GetManipulation() as IPMPItemMetadata).Where(x => x != null);
                     var byRoot = metaOptions.GroupBy(x => x.GetRoot());
                     total = byRoot.Count();
 
@@ -1248,8 +1266,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var entries = PMPRspManipulationJson.FromRgspEntry(rgsp);
             foreach(var e in entries)
             {
-                var entry = new PMPMetaManipulationJson() { Type = "Rsp" };
-                entry.Manipulation = e;
+                var entry = new PMPRspManipulationWrapperJson() { Type = "Rsp" };
+                entry.SetManipulation(e);
                 ret.Add(entry);
             }
             return ret;
@@ -1261,15 +1279,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             if (m.GmpEntry != null)
             {
-                var entry = new PMPMetaManipulationJson() { Type = "Gmp" };
-                entry.Manipulation = PMPGmpManipulationJson.FromGmpEntry(m.GmpEntry, root);
+                var entry = new PMPGmpManipulationWrapperJson() { Type = "Gmp" };
+                entry.SetManipulation(PMPGmpManipulationJson.FromGmpEntry(m.GmpEntry, root));
                 ret.Add(entry);
             }
 
             if(m.EqpEntry != null)
             {
-                var entry = new PMPMetaManipulationJson() { Type = "Eqp" };
-                entry.Manipulation = PMPEqpManipulationJson.FromEqpEntry(m.EqpEntry, root);
+                var entry = new PMPEqdpManipulationWrapperJson() { Type = "Eqp" };
+                entry.SetManipulation(PMPEqpManipulationJson.FromEqpEntry(m.EqpEntry, root));
                 ret.Add(entry);
             }
 
@@ -1277,8 +1295,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 foreach(var est in m.EstEntries)
                 {
-                    var entry = new PMPMetaManipulationJson() { Type = "Est" };
-                    entry.Manipulation = PMPEstManipulationJson.FromEstEntry(est.Value, root.Slot);
+                    var entry = new PMPEstManipulationWrapperJson() { Type = "Est" };
+                    entry.SetManipulation(PMPEstManipulationJson.FromEstEntry(est.Value, root.Slot));
                     ret.Add(entry);
                 }
             }
@@ -1286,8 +1304,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             if(m.EqdpEntries != null && m.EqdpEntries.Count > 0)
             {
                 foreach (var eqdp in m.EqdpEntries) {
-                    var entry = new PMPMetaManipulationJson() { Type = "Eqdp" };
-                    entry.Manipulation = PMPEqdpManipulationJson.FromEqdpEntry(eqdp.Value, root, eqdp.Key);
+                    var entry = new PMPEqdpManipulationWrapperJson() { Type = "Eqdp" };
+                    entry.SetManipulation(PMPEqdpManipulationJson.FromEqdpEntry(eqdp.Value, root, eqdp.Key));
                     ret.Add(entry);
                 }
             }
@@ -1296,8 +1314,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 for(int i = 0; i < m.ImcEntries.Count; i++)
                 {
-                    var entry = new PMPMetaManipulationJson() { Type = "Imc" };
-                    entry.Manipulation = PMPImcManipulationJson.FromImcEntry(m.ImcEntries[i], i, root);
+                    var entry = new PMPImcManipulationWrapperJson() { Type = "Imc" };
+                    entry.SetManipulation(PMPImcManipulationJson.FromImcEntry(m.ImcEntries[i], i, root));
                     ret.Add(entry);
                 }
             }
@@ -1418,6 +1436,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         List<string> Tags;
     }
 
+    [JsonConverter(typeof(JsonSubtypes), "Type")]
+    [JsonSubtypes.KnownSubType(typeof(PMPGroupJson), "Imc")]
     public class PMPGroupJson
     {
         public string Name;
@@ -1436,90 +1456,139 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public List<PMPOptionJson> Options = new List<PMPOptionJson>();
     }
 
+    public class PMPImcGroupJson : PMPGroupJson
+    {
+        public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
+        public PmpIdentifierJson Identifier;
+    }
+
+    public class PmpIdentifierJson
+    {
+        public PMPObjectType ObjectType;
+        public uint PrimaryId;
+        public uint SecondaryId;
+        public uint Variant;
+        public PMPEquipSlot EquipSlot;
+        public PMPObjectType BodySlot;
+    }
+
+    [JsonConverter(typeof(JsonSubtypes))]
+    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpStandardOptionJson), "Files")]
+    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDefaultImcOptionJson), "IsDisableSubMod")]
+    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpImcOptionJson), "AttributeMask")]
     public class PMPOptionJson
     {
         public string Name;
         public string Description;
+    }
 
+    public class PmpStandardOptionJson : PMPOptionJson
+    {
         public Dictionary<string, string> Files;
         public Dictionary<string, string> FileSwaps;
         public List<PMPMetaManipulationJson> Manipulations;
     }
 
-    public class PMPMetaManipulationJson
+    public class PmpDefaultImcOptionJson : PMPOptionJson
     {
-        public string Type;
-        public object Manipulation;
+        public bool IsDisableSubMod;
     }
-
-    /// <summary>
-    /// Simple JSON converter that dynamically converts the meta entries to the correct object type.
-    /// </summary>
-    public class PMPMetaManipulationConverter : JsonConverter
+    public class PmpImcOptionJson : PMPOptionJson
     {
-        public override bool CanConvert(Type objectType)
-        {
-            Debug.WriteLine(objectType.FullName);
-            if(objectType == typeof(PMPMetaManipulationJson))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            if (reader.TokenType == JsonToken.Null)
-            {
-                return null;
-            }
-            JObject jo = JObject.Load(reader);
-
-            var obj = new PMPMetaManipulationJson();
-            obj.Type = (string) jo.Properties().FirstOrDefault(x => x.Name == "Type");
-
-
-            var manip = jo.Properties().FirstOrDefault(x => x.Name == "Manipulation").Value as JObject;
-
-            var parent = manip.Parent as JObject;
-
-
-            // Convert the manipulation to the appropriate internal type.
-            switch (obj.Type)
-            {
-                case "Eqp":
-                    obj.Manipulation = manip.ToObject<PMPEqpManipulationJson>();
-                    break;
-                case "Eqdp":
-                    obj.Manipulation = manip.ToObject<PMPEqdpManipulationJson>();
-                    break;
-                case "Gmp":
-                    obj.Manipulation = manip.ToObject<PMPGmpManipulationJson>();
-                    break;
-                case "Imc":
-                    obj.Manipulation = manip.ToObject<PMPImcManipulationJson>();
-                    break;
-                case "Est":
-                    obj.Manipulation = manip.ToObject<PMPEstManipulationJson>();
-                    break;
-                case "Rsp":
-                    obj.Manipulation = manip.ToObject<PMPRspManipulationJson>();
-                    break;
-            }
-
-            return obj;
-        }
-
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            // Just use normal JSON writer, don't use this converter for JSON writing.
-            throw new NotImplementedException("Use standard JSON Converter for writing PMP files, not PMPMetaManipulationConverter.");
-        }
+        public int AttributeMask;
     }
 
     #endregion
 
     #region Metadata Manipulations
+
+    [JsonConverter(typeof(JsonSubtypes), "Type")]
+    [JsonSubtypes.KnownSubType(typeof(PMPImcManipulationWrapperJson), "Imc")]
+    [JsonSubtypes.KnownSubType(typeof(PMPEstManipulationWrapperJson), "Est")]
+    [JsonSubtypes.KnownSubType(typeof(PMPEqpManipulationWrapperJson), "Eqp")]
+    [JsonSubtypes.KnownSubType(typeof(PMPEqdpManipulationWrapperJson), "Eqdp")]
+    [JsonSubtypes.KnownSubType(typeof(PMPGmpManipulationWrapperJson), "Gmp")]
+    [JsonSubtypes.KnownSubType(typeof(PMPRspManipulationWrapperJson), "Rsp")]
+    public class PMPMetaManipulationJson
+    {
+        public string Type;
+
+        public virtual object GetManipulation()
+        {
+            return null;
+        }
+        public virtual void SetManipulation(object o)
+        {
+            return;
+        }
+    }
+
+    public class PMPImcManipulationWrapperJson : PMPMetaManipulationJson
+    {
+        public PMPImcManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPImcManipulationJson;
+        }
+    }
+    public class PMPEstManipulationWrapperJson : PMPMetaManipulationJson
+    {
+        public PMPEstManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPEstManipulationJson;
+        }
+    }
+    public class PMPEqpManipulationWrapperJson : PMPMetaManipulationJson
+    {
+        public PMPEqpManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPEqpManipulationJson;
+        }
+    }
+    public class PMPEqdpManipulationWrapperJson : PMPMetaManipulationJson
+    {
+        public PMPEqdpManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPEqdpManipulationJson;
+        }
+    }
+    public class PMPGmpManipulationWrapperJson : PMPMetaManipulationJson
+    {
+        public PMPGmpManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPGmpManipulationJson;
+        }
+    }
+    public class PMPRspManipulationWrapperJson : PMPMetaManipulationJson
+    {
+        public PMPRspManipulationJson Manipulation;
+    }
+
+
     public interface IPMPItemMetadata
     {
         /// <summary>
@@ -1534,7 +1603,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <param name="metadata"></param>
         public void ApplyToMetadata(ItemMetadata metadata);
     }
-
     public class PMPEstManipulationJson : IPMPItemMetadata
     {
         public ushort Entry = 0;
