@@ -1286,7 +1286,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             if(m.EqpEntry != null)
             {
-                var entry = new PMPEqdpManipulationWrapperJson() { Type = "Eqp" };
+                var entry = new PMPEqpManipulationWrapperJson() { Type = "Eqp" };
                 entry.SetManipulation(PMPEqpManipulationJson.FromEqpEntry(m.EqpEntry, root));
                 ret.Add(entry);
             }
@@ -1519,6 +1519,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
         public virtual void SetManipulation(object o)
         {
+            throw new NotImplementedException();
             return;
         }
     }
@@ -1848,6 +1849,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry, XivDependencyRootInfo root)
         {
+            
             var slot = PMPExtensions.PenumbraSlotToGameSlot.First(x => x.Value == entry.Slot).Key;
             var offset = EquipmentParameterSet.EntryOffsets[entry.Slot];
             var size = EquipmentParameterSet.EntrySizes[entry.Slot];
