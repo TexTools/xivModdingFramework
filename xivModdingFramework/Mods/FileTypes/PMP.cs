@@ -237,7 +237,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             UnionDict(imported, groupRes.Imported);
                             notImported.UnionWith(groupRes.NotImported);
                         }
-                        else
+                        else if(group.Type == "Multi")
                         {
                             // Bitmask options.
                             for (int i = 0; i < group.Options.Count; i++)
@@ -252,6 +252,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 }
                             }
 
+                        } else if(group.Type == "Imc")
+                        {
+                            throw new NotImplementedException();
                         }
 
                     }
@@ -1473,8 +1476,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             JObject jo = JObject.Load(reader);
 
             var obj = new PMPMetaManipulationJson();
-
             obj.Type = (string) jo.Properties().FirstOrDefault(x => x.Name == "Type");
+
 
             var manip = jo.Properties().FirstOrDefault(x => x.Name == "Manipulation").Value as JObject;
 
@@ -1516,6 +1519,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     #endregion
 
+    #region Metadata Manipulations
     public interface IPMPItemMetadata
     {
         /// <summary>
@@ -1975,5 +1979,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     }
 
+    #endregion
 
 }
