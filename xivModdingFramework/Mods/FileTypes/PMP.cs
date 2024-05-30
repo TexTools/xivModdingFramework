@@ -223,10 +223,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                         // Get Default selection.
                         var selected = group.DefaultSettings;
-                        if (selected < 0 || selected >= group.Options.Count)
-                        {
-                            selected = 0;
-                        }
 
                         // If the user selected custom settings, use those.
                         if (group.SelectedSettings >= 0)
@@ -236,6 +232,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                         if (group.Type == "Single")
                         {
+                            if (selected < 0 || selected >= group.Options.Count)
+                            {
+                                selected = 0;
+                            }
                             var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, optionIdx);
                             UnionDict(imported, groupRes.Imported);
                             notImported.UnionWith(groupRes.NotImported);
@@ -257,7 +257,52 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                         } else if(group.Type == "Imc")
                         {
-                            throw new NotImplementedException();
+                            // Could do with popping this out to its own function.
+                            var imcGroup = group as PMPImcGroupJson;
+                            var xivImc = imcGroup.DefaultEntry.ToXivImc();
+
+                            bool disabled = false;
+                            // Bitmask options.
+                            for (int i = 0; i < group.Options.Count; i++)
+                            {
+                                var value = 1 << i;
+                                if ((selected & value) > 0)
+                                {
+                                    var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
+                                    if (disableOpt != null)
+                                    {
+                                        // No options allowed >:|
+                                        disabled = true;
+                                        break;
+                                    }
+
+                                    var opt = group.Options[i] as PmpImcOptionJson;
+                                    optionIdx++;
+
+                                    xivImc.AttributeMask |= opt.AttributeMask;
+                                }
+                            }
+
+                            if (!disabled)
+                            {
+                                var root = imcGroup.GetRoot();
+                                var metaData = await GetImportMetadata(imported, root, tx);
+
+                                if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
+                                {
+                                    while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
+                                    {
+                                        metaData.ImcEntries.Add((XivImc)xivImc.Clone());
+                                    }
+                                }
+                                else
+                                {
+                                    metaData.ImcEntries[(int)imcGroup.Identifier.Variant] = xivImc;
+                                }
+                                await ItemMetadata.SaveMetadata(metaData, _Source, tx);
+                                await ItemMetadata.ApplyMetadata(metaData, tx);
+
+                            }
                         }
 
                     }
@@ -459,25 +504,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     progress?.Report((i, total, "Importing Metadata Changes from Option " + (optionIdx + 1) + "..."));
                     var root = group.Key;
-                    var metaPath = root.Info.GetRootFile();
-
-                    // Save initial state.
-                    if (!imported.ContainsKey(metaPath))
-                    {
-                        imported.Add(metaPath, await tx.SaveFileState(metaPath));
-                    }
-
-                    ItemMetadata metaData;
-                    if (!_MetaFiles.Contains(metaPath))
-                    {
-                        // If this is the first time we're seeing the metadata entry during this import sequence, then start from the clean base game version.
-                        metaData = await ItemMetadata.GetMetadata(metaPath, true, tx);
-                        _MetaFiles.Add(metaPath);
-                    } else
-                    {
-                        // Otherwise use the current transaction metadata state for metadata compilation.
-                        metaData = await ItemMetadata.GetMetadata(metaPath, false, tx);
-                    }
+                    var metaData = await GetImportMetadata(imported, root, tx);
 
                     foreach (var meta in group)
                     {
@@ -491,6 +518,32 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
             return (imported, notImported);
+        }
+
+        private static async Task<ItemMetadata> GetImportMetadata(Dictionary<string, TxFileState> imported, XivDependencyRoot root, ModTransaction tx)
+        {
+            var metaPath = root.Info.GetRootFile();
+
+            // Save initial state.
+            if (!imported.ContainsKey(metaPath))
+            {
+                imported.Add(metaPath, await tx.SaveFileState(metaPath));
+            }
+
+            ItemMetadata metaData;
+            if (!_MetaFiles.Contains(metaPath))
+            {
+                // If this is the first time we're seeing the metadata entry during this import sequence, then start from the clean base game version.
+                metaData = await ItemMetadata.GetMetadata(metaPath, true, tx);
+                _MetaFiles.Add(metaPath);
+            }
+            else
+            {
+                // Otherwise use the current transaction metadata state for metadata compilation.
+                metaData = await ItemMetadata.GetMetadata(metaPath, false, tx);
+            }
+
+            return metaData;
         }
 
         private static bool CanImport(string internalFilePath)
@@ -1437,7 +1490,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
-    [JsonSubtypes.KnownSubType(typeof(PMPGroupJson), "Imc")]
+    [JsonSubtypes.KnownSubType(typeof(PMPImcGroupJson), "Imc")]
     public class PMPGroupJson
     {
         public string Name;
@@ -1460,6 +1513,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public PmpIdentifierJson Identifier;
+
+        public XivDependencyRoot GetRoot()
+        {
+            var root = PMPExtensions.GetRootFromPenumbraValues(Identifier.ObjectType, Identifier.PrimaryId, Identifier.BodySlot, Identifier.SecondaryId, Identifier.EquipSlot);
+            return new XivDependencyRoot(root);
+        }
     }
 
     public class PmpIdentifierJson
@@ -1474,7 +1533,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     [JsonConverter(typeof(JsonSubtypes))]
     [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpStandardOptionJson), "Files")]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDefaultImcOptionJson), "IsDisableSubMod")]
+    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
     [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpImcOptionJson), "AttributeMask")]
     public class PMPOptionJson
     {
@@ -1489,13 +1548,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public List<PMPMetaManipulationJson> Manipulations;
     }
 
-    public class PmpDefaultImcOptionJson : PMPOptionJson
+    public class PmpDisableImcOptionJson : PMPOptionJson
     {
         public bool IsDisableSubMod;
     }
     public class PmpImcOptionJson : PMPOptionJson
     {
-        public int AttributeMask;
+        public ushort AttributeMask;
     }
 
     #endregion
@@ -1674,6 +1733,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             public ushort AttributeAndSound;
             public ushort AttributeMask;
             public byte SoundId;
+
+            public XivImc ToXivImc()
+            {
+                var imc = new XivImc();
+                imc.Animation = MaterialAnimationId;
+                imc.AttributeMask = AttributeMask;
+                imc.SoundId = SoundId;
+                imc.MaterialSet = MaterialId;
+                imc.Decal = DecalId;
+                imc.Vfx = VfxId;
+                return imc;
+            }
         }
         public PMPImcEntry Entry;
         public uint PrimaryId;
