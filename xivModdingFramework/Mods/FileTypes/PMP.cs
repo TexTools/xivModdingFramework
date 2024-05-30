@@ -1526,9 +1526,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public PMPObjectType ObjectType;
         public uint PrimaryId;
         public uint SecondaryId;
-        public uint Variant;
+        public ushort Variant;
         public PMPEquipSlot EquipSlot;
         public PMPObjectType BodySlot;
+
+        public XivDependencyRoot GetRoot()
+        {
+            var root = PMPExtensions.GetRootFromPenumbraValues(ObjectType, PrimaryId, BodySlot, SecondaryId, EquipSlot);
+            return new XivDependencyRoot(root);
+        }
     }
 
     [JsonConverter(typeof(JsonSubtypes))]
