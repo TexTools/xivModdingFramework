@@ -456,64 +456,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             // Setup Metadata.
             if (option.Manipulations != null && option.Manipulations.Count > 0)
             {
-                // RSP Options resolve by race/gender pairing.
-                var rspOptions = option.Manipulations.Select(x => x.GetManipulation() as PMPRspManipulationJson).Where(x => x != null);
-                var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
+                var data = await ManipulationsToMetadata(option.Manipulations, tx, imported);
 
-                i = 0;
-                var total = byRg.Count();
-                foreach (var group in byRg)
+                foreach(var meta in data.Metadatas)
                 {
-                    progress?.Report((i, total, "Importing Race Scaling Changes from Option " + (optionIdx + 1) + "..."));
-                    var rg = group.First().GetRaceGender();
-                    RacialGenderScalingParameter cmp;
-                    if (_RgspRaceGenders.Contains(group.Key))
-                    {
-                        // If this our first time seeing this race/gender pairing in this import sequence, use the original game clean version of the file.
-                        cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, true, tx);
-                        _RgspRaceGenders.Add(group.Key);
-                    } else
-                    {
-                        cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, false, tx);
-                    }
-
-                    // Save initial state.
-                    var path = CMP.GetRgspPath(cmp.Race, cmp.Gender);
-                    if (!imported.ContainsKey(path))
-                    {
-                        imported.Add(path, await tx.SaveFileState(path));
-                    }
-
-                    foreach (var effect in group)
-                    {
-                        effect.ApplyScaling(cmp);
-                    }
-
-                    await CMP.SaveScalingParameter(cmp, _Source, tx);
-                    i++;
+                    await ItemMetadata.SaveMetadata(meta, _Source, tx);
                 }
 
-                // Metadata.
-                var metaOptions = option.Manipulations.Select(x => x.GetManipulation() as IPMPItemMetadata).Where(x => x != null);
-
-                var byRoot = metaOptions.GroupBy(x => x.GetRoot());
-
-                total = byRoot.Count();
-                // Apply Metadata in order by Root.
-                foreach (var group in byRoot)
+                foreach(var rgsp in data.Rgsps)
                 {
-                    progress?.Report((i, total, "Importing Metadata Changes from Option " + (optionIdx + 1) + "..."));
-                    var root = group.Key;
-                    var metaData = await GetImportMetadata(imported, root, tx);
-
-                    foreach (var meta in group)
-                    {
-                        meta.ApplyToMetadata(metaData);
-                    }
-
-                    await ItemMetadata.SaveMetadata(metaData, _Source, tx);
-                    await ItemMetadata.ApplyMetadata(metaData, tx);
-                    i++;
+                    await CMP.SaveScalingParameter(rgsp, _Source, tx);
                 }
             }
 
@@ -544,6 +496,32 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
             return metaData;
+        }
+        private static async Task<RacialGenderScalingParameter> GetImportRgsp(Dictionary<string, TxFileState> imported, XivSubRace race, XivGender gender, ModTransaction tx)
+        {
+            var key = PMPRspManipulationJson.GetRaceGenderHash(race, gender);
+            var path = CMP.GetRgspPath(race, gender);
+
+            // Save initial state.
+            if (!imported.ContainsKey(path))
+            {
+                imported.Add(path, await tx.SaveFileState(path));
+            }
+
+            RacialGenderScalingParameter rgsp;
+            if (!_RgspRaceGenders.Contains(key))
+            {
+                // If this is the first time we're seeing the metadata entry during this import sequence, then start from the clean base game version.
+                rgsp = await CMP.GetScalingParameter(race, gender, true, tx);
+                _RgspRaceGenders.Add(key);
+            }
+            else
+            {
+                // Otherwise use the current transaction metadata state for metadata compilation.
+                rgsp = await CMP.GetScalingParameter(race, gender, false, tx);
+            }
+
+            return rgsp;
         }
 
         private static bool CanImport(string internalFilePath)
@@ -708,16 +686,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
 
         /// <summary>
-        /// Makes all slashes into backslashes for consistency.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        private static string ReplaceSlashes(string path)
-        {
-            return path.Replace("/", "\\");
-        }
-
-        /// <summary>
         /// Unpacks a PMP into a single dictionary of [File Path] => [File Storage Info]
         /// Only works if the PMP has no options/a single option.
         /// </summary>
@@ -756,7 +724,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
 
-                return await UnpackPmpOption(option, modpackPath, includeData, tx);
+                return await UnpackPmpOption(option, modpackPath, null, tx);
             }
             catch (Exception ex)
             {
@@ -764,233 +732,262 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
+
         /// <summary>
         /// Unzips and Unpacks a given PMP option into a dictionary of [Internal File Path] => [File Storage Information]
         /// </summary>
-        /// <param name="option"></param>
-        /// <param name="pmpPath"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        public static async Task<Dictionary<string, FileStorageInformation>> UnpackPmpOption(PMPOptionJson baseOption, string pmpPath, bool includeData = true, ModTransaction tx = null)
+        public static async Task<Dictionary<string, FileStorageInformation>> UnpackPmpOption(PMPOptionJson baseOption, string zipArchivePath = null, string unzipPath = null, ModTransaction tx = null)
         {
 
             var option = baseOption as PmpStandardOptionJson;
 
             if (option == null)
             {
+                // TODO - Convert IMC file to MetaFile here.
                 throw new NotImplementedException();
             }
 
-            // Task wrapper since we might be doing some heavy lifting.
-            return await Task.Run(async () =>
+            var includeData = zipArchivePath != null;
+
+            bool alreadyUnzipped = false;
+            if (zipArchivePath != null)
             {
-                // Resolve the base path we're working, and unzip if needed...
-                HashSet<string> files = new HashSet<string>();
-                foreach(var kv in option.Files)
+                if (zipArchivePath.ToLower().EndsWith(".json"))
                 {
-                    files.Add(ReplaceSlashes(kv.Value));
+                    zipArchivePath = Path.GetDirectoryName(zipArchivePath);
                 }
-                var basePath = pmpPath;
 
-                if (pmpPath.EndsWith(".json"))
+                if (IOUtil.IsDirectory(zipArchivePath))
                 {
-                    // PMP Folder by Json reference at root level.
-                    basePath = Path.GetDirectoryName(pmpPath);
+                    alreadyUnzipped = true;
+                    unzipPath = zipArchivePath;
                 }
-                else if (pmpPath.EndsWith(".pmp"))
-                {
-                    // Compressed PMP file.  Decompress it first.
-                    if (tx != null)
-                    {
-                        // Unzip to TX store if we have one.
-                        basePath = tx.UNSAFE_GetTransactionStore();
-                    }
-                    else
-                    {
-                        basePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                    }
+            }
 
-                    if (includeData)
-                    {
-                        // Run Zip extract on a new thread.
-                        await Task.Run(async () =>
-                        {
-                            // Just JSON files.
-                            using (var zip = new Ionic.Zip.ZipFile(pmpPath))
-                            {
-                                var toUnzip = zip.Entries.Where(x => files.Contains(ReplaceSlashes(x.FileName)));
-                                foreach (var e in toUnzip)
-                                {
-                                    e.Extract(basePath);
-                                }
-                            }
-                        });
-                    }
+            if (!alreadyUnzipped && unzipPath == null)
+            {
+                if (tx != null && !tx.ReadOnly && unzipPath == null)
+                {
+                    // Use TX data store if we have one.
+                    unzipPath = tx.UNSAFE_GetTransactionStore();
                 } else
                 {
-                    // Already unzipped folder path.
-                    basePath = pmpPath;
+                    // Make our own temp path.
+                    unzipPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
                 }
+            }
 
-                var ret = new Dictionary<string, FileStorageInformation>();
-
-                if (tx == null)
+            // Task wrapper since we might be doing some heavy lifting.
+            await Task.Run(async () =>
+            {
+                // Resolve the base path we're working, and unzip if needed...
+                if (includeData)
                 {
-                    // Grab a readonly TX here to read base game files when needed.
-                    tx = ModTransaction.BeginTransaction();
+                    await IOUtil.UnzipFiles(zipArchivePath, unzipPath, option.Files.Values);
                 }
+            });
+
+            var ret = new Dictionary<string, FileStorageInformation>();
+
+            if (tx == null)
+            {
+                // Grab a readonly TX here to read base game files when needed.
+                tx = ModTransaction.BeginTransaction();
+            }
 
 
-                // Custom Files from the .pmp Zip Archive.
-                foreach (var file in option.Files)
+            // Custom Files from the .pmp Zip Archive.
+            foreach (var file in option.Files)
+            {
+                var internalPath = file.Key;
+                // Safety checks.
+                if (!CanImport(file.Key))
                 {
-                    var internalPath = file.Key;
-                    var externalPath = Path.Combine(basePath, file.Value);
-                    // Safety checks.
-                    if (!CanImport(file.Key))
-                    {
-                        continue;
-                    }
-
-                    if (!includeData)
-                    {
-                        ret.Add(internalPath, new FileStorageInformation());
-                        continue;
-                    }
-
-                    if (!File.Exists(externalPath))
-                    {
-                        continue;
-                    }
-
-
-                    var fSize = new FileInfo(externalPath).Length;
-
-                    var fileInfo = new FileStorageInformation()
-                    {
-                        FileSize = (int) fSize,
-                        StorageType = EFileStorageType.UncompressedIndividual,
-                        RealPath = externalPath,
-                        RealOffset = 0,
-                    };
-
-                    ret.Add(internalPath, fileInfo);
+                    continue;
                 }
 
-                // File Swaps from base game files.
-                foreach (var kv in option.FileSwaps)
-                { 
-                    // For some reason the destination value is backslashed instead of forward-slashed.                
-                    var src = kv.Value.Replace("\\", "/");
-                    var dest = kv.Key.Replace("\\", "/");
+                var externalPath = Path.Combine(unzipPath, file.Value);
+                var fileInfo = new FileStorageInformation()
+                {
+                    StorageType = EFileStorageType.UncompressedIndividual,
+                    RealPath = externalPath,
+                    RealOffset = 0,
+                    FileSize = 0,
+                };
 
-                    if (!CanImport(src) || !CanImport(dest))
-                    {
-                        continue;
-                    }
+                ret.Add(internalPath, fileInfo);
+            }
 
-                    if (!includeData)
-                    {
-                        ret.Add(src, new FileStorageInformation());
-                        continue;
-                    }
+            // File Swaps from base game files.
+            foreach (var kv in option.FileSwaps)
+            { 
+                // For some reason the destination value is backslashed instead of forward-slashed.                
+                var src = kv.Value.Replace("\\", "/");
+                var dest = kv.Key.Replace("\\", "/");
 
-                    // This is dangerous to hand potentially unknown code a direct file pointer to raw game files.
-                    // So we'll copy it to a temp file instead.
-                    var data = await tx.ReadFile(src, true, true);
+                if (!CanImport(src) || !CanImport(dest))
+                {
+                    continue;
+                }
+
+                if (!includeData)
+                {
+                    ret.Add(src, new FileStorageInformation());
+                    continue;
+                }
+
+                var df = IOUtil.GetDataFileFromPath(src);
+                var offset = await tx.Get8xDataOffset(src, true);
+                var fileInfo = IOUtil.MakeGameStorageInfo(df, offset);
+
+                ret.Add(src, fileInfo);
+            }
+
+            // Metadata files.
+            if (option.Manipulations != null && option.Manipulations.Count > 0)
+            {
+                var manips = await ManipulationsToMetadata(option.Manipulations, tx);
+
+                foreach(var meta in manips.Metadatas)
+                {
+                    var metaPath = meta.Root.Info.GetRootFile();
+
+                    // These are a bit weird, and basically have to be written to disk or some kind of memory store.
+                    var data = await ItemMetadata.Serialize(meta);
                     var tempFilePath = Path.GetTempFileName();
                     File.WriteAllBytes(tempFilePath, data);
 
                     var fileInfo = new FileStorageInformation()
                     {
                         FileSize = data.Length,
-                        StorageType = EFileStorageType.CompressedIndividual,
+                        StorageType = EFileStorageType.UncompressedIndividual,
                         RealPath = tempFilePath,
                         RealOffset = 0,
                     };
 
-                    ret.Add(src, fileInfo);
+                    ret.Add(metaPath, fileInfo);
                 }
 
-
-                // Metadata files.
-                if (option.Manipulations != null && option.Manipulations.Count > 0)
+                foreach(var rgsp in manips.Rgsps)
                 {
-                    // RSP Options resolve by race/gender pairing.
-                    var rspOptions = option.Manipulations.Select(x => x.GetManipulation() as PMPRspManipulationJson).Where(x => x != null);
-                    var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
+                    var path = CMP.GetRgspPath(rgsp.Race, rgsp.Gender);
+                    // These are a bit weird, and basically have to be written to disk or some kind of memory store.
+                    var data = rgsp.GetBytes();
+                    var tempFilePath = Path.GetTempFileName();
+                    File.WriteAllBytes(tempFilePath, data);
 
-                    var total = byRg.Count();
-                    foreach (var group in byRg)
+                    var fileInfo = new FileStorageInformation()
                     {
-                        var rg = group.First().GetRaceGender();
+                        FileSize = data.Length,
+                        StorageType = EFileStorageType.UncompressedIndividual,
+                        RealPath = tempFilePath,
+                        RealOffset = 0,
+                    };
 
-                        var path = CMP.GetRgspPath(rg.Race, rg.Gender);
-                        if (!includeData)
-                        {
-                            ret.Add(path, new FileStorageInformation());
-                            continue;
-                        }
+                    ret.Add(path, fileInfo);
+                }
+            }
 
-                        var cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, true, tx);
+            return ret;
+        }
 
-                        var data = cmp.GetBytes();
 
-                        var tempFilePath = Path.GetTempFileName();
-                        File.WriteAllBytes(tempFilePath, data);
+        /// <summary>
+        /// Converts a list of PMP Manipulation entries into fully validated Metadata/RGSP entries.
+        /// If the Imported list is included, the original states of the files are added if needed,
+        /// and bases are populated through the appropriate functions to maintain TX consistency.
+        /// If the Imported list is NULL, base game files are used as the starter point.
+        /// </summary>
+        /// <param name="manipulations"></param>
+        /// <param name="tx"></param>
+        /// <param name="imported"></param>
+        /// <returns></returns>
+        public static async Task<(List<ItemMetadata> Metadatas, List<RacialGenderScalingParameter> Rgsps)> ManipulationsToMetadata(List<PMPMetaManipulationJson> manipulations, ModTransaction tx, Dictionary<string, TxFileState> imported = null)
+        {
 
-                        var fileInfo = new FileStorageInformation()
-                        {
-                            FileSize = data.Length,
-                            StorageType = EFileStorageType.UncompressedIndividual,
-                            RealPath = tempFilePath,
-                            RealOffset = 0,
-                        };
+            // Setup Metadata.
+            if (manipulations != null || manipulations.Count == 0)
+            {
+                return (new List<ItemMetadata>(), new List<RacialGenderScalingParameter>());
+            }
 
-                        ret.Add(path, fileInfo);
+            Dictionary<string, ItemMetadata> seenMetadata = new Dictionary<string, ItemMetadata>();
+            Dictionary<uint, RacialGenderScalingParameter> seenRgsps = new Dictionary<uint, RacialGenderScalingParameter>();
+
+
+            // RSP Options resolve by race/gender pairing.
+            var rspOptions = manipulations.Select(x => x.GetManipulation() as PMPRspManipulationJson).Where(x => x != null);
+            var byRg = rspOptions.GroupBy(x => x.GetRaceGenderHash());
+
+            var total = byRg.Count();
+            foreach (var group in byRg)
+            {
+                var rg = group.First().GetRaceGender();
+                RacialGenderScalingParameter cmp;
+                if (!seenRgsps.ContainsKey(group.Key))
+                {
+                    // If this our first time seeing this race/gender pairing in this import sequence, use the original game clean version of the file.
+                    if (imported != null)
+                    {
+                        cmp = await GetImportRgsp(imported, rg.Race, rg.Gender, tx);
+                    } else
+                    {
+                        cmp = await CMP.GetScalingParameter(rg.Race, rg.Gender, true, tx);
                     }
 
-                    // Metadata.
-                    var metaOptions = option.Manipulations.Select(x => x.GetManipulation() as IPMPItemMetadata).Where(x => x != null);
-                    var byRoot = metaOptions.GroupBy(x => x.GetRoot());
-                    total = byRoot.Count();
-
-                    // Create the metadata files and save them to disk.
-                    foreach (var group in byRoot)
-                    {
-                        var root = group.Key;
-                        var metaPath = root.Info.GetRootFile();
-                        if (!includeData)
-                        {
-                            ret.Add(metaPath, new FileStorageInformation());
-                            continue;
-                        }
-
-                        var metaData = await ItemMetadata.GetMetadata(metaPath, true, tx);
-
-                        foreach (var meta in group)
-                        {
-                            meta.ApplyToMetadata(metaData);
-                        }
-
-                        var data = await ItemMetadata.Serialize(metaData);
-                        var tempFilePath = Path.GetTempFileName();
-                        File.WriteAllBytes(tempFilePath, data);
-
-                        var fileInfo = new FileStorageInformation()
-                        {
-                            FileSize = data.Length,
-                            StorageType = EFileStorageType.UncompressedIndividual,
-                            RealPath = tempFilePath,
-                            RealOffset = 0,
-                        };
-
-                        ret.Add(metaPath, fileInfo);
-                    }
+                    seenRgsps.Add(group.Key, cmp);
+                }
+                else
+                {
+                    cmp = seenRgsps[group.Key];
                 }
 
-                return ret;
-            });
+                foreach (var effect in group)
+                {
+                    effect.ApplyScaling(cmp);
+                }
+            }
+
+            // Metadata.
+            var metaOptions = manipulations.Select(x => x.GetManipulation() as IPMPItemMetadata).Where(x => x != null);
+
+            var byRoot = metaOptions.GroupBy(x => x.GetRoot());
+
+            total = byRoot.Count();
+            // Apply Metadata in order by Root.
+            foreach (var group in byRoot)
+            {
+                var root = group.Key;
+                var path = root.Info.GetRootFile();
+
+                ItemMetadata metaData;
+                if (!seenMetadata.ContainsKey(path))
+                {
+                    // If this our first time seeing this race/gender pairing in this import sequence, use the original game clean version of the file.
+                    if (imported != null)
+                    {
+                        metaData = await ItemMetadata.GetMetadata(path, true, tx);
+                    }
+                    else
+                    {
+                        metaData = await PMP.GetImportMetadata(imported, root, tx);
+                    }
+
+                    seenMetadata.Add(path, metaData);
+                }
+                else
+                {
+                    metaData = seenMetadata[path];
+                }
+
+                foreach (var meta in group)
+                {
+                    meta.ApplyToMetadata(metaData);
+                }
+            }
+
+
+            return (seenMetadata.Values.ToList(), seenRgsps.Values.ToList());
         }
 
     }
@@ -2014,9 +2011,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public uint GetRaceGenderHash()
         {
             var rg = GetRaceGender();
+
+            return GetRaceGenderHash(rg.Race, rg.Gender);
+        }
+        public static uint GetRaceGenderHash(XivSubRace race, XivGender gender)
+        {
             uint hash = 0;
-            hash |= ((uint) rg.Race) << 8;
-            hash |= ((uint) rg.Gender);
+            hash |= ((uint)race) << 8;
+            hash |= ((uint)gender);
 
             return hash;
         }

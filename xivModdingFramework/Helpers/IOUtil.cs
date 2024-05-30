@@ -28,6 +28,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Helpers
 {
@@ -517,6 +518,72 @@ namespace xivModdingFramework.Helpers
                 default:
                     return false;
             }
+        }
+
+
+        public static FileStorageInformation MakeGameStorageInfo(XivDataFile df, long offset8x)
+        {
+            // Create standard Game DAT file request info.
+            var info = new FileStorageInformation();
+            var parts = IOUtil.Offset8xToParts(offset8x);
+            info.RealOffset = parts.Offset;
+            info.RealPath = Dat.GetDatPath(df, parts.DatNum);
+            info.StorageType = EFileStorageType.CompressedBlob;
+
+            // We could check the file size here, but since this is a temporary file handle, and we don't know if we actually need the pointer...
+            // Just set it to 0, then code down the line can identify that it needs to check the file size manually if needed.
+            info.FileSize = 0;
+
+            return info;
+        }
+
+        public  static async Task UnzipFiles(string zipLocation, string destination, IEnumerable<string> files = null)
+        {
+            HashSet<string> filesToUnzip = null;
+            if (files != null)
+            {
+                filesToUnzip = new HashSet<string>();
+                foreach (var f in files)
+                {
+                    filesToUnzip.Add(ReplaceSlashes(f));
+                }
+            }
+
+            Directory.CreateDirectory(destination);
+            // Run Zip extract on a new thread.
+            await Task.Run(async () =>
+            {
+                // Just JSON files.
+                using (var zip = new Ionic.Zip.ZipFile(zipLocation))
+                {
+                    var toUnzip = zip.Entries.Where(x => filesToUnzip.Contains(ReplaceSlashes(x.FileName)));
+                    foreach (var e in toUnzip)
+                    {
+                        e.Extract(destination);
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Makes all slashes into backslashes for consistency.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        private static string ReplaceSlashes(string path)
+        {
+            return path.Replace("/", "\\");
+        }
+
+        public static bool IsDirectory(string path)
+        {
+            FileAttributes attr = File.GetAttributes(path);
+
+            //detect whether its a directory or file
+            if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
+                return true;
+            else
+                return false;
         }
 
     }
