@@ -95,8 +95,6 @@ namespace xivModdingFramework.Mods
 
         /// <summary>
         /// Handles importing an arbitrary external file to the given transaction, or to the base game files, if no transaction is provided.
-        /// NOTE: If a Cached index/modlist is provided, the resulting index/modlist changes will not be automatically saved,
-        /// as it is assumed to be part of a batch write that will be handled later.
         /// </summary>
         /// <param name="externalPath"></param>
         /// <param name="internalPath"></param>
