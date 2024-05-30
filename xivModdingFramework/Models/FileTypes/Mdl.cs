@@ -965,7 +965,18 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #region Base Geometry Data 
 
-                var lodNum = 0;
+
+                if (xivMdl.LoDList[1].VertexDataSize == 0 
+                    && xivMdl.LoDList[0].VertexDataOffset != br.BaseStream.Position)
+                {
+                    // Old jank mod model with incorrect offset.
+                    var delta = (int) (xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
+                    xivMdl.LoDList[0].VertexDataOffset -= delta;
+                    xivMdl.LoDList[0].IndexDataOffset -= delta;
+                }
+
+
+                    var lodNum = 0;
                 var totalMeshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
@@ -1066,7 +1077,17 @@ namespace xivModdingFramework.Models.FileTypes
 
                                     positionVector = new Vector3(x, y, z);
                                 }
-                                vertexData.Positions.Add(positionVector);
+
+                                if(float.IsNaN(positionVector.X) || float.IsInfinity(positionVector.X)
+                                    || float.IsNaN(positionVector.Y) || float.IsInfinity(positionVector.Y)
+                                    || float.IsNaN(positionVector.Z) || float.IsInfinity(positionVector.Z))
+                                {
+                                    vertexData.Positions.Add(new Vector3());
+                                    //throw new InvalidDataException("Model has NaN/Infinite Position data.");
+                                } else
+                                {
+                                    vertexData.Positions.Add(positionVector);
+                                }
                             }
                         }
 
@@ -5381,15 +5402,15 @@ namespace xivModdingFramework.Models.FileTypes
                                 validNewMaterials.Add(newMatName, path);
                             }
                             copiedPaths.Add(path);
-                        }
 
 
-                        // Switch out any material references to the material in the model file.
-                        foreach (var m in model.MeshGroups)
-                        {
-                            if (m.Material == originalMatName)
+                            // Switch out any material references to the material in the model file.
+                            foreach (var m in model.MeshGroups)
                             {
-                                m.Material = newMatName;
+                                if (m.Material == originalMatName)
+                                {
+                                    m.Material = newMatName;
+                                }
                             }
                         }
 
