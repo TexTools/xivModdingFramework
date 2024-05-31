@@ -289,6 +289,22 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
+        public FileStorageInformation GetStorageInfo(XivDataFile dataFile, long offset8x)
+        {
+            FileStorageInformation info;
+            if (OffsetMapping[dataFile].ContainsKey(offset8x))
+            {
+                // Load info from mapping
+                info = OffsetMapping[dataFile][offset8x];
+            }
+            else
+            {
+                // Create standard Game DAT file request info.
+                info = IOUtil.MakeGameStorageInfo(dataFile, offset8x);
+            }
+            return info;
+        }
+
         /// <summary>
         /// Retrieves a given SqPacked file from the data store, based on 8x Data Offset(With Dat# Embed) and data file the file would exist in.
         /// Compresses the file from the file store if necessary.

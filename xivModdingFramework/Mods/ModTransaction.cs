@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TeximpNet.Compression;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
@@ -1583,6 +1584,24 @@ namespace xivModdingFramework.Mods
             {
                 return await _DataHandler.GetUncompressedFile(dataFile, offset8x);
             }
+        }
+
+        public async Task<FileStorageInformation> UNSAFE_GetStorageInfo(string path, bool forceOriginal = false)
+        {
+            var df = IOUtil.GetDataFileFromPath(path);
+            var offset = await Get8xDataOffset(path, forceOriginal);
+
+            if (offset == 0)
+            {
+                throw new FileNotFoundException("File does not currently exist: " + path);
+            }
+
+            return UNSAFE_GetStorageInfo(df, offset);
+
+        }
+        public FileStorageInformation UNSAFE_GetStorageInfo(XivDataFile dataFile, long offset8x)
+        {
+            return _DataHandler.GetStorageInfo(dataFile, offset8x);
         }
 
         /// <summary>
