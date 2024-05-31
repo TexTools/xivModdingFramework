@@ -383,6 +383,26 @@ namespace xivModdingFramework.Mods.FileTypes
                 return modPackJson;
             });
         }
+
+        public static async Task<string> UnzipTtmp(string path, string targetPath = null)
+        {
+            return await Task.Run(() =>
+            {
+                if (targetPath == null)
+                {
+                    targetPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                }
+                using (var zf = ZipFile.Read(path))
+                {
+                    Directory.CreateDirectory(targetPath);
+                    zf.ExtractAll(targetPath);
+                }
+
+                return targetPath;
+            });
+        }
+
+
         /// <summary>
         /// Unzips the images from a zip/modpack file, unloading them into a temporary directory and returning the path.
         /// File paths match their modpack path structure.

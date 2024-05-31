@@ -422,7 +422,7 @@ namespace xivModdingFramework.Mods
 
             if(_ModList == null)
             {
-                // TODO: Should store modified times here to validate like we do for Index Files.
+                // TODO: Should store modified times here to validate like we do for Index Files?
                 _LoadingModlist = true;
                 try
                 {

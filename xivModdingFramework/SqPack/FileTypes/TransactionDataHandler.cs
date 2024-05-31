@@ -132,7 +132,7 @@ namespace xivModdingFramework.SqPack.FileTypes
     /// Class that handles wrapping access to the core DAT files, during transactionary states.
     /// In particular, this maps DataFile+8xDataOffsets to transactionary data stores, and implements access to them.
     /// </summary>
-    internal class TransactionDataHandler : IDisposable
+    public class TransactionDataHandler : IDisposable
     {
         internal readonly EFileStorageType DefaultType;
         internal readonly string DefaultPathRoot;
@@ -209,7 +209,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetUncompressedFile(info);
         }
-        internal static async Task<byte[]> GetUncompressedFile(FileStorageInformation info)
+        public static async Task<byte[]> GetUncompressedFile(FileStorageInformation info)
         {
             using (var fs = File.OpenRead(info.RealPath))
             {
@@ -266,7 +266,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetUncompressedFileStream(info);
         }
-        internal static async Task<BinaryReader> GetUncompressedFileStream(FileStorageInformation info)
+        public static async Task<BinaryReader> GetUncompressedFileStream(FileStorageInformation info)
         {
             if (!info.IsCompressed)
             {
@@ -340,7 +340,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetCompressedFile(info, forceType2);
         }
-        internal static async Task<byte[]> GetCompressedFile(FileStorageInformation info, bool forceType2 = false)
+        public static async Task<byte[]> GetCompressedFile(FileStorageInformation info, bool forceType2 = false)
         {
             using (var fs = File.OpenRead(info.RealPath))
             {
@@ -400,7 +400,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetCompressedFileStream(info, forceType2);
         }
-        internal static async Task<BinaryReader> GetCompressedFileStream(FileStorageInformation info, bool forceType2 = false)
+        public static async Task<BinaryReader> GetCompressedFileStream(FileStorageInformation info, bool forceType2 = false)
         {
             if (info.IsCompressed)
             {
