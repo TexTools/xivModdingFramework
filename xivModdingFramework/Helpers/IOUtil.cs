@@ -22,6 +22,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -584,6 +585,19 @@ namespace xivModdingFramework.Helpers
                 return true;
             else
                 return false;
+        }
+
+        public static string MakePathSafe(string fileName, bool makeLowercase = true)
+        {
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                fileName = fileName.Replace(c, '-');
+            }
+            if (makeLowercase)
+            {
+                fileName = fileName.ToLower();
+            }
+            return fileName;
         }
 
     }
