@@ -650,6 +650,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 foreach (var fi in files)
                 {
+                    if(!File.Exists(fi.Info.RealPath))
+                    {
+                        // Sometimes poorly behaved penumbra folders don't actually have the files they claim they do.
+                        // Remove them in this case.
+                        continue;
+                    }
+
                     var data = await TransactionDataHandler.GetUncompressedFile(fi.Info);
                     if (fi.Path.EndsWith(".meta"))
                     {
@@ -1046,7 +1053,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Description;
         public string Version;
         public string Website;
-
+        public string Image;
 
         // These exist.
         public List<string> Tags;
@@ -1059,6 +1066,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Name;
         public string Description;
         public int Priority;
+        public string Image;
 
         // "Multi" or "Single"
         public string Type;
@@ -1076,6 +1084,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public PmpIdentifierJson Identifier;
+        public int Page;
 
         public XivDependencyRoot GetRoot()
         {
@@ -1108,6 +1117,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public string Name;
         public string Description;
+        public string Image;
     }
 
     public class PmpStandardOptionJson : PMPOptionJson

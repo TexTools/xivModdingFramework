@@ -23,6 +23,7 @@ namespace xivModdingFramework.Mods.FileTypes
     [JsonSubtypes.KnownSubType(typeof(PMPEqdpManipulationWrapperJson), "Eqdp")]
     [JsonSubtypes.KnownSubType(typeof(PMPGmpManipulationWrapperJson), "Gmp")]
     [JsonSubtypes.KnownSubType(typeof(PMPRspManipulationWrapperJson), "Rsp")]
+    [JsonSubtypes.KnownSubType(typeof(PMPGlobalEqpManipulationWrapperJson), "GlobalEqp")]
     public class PMPManipulationWrapperJson
     {
         public string Type;
@@ -34,18 +35,22 @@ namespace xivModdingFramework.Mods.FileTypes
         public virtual void SetManipulation(object o)
         {
             throw new NotImplementedException();
-            return;
+        }
+
+        public virtual string GetNiceName()
+        {
+            return Type + " Manipulation";
         }
     }
 
     public class PMPUnknownManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public object Manipulation;
-        public virtual object GetManipulation()
+        public override object GetManipulation()
         {
             return Manipulation;
         }
-        public virtual void SetManipulation(object o)
+        public override void SetManipulation(object o)
         {
             Manipulation = o;
         }
@@ -62,6 +67,10 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             Manipulation = o as PMPImcManipulationJson;
         }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - " + Manipulation.ObjectType.ToString() + " #" + Manipulation.PrimaryId.ToString() + " " + Manipulation.EquipSlot + " v" + Manipulation.Variant;
+        }
     }
     public class PMPEstManipulationWrapperJson : PMPManipulationWrapperJson
     {
@@ -73,6 +82,10 @@ namespace xivModdingFramework.Mods.FileTypes
         public override void SetManipulation(object o)
         {
             Manipulation = o as PMPEstManipulationJson;
+        }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - e" + Manipulation.SetId + " " + Manipulation.Slot + " " + Manipulation.Race + " " + Manipulation.Gender;
         }
     }
     public class PMPEqpManipulationWrapperJson : PMPManipulationWrapperJson
@@ -86,6 +99,10 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             Manipulation = o as PMPEqpManipulationJson;
         }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - " + Manipulation.SetId + " " + Manipulation.Slot;
+        }
     }
     public class PMPEqdpManipulationWrapperJson : PMPManipulationWrapperJson
     {
@@ -97,6 +114,10 @@ namespace xivModdingFramework.Mods.FileTypes
         public override void SetManipulation(object o)
         {
             Manipulation = o as PMPEqdpManipulationJson;
+        }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - " + Manipulation.SetId + " " + Manipulation.Slot + " " + Manipulation.Race.ToString() + " " + Manipulation.Gender;
         }
     }
     public class PMPGmpManipulationWrapperJson : PMPManipulationWrapperJson
@@ -110,10 +131,42 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             Manipulation = o as PMPGmpManipulationJson;
         }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - e" + Manipulation.SetId;
+        }
     }
     public class PMPRspManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPRspManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPRspManipulationJson;
+        }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - " + Manipulation.SubRace + " " + Manipulation.Attribute;
+        }
+    }
+    public class PMPGlobalEqpManipulationWrapperJson : PMPManipulationWrapperJson
+    {
+        public PMPGlobalEqpManipulationJson Manipulation;
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPGlobalEqpManipulationJson;
+        }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - " + Manipulation.Type + " " + Manipulation.Condition;
+        }
     }
 
 
@@ -592,6 +645,11 @@ namespace xivModdingFramework.Mods.FileTypes
             return manips;
         }
 
+    }
+    public class PMPGlobalEqpManipulationJson
+    {
+        public GlobalEqpType Type;
+        public int Condition;
     }
 
     #endregion

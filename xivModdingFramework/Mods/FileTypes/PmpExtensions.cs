@@ -175,6 +175,19 @@ namespace xivModdingFramework.Mods.FileTypes
         NumAttributes,
     }
 
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum GlobalEqpType
+    {
+        DoNotHideEarrings,
+        DoNotHideNecklace,
+        DoNotHideBracelets,
+        DoNotHideRingR,
+        DoNotHideRingL,
+        DoNotHideHrothgarHats,
+        DoNotHideVieraHats
+    }
+
+
     #endregion
 
     #region Extensions
@@ -426,6 +439,13 @@ namespace xivModdingFramework.Mods.FileTypes
                 var info = f.Info;
                 var id = f.Id;
 
+                if (!File.Exists(f.Info.RealPath))
+                {
+                    // Sometimes badly behaved penumbra folders can be loaded and re-written that never actually had some of the files in question.
+                    guidHashDict.Add(id, new SHA1HashKey());
+                    continue;
+                }
+
                 byte[] data;
                 if (defaultStorageType == EFileStorageType.CompressedIndividual || defaultStorageType == EFileStorageType.CompressedBlob)
                 {
@@ -463,6 +483,10 @@ namespace xivModdingFramework.Mods.FileTypes
             foreach (var fkv in files)
             {
                 var hash = guidHashDict[fkv.Value.Id];
+                if (!seenFiles.ContainsKey(hash))
+                {
+                    continue;
+                }
                 var pmpPath = seenFiles[hash];
                 files[fkv.Key].PmpPath = pmpPath;
             }
