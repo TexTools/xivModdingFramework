@@ -70,6 +70,11 @@ namespace xivModdingFramework.Mods
         public ETransactionTarget Target { get; set; }
         public string TargetPath { get; set; }
         public bool Unsafe { get; set; }
+
+        /// <summary>
+        /// Additional data used by individual targets, if needed.
+        /// </summary>
+        public object ExtraTargetInfo { get; set; }
     }
     #endregion
 

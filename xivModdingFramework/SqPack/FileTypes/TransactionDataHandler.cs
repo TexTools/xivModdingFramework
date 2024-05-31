@@ -799,7 +799,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Description = "A Penumbra Modpack created from a TexTools transaction."
             };
 
-            await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict);
+            await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict, null, true);
 
 
             // Don't have real offsets to update to, since we don't write to game files.
@@ -839,7 +839,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 Description = "A Penumbra Modpack created from a TexTools transaction."
             };
 
-            await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict, false);
+            await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict, null, false);
 
             await PenumbraAPI.ReloadMod(di.Name);
             await PenumbraAPI.Redraw();

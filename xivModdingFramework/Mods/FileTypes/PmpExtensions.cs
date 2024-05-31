@@ -337,9 +337,9 @@ namespace xivModdingFramework.Mods.FileTypes
                 _ => PMPGender.Unknown,
             };
 
-        public static List<PMPMetaManipulationJson> RgspToManipulations(RacialGenderScalingParameter rgsp)
+        public static List<PMPManipulationWrapperJson> RgspToManipulations(RacialGenderScalingParameter rgsp)
         {
-            var ret = new List<PMPMetaManipulationJson>();
+            var ret = new List<PMPManipulationWrapperJson>();
             var entries = PMPRspManipulationJson.FromRgspEntry(rgsp);
             foreach (var e in entries)
             {
@@ -349,9 +349,9 @@ namespace xivModdingFramework.Mods.FileTypes
             }
             return ret;
         }
-        public static List<PMPMetaManipulationJson> MetadataToManipulations(ItemMetadata m)
+        public static List<PMPManipulationWrapperJson> MetadataToManipulations(ItemMetadata m)
         {
-            var ret = new List<PMPMetaManipulationJson>();
+            var ret = new List<PMPManipulationWrapperJson>();
             var root = m.Root.Info;
 
             if (m.GmpEntry != null)

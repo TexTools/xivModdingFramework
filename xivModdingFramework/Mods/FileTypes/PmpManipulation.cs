@@ -16,14 +16,14 @@ namespace xivModdingFramework.Mods.FileTypes
     #region Metadata Manipulations
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
-    [JsonSubtypes.FallBackSubType(typeof(PMPUnknownManipulationJson))]
+    [JsonSubtypes.FallBackSubType(typeof(PMPUnknownManipulationWrapperJson))]
     [JsonSubtypes.KnownSubType(typeof(PMPImcManipulationWrapperJson), "Imc")]
     [JsonSubtypes.KnownSubType(typeof(PMPEstManipulationWrapperJson), "Est")]
     [JsonSubtypes.KnownSubType(typeof(PMPEqpManipulationWrapperJson), "Eqp")]
     [JsonSubtypes.KnownSubType(typeof(PMPEqdpManipulationWrapperJson), "Eqdp")]
     [JsonSubtypes.KnownSubType(typeof(PMPGmpManipulationWrapperJson), "Gmp")]
     [JsonSubtypes.KnownSubType(typeof(PMPRspManipulationWrapperJson), "Rsp")]
-    public class PMPMetaManipulationJson
+    public class PMPManipulationWrapperJson
     {
         public string Type;
 
@@ -38,7 +38,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
     }
 
-    public class PMPUnknownManipulationJson : PMPMetaManipulationJson
+    public class PMPUnknownManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public object Manipulation;
         public virtual object GetManipulation()
@@ -51,7 +51,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
     }
 
-    public class PMPImcManipulationWrapperJson : PMPMetaManipulationJson
+    public class PMPImcManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPImcManipulationJson Manipulation;
         public override object GetManipulation()
@@ -63,7 +63,7 @@ namespace xivModdingFramework.Mods.FileTypes
             Manipulation = o as PMPImcManipulationJson;
         }
     }
-    public class PMPEstManipulationWrapperJson : PMPMetaManipulationJson
+    public class PMPEstManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPEstManipulationJson Manipulation;
         public override object GetManipulation()
@@ -75,7 +75,7 @@ namespace xivModdingFramework.Mods.FileTypes
             Manipulation = o as PMPEstManipulationJson;
         }
     }
-    public class PMPEqpManipulationWrapperJson : PMPMetaManipulationJson
+    public class PMPEqpManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPEqpManipulationJson Manipulation;
         public override object GetManipulation()
@@ -87,7 +87,7 @@ namespace xivModdingFramework.Mods.FileTypes
             Manipulation = o as PMPEqpManipulationJson;
         }
     }
-    public class PMPEqdpManipulationWrapperJson : PMPMetaManipulationJson
+    public class PMPEqdpManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPEqdpManipulationJson Manipulation;
         public override object GetManipulation()
@@ -99,7 +99,7 @@ namespace xivModdingFramework.Mods.FileTypes
             Manipulation = o as PMPEqdpManipulationJson;
         }
     }
-    public class PMPGmpManipulationWrapperJson : PMPMetaManipulationJson
+    public class PMPGmpManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPGmpManipulationJson Manipulation;
         public override object GetManipulation()
@@ -111,7 +111,7 @@ namespace xivModdingFramework.Mods.FileTypes
             Manipulation = o as PMPGmpManipulationJson;
         }
     }
-    public class PMPRspManipulationWrapperJson : PMPMetaManipulationJson
+    public class PMPRspManipulationWrapperJson : PMPManipulationWrapperJson
     {
         public PMPRspManipulationJson Manipulation;
     }

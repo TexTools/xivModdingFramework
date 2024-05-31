@@ -468,6 +468,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     await CMP.SaveScalingParameter(rgsp, _Source, tx);
                 }
+
+                // Data we don't know how to import/use, or can't use in TexTools.
+                foreach(var manip in data.OtherManipulations)
+                {
+                    notImported.Add(manip.Type + " Manipulation");
+                }
             }
 
             return (imported, notImported);
@@ -550,7 +556,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Creates a simple single-option PMP from a given dictionary of file information at the target filepath.
         /// </summary>
-        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, bool zip = true)
+        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, bool zip = true)
         {
             if (!destination.ToLower().EndsWith(".pmp") && zip)
             {
@@ -576,7 +582,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos);
 
-                pmp.DefaultMod = await CreatePmpStandardOption(workingPath, "Default", "The only option.", files);
+                pmp.DefaultMod = await CreatePmpStandardOption(workingPath, "Default", "The only option.", files, otherManipulations);
 
                 pmp.Meta.Author = modpackMeta.Author;
                 pmp.Meta.Name = modpackMeta.Name;
@@ -627,7 +633,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
-        public static async Task<PmpStandardOptionJson> CreatePmpStandardOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files)
+        public static async Task<PmpStandardOptionJson> CreatePmpStandardOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, string imagePath = null)
         {
             var opt = new PmpStandardOptionJson()
             {
@@ -635,7 +641,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 Description = description,
                 Files = new Dictionary<string, string>(),
                 FileSwaps = new Dictionary<string, string>(),
-                Manipulations = new List<PMPMetaManipulationJson>(),
+                Manipulations = new List<PMPManipulationWrapperJson>(),
             };
 
             // TODO - Could paralell this? Unsure how big the gains would really be though,
@@ -674,6 +680,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 }
             }
+
+            if (otherManipulations != null)
+            {
+                foreach (var manip in otherManipulations)
+                {
+                    opt.Manipulations.Add(manip);
+                }
+            }
             return opt;
         }
 
@@ -691,6 +705,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Unpacks a PMP into a single dictionary of [File Path] => [File Storage Info]
         /// Only works if the PMP has no options/a single option.
+        /// 
+        /// NOTE - This discards manipulation data that cannot be packed into TT-Usable filetypes.
         /// </summary>
         /// <param name="modpackPath"></param>
         /// <returns></returns>
@@ -726,8 +742,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     return null;
                 }
 
-
-                return await UnpackPmpOption(option, modpackPath, null, tx);
+                // Manipulation which cannot be converted into .meta or .rgsp are discarded here.
+                return (await UnpackPmpOption(option, modpackPath, null, tx)).Files;
             }
             catch (Exception ex)
             {
@@ -739,7 +755,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Unzips and Unpacks a given PMP option into a dictionary of [Internal File Path] => [File Storage Information]
         /// </summary>
-        public static async Task<Dictionary<string, FileStorageInformation>> UnpackPmpOption(PMPOptionJson baseOption, string zipArchivePath = null, string unzipPath = null, ModTransaction tx = null)
+        public static async Task<(Dictionary<string, FileStorageInformation> Files, List<PMPManipulationWrapperJson> OtherManipulations)> UnpackPmpOption(PMPOptionJson baseOption, string zipArchivePath = null, string unzipPath = null, ModTransaction tx = null)
         {
 
             var option = baseOption as PmpStandardOptionJson;
@@ -846,6 +862,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 ret.Add(src, fileInfo);
             }
 
+            List<PMPManipulationWrapperJson> otherManips = null;
             // Metadata files.
             if (option.Manipulations != null && option.Manipulations.Count > 0)
             {
@@ -889,9 +906,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                     ret.Add(path, fileInfo);
                 }
+
+                otherManips = manips.OtherManipulations;
             }
 
-            return ret;
+            return (ret, otherManips);
         }
 
 
@@ -905,18 +924,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <param name="tx"></param>
         /// <param name="imported"></param>
         /// <returns></returns>
-        public static async Task<(List<ItemMetadata> Metadatas, List<RacialGenderScalingParameter> Rgsps)> ManipulationsToMetadata(List<PMPMetaManipulationJson> manipulations, ModTransaction tx, Dictionary<string, TxFileState> imported = null)
+        public static async Task<(List<ItemMetadata> Metadatas, List<RacialGenderScalingParameter> Rgsps, List<PMPManipulationWrapperJson> OtherManipulations)> ManipulationsToMetadata(List<PMPManipulationWrapperJson> manipulations, ModTransaction tx, Dictionary<string, TxFileState> imported = null)
         {
 
             // Setup Metadata.
-            if (manipulations != null || manipulations.Count == 0)
+            if (manipulations == null || manipulations.Count == 0)
             {
-                return (new List<ItemMetadata>(), new List<RacialGenderScalingParameter>());
+                return (new List<ItemMetadata>(), new List<RacialGenderScalingParameter>(), new List<PMPManipulationWrapperJson>());
             }
 
             Dictionary<string, ItemMetadata> seenMetadata = new Dictionary<string, ItemMetadata>();
             Dictionary<uint, RacialGenderScalingParameter> seenRgsps = new Dictionary<uint, RacialGenderScalingParameter>();
-
 
             // RSP Options resolve by race/gender pairing.
             var rspOptions = manipulations.Select(x => x.GetManipulation() as PMPRspManipulationJson).Where(x => x != null);
@@ -967,7 +985,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (!seenMetadata.ContainsKey(path))
                 {
                     // If this our first time seeing this race/gender pairing in this import sequence, use the original game clean version of the file.
-                    if (imported != null)
+                    if (imported == null)
                     {
                         metaData = await ItemMetadata.GetMetadata(path, true, tx);
                     }
@@ -990,7 +1008,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
 
-            return (seenMetadata.Values.ToList(), seenRgsps.Values.ToList());
+            var otherManipulations = manipulations.Where(x =>
+            {
+                var manip = x.GetManipulation();
+                if(manip as IPMPItemMetadata != null)
+                {
+                    return false;
+                }
+                if(manip as PMPRspManipulationJson != null)
+                {
+                    return false;
+                }
+                return true;
+            }).ToList();
+
+
+            return (seenMetadata.Values.ToList(), seenRgsps.Values.ToList(), otherManipulations);
         }
 
     }
@@ -1081,7 +1114,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public Dictionary<string, string> Files;
         public Dictionary<string, string> FileSwaps;
-        public List<PMPMetaManipulationJson> Manipulations;
+        public List<PMPManipulationWrapperJson> Manipulations;
     }
 
     public class PmpDisableImcOptionJson : PMPOptionJson
