@@ -369,7 +369,15 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
 
 
-                    var data = br.ReadBytes(info.FileSize);
+                    byte[] data;
+                    if (info.IsBlob)
+                    {
+                        data = br.ReadBytes(info.FileSize);
+                    } else
+                    {
+                        data = br.ReadAllBytes();
+                    }
+
                     if (!info.IsCompressed)
                     {
                         // This is a bit clunky.  We have to ship this to the smart compressor.
