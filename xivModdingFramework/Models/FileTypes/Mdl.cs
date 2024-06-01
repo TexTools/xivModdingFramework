@@ -5542,12 +5542,6 @@ namespace xivModdingFramework.Models.FileTypes
                 var mergeInRace = IOUtil.GetRaceFromPath(mergeIn);
 
 
-                if (mainRace != mergeInRace)
-                {
-                    // Convert the model to the new race.
-                    ModelModifiers.RaceConvert(mergeInModel, mainRace, mergeIn);
-                    ModelModifiers.FixUpSkinReferences(mergeInModel, mergeIn);
-                }
 
 
                 // Get all variant materials of the mesh we want to merge in.
@@ -5563,34 +5557,17 @@ namespace xivModdingFramework.Models.FileTypes
                 foreach (var material in materialPaths)
                 {
 
-                    // Get the new path.
-                    var path = RootCloner.UpdatePath(mergeInRoot, mainRoot, material);
-
-                    // Adjust race code entries if needed.
-                    if (mainRoot.Info.PrimaryType == XivItemType.equipment || mainRoot.Info.PrimaryType == XivItemType.accessory)
-                    {
-                        path = _raceRegex.Replace(path, "c" + mergeInRace.GetRaceCode());
-                    }
-
-                    // Shenanigans time.  Add a suffix for our source root.
-                    // Not really the right way to do it, but works.
-                    path = path.Replace(".mtrl", "_" + mergeInRoot.Info.GetBaseFileName() + ".mtrl");
-
-                    
-
-
-                    // Get file names.
-                    var io = material.LastIndexOf("/", StringComparison.Ordinal);
-                    var originalMatName = material.Substring(io, material.Length - io);
-
-                    io = path.LastIndexOf("/", StringComparison.Ordinal);
-                    var newMatName = path.Substring(io, path.Length - io);
-
 
                     // Time to copy the materials!
                     try
                     {
                         var mtrl = await Mtrl.GetXivMtrl(material, false, tx);
+                        var newMtrlPath = await mainRoot.Info.GetNextAvailableMaterial(mainRace, 1, null, tx);
+
+                        var oldMat = Path.GetFileName(material);
+                        var newMatName = Path.GetFileName(newMtrlPath);
+
+                        mtrl.MTRLPath = newMtrlPath;
 
                         if (copyTextures == true)
                         {
@@ -5614,26 +5591,23 @@ namespace xivModdingFramework.Models.FileTypes
                                 await Dat.CopyFile(tex, ntex, primaryModel, true, item, tx);
                             }
 
-                            mtrl.MTRLPath = path;
+                            mtrl.MTRLPath = newMtrlPath;
                             allFiles.Add(mtrl.MTRLPath);
                             states.Add(await tx.SaveFileState(mtrl.MTRLPath));
                             await Mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
 
                             if (!validNewMaterials.ContainsKey(newMatName))
                             {
-                                validNewMaterials.Add(newMatName, path);
+                                validNewMaterials.Add(newMatName, newMtrlPath);
                             }
-                            copiedPaths.Add(path);
+                            copiedPaths.Add(newMtrlPath);
                         }
 
 
                         // Switch out any material references to the material in the model file.
                         foreach (var m in mergeInModel.MeshGroups)
                         {
-                            if (m.Material == originalMatName)
-                            {
-                                m.Material = newMatName;
-                            }
+                            m.Material = m.Material.Replace(Path.GetFileName(oldMat), newMatName);
                         }
 
                     }
@@ -5680,6 +5654,12 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
+
+                if (mainRace != mergeInRace)
+                {
+                    // Convert the model to the new race.
+                    ModelModifiers.RaceConvert(mergeInModel, mainRace, mainModel.Source);
+                }
 
                 // Merging the actual models is the simplest part of this whole affair...
                 ModelModifiers.MergeModels(mainModel, mergeInModel);
