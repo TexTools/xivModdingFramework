@@ -5122,8 +5122,17 @@ namespace xivModdingFramework.Models.FileTypes
         #endregion
 
         #region Dawntrail Model Fix
-        public static async Task FixPreDawntrailMdl(string path, string source = "Unknown", ModTransaction tx = null)
+        public static async Task FixPreDawntrailMdl(string path, string source, ModTransaction tx)
         {
+            using (var br = await tx.GetFileStream(path))
+            {
+                var version = br.ReadUInt16();
+                if(version != 5)
+                {
+                    return;
+                }
+            };
+
             // HACKHACK: This is going to be extremely inefficient, but works for the moment.
             var ttMdl = await GetTTModel(path, false, tx);
             var xivMdl = await GetXivMdl(path, false, tx);

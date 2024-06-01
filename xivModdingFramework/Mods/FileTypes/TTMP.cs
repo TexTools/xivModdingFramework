@@ -62,7 +62,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <summary>
         /// Should the Materials/Models be processed for Dawntrail updates?
         /// </summary>
-        public bool UpdateDawntrailMaterials = true;
+        public bool UpdateEndwalkerFiles = true;
 
         /// <summary>
         /// Function that should be called to determine root conversions based on the incoming file paths.
@@ -818,12 +818,12 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     // Fix Pre-Dawntrail files.
-                    if (settings.UpdateDawntrailMaterials)
+                    if (settings.UpdateEndwalkerFiles)
                     {
                         if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
                         {
                             var modPack = filteredModsJson[0].ModPackEntry;
-                            await FixPreDawntrailImports(filePaths, settings.SourceApplication, originalStates, progress, tx);
+                            await UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, progress, tx);
                         }
                     }
 
@@ -891,7 +891,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
 
-        public static async Task FixPreDawntrailImports(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
 #if ENDWALKER
             return;
@@ -1131,9 +1131,10 @@ namespace xivModdingFramework.Mods.FileTypes
                         }
                     }
                 }
-                if (settings.UpdateDawntrailMaterials)
+
+                if (settings.UpdateEndwalkerFiles)
                 {
-                    await FixPreDawntrailImports(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
+                    await UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
                 }
 
 

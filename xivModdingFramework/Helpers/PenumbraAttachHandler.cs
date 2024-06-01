@@ -337,7 +337,7 @@ namespace xivModdingFramework.Helpers
                     AutoAssignSkinMaterials = false,
                     RootConversionFunction = null,
                     SourceApplication = "PenumbraLiveEdit",
-                    UpdateDawntrailMaterials = false,
+                    UpdateEndwalkerFiles = false,
                 };
 
                 await TTMP.ImportFiles(files, null, importSettings, tx);
