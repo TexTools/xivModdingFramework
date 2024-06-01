@@ -11,6 +11,7 @@ using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.Enums;
@@ -119,6 +120,10 @@ namespace xivModdingFramework.General
             return name;
         }
 
+        public static string GetRgspPath(RacialGenderScalingParameter rgsp)
+        {
+            return GetRgspPath(rgsp.Race, rgsp.Gender);
+        }
         public static string GetRgspPath(XivSubRace race, XivGender gender)
         {
             var subraceId = (int)race;
@@ -157,11 +162,17 @@ namespace xivModdingFramework.General
             var bytes = rgsp.GetBytes();
 
 
+            var dummyItem = GetDummyItem(rgsp);
+
+            await Dat.ImportType2Data(bytes, rgspFilePath, sourceApplication, dummyItem , tx);
+        }
+
+        public static IItem GetDummyItem(RacialGenderScalingParameter rgsp)
+        {
             var dummyItem = new XivGenericItemModel();
             dummyItem.Name = rgsp.Race.GetDisplayName() + " - " + rgsp.Gender.ToString();
             dummyItem.SecondaryCategory = "Racial Scaling";
-
-            await Dat.ImportType2Data(bytes, rgspFilePath, sourceApplication, dummyItem , tx);
+            return dummyItem;
         }
 
 

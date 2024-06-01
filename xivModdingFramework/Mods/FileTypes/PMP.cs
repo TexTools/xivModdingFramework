@@ -750,7 +750,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
                 // Manipulation which cannot be converted into .meta or .rgsp are discarded here.
-                return (await UnpackPmpOption(option, modpackPath, null, tx)).Files;
+                return (await UnpackPmpOption(option, modpackPath, null, true, tx)).Files;
             }
             catch (Exception ex)
             {
@@ -762,7 +762,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Unzips and Unpacks a given PMP option into a dictionary of [Internal File Path] => [File Storage Information]
         /// </summary>
-        public static async Task<(Dictionary<string, FileStorageInformation> Files, List<PMPManipulationWrapperJson> OtherManipulations)> UnpackPmpOption(PMPOptionJson baseOption, string zipArchivePath = null, string unzipPath = null, ModTransaction tx = null)
+        public static async Task<(Dictionary<string, FileStorageInformation> Files, List<PMPManipulationWrapperJson> OtherManipulations)> UnpackPmpOption(PMPOptionJson baseOption, string zipArchivePath = null, string unzipPath = null, bool mergeManipulations = true, ModTransaction tx = null)
         {
 
             var option = baseOption as PmpStandardOptionJson;
@@ -873,48 +873,55 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             // Metadata files.
             if (option.Manipulations != null && option.Manipulations.Count > 0)
             {
-                var manips = await ManipulationsToMetadata(option.Manipulations, tx);
-
-                foreach(var meta in manips.Metadatas)
+                if (mergeManipulations)
                 {
-                    var metaPath = meta.Root.Info.GetRootFile();
+                    var manips = await ManipulationsToMetadata(option.Manipulations, tx);
 
-                    // These are a bit weird, and basically have to be written to disk or some kind of memory store.
-                    var data = await ItemMetadata.Serialize(meta);
-                    var tempFilePath = Path.GetTempFileName();
-                    File.WriteAllBytes(tempFilePath, data);
-
-                    var fileInfo = new FileStorageInformation()
+                    foreach (var meta in manips.Metadatas)
                     {
-                        FileSize = data.Length,
-                        StorageType = EFileStorageType.UncompressedIndividual,
-                        RealPath = tempFilePath,
-                        RealOffset = 0,
-                    };
+                        var metaPath = meta.Root.Info.GetRootFile();
 
-                    ret.Add(metaPath, fileInfo);
+                        // These are a bit weird, and basically have to be written to disk or some kind of memory store.
+                        var data = await ItemMetadata.Serialize(meta);
+                        var tempFilePath = Path.GetTempFileName();
+                        File.WriteAllBytes(tempFilePath, data);
+
+                        var fileInfo = new FileStorageInformation()
+                        {
+                            FileSize = data.Length,
+                            StorageType = EFileStorageType.UncompressedIndividual,
+                            RealPath = tempFilePath,
+                            RealOffset = 0,
+                        };
+
+                        ret.Add(metaPath, fileInfo);
+                    }
+
+                    foreach (var rgsp in manips.Rgsps)
+                    {
+                        var path = CMP.GetRgspPath(rgsp.Race, rgsp.Gender);
+                        // These are a bit weird, and basically have to be written to disk or some kind of memory store.
+                        var data = rgsp.GetBytes();
+                        var tempFilePath = Path.GetTempFileName();
+                        File.WriteAllBytes(tempFilePath, data);
+
+                        var fileInfo = new FileStorageInformation()
+                        {
+                            FileSize = data.Length,
+                            StorageType = EFileStorageType.UncompressedIndividual,
+                            RealPath = tempFilePath,
+                            RealOffset = 0,
+                        };
+
+                        ret.Add(path, fileInfo);
+                    }
+
+                    otherManips = manips.OtherManipulations;
+                } else
+                {
+                    otherManips = option.Manipulations;
                 }
 
-                foreach(var rgsp in manips.Rgsps)
-                {
-                    var path = CMP.GetRgspPath(rgsp.Race, rgsp.Gender);
-                    // These are a bit weird, and basically have to be written to disk or some kind of memory store.
-                    var data = rgsp.GetBytes();
-                    var tempFilePath = Path.GetTempFileName();
-                    File.WriteAllBytes(tempFilePath, data);
-
-                    var fileInfo = new FileStorageInformation()
-                    {
-                        FileSize = data.Length,
-                        StorageType = EFileStorageType.UncompressedIndividual,
-                        RealPath = tempFilePath,
-                        RealOffset = 0,
-                    };
-
-                    ret.Add(path, fileInfo);
-                }
-
-                otherManips = manips.OtherManipulations;
             }
 
             return (ret, otherManips);
