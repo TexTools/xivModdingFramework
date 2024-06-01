@@ -1911,7 +1911,7 @@ namespace xivModdingFramework.Models.FileTypes
                     // External Importer converts the file to .db format.
                     var dbFile = await RunExternalImporter(suffix, externalPath, loggingFunction);
                     loggingFunction(false, "Loading intermediate file...");
-                    ttModel = TTModel.LoadFromFile(dbFile, loggingFunction);
+                    ttModel = TTModel.LoadFromFile(dbFile, loggingFunction, options);
                 }
                 #endregion
 

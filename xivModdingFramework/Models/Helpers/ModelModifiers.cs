@@ -115,11 +115,6 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.MergeMaterialData(ttModel, currentMdl, LoggingFunction);
             }
 
-            if (ForceUVQuadrant)
-            {
-                ModelModifiers.ForceUVQuadrant(ttModel, LoggingFunction);
-            }
-
             if (ClearUV2)
             {
                 ModelModifiers.ClearUV2(ttModel, LoggingFunction);
@@ -818,8 +813,6 @@ namespace xivModdingFramework.Models.Helpers
                 loggingFunction = NoOp;
             }
 
-            MakeExportReady(model, loggingFunction);
-
             loggingFunction(false, "Forcing UV1 to [1,-1]...");
             foreach(var m in model.MeshGroups)
             {
@@ -880,7 +873,6 @@ namespace xivModdingFramework.Models.Helpers
                     }
                 }
             }
-            MakeImportReady(model, loggingFunction);
 
         }
 
@@ -1520,7 +1512,6 @@ namespace xivModdingFramework.Models.Helpers
             }
             if (model == null) return;
 
-            loggingFunction(false, "Calculating Tangents...");
             var hasTangents = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Tangent != Vector3.Zero)));
             var hasBinormals = model.MeshGroups.Any(x => x.Parts.Any(x => x.Vertices.Any(x => x.Binormal != Vector3.Zero)));
 
@@ -1529,6 +1520,7 @@ namespace xivModdingFramework.Models.Helpers
                 // Why are we here?  Go away.
                 return;
             }
+            loggingFunction(false, "Calculating Tangents...");
 
             var resetShapes = new List<string>();
             if(model.ActiveShapes.Count != 0)

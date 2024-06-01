@@ -1305,7 +1305,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFunction = null)
+        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFunction = null, ModelImportOptions settings = null)
         {
             if (loggingFunction == null)
             {
@@ -1545,6 +1545,10 @@ namespace xivModdingFramework.Models.DataContainers
             }
 
 
+            if(settings != null && settings.ForceUVQuadrant)
+            {
+                ModelModifiers.ForceUVQuadrant(model, loggingFunction);
+            }
 
             // Convert the model to FFXIV's internal weirdness.
             ModelModifiers.MakeImportReady(model, loggingFunction);
