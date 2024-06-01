@@ -268,6 +268,10 @@ namespace xivModdingFramework.Mods.DataContainers
 
         public ModPack? GetModPack(string modpackName)
         {
+            if(modpackName == null)
+            {
+                return null;
+            }
             ModPack? modpack = _ModPacks.ContainsKey(modpackName) ? _ModPacks[modpackName] : null;
             return modpack;
         }

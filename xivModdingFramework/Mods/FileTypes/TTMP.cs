@@ -366,6 +366,11 @@ namespace xivModdingFramework.Mods.FileTypes
         /// <returns></returns>
         public static async Task<ModPackJson> GetModpackList(string path)
         {
+            if(Path.GetExtension(path).ToLower() == ".ttmp")
+            {
+                return await GetLegacyModpackMpl(path);
+            }
+
             return await Task.Run(() =>
             {
                 ModPackJson modPackJson = null;
@@ -384,126 +389,23 @@ namespace xivModdingFramework.Mods.FileTypes
             });
         }
 
-        public static async Task<string> UnzipTtmp(string path, string targetPath = null)
-        {
-            return await Task.Run(() =>
-            {
-                if (targetPath == null)
-                {
-                    targetPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                }
-                using (var zf = ZipFile.Read(path))
-                {
-                    Directory.CreateDirectory(targetPath);
-                    zf.ExtractAll(targetPath);
-                }
-
-                return targetPath;
-            });
-        }
-
-
-        /// <summary>
-        /// Unzips the images from a zip/modpack file, unloading them into a temporary directory and returning the path.
-        /// File paths match their modpack path structure.
-        /// </summary>
-        /// <returns></returns>
-        public static async Task<string> GetModpackImages(string path)
-        {
-            return await Task.Run(() =>
-            {
-                var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                using (var zf = ZipFile.Read(path))
-                {
-                    Directory.CreateDirectory(tempFolder);
-                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.EndsWith(".jpg") || x.FileName.EndsWith(".bmp") || x.FileName.EndsWith(".jpeg") || x.FileName.EndsWith(".gif") || x.FileName.StartsWith("images/"));
-                    foreach(var image in images)
-                    {
-                        image.Extract(tempFolder);
-                    }
-                }
-
-                return tempFolder;
-            });
-        }
-
-        /// <summary>
-        /// LEGACY: Only used by the Create Modpack Wizard in TT, which should be reworked to not rely on these pre-read image files.
-        /// Gets the data from a mod pack including images if present
-        /// </summary>
-        /// <param name="modPackDirectory">The directory of the mod pack</param>
-        /// <returns>A tuple containing the mod pack json data and a dictionary of images if any</returns>
-        public static Task<(ModPackJson ModPackJson, Dictionary<string, Image> ImageDictionary)> LEGACY_GetModPackJsonData(DirectoryInfo modPackDirectory)
-        {
-            return Task.Run(() =>
-            {
-                ModPackJson modPackJson = null;
-                var imageDictionary = new Dictionary<string, Image>();
-
-                using (var zf = ZipFile.Read(modPackDirectory.FullName))
-                {
-                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.StartsWith("images/"));
-                    var mpl = zf.Entries.First(x => x.FileName.EndsWith(".mpl"));
-
-                    using (var streamReader = new StreamReader(mpl.OpenReader()))
-                    {
-                        var jsonString = streamReader.ReadToEnd();
-
-                        modPackJson = JsonConvert.DeserializeObject<ModPackJson>(jsonString);
-                    }
-
-                    foreach(var imgEntry in images)
-                    {
-                        imageDictionary.Add(imgEntry.FileName, Image.Load(imgEntry.OpenReader()));
-                    }
-                }
-
-                return (modPackJson, imageDictionary);
-            });
-        }
-
-        public static Task<byte[]> GetModPackData(DirectoryInfo modPackDirectory)
-        {
-            return Task.Run(() =>
-            {
-                using (var zf = ZipFile.Read(modPackDirectory.FullName))
-                {
-                    var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
-
-                    using (var ms = new MemoryStream())
-                    {
-                        mpd.Extract(ms);
-                        return ms.ToArray();
-                    }
-                }
-                //using (var stream = new ZipInputStream(modPackDirectory.FullName))
-                //{
-                //    while (stream.GetNextEntry() is var entry)
-                //    {
-                //        if (entry.FileName.EndsWith(".mpd"))
-                //        {
-                //            stream.Read(buffer, 0, modJson.ModSize);
-                //            stream.Read(buffer, 0, modJson.ModSize);
-                //            stream.Read(buffer, 0, modJson.ModSize);
-                //            break;
-                //        }
-                //    }
-                //};
-            });
-        }
-
         /// <summary>
         /// Gets the data from first generation mod packs
         /// </summary>
         /// <param name="modPackDirectory">The directory of the mod pack</param>
         /// <returns>A list containing original mod pack json data</returns>
-        public static Task<List<OriginalModPackJson>> GetOriginalModPackJsonData(DirectoryInfo modPackDirectory)
+        public static async Task<ModPackJson> GetLegacyModpackMpl(string modpackPath)
         {
-            return Task.Run(() =>
+            if (!modpackPath.ToLower().EndsWith(".ttmp"))
+            {
+                throw new InvalidDataException("Legacy modpack must be .ttmp extension");
+            }
+
+            var originalJson = await Task.Run(() =>
             {
                 var modPackJsonList = new List<OriginalModPackJson>();
 
-                using (var archive = System.IO.Compression.ZipFile.OpenRead(modPackDirectory.FullName))
+                using (var archive = System.IO.Compression.ZipFile.OpenRead(modpackPath))
                 {
                     foreach (var entry in archive.Entries)
                     {
@@ -535,6 +437,120 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
                 return modPackJsonList;
+            });
+
+            var mpj = new ModPackJson()
+            {
+                Author = "Unknown",
+                Description = "",
+                Name = Path.GetFileNameWithoutExtension(modpackPath),
+                Version = "1.0",
+                TTMPVersion = "0.1s",
+                Url = "",
+                SimpleModsList = new List<ModsJson>()
+            };
+
+            foreach (var entry in originalJson)
+            {
+                var mj = new ModsJson();
+                mj.FullPath = entry.FullPath;
+                mj.DatFile = entry.DatFile;
+                mj.Name = entry.Name;
+                mj.Category = entry.Category;
+                mj.ModSize = entry.ModSize;
+                mj.ModOffset = entry.ModOffset;
+                mpj.SimpleModsList.Add(mj);
+            }
+
+            return mpj;
+        }
+
+
+        /// <summary>
+        /// Basic TTMP Unzip.
+        /// If a custom MPD name is set, only the MPD is unzipped.
+        /// Returns the folder the files were unzipped to.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="targetPath"></param>
+        /// <param name="mpdName"></param>
+        /// <returns></returns>
+        public static async Task<string> UnzipTtmp(string path, string targetPath = null, string mpdName = null)
+        {
+            return await Task.Run(() =>
+            {
+                if (targetPath == null)
+                {
+                    targetPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                }
+
+                Directory.CreateDirectory(targetPath);
+
+                if (mpdName == null)
+                {
+                    using (var zf = ZipFile.Read(path))
+                    {
+                        zf.ExtractAll(targetPath);
+                    }
+                }
+                else
+                {
+                    using (var zf = ZipFile.Read(path))
+                    {
+                        foreach (var f in zf.Entries)
+                        {
+                            if (f.FileName.ToLower().EndsWith(".mpd"))
+                            {
+                                using var fs = File.OpenWrite(Path.Combine(targetPath, mpdName));
+                                f.Extract(fs);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                return targetPath;
+            });
+        }
+
+
+        /// <summary>
+        /// Unzips the images from a zip/modpack file, unloading them into a temporary directory and returning the path.
+        /// File paths match their modpack path structure.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<string> GetModpackImages(string path)
+        {
+            return await Task.Run(() =>
+            {
+                var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                using (var zf = ZipFile.Read(path))
+                {
+                    Directory.CreateDirectory(tempFolder);
+                    var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.EndsWith(".jpg") || x.FileName.EndsWith(".bmp") || x.FileName.EndsWith(".jpeg") || x.FileName.EndsWith(".gif") || x.FileName.StartsWith("images/"));
+                    foreach(var image in images)
+                    {
+                        image.Extract(tempFolder);
+                    }
+                }
+
+                return tempFolder;
+            });
+        }
+        public static Task<byte[]> GetModPackData(DirectoryInfo modPackDirectory)
+        {
+            return Task.Run(() =>
+            {
+                using (var zf = ZipFile.Read(modPackDirectory.FullName))
+                {
+                    var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
+
+                    using (var ms = new MemoryStream())
+                    {
+                        mpd.Extract(ms);
+                        return ms.ToArray();
+                    }
+                }
             });
         }
 
@@ -652,7 +668,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
 
 
-                    var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
+                    var needsTexFix = DoesModpackNeedTexFix(new DirectoryInfo(modpackPath));
                     var count = 0;
                     var modList = await tx.GetModList();
 
@@ -661,18 +677,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // First, unzip the TTMP into our transaction data store folder.
                     var txSTorePath = tx.UNSAFE_GetTransactionStore();
-                    using (var zf = ZipFile.Read(modpackPath))
-                    {
-                        progress.Report((0, 0, "Unzipping TTMP File to Transaction Data Store..."));
-                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
 
-                        _tempMPD = Path.Combine(txSTorePath, Guid.NewGuid().ToString());
-
-                        using (var fs = new FileStream(_tempMPD, FileMode.Create))
-                        {
-                            mpd.Extract(fs);
-                        }
-                    }
+                    var mpdName = Guid.NewGuid().ToString() + ".mpd";
+                    await UnzipTtmp(modpackPath, txSTorePath, mpdName);
+                    _tempMPD = Path.Combine(txSTorePath, mpdName);
 
                     // Now, we need to rip the offsets, and generate Transaction data store file handles for them.
                     var tempOffsets = new Dictionary<string, long>();
@@ -857,11 +865,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
         /// <summary>
         /// Parse the version out of this modpack to determine whether or not we need
-        /// to add 80 to the uncompressed size of the Tex files contained within.
+        /// to recalculate and correct the compressed type 4 file sizes.
         /// </summary>
         /// <param name="mpd">The path to the modpack.</param>
         /// <returns>True if we must modify tex header uncompressed sizes, false otherwise.</returns>
-        private static bool DoesTexNeedFixing(DirectoryInfo mpd) {
+        private static bool DoesModpackNeedTexFix(DirectoryInfo mpd) {
 
 	        var ver = GetVersion(mpd);
 	        if (string.IsNullOrEmpty(ver))
@@ -875,7 +883,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
 	        double.TryParse(newVer, out var verDouble);
 
-	        return verDouble < 1.3;
+	        return verDouble < 2.0;
         }
 
         /// <summary>
@@ -988,7 +996,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var modpack = new ModPack();
             var description = "";
-            if (modpackFile.EndsWith(".ttmp2")) {
+            if (modpackFile.EndsWith(".ttmp2") || modpackFile.EndsWith(".ttmp")) {
                 var mpl = await GetModpackList(modpackFile);
                 modpack.Author = mpl.Author;
                 modpack.Name = mpl.Name;
@@ -1180,7 +1188,7 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 return await PMP.PMP.UnpackPMP(modpackPath, includeData, tx);
             }
-            if (!modpackPath.EndsWith(".ttmp2"))
+            if (!modpackPath.EndsWith(".ttmp2") && !modpackPath.EndsWith(".ttmp"))
             {
                 throw new InvalidDataException("File must be .TTMP2 or .PMP");
             }
@@ -1205,11 +1213,11 @@ namespace xivModdingFramework.Mods.FileTypes
         private static async Task<Dictionary<string, FileStorageInformation>> UnpackSimpleModlist(string modpackPath, ModPackJson mpl, bool includeData = true, ModTransaction tx = null)
         {
             // Wrapped to task since we're going to be potentially unzipping a large file.
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
 
                 var _tempMPD = "";
-                var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
+                var needsTexFix = DoesModpackNeedTexFix(new DirectoryInfo(modpackPath));
                 if (includeData)
                 {
                     string tempFolder;
@@ -1224,16 +1232,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
 
                     // First, unzip the TTMP into our transaction data store folder.
-                    using (var zf = ZipFile.Read(modpackPath))
-                    {
-                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
-                        _tempMPD = Path.Combine(tempFolder, Guid.NewGuid().ToString());
-
-                        using (var fs = new FileStream(_tempMPD, FileMode.Create))
-                        {
-                            mpd.Extract(fs);
-                        }
-                    }
+                    var mpdName = Guid.NewGuid().ToString() + ".mpd";
+                    await UnzipTtmp(modpackPath, tempFolder, mpdName);
+                    _tempMPD = Path.Combine(tempFolder, mpdName);
                 }
 
                 return MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, needsTexFix, includeData);
@@ -1264,7 +1265,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
 
                 var _tempMPD = "";
-                var needsTexFix = DoesTexNeedFixing(new DirectoryInfo(modpackPath));
+                var needsTexFix = DoesModpackNeedTexFix(new DirectoryInfo(modpackPath));
                 if (includeData)
                 {
                     string tempFolder;

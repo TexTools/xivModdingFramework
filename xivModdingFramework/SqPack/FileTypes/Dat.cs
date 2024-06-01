@@ -764,24 +764,35 @@ namespace xivModdingFramework.SqPack.FileTypes
             var indexBufferRealSizes = new uint[_VertexSegments];
 
             // Vertex and Model Headers
-            var vInfoRealSize = await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
-            decompOffset += vInfoRealSize;
-            var mInfoRealSize = await CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
-            decompOffset += mInfoRealSize;
+            var res = await CompleteReadCompressedBlocks(vertexInfoData, decompressedData, decompOffset);
+            decompressedData = res.Buffer;
+            decompOffset += res.BytesWritten;
+            var vInfoRealSize = res.BytesWritten;
+
+            res = await CompleteReadCompressedBlocks(modelInfoData, decompressedData, decompOffset);
+            decompressedData = res.Buffer;
+            decompOffset += res.BytesWritten;
+            var mInfoRealSize = res.BytesWritten;
 
             for (int i = 0; i < _VertexSegments; i++)
             {
                 // Geometry data in LoD order.
                 // Mark the real uncompressed offsets and sizes on the way through.
                 vertexBufferUncompressedOffsets[i] = (uint)decompOffset;
-                vertexBufferRealSizes[i] = (uint)await CompleteReadCompressedBlocks(vertexBuffers[i], decompressedData, decompOffset);
-                decompOffset += (int)vertexBufferRealSizes[i];
+                res = await CompleteReadCompressedBlocks(vertexBuffers[i], decompressedData, decompOffset);
+                decompressedData = res.Buffer;
+                decompOffset += res.BytesWritten;
+                vertexBufferRealSizes[i] = (uint)res.BytesWritten;
 
-                decompOffset += await CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
+                res = await CompleteReadCompressedBlocks(edgeBuffers[i], decompressedData, decompOffset);
+                decompressedData = res.Buffer;
+                decompOffset += res.BytesWritten;
 
                 indexBufferUncompressedOffsets[i] = (uint)decompOffset;
-                indexBufferRealSizes[i] = (uint)await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
-                decompOffset += (int)indexBufferRealSizes[i];
+                res = await CompleteReadCompressedBlocks(indexBuffers[i], decompressedData, decompOffset);
+                decompressedData = res.Buffer;
+                decompOffset += res.BytesWritten;
+                indexBufferRealSizes[i] = (uint)res.BytesWritten;
             }
 
             var header = new List<byte>(baseHeaderLength);
@@ -876,7 +887,9 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             for (int i = 0; i < mipCount; i++)
             {
-                decompOffset += await CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
+                var res = await CompleteReadCompressedBlocks(mipData[i], decompressedData, decompOffset);
+                decompOffset += res.BytesWritten;
+                decompressedData = res.Buffer;
             }
 
             byte[] finalbytes = new byte[texHeader.Length + decompressedData.Length];
@@ -2338,18 +2351,27 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         // Completes all provided tasks from BeginReadCompressedBlocks and writes them sequentially in to destBuffer
         // Returns the number of bytes written in to destBuffer
-        public static async Task<int> CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
+        public static async Task<(int BytesWritten, byte[] Buffer)> CompleteReadCompressedBlocks(List<Task<byte[]>> tasks, byte[] destBuffer, int destOffset)
         {
+            
             int currentOffset = destOffset;
             foreach (var task in tasks)
             {
                 await task;
                 var result = task.Result;
+
+                if(currentOffset + result.Length >= destBuffer.Length)
+                {
+                    var newSize = currentOffset + result.Length;
+                    var newArray = new byte[newSize];
+                    Array.Copy(destBuffer, 0, newArray, 0, destBuffer.Length);
+                    destBuffer = newArray;
+                }
                 result.CopyTo(destBuffer, currentOffset);
                 currentOffset += result.Length;
             }
-
-            return currentOffset - destOffset;
+            var written = currentOffset - destOffset;
+            return (written, destBuffer);
         }
 
         public static async Task<byte[]> ReadCompressedBlock(BinaryReader br, long offset = -1)
