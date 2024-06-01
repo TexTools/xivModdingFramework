@@ -1067,6 +1067,10 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<bool> FileExists(string path, bool forceOriginal = false)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
             var offset = await Get8xDataOffset(path, forceOriginal);
             return offset != 0;
         }

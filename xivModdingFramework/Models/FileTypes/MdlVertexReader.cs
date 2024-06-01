@@ -24,8 +24,6 @@ namespace xivModdingFramework.Models.FileTypes
             var block1Offset = meshData.MeshInfo.VertexDataOffset1 + lodVertexOffset;
             var indexOffset = (meshData.MeshInfo.IndexDataOffset * 2) + lodIndexOffset;
 
-
-
             br.BaseStream.Seek(block0Offset, SeekOrigin.Begin);
             var block0Sorted = info.Where(x => x.DataBlock == 0).OrderBy(x => x.DataOffset);
             for(int i = 0; i < vertexCount; i++)
@@ -38,7 +36,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if(br.BaseStream.Position != block0Offset + (vertexCount * meshData.MeshInfo.VertexDataEntrySize0))
             {
-                throw new InvalidDataException("Vertex Size Mismatch.  Some part(s) of the vertex data stream 0 were not read properly.");
+                throw new InvalidDataException("Vertex Data Size Mismatch. Some part(s) of the vertex data in stream 0 were not read properly.");
             }
 
             br.BaseStream.Seek(block1Offset, SeekOrigin.Begin);
@@ -53,7 +51,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (br.BaseStream.Position != block1Offset + (vertexCount * meshData.MeshInfo.VertexDataEntrySize1))
             {
-                throw new InvalidDataException("Vertex Size Mismatch.  Some part(s) of the vertex data stream 1 were not read properly.");
+                throw new InvalidDataException("Vertex Data Size Mismatch. Some part(s) of the vertex data in stream 1 were not read properly.");
             }
 
             br.BaseStream.Seek(indexOffset, SeekOrigin.Begin);
@@ -64,10 +62,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (br.BaseStream.Position != indexOffset + (indexCount * 2))
             {
-                throw new InvalidDataException("Index Size Mismatch.  Some part(s) of the index data were not read properly.");
+                throw new InvalidDataException("Index Size Mismatch. Some part(s) of the index data were not read properly.");
             }
-
-
 
             meshData.VertexData = vertexData;
         }

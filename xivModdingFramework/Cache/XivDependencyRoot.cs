@@ -214,7 +214,7 @@ namespace xivModdingFramework.Cache
                 || PrimaryType == XivItemType.outdoor
                 || PrimaryType == XivItemType.painting)
             {
-                throw new InvalidDataException("Model Path cannot be pre-calculated for SGB-using assets.");
+                return "";
             }
 
             var basePath = GetRootFolder();
