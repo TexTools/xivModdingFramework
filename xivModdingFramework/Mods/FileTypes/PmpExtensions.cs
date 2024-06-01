@@ -225,7 +225,13 @@ namespace xivModdingFramework.Mods.FileTypes
                 info.SecondaryType = XivItemTypes.FromSystemName(bodySlot.ToString().ToLower());
             }
 
-            info.Slot = PenumbraSlotToGameSlot[slot];
+            if (PenumbraSlotToGameSlot.ContainsKey(slot))
+            {
+                info.Slot = PenumbraSlotToGameSlot[slot];
+            } else
+            {
+                info.Slot = null;
+            }
 
 
             return info;
@@ -248,6 +254,20 @@ namespace xivModdingFramework.Mods.FileTypes
             { PMPEquipSlot.RFinger, "rir" },
             { PMPEquipSlot.LFinger, "ril" },
         };
+        // We only really care about the ones used in IMC entries here.
+        public static bool IsAccessory(PMPEquipSlot slot)
+        {
+            if(slot == PMPEquipSlot.Ears
+                || slot == PMPEquipSlot.Neck
+                || slot == PMPEquipSlot.Wrists
+                || slot == PMPEquipSlot.RFinger
+                || slot == PMPEquipSlot.LFinger
+                )
+            {
+                return true;
+            }
+            return false;
+        }
 
         public static XivRace GetRaceFromPenumbraValue(PMPModelRace race, PMPGender gender)
         {

@@ -1067,6 +1067,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Description;
         public int Priority;
         public string Image;
+        public int Page;
 
         // "Multi" or "Single"
         public string Type;
@@ -1084,7 +1085,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public PmpIdentifierJson Identifier;
-        public int Page;
 
         public XivDependencyRoot GetRoot()
         {

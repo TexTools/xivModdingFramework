@@ -347,7 +347,9 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public XivDependencyRoot GetRoot()
         {
-            var root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, Slot);
+            var isAccessory = PMPExtensions.IsAccessory(Slot);
+            var type = isAccessory ? PMPObjectType.Accessory : PMPObjectType.Equipment;
+            var root = PMPExtensions.GetRootFromPenumbraValues(type, SetId, PMPObjectType.Unknown, 0, Slot);
             return new XivDependencyRoot(root);
         }
         public void ApplyToMetadata(ItemMetadata metadata)
