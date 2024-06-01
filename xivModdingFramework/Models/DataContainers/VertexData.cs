@@ -28,7 +28,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The vertex position data in Vector3 format (X, Y, Z)
         /// </summary>
-        public Vector3Collection Positions { get; set; }
+        public Vector3Collection Positions { get; set; } = new Vector3Collection();
 
         /// <summary>
         /// The bone weight array per vertex
@@ -36,7 +36,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// Each vertex can hold a maximum of 4 bone weights
         /// </remarks>
-        public List<float[]> BoneWeights { get; set; }
+        public List<float[]> BoneWeights { get; set; } = new List<float[]>();
 
         /// <summary>
         /// The bone index array per vertex
@@ -44,7 +44,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// Each vertex can hold a maximum of 4 bone indices
         /// </remarks>
-        public List<byte[]> BoneIndices { get; set; }
+        public List<byte[]> BoneIndices { get; set; } = new List<byte[]>();
 
         /// <summary>
         /// The vertex normal data in Vector4 format (X, Y, Z, W)
@@ -52,51 +52,52 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// The W coordinate is present but has never been noticed to be anything other than 0
         /// </remarks>
-        public Vector3Collection Normals { get; set; }
+        public Vector3Collection Normals { get; set; } = new Vector3Collection();
 
         /// <summary>
         /// The vertex BiNormal data in Vector3 format (X, Y, Z)
         /// </summary>
-        public Vector3Collection BiNormals { get; set; }
+        public Vector3Collection BiNormals { get; set; } = new Vector3Collection();
 
         /// <summary>
         /// The vertex BiNormal Handedness data in bytes
         /// </summary>
-        public List<byte> BiNormalHandedness { get; set; }
+        public List<byte> BiNormalHandedness { get; set; } = new List<byte>();
 
         /// <summary>
         /// The vertex Tangent data in Vector3 format (X, Y, Z)
         /// </summary>
-        public Vector3Collection Tangents { get; set; }
+        public Vector3Collection Tangents { get; set; } = new Vector3Collection();
+
+        /// <summary>
+        /// The vertex BiNormal Handedness data in bytes
+        /// </summary>
+        public List<byte> TangentHandedness { get; set; } = new List<byte>();
 
         /// <summary>
         /// The vertex color data in Byte4 format (R, G, B, A)
         /// </summary>
-        public List<Color> Colors { get; set; }
+        public List<Color> Colors { get; set; } = new List<Color>();
 
         /// <summary>
         /// Second Vertex Color Channel
         /// </summary>
-        public List<Color> Colors2 { get; set; }
+        public List<Color> Colors2 { get; set; } = new List<Color>();
 
-        /// <summary>
-        /// The vertex color data in Color4 format
-        /// </summary>
-        public Color4Collection Colors4 { get; set; }
 
         /// <summary>
         /// The primary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
-        public Vector2Collection TextureCoordinates0 { get; set; }
+        public Vector2Collection TextureCoordinates0 { get; set; } = new Vector2Collection();
 
         /// <summary>
         /// The secondary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
-        public Vector2Collection TextureCoordinates1 { get; set; }
+        public Vector2Collection TextureCoordinates1 { get; set; } = new Vector2Collection();
 
         /// <summary>
         /// The index data for the mesh
         /// </summary>
-        public IntCollection Indices { get; set; }
+        public IntCollection Indices { get; set; } = new IntCollection();
     }
 }
